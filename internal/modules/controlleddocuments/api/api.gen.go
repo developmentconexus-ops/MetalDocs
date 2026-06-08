@@ -232,11 +232,26 @@ type RevisionResponse struct {
 	Document DocumentRef `json:"document"`
 }
 
+// BadRequest defines model for BadRequest.
+type BadRequest = Problem
+
 // Conflict defines model for Conflict.
 type Conflict = Problem
 
+// Forbidden defines model for Forbidden.
+type Forbidden = Problem
+
 // InternalServerError defines model for InternalServerError.
 type InternalServerError = Problem
+
+// NotFound defines model for NotFound.
+type NotFound = Problem
+
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = Problem
+
+// UnprocessableEntity defines model for UnprocessableEntity.
+type UnprocessableEntity = Problem
 
 // sessionCookieContextKey is the context key for sessionCookie security scheme
 type sessionCookieContextKey string
@@ -868,9 +883,19 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	return m
 }
 
+type BadRequestApplicationProblemPlusJSONResponse Problem
+
 type ConflictApplicationProblemPlusJSONResponse Problem
 
+type ForbiddenApplicationProblemPlusJSONResponse Problem
+
 type InternalServerErrorApplicationProblemPlusJSONResponse Problem
+
+type NotFoundApplicationProblemPlusJSONResponse Problem
+
+type UnauthorizedApplicationProblemPlusJSONResponse Problem
+
+type UnprocessableEntityApplicationProblemPlusJSONResponse Problem
 
 type ListControlledDocumentsRequestObject struct {
 	Params ListControlledDocumentsParams
@@ -896,28 +921,68 @@ func (response ListControlledDocuments200JSONResponse) VisitListControlledDocume
 	return err
 }
 
-type ListControlledDocuments400Response struct {
+type ListControlledDocuments400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ListControlledDocuments400Response) VisitListControlledDocumentsResponse(w http.ResponseWriter) error {
+func (response ListControlledDocuments400ApplicationProblemPlusJSONResponse) VisitListControlledDocumentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(400)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type ListControlledDocuments401Response struct {
+type ListControlledDocuments401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
 }
 
-func (response ListControlledDocuments401Response) VisitListControlledDocumentsResponse(w http.ResponseWriter) error {
+func (response ListControlledDocuments401ApplicationProblemPlusJSONResponse) VisitListControlledDocumentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type ListControlledDocuments403Response struct {
+type ListControlledDocuments403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
 }
 
-func (response ListControlledDocuments403Response) VisitListControlledDocumentsResponse(w http.ResponseWriter) error {
+func (response ListControlledDocuments403ApplicationProblemPlusJSONResponse) VisitListControlledDocumentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(403)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListControlledDocuments500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListControlledDocuments500ApplicationProblemPlusJSONResponse) VisitListControlledDocumentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type AtomicCreateControlledDocumentRequestObject struct {
@@ -943,20 +1008,52 @@ func (response AtomicCreateControlledDocument201JSONResponse) VisitAtomicCreateC
 	return err
 }
 
-type AtomicCreateControlledDocument400Response struct {
+type AtomicCreateControlledDocument400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response AtomicCreateControlledDocument400Response) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
+func (response AtomicCreateControlledDocument400ApplicationProblemPlusJSONResponse) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(400)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type AtomicCreateControlledDocument401Response struct {
+type AtomicCreateControlledDocument401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
 }
 
-func (response AtomicCreateControlledDocument401Response) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
+func (response AtomicCreateControlledDocument401ApplicationProblemPlusJSONResponse) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AtomicCreateControlledDocument403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AtomicCreateControlledDocument403ApplicationProblemPlusJSONResponse) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type AtomicCreateControlledDocument409ApplicationProblemPlusJSONResponse struct {
@@ -975,12 +1072,20 @@ func (response AtomicCreateControlledDocument409ApplicationProblemPlusJSONRespon
 	return err
 }
 
-type AtomicCreateControlledDocument422Response struct {
+type AtomicCreateControlledDocument422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
 }
 
-func (response AtomicCreateControlledDocument422Response) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
+func (response AtomicCreateControlledDocument422ApplicationProblemPlusJSONResponse) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type AtomicCreateControlledDocument500ApplicationProblemPlusJSONResponse struct {
@@ -1021,20 +1126,68 @@ func (response PreviewControlledDocumentCode200JSONResponse) VisitPreviewControl
 	return err
 }
 
-type PreviewControlledDocumentCode400Response struct {
+type PreviewControlledDocumentCode400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response PreviewControlledDocumentCode400Response) VisitPreviewControlledDocumentCodeResponse(w http.ResponseWriter) error {
+func (response PreviewControlledDocumentCode400ApplicationProblemPlusJSONResponse) VisitPreviewControlledDocumentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(400)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type PreviewControlledDocumentCode401Response struct {
+type PreviewControlledDocumentCode401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
 }
 
-func (response PreviewControlledDocumentCode401Response) VisitPreviewControlledDocumentCodeResponse(w http.ResponseWriter) error {
+func (response PreviewControlledDocumentCode401ApplicationProblemPlusJSONResponse) VisitPreviewControlledDocumentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewControlledDocumentCode403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewControlledDocumentCode403ApplicationProblemPlusJSONResponse) VisitPreviewControlledDocumentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PreviewControlledDocumentCode500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response PreviewControlledDocumentCode500ApplicationProblemPlusJSONResponse) VisitPreviewControlledDocumentCodeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetControlledDocumentRequestObject struct {
@@ -1059,20 +1212,68 @@ func (response GetControlledDocument200JSONResponse) VisitGetControlledDocumentR
 	return err
 }
 
-type GetControlledDocument401Response struct {
+type GetControlledDocument401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
 }
 
-func (response GetControlledDocument401Response) VisitGetControlledDocumentResponse(w http.ResponseWriter) error {
+func (response GetControlledDocument401ApplicationProblemPlusJSONResponse) VisitGetControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type GetControlledDocument404Response struct {
+type GetControlledDocument403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
 }
 
-func (response GetControlledDocument404Response) VisitGetControlledDocumentResponse(w http.ResponseWriter) error {
+func (response GetControlledDocument403ApplicationProblemPlusJSONResponse) VisitGetControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetControlledDocument404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetControlledDocument404ApplicationProblemPlusJSONResponse) VisitGetControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetControlledDocument500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetControlledDocument500ApplicationProblemPlusJSONResponse) VisitGetControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetActiveDocumentRequestObject struct {
@@ -1097,20 +1298,68 @@ func (response GetActiveDocument200JSONResponse) VisitGetActiveDocumentResponse(
 	return err
 }
 
-type GetActiveDocument401Response struct {
+type GetActiveDocument401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
 }
 
-func (response GetActiveDocument401Response) VisitGetActiveDocumentResponse(w http.ResponseWriter) error {
+func (response GetActiveDocument401ApplicationProblemPlusJSONResponse) VisitGetActiveDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type GetActiveDocument404Response struct {
+type GetActiveDocument403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
 }
 
-func (response GetActiveDocument404Response) VisitGetActiveDocumentResponse(w http.ResponseWriter) error {
+func (response GetActiveDocument403ApplicationProblemPlusJSONResponse) VisitGetActiveDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActiveDocument404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetActiveDocument404ApplicationProblemPlusJSONResponse) VisitGetActiveDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActiveDocument500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetActiveDocument500ApplicationProblemPlusJSONResponse) VisitGetActiveDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ObsoleteControlledDocumentRequestObject struct {
@@ -1129,28 +1378,100 @@ func (response ObsoleteControlledDocument204Response) VisitObsoleteControlledDoc
 	return nil
 }
 
-type ObsoleteControlledDocument401Response struct {
+type ObsoleteControlledDocument400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response ObsoleteControlledDocument401Response) VisitObsoleteControlledDocumentResponse(w http.ResponseWriter) error {
+func (response ObsoleteControlledDocument400ApplicationProblemPlusJSONResponse) VisitObsoleteControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObsoleteControlledDocument401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ObsoleteControlledDocument401ApplicationProblemPlusJSONResponse) VisitObsoleteControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type ObsoleteControlledDocument404Response struct {
+type ObsoleteControlledDocument403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
 }
 
-func (response ObsoleteControlledDocument404Response) VisitObsoleteControlledDocumentResponse(w http.ResponseWriter) error {
+func (response ObsoleteControlledDocument403ApplicationProblemPlusJSONResponse) VisitObsoleteControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObsoleteControlledDocument404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ObsoleteControlledDocument404ApplicationProblemPlusJSONResponse) VisitObsoleteControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type ObsoleteControlledDocument409Response struct {
+type ObsoleteControlledDocument409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
 }
 
-func (response ObsoleteControlledDocument409Response) VisitObsoleteControlledDocumentResponse(w http.ResponseWriter) error {
+func (response ObsoleteControlledDocument409ApplicationProblemPlusJSONResponse) VisitObsoleteControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(409)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObsoleteControlledDocument500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ObsoleteControlledDocument500ApplicationProblemPlusJSONResponse) VisitObsoleteControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type CreateControlledDocumentRevisionRequestObject struct {
@@ -1177,36 +1498,100 @@ func (response CreateControlledDocumentRevision201JSONResponse) VisitCreateContr
 	return err
 }
 
-type CreateControlledDocumentRevision400Response struct {
+type CreateControlledDocumentRevision400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response CreateControlledDocumentRevision400Response) VisitCreateControlledDocumentRevisionResponse(w http.ResponseWriter) error {
+func (response CreateControlledDocumentRevision400ApplicationProblemPlusJSONResponse) VisitCreateControlledDocumentRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(400)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type CreateControlledDocumentRevision401Response struct {
+type CreateControlledDocumentRevision401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
 }
 
-func (response CreateControlledDocumentRevision401Response) VisitCreateControlledDocumentRevisionResponse(w http.ResponseWriter) error {
+func (response CreateControlledDocumentRevision401ApplicationProblemPlusJSONResponse) VisitCreateControlledDocumentRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type CreateControlledDocumentRevision404Response struct {
+type CreateControlledDocumentRevision403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
 }
 
-func (response CreateControlledDocumentRevision404Response) VisitCreateControlledDocumentRevisionResponse(w http.ResponseWriter) error {
+func (response CreateControlledDocumentRevision403ApplicationProblemPlusJSONResponse) VisitCreateControlledDocumentRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateControlledDocumentRevision404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateControlledDocumentRevision404ApplicationProblemPlusJSONResponse) VisitCreateControlledDocumentRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type CreateControlledDocumentRevision409Response struct {
+type CreateControlledDocumentRevision409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
 }
 
-func (response CreateControlledDocumentRevision409Response) VisitCreateControlledDocumentRevisionResponse(w http.ResponseWriter) error {
+func (response CreateControlledDocumentRevision409ApplicationProblemPlusJSONResponse) VisitCreateControlledDocumentRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(409)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateControlledDocumentRevision500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateControlledDocumentRevision500ApplicationProblemPlusJSONResponse) VisitCreateControlledDocumentRevisionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type SupersedeControlledDocumentRequestObject struct {
@@ -1225,28 +1610,100 @@ func (response SupersedeControlledDocument204Response) VisitSupersedeControlledD
 	return nil
 }
 
-type SupersedeControlledDocument401Response struct {
+type SupersedeControlledDocument400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
 }
 
-func (response SupersedeControlledDocument401Response) VisitSupersedeControlledDocumentResponse(w http.ResponseWriter) error {
+func (response SupersedeControlledDocument400ApplicationProblemPlusJSONResponse) VisitSupersedeControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SupersedeControlledDocument401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SupersedeControlledDocument401ApplicationProblemPlusJSONResponse) VisitSupersedeControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(401)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type SupersedeControlledDocument404Response struct {
+type SupersedeControlledDocument403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
 }
 
-func (response SupersedeControlledDocument404Response) VisitSupersedeControlledDocumentResponse(w http.ResponseWriter) error {
+func (response SupersedeControlledDocument403ApplicationProblemPlusJSONResponse) VisitSupersedeControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SupersedeControlledDocument404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SupersedeControlledDocument404ApplicationProblemPlusJSONResponse) VisitSupersedeControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type SupersedeControlledDocument409Response struct {
+type SupersedeControlledDocument409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
 }
 
-func (response SupersedeControlledDocument409Response) VisitSupersedeControlledDocumentResponse(w http.ResponseWriter) error {
+func (response SupersedeControlledDocument409ApplicationProblemPlusJSONResponse) VisitSupersedeControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(409)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SupersedeControlledDocument500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SupersedeControlledDocument500ApplicationProblemPlusJSONResponse) VisitSupersedeControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 // StrictServerInterface represents all server handlers.
@@ -1534,60 +1991,61 @@ func (sh *strictHandler) SupersedeControlledDocument(w http.ResponseWriter, r *h
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7Dttb+S20X+F0PN8uENXlu9yQRHnk+tLUrdJzzhf8iU1FrPiaJexROpIau3NwkB/RH9hf0nBF0nULqVd",
-	"+16QA/rJK3JmOJz3IeltkouqFhy5VsnZNpGoasEV2o8LwYuS5dr8zgXXyO1PqOuS5aCZ4FktxaLE6k+/",
-	"KcHNnMpXWIH59f8Si+Qs+b+sXyBzsyq7cljJw8PDLKGocslqQy4582tqQSgSVBqoSB5mySXXKDmU1yjX",
-	"KL+TUsjPyZRZkDDLgyBUEIVyzaiQiQH1+Ib8ea7ZGl+LvKmQ67delmamlqJGqZkTLNS1FGso54wrDTzH",
-	"OaNmvBCyAp2cJU3DaDJL9KbG5CxRWjK+NHLoEJUGbQkjb6rk7NeESih0MksaTlHOJa4Z3iUtAhpihk/a",
-	"lPa3xN8w1/ZnbtYvzfBNZEEv4fkK1MostwdA/WaP3UHdLEqmVkjnj8U0e1JM8PkapWJOsxXjrDICeNEh",
-	"GDUt0anGD4mF2a2hca5FxfILiaBxXD1m01IYmXRMHjKeiw6l1X4onEPYvcUUlm+J7xsmkRrFxpgJKN9E",
-	"dhlhJrJHilGF5lY4dA56oBUKGlPNKoyphmINUltltnR5U5awKDE507LBCM6RWhdrlJJRnGus6hI0tuof",
-	"MZuD64o7jnLeKJSewr6JSpGjUnOQCPNROdVSFKzEcQCF7xs0vm09dFQinb3OEuPUjQq9GmxASWaJWChR",
-	"ojY/VVOjVEhHPFYjh+OdSjNdxtlvavpoOzAOumAl05vH+8svPe6uCzjWu33tyD6msFni/7j97Wq9E/WA",
-	"5YHtDwRwnJP9Mtj9TsRvWbNfTGOlolL3AyAlbKxJ5KIexHkjS+AbG8MNmo3iMTvwe33Uejtyd4vPQuYD",
-	"ulGhWAG6KPvW2L+KhJ5ItBhPKxwq9JH+R+RLvQpjfQ9v7HNOQdssD5Qyk7mhvAoWHnhdz3IFvIFynJNg",
-	"fi4RfElxRJx6FPB0UDscxA6IJxrSDuMMAtwB8KdupYtAB+h/othyRCgZiyFDGx1wOO4bb30VM+odT7fk",
-	"I13laYraEZtdK7bLsJSJFlaT1eRTWLEgA8oxvr5nWNKucTiyFioMkgtZYTvwt+s3/yC1sA0BEZJQoUkN",
-	"ehUz7wqVgmWM/M423Fpd4mrxYnu5cuX9haATRex09TI6wfFezxW+P1RdHyyApv0s9K9uSc9WfMuuORvV",
-	"3VBDP0G+YhxTiUBNzUUMGCmkqEgOXHCWQ0k03Asuqk28otXAyqiE0BjRMK1ORaPA8CL5vW0A4xVkVw9W",
-	"cO808fU338x6vbw6PY1pZryocwOhh0l20MHa+NfVTKNa6oPbmFV+jI5oovexZXfeSKY314aSW1ShMlxd",
-	"CHHLIsZy7aZJbucJU6pBShYbcvXm+h3JoGbZ+kUGjV5lpVgyfpIYvSVniUNI2sibVKihpCJXc79iL1qo",
-	"2d9x484WGC/EPhfnV5eEcZYzKAkV5CdD67XIFXm2fvH8hHxnijFBQDdQEoWVPY5YSshBkFxU5PL85J+8",
-	"S1ZnSY9/fnVpklPbNCcvTk5PTm0RUSOHmiVnyVcnpydfmewHemUllrUHDRnjC3GfnG0fZoNBZ7Uq2wYn",
-	"GA9HgmXuyOFYaKVhaQbtXzfCllwUhdqlIEWjcWQ020YYDKYyirbZcscqFqqhTGe49kdju0MZ3tdC6vGZ",
-	"bOv+XvbrTgJlVNzxUgDtoPUqy1fAl5jWoNSdkIMpa4s7A6LR4UiF4Zc3ShUby7b+V89tf/CQth5nbWOJ",
-	"1nuNV9vjtkuanCU/MqX36y5lbUpChRpNyPx16xznfYNy0/uNzw0XLh30p3V7YWkU3dRs5xLhqST6luSp",
-	"FGxx+LNCeUmfgv7+KUhdQO4xn3xwMLZGySqmB0t02ec0duY2Ip2iUPgIMjez4Un0y9PTifPe/XPeYdLp",
-	"8vRRCTt+lDfZKDu6kXS0d5Isbg2xV247w6k1lIzaDc2xLRdenb7YB2y4cV3k2uwfqYP7ah+uEHLBKEXu",
-	"8mJTVSA33ldJ792EBt6qYamGp46B89/Mkvu0hiXjls0U77GqdduPRKbStgdOflaoiLWlzNkC6YEJaCIb",
-	"rlmF5BkXmmxQk7yRSsi0YktpNvn8Wz9C3IhB0xLyW6SkEJJcrUAh+f7EFqZCRSJUePQbUXE8UK0QKMre",
-	"ji8pVrXQyPNNavJ5aAZOCr0NHupibhwyKv0XQTePMu9J840cwTwMDdZw+rDnYS8+GgvRU/aIM/jjtk/k",
-	"Ed+MsdntO+suuAzCy5f7hLtemXHLjAH82rE6TTl2YTX0QickKMsNcXKIuSQBTk1VqE1V2F6AHOWmRiC/",
-	"p6bNsrboGtno8QYXpuRJTPpM7Ykf9QydEb1CokEujbs6TGIwCVN2ypsvqWFj6hZiV5kR5IWQOVLj15qh",
-	"TF8Sxi1CYFKkhA1K8uz89VtyevrypffgPz831bUSjTQ9UbIwnmEtJ1qOZLXrhNO2C4zWJl27vOv0Ptc/",
-	"ukIZ9/nJo5ex5Ah94fJUyh+aL6fvRfdPGz5XZht4jGfEWhLHe02g0SJdIkebInqnsc3+HdMr0WgCZSnM",
-	"vvmS2EJm2nXGTc33D3ET+wH10TnFnxR55TP64UnkEyk+VgiN6/3YsPxqH44LPS9Ew3cV/gNG6xTTml++",
-	"/kBVZq5CTsMDiTHVDq/1v3S1jjxS+FSqnTtBd08dIjq2qcFC9TpuwW11BzEz+FAD6Doj0y80Ec2/8QB/",
-	"FM+OiLfdA/2YPtgVTzvV2v5DhLnB8q3mUK0/gbyNFzSKBC3pY+sYipKtkc4LKao4S+rk2BoH6kdVKiaf",
-	"uClTAZl6x7QeUlR2MLIBIsUdefb9m7fk56vX5+++e/4t4bhG6ZCgq55s1XSoENL3U2WQtee2PLTWEu+B",
-	"xrqft31l+cntevalt1a7N3ifubnaO2P/7I3Vq+Njw0eMKE74BAjHu64V+nTZoTssG00P1y3EHzg/BEd+",
-	"X1CCCLj+X4p4fIoIT+sH35nSEBkNbkZ2a2R/UZIG15QxMJmvjIbjk40WCtZoYlnF9AGgWqJiSx6HGtwb",
-	"7c6tML+1d/LqIEC29bdhJmkqLeQI64ZjHCfoZ7NtyRYS5Oby9YgYaeMsZWQZfxNERX6fNrKcBKppEZ8v",
-	"WGnUlHYBJArDoWS/j7AR1MOR2bqEHFeipChTYT1eZdt61HICcHUYYpKSezAcn5SYC660bHI9BuASRbpi",
-	"RtGbaSiVbaX5HtVC+4Y6neTKX6VlkNvgPg1kw0sqsURQB0BXCFIvEPQ02DQtd3c6MtksRl00TIiRafve",
-	"3M0UCLqRmBalDd12bIVQ6lVW9mHCj0gE2mqFQZUBrRjPxBplQNFOmMBcYbVAqVasVhNT2dY/0nrItl2I",
-	"fwgQcqjBvtRiGNK5rVnwZUIR8hwzxaFWK6GDOSlKTEeomLnwu/Hvf/rv3ie672zRlLd7g4yvmd7Dddvr",
-	"L2r3J7K4nHaAzP707tVyDG5vQ4Pphpcib3mvUEuWt9AKTWrYS0jtE43MIIpmf7wqIM2NDfSS6+aMAUPZ",
-	"obAlx5b39kGPNQgVHcy2oS10cwVUrOzVuDc+guaPhdXY+AE0P51RLKApddreNrTw/lPtfg+CcQ4aSrHc",
-	"g1EbpbHKFiXw273JIOUPB/uUnwtesOUI0CDh7042tIshO1M+7arp2WzLHw5DeE7xGMhoCXIUxrAemUJx",
-	"6bs2VV+QxQ9jHAdq/7vnMNwwLU1B+v8QOgw4KCgOAz5OBH3CCV5u2YZp583Wrzem4VH2Ns11VHaBxL/O",
-	"Ssys7xTGnncFbY75/M+//k3sE5oZcQ9nZvayzVbqjZTIdWoiHKmlWOBJcFvT6FXyMNtd5ZIa2npjiUBu",
-	"78oq4LBEW+ib1WzcnBEbTmckzB4z0r7DcUzY/iGI4cHyDKrI6u/sP0cQ63qpfWBElJYIlSXnakc12ITx",
-	"0X06114FpGt1lWUd8lw0XJM2YFuyrb6ID8kB/U6VsSWMDtOg9XORpvG3+oayryCIrSACsgPICO22/yad",
-	"zc1Ia28z4k9QvIh9nBuuHqzVR9+pdXxIt0Jqw/rM6s+v02aQkHL77nSf8EWkRyxZgfkmL9HSs3db7Z3W",
-	"gOFogzzBuzFkIRlfDqzPB74ZadubGQkr9dmIQU2teN6K2j23m3Vn+0YnbMlTURSecGTTWgJX9hH8wIA9",
-	"zZgMpVCqF5+rQQa2aQYiiD+yNXJ7x80pMXUps182AIRru8o1QuBN6zRQkr++e3dFfDUU4IqFiWHQ/jPC",
-	"zcN/AwAA//8=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

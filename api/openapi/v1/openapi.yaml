@@ -1089,7 +1089,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/TemplateDTO'
-        '403': { description: forbidden }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     post:
       summary: Create template (docx)
       tags: [templates]
@@ -1140,7 +1145,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SystemBlankTemplateResponse'
-        '404': { description: not_found }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /templates/{id}/versions/{n}:
     get:
       summary: Get template version metadata (docx)
@@ -1151,7 +1163,14 @@ paths:
         - { in: path, name: n, required: true, schema: { type: integer } }
       responses:
         '200': { description: ok }
-        '404': { description: not_found }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /templates/{id}/versions/{n}/docx-upload-url:
     post:
       summary: Presign PUT URL for draft .docx upload
@@ -1241,9 +1260,20 @@ paths:
                 schema_content_hash: { type: string }
       responses:
         '204': { description: ok }
-        '409': { description: template_draft_stale }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '412':
-          description: stale expected_lock_version
+          $ref: '#/components/responses/PreconditionFailed'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /templates/{id}/versions/{n}/publish:
     post:
       summary: Publish draft (validates template tokens)
@@ -1278,6 +1308,14 @@ paths:
                   published_version_id: { type: string }
                   next_draft_id: { type: string }
                   next_draft_version_num: { type: integer }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '422':
           description: template invalid
           # AD-2 exemption (api-contract-hardening Phase D): bespoke template-token
@@ -1295,6 +1333,8 @@ paths:
                   parse_errors: { type: array, items: { type: object } }
                   missing_tokens: { type: array, items: { type: string } }
                   orphan_tokens: { type: array, items: { type: string } }
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   # â”€â”€ Registry: Controlled Documents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   /templates/{id}/versions:
@@ -1363,10 +1403,22 @@ paths:
                     required: [version]
                     properties:
                       version: { $ref: '#/components/schemas/VersionDTO' }
-        '400': { description: invalid_request }
-        '409': { description: invalid_state_transition }
-        '412': { description: stale_lock_version }
-        '422': { description: placeholder_validation_error }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /templates/{id}/versions/{n}/autosave/presign:
     post:
       summary: Presign template autosave
@@ -2012,9 +2064,14 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/ControlledDocument'
-        '400': { description: validation_error }
-        '401': { description: unauthenticated }
-        '403': { description: forbidden }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     post:
       summary: Atomically create controlled document and initial revision
       tags: [controlled-documents]
@@ -2043,11 +2100,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AtomicCreateResponse'
-        '400': { description: validation_error }
-        '401': { description: unauthenticated }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
-        '422': { description: template_invalid }
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -2072,8 +2134,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PreviewCodeResponse'
-        '400': { description: validation_error }
-        '401': { description: unauthenticated }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /controlled-documents/{id}:
     get:
@@ -2092,8 +2160,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ControlledDocument'
-        '401': { description: unauthenticated }
-        '404': { description: not_found }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /controlled-documents/{id}/revisions:
     post:
@@ -2122,10 +2196,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RevisionResponse'
-        '400': { description: validation_error }
-        '401': { description: unauthenticated }
-        '404': { description: controlled_document_not_found }
-        '409': { description: controlled_document_not_active }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /controlled-documents/{id}/active-document:
     get:
@@ -2144,8 +2226,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ActiveDocumentResponse'
-        '401': { description: unauthenticated }
-        '404': { description: no_active_instance }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /controlled-documents/{id}/obsolete:
     put:
@@ -2166,9 +2254,18 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '204': { description: obsoleted }
-        '401': { description: unauthenticated }
-        '404': { description: not_found }
-        '409': { description: controlled_document_not_active }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /controlled-documents/{id}/supersede:
     put:
@@ -2189,9 +2286,18 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         '204': { description: superseded }
-        '401': { description: unauthenticated }
-        '404': { description: not_found }
-        '409': { description: controlled_document_not_active }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /documents:
     get:
@@ -2262,7 +2368,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentDetailResponse'
-        '404': { description: not_found }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     patch:
       summary: Rename document
       tags: [documents]
@@ -2332,7 +2445,18 @@ paths:
                 required: [instance_id]
                 properties:
                   instance_id: { type: string, format: uuid }
-        '409': { description: invalid_state_transition }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /documents/{id}/archive:
     post:
       summary: Archive document
@@ -2488,7 +2612,21 @@ paths:
       tags: [documents]
       operationId: heartbeatDocumentSession
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { '200': { description: ok }, '409': { description: session_inactive } }
+      responses:
+        '200':
+          description: ok
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /documents/{id}/session/release:
     post:
       summary: Release document session
@@ -2516,7 +2654,19 @@ paths:
       tags: [documents]
       operationId: forceReleaseDocumentSession
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { '200': { description: ok }, '403': { description: forbidden } }
+      responses:
+        '200':
+          description: ok
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /documents/{id}/autosave/presign:
     post:
@@ -2542,7 +2692,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentAutosavePresignResponse'
-        '409': { description: session_inactive | session_not_holder | stale_base }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /documents/{id}/autosave/commit:
     post:
       summary: Commit document autosave
@@ -2584,11 +2745,22 @@ paths:
                     type: string
                     nullable: true
                     enum: [eigenpal_client, server_renderer]
-        '403': { description: session_not_holder | document_not_owner }
-        '404': { description: pending_not_found }
-        '409': { description: misbound | session_inactive | stale_base }
-        '410': { description: expired_upload | upload_missing }
-        '422': { description: content_hash_mismatch }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /documents/{id}/checkpoints:
     get:
@@ -2663,8 +2835,16 @@ paths:
                   new_revision_num: { type: integer, minimum: 1 }
                   source_checkpoint_version_num: { type: integer, minimum: 1 }
                   idempotent: { type: boolean, description: "true when ON CONFLICT (document_id, content_hash) fired - current head already matches" }
-        '403': { description: session_not_holder | document_not_owner | session_inactive }
-        '404': { description: checkpoint_not_found }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /documents/{id}/revisions/{rid}/url:
     get:
@@ -2822,9 +3002,22 @@ paths:
                   size_bytes:     { type: integer, format: int64 }
                   cached:         { type: boolean }
                   revision_id:    { type: string, format: uuid }
-        '409': { description: docx_missing }
-        '429': { description: rate_limited }
-        '502': { description: gotenberg_failed }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
 
   /documents/{id}/export/docx-url:
     get:
@@ -2844,7 +3037,16 @@ paths:
                 properties:
                   signed_url:  { type: string, format: uri }
                   revision_id: { type: string, format: uuid }
-        '409': { description: docx_missing }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /documents/{id}/fill-in-schema:
     get:
@@ -3194,6 +3396,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApprovalInstanceByDocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -3211,6 +3417,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApprovalInstanceByDocumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -3475,6 +3685,30 @@ components:
             $ref: '#/components/schemas/Problem'
     InternalServerError:
       description: Erro interno do servidor
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionFailed:
+      description: Pre-condicao falhou (ETag/lock version desatualizado)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Gone:
+      description: Recurso expirado ou nao mais disponivel
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: Limite de requisicoes excedido
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    BadGateway:
+      description: Falha no servico upstream
       content:
         application/problem+json:
           schema:
