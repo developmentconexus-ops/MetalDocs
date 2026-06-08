@@ -65,6 +65,8 @@ A `cmd/authzgen` spike was evaluated as a way to wrap `authz.Require` calls per 
 
 Replaced with two CI lint rules: `authz-call-present` (every op with `x-authz-area` has a matching `authz.Require` call in the handler) and `tripwire-pairing` (every mutating SQL statement in repositories pairs with an `authz.Require` call). Implemented in `scripts/api-lint/code_rules.go`.
 
+**Amendment (2026-06-08, api-contract-hardening Phase F · FD-1): `authz-call-present` deleted.** The rule was dormant by design across every phase — it expected a handler-body `authz.Require(req.Body.AreaCode)`, but MetalDocs derives the area from the DB row inside the tx (the tx-coupling this amendment established), so that shape never existed and the rule's count was always 0. It was replaced not by activation (Option B, an interprocedural call-graph lint — rejected for re-proving what the DB already enforces) but by **honest positive `x-authz-area` markers** (`source: tx, derived_from` for DB-derived area; `source: body|path, field` for request-target area; `x-authz-area-none` for area-less ops), validated by `AUTHZ-DRIFT`. The standing static guarantees are `tripwire-pairing` (below), the `authz-area-scope-binding` AST guard (ADR 0022 Phase 7), and the Postgres tripwire (migration 0142b). See ADR [`0023-authz-area-markers.md`](0023-authz-area-markers.md).
+
 Full spike notes: `docs/superpowers/notes/2026-05-10-authz-codegen-feasibility.md`.
 
 ## References
@@ -75,7 +77,7 @@ Full spike notes: `docs/superpowers/notes/2026-05-10-authz-codegen-feasibility.m
 - `internal/modules/iam/infrastructure/postgres/role_provider.go` — tenant-scoped `RolesByUserID` (Group B fix)
 - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go` — tenant-scoped admin ops, DELETE-then-INSERT (Group B fix)
 - `apps/api/internal/wiring/documents.go:24` — `NewCapabilityChecker` adapter (J2 fix)
-- `scripts/api-lint/code_rules.go` — `authz-call-present` + `tripwire-pairing` lint rules (codegen-rejection amendment)
+- `scripts/api-lint/code_rules.go` — `tripwire-pairing` lint rule (the `authz-call-present` rule was deleted 2026-06-08, Phase F · FD-1; see ADR 0023)
 - Migration 0142b — Postgres tripwire trigger (`enforce_capability_asserted`) on `approval_instances` + `approval_signoffs`
 - Migration 0162 — added `tenant_id` to `iam_user_roles`
 - Migration 0165 — reseeded `role_capabilities`

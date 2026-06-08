@@ -1,23 +1,18 @@
 openapi: 3.0.3
 info:
-  title: handlers
+  title: authz-area-tx-no-derived
   version: 1.0.0
 paths:
-  /widgets:
+  /widgets/{id}/publish:
     post:
-      operationId: createWidget
+      operationId: publishWidget
       security:
-        - bearerAuth: []
+        - sessionCookie: []
       x-authz-area:
-        source: body
-        field: area_code
+        source: tx
       responses:
-        '201':
-          description: created
-          content:
-            application/json:
-              schema:
-                type: object
+        '204':
+          description: done
         '403':
           description: denied
           content:
@@ -26,9 +21,10 @@ paths:
                 $ref: '#/components/schemas/Problem'
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: md_session
   schemas:
     Problem:
       type: object

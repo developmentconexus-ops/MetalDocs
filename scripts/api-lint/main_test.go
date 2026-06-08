@@ -35,13 +35,16 @@ func TestRules(t *testing.T) {
 		{name: "missing_security", spec: "missing_security.openapi.yaml", want: []wantViolation{{Rule: "AUTHZ-DRIFT", MessageContains: "missing security declaration"}}},
 		{name: "global_security_good", spec: "global_security_good.openapi.yaml"},
 		{name: "state_transition_no_area", spec: "state_transition_no_area.openapi.yaml", want: []wantViolation{{Rule: "AUTHZ-DRIFT", MessageContains: "state-transition op"}}},
-		{name: "state_transition_skip_area", spec: "state_transition_skip_area.openapi.yaml"},
+		// FD-1 (Phase F): positive authz-area markers replace the deleted negative
+		// x-authz-skip-area escape hatch. A tx-derived marker satisfies the
+		// state-transition requirement; area-none does too; a malformed marker is
+		// drift.
+		{name: "state_transition_area_tx", spec: "state_transition_area_tx.openapi.yaml"},
+		{name: "state_transition_area_none", spec: "state_transition_area_none.openapi.yaml"},
+		{name: "authz_area_tx_no_derived", spec: "authz_area_tx_no_derived.openapi.yaml", want: []wantViolation{{Rule: "AUTHZ-DRIFT", MessageContains: "source:tx requires a non-empty derived_from"}}},
+		{name: "authz_area_bad_source", spec: "authz_area_bad_source.openapi.yaml", want: []wantViolation{{Rule: "AUTHZ-DRIFT", MessageContains: "invalid source"}}},
 		{name: "pagination_exempt_good", spec: "pagination_exempt_good.openapi.yaml"},
 		{name: "pagination_exempt_no_reason", spec: "pagination_exempt_no_reason.openapi.yaml", want: []wantViolation{{Rule: "PAGINATION-DRIFT", MessageContains: "without a non-empty x-pagination-exempt-reason"}}},
-		{name: "handlers_good", spec: "handlers_good/spec.yaml", modules: "handlers_good"},
-		{name: "handlers_missing_call", spec: "handlers_missing_call/spec.yaml", modules: "handlers_missing_call", want: []wantViolation{{Rule: "authz-call-present", MessageContains: "does not call authz.Require"}}},
-		{name: "handlers_wrong_field", spec: "handlers_wrong_field/spec.yaml", modules: "handlers_wrong_field", want: []wantViolation{{Rule: "authz-call-present", MessageContains: "expected req.Body.AreaCode"}}},
-		{name: "handlers_custom", spec: "handlers_custom/spec.yaml", modules: "handlers_custom"},
 		{name: "repo_good", spec: "repo_good/spec.yaml", modules: "repo_good"},
 		{name: "repo_missing", spec: "repo_missing/spec.yaml", modules: "repo_missing", want: []wantViolation{{Rule: "tripwire-pairing", MessageContains: "without authz.Require call"}}},
 	}

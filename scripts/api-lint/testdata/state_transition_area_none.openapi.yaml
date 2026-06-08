@@ -1,23 +1,17 @@
 openapi: 3.0.3
 info:
-  title: handlers
+  title: transition-area-none
   version: 1.0.0
 paths:
-  /widgets:
+  /widgets/{id}/archive:
     post:
-      operationId: createWidget
+      operationId: archiveWidget
       security:
-        - bearerAuth: []
-      x-authz-area:
-        source: body
-        field: area_code
+        - sessionCookie: []
+      x-authz-area-none: 'Widgets are tenant-global; tier-1 capability-gated, no per-area scope.'
       responses:
-        '201':
-          description: created
-          content:
-            application/json:
-              schema:
-                type: object
+        '204':
+          description: done
         '403':
           description: denied
           content:
@@ -26,9 +20,10 @@ paths:
                 $ref: '#/components/schemas/Problem'
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: md_session
   schemas:
     Problem:
       type: object

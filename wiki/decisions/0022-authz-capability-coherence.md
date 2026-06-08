@@ -438,6 +438,17 @@ The 2026-06-04 final review found that Principle 5 ("the model is bound by CI, n
 
 **Bounded defers / flags (NOT done here — separate follow-ups):** F4 cross-tier test; `controlled_documents.{obsolete,supersede}` collapse; F7 repo-helper fold; stale `capability_scope.go:31-35` comment; pre-existing `TestListDocumentsPaginated_*` base failure (`Scan 14 vs 18`, unrelated). Phase 6 wiki sync still runs LAST.
 
+## Amendment — F6 closed: `authz-call-present` deleted, honest positive markers (2026-06-08, api-contract-hardening Phase F · FD-1)
+
+The Phase-F closing audit resolved the **F6 dead-scaffolding** finding (above) at root. The `authz-call-present` lint (`code_rules.go`) had been dormant across every phase **by design**: it expected each area op's operationId-named handler to itself call `authz.Require(req.Body.AreaCode | req.<Op>Params.X)`, but MetalDocs derives the area from the DB row **inside the tx** (un-spoofable, ADR 0007 tx-coupling) — a handler-body shape no module ever had. To silence the rule, all 16 area ops carried a **negative `x-authz-skip-area` escape hatch** that read as "we skipped the area check" when in fact the area was being enforced more strictly (tx-layer + Postgres tripwire).
+
+**Decision (FD-1 = Option A):** delete the dead rule and replace the negative markers with honest positive ones. **No runtime / enforcement change** — lint + spec + docs only.
+- **Deleted** `checkAuthzCallPresent` + its exclusive helpers (`inspectAuthzCalls`, `expectedAuthzCall`, `pascalCase*`, `indexModuleFuncs`) and the `handlers_*` testdata. The real static guarantees are untouched: `tripwire-pairing` (`code_rules.go`), the `authz-area-scope-binding` AST guard (`registry_rules.go`, Phase 7), and the Postgres tripwire (migration 0142b).
+- **Rewrote the 16 markers** → positive provenance: `x-authz-area: {source: tx, derived_from: "<table>.<column>"}` for the 12 tx-derived ops (10 document + 2 controlled-document), `x-authz-area: {source: body|path, field: …}` for the 3 request-target ops (membership grant/revoke, atomic CD create), and `x-authz-area-none: "<reason>"` for the 1 genuinely area-less op (`archiveTemplate`, tenant-global).
+- **`AUTHZ-DRIFT`** (`spec_rules.go`) now validates marker shape (`source: tx`→`derived_from`; `source: body|path`→`field`; state-transition POSTs require exactly one of `x-authz-area` / `x-authz-area-none` / `x-authz-custom`).
+
+Rationale + full model: ADR [`0023-authz-area-markers.md`](0023-authz-area-markers.md). Option B (an interprocedural call-graph lint) was rejected — it re-proves what the DB already enforces, the exact duplication ADR 0007 rejected.
+
 ## References
 - [`wiki/references/authz-industry-evidence.md`](../references/authz-industry-evidence.md) — cited external evidence base (NIST, K8s, GCP, AWS, OWASP, CWE, Zanzibar, Cedar, OPA)
 - Cross-module authz audit, 2026-06-03 (this session) — three-dialect map, tier-2 areaCode survey, drift inventory
@@ -445,4 +456,5 @@ The 2026-06-04 final review found that Principle 5 ("the model is bound by CI, n
 - ADR [`0016-view-grade-capabilities.md`](0016-view-grade-capabilities.md) — view/manage split; §Security Boundary documented the (now-revised) handler gate
 - ADR [`0021-tenant-vs-platform-admin-separation.md`](0021-tenant-vs-platform-admin-separation.md) — capabilities, not role names, are the boundary
 - `wiki/concepts/authz-tiers.md` — tier-1/tier-2 reference
-- `scripts/api-lint/code_rules.go` — `authz-call-present`, `tripwire-pairing`
+- `scripts/api-lint/code_rules.go` — `tripwire-pairing` (the `authz-call-present` rule was deleted 2026-06-08, Phase F · FD-1; see ADR 0023)
+- ADR [`0023-authz-area-markers.md`](0023-authz-area-markers.md) — honest positive authz-area marker model (replaces the negative `x-authz-skip-area` escape hatch)

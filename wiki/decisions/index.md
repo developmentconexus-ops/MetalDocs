@@ -18,6 +18,7 @@
 - [0019-cap-audit-read-and-session-manage.md](0019-cap-audit-read-and-session-manage.md) — tier-1 caps for audit read + session manage (PR-2)
 - [0020-admin-center-six-tab-ia.md](0020-admin-center-six-tab-ia.md) — **Accepted** — Admin Center 6-tab IA, shipped at PR-12
 - [0021-tenant-vs-platform-admin-separation.md](0021-tenant-vs-platform-admin-separation.md) — **Accepted** — tenant admin vs. platform admin scope split, shipped at PR-12
+- [0023-authz-area-markers.md](0023-authz-area-markers.md) — **Accepted** — honest positive authz-area markers (`source: tx` derived_from / `x-authz-area-none`) replace the negative `x-authz-skip-area`; dormant `authz-call-present` lint deleted (Phase F · FD-1)
 - [2026-06-03-audit-events-cursor-shape.md](2026-06-03-audit-events-cursor-shape.md) — **Open** — `/audit/events` runtime emits flat `{nextCursor,hasMore}` while spec declares `page.{next_cursor,has_more}`; FE adapter bridges until backend reconciles
 
 Legacy ADR material in `docs/adr/` remains historical/reference content until reconciled deliberately.

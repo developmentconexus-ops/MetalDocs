@@ -267,24 +267,64 @@ func checkPagination(file, opID string, op, schemas *yaml.Node) []Violation {
 	return out
 }
 
+// checkAuthz enforces two AUTHZ-DRIFT guarantees:
+//
+//  1. Every op is secure-in-doc — it declares its own `security` (including an
+//     explicit `security: []` public opt-out) OR inherits a non-empty global
+//     `security` requirement.
+//  2. The authz-area posture markers are honest (api-contract-hardening Phase F,
+//     FD-1). The pre-F negative `x-authz-skip-area` escape hatch is GONE; an
+//     area-scoped op now carries a positive marker that says where the enforced
+//     area comes from:
+//     - `x-authz-area: {source: tx, derived_from: "<table>.<column>"}` — area
+//       loaded from the DB row inside the tx (un-spoofable).
+//     - `x-authz-area: {source: body|path, field: <name>}` — area is the
+//       request-supplied action target (e.g. grant membership in area X).
+//     - `x-authz-area-none: "<reason>"` — genuinely area-less (tenant-global).
+//     - `x-authz-custom: true` — bespoke handler-level check.
+//     Every state-transition POST must carry exactly one of those.
 func checkAuthz(file, opID, path, method string, op *yaml.Node, hasGlobalSecurity bool) []Violation {
 	out := []Violation{}
-	// An op is secure-in-doc when it declares its own `security` (including an
-	// explicit `security: []` opt-out for a public endpoint) OR inherits a
-	// non-empty global `security` requirement.
 	if mapGet(op, "security") == nil && !hasGlobalSecurity {
 		out = append(out, Violation{File: file, Line: op.Line, Rule: "AUTHZ-DRIFT", Message: fmt.Sprintf("op %s missing security declaration", opID)})
 	}
+
+	area := mapGet(op, "x-authz-area")
+	none := strings.TrimSpace(scalarValue(mapGet(op, "x-authz-area-none")))
+	hasCustom := strings.EqualFold(scalarValue(mapGet(op, "x-authz-custom")), "true")
+
+	// Validate the positive area marker's shape wherever it appears (not just on
+	// state-transition POSTs): an x-authz-area that omits its provenance is drift.
+	if area != nil {
+		out = append(out, checkAuthzAreaShape(file, opID, area)...)
+	}
+
 	if method == "POST" && stateTransitionPathRE.MatchString(path) {
-		hasArea := mapGet(op, "x-authz-area") != nil
-		skip := mapGet(op, "x-authz-skip-area")
-		hasSkip := skip != nil && strings.TrimSpace(skip.Value) != ""
-		hasCustom := strings.EqualFold(scalarValue(mapGet(op, "x-authz-custom")), "true")
-		if !hasArea && !hasSkip && !hasCustom {
-			out = append(out, Violation{File: file, Line: op.Line, Rule: "AUTHZ-DRIFT", Message: fmt.Sprintf("state-transition op %s missing x-authz-area / x-authz-skip-area / x-authz-custom", opID)})
+		if area == nil && none == "" && !hasCustom {
+			out = append(out, Violation{File: file, Line: op.Line, Rule: "AUTHZ-DRIFT", Message: fmt.Sprintf("state-transition op %s missing x-authz-area / x-authz-area-none / x-authz-custom", opID)})
 		}
 	}
 	return out
+}
+
+// checkAuthzAreaShape validates that an x-authz-area marker honestly declares
+// where the enforced area is resolved from: source:tx needs derived_from;
+// source:body|path needs field.
+func checkAuthzAreaShape(file, opID string, area *yaml.Node) []Violation {
+	source := strings.ToLower(strings.TrimSpace(scalarValue(mapGet(area, "source"))))
+	switch source {
+	case "tx":
+		if strings.TrimSpace(scalarValue(mapGet(area, "derived_from"))) == "" {
+			return []Violation{{File: file, Line: area.Line, Rule: "AUTHZ-DRIFT", Message: fmt.Sprintf("op %s x-authz-area source:tx requires a non-empty derived_from", opID)}}
+		}
+	case "body", "path":
+		if strings.TrimSpace(scalarValue(mapGet(area, "field"))) == "" {
+			return []Violation{{File: file, Line: area.Line, Rule: "AUTHZ-DRIFT", Message: fmt.Sprintf("op %s x-authz-area source:%s requires a non-empty field", opID, source)}}
+		}
+	default:
+		return []Violation{{File: file, Line: area.Line, Rule: "AUTHZ-DRIFT", Message: fmt.Sprintf("op %s x-authz-area has invalid source %q (want tx|body|path)", opID, source)}}
+	}
+	return nil
 }
 
 func isProblemSchema(media *yaml.Node) bool {

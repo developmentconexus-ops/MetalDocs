@@ -15,7 +15,7 @@
 > - `migrations/0142b_role_capabilities_v2_enforce.sql:138-172`     Postgres tripwire trigger
 > - `frontend/apps/web/src/lib/api/problem.ts`     frontend Problem parser + ApiError
 > - `scripts/api-lint/spec_rules.go`     envelope/pagination/authz-drift rules
-> - `scripts/api-lint/code_rules.go`     authz-call-present + tripwire-pairing rules
+> - `scripts/api-lint/code_rules.go`     tripwire-pairing + registry-binding rules (the `authz-call-present` rule was deleted in Phase F, FD-1)
 
 ---
 
@@ -33,7 +33,7 @@ MetalDocs exposes a growing HTTP surface across 7 modules. Without a shared cont
 | 2 | Pagination | Cursor-first target; module-level temporary exceptions allowed while migration is incomplete | `cursor.go`; `PAGINATION-DRIFT` CI rule |
 | 3 | Idempotency | Stripe-model `Idempotency-Key`, shared store, 24h TTL | `middleware.go` + `postgres_store.go`; migration `0147_idempotency_keys.sql` |
 | 4 | Body validation | oapi-codegen per-op generated validation (not reflection middleware) | `cfg.yaml` `validate-against-spec: true`; strict-decode `DisallowUnknownFields` |
-| 5 | Two-tier authz | `security` + `x-authz-area` in spec; enforced by Postgres tripwire | `authz.Require`; tripwire trigger; `AUTHZ-DRIFT` + `authz-call-present` + `tripwire-pairing` CI rules |
+| 5 | Two-tier authz | `security` + honest `x-authz-area`/`x-authz-area-none` markers in spec; enforced by Postgres tripwire | `authz.Require`; tripwire trigger; `AUTHZ-DRIFT` + `tripwire-pairing` CI rules |
 | 6 | List filtering | Stripe-flat params + per-resource allowlist + typed parser | oapi-codegen `parameters` per op; `UNKNOWN_FILTER` code |
 | 7 | Mini-conventions | UUIDv4, ISO 8601 UTC, snake_case, plural kebab paths, positive booleans, null-vs-absent, UUID-only path IDs, session-cookie auth | Codified in spec; payload casing enforced by the blocking `CASING-DRIFT` rule (Phase E1); codegen type alignment |
 
@@ -177,22 +177,32 @@ security:
 ```
 Authentication is the `sessionCookie` apiKey scheme (a `metaldocs_session` cookie issued by `POST /api/v1/auth/login`); there is **no** bearer/JWT scheme — MetalDocs is session-cookie only. A root-level `security: [- sessionCookie: []]` makes every operation authenticated by default (api-contract-hardening Phase E2, F-NO-GLOBAL-SEC); truly public ops (login, health/readiness probes, feature flags, signed-URL downloads) opt out with an explicit `security: []`. Capabilities are **not** carried as OpenAPI security scopes: the route→capability map lives in `apps/api/cmd/metaldocs-api/permissions.go` and the `CapabilityService` middleware enforces it before the handler runs. The `AUTHZ-DRIFT` lint rule (now BLOCKING, Phase E2) treats the inherited global `security` as satisfying each op.
 
-**Tier 2     area (in-transaction):**
+**Tier 2     area (in-transaction).** The marker honestly declares **where the enforced area comes from** (api-contract-hardening Phase F, FD-1):
+
 ```yaml
+# Area loaded from the DB row inside the tx (un-spoofable) — the common case:
 x-authz-area:
-  source: body        # body | path
-  field: area_code    # top-level field; dotted for nested
-  multi: false        # true     field is array     authz.RequireAll
+  source: tx
+  derived_from: documents.process_area_code_snapshot   # the DB column the area is read from
+  note: "..."                                          # optional: where/how the tier-2 check runs
+
+# Area is the request-supplied action target (e.g. "grant membership in area X"):
+x-authz-area:
+  source: body          # body | path
+  field: area_code      # the request field / path param carrying the area
+  # multi: false        # true → field is an array → authz.RequireAll
 ```
-Handler calls `authz.Require(ctx, tx, capability, areaCode)` (`internal/modules/iam/authz/authz.go:44`) inside its transaction. This call does three things: permission check, `system_admin` bypass, and **sets the tx-scoped GUC `metaldocs.asserted_caps`**.
+Handler (or tx-layer service) calls `authz.Require(ctx, tx, capability, areaCode)` (`internal/modules/iam/authz/authz.go:44`) inside its transaction. This call does three things: permission check, `system_admin` bypass, and **sets the tx-scoped GUC `metaldocs.asserted_caps`**.
 
 **The Postgres tripwire trigger is the real enforcer.** `migrations/0142b_role_capabilities_v2_enforce.sql:138-172` reads `metaldocs.asserted_caps` on every INSERT into `approval_instances` and `approval_signoffs`. If the required cap is absent, the database raises `ErrCapabilityNotAsserted` and rejects the write. The Go `authz.Require` call is how handlers prove the cap was checked; the transaction carries the proof.
 
-**No code generation.** `x-authz-area` is a lint contract, not a codegen input. A `cmd/authzgen` spike was evaluated and rejected (see amendment in `wiki/decisions/0007-two-tier-authz.md`). The pre-tx wrapper cannot supply `tx`; the tripwire already provides the static guarantee.
+**No code generation.** `x-authz-area` is a lint contract, not a codegen input. A `cmd/authzgen` spike was evaluated and rejected (see amendment in `wiki/decisions/0007-two-tier-authz.md`). The pre-tx wrapper cannot supply `tx`; the tripwire already provides the static guarantee. The old `authz-call-present` lint (which expected a handler-body `authz.Require(req.Body.AreaCode)`) was **deleted** in Phase F: MetalDocs derives the area in the tx-layer (`source: tx`), so that handler-body shape never existed and the rule was dormant by design. See `wiki/decisions/0023-authz-area-markers.md`.
 
-**Escape hatches:**
-- `x-authz-skip-area: "<reason>"`     explicit opt-out for routes with no area dimension (e.g. `/v1/auth/login`).
-- `x-authz-custom: true`     silences lint for ops that compute area at runtime; handler must still contain at least one `authz.Require` call.
+**Markers for non-area ops:**
+- `x-authz-area-none: "<reason>"`     genuinely area-less op (e.g. tenant-global templates; `POST /auth/login`). Replaces the retired negative `x-authz-skip-area`.
+- `x-authz-custom: true`     ops that compute area at runtime by a bespoke path; handler must still contain at least one `authz.Require` call.
+
+`AUTHZ-DRIFT` validates the marker shape: `source: tx` requires a non-empty `derived_from`; `source: body|path` requires a non-empty `field`; every state-transition POST must carry exactly one of `x-authz-area` / `x-authz-area-none` / `x-authz-custom`.
 
 ---
 
@@ -230,8 +240,7 @@ Five rules in `scripts/api-lint/`, running in the `api-design-system-lint` job o
 | `ENVELOPE-DRIFT` | `spec_rules.go` | **BLOCKING (Phase D).** Every response     400 with a body resolves to `Problem` — inline or via a `#/components/responses/*` `$ref`. Exempt: description-only responses, `/health/*` probes, and reviewed `x-error-envelope-exempt` bodies |
 | `CASING-DRIFT` | `spec_rules.go` | **BLOCKING (Phase E1).** Every declared schema `properties:` key (components/schemas + inline bodies) matches `^[a-z][a-z0-9]*(_[a-z0-9]+)*$`. Exempt: RFC 9457 Problem fields (already lowercase) and the SCREAMING_SNAKE feature-flag key `MDDM_NATIVE_EXPORT_ROLLOUT_PCT` (env-var-mirrored constant). Does not walk free-form object content |
 | `PAGINATION-DRIFT` | `spec_rules.go` | **BLOCKING (Phase E2).** Every `list*` op declares `cursor`/`limit` params with a `page.next_cursor` + `page.has_more` response, OR carries a reviewed `x-pagination-exempt: true` + non-empty `x-pagination-exempt-reason` (bounded/offset lists). `limit` max is clamped to 100 in spec and runtime |
-| `AUTHZ-DRIFT` | `spec_rules.go` | **BLOCKING (Phase E2).** Every op is secure-in-doc via its own `security` (incl. `security: []` public opt-out) or the inherited root-level `security`; state-transition ops declare `x-authz-area` or an escape hatch |
-| `authz-call-present` | `code_rules.go` | Each op with `x-authz-area` has a matching `authz.Require` call in the handler body |
+| `AUTHZ-DRIFT` | `spec_rules.go` | **BLOCKING (Phase E2; markers reworked Phase F).** Every op is secure-in-doc via its own `security` (incl. `security: []` public opt-out) or the inherited root-level `security`. State-transition POSTs declare exactly one of `x-authz-area` / `x-authz-area-none` / `x-authz-custom`, and the `x-authz-area` shape is validated (`source: tx`→`derived_from`; `source: body\|path`→`field`) |
 | `tripwire-pairing` | `code_rules.go` | Every mutating SQL in `*repository*.go` lives in a function that also calls `authz.Require` |
 
 The three existing jobs (`backend-codegen-drift`, `frontend-codegen-drift`, `openapi-lint`) remain blocking and unchanged.

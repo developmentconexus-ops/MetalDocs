@@ -3,62 +3,42 @@ package main
 // Code-side lints are intentionally single-file scans; they do not build a call graph.
 
 import (
-	"bytes"
 	"fmt"
 	"go/ast"
 	"go/parser"
-	"go/printer"
 	"go/token"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"unicode"
-
-	"gopkg.in/yaml.v3"
 )
 
+// RunCodeRules runs the code-side lints that read the Go module tree:
+//   - tripwire-pairing: mutating SQL in a repository must pair with authz.Require
+//     (single-file scan; legitimate one-layer-up enforcement is allow-listed).
+//   - the ADR 0022 registry-binding lints (RunRegistryRules).
+//
+// The former `authz-call-present` spec→handler scan was DELETED in api-contract-
+// hardening Phase F (FD-1 = Option A). It was dormant by design (0 hits across
+// every phase): it expected each area op's handler to itself call
+// authz.Require(req.Body.AreaCode), but MetalDocs derives the area from the DB row
+// inside the tx (un-spoofable, ADR 0007 tx-coupling) and enforces it via the
+// Postgres tripwire (migration 0142b) + the tier-2 authz.Require in the tx-layer
+// service. The rule modelled the wrong architecture, so every area op carried a
+// negative `x-authz-skip-area` escape hatch. Phase F replaces those negative
+// markers with honest positive ones (`x-authz-area: {source: tx, derived_from}` /
+// `x-authz-area-none`) validated by AUTHZ-DRIFT in spec_rules.go. The real static
+// guarantees that remain: tripwire-pairing (below), the authz-area-scope-binding
+// AST guard in registry_rules.go, and the DB trigger.
 func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error) {
 	if modulesRoot == "" {
 		return nil, nil
 	}
 
-	data, err := os.ReadFile(specPath)
-	if err != nil {
-		return nil, err
-	}
-
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return nil, err
-	}
-
-	root := doc.Content[0]
-	paths := mapGet(root, "paths")
-	if paths == nil {
-		return nil, fmt.Errorf("%s: missing paths", specPath)
-	}
-
 	fset := token.NewFileSet()
-	index, err := indexModuleFuncs(modulesRoot, fset)
-	if err != nil {
-		return nil, err
-	}
 
 	out := []Violation{}
-	for i := 0; i+1 < len(paths.Content); i += 2 {
-		pathVal := paths.Content[i+1]
-		for j := 0; j+1 < len(pathVal.Content); j += 2 {
-			op := pathVal.Content[j+1]
-			opID := scalarValue(mapGet(op, "operationId"))
-			if opID == "" {
-				continue
-			}
-			out = append(out, checkAuthzCallPresent(specPath, opID, op, index, fset)...)
-		}
-	}
-
 	tripwire, err := checkTripwirePairing(modulesRoot, fset, strict)
 	if err != nil {
 		return nil, err
@@ -74,253 +54,6 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	out = append(out, registry...)
 
 	return out, nil
-}
-
-type indexedFunc struct {
-	File string
-	Decl *ast.FuncDecl
-}
-
-func indexModuleFuncs(modulesRoot string, fset *token.FileSet) (map[string][]indexedFunc, error) {
-	out := map[string][]indexedFunc{}
-	err := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if d.IsDir() {
-			// Skip VCS / tooling / vendor / fixture trees (match the registry
-			// walkers). A stale agent worktree under .claude holds detached code
-			// copies whose duplicate receiver methods would otherwise produce
-			// spurious "multiple handler matches" noise (ADR 0022 Phase 11 F5).
-			switch d.Name() {
-			case ".git", ".claude", "node_modules", "vendor", "testdata":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(strings.ToLower(path), ".go") || strings.HasSuffix(strings.ToLower(path), "_test.go") {
-			return nil
-		}
-		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
-		if err != nil {
-			return err
-		}
-		for _, decl := range file.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Recv == nil {
-				continue
-			}
-			out[fn.Name.Name] = append(out[fn.Name.Name], indexedFunc{File: path, Decl: fn})
-		}
-		return nil
-	})
-	return out, err
-}
-
-// checkAuthzCallPresent is DORMANT by design (ADR 0022 Phase 11 F6 — documented,
-// not deleted). It only fires for an operation that declares x-authz-area or
-// x-authz-custom:true WITHOUT x-authz-skip-area, and then expects the operationId-
-// named handler to itself call authz.Require(req.Body.X | req.<Op>Params.X). No
-// MetalDocs module matches that shape: tier-2 area enforcement lives in tx-layer
-// services where the area is DB-derived (un-spoofable, per ADR 0007 tx-coupling),
-// not request-supplied, and every area-grade op therefore carries x-authz-skip-area
-// (which silences this rule) — so the rule's live count is 0 and has been across
-// all phases. Activating it for real requires a call-graph / "source: derived"
-// lint-engine rewrite (tracked as Phase 5+ residual), which is out of scope here.
-// It is kept (a) so the x-authz-custom: true escape hatch keeps working if a future
-// codegen handler does inline authz.Require, and (b) as the documented seam for that
-// rewrite. Do NOT treat its 0-count as "all area ops are statically verified" — the
-// authz-area-scope-binding AST guard (registry_rules.go) is the real per-call-site
-// binding; this is a complementary, currently-unreachable spec-shape check.
-func checkAuthzCallPresent(specPath, opID string, op *yaml.Node, index map[string][]indexedFunc, fset *token.FileSet) []Violation {
-	// Gate: rule applies only when the op declares x-authz-area or x-authz-custom: true.
-	// x-authz-skip-area silences the rule explicitly (also implies the gate is open).
-	if mapGet(op, "x-authz-skip-area") != nil {
-		return nil
-	}
-	hasArea := mapGet(op, "x-authz-area") != nil
-	custom := strings.EqualFold(scalarValue(mapGet(op, "x-authz-custom")), "true")
-	if !hasArea && !custom {
-		return nil
-	}
-
-	handlerName := pascalCase(opID)
-	candidates := index[handlerName]
-	if len(candidates) == 0 {
-		return []Violation{{
-			File:    specPath,
-			Line:    op.Line,
-			Rule:    "authz-call-present",
-			Message: fmt.Sprintf("handler %s not found for operation %s", handlerName, opID),
-		}}
-	}
-	if len(candidates) > 1 {
-		fmt.Printf("warning: multiple handler matches for %s (%s), using first\n", opID, handlerName)
-	}
-
-	fn := candidates[0].Decl
-	expectedFn, expectedExpr := expectedAuthzCall(opID, op)
-	hasAny, hasExpectedFn, matchedArg, actualArg := inspectAuthzCalls(fn, fset, expectedFn, expectedExpr)
-
-	if custom {
-		if !hasAny {
-			return []Violation{{
-				File:    candidates[0].File,
-				Line:    fset.Position(fn.Pos()).Line,
-				Rule:    "authz-call-present",
-				Message: fmt.Sprintf("handler %s does not call authz.Require or authz.RequireAll", handlerName),
-			}}
-		}
-		return nil
-	}
-
-	if !hasExpectedFn {
-		return []Violation{{
-			File:    candidates[0].File,
-			Line:    fset.Position(fn.Pos()).Line,
-			Rule:    "authz-call-present",
-			Message: fmt.Sprintf("handler %s does not call authz.%s", handlerName, expectedFn),
-		}}
-	}
-
-	if matchedArg {
-		return nil
-	}
-
-	if actualArg == "" {
-		actualArg = "<missing>"
-	}
-	return []Violation{{
-		File:    candidates[0].File,
-		Line:    fset.Position(fn.Pos()).Line,
-		Rule:    "authz-call-present",
-		Message: fmt.Sprintf("handler %s calls authz.%s with arg %s; expected %s", handlerName, expectedFn, actualArg, expectedExpr),
-	}}
-}
-
-func inspectAuthzCalls(fn *ast.FuncDecl, fset *token.FileSet, expectedFn, expectedExpr string) (hasAny, hasExpectedFn, matchedArg bool, actualArg string) {
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-		x, ok := sel.X.(*ast.Ident)
-		if !ok || x.Name != "authz" {
-			return true
-		}
-		if sel.Sel.Name != "Require" && sel.Sel.Name != "RequireAll" {
-			return true
-		}
-		hasAny = true
-		if sel.Sel.Name != expectedFn {
-			return true
-		}
-		hasExpectedFn = true
-		if len(call.Args) == 0 {
-			if actualArg == "" {
-				actualArg = "<missing>"
-			}
-			return true
-		}
-		arg := renderExpr(fset, call.Args[len(call.Args)-1])
-		if arg == expectedExpr {
-			matchedArg = true
-			return false
-		}
-		if actualArg == "" {
-			actualArg = arg
-		}
-		return true
-	})
-	return hasAny, hasExpectedFn, matchedArg, actualArg
-}
-
-func expectedAuthzCall(opID string, op *yaml.Node) (fnName, expr string) {
-	area := mapGet(op, "x-authz-area")
-	source := strings.ToLower(strings.TrimSpace(scalarValue(mapGet(area, "source"))))
-	if source == "" {
-		source = "body"
-	}
-	field := strings.TrimSpace(scalarValue(mapGet(area, "field")))
-	multi := strings.EqualFold(scalarValue(mapGet(area, "multi")), "true")
-
-	fnName = "Require"
-	if multi {
-		fnName = "RequireAll"
-	}
-
-	if source == "path" {
-		expr = "req." + pascalCase(opID) + "Params"
-		if field != "" {
-			expr += "." + pascalCasePath(field)
-		}
-		return fnName, expr
-	}
-
-	expr = "req.Body"
-	if field != "" {
-		expr += "." + pascalCasePath(field)
-	}
-	return fnName, expr
-}
-
-func pascalCasePath(path string) string {
-	parts := strings.Split(path, ".")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if strings.TrimSpace(p) == "" {
-			continue
-		}
-		out = append(out, pascalCase(p))
-	}
-	return strings.Join(out, ".")
-}
-
-// pascalCase mirrors oapi-codegen's method-name derivation for operation IDs.
-//
-// Behaviour:
-//   - If the input already has no separators (`_`, `-`, `.`), preserve internal
-//     case and just uppercase the leading rune. This matches camelCase op-ids
-//     like `listTemplatesV2` → `ListTemplatesV2` and initialism-rich names like
-//     `recordMDDMShadowDiff` → `RecordMDDMShadowDiff`.
-//   - If the input has separators (e.g. `area_code`, `zone.area_code`), split,
-//     lowercase each segment, then uppercase the first rune of each.
-//
-// TODO(initialisms): for snake_case fields like `template_id`, real codegen
-// can emit `TemplateID` rather than `TemplateId` depending on initialism
-// config. Revisit once a real handler trips this.
-func pascalCase(s string) string {
-	if s == "" {
-		return ""
-	}
-	if !strings.ContainsAny(s, "_-.") {
-		r := []rune(s)
-		r[0] = unicode.ToUpper(r[0])
-		return string(r)
-	}
-	parts := strings.FieldsFunc(s, func(r rune) bool {
-		return r == '_' || r == '-' || r == '.'
-	})
-	var b strings.Builder
-	for _, p := range parts {
-		if p == "" {
-			continue
-		}
-		r := []rune(strings.ToLower(p))
-		r[0] = unicode.ToUpper(r[0])
-		b.WriteString(string(r))
-	}
-	return b.String()
-}
-
-func renderExpr(fset *token.FileSet, expr ast.Expr) string {
-	var b bytes.Buffer
-	_ = printer.Fprint(&b, fset, expr)
-	return b.String()
 }
 
 // checkTripwirePairing flags repository functions that run mutating SQL without

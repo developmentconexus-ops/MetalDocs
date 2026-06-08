@@ -992,9 +992,8 @@ paths:
       operationId: grantAreaMembership
       x-authz-area:
         source: body
-        field: areaCode
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 3): membership.manage is enforced at the tx-layer repository via authz.Require with the request areaCode. The IAM membership handler is hand-rolled (pre-codegen, ADR 0012 partial rollout), so authz-call-present — a single-function-body scan keyed to the PascalCase operationId handler calling req.Body/req.Params — cannot match it. Covered by tests/unit/iam_memberships + tests/integration/iam/membership_area_scope_test.go; lint activation deferred to ADR 0022 Phase 5.'
+        field: area_code
+        note: 'membership.manage enforced at tier-2 in the tx-layer repository via authz.Require with the request area_code. Covered by tests/unit/iam_memberships + tests/integration/iam/membership_area_scope_test.go.'
       requestBody:
         required: true
         content:
@@ -1030,8 +1029,7 @@ paths:
       x-authz-area:
         source: path
         field: area_code
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 3): membership.manage is enforced at the tx-layer repository via authz.Require with the path area_code. The IAM membership handler is hand-rolled (pre-codegen, ADR 0012 partial rollout), so authz-call-present — a single-function-body scan keyed to the PascalCase operationId handler calling req.Body/req.Params — cannot match it. Covered by tests/unit/iam_memberships + tests/integration/iam/membership_area_scope_test.go; lint activation deferred to ADR 0022 Phase 5.'
+        note: 'membership.manage enforced at tier-2 in the tx-layer repository via authz.Require with the path area_code. Covered by tests/unit/iam_memberships + tests/integration/iam/membership_area_scope_test.go.'
       parameters:
         - name: user_id
           in: path
@@ -1503,8 +1501,7 @@ paths:
       summary: Archive template
       tags: [templates]
       operationId: archiveTemplate
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'No area dimension: templates are tenant-global. Archive is tier-1 capability-gated (template.archive) with area "*" in routes_lifecycle.go; there is no per-area scope to assert.'
+      x-authz-area-none: 'Templates are tenant-global; archive is tier-1 capability-gated (template.archive, area "*" in routes_lifecycle.go). No per-area scope to assert.'
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -2022,12 +2019,12 @@ paths:
       summary: Atomically create controlled document and initial revision
       tags: [controlled-documents]
       operationId: atomicCreateControlledDocument
-      x-authz-skip-area: true
-      x-authz-skip-reason: >-
-        controlled_documents.create is area-grade; the target process area is
-        taken from the request payload (processAreaCode) and enforced at tier-2 in
-        the application layer, not from a uniform request field scannable here
-        (ADR 0022 Phase 7).
+      x-authz-area:
+        source: body
+        field: process_area_code
+        note: >-
+          Area-scoped create: the target process area is the request payload
+          field, enforced at tier-2 in the application layer (ADR 0022 Phase 7).
       parameters:
         - name: Idempotency-Key
           in: header
@@ -2155,11 +2152,13 @@ paths:
       summary: Mark controlled document as obsolete
       tags: [controlled-documents]
       operationId: obsoleteControlledDocument
-      x-authz-skip-area: true
-      x-authz-skip-reason: >-
-        controlled_documents.obsolete is area-grade; the area is loaded from the
-        controlled document row (FOR UPDATE) and enforced at tier-2 in the
-        application layer, not from a request field scannable here (ADR 0022 Phase 7).
+      x-authz-area:
+        source: tx
+        derived_from: 'controlled_documents.process_area_code'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the application layer with the
+          area loaded from the controlled-document row (FOR UPDATE); never from a
+          request field (ADR 0022 Phase 7).
       parameters:
         - name: id
           in: path
@@ -2176,11 +2175,13 @@ paths:
       summary: Mark controlled document as superseded
       tags: [controlled-documents]
       operationId: supersedeControlledDocument
-      x-authz-skip-area: true
-      x-authz-skip-reason: >-
-        controlled_documents.supersede is area-grade; the area is loaded from the
-        controlled document row (FOR UPDATE) and enforced at tier-2 in the
-        application layer, not from a request field scannable here (ADR 0022 Phase 7).
+      x-authz-area:
+        source: tx
+        derived_from: 'controlled_documents.process_area_code'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the application layer with the
+          area loaded from the controlled-document row (FOR UPDATE); never from a
+          request field (ADR 0022 Phase 7).
       parameters:
         - name: id
           in: path
@@ -2266,12 +2267,14 @@ paths:
       summary: Rename document
       tags: [documents]
       operationId: renameDocument
-      x-authz-skip-area: true
-      x-authz-skip-reason: >-
-        document.edit is area-grade; the document's process area is loaded from
-        the document row and enforced at tier-2 in the repository layer, not from a
-        request field scannable here (ADR 0022 Phase 7). Representative surface for
-        the document.edit area posture.
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area resolved from the document row
+          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
+          (migration 0142b) is the backstop.
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -2335,8 +2338,14 @@ paths:
       summary: Archive document
       tags: [documents]
       operationId: archiveDocument
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.archive is enforced at the tx-layer service via authorizeDocumentScope/authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area resolved from the document row
+          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
+          (migration 0142b) is the backstop.
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -2380,8 +2389,13 @@ paths:
       summary: Duplicate document
       tags: [documents]
       operationId: duplicateDocument
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2/7): document.create is enforced at the tx-layer via CreateDocumentTx authz.Require with the resolved document ProcessAreaCode, not in the handler. Phase 9 routes this op to CapDocumentCreate at tier-1; tier-2 area enforcement is the tx guard, so no handler-level x-authz-area applies.'
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer via CreateDocumentTx
+          authz.Require with the area resolved from the source document row; never
+          from a request field. Tier-1 routes this op to CapDocumentCreate.
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '201':
@@ -2971,8 +2985,14 @@ paths:
       summary: Submit document for approval
       tags: [approval]
       operationId: submitDocumentForApproval
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.submit is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area resolved from the document row
+          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
+          (migration 0142b) is the backstop.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
@@ -2996,8 +3016,14 @@ paths:
       summary: Record approval stage signoff
       tags: [approval]
       operationId: recordApprovalStageSignoff
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.signoff is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area resolved from the document row
+          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
+          (migration 0142b) is the backstop.
       parameters:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: stage_id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -3023,8 +3049,14 @@ paths:
       summary: Publish document
       tags: [approval]
       operationId: publishDocument
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.publish is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area resolved from the document row
+          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
+          (migration 0142b) is the backstop.
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3046,8 +3078,14 @@ paths:
       summary: Schedule document publish
       tags: [approval]
       operationId: scheduleDocumentPublish
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.publish is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area resolved from the document row
+          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
+          (migration 0142b) is the backstop.
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3069,8 +3107,14 @@ paths:
       summary: Supersede document
       tags: [approval]
       operationId: supersedeDocument
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.supersede is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area resolved from the document row
+          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
+          (migration 0142b) is the backstop.
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3092,8 +3136,14 @@ paths:
       summary: Obsolete document
       tags: [approval]
       operationId: obsoleteDocument
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.obsolete is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area resolved from the document row
+          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
+          (migration 0142b) is the backstop.
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '200':
@@ -3186,8 +3236,14 @@ paths:
       summary: Record document signoff
       tags: [approval]
       operationId: recordDocumentSignoff
-      x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.signoff is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area resolved from the document row
+          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
+          (migration 0142b) is the backstop.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }

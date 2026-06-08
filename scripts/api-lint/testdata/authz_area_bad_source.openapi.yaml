@@ -1,14 +1,16 @@
 openapi: 3.0.3
 info:
-  title: transition-skip
+  title: authz-area-bad-source
   version: 1.0.0
 paths:
   /widgets/{id}/publish:
     post:
       operationId: publishWidget
       security:
-        - bearerAuth: []
-      x-authz-skip-area: migration-safe
+        - sessionCookie: []
+      x-authz-area:
+        source: zone
+        field: area_code
       responses:
         '204':
           description: done
@@ -20,9 +22,10 @@ paths:
                 $ref: '#/components/schemas/Problem'
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: md_session
   schemas:
     Problem:
       type: object
