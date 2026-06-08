@@ -1,10 +1,8 @@
 # Error UX — Shared HTTP Client & Auth Bus
 
-> **Migration note.** The legacy `ApiErrorEnvelope` shape documented below (`{ error: { code, message } }`) will be replaced by RFC 9457 Problem in Plan 2. See [`architecture/api-design-system.md`](../architecture/api-design-system.md) for the incoming contract.
+> **Migration note (DONE).** The legacy `ApiErrorEnvelope` shape (`{ error: { code, message } }`) has been **fully retired** by api-contract-hardening Phase D (AD-2, 2026-06-07): RFC 9457 `application/problem+json` is the only error shape across the whole API, including `GET /api/v1/audit/events` (already on `problem.New`/`writeProblem`). The shared parser is the canonical contract; see [`architecture/api-design-system.md`](../architecture/api-design-system.md). Any "legacy envelope" wording below is historical.
 
-> **Audit envelope note.** `GET /api/v1/audit/events` emits the same legacy `{error:{code,message,details,trace_id}}` envelope on errors (audit T-002 in [`modules/audit-tech-debt.md`](../modules/audit-tech-debt.md)). The success body is `{"items":[...]}` — not a `data` wrapper. See [`modules/audit.md §8.2`](../modules/audit.md) for the full envelope spec.
-
-> **Last verified:** 2026-05-28 (qa/fe-401-interceptor: 401 discrimination by problem.code)
+> **Last verified:** 2026-06-07 (Phase D: legacy `ApiErrorEnvelope` retired API-wide; audit confirmed Problem-based. Prior: 2026-05-28 qa/fe-401-interceptor)
 > **Branch:** `phase-e-error-ux` (merged into main)
 > **Bugs fixed:** E2, E3, E4; T-014 (401 session-expiry vs domain-401 conflation)
 
