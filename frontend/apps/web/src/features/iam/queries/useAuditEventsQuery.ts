@@ -32,28 +32,23 @@ export type AuditEventsPage = {
   hasMore: boolean;
 };
 
-// TODO(contract-drift): backend returns flat {items,nextCursor,hasMore};
-// OpenAPI says page.{next_cursor,has_more}. Tracked in
-// wiki/decisions/2026-06-03-audit-events-cursor-shape.md
+// Canonical cursor envelope: { items, page:{ next_cursor, has_more } } — matches
+// the OpenAPI ListAuditEventsResponse / CursorPage and the runtime handler. (The
+// prior flat-shape fallback + drift was closed in Phase F; see
+// wiki/decisions/2026-06-03-audit-events-cursor-shape.md.)
 function adaptPage(raw: unknown): AuditEventsPage {
   if (!raw || typeof raw !== "object") {
     return { items: [], nextCursor: null, hasMore: false };
   }
   const r = raw as {
     items?: unknown;
-    nextCursor?: unknown;
-    hasMore?: unknown;
     page?: { next_cursor?: unknown; has_more?: unknown };
   };
   const items = Array.isArray(r.items) ? (r.items as AuditEventItem[]) : [];
-  const flatCursor = typeof r.nextCursor === "string" ? r.nextCursor : null;
-  const nestedCursor =
+  const nextCursor =
     typeof r.page?.next_cursor === "string" ? r.page.next_cursor : null;
-  const flatHas = typeof r.hasMore === "boolean" ? r.hasMore : undefined;
-  const nestedHas =
-    typeof r.page?.has_more === "boolean" ? r.page.has_more : undefined;
-  const nextCursor = flatCursor ?? nestedCursor;
-  const hasMore = flatHas ?? nestedHas ?? Boolean(nextCursor);
+  const hasMore =
+    typeof r.page?.has_more === "boolean" ? r.page.has_more : Boolean(nextCursor);
   return { items, nextCursor, hasMore };
 }
 

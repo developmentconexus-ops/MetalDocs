@@ -110,13 +110,15 @@ func TestAuditHandler_CursorPagination(t *testing.T) {
 		Items []struct {
 			ID string `json:"id"`
 		} `json:"items"`
-		NextCursor string `json:"next_cursor"`
-		HasMore    bool   `json:"has_more"`
+		Page struct {
+			NextCursor string `json:"next_cursor"`
+			HasMore    bool   `json:"has_more"`
+		} `json:"page"`
 	}
 	if err := json.Unmarshal(rec1.Body.Bytes(), &page1); err != nil {
 		t.Fatalf("decode page1: %v", err)
 	}
-	if len(page1.Items) != 2 || !page1.HasMore || page1.NextCursor == "" {
+	if len(page1.Items) != 2 || !page1.Page.HasMore || page1.Page.NextCursor == "" {
 		t.Fatalf("unexpected page1: %+v", page1)
 	}
 	if page1.Items[0].ID != "evt-e" || page1.Items[1].ID != "evt-d" {
@@ -124,7 +126,7 @@ func TestAuditHandler_CursorPagination(t *testing.T) {
 	}
 
 	rec2 := httptest.NewRecorder()
-	mux.ServeHTTP(rec2, authedRequest(t, http.MethodGet, "/api/v1/audit/events?limit=2&cursor="+page1.NextCursor, "tenant-a", "actor-test", ""))
+	mux.ServeHTTP(rec2, authedRequest(t, http.MethodGet, "/api/v1/audit/events?limit=2&cursor="+page1.Page.NextCursor, "tenant-a", "actor-test", ""))
 	var page2 struct {
 		Items []struct {
 			ID string `json:"id"`

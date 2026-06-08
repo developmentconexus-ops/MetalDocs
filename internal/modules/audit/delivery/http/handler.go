@@ -108,18 +108,21 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := map[string]any{
-		"items": responseItems,
-	}
+	// Canonical cursor envelope (matches ListAuditEventsResponse / CursorPage and
+	// every other list op): {items, page:{next_cursor, has_more}}. Previously this
+	// emitted next_cursor/has_more at the top level — a spec↔runtime drift the FE
+	// bridged with a dual-shape adapter (closed: ADR 2026-06-03-audit-events-cursor-shape).
+	page := map[string]any{"next_cursor": nil, "has_more": false}
 	if len(items) >= query.Limit {
 		last := items[len(items)-1]
-		resp["next_cursor"] = encodeCursor(domain.Cursor{OccurredAt: last.OccurredAt, ID: last.ID})
-		resp["has_more"] = true
-	} else {
-		resp["has_more"] = false
+		page["next_cursor"] = encodeCursor(domain.Cursor{OccurredAt: last.OccurredAt, ID: last.ID})
+		page["has_more"] = true
 	}
 
-	httpresponse.WriteJSON(w, http.StatusOK, resp)
+	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
+		"items": responseItems,
+		"page":  page,
+	})
 }
 
 func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
