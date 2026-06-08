@@ -2,19 +2,19 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-06-08 (Phase E1 casing big-bang: `ActiveDocumentResponse` json tags updated to snake_case in artifact; prior: 2026-06-07) | **Owner:** leandro | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-06-08 (Phase F F4/FD-1: repository.go line anchors updated for cursor migration; idempotency diagram updated CheckReplay→BeginReplay/RecordReplay→CompleteReplay) | **Owner:** leandro | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/controlleddocuments/module.go:25` - module wiring (`New`, dependencies)
 > - `internal/modules/controlleddocuments/application/service.go:104` - service `Create` (legacy literal struct identifier noted in Historical Literal Key Notes)
 > - `internal/modules/controlleddocuments/application/service.go:293` - `Obsolete` / `Supersede` via `changeStatus`
-> - `internal/modules/controlleddocuments/delivery/http/handler.go:48` - `injectTenant` middleware (reads tenant via `tenant.FromContext`)
-> - `internal/modules/controlleddocuments/delivery/http/handler.go:60` - `tenantIDFromContext` (local context accessor)
+> - `internal/modules/controlleddocuments/delivery/http/handler.go:49` - `injectTenant` middleware (reads tenant via `tenant.FromContext`)
+> - `internal/modules/controlleddocuments/delivery/http/handler.go:61` - `tenantIDFromContext` (local context accessor)
 > - `internal/modules/controlleddocuments/delivery/http/routes.go:43` - `AtomicCreateControlledDocument` handler
 > - `internal/modules/controlleddocuments/delivery/http/routes.go:232` - `GetActiveDocument` handler (FULL OUTER JOIN)
 > - `internal/modules/controlleddocuments/delivery/http/routes.go:488` - `tenantIDFromRequest` -> `tenant.FromContext`
 > - `internal/modules/controlleddocuments/domain/document_initializer.go:30` - `DocumentInitializer` port (consumed by documents)
-> - `internal/modules/controlleddocuments/infrastructure/repository.go:184` - `UpdateStatus` (lifecycle mutation)
+> - `internal/modules/controlleddocuments/infrastructure/repository.go:432` - `UpdateStatus` (lifecycle mutation)
 > - `migrations/0124_registry_controlled_documents.sql` - initial table (legacy literal migration filename)
 > - `migrations/0182_cd_sequence_per_area.sql` - per-area sequence (ADR 0011)
 
@@ -162,9 +162,9 @@ Full list in `_artifacts/01-surface.md` (89 exported symbols). Anchors below:
 | `domain/document_initializer.go:38` | `NewDocumentRef` | func | Validates document handles returned by the documents port |
 | `domain/sequence.go:13` | `SequenceAllocator` | iface | Counter port |
 | `domain/resolution.go:30` | `Resolve` | func | Template-version resolution (default vs override) |
-| `infrastructure/repository.go:137` | `CreateTx` | method | Insert in caller-owned tx |
-| `infrastructure/repository.go:184` | `UpdateStatus` | method | Lifecycle UPDATE |
-| `infrastructure/repository.go:239` | `NextAndIncrement` | method | Sequence allocation |
+| `infrastructure/repository.go:353` | `CreateTx` | method | Insert in caller-owned tx |
+| `infrastructure/repository.go:432` | `UpdateStatus` | method | Lifecycle UPDATE |
+| `infrastructure/repository.go:559` | `NextAndIncrement` | method | Sequence allocation |
 
 ### 5.3 HTTP operations
 
@@ -216,7 +216,7 @@ sequenceDiagram
     participant DocRepo as documents.CreateDocumentTx
     participant Log as govLogger
     C->>Idem: POST /controlled-documents (Idempotency-Key, body)
-    Idem->>Idem: CheckReplay (body hash)
+    Idem->>Idem: BeginReplay (body hash — idempotency.Require middleware)
     Idem->>H: forward
     H->>S: Create(cmd)
     S->>Repo: TaxonomyProfileReader.GetByCode
@@ -234,7 +234,7 @@ sequenceDiagram
     S->>Log: emit governance events
     S-->>H: CreateResult
     H-->>Idem: 201 AtomicCreateResponse
-    Idem->>Idem: RecordReplay
+    Idem->>Idem: CompleteReplay
     Idem-->>C: 201
 ```
 
@@ -355,7 +355,7 @@ RFC 9457 `application/problem+json`. `httpresponse.WriteError` at `internal/plat
 
 ### 8.3 Idempotency
 
-`Idempotency-Key` header required on POST create + POST revisions. Middleware: `internal/platform/idempotency/middleware.go:22`. Store: `postgres_store.go:19`. Body-hash conflict -> 422 `IDEMPOTENCY_KEY_CONFLICT`. PUT lifecycle routes are NOT covered (T-008).
+`Idempotency-Key` header required on POST create + POST revisions. Middleware: `internal/platform/idempotency/middleware.go:80` (`Require`). Store: `postgres_store.go:74` (`BeginReplay`). Body-hash conflict → 422 `IDEMPOTENCY_KEY_CONFLICT`. PUT lifecycle routes are NOT covered (T-008).
 
 ### 8.4 Pagination
 
@@ -460,7 +460,7 @@ Top 3 (by severity, then blast-radius):
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
 | Postgres unavailable mid atomic-create | Tx aborts; no CD row, no first revision — caller sees 500 | `application/service.go:104` `Create` rolls back the whole tx | Per ADR 0011: atomic guarantee — no orphan slots possible by design |
-| Sequence counter collision (concurrent create on same `(tenant, profile, area)`) | One side wins via `NextAndIncrement`; loser retries | `infrastructure/repository.go:239` uses `SELECT … FOR UPDATE` or `UPDATE … RETURNING` | Caller retries with fresh `Idempotency-Key`; race is bounded |
+| Sequence counter collision (concurrent create on same `(tenant, profile, area)`) | One side wins via `NextAndIncrement`; loser retries | `infrastructure/repository.go:559` uses `SELECT … FOR UPDATE` or `UPDATE … RETURNING` | Caller retries with fresh `Idempotency-Key`; race is bounded |
 | Idempotency replay (`Idempotency-Key` header reused) | 201 with stored response; no duplicate CD/document | `platform/idempotency.Require` middleware | Expected; safe network-retry path |
 | Body-hash mismatch on replay | 409 from idempotency middleware | Idempotency store detects payload change | Caller must use a fresh key for a different payload |
 | FK validation: profile / area unknown | 4xx from `TaxonomyProfileReader` / `AreaReader` | `taxRead.GetByCode` returns not-found | Confirm taxonomy data; backfill missing rows |

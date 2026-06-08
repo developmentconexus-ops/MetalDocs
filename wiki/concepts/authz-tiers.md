@@ -1,6 +1,6 @@
 # Authz Tiers
 
-> **Last verified:** 2026-06-07 (Phase C dead-path prune: rule authoring rules §3 example block updated :104-117 → :101-116; prior: 2026-06-03)
+> **Last verified:** 2026-06-08 (Phase F FD-1: authz-call-present lint deleted from code_rules.go; no anchor change needed here — code_rules.go anchor was already removed)
 > **Scope:** Two authorization tiers in MetalDocs — HTTP middleware (tier 1) vs in-transaction area check (tier 2).
 > **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam.md`.
 > **Key files:**

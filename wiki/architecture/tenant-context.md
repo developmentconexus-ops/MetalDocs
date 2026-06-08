@@ -1,6 +1,6 @@
 ﻿# Architecture: Session-Bound Tenant Context
 
-> **Last verified:** 2026-05-21 (spec-review convergence sync)
+> **Last verified:** 2026-06-08 (Phase F: controlled-documents injectTenant anchor :50 → :49)
 > **Freeze verification note (2026-05-21):** Terminology and ownership framing were re-checked during spec-review cleanup; runtime/source-of-truth claims in this doc were not expanded in this pass.
 > **Scope:** `internal/platform/tenant` package; how tenant identity flows from login through every request handler; `AllowDevTenantFallback` flag; IAM legacy fallback pattern.
 > **Out of scope:** per-tenant IAM role assignment (see `wiki/modules/iam.md   8.2`); row-level Postgres isolation via GUC/RLS (tracked per-module as tech debt).
@@ -150,7 +150,7 @@ All of the following now call `tenant.FromContext` (or a thin wrapper over it) i
 | IAM | `iam/delivery/http/admin_handler.go:109` | direct `tenant.FromContext` |
 | IAM | `iam/delivery/http/routes_memberships.go:146` | `tenantIDFromRequest`     `tenant.FromContext` |
 | controlled-documents | `internal/modules/controlleddocuments/delivery/http/routes.go:488` | `tenantIDFromRequest`     `tenant.FromContext` |
-| controlled-documents | `internal/modules/controlleddocuments/delivery/http/handler.go:50` | `injectTenant` middleware     `tenant.FromContext` |
+| controlled-documents | `internal/modules/controlleddocuments/delivery/http/handler.go:49` | `injectTenant` middleware     `tenant.FromContext` |
 | templates | `templates/delivery/http/handler.go:83` | `tenantIDFromReq`     `tenant.FromContext` |
 | taxonomy | `taxonomy/delivery/http/routes_profiles.go:230` | `tenantIDFromRequest`     `tenant.FromContext` |
 | documents | `documents/delivery/http/handler.go` | `tenant.FromContext` |

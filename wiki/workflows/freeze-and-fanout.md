@@ -1,6 +1,6 @@
 # Workflow: Freeze and Fanout
 
-> **Last verified:** 2026-05-04
+> **Last verified:** 2026-06-08 (Phase F F8: legacyFanout param removed from NewFreezeService — no line anchor in this doc; no content changes needed)
 > **Scope:** The full pipeline from signoff approval → computed value resolution → DOCX substitution → frozen artifact stored in S3 → async PDF generation via outbox worker.
 > **Out of scope:** Approval routing and signoff rules (see `workflows/approval.md`), editor-side substitution deferral (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**

@@ -1,10 +1,10 @@
 # Workflow: Approval
 
-> **Last verified:** 2026-06-08 (Phase E1: `instanceId` → `instance_id` in finalize response; prior: 2026-06-02)
+> **Last verified:** 2026-06-08 (Phase F F8: finalizeDocument line anchor updated :423 → :435; CheckReplay note replaced with BeginReplay)
 > **Scope:** Submit → route assignment → signoffs → approval condition met → freeze trigger.
 > **Out of scope:** Freeze pipeline (see `workflows/freeze-and-fanout.md`), route admin (see `modules/approval.md`).
 > **Key files:**
-> - `internal/modules/documents/delivery/http/handler.go:423` — `finalizeDocument` — atomic finalize+submit handler
+> - `internal/modules/documents/delivery/http/handler.go:435` — `finalizeDocument` — atomic finalize+submit handler
 > - `internal/modules/documents/approval/application/submit_service.go:140` — `resolveEligibleActors` call inside stage-instance loop
 > - `internal/modules/documents/approval/application/submit_service.go:299` — `resolveEligibleActors` implementation (queries `metaldocs.user_process_areas`)
 > - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
@@ -24,7 +24,7 @@ See [workflows/user-onboarding.md](user-onboarding.md) for the full step-by-step
 
 Previously `POST /api/v1/documents/{id}/finalize` only updated the document status to `under_review`. No approval instance was created, so the inbox was always empty after finalize.
 
-Now `finalizeDocument` at `handler.go:316`:
+Now `finalizeDocument` at `handler.go:435`:
 
 1. Reads `revision_version` and `controlled_document_id` from the document row (errors with 409 if not in `draft`).
 2. Reads `profile_code` from `controlled_documents`.
@@ -32,7 +32,7 @@ Now `finalizeDocument` at `handler.go:316`:
 4. Calls `SubmitRevisionForReview` — this single transaction creates the approval instance, stage instances, and transitions the document to `under_review`.
 5. Returns HTTP 201 with `{"instance_id": "<uuid>"}`.
 
-`NewHandlerWithSubmit` at `handler.go:90` is required to wire `db` + `submitSvc`; if only `NewHandler` is used the legacy status-only path runs as fallback.
+`NewHandlerWithSubmit` at `handler.go:100` is required to wire `db` + `submitSvc`; if only `NewHandler` is used the legacy status-only path runs as fallback.
 
 ## eligible_actor_ids populated at submit time (fixed 2026-05-02)
 
@@ -66,7 +66,7 @@ WHERE id = '<stage_id>';
 
 `SignoffByDocumentHandler` now requires an `Idempotency-Key` request header. Before calling the domain:
 
-1. Checks `idempotency_keys` table via `PostgresSignoffIdempStore.CheckReplay`.
+1. Checks `idempotency_keys` table via `PostgresSignoffIdempStore.BeginReplay` (shared `internal/platform/idempotency` protocol).
 2. If a completed record exists, returns HTTP 200 with `{"was_replay": true, "outcome": "<prior outcome>"}` — **no duplicate domain call**.
 3. On fresh signoff: records the outcome in `idempotency_keys` (keyed by `(tenant_id, actor_user_id, route_template, key)`; expires 24 h).
 

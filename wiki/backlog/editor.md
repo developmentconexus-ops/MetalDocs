@@ -129,7 +129,7 @@ Route truth evidence:
 
 - OpenAPI comments paths: `api/openapi/v1/openapi.yaml:2330` and `api/openapi/v1/openapi.yaml:2362`
 - Generated backend comments surface: `internal/modules/documents/api/api.gen.go` (`ListDocumentComments`, `CreateDocumentComment`, `UpdateDocumentComment`, `DeleteDocumentComment`)
-- Runtime route wiring: `internal/modules/documents/delivery/http/handler.go:120-123` and `internal/modules/documents/delivery/http/handler.go:155-158`
+- Runtime route wiring: `internal/modules/documents/delivery/http/handler.go:136-139` (`RegisterRoutes`) and `internal/modules/documents/delivery/http/handler.go:172-175` (`RegisterRoutesWithRateLimit`)
 - Frontend wrapper: `frontend/apps/web/src/features/documents/api/documents.ts`
 
 | Item | Source | Runtime/API reality | Frontend reality | Classification | Action |

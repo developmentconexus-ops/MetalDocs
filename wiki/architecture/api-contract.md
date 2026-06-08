@@ -2,7 +2,7 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-06-08 (api-contract-hardening Phase E2 — spec hygiene: root-level `security` secure-by-default, top-level `tags`, one pagination convention, full per-op error-mode coverage, and two non-standard methods reshaped: `DELETE /iam/area-memberships`→`DELETE …/{user_id}/{area_code}` (hand-rolled iam handler), `DELETE /approval/routes/{id}`→`POST …/{id}/deactivate` (generated-wrapper-mounted). All 6 oapi-codegen packages regenerated, idempotent. See `wiki/architecture/api-design-system.md` for the conventions and `wiki/backlog/api-contract-hardening.md` Phase E2 for evidence. Prior: 2026-05-21)
+> **Last verified:** 2026-06-08 (Phase F: HandlerWithOptions anchor updated; api-contract-hardening Phase E2 — spec hygiene: root-level `security` secure-by-default, top-level `tags`, one pagination convention, full per-op error-mode coverage, and two non-standard methods reshaped: `DELETE /iam/area-memberships`→`DELETE …/{user_id}/{area_code}` (hand-rolled iam handler), `DELETE /approval/routes/{id}`→`POST …/{id}/deactivate` (generated-wrapper-mounted). All 6 oapi-codegen packages regenerated, idempotent. See `wiki/architecture/api-design-system.md` for the conventions and `wiki/backlog/api-contract-hardening.md` Phase E2 for evidence. Prior: 2026-05-21)
 > **Scope:** OpenAPI spec location, backend codegen (oapi-codegen v2), frontend codegen (openapi-typescript v7), runtime enforcement gaps, CI drift guard, and freeze-law contract checks.
 > **Out of scope:** Auth/IAM mechanics (`modules/iam.md`), approval-specific request shapes (`modules/approval.md`), frontend API call patterns (`architecture/frontend-structure.md section 7`).
 > **Key files:**
@@ -18,7 +18,7 @@
 > - `internal/modules/documents/api/gen.go:1` - `//go:generate` invocation for documents
 > - `internal/modules/documents/api/api.gen.go:1` - generated; DO NOT EDIT
 > - `internal/modules/documents/approval/http/contracts/strictjson.go:23` - `Decode` helper; `DisallowUnknownFields` pattern used at handler boundaries
-> - `internal/modules/controlleddocuments/delivery/http/handler.go:72` - `ServerInterfaceWrapper` wiring pattern (controlled-documents)
+> - `internal/modules/controlleddocuments/delivery/http/handler.go:95` - `HandlerWithOptions` wiring pattern (controlled-documents)
 > - `internal/modules/templates/delivery/http/handler.go:32` - `ServerInterfaceWrapper` wiring pattern (templates)
 > - `migrations/0183_documents_name_not_empty.sql:27` - DB invariant floor for `documents.name`
 > - `.github/workflows/api-contract.yml:1` - CI drift guard (3 jobs)
@@ -66,21 +66,18 @@ CI runs `go generate ./...` - see `api-contract.yml:27`.
 
 ## 3. Handler wiring pattern
 
-Handlers do **not** implement `StrictServerInterface` directly. The current pattern uses `ServerInterfaceWrapper`:
+Handlers do **not** implement `StrictServerInterface` directly. The current pattern uses `HandlerWithOptions` (previously `ServerInterfaceWrapper`):
 
 ```go
-// internal/modules/controlleddocuments/delivery/http/handler.go:72
-generated := controlleddocumentsapi.ServerInterfaceWrapper{
-    Handler: h,
-    ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-        httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
-    },
-}
-mux.HandleFunc("GET /api/v1/controlled-documents", generated.ListControlledDocuments)
-// ...
+// internal/modules/controlleddocuments/delivery/http/handler.go:95
+controlleddocumentsapi.HandlerWithOptions(h, controlleddocumentsapi.StdHTTPServerOptions{
+    BaseRouter: mux,
+    BaseURL: "/api/v1",
+    // ...
+})
 ```
 
-The handler struct (`*Handler`) implements `ServerInterface`; the wrapper handles route dispatch and param parsing.
+The handler struct (`*Handler`) implements `ServerInterface`; the generated `HandlerWithOptions` handles route dispatch and param parsing.
 
 ---
 
@@ -198,7 +195,7 @@ If any of these conflict, stop and resolve the prerequisite before feature imple
    //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config=cfg.yaml ../../../../api/openapi/v1/openapi.yaml
    ```
 5. Run `GOFLAGS=-mod=mod go generate ./internal/modules/<x>/api/...`.
-6. Implement `ServerInterface` on the handler struct; wire via `ServerInterfaceWrapper` (controlled-documents pattern at `handler.go:72`).
+6. Implement `ServerInterface` on the handler struct; wire via `HandlerWithOptions` (controlled-documents pattern at `handler.go:95`).
 7. Commit `api.gen.go` - CI drift check will verify it stays in sync.
 
 ---

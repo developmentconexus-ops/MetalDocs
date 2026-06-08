@@ -1,14 +1,14 @@
 # 1. File tree
 
-- `application/.gitkeep` — type: marker
-- `application/service.go` — type: service
-- `delivery/http/.gitkeep` — type: marker
-- `delivery/http/handler.go` — type: handler, router
-- `domain/.gitkeep` — type: marker
-- `domain/port.go` — type: model, dto, interface(port)
-- `infrastructure/.gitkeep` — type: marker
-- `infrastructure/memory/writer.go` — type: repo(writer)
-- `infrastructure/postgres/writer.go` — type: repo(writer)
+- `application/.gitkeep` ï¿½ type: marker
+- `application/service.go` ï¿½ type: service
+- `delivery/http/.gitkeep` ï¿½ type: marker
+- `delivery/http/handler.go` ï¿½ type: handler, router
+- `domain/.gitkeep` ï¿½ type: marker
+- `domain/port.go` ï¿½ type: model, dto, interface(port)
+- `infrastructure/.gitkeep` ï¿½ type: marker
+- `infrastructure/memory/writer.go` ï¿½ type: repo(writer)
+- `infrastructure/postgres/writer.go` ï¿½ type: repo(writer)
 
 # 2. Public surface
 
@@ -17,10 +17,10 @@
 | `internal/modules/audit/application/service.go:10` | type | `Service` | `type Service struct { ... }` |
 | `internal/modules/audit/application/service.go:14` | func | `NewService` | `func NewService(reader domain.Reader) *Service` |
 | `internal/modules/audit/application/service.go:18` | method | `ListEvents` | `func (s *Service) ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, error)` |
-| `internal/modules/audit/delivery/http/handler.go:15` | type | `Handler` | `type Handler struct { ... }` |
-| `internal/modules/audit/delivery/http/handler.go:19` | type | `EventResponse` | `type EventResponse struct { ... }` |
-| `internal/modules/audit/delivery/http/handler.go:30` | func | `NewHandler` | `func NewHandler(service *application.Service) *Handler` |
-| `internal/modules/audit/delivery/http/handler.go:34` | method | `RegisterRoutes` | `func (h *Handler) RegisterRoutes(mux *http.ServeMux)` |
+| `internal/modules/audit/delivery/http/handler.go:37` | type | `Handler` | `type Handler struct { ... }` |
+| `internal/modules/audit/delivery/http/handler.go:42` | type | `EventResponse` | `type EventResponse struct { ... }` |
+| `internal/modules/audit/delivery/http/handler.go:53` | func | `NewHandler` | `func NewHandler(service AuditQuerier) *Handler` |
+| `internal/modules/audit/delivery/http/handler.go:67` | method | `RegisterRoutes` | `func (h *Handler) RegisterRoutes(mux *http.ServeMux)` |
 | `internal/modules/audit/domain/port.go:8` | type | `Event` | `type Event struct { ... }` |
 | `internal/modules/audit/domain/port.go:19` | type | `ListEventsQuery` | `type ListEventsQuery struct { ... }` |
 | `internal/modules/audit/domain/port.go:25` | type(interface) | `Writer` | `type Writer interface { Record(ctx context.Context, event Event) error }` |
@@ -38,7 +38,7 @@
 
 | Method | Path | Handler function | Auth middleware | Route registration |
 |---|---|---|---|---|
-| `GET` | `/api/v1/audit/events` | `h.handleEvents` | `(none)` | `internal/modules/audit/delivery/http/handler.go:35` |
+| `GET` | `/api/v1/audit/events` | `h.handleEvents` | `(none)` | `internal/modules/audit/delivery/http/handler.go:68` |
 
 # 4. Migration list
 

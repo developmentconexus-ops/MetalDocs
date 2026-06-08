@@ -1,6 +1,6 @@
 # Decisions
 
-> **Last verified:** 2026-06-03
+> **Last verified:** 2026-06-08 (Phase F: ADR 0022 added to index; stamps bumped on 0007, 0022)
 > **Scope:** Durable ADRs and consequential technical decisions.
 
 - [0001-eigenpal-adoption.md](0001-eigenpal-adoption.md)
@@ -18,6 +18,7 @@
 - [0019-cap-audit-read-and-session-manage.md](0019-cap-audit-read-and-session-manage.md) — tier-1 caps for audit read + session manage (PR-2)
 - [0020-admin-center-six-tab-ia.md](0020-admin-center-six-tab-ia.md) — **Accepted** — Admin Center 6-tab IA, shipped at PR-12
 - [0021-tenant-vs-platform-admin-separation.md](0021-tenant-vs-platform-admin-separation.md) — **Accepted** — tenant admin vs. platform admin scope split, shipped at PR-12
+- [0022-authz-capability-coherence.md](0022-authz-capability-coherence.md) — **Accepted (in execution)** — single source of truth for capability registry, route table, seed, and spec markers; area-scoped admin coherence; 13-phase execution plan
 - [0023-authz-area-markers.md](0023-authz-area-markers.md) — **Accepted** — honest positive authz-area markers (`source: tx` derived_from / `x-authz-area-none`) replace the negative `x-authz-skip-area`; dormant `authz-call-present` lint deleted (Phase F · FD-1)
 - [0024-openapi-single-base-path.md](0024-openapi-single-base-path.md) — **Accepted** — AD-1: one `servers.url: /api/v1` + relative path keys; PATH-BASE-PREFIX gate kills the double-prefix bug class
 - [0025-error-envelope-rfc9457.md](0025-error-envelope-rfc9457.md) — **Accepted** — AD-2: RFC 9457 Problem is the only error shape; ApiErrorEnvelope retired; ENVELOPE-DRIFT blocking, zero exemptions

@@ -134,7 +134,7 @@ GET /api/v1/documents?cursor=<opaque>&limit=20
 
 `id` is always appended as a tie-breaker (`asc`) when sort field is non-unique. Filter/sort change between pages     400 `INVALID_CURSOR`; client restarts pagination.
 
-**Go helper:** `internal/platform/pagination/cursor.go`     `Encode`, `Decode`, `ValidateMatch`, `HashFilters`, `AppendIDTieBreaker`, `ClampLimit`.
+**Go helper:** `internal/platform/pagination/cursor.go`     `EncodeCursor` (base64 `sortValue|id`), `DecodeCursor` (returns sortValue, id, err), `ClampLimit` (default 20, max 100).
 
 ---
 

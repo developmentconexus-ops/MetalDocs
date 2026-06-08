@@ -1,6 +1,6 @@
 # Architecture: Data Model
 
-> **Last verified:** 2026-05-15
+> **Last verified:** 2026-06-08 (Phase F F4: ListDocumentsPaginated cursor migration; repository.go line anchors updated)
 > **Status:** Stub. Expand with ERD + per-table schema notes when SQL stabilizes.
 > **Scope:** Postgres tables, key relationships, snapshot columns, hash columns.
 > **Out of scope:** Migration archaeology (see `docs/db-research/` and retained historical `migrations/` evidence).
@@ -102,15 +102,14 @@ Without `0161`: all family API endpoints fail with Postgres permission errors.
 
 ## List/stats query pattern (Library)
 
-`ListDocumentsPaginated` and its sibling queries (`CountDocuments`, `StatsByStatus`, `StatsByArea`) all share a single `buildDocumentFilter` helper at `internal/modules/documents/repository/repository.go:284`.
+`ListDocumentsPaginated` and its sibling queries (`CountDocuments`, `StatsByStatus`, `StatsByArea`) all share a single `buildDocumentFilter` helper at `internal/modules/documents/repository/repository.go:429`.
 
-The **two-query pattern** used by the Library screen:
-1. `SELECT … FROM documents WHERE <filter> ORDER BY updated_at DESC LIMIT $N OFFSET $M` — returns page items.
-2. `SELECT COUNT(*) FROM documents WHERE <filter>` — returns total for pagination controls.
+The **keyset cursor pattern** used by the Library screen (Phase F F4):
+- `ListDocumentsPaginated` returns `(items, hasMore)` using an opaque cursor from `internal/platform/pagination` (`EncodeCursor`/`DecodeCursor`/`ClampLimit`).
+- The service layer re-exports `hasMore` and builds `next_cursor` in the handler envelope `{items, page:{next_cursor, has_more}}`.
+- A `total` count query still runs via `CountDocuments` for pagination controls where needed.
 
-Both queries execute the same WHERE clause (same args, same parameterized bindings) to keep item count and total in sync. Stats queries add `GROUP BY status` or `GROUP BY process_area_code_snapshot` on the same filter.
-
-`ListOptions` struct lives in `repository.go:253`; it is re-exported as a type alias at `application/list_options.go:1` so handlers depend only on the `application` package.
+`ListOptions` struct lives in `repository.go:412`; it is re-exported as a type alias at `application/list_options.go:1` so handlers depend only on the `application` package.
 
 Index note: `(tenant_id, status)` and `(tenant_id, process_area_code_snapshot)` may benefit from a composite index under real-data load — tracked as a backend follow-up in `wiki/implementation/plan-library.md`.
 

@@ -1,6 +1,6 @@
 # Architecture: Rate Limiting
 
-> **Last verified:** 2026-06-07 (api-contract-hardening Phase D: both limiters now emit RFC 9457 `application/problem+json` with code `RATE_LIMITED` + `Retry-After`, replacing the legacy `{error:…}` JSON bodies. Prior: 2026-05-22 commit H2 fix)
+> **Last verified:** 2026-06-08 (Phase F F8: handler.go autosave rate-limit line anchors updated :145-152 → :157-164)
 > **Scope:** the two parallel rate-limiter implementations currently live in the API, what each one keys on, which routes each one protects, and the bounded-memory contract both honor (review finding **C2**).
 > **Out of scope:** circuit-breakers on downstream calls, infrastructure-layer (CDN / WAF) limiting, per-tenant quota enforcement, billing-driven throttling. Merging the two limiters is intentionally **deferred** to a separate refactor — see "Known duplication" below.
 > **Key files:**
@@ -62,8 +62,8 @@ apps/api/cmd/metaldocs-api/main.go (proposed)
 
 | Route | Method | `RouteKey` | Default quota (req/min) | Callsite |
 |---|---|---|---|---|
-| `/api/v1/documents/{id}/autosave/presign` | `POST` | `RouteAutosavePresign` | 60 | [`handler.go:145-148`](../../internal/modules/documents/delivery/http/handler.go) |
-| `/api/v1/documents/{id}/autosave/commit`  | `POST` | `RouteAutosaveCommit`  | 30 | [`handler.go:149-152`](../../internal/modules/documents/delivery/http/handler.go) |
+| `/api/v1/documents/{id}/autosave/presign` | `POST` | `RouteAutosavePresign` | 60 | [`handler.go:157-160`](../../internal/modules/documents/delivery/http/handler.go) |
+| `/api/v1/documents/{id}/autosave/commit`  | `POST` | `RouteAutosaveCommit`  | 30 | [`handler.go:161-164`](../../internal/modules/documents/delivery/http/handler.go) |
 | `/api/v1/documents/{id}/export/pdf`       | `POST` | `RouteExportPDF`       | 20 | [`export_handler.go:44-48`](../../internal/modules/documents/delivery/http/export_handler.go) |
 
 `RouteUploadsPresign` and `RouteDocumentsRender` exist in the catalog (`config.go:12-16`) but have no `rl.Limit` callsite yet — they are reserved for future endpoints. Adding a new per-route limit means (a) declaring a `RouteKey` constant, (b) giving it a `Quotas` entry in `DefaultConfig`, and (c) wrapping the handler with `rl.Limit(...)`.

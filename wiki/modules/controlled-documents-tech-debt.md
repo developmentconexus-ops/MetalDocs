@@ -2,7 +2,7 @@
 
 > Companion to [wiki/modules/controlled-documents.md](controlled-documents.md). Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in [wiki/backlog/controlled-documents-refactor.md](../backlog/controlled-documents-refactor.md).
 
-**Last verified:** 2026-05-25 (backend medium quality-bar sync)
+**Last verified:** 2026-06-08 (Phase F F4: repository.go line anchors updated for cursor migration)
 
 ## Severity scale
 
@@ -66,7 +66,7 @@ The category names are useful only when paired with concrete triggers. Use the t
 
 ### T-005    Tenant scoping via query arg only     no GUC + RLS backstop
 - **Severity:** major
-- **Surface:** `internal/modules/controlleddocuments/infrastructure/repository.go:26`, `:36`, `:46`, `:57`, `:137`, `:184`, `:208`, `:239`
+- **Surface:** `internal/modules/controlleddocuments/infrastructure/repository.go` — `GetByID`, `GetByCode`, `CodeExists`, `List`, `CreateTx`, `UpdateStatus`, `NextAndIncrement` (all include `tenant_id = $...` predicate)
 - **Observation:** Every WHERE clause includes `tenant_id = $...` from the request context (sourced via `tenant.FromContext`     Plan 3 removed the `X-Tenant-ID` header source). No `SET LOCAL metaldocs.tenant_id` GUC is issued before the query; no RLS policy on `controlled_documents` / `cd_sequence_counters`. A repository method that forgets the `tenant_id` predicate has no DB-level backstop. Defense-in-depth gap on a multi-tenant table.
 - **Evidence:** `_artifacts/04-persistence.md`   5; `_artifacts/05-industry.md` IP-008
 - **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-005`](../backlog/controlled-documents-refactor.md)

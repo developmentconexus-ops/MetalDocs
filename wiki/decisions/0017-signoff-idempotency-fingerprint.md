@@ -11,7 +11,7 @@ Signoff replay is backed by `metaldocs.idempotency_keys`. The store follows the
 Stripe / IETF `Idempotency-Key` model:
 
 - **Slot identity** is the table primary key `(tenant_id, actor_user_id, route_template, key)` (`db/baseline/0001_current_schema.sql`). The route template is the *literal* template (`POST /api/v1/documents/{id}/signoff`) — it carries no document ID.
-- **`payload_hash` is a separate misuse guard.** On a same-slot re-claim the store compares the stored hash to the incoming hash; a mismatch returns `idempotency.ErrConflict` (`internal/platform/idempotency/postgres_store.go:134`), signalling "this key was reused for a different request."
+- **`payload_hash` is a separate misuse guard.** On a same-slot re-claim the store compares the stored hash to the incoming hash; a mismatch returns `idempotency.ErrConflict` (`internal/platform/idempotency/postgres_store.go:134` — `BeginReplay` conflict branch), signalling "this key was reused for a different request."
 
 The first F-002 fix reordered `BeginDocumentReplay` to run before state/eligibility
 validation, but left the document-scoped `payloadHash` deriving its `stageID`

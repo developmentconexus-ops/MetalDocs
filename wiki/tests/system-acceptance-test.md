@@ -1,6 +1,6 @@
 # System Acceptance Test — MetalDocs QMS
 
-> **Last verified:** 2026-05-07
+> **Last verified:** 2026-06-08 (Phase F F4: repository.go archived_at filter anchor updated)
 > **Scope:** Full end-to-end manual acceptance run for the MetalDocs regulatory-grade QMS. Covers taxonomy bootstrap → template authoring → controlled-document creation → ISO-segregated approval → freeze → PDF fanout → archive. Exercises Groups A–E shipped fixes.
 > **Out of scope:** IAM admin flows (B1/A8), route-stage editing (A7/E8), multi-tenant isolation (B5/B6), Playwright e2e automation (see `references/how-to-run-tests.md`).
 > **Audience:** QA engineers, release approvers, on-call engineers validating a hot-fix deploy.
@@ -11,7 +11,7 @@
 > - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:197` — auth gate: early return with "Aguardando autenticação" when `currentUser?.userId` is falsy (E12; old create dialog deleted)
 > - `frontend/apps/web/src/features/controlled-documents/ControlledDocumentDetailPage.tsx:170` — "Nova Revisão" button (E10)
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx:98` — area filter first option "Todas as áreas", options from taxonomy (E7)
-> - `internal/modules/documents/repository/repository.go:206,233,892-910` — `archived_at IS NULL` filter (C1)
+> - `internal/modules/documents/repository/repository.go:433` — `archived_at IS NULL` filter in `buildDocumentFilter` (C1); list queries at `:367` (ListDocuments), `:394` (ListDocumentsForUser)
 
 **Predecessor doc:** `wiki/workflows/user-onboarding.md` — read for conceptual context on each step before running this checklist.
 
@@ -292,7 +292,7 @@ See `wiki/workflows/user-onboarding.md:229-253` for the canonical SQL and pitfal
 
 - [ ] On CD `DC-RH-001` (any state) → **Arquivar** (or via API `POST /api/v1/documents/{id}/archive`).
 - [ ] Return to **Documentos Controlados** list.
-- [ ] **Expected:** the CD does **not appear** in the default list. (`archived_at IS NULL` filter — `repository.go:206,233,892-910`, ADR 0008.)
+- [ ] **Expected:** the CD does **not appear** in the default list. (`archived_at IS NULL` filter — `repository.go:433` in `buildDocumentFilter`, ADR 0008.)
 - [ ] (If UI supports it) toggle "incluir arquivados" filter → CD reappears with `arquivado` badge.
 - [ ] Confirm via DB:
   ```sql

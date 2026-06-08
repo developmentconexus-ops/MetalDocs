@@ -1,12 +1,12 @@
 # Sequence — Edit + Autosave
 
-> **Last verified:** 2026-06-01
+> **Last verified:** 2026-06-08 (Phase F F8: handler.go presignAutosave anchor :117 → :752)
 > **Flow:** Eigenpal editor in the browser autosaves every ~1.5s. Bytes go **directly** from browser to MinIO via presigned PUT URLs; the API only signs URLs and records hashes.
 > **Why it matters:** This is the scaling pattern. The API never proxies multi-MB docx bytes — 100 concurrent users hitting Save burden MinIO, not the API.
 > **Code anchors:**
 > - [`packages/editor-ui/src/MetalDocsEditor.tsx`](../../packages/editor-ui/src/MetalDocsEditor.tsx) — the editor wrapper (debounced autosave)
 > - [`frontend/apps/web/src/features/documents/hooks/editor/useDocumentAutosave.ts`](../../frontend/apps/web/src/features/documents/hooks/editor/useDocumentAutosave.ts) — autosave hook
-> - [`internal/modules/documents/delivery/http/handler.go:117`](../../internal/modules/documents/delivery/http/handler.go) — `presignAutosave` + `commitAutosave` routes
+> - [`internal/modules/documents/delivery/http/handler.go:752`](../../internal/modules/documents/delivery/http/handler.go) — `presignAutosave` handler; `commitAutosave` at `:790`
 > - [`internal/platform/objectstore/document_presigner.go`](../../internal/platform/objectstore/document_presigner.go) — `PresignRevisionPUT`, scoped to one exact key + TTL + size cap
 
 ```mermaid

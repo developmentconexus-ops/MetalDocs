@@ -1,13 +1,13 @@
 # Backend/API Structure
 
-> **Last verified:** 2026-05-12
+> **Last verified:** 2026-06-08 (Phase F: controlled-documents handler.go HandlerWithOptions anchor updated :67 → :95)
 > **Scope:** Canonical backend/API structure rules for MetalDocs: module HTTP ownership, OpenAPI-first workflow, generated package layout, route truth requirements, migration rules, and verification gates.
 > **Out of scope:** API behavior conventions such as RFC 9457, pagination, idempotency, and authz details (`architecture/api-design-system.md`); operational oapi-codegen usage (`references/oapi-codegen.md`); ADR rationale (`decisions/0012-contract-first-api.md`).
 > **Key files:**
 > - `api/openapi/v1/openapi.yaml:1` - single public HTTP contract
 > - `internal/modules/controlleddocuments/api/cfg.yaml:1` - canonical per-module codegen config
 > - `internal/modules/controlleddocuments/api/gen.go:1` - canonical `//go:generate` file
-> - `internal/modules/controlleddocuments/delivery/http/handler.go:67` - canonical `ServerInterfaceWrapper` pattern
+> - `internal/modules/controlleddocuments/delivery/http/handler.go:95` - canonical `HandlerWithOptions` pattern
 > - `wiki/architecture/api-contract.md:1` - contract-first architecture overview
 > - `wiki/architecture/api-design-system.md:1` - shared API behavior conventions
 

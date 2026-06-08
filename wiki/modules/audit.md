@@ -2,12 +2,13 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-08 (Phase E1 casing big-bang: EventResponse wire keys updated to snake_case; prior: 2026-06-07) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-08 (Phase F audit-cursor re-audit: handleEvents now emits nested `{items, page:{next_cursor,has_more}}`; prior: Phase E1 casing big-bang) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/audit/domain/port.go:8-31` â€” `Event`, `ListEventsQuery`, `Writer`, `Reader`
 > - `internal/modules/audit/application/service.go:18` â€” `Service.ListEvents` (limit clamp [1..200] default 50)
-> - `internal/modules/audit/delivery/http/handler.go:34` â€” `RegisterRoutes` (`GET /api/v1/audit/events`)
+> - `internal/modules/audit/delivery/http/handler.go:67` â€” `RegisterRoutes` (mounts `GET /api/v1/audit/events`, export routes)
+> - `internal/modules/audit/delivery/http/handler.go:73` â€” `handleEvents` (cursor envelope `{items, page:{next_cursor, has_more}}`)
 > - `internal/modules/audit/infrastructure/postgres/writer.go:20,44` â€” `Record` (INSERT) + `ListEvents` (SELECT)
 > - `migrations/0004_init_audit_events.sql:1` â€” `metaldocs.audit_events` table
 > - `migrations/0005_grant_workflow_audit_privileges.sql:2` â€” INSERT grant to `metaldocs_app`
@@ -51,8 +52,8 @@
 - Language / runtime: Go 1.25
 - Persistence: Postgres, table `metaldocs.audit_events` (schema-qualified, not `public`)
 - API contract: OpenAPI 3.0.3 declares `/audit/events` at `api/openapi/v1/openapi.yaml:819` (no `operationId` — T-008)
-- HTTP routing: `http.ServeMux.HandleFunc` directly â€” NOT oapi-codegen (`handler.go:35`)
-- Error envelope: legacy `{error:{code,message,details,trace_id}}` (not RFC 9457 â€” T-002)
+- HTTP routing: `http.ServeMux.HandleFunc` directly â€” NOT oapi-codegen (`handler.go:68`)
+- Error envelope: RFC 9457 Problem Details (`problem.Write`) — T-002 closed Phase D/F
 - Append-only by grant only â€” `INSERT` grant exclusively (`migrations/0005:2`); no application-layer UPDATE/DELETE path
 
 ---
@@ -144,10 +145,10 @@ C4Container
 | `internal/modules/audit/application/service.go:10` | `Service` | struct | wraps a `Reader` |
 | `internal/modules/audit/application/service.go:14` | `NewService(reader)` | func | constructor |
 | `internal/modules/audit/application/service.go:18` | `Service.ListEvents` | method | normalize + clamp `Limit` to `[1..200]`, default 50 |
-| `internal/modules/audit/delivery/http/handler.go:15` | `Handler` | struct | HTTP wrapper |
-| `internal/modules/audit/delivery/http/handler.go:19` | `EventResponse` | struct | wire shape: `id`, `occurred_at` (RFC3339 UTC), `actor_id`, `action`, `resource_type`, `resource_id`, `payload` (decoded), `trace_id` |
-| `internal/modules/audit/delivery/http/handler.go:30` | `NewHandler(service)` | func | constructor |
-| `internal/modules/audit/delivery/http/handler.go:34` | `Handler.RegisterRoutes` | method | mounts `GET /api/v1/audit/events` on a `*http.ServeMux` |
+| `internal/modules/audit/delivery/http/handler.go:37` | `Handler` | struct | HTTP wrapper |
+| `internal/modules/audit/delivery/http/handler.go:42` | `EventResponse` | struct | wire shape: `id`, `occurred_at` (RFC3339 UTC), `actor_id`, `action`, `resource_type`, `resource_id`, `payload` (decoded), `trace_id` |
+| `internal/modules/audit/delivery/http/handler.go:53` | `NewHandler(service)` | func | constructor |
+| `internal/modules/audit/delivery/http/handler.go:67` | `Handler.RegisterRoutes` | method | mounts `GET /api/v1/audit/events` (+ export routes) on a `*http.ServeMux` |
 | `internal/modules/audit/infrastructure/postgres/writer.go:12,16,20,44` | `postgres.Writer`, `NewWriter`, `Record`, `ListEvents` | type + methods | Postgres adapter (satisfies both Writer + Reader) |
 | `internal/modules/audit/infrastructure/memory/writer.go:11,16,20,27` | `memory.Writer`, `NewWriter`, `Record`, `ListEvents` | type + methods | in-process adapter for dev/tests |
 
@@ -155,13 +156,13 @@ C4Container
 
 | Method | Path | OperationID | Handler | Authz |
 |---|---|---|---|---|
-| GET | `/api/v1/audit/events` | _missing_ (T-008) | `Handler.handleEvents` (`handler.go:38`) | **none** (T-001) |
+| GET | `/api/v1/audit/events` | _missing_ (T-008) | `Handler.handleEvents` (`handler.go:73`) | **none** (T-001) |
 
 ## API Route Truth Table (Plan 8 Baseline)
 
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/audit/events` | `internal/modules/audit/delivery/http/handler.go:36` | `handleEvents` | `/audit/events` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| GET | `/api/v1/audit/events` | `internal/modules/audit/delivery/http/handler.go:68` | `handleEvents` | `/audit/events` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
 
 - Module contract status: Contracted
 - Owner: leandro
@@ -218,16 +219,16 @@ sequenceDiagram
     DB-->>PG: rows
     PG-->>S: []Event
     S-->>H: []Event
-    H-->>C: 200 {"items":[EventResponse...]} | legacy {"error":{...}} on err
+    H-->>C: 200 {"items":[EventResponse...], "page":{"next_cursor":..., "has_more":...}} | RFC 9457 problem+json on err
 ```
 
 Failure modes â€” reference `wiki/concepts/error-ux.md`:
 
 | Condition | HTTP | Envelope `code` | Note |
 |---|---|---|---|
-| Wrong method | 405 | _no body_ | `w.WriteHeader(http.StatusMethodNotAllowed)` (`handler.go:40`) |
-| Bad `limit` | 400 | `VALIDATION_ERROR` | legacy envelope (T-002) |
-| Repo error | 500 | `INTERNAL_ERROR` | legacy envelope (T-002) |
+| Wrong method | 405 | _no body_ | `w.WriteHeader(http.StatusMethodNotAllowed)` (`handler.go:79`) |
+| Bad `limit` | 400 | `VALIDATION_ERROR` | RFC 9457 `problem+json` via `writeProblem` |
+| Repo error | 500 | `INTERNAL_ERROR` | RFC 9457 `problem+json` via `writeProblem` |
 
 ### 6.3 IAM admin recent-events read (internal Reader consumer)
 
@@ -269,18 +270,18 @@ Wiring: `iamdelivery.NewAdminHandler(..., deps.AuditWriter).WithAuditReader(deps
 - **Postgres tripwire:** does not apply. The tripwire enforces caller-side capability before mutation; the audit Record records what already happened. The repo `Record` does NOT call `metaldocs.assert_caps` and is not expected to.
 
 ### 8.2 Error envelope
-- Audit emits the **legacy** envelope `{"error":{"code","message","details","trace_id"}}` (`handler.go:97-105`). Not RFC 9457 Problem Details. â†’ T-002.
-- Success body is `{"items":[EventResponse...]}` (not a `data` wrapper â€” also a contract drift the API-design-system doc flags for v2 read surfaces).
+- Audit now emits RFC 9457 Problem Details (`application/problem+json`) via `writeProblem` / `problem.Write` — T-002 closed Phase D/F.
+- Success body is `{“items”:[EventResponse...], “page”:{“next_cursor”:…, “has_more”:…}}` — canonical cursor envelope matching every other list op (closed: ADR 2026-06-03-audit-events-cursor-shape).
 
 ### 8.3 Idempotency
 - **Write path:** no idempotency key. The application generates `id = "evt_" + UTC timestamp formatted with nanos` (`admin_handler.go:458`, `main.go:467`). On high-concurrency duplicate-second writes, two emitters can collide â†’ PK violation, event lost (T-006).
 - **Read path:** idempotent by nature.
 
 ### 8.4 Pagination
-- ListEvents supports a `limit` clamp only ([1..200], default 50). No cursor, no offset, no `next_cursor`. For a 25-row admin overview this is adequate; for compliance-grade trail export it is not (would require paging or a different export endpoint).
+- ListEvents supports `limit` ([1..200], default 50) plus an opaque keyset `cursor` (`occurred_at|id`, base64). Response includes `page.next_cursor` / `page.has_more`. The limit-only cursor shape is sufficient for the 25-row admin overview; full cursor navigation closes the export-paging gap (closed: ADR 2026-06-03-audit-events-cursor-shape).
 
 ### 8.5 Logging & Observability
-- `trace_id` is stored per event (`port.go:16`) â€” sourced from the `X-Trace-Id` request header (`handler.go:87-94`) or defaults to `"trace-local"`. Single-header correlation; structured logging is not used by the audit module itself.
+- `trace_id` is stored per event (`port.go:16`) â€” sourced at the postgres writer from the request context / `X-Trace-Id` header; defaults to `”trace-local”`. Single-header correlation; structured logging is not used by the audit module itself.
 - Audit-emission failure on the **adapter** path is `log.Printf`'d (`main.go:467`). Audit-emission failure on the **iam handler** path is discarded (`admin_handler.go:457`).
 
 ### 8.6 Concurrency / Transactions
@@ -314,7 +315,7 @@ Wiring: `iamdelivery.NewAdminHandler(..., deps.AuditWriter).WithAuditReader(deps
 | **Tamper-resistance (DBA)** | Schema owner or superuser executes `UPDATE audit_events SET action=...` | Detected via integrity proof | PASSES for detection once `ENABLE_JOB_AUDIT_INTEGRITY_VALIDATOR` is enabled; row-hash chain added in T-004 follow-up. |
 | **Coverage of regulated mutations** | Every regulated write in iam/documents/auth has a paired `Record` call | grep over consumer modules shows zero gaps | **PARTIAL** â€” auth T-002, iam T-005, documents T-005 are gaps in the consumer registers. |
 | **Durability of accepted events** | INSERT returns nil â†’ event survives crash | row present after restart | PASSES â€” synchronous INSERT. |
-| **Visibility of dropped events** | `Record` fails â†’ operator can detect | log line or metric | **FAILS** â€” iam path discards error (`admin_handler.go:457`); adapter path logs but emits no metric (T-005). |
+| **Visibility of dropped events** | `Record` fails → operator can detect | log line or metric | **FAILS** — iam path discards error (`admin_handler.go:457`); adapter path logs but emits no metric (T-005). |
 | **Multi-tenant isolation** | Tenant A reads `/api/v1/audit/events` â†’ no Tenant B rows | tenant filter in SQL | **N/A today** â€” MetalDocs is single-tenant; latent gap on multi-tenant cutover (T-007). |
 
 ---
@@ -358,7 +359,7 @@ Top 3 (by severity, then by blast-radius):
 | Auth module never emits audit (T-002 in `auth-tech-debt.md`) | Trail has no login/logout/password-change rows | Compliance review finds gap | Implement `auth` → `Writer.Record` integration; tracked as Critical gap |
 | Tamper attempt via DBA / superuser | Row mutated post-write | `audit_event_row_hash` chain validation job flags `prev_hash`/`row_hash` mismatch | Investigate operator action; restore from PITR backup |
 | `GET /api/v1/audit/events` reached without authz (T-001) | Any caller reads the trail | Manual: route has no tier-1/tier-2 check | T-001 — add authz middleware before exposing to non-internal callers |
-| Limit parse error | 400 with legacy error envelope (T-003 — not RFC 9457) | `Handler.handleEvents` returns `{"error":{...}}` | Migrate to `problem+json`; backlog item |
+| Limit parse error | 400 RFC 9457 `problem+json` | `Handler.handleEvents` returns `application/problem+json` via `writeProblem` | T-003/T-002 closed Phase D/F |
 | Adapter mismatch (Postgres unavailable, memory adapter selected accidentally in prod) | Trail kept in-process; lost on restart | `bootstrap/api.go:100-101` should always pick `auditpg.NewWriter` in prod | Config audit at startup; bootstrap guard |
 
 ## Cross-links
