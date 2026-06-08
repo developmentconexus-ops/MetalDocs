@@ -72,19 +72,6 @@ export type TemplateListRow = {
   archived_at: string | null;
 };
 
-export interface PublishError {
-  valid: false;
-  parse_errors: Array<{ type: string; element?: string; ident?: string }>;
-  missing_tokens: string[];
-  orphan_tokens: string[];
-}
-
-export interface PublishSuccess {
-  published_version_id: string;
-  next_draft_id: string;
-  next_draft_version_num: number;
-}
-
 async function apiJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     try {
@@ -264,26 +251,6 @@ export async function saveDraft(
   },
 ): Promise<void> {
   await commitAutosave(templateId, versionNum, body.docx_content_hash || body.schema_content_hash);
-}
-
-export async function publishVersion(
-  templateId: string,
-  versionNum: number,
-  docxKey: string,
-  schemaKey: string,
-): Promise<PublishSuccess | PublishError> {
-  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/publish`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ docx_key: docxKey, schema_key: schemaKey }),
-  });
-  if (res.status === 422) {
-    return (await res.json()) as PublishError;
-  }
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
-  }
-  return (await res.json()) as PublishSuccess;
 }
 
 export async function getDocxURL(templateId: string, versionNum: number): Promise<string> {

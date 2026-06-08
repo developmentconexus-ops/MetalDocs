@@ -4296,20 +4296,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            /** @description template invalid */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        valid?: boolean;
-                        parse_errors?: Record<string, never>[];
-                        missing_tokens?: string[];
-                        orphan_tokens?: string[];
-                    };
-                };
-            };
+            422: components["responses"]["UnprocessableEntity"];
             500: components["responses"]["InternalServerError"];
         };
     };

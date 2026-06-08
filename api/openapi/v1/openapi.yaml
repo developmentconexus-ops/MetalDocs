@@ -1317,22 +1317,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
-          description: template invalid
-          # AD-2 exemption (api-contract-hardening Phase D): bespoke template-token
-          # validation result, not the RFC 9457 error shape. Consumed by the template
-          # editor FE (features/templates/api/templates.ts) to render parse errors +
-          # missing tokens; migrating it to Problem.errors[] is a coupled spec+runtime+FE
-          # change owned by the templates-module contract refresh (Phase E/F).
-          x-error-envelope-exempt: "Legacy template-token validation payload (valid/parse_errors/missing_tokens) consumed by the template editor; Problem migration tracked for the templates-module contract refresh."
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  valid: { type: boolean }
-                  parse_errors: { type: array, items: { type: object } }
-                  missing_tokens: { type: array, items: { type: string } }
-                  orphan_tokens: { type: array, items: { type: string } }
+          $ref: '#/components/responses/UnprocessableEntity'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
