@@ -1076,7 +1076,7 @@ paths:
   /templates:
     get:
       x-pagination-exempt: true
-      x-pagination-exempt-reason: 'Returns the full per-tenant template set (small, bounded); cursor migration tracked for Phase F.'
+      x-pagination-exempt-reason: 'Returns the full per-tenant template catalog (a small, bounded configuration set returned in one shot); a permanent bounded-list exemption, not a deferred cursor migration.'
       summary: List templates for tenant (docx)
       tags: [templates]
       operationId: listTemplates

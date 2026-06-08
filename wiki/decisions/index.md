@@ -19,6 +19,9 @@
 - [0020-admin-center-six-tab-ia.md](0020-admin-center-six-tab-ia.md) — **Accepted** — Admin Center 6-tab IA, shipped at PR-12
 - [0021-tenant-vs-platform-admin-separation.md](0021-tenant-vs-platform-admin-separation.md) — **Accepted** — tenant admin vs. platform admin scope split, shipped at PR-12
 - [0023-authz-area-markers.md](0023-authz-area-markers.md) — **Accepted** — honest positive authz-area markers (`source: tx` derived_from / `x-authz-area-none`) replace the negative `x-authz-skip-area`; dormant `authz-call-present` lint deleted (Phase F · FD-1)
-- [2026-06-03-audit-events-cursor-shape.md](2026-06-03-audit-events-cursor-shape.md) — **Open** — `/audit/events` runtime emits flat `{nextCursor,hasMore}` while spec declares `page.{next_cursor,has_more}`; FE adapter bridges until backend reconciles
+- [0024-openapi-single-base-path.md](0024-openapi-single-base-path.md) — **Accepted** — AD-1: one `servers.url: /api/v1` + relative path keys; PATH-BASE-PREFIX gate kills the double-prefix bug class
+- [0025-error-envelope-rfc9457.md](0025-error-envelope-rfc9457.md) — **Accepted** — AD-2: RFC 9457 Problem is the only error shape; ApiErrorEnvelope retired; ENVELOPE-DRIFT blocking, zero exemptions
+- [0026-unified-authz-enforcement.md](0026-unified-authz-enforcement.md) — **Accepted** — AD-3: unified capability+area+grants is the only per-resource authz model; dead ABAC AccessPolicy path removed (extends ADR 0022)
+- [2026-06-03-audit-events-cursor-shape.md](2026-06-03-audit-events-cursor-shape.md) — **Closed 2026-06-08** — `/audit/events` runtime reconciled to the nested `page.{next_cursor,has_more}` CursorPage shape (Phase F re-audit); FE dual-shape adapter removed
 
 Legacy ADR material in `docs/adr/` remains historical/reference content until reconciled deliberately.
