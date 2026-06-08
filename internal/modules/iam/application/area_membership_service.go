@@ -122,24 +122,29 @@ func (s *AreaMembershipService) Grant(
 		if err := s.repo.GrantAtomic(ctx, *existing, membership); err != nil {
 			return fmt.Errorf("grant membership atomically: %w", err)
 		}
+		// Flush the actor's cached roles unconditionally once the mutation commits:
+		// the cache flush is a best-effort safety net and must not be gated on the
+		// governance-logger outcome (A3).
+		s.invalidate(userID, tenantID)
 		if s.logger != nil {
 			if err := s.logger.Log(ctx, "role.grant", membership); err != nil {
 				return fmt.Errorf("log membership grant: %w", err)
 			}
 		}
-		s.invalidate(userID, tenantID)
 		return nil
 	}
 
 	if err := s.repo.Insert(ctx, membership); err != nil {
 		return fmt.Errorf("insert membership: %w", err)
 	}
+	// Flush the actor's cached roles unconditionally once the mutation commits
+	// (see above): not gated on the governance-logger outcome (A3).
+	s.invalidate(userID, tenantID)
 	if s.logger != nil {
 		if err := s.logger.Log(ctx, "role.grant", membership); err != nil {
 			return fmt.Errorf("log membership grant: %w", err)
 		}
 	}
-	s.invalidate(userID, tenantID)
 	return nil
 }
 
@@ -175,6 +180,10 @@ func (s *AreaMembershipService) Revoke(
 		return fmt.Errorf("close active membership: %w", err)
 	}
 
+	// Flush the actor's cached roles unconditionally once the mutation commits:
+	// the cache flush is a best-effort safety net and must not be gated on the
+	// governance-logger outcome (A3).
+	s.invalidate(userID, tenantID)
 	if s.logger != nil {
 		membership := *active
 		if revokedBy != "" {
@@ -184,6 +193,5 @@ func (s *AreaMembershipService) Revoke(
 			return fmt.Errorf("log membership revoke: %w", err)
 		}
 	}
-	s.invalidate(userID, tenantID)
 	return nil
 }

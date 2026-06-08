@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"metaldocs/internal/modules/audit/domain"
+	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/sqlescape"
 )
 
@@ -141,7 +142,7 @@ ORDER BY audit_sequence
 func (w *Writer) ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, bool, error) {
 	limit := query.Limit
 	if limit <= 0 {
-		limit = 50
+		limit = pagination.DefaultLimit
 	}
 
 	// +1 probe row to detect hasMore: a trailing row beyond the page means a

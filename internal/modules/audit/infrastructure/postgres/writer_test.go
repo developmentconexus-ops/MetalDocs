@@ -85,8 +85,11 @@ func TestWriterListEventsExactPageHasNoMore(t *testing.T) {
 	defer db.Close()
 
 	// limit=3 → reader probes for limit+1 (4); only 3 rows exist → no probe row.
+	// AnyArg() for the leading filter args + a literal last arg asserts the probe
+	// value (limit+1) is the FINAL bound regardless of how many filter args precede
+	// it, so a future filter that shifts arg order can't silently pass this guard.
 	mock.ExpectQuery("FROM metaldocs.audit_events").
-		WithArgs("tenant-1", 4).
+		WithArgs(sqlmock.AnyArg(), 4).
 		WillReturnRows(auditListRows(3))
 
 	writer := NewWriter(db)
@@ -116,8 +119,11 @@ func TestWriterListEventsTrimsProbeRow(t *testing.T) {
 	defer db.Close()
 
 	// limit=3 → probe for 4; 4 rows returned → trimmed to 3 + hasMore=true.
+	// AnyArg() for the leading filter args + a literal last arg asserts the probe
+	// value (limit+1) is the FINAL bound regardless of preceding filter args (see
+	// TestWriterListEventsExactPageHasNoMore).
 	mock.ExpectQuery("FROM metaldocs.audit_events").
-		WithArgs("tenant-1", 4).
+		WithArgs(sqlmock.AnyArg(), 4).
 		WillReturnRows(auditListRows(4))
 
 	writer := NewWriter(db)

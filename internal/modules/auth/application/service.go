@@ -346,13 +346,13 @@ func (s *Service) ResolveSession(ctx context.Context, rawToken string) (authdoma
 	if err != nil {
 		return authdomain.CurrentUser{}, err
 	}
+	now := s.now().UTC()
 	if session.RevokedAt != nil {
 		return authdomain.CurrentUser{}, authdomain.ErrSessionRevoked
 	}
-	if session.ExpiresAt.Before(s.now().UTC()) {
+	if session.ExpiresAt.Before(now) {
 		return authdomain.CurrentUser{}, authdomain.ErrSessionExpired
 	}
-	now := s.now().UTC()
 	// Sliding idle timeout (A2): expire the session if it has not been seen within
 	// the window. Measured against the pre-touch LastSeenAt — TouchSession below
 	// would otherwise advance it and defeat the check. 0 = disabled.

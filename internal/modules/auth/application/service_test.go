@@ -250,7 +250,7 @@ func TestAuthenticate_TimingConstant(t *testing.T) {
 		SessionTTL:             24 * time.Hour,
 		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
-		LoginMaxFailedAttempts: 100, // high so repeated wrong attempts never lock
+		LoginMaxFailedAttempts: 100, // intentionally high so the repeated timing-probe attempts below never trip account lockout
 		LoginLockDuration:      15 * time.Minute,
 		AllowDevTenantFallback: true,
 	})

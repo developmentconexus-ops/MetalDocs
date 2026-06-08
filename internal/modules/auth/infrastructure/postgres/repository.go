@@ -366,6 +366,12 @@ func (r *Repository) WithinLoginLock(ctx context.Context, userID string, fn func
 // threshold is reached, sets locked_until. It also stamps last_failed_login_at
 // + last_failed_login_ip (PR-7) so /security/lockouts and /security/signals
 // can surface the most recent failure context per user.
+//
+// It is no longer part of authdomain.Repository (removed on this branch — the
+// production failed-attempt write goes through LoginTx.RecordFailedLogin inside
+// the login lock). It is retained as a concrete helper: the shared
+// recordFailedLogin helper backs loginTx.RecordFailedLogin, and tests call this
+// method directly via the concrete *Repository type.
 func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
 	return recordFailedLogin(ctx, r.db, userID, maxAttempts, lockDurationSeconds, ip)
 }

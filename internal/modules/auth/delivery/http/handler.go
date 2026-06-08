@@ -74,9 +74,12 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	session, err := h.service.Authenticate(r.Context(), req.Identifier, req.Password, r)
 	if err != nil {
-		log.Printf("auth login failed for %q: %v", strings.TrimSpace(req.Identifier), err)
-		http.SetCookie(w, h.service.ExpiredSessionCookie())
+		// Log the sha256 of the identifier, never the raw plaintext: the raw value
+		// is PII and an account-enumeration aid. The full identifier survives only
+		// in the structured audit record below.
 		identifierHash := hashIdentifier(req.Identifier)
+		log.Printf("auth login failed for sha256=%s: %v", identifierHash, err)
+		http.SetCookie(w, h.service.ExpiredSessionCookie())
 		h.recordAudit(r, "", "auth.login.failed", identifierHash, map[string]any{
 			"identifier_sha256": identifierHash,
 		})

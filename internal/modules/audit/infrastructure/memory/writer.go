@@ -65,6 +65,9 @@ func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]
 			}
 		}
 		items = append(items, event)
+		// Paired checks: the in-loop break stops once the limit+1 probe is collected
+		// so the scan is bounded to at most limit+1 matches, and the post-loop check
+		// below does the actual trim + hasMore decision.
 		if len(items) > limit {
 			break
 		}

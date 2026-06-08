@@ -90,10 +90,15 @@ func checkPaginationCodec(modulesRoot string, fset *token.FileSet) ([]Violation,
 			return nil
 		}
 		lower := strings.ToLower(path)
+		// _test.go is exempt: test fixtures legitimately reference base64.StdEncoding
+		// to build/decode expected values and never participate in the runtime cursor
+		// path the rule protects.
 		if !strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, "_test.go") || strings.HasSuffix(lower, ".gen.go") {
 			return nil
 		}
-		if strings.HasSuffix(filepath.ToSlash(path), paginationCursorFile) {
+		// Anchored repo-relative match (mirrors tripwireKey): a bare HasSuffix could
+		// false-exempt any file whose path merely ends in cursor.go.
+		if rel, err := filepath.Rel(modulesRoot, path); err == nil && filepath.ToSlash(rel) == paginationCursorFile {
 			return nil
 		}
 		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)

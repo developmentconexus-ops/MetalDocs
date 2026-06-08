@@ -45,14 +45,15 @@ func repoRoot(t *testing.T) string {
 }
 
 func TestExitCode_FailsOnAnyViolationZeroOnCleanSpec(t *testing.T) {
+	t.Parallel()
 	bin := buildLinter(t)
 	root := repoRoot(t)
 	cleanSpec := filepath.Join(root, "api", "openapi", "v1", "openapi.yaml")
 
 	cases := []struct {
-		name       string
-		args       []string
-		wantNonNil bool // true => expect a non-zero exit (violation gated)
+		name            string
+		args            []string
+		wantNonZeroExit bool // true => expect a non-zero exit (violation gated)
 	}{
 		{
 			// The live spec from the repo root must pass: every blocking rule
@@ -62,39 +63,47 @@ func TestExitCode_FailsOnAnyViolationZeroOnCleanSpec(t *testing.T) {
 		},
 		{
 			// PATH-BASE-PREFIX is a binding/structural guard.
-			name:       "bad_path_base_prefix",
-			args:       []string{filepath.Join("testdata", "path_base_prefix.openapi.yaml")},
-			wantNonNil: true,
+			name:            "bad_path_base_prefix",
+			args:            []string{filepath.Join("testdata", "path_base_prefix.openapi.yaml")},
+			wantNonZeroExit: true,
 		},
 		{
 			// ENVELOPE-DRIFT is a formerly "reported-only" spec-drift family; it
 			// must now gate the exit code with no -enforce escape hatch.
-			name:       "bad_envelope_drift_gates",
-			args:       []string{filepath.Join("testdata", "missing_problem.openapi.yaml")},
-			wantNonNil: true,
+			name:            "bad_envelope_drift_gates",
+			args:            []string{filepath.Join("testdata", "missing_problem.openapi.yaml")},
+			wantNonZeroExit: true,
 		},
 		{
 			// AUTHZ-DRIFT — the other formerly-deferred family — must gate too.
-			name:       "bad_authz_drift_gates",
-			args:       []string{filepath.Join("testdata", "missing_security.openapi.yaml")},
-			wantNonNil: true,
+			name:            "bad_authz_drift_gates",
+			args:            []string{filepath.Join("testdata", "missing_security.openapi.yaml")},
+			wantNonZeroExit: true,
+		},
+		{
+			// PAGINATION-DRIFT — the third formerly-deferred family — must gate too,
+			// closing the CWE-693 guard coverage gap.
+			name:            "bad_pagination_drift_gates",
+			args:            []string{filepath.Join("testdata", "missing_cursor.openapi.yaml")},
+			wantNonZeroExit: true,
 		},
 	}
 
 	for _, c := range cases {
 		c := c
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 			cmd := exec.Command(bin, c.args...)
 			out, err := cmd.CombinedOutput()
 			exitErr, isExit := err.(*exec.ExitError)
 			switch {
-			case c.wantNonNil && err == nil:
+			case c.wantNonZeroExit && err == nil:
 				t.Fatalf("want non-zero exit on a known-bad spec, got exit 0\nargs=%v\noutput:\n%s", c.args, out)
-			case c.wantNonNil && !isExit:
+			case c.wantNonZeroExit && !isExit:
 				t.Fatalf("want a clean non-zero process exit, got non-exit error %v\nargs=%v\noutput:\n%s", err, c.args, out)
-			case c.wantNonNil && exitErr.ExitCode() != 1:
+			case c.wantNonZeroExit && isExit && exitErr.ExitCode() != 1:
 				t.Fatalf("want exit code 1 on a known-bad spec, got %d\nargs=%v\noutput:\n%s", exitErr.ExitCode(), c.args, out)
-			case !c.wantNonNil && err != nil:
+			case !c.wantNonZeroExit && err != nil:
 				t.Fatalf("want exit 0 on the clean spec, got %v\nargs=%v\noutput:\n%s", err, c.args, out)
 			}
 		})

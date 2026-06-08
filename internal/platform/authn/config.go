@@ -71,7 +71,7 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 	if raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_SESSION_IDLE_MINUTES")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 0 {
-			return authapp.Config{}, fmt.Errorf("invalid METALDOCS_AUTH_SESSION_IDLE_MINUTES")
+			return authapp.Config{}, fmt.Errorf("METALDOCS_AUTH_SESSION_IDLE_MINUTES must be 0 or a positive integer")
 		}
 		sessionIdleMinutes = parsed
 	}
