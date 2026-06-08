@@ -15,7 +15,7 @@ func TestService_ListDocumentsPaginated_AdminBypassesUserFilter(t *testing.T) {
 	}
 	svc := application.New(repo, nil, nil, nil, nil)
 
-	items, total, err := svc.ListDocumentsPaginated(context.Background(), "tenant_1", "", application.ListOptions{CreatedBy: "client_value", Page: 1, PageSize: 10})
+	items, total, _, err := svc.ListDocumentsPaginated(context.Background(), "tenant_1", "", application.ListOptions{CreatedBy: "client_value", PageSize: 10})
 	if err != nil {
 		t.Fatalf("ListDocumentsPaginated() error = %v", err)
 	}
@@ -34,7 +34,7 @@ func TestService_ListDocumentsPaginated_FillerForcesUserScope(t *testing.T) {
 	}
 	svc := application.New(repo, nil, nil, nil, nil)
 
-	_, _, err := svc.ListDocumentsPaginated(context.Background(), "tenant_1", "u1", application.ListOptions{CreatedBy: "ignored", Page: 1, PageSize: 10})
+	_, _, _, err := svc.ListDocumentsPaginated(context.Background(), "tenant_1", "u1", application.ListOptions{CreatedBy: "ignored", PageSize: 10})
 	if err != nil {
 		t.Fatalf("ListDocumentsPaginated() error = %v", err)
 	}

@@ -33,7 +33,7 @@ type Repository interface {
 	UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, docID, name string) error
 	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
-	ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, error)
+	ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, bool, error)
 	CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error)
 	StatsByStatus(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
 	StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
@@ -514,22 +514,22 @@ type DocumentStats struct {
 	ByArea   map[string]int64 `json:"by_area"`
 }
 
-func (s *Service) ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts ListOptions) ([]*domain.Document, int64, error) {
+func (s *Service) ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts ListOptions) (items []*domain.Document, total int64, hasMore bool, err error) {
 	if userID != "" {
 		opts.CreatedBy = userID
 	}
 
-	items, err := s.repo.ListDocumentsPaginated(ctx, tenantID, opts)
+	items, hasMore, err = s.repo.ListDocumentsPaginated(ctx, tenantID, opts)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, false, err
 	}
 
-	total, err := s.repo.CountDocuments(ctx, tenantID, opts)
+	total, err = s.repo.CountDocuments(ctx, tenantID, opts)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, false, err
 	}
 
-	return items, total, nil
+	return items, total, hasMore, nil
 }
 
 func (s *Service) DocumentStats(ctx context.Context, tenantID, userID string, opts ListOptions) (*DocumentStats, error) {

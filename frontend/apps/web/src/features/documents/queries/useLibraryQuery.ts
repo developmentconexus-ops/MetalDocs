@@ -3,8 +3,8 @@ import { fetchLibrary } from '../api/library';
 import { QK } from '../../../lib/queryKeys';
 
 type LibraryQueryParams = {
-  page?: number;
-  pageSize?: number;
+  cursor?: string;
+  limit?: number;
   status?: string;
   areaCode?: string;
   profileCode?: string;

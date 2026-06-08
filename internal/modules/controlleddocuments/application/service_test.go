@@ -305,9 +305,9 @@ func (f *fakeControlledDocumentRepository) CodeExists(_ context.Context, _, _, _
 	return f.codeExists, nil
 }
 
-func (f *fakeControlledDocumentRepository) List(_ context.Context, _ string, filter controlleddocumentsdomain.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, error) {
+func (f *fakeControlledDocumentRepository) List(_ context.Context, _ string, filter controlleddocumentsdomain.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, bool, error) {
 	f.lastListFilter = filter
-	return nil, nil
+	return nil, false, nil
 }
 func (f *fakeControlledDocumentRepository) CanRead(_ context.Context, _, _, _ string) (bool, error) {
 	return f.canRead, nil
@@ -745,7 +745,7 @@ func TestList_MissingActorContextReturnsErrActorMissing(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
 
-	_, err := svc.List(context.Background(), "tenant-a", controlleddocumentsdomain.CDFilter{})
+	_, _, err := svc.List(context.Background(), "tenant-a", controlleddocumentsdomain.CDFilter{})
 	if !errors.Is(err, ErrActorMissing) {
 		t.Fatalf("List: expected ErrActorMissing, got %v", err)
 	}
@@ -759,7 +759,7 @@ func TestList_AppliesActorFilterWhenContextPresent(t *testing.T) {
 	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
 
 	ctx := iamdomain.WithAuthContext(context.Background(), "actor-1", []iamdomain.Role{"system_admin"})
-	_, err := svc.List(ctx, "tenant-a", controlleddocumentsdomain.CDFilter{})
+	_, _, err := svc.List(ctx, "tenant-a", controlleddocumentsdomain.CDFilter{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}

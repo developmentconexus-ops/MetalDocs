@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
@@ -79,7 +80,11 @@ func (r *PostgresControlledDocumentRepository) CodeExists(ctx context.Context, t
 	return exists, nil
 }
 
-func (r *PostgresControlledDocumentRepository) List(ctx context.Context, tenantID string, filter controlleddocumentsdomain.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, error) {
+// List returns up to filter.Limit controlled documents ordered by
+// (created_at DESC, id DESC) using an opaque keyset cursor (FD-2). hasMore
+// reports whether a further page exists; the caller builds the next cursor from
+// the last returned document's (CreatedAt, ID).
+func (r *PostgresControlledDocumentRepository) List(ctx context.Context, tenantID string, filter controlleddocumentsdomain.CDFilter) (items []controlleddocumentsdomain.ControlledDocument, hasMore bool, err error) {
 	q := `
 SELECT id::text, tenant_id::text, profile_code, process_area_code, department_code,
        code, sequence_num, title, owner_user_id, coalesce(override_template_version_id::text, ''),
@@ -160,38 +165,45 @@ WHERE tenant_id = $1`
 		args = append(args, *filter.ActorUserID)
 		idx++
 	}
-	q += " ORDER BY created_at DESC"
-	if filter.Limit > 0 {
-		q += fmt.Sprintf(" LIMIT $%d", idx)
-		args = append(args, filter.Limit)
-		idx++
+	cursorTS, cursorID, err := pagination.DecodeCursor(filter.Cursor)
+	if err != nil {
+		return nil, false, err
 	}
-	if filter.Offset > 0 {
-		q += fmt.Sprintf(" OFFSET $%d", idx)
-		args = append(args, filter.Offset)
+	if cursorTS != "" {
+		q += fmt.Sprintf(" AND (created_at, id) < ($%d::timestamptz, $%d::uuid)", idx, idx+1)
+		args = append(args, cursorTS, cursorID)
+		idx += 2
 	}
+
+	limit := pagination.ClampLimit(filter.Limit)
+	q += fmt.Sprintf(" ORDER BY created_at DESC, id DESC LIMIT $%d", idx)
+	args = append(args, limit+1) // +1 probe row to detect hasMore
 
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list controlled documents: %w", err)
+		return nil, false, fmt.Errorf("list controlled documents: %w", err)
 	}
 	defer rows.Close()
 
-	out := make([]controlleddocumentsdomain.ControlledDocument, 0)
+	out := make([]controlleddocumentsdomain.ControlledDocument, 0, limit+1)
 	for rows.Next() {
 		doc, err := scanControlledDocument(rows)
 		if err != nil {
-			return nil, fmt.Errorf("scan controlled document list row: %w", err)
+			return nil, false, fmt.Errorf("scan controlled document list row: %w", err)
 		}
 		out = append(out, *doc)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate controlled document list rows: %w", err)
+		return nil, false, fmt.Errorf("iterate controlled document list rows: %w", err)
+	}
+	if len(out) > limit {
+		out = out[:limit]
+		hasMore = true
 	}
 	if err := r.hydrateVisibilityGrants(ctx, tenantID, out); err != nil {
-		return nil, fmt.Errorf("hydrate controlled document visibility grants: %w", err)
+		return nil, false, fmt.Errorf("hydrate controlled document visibility grants: %w", err)
 	}
-	return out, nil
+	return out, hasMore, nil
 }
 
 func (r *PostgresControlledDocumentRepository) loadVisibilityGrants(ctx context.Context, tenantID, controlledDocumentID string) (controlleddocumentsdomain.Visibility, error) {

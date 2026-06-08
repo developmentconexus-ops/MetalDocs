@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -18,6 +19,7 @@ import (
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
@@ -38,8 +40,12 @@ func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	items, err := h.svc.List(r.Context(), tenantID, filter)
+	items, hasMore, err := h.svc.List(r.Context(), tenantID, filter)
 	if err != nil {
+		if errors.Is(err, pagination.ErrInvalidCursor) {
+			httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid cursor")
+			return
+		}
 		h.writeDomainError(w, err)
 		return
 	}
@@ -48,7 +54,17 @@ func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request
 		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, controlleddocumentsapi.ListControlledDocuments200JSONResponse{Items: respItems})
+
+	var nextCursor *string
+	if hasMore && len(items) > 0 {
+		last := items[len(items)-1]
+		c := pagination.EncodeCursor(last.CreatedAt.UTC().Format(time.RFC3339Nano), last.ID)
+		nextCursor = &c
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, controlleddocumentsapi.ListControlledDocuments200JSONResponse{
+		Items: respItems,
+		Page:  controlleddocumentsapi.CursorPage{NextCursor: nextCursor, HasMore: hasMore},
+	})
 }
 
 func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.Request, params controlleddocumentsapi.AtomicCreateControlledDocumentParams) {
@@ -628,16 +644,13 @@ func filterFromListParams(params controlleddocumentsapi.ListControlledDocumentsP
 		filter.Status = &status
 	}
 	if params.Limit != nil {
-		if *params.Limit < 0 {
-			return application.CDFilter{}, errors.New("invalid limit value")
+		if *params.Limit < 1 || *params.Limit > 100 {
+			return application.CDFilter{}, errors.New("limit must be between 1 and 100")
 		}
 		filter.Limit = *params.Limit
 	}
-	if params.Offset != nil {
-		if *params.Offset < 0 {
-			return application.CDFilter{}, errors.New("invalid offset value")
-		}
-		filter.Offset = *params.Offset
+	if params.Cursor != nil {
+		filter.Cursor = strings.TrimSpace(*params.Cursor)
 	}
 
 	return filter, nil

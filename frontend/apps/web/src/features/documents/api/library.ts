@@ -6,8 +6,8 @@ export type DocumentListResponse = components['schemas']['DocumentListResponse']
 export type DocumentStatsResponse = components['schemas']['DocumentStatsResponse'];
 
 type DocumentListQueryParams = {
-  page?: number;
-  pageSize?: number;
+  cursor?: string;
+  limit?: number;
   status?: string;
   areaCode?: string;
   profileCode?: string;

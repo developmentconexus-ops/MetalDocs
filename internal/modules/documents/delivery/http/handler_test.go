@@ -123,16 +123,16 @@ func (f *fakeSvc) ListDocumentsForUser(_ context.Context, _, _ string) ([]domain
 	return f.listForUser, nil
 }
 
-func (f *fakeSvc) ListDocumentsPaginated(_ context.Context, _, userID string, opts application.ListOptions) ([]*domain.Document, int64, error) {
+func (f *fakeSvc) ListDocumentsPaginated(_ context.Context, _, userID string, opts application.ListOptions) ([]*domain.Document, int64, bool, error) {
 	f.listPaginatedOpts = opts
 	f.listPaginatedUser = userID
 	if f.listPaginatedErr != nil {
-		return nil, 0, f.listPaginatedErr
+		return nil, 0, false, f.listPaginatedErr
 	}
 	if f.listPaginatedItems == nil {
-		return []*domain.Document{{ID: "doc_1"}}, 1, nil
+		return []*domain.Document{{ID: "doc_1"}}, 1, false, nil
 	}
-	return f.listPaginatedItems, f.listPaginatedTotal, nil
+	return f.listPaginatedItems, f.listPaginatedTotal, false, nil
 }
 
 func (f *fakeSvc) DocumentStats(_ context.Context, _, _ string, _ application.ListOptions) (*application.DocumentStats, error) {

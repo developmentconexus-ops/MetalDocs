@@ -10,7 +10,7 @@ type ControlledDocumentRepository interface {
 	GetByID(ctx context.Context, tenantID, id string) (*ControlledDocument, error)
 	GetByCode(ctx context.Context, tenantID, profileCode, code string) (*ControlledDocument, error)
 	CodeExists(ctx context.Context, tenantID, profileCode, code string) (bool, error)
-	List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, error)
+	List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, bool, error)
 	CanRead(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (bool, error)
 
 	// Write operations.
@@ -30,5 +30,6 @@ type CDFilter struct {
 	Query           *string
 	ActorUserID     *string
 	Limit           int
-	Offset          int
+	// Cursor is the opaque forward keyset cursor (FD-2). Empty = first page.
+	Cursor string
 }

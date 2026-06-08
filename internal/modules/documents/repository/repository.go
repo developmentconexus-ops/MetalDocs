@@ -17,6 +17,7 @@ import (
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/pagination"
 )
 
 // isInvalidUUID returns true when err is a Postgres error with SQLSTATE 22P02
@@ -409,7 +410,8 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 }
 
 type ListOptions struct {
-	Page            int
+	// Cursor is the opaque forward keyset cursor (FD-2). Empty = first page.
+	Cursor          string
 	PageSize        int
 	CreatedBy       string
 	Status          []string
@@ -419,24 +421,9 @@ type ListOptions struct {
 	IncludeArchived bool
 }
 
-func (o ListOptions) Offset() int {
-	if o.Page < 1 {
-		return 0
-	}
-	return (o.Page - 1) * o.Limit()
-}
-
+// Limit clamps the page size to the design-system bounds (default 20, max 100).
 func (o ListOptions) Limit() int {
-	if o.PageSize == 0 {
-		return 20
-	}
-	if o.PageSize < 1 {
-		return 1
-	}
-	if o.PageSize > 50 {
-		return 50
-	}
-	return o.PageSize
+	return pagination.ClampLimit(o.PageSize)
 }
 
 func buildDocumentFilter(tenantID string, opts ListOptions) (whereClause string, args []interface{}) {
@@ -470,11 +457,25 @@ func buildDocumentFilter(tenantID string, opts ListOptions) (whereClause string,
 	return strings.Join(conds, " AND "), args
 }
 
-func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, error) {
+// ListDocumentsPaginated returns up to opts.Limit() documents ordered by
+// (updated_at DESC, id DESC) using an opaque keyset cursor (FD-2). hasMore
+// reports whether a further page exists (a limit+1 probe row was found and
+// trimmed). The caller builds the next cursor from the last returned document's
+// (UpdatedAt, ID).
+func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) (items []*domain.Document, hasMore bool, err error) {
 	where, args := buildDocumentFilter(tenantID, opts)
-	args = append(args, opts.Limit(), opts.Offset())
-	limitIdx := len(args) - 1
-	offsetIdx := len(args)
+
+	cursorTS, cursorID, err := pagination.DecodeCursor(opts.Cursor)
+	if err != nil {
+		return nil, false, err
+	}
+	if cursorTS != "" {
+		args = append(args, cursorTS, cursorID)
+		where += fmt.Sprintf(" AND (updated_at, id) < ($%d::timestamptz, $%d)", len(args)-1, len(args))
+	}
+
+	limit := opts.Limit()
+	args = append(args, limit+1) // +1 probe row to detect hasMore
 	q := fmt.Sprintf(`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
 			coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
 			archived_at, created_at, updated_at, created_by,
@@ -483,16 +484,16 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 			revision_version, revision_number
 		FROM documents
 		WHERE %s
-		ORDER BY updated_at DESC
-		LIMIT $%d OFFSET $%d`, where, limitIdx, offsetIdx)
+		ORDER BY updated_at DESC, id DESC
+		LIMIT $%d`, where, len(args))
 
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
 
-	out := make([]*domain.Document, 0)
+	out := make([]*domain.Document, 0, limit+1)
 	for rows.Next() {
 		var d domain.Document
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
@@ -500,11 +501,17 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code,
 			&d.ProfileCodeSnapshot, &d.ProcessAreaCodeSnapshot,
 			&d.RevisionVersion, &d.RevisionNumber); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		out = append(out, &d)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	if len(out) > limit {
+		return out[:limit], true, nil
+	}
+	return out, false, nil
 }
 
 func (r *Repository) CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error) {

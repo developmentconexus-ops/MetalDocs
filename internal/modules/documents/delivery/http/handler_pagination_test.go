@@ -32,7 +32,7 @@ func TestListDocuments_Paginated_Envelope(t *testing.T) {
 	}
 	mux := newMux(t, svc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?page=1&pageSize=5", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?limit=5", nil)
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -41,24 +41,27 @@ func TestListDocuments_Paginated_Envelope(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 
+	// FD-2 cursor envelope: {items, page:{next_cursor, has_more}, total}.
 	var out struct {
-		Items    []map[string]any `json:"items"`
-		Page     int              `json:"page"`
-		PageSize int              `json:"page_size"`
-		Total    int64            `json:"total"`
+		Items []map[string]any `json:"items"`
+		Page  struct {
+			NextCursor string `json:"next_cursor"`
+			HasMore    bool   `json:"has_more"`
+		} `json:"page"`
+		Total int64 `json:"total"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if len(out.Items) != 1 || out.Page != 1 || out.PageSize != 5 || out.Total != 7 {
+	if len(out.Items) != 1 || out.Total != 7 || out.Page.HasMore {
 		t.Fatalf("unexpected envelope: %+v", out)
 	}
 }
 
-func TestListDocuments_PageSizeCap_Returns400(t *testing.T) {
+func TestListDocuments_LimitCap_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?page=1&pageSize=999", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?limit=999", nil)
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 

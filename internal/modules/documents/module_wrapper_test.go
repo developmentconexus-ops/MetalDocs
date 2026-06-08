@@ -40,8 +40,8 @@ func (s *moduleTestService) ListDocuments(context.Context, string) ([]domain.Doc
 func (s *moduleTestService) ListDocumentsForUser(context.Context, string, string) ([]domain.Document, error) {
 	return nil, nil
 }
-func (s *moduleTestService) ListDocumentsPaginated(context.Context, string, string, application.ListOptions) ([]*domain.Document, int64, error) {
-	return []*domain.Document{{ID: "doc_1"}}, 1, nil
+func (s *moduleTestService) ListDocumentsPaginated(context.Context, string, string, application.ListOptions) ([]*domain.Document, int64, bool, error) {
+	return []*domain.Document{{ID: "doc_1"}}, 1, false, nil
 }
 func (s *moduleTestService) DocumentStats(context.Context, string, string, application.ListOptions) (*application.DocumentStats, error) {
 	return &application.DocumentStats{ByStatus: map[string]int64{"draft": 1}}, nil

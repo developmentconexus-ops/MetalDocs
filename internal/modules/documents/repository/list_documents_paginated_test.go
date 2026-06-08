@@ -57,7 +57,7 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(`profile_code_snapshot, process_area_code_snapshot`)).
 		WillReturnRows(rows)
 
-	got, err := repo.ListDocumentsPaginated(context.Background(), "tenant-1", repository.ListOptions{Page: 1, PageSize: 20})
+	got, _, err := repo.ListDocumentsPaginated(context.Background(), "tenant-1", repository.ListOptions{PageSize: 20})
 	if err != nil {
 		t.Fatalf("ListDocumentsPaginated: %v", err)
 	}

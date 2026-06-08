@@ -2006,8 +2006,6 @@ paths:
           $ref: '#/components/responses/InternalServerError'
   /controlled-documents:
     get:
-      x-pagination-exempt: true
-      x-pagination-exempt-reason: 'Uses limit/offset pagination at runtime (not yet cursor-migrated); cursor migration tracked for Phase F.'
       summary: List controlled documents
       tags: [controlled-documents]
       operationId: listControlledDocuments
@@ -2030,12 +2028,13 @@ paths:
         - name: status
           in: query
           schema: { type: string, enum: [active, obsolete, superseded] }
+        - name: cursor
+          in: query
+          description: Opaque forward keyset cursor from a prior page's page.next_cursor.
+          schema: { type: string }
         - name: limit
           in: query
-          schema: { type: integer, minimum: 0 }
-        - name: offset
-          in: query
-          schema: { type: integer, minimum: 0 }
+          schema: { type: integer, minimum: 1, maximum: 100 }
       responses:
         '200':
           description: ok
@@ -2043,12 +2042,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, page]
                 properties:
                   items:
                     type: array
                     items:
                       $ref: '#/components/schemas/ControlledDocument'
+                  page:
+                    $ref: '#/components/schemas/CursorPage'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2286,23 +2287,21 @@ paths:
 
   /documents:
     get:
-      x-pagination-exempt: true
-      x-pagination-exempt-reason: 'Uses page/page_size pagination at runtime (not yet cursor-migrated); cursor migration tracked for Phase F.'
       summary: List documents for tenant
       tags: [documents]
       operationId: listDocuments
       parameters:
-        - name: page
+        - name: cursor
+          in: query
+          description: Opaque forward keyset cursor from a prior page's page.next_cursor.
+          schema:
+            type: string
+        - name: limit
           in: query
           schema:
             type: integer
             minimum: 1
-        - name: pageSize
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 50
+            maximum: 100
         - name: status
           in: query
           description: CSV status filter, also accepts repeated query params
@@ -4186,19 +4185,18 @@ components:
             enum: [system_admin, approver, author, editor, viewer]
     DocumentListResponse:
       type: object
-      required: [items, page, page_size, total]
+      required: [items, page, total]
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/DocumentSummary'
         page:
-          type: integer
-        page_size:
-          type: integer
+          $ref: '#/components/schemas/CursorPage'
         total:
           type: integer
           format: int64
+          description: Total documents matching the filter (cursor-independent count).
     DocumentCreateResult:
       type: object
       required: [document_id, initial_revision_id, session_id]

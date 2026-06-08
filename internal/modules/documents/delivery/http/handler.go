@@ -21,6 +21,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/idempotency"
+	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/ratelimit"
 	"metaldocs/internal/platform/tenant"
@@ -34,7 +35,7 @@ type Service interface {
 	RenameDocument(ctx context.Context, tenantID, userID, docID, newName string) error
 	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
-	ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts application.ListOptions) ([]*domain.Document, int64, error)
+	ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts application.ListOptions) ([]*domain.Document, int64, bool, error)
 	DocumentStats(ctx context.Context, tenantID, userID string, opts application.ListOptions) (*application.DocumentStats, error)
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
 	AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, bool, error)
@@ -193,18 +194,30 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, total, err := h.svc.ListDocumentsPaginated(r.Context(), tenantID, effectiveUserID, opts)
+	items, total, hasMore, err := h.svc.ListDocumentsPaginated(r.Context(), tenantID, effectiveUserID, opts)
 	if err != nil {
+		if errors.Is(err, pagination.ErrInvalidCursor) {
+			httpErr(w, http.StatusBadRequest, "invalid_cursor")
+			return
+		}
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
 	}
 
+	nextCursor := ""
+	if hasMore && len(items) > 0 {
+		last := items[len(items)-1]
+		nextCursor = pagination.EncodeCursor(last.UpdatedAt.UTC().Format(time.RFC3339Nano), last.ID)
+	}
+
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"items":     items,
-		"page":      opts.Page,
-		"page_size": opts.PageSize,
-		"total":     total,
+		"items": items,
+		"page": map[string]any{
+			"next_cursor": nextCursor,
+			"has_more":    hasMore,
+		},
+		"total": total,
 	})
 }
 
@@ -240,33 +253,25 @@ func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
 func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (application.ListOptions, string, error) {
 	query := r.URL.Query()
 	opts := application.ListOptions{
-		Page:     1,
 		PageSize: 20,
 	}
 
-	if rawPage := strings.TrimSpace(query.Get("page")); rawPage != "" {
-		page, err := strconv.Atoi(rawPage)
-		if err != nil {
-			return opts, "", errors.New("page must be a valid integer")
-		}
-		if page < 1 {
-			return opts, "", errors.New("page must be >= 1")
-		}
-		opts.Page = page
-	}
+	// FD-2: keyset cursor pagination. `cursor` is opaque (validated by the repo
+	// on decode); `limit` clamps server-side to 1..100.
+	opts.Cursor = strings.TrimSpace(query.Get("cursor"))
 
-	if rawPageSize := strings.TrimSpace(query.Get("pageSize")); rawPageSize != "" {
-		pageSize, err := strconv.Atoi(rawPageSize)
+	if rawLimit := strings.TrimSpace(query.Get("limit")); rawLimit != "" {
+		limit, err := strconv.Atoi(rawLimit)
 		if err != nil {
-			return opts, "", errors.New("pageSize must be a valid integer")
+			return opts, "", errors.New("limit must be a valid integer")
 		}
-		if pageSize < 1 {
-			return opts, "", errors.New("pageSize must be >= 1")
+		if limit < 1 {
+			return opts, "", errors.New("limit must be >= 1")
 		}
-		if pageSize > 50 {
-			return opts, "", errors.New("pageSize must be <= 50")
+		if limit > 100 {
+			return opts, "", errors.New("limit must be <= 100")
 		}
-		opts.PageSize = pageSize
+		opts.PageSize = limit
 	}
 
 	statusValues := query["status"]

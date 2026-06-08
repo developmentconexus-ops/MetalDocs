@@ -19,7 +19,7 @@ type tenantContextKey struct{}
 
 type controlledDocumentService interface {
 	Create(ctx context.Context, cmd application.CreateControlledDocumentCmd) (*application.CreateResult, error)
-	List(ctx context.Context, tenantID string, filter application.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, error)
+	List(ctx context.Context, tenantID string, filter application.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, bool, error)
 	CreateRevision(ctx context.Context, cmd application.CreateRevisionCmd) (*controlleddocumentsdomain.DocumentRef, error)
 	Get(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error)
 	Obsolete(ctx context.Context, tenantID, id string) error

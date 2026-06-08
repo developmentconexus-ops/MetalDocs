@@ -122,12 +122,12 @@ func (f *fakeRepo) ListDocumentsForUser(_ context.Context, _, _ string) ([]domai
 	return f.listReturn, nil
 }
 
-func (f *fakeRepo) ListDocumentsPaginated(_ context.Context, _ string, opts application.ListOptions) ([]*domain.Document, error) {
+func (f *fakeRepo) ListDocumentsPaginated(_ context.Context, _ string, opts application.ListOptions) ([]*domain.Document, bool, error) {
 	f.lastOpts = opts
 	if f.listPaginatedErr != nil {
-		return nil, f.listPaginatedErr
+		return nil, false, f.listPaginatedErr
 	}
-	return f.listPaginatedReturn, nil
+	return f.listPaginatedReturn, false, nil
 }
 
 func (f *fakeRepo) CountDocuments(_ context.Context, _ string, opts application.ListOptions) (int64, error) {

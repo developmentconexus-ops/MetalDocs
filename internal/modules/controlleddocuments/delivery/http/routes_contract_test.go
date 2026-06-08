@@ -37,8 +37,8 @@ func (f fakeRegistryDocs) CodeExists(ctx context.Context, tenantID, profileCode,
 	return false, nil
 }
 
-func (f fakeRegistryDocs) List(ctx context.Context, tenantID string, filter controlleddocumentsdomain.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, error) {
-	return nil, nil
+func (f fakeRegistryDocs) List(ctx context.Context, tenantID string, filter controlleddocumentsdomain.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, bool, error) {
+	return nil, false, nil
 }
 func (f fakeRegistryDocs) CanRead(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (bool, error) {
 	return true, nil
@@ -124,10 +124,10 @@ func (s *spyControlledDocumentService) Create(ctx context.Context, cmd applicati
 	}, nil
 }
 
-func (s *spyControlledDocumentService) List(ctx context.Context, tenantID string, filter application.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, error) {
+func (s *spyControlledDocumentService) List(ctx context.Context, tenantID string, filter application.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, bool, error) {
 	s.gotListTenantID = tenantID
 	s.gotListFilter = filter
-	return s.listResult, nil
+	return s.listResult, false, nil
 }
 
 func (s *spyControlledDocumentService) CreateRevision(ctx context.Context, cmd application.CreateRevisionCmd) (*controlleddocumentsdomain.DocumentRef, error) {
@@ -493,7 +493,7 @@ func TestListControlledDocuments_UsesGeneratedParams(t *testing.T) {
 	handler := &Handler{svc: spy}
 	status := controlleddocumentsapi.ListControlledDocumentsParamsStatusActive
 	limit := 10
-	offset := 2
+	cursor := "Y3Vyc29y"
 	profileCode := "DC"
 	processAreaCode := "RH"
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents", nil)
@@ -505,7 +505,7 @@ func TestListControlledDocuments_UsesGeneratedParams(t *testing.T) {
 		ProcessAreaCode: &processAreaCode,
 		Status:          &status,
 		Limit:           &limit,
-		Offset:          &offset,
+		Cursor:          &cursor,
 	})
 
 	if rec.Code != http.StatusOK {
@@ -520,8 +520,8 @@ func TestListControlledDocuments_UsesGeneratedParams(t *testing.T) {
 	if spy.gotListFilter.Status == nil || *spy.gotListFilter.Status != controlleddocumentsdomain.CDStatusActive {
 		t.Fatalf("Status = %v, want active", spy.gotListFilter.Status)
 	}
-	if spy.gotListFilter.Limit != limit || spy.gotListFilter.Offset != offset {
-		t.Fatalf("limit/offset = %d/%d, want %d/%d", spy.gotListFilter.Limit, spy.gotListFilter.Offset, limit, offset)
+	if spy.gotListFilter.Limit != limit || spy.gotListFilter.Cursor != cursor {
+		t.Fatalf("limit/cursor = %d/%q, want %d/%q", spy.gotListFilter.Limit, spy.gotListFilter.Cursor, limit, cursor)
 	}
 	if !strings.Contains(rec.Body.String(), `"items"`) {
 		t.Fatalf("body %q does not contain generated items response", rec.Body.String())

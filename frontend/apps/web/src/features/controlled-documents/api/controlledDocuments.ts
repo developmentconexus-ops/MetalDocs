@@ -9,15 +9,17 @@ export async function fetchControlledDocuments(filter?: {
   processAreaCode?: string;
   status?: string;
   limit?: number;
-  offset?: number;
+  cursor?: string;
 }): Promise<ControlledDocument[]> {
   const params = new URLSearchParams();
   if (filter?.profileCode) params.set("profileCode", filter.profileCode);
   if (filter?.processAreaCode) params.set("processAreaCode", filter.processAreaCode);
   if (filter?.status) params.set("status", filter.status);
   if (filter?.limit != null) params.set("limit", String(filter.limit));
-  if (filter?.offset != null) params.set("offset", String(filter.offset));
+  if (filter?.cursor) params.set("cursor", filter.cursor);
   const qs = params.toString() ? `?${params.toString()}` : "";
+  // FD-2: response is now { items, page:{ next_cursor, has_more } }; this helper
+  // returns the first page's items (no paginated CD UI consumes the cursor yet).
   const res = await apiFetch<{ items: ControlledDocument[] }>(`${BASE}${qs}`);
   return res.items;
 }

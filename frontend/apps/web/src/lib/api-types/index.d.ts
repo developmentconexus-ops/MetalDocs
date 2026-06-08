@@ -2175,9 +2175,11 @@ export interface components {
         };
         DocumentListResponse: {
             items: components["schemas"]["DocumentSummary"][];
-            page: number;
-            page_size: number;
-            /** Format: int64 */
+            page: components["schemas"]["CursorPage"];
+            /**
+             * Format: int64
+             * @description Total documents matching the filter (cursor-independent count).
+             */
             total: number;
         };
         DocumentCreateResult: {
@@ -5086,8 +5088,9 @@ export interface operations {
                 ownerUserId?: string;
                 q?: string;
                 status?: "active" | "obsolete" | "superseded";
+                /** @description Opaque forward keyset cursor from a prior page's page.next_cursor. */
+                cursor?: string;
                 limit?: number;
-                offset?: number;
             };
             header?: never;
             path?: never;
@@ -5103,6 +5106,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         items: components["schemas"]["ControlledDocument"][];
+                        page: components["schemas"]["CursorPage"];
                     };
                 };
             };
@@ -5312,8 +5316,9 @@ export interface operations {
     listDocuments: {
         parameters: {
             query?: {
-                page?: number;
-                pageSize?: number;
+                /** @description Opaque forward keyset cursor from a prior page's page.next_cursor. */
+                cursor?: string;
+                limit?: number;
                 /** @description CSV status filter, also accepts repeated query params */
                 status?: string;
                 areaCode?: string;

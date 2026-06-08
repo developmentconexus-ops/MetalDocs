@@ -6,7 +6,6 @@ import { LibraryFilterTabs } from '../components/LibraryFilterTabs';
 import { LibraryStatCards } from '../components/LibraryStatCards';
 import { LibrarySidebar } from '../components/LibrarySidebar';
 import { PageSizeSelector } from '../components/PageSizeSelector';
-import { Pagination } from '../components/Pagination';
 import { useLibraryQuery } from '../queries/useLibraryQuery';
 import { useLibraryStatsQuery } from '../queries/useLibraryStatsQuery';
 import { filterToStatus, type LibraryFilter } from '../lib/libraryStatus';
@@ -37,7 +36,10 @@ export default function LibraryPage(): JSX.Element {
   const navigate = useNavigate();
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<LibraryFilter>('todos');
-  const [page, setPage] = useState(1);
+  // FD-2 keyset pagination: a client-side stack of opaque cursors. Entry 0 is
+  // the first page (empty cursor); the active cursor is the last entry. Next
+  // pushes the response's page.next_cursor; Prev pops. Page number = stack length.
+  const [cursorStack, setCursorStack] = useState<string[]>(['']);
   // Lazy init — reads localStorage once on mount, prevents hydration flash.
   const [pageSize, setPageSize] = useState<PageSize>(readStoredPageSize);
   const [activityOpen, setActivityOpen] = useState<boolean>(readStoredActivityOpen);
@@ -48,22 +50,26 @@ export default function LibraryPage(): JSX.Element {
     window.localStorage.setItem(PAGE_SIZE_KEY, String(pageSize));
   }, [pageSize]);
 
-  // Reset to page 1 whenever the debounced search query changes — avoids
-  // landing on page N of a smaller filtered result set.
+  // Reset to the first page whenever the debounced search query changes — avoids
+  // landing on a stale cursor against a smaller filtered result set.
   useEffect(() => {
-    setPage(1);
+    setCursorStack(['']);
   }, [debouncedQuery]);
 
   const status = useMemo(() => filterToStatus(activeFilter), [activeFilter]);
 
+  function resetToFirstPage() {
+    setCursorStack(['']);
+  }
+
   function handleFilterChange(f: LibraryFilter) {
     setActiveFilter(f);
-    setPage(1);
+    resetToFirstPage();
   }
 
   function handleAreaChange(code: string | null) {
     setSelectedArea(code);
-    setPage(1);
+    resetToFirstPage();
   }
 
   function toggleActivity() {
@@ -76,9 +82,10 @@ export default function LibraryPage(): JSX.Element {
     navigate(`/documents/${id}`);
   }
 
+  const activeCursor = cursorStack[cursorStack.length - 1];
   const libraryQuery = useLibraryQuery({
-    page,
-    pageSize,
+    cursor: activeCursor || undefined,
+    limit: pageSize,
     status,
     areaCode: selectedArea ?? undefined,
     q: debouncedQuery.trim() || undefined,
@@ -87,7 +94,16 @@ export default function LibraryPage(): JSX.Element {
 
   const items = libraryQuery.data?.items ?? [];
   const total = libraryQuery.data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const pageNumber = cursorStack.length;
+  const nextCursor = libraryQuery.data?.page?.next_cursor ?? null;
+  const hasMore = libraryQuery.data?.page?.has_more ?? false;
+
+  function goNextPage() {
+    if (hasMore && nextCursor) setCursorStack((s) => [...s, nextCursor]);
+  }
+  function goPrevPage() {
+    setCursorStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
+  }
   const statsByStatus = statsQuery.data?.by_status ?? {};
   const statsByArea = statsQuery.data?.by_area ?? {};
 
@@ -217,9 +233,27 @@ export default function LibraryPage(): JSX.Element {
             <PageSizeSelector
               pageSize={pageSize}
               options={[...PAGE_SIZE_OPTIONS]}
-              onPageSizeChange={(size) => { setPageSize(size as PageSize); setPage(1); }}
+              onPageSizeChange={(size) => { setPageSize(size as PageSize); resetToFirstPage(); }}
             />
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+            <div className={styles.cursorPager}>
+              <button
+                type="button"
+                className={styles.activityButton}
+                onClick={goPrevPage}
+                disabled={pageNumber <= 1 || libraryQuery.isFetching}
+              >
+                Anterior
+              </button>
+              <span className={styles.pagerLabel}>Página {pageNumber}</span>
+              <button
+                type="button"
+                className={styles.activityButton}
+                onClick={goNextPage}
+                disabled={!hasMore || libraryQuery.isFetching}
+              >
+                Próxima
+              </button>
+            </div>
           </footer>
         </section>
       </main>

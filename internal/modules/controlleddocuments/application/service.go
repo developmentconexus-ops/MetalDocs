@@ -456,17 +456,17 @@ func (s *ControlledDocumentService) Supersede(ctx context.Context, tenantID, con
 	return s.changeStatus(ctx, tenantID, controlledDocumentID, controlleddocumentsdomain.CDStatusSuperseded, string(iamdomain.CapControlledDocumentSupersede))
 }
 
-func (s *ControlledDocumentService) List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, error) {
+func (s *ControlledDocumentService) List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, bool, error) {
 	actorUserID, ok := authn.UserIDFromContext(ctx)
 	if !ok {
-		return nil, ErrActorMissing
+		return nil, false, ErrActorMissing
 	}
 	filter.ActorUserID = &actorUserID
-	docs, err := s.docs.List(ctx, tenantID, filter)
+	docs, hasMore, err := s.docs.List(ctx, tenantID, filter)
 	if err != nil {
-		return nil, fmt.Errorf("controlled_documents: list controlled documents: %w", err)
+		return nil, false, fmt.Errorf("controlled_documents: list controlled documents: %w", err)
 	}
-	return docs, nil
+	return docs, hasMore, nil
 }
 
 func (s *ControlledDocumentService) Get(ctx context.Context, tenantID, id string) (*ControlledDocument, error) {
