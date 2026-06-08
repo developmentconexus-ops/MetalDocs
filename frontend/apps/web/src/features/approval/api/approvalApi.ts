@@ -1,6 +1,6 @@
 import { etagCache } from './etagCache';
 import { mutate, type MutateOptions } from './mutationClient';
-import { apiFetch, ApiError } from '../../../lib/api';
+import { apiFetch, ApiError, requestRaw } from '../../../lib/api';
 import type { components } from '../../../lib/api-types';
 import type {
   ApprovalInstance,
@@ -24,20 +24,13 @@ import type {
 
 const BASE = '/api/v1';
 
-async function getJSON<T>(url: string): Promise<{ data: T; etag?: string }> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw Object.assign(new Error(`http_${res.status}`), { status: res.status });
-  }
-  const data = (await res.json()) as T;
-  const etag = res.headers.get('ETag') ?? undefined;
-  return { data, etag };
-}
-
 export async function getInstance(documentId: string): Promise<ApprovalInstance> {
-  const { data, etag } = await getJSON<ApprovalInstance>(
-    `${BASE}/documents/${documentId}/approval-instance`,
-  );
+  // requestRaw goes through the shared transport (credentials, RFC 9457 Problem
+  // decoding, authn.expired dispatch) but returns the Response so the ETag header
+  // can seed the cache for a subsequent If-Match write (F-FE-RAWFETCH).
+  const res = await requestRaw(`${BASE}/documents/${documentId}/approval-instance`);
+  const data = (await res.json()) as ApprovalInstance;
+  const etag = res.headers.get('ETag');
   if (etag) {
     etagCache.set(documentId, etag);
   }
@@ -56,8 +49,7 @@ export async function listInbox(params: ListInboxParams = {}): Promise<ListInbox
     qs.set('offset', String(params.offset));
   }
   const url = `${BASE}/approval/inbox${qs.toString() ? `?${qs}` : ''}`;
-  const { data } = await getJSON<ListInboxResponse>(url);
-  return data;
+  return apiFetch<ListInboxResponse>(url);
 }
 
 export function submit(

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ApiError } from '../../../../lib/api';
 import { etagCache } from '../etagCache';
-import { ApprovalError } from '../mutationClient';
 import { listRoutes, seedRouteEtag } from '../routeAdminApi';
 
 vi.mock('../../../../lib/api', async () => {
@@ -47,7 +47,7 @@ describe('seedRouteEtag', () => {
 });
 
 describe('listRoutes', () => {
-  it('parses problem+json and throws ApprovalError with the backend code', async () => {
+  it('parses problem+json and throws ApiError with the backend code (shared transport)', async () => {
     const problem = {
       type: 'about:blank',
       title: 'forbidden',
@@ -65,7 +65,7 @@ describe('listRoutes', () => {
       code: 'authz.capability_denied',
       status: 403,
     });
-    await expect(listRoutes()).rejects.toBeInstanceOf(ApprovalError);
+    await expect(listRoutes()).rejects.toBeInstanceOf(ApiError);
   });
 
   it('returns the parsed body on 2xx', async () => {

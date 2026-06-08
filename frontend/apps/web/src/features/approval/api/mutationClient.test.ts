@@ -54,8 +54,8 @@ describe('mutationClient', () => {
       vi.spyOn(global, 'fetch').mockImplementation(() =>
         Promise.resolve(
           new Response(
-            JSON.stringify({ error: { code: 'sod.submitter_cannot_sign', message: 'forbidden' } }),
-            { status: 403 },
+            JSON.stringify({ type: 'about:blank', title: 'forbidden', status: 403, code: 'sod.submitter_cannot_sign' }),
+            { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
           ),
         ),
       );
@@ -75,8 +75,8 @@ describe('mutationClient', () => {
       vi.spyOn(global, 'fetch').mockImplementation(() =>
         Promise.resolve(
           new Response(
-            JSON.stringify({ error: { code: 'sod.cross_stage_duplicate', message: 'forbidden' } }),
-            { status: 403 },
+            JSON.stringify({ type: 'about:blank', title: 'forbidden', status: 403, code: 'sod.cross_stage_duplicate' }),
+            { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
           ),
         ),
       );
@@ -97,8 +97,8 @@ describe('mutationClient', () => {
       vi.spyOn(global, 'fetch').mockImplementation(() =>
         Promise.resolve(
           new Response(
-            JSON.stringify({ error: { code: 'conflict.stale' } }),
-            { status: 412 },
+            JSON.stringify({ type: 'about:blank', title: 'stale', status: 412, code: 'conflict.stale' }),
+            { status: 412, headers: { 'Content-Type': 'application/problem+json' } },
           ),
         ),
       );

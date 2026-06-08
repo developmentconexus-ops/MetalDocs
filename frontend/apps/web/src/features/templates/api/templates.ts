@@ -1,4 +1,5 @@
 import { apiFetch } from '../../../lib/api/client';
+import { ApiError } from '../../../lib/api/errors';
 import type { components, paths } from '../../../lib/api-types';
 import type { Placeholder, CompositionConfig } from '../placeholder-types';
 export type { Placeholder, CompositionConfig };
@@ -72,23 +73,6 @@ export type TemplateListRow = {
   archived_at: string | null;
 };
 
-async function apiJson<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    try {
-      const body = (await res.json()) as { error?: { code?: string; message?: string } };
-      const message = body?.error?.message;
-      throw new Error(message || `HTTP ${res.status}`);
-    } catch (err) {
-      if (err instanceof Error) {
-        throw err;
-      }
-      throw new Error(`HTTP ${res.status}`);
-    }
-  }
-
-  return (await res.json()) as T;
-}
-
 function toFiniteNumber(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -161,14 +145,16 @@ export async function listTemplates(params?: {
 }
 
 export async function getTemplate(id: string): Promise<{ template: TemplateDTO; latest_version: VersionDTO }> {
-  const res = await fetch(`/api/v1/templates/${id}`);
-  const body = await apiJson<{ data: { template: TemplateDTO; latest_version: VersionDTO } }>(res);
+  const body = await apiFetch<{ data: { template: TemplateDTO; latest_version: VersionDTO } }>(
+    `/api/v1/templates/${id}`,
+  );
   return body.data;
 }
 
 export async function getVersion(templateId: string, n: number): Promise<VersionDTO> {
-  const res = await fetch(`/api/v1/templates/${templateId}/versions/${n}`);
-  const body = await apiJson<{ data: { version: VersionDTO } }>(res);
+  const body = await apiFetch<{ data: { version: VersionDTO } }>(
+    `/api/v1/templates/${templateId}/versions/${n}`,
+  );
   return body.data.version;
 }
 
@@ -176,12 +162,9 @@ export async function presignAutosave(
   templateId: string,
   versionNum: number,
 ): Promise<{ upload_url: string; storage_key: string; expires_at: string }> {
-  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/autosave/presign`, {
-    method: 'POST',
-  });
-  const body = await apiJson<{
+  const body = await apiFetch<{
     data: { upload_url: string; storage_key: string; expires_at: string };
-  }>(res);
+  }>(`/api/v1/templates/${templateId}/versions/${versionNum}/autosave/presign`, { method: 'POST' });
   return body.data;
 }
 
@@ -190,12 +173,10 @@ export async function commitAutosave(
   versionNum: number,
   expectedContentHash: string,
 ): Promise<VersionDTO> {
-  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/autosave/commit`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ expected_content_hash: expectedContentHash }),
-  });
-  const body = await apiJson<{ data: { version: VersionDTO } }>(res);
+  const body = await apiFetch<{ data: { version: VersionDTO } }>(
+    `/api/v1/templates/${templateId}/versions/${versionNum}/autosave/commit`,
+    { method: 'POST', body: JSON.stringify({ expected_content_hash: expectedContentHash }) },
+  );
   return body.data.version;
 }
 
@@ -254,12 +235,9 @@ export async function saveDraft(
 }
 
 export async function getDocxURL(templateId: string, versionNum: number): Promise<string> {
-  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/docx-url`);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as any)?.error?.message || `HTTP ${res.status}`);
-  }
-  const body = (await res.json()) as { data: { url: string } };
+  const body = await apiFetch<{ data: { url: string } }>(
+    `/api/v1/templates/${templateId}/versions/${versionNum}/docx-url`,
+  );
   return body.data.url;
 }
 
@@ -277,16 +255,10 @@ export async function reviewVersion(
   accept: boolean,
   reason?: string,
 ): Promise<VersionDTO> {
-  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/review`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ accept, reason: reason || '' }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as any)?.error?.message || `HTTP ${res.status}`);
-  }
-  const data = (await res.json()) as { data: { version: VersionDTO } };
+  const data = await apiFetch<{ data: { version: VersionDTO } }>(
+    `/api/v1/templates/${templateId}/versions/${versionNum}/review`,
+    { method: 'POST', body: JSON.stringify({ accept, reason: reason || '' }) },
+  );
   return data.data.version;
 }
 
@@ -306,21 +278,15 @@ export async function approveVersion(
   accept: boolean,
   reason?: string,
 ): Promise<ApproveVersionResult> {
-  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/approve`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ accept, reason: reason || '' }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as any)?.error?.message || `HTTP ${res.status}`);
-  }
-  const data = (await res.json()) as {
+  const data = await apiFetch<{
     data: {
       version: VersionDTO;
       next_draft?: { id: string; version_number: number } | null;
     };
-  };
+  }>(`/api/v1/templates/${templateId}/versions/${versionNum}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ accept, reason: reason || '' }),
+  });
   const raw = data.data.next_draft;
   const nextDraft: NextDraftRef | null =
     raw && raw.id && Number.isFinite(raw.version_number)
@@ -382,15 +348,14 @@ export async function getTemplateSchemas(
   templateId: string,
   versionNum: number,
 ): Promise<{ schemas: TemplateSchemas; lockVersion: number }> {
-  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}`);
-  const body = await apiJson<{
+  const body = await apiFetch<{
     data: {
       version: VersionDTO & {
         placeholder_schema: WirePlaceholder[] | null;
         lock_version?: number;
       };
     };
-  }>(res);
+  }>(`/api/v1/templates/${templateId}/versions/${versionNum}`);
   const v = body.data.version;
   return {
     schemas: {
@@ -407,29 +372,27 @@ export async function putTemplateSchemas(
   schemas: TemplateSchemas,
   expectedLockVersion: number,
 ): Promise<{ lockVersion: number }> {
-  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/schema`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      metadata_schema: {},
-      placeholder_schema: schemas.placeholders.map(placeholderToWire),
-      expected_lock_version: expectedLockVersion,
-    }),
-  });
-  if (!res.ok) {
-    let payload: { code?: string; title?: string; error?: { code?: string; message?: string } } = {};
-    try {
-      payload = await res.json();
-    } catch {
-      // fall through
+  try {
+    const body = await apiFetch<{ data?: { version?: { lock_version?: number } } }>(
+      `/api/v1/templates/${templateId}/versions/${versionNum}/schema`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          metadata_schema: {},
+          placeholder_schema: schemas.placeholders.map(placeholderToWire),
+          expected_lock_version: expectedLockVersion,
+        }),
+      },
+    );
+    const next = body?.data?.version?.lock_version;
+    return { lockVersion: typeof next === 'number' ? next : expectedLockVersion + 1 };
+  } catch (err) {
+    // The optimistic-lock conflict surfaces as RFC 9457 412/stale_lock_version
+    // through the shared transport; re-raise as the typed domain error so the
+    // editor can prompt a refresh.
+    if (err instanceof ApiError && (err.code === 'stale_lock_version' || err.status === 412)) {
+      throw new StaleLockVersionError(err.message);
     }
-    const code = payload.code ?? payload.error?.code;
-    if (code === 'stale_lock_version') {
-      throw new StaleLockVersionError(payload.title ?? payload.error?.message);
-    }
-    throw new Error(payload.title ?? payload.error?.message ?? `HTTP ${res.status}`);
+    throw err;
   }
-  const body = (await res.json()) as { data?: { version?: { lock_version?: number } } };
-  const next = body?.data?.version?.lock_version;
-  return { lockVersion: typeof next === 'number' ? next : expectedLockVersion + 1 };
 }

@@ -36,8 +36,14 @@ export async function mutate<TReq, TRes>(
   };
   if (ifMatch) headers['If-Match'] = ifMatch;
 
+  // Same-origin /api/v1; `credentials: 'include'` is set explicitly to mirror the
+  // shared apiFetch transport (do not rely on the same-origin default). The
+  // ETag/If-Match + Idempotency-Key + 412 semantics below are why this stays a
+  // dedicated client rather than folding into apiFetch (which returns parsed JSON
+  // and does not expose response headers).
   const res = await fetch(url, {
     method,
+    credentials: 'include',
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
@@ -48,33 +54,19 @@ export async function mutate<TReq, TRes>(
   }
 
   if (res.ok) {
+    if (res.status === 204) return undefined as TRes;
     return res.json() as Promise<TRes>;
   }
 
-  // Try RFC 9457 problem+json first.
+  // The API emits only RFC 9457 problem+json (AD-2). Parse it; a missing body
+  // means a non-handler failure (infra 502/504/bodyless) → synthesize generic.
   const prob = await parseProblem(res.clone());
-  if (prob) {
-    if (prob.status === 401) {
-      dispatchAuthExpired(window.location.pathname + window.location.search);
-    }
-    if (prob.status === 412 && opts.on412 && opts.resourceId) {
-      opts.on412(opts.resourceId);
-    } else if (prob.status === 412) {
-      toast.error('Documento foi alterado. Por favor, atualize a página.');
-    }
-    throw new ApprovalError(prob.code, prob.status, prob.title ?? prob.detail ?? '');
-  }
-
-  // Legacy envelope fallback: { error: { code, message } }.
-  const legacyBody = (await res.json().catch(() => ({}))) as {
-    error?: { code?: string; message?: string };
-  };
-  const legacyCode = legacyBody?.error?.code ?? `http_${res.status}`;
-  const legacyMessage = legacyBody?.error?.message ?? 'Erro interno';
-
-  if (res.status === 401) {
+  if (res.status === 401 && (!prob || prob.code === 'AUTH_UNAUTHORIZED')) {
     dispatchAuthExpired(window.location.pathname + window.location.search);
-    throw new ApprovalError('authn.expired', 401, 'Não autorizado');
+    throw new ApprovalError('authn.expired', 401, 'Sessão expirada');
+  }
+  if (res.status === 429) {
+    throw new ApprovalError('authn.rate_limited', 429, 'Muitas tentativas. Aguarde 30 segundos.');
   }
   if (res.status === 412) {
     if (opts.on412 && opts.resourceId) {
@@ -82,10 +74,10 @@ export async function mutate<TReq, TRes>(
     } else {
       toast.error('Documento foi alterado. Por favor, atualize a página.');
     }
-    throw new ApprovalError(legacyCode, 412, legacyMessage);
   }
-  if (res.status === 429) {
-    throw new ApprovalError('authn.rate_limited', 429, 'Muitas tentativas. Aguarde 30 segundos.');
+  if (prob) {
+    throw new ApprovalError(prob.code, prob.status, prob.title ?? prob.detail ?? '');
   }
-  throw new ApprovalError(legacyCode, res.status, legacyMessage);
+  const code = `http_${res.status}`;
+  throw new ApprovalError(code, res.status, 'Erro interno');
 }

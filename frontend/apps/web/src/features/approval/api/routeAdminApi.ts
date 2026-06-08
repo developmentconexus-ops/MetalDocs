@@ -9,9 +9,8 @@
 // Types come from the OpenAPI codegen (`components['schemas']`) — never
 // re-typed locally.
 
-import { dispatchAuthExpired } from '../../../lib/api';
-import { parseProblem } from '../../../lib/api/problem';
-import { ApprovalError, mutate, type MutateOptions } from './mutationClient';
+import { apiFetch } from '../../../lib/api';
+import { mutate, type MutateOptions } from './mutationClient';
 import { etagCache } from './etagCache';
 import type { components } from '../../../lib/api-types';
 
@@ -26,30 +25,15 @@ export type RouteResponse = components['schemas']['RouteResponse'];
 export type StageRequest = components['schemas']['StageRequest'];
 
 export async function listRoutes(): Promise<ListRoutesResponse> {
-  const res = await fetch(BASE);
-  if (res.ok) {
-    const data = (await res.json()) as ListRoutesResponse;
-    // Seed the ETag cache from the list so a cold-load Edit/Deactivate sends a
-    // valid `If-Match` without first issuing a write. `seedRouteEtag` is
-    // monotonic and skips version <= 0, so legacy rows are a safe no-op.
-    for (const route of data.routes ?? []) {
-      seedRouteEtag(route.id, route.version);
-    }
-    return data;
+  // Shared transport: apiFetch adds credentials, RFC 9457 Problem decoding, and
+  // authn.expired dispatch (F-FE-RAWFETCH). The ETag cache is seeded from each
+  // route's body version (monotonic; skips version <= 0) so a cold-load
+  // Edit/Deactivate sends a valid `If-Match` without first issuing a write.
+  const data = await apiFetch<ListRoutesResponse>(BASE);
+  for (const route of data.routes ?? []) {
+    seedRouteEtag(route.id, route.version);
   }
-
-  const prob = await parseProblem(res.clone());
-  if (prob) {
-    if (prob.status === 401) {
-      dispatchAuthExpired(window.location.pathname + window.location.search);
-    }
-    throw new ApprovalError(prob.code, prob.status, prob.title ?? prob.detail ?? '');
-  }
-  if (res.status === 401) {
-    dispatchAuthExpired(window.location.pathname + window.location.search);
-    throw new ApprovalError('authn.expired', 401, 'Não autorizado');
-  }
-  throw new ApprovalError(`http_${res.status}`, res.status, 'Erro interno');
+  return data;
 }
 
 export function createRoute(

@@ -150,11 +150,10 @@ describe('templates.createTemplate', () => {
 
     await importTemplateDocx('tpl_123', 1, file);
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      '/api/v1/templates/tpl_123/versions/1/autosave/presign',
-      { method: 'POST' },
-    );
+    // presign now goes through the shared apiFetch transport (adds
+    // credentials + Content-Type), so match the call shape rather than exact args.
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/templates/tpl_123/versions/1/autosave/presign');
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'POST' });
     expect(fetchMock.mock.calls[1][0]).toBe('https://minio/upload/docx');
     expect(fetchMock.mock.calls[1][1]).toMatchObject({
       method: 'PUT',
