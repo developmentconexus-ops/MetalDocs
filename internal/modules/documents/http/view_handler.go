@@ -44,7 +44,7 @@ func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {
 		r.PathValue("id"),
 	)
 	if err != nil {
-		writeViewError(r.Context(), w, tenantID, r.PathValue("id"), err)
+		writeViewError(r.Context(), w, tenantID, r.PathValue("id"), requestID(r), err)
 		return
 	}
 	payload := map[string]any{"pdf_status": result.PDFStatus}
@@ -55,14 +55,13 @@ func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {
 	writeFillInJSON(w, http.StatusOK, payload)
 }
 
-func writeViewError(ctx context.Context, w http.ResponseWriter, tenantID, documentID string, err error) {
-	switch {
-	case errors.As(err, &authz.ErrCapDenied{}):
-		writeFillInJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
-	case errors.Is(err, v2domain.ErrNotFound):
-		writeFillInJSON(w, http.StatusNotFound, map[string]any{"error": "not_found"})
-	default:
+func writeViewError(ctx context.Context, w http.ResponseWriter, tenantID, documentID, reqID string, err error) {
+	// mapFillInError already classifies ErrCapDenied (403) / ErrNotFound (404)
+	// and defaults to 500; route through the unified RFC 9457 writer so view
+	// errors carry the same Problem shape as the rest of the API (AD-2). Keep the
+	// handler-level log for the unclassified (500) case.
+	if !errors.As(err, &authz.ErrCapDenied{}) && !errors.Is(err, v2domain.ErrNotFound) {
 		slog.ErrorContext(ctx, "view document failed", "tenant_id", tenantID, "document_id", documentID, "err", err)
-		writeFillInJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal"})
 	}
+	writeFillInError(w, reqID, err)
 }
