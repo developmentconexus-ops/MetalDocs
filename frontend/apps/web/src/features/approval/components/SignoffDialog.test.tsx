@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApprovalError } from '../api/mutationClient';
@@ -21,16 +22,19 @@ function createDeferred<T>() {
 function renderDialog(props: Partial<Parameters<typeof SignoffDialog>[0]> = {}) {
   const onClose = vi.fn();
   const onSuccess = vi.fn();
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const renderResult = render(
-    <SignoffDialog
-      documentId="doc-1"
-      contentHash="hash-1"
-      instanceId="inst-1"
-      revisionVersion={0}
-      onClose={onClose}
-      onSuccess={onSuccess}
-      {...props}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <SignoffDialog
+        documentId="doc-1"
+        contentHash="hash-1"
+        instanceId="inst-1"
+        revisionVersion={0}
+        onClose={onClose}
+        onSuccess={onSuccess}
+        {...props}
+      />
+    </QueryClientProvider>,
   );
   return { onClose, onSuccess, ...renderResult };
 }
@@ -51,16 +55,19 @@ describe('SignoffDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
 
     expect(screen.getByRole('button', { name: 'Enviando...' })).toBeTruthy();
-    expect(vi.mocked(approvalApi.signoff)).toHaveBeenCalledWith(
-      'doc-1',
-      {
-        decision: 'approve',
-        reason: undefined,
-        password: 'secret',
-        content_hash: 'hash-1',
-      },
-      { ifMatch: '"v0"' },
-    );
+    // useMutation dispatches mutationFn on a microtask — await the call.
+    await waitFor(() => {
+      expect(vi.mocked(approvalApi.signoff)).toHaveBeenCalledWith(
+        'doc-1',
+        {
+          decision: 'approve',
+          reason: undefined,
+          password: 'secret',
+          content_hash: 'hash-1',
+        },
+        { ifMatch: '"v0"' },
+      );
+    });
 
     deferred.resolve({ signoff_id: 'sig-1', was_replay: false });
     await waitFor(() => {

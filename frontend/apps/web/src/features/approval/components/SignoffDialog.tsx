@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { signoff } from '../api/approvalApi';
 import { ApprovalError } from '../api/mutationClient';
@@ -157,7 +158,40 @@ export function SignoffDialog({
     return 'error_server';
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const queryClient = useQueryClient();
+  const signoffMutation = useMutation({
+    mutationFn: (vars: { decision: Decision; reason?: string }) =>
+      signoff(
+        documentId,
+        {
+          decision: vars.decision,
+          reason: vars.reason,
+          password,
+          content_hash: contentHash,
+        },
+        { ifMatch: `"v${revisionVersion}"` },
+      ),
+    onSuccess: () => {
+      // F-FE-NOINVALIDATE: a sign-off changes the inbox, the approval instance,
+      // and the document's status — invalidate every affected cache subtree
+      // instead of refetching a single query.
+      void queryClient.invalidateQueries({ queryKey: ['approval'] });
+      void queryClient.invalidateQueries({ queryKey: ['documents'] });
+      setState('success');
+      successTimeoutRef.current = window.setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 1500);
+    },
+    onError: (error) => {
+      setState(mapErrorToState(error));
+    },
+    onSettled: () => {
+      setPassword('');
+    },
+  });
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting || isSuccess) {
       return;
@@ -174,28 +208,10 @@ export function SignoffDialog({
     }
 
     setState('submitting');
-    try {
-      await signoff(
-        documentId,
-        {
-          decision,
-          reason: decision === 'reject' ? normalizedReason : undefined,
-          password,
-          content_hash: contentHash,
-        },
-        { ifMatch: `"v${revisionVersion}"` },
-      );
-
-      setState('success');
-      successTimeoutRef.current = window.setTimeout(() => {
-        onSuccess();
-        onClose();
-      }, 1500);
-    } catch (error) {
-      setState(mapErrorToState(error));
-    } finally {
-      setPassword('');
-    }
+    signoffMutation.mutate({
+      decision,
+      reason: decision === 'reject' ? normalizedReason : undefined,
+    });
   };
 
   return (
