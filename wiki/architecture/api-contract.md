@@ -2,7 +2,7 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-05-21
+> **Last verified:** 2026-06-08 (api-contract-hardening Phase E2 — spec hygiene: root-level `security` secure-by-default, top-level `tags`, one pagination convention, full per-op error-mode coverage, and two non-standard methods reshaped: `DELETE /iam/area-memberships`→`DELETE …/{user_id}/{area_code}` (hand-rolled iam handler), `DELETE /approval/routes/{id}`→`POST …/{id}/deactivate` (generated-wrapper-mounted). All 6 oapi-codegen packages regenerated, idempotent. See `wiki/architecture/api-design-system.md` for the conventions and `wiki/backlog/api-contract-hardening.md` Phase E2 for evidence. Prior: 2026-05-21)
 > **Scope:** OpenAPI spec location, backend codegen (oapi-codegen v2), frontend codegen (openapi-typescript v7), runtime enforcement gaps, CI drift guard, and freeze-law contract checks.
 > **Out of scope:** Auth/IAM mechanics (`modules/iam.md`), approval-specific request shapes (`modules/approval.md`), frontend API call patterns (`architecture/frontend-structure.md section 7`).
 > **Key files:**
