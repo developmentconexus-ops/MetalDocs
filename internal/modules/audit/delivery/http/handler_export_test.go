@@ -110,8 +110,8 @@ func TestAuditHandler_CursorPagination(t *testing.T) {
 		Items []struct {
 			ID string `json:"id"`
 		} `json:"items"`
-		NextCursor string `json:"nextCursor"`
-		HasMore    bool   `json:"hasMore"`
+		NextCursor string `json:"next_cursor"`
+		HasMore    bool   `json:"has_more"`
 	}
 	if err := json.Unmarshal(rec1.Body.Bytes(), &page1); err != nil {
 		t.Fatalf("decode page1: %v", err)
@@ -158,9 +158,9 @@ func TestAuditHandler_ExportCSVThenDownloadIsTenantScoped(t *testing.T) {
 		t.Fatalf("export status = %d (%s)", rec.Code, rec.Body.String())
 	}
 	var export struct {
-		ExportID  string `json:"exportId"`
+		ExportID  string `json:"export_id"`
 		Status    string `json:"status"`
-		SignedURL string `json:"signedUrl"`
+		SignedURL string `json:"signed_url"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &export); err != nil {
 		t.Fatalf("decode export: %v", err)

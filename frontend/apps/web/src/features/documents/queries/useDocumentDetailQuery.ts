@@ -19,7 +19,7 @@ export function useDocumentDetailQuery(id: string, options: DocumentDetailQueryO
       if (!options.pollScheduledLifecycle) {
         return false;
       }
-      return query.state.data?.Status === 'scheduled' ? 5_000 : false;
+      return query.state.data?.status === 'scheduled' ? 5_000 : false;
     },
   });
 }

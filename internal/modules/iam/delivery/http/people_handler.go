@@ -167,7 +167,7 @@ func (h *PeopleHandler) handleInvite(w http.ResponseWriter, r *http.Request) {
 	h.recordAudit(r, result.UserID, "iam.user.invited", map[string]any{
 		"username":   input.Username,
 		"email":      input.Email,
-		"tenantRole": string(input.TenantRole),
+		"tenant_role": string(input.TenantRole),
 		"areaCount":  areaCount,
 	})
 
@@ -226,7 +226,7 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	h.recordAudit(r, userID, "iam.user.updated", changes)
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"userId":  userID,
+		"user_id":  userID,
 		"updated": true,
 		"changes": changes,
 	})
@@ -256,7 +256,7 @@ func (h *PeopleHandler) handleResetPassword(w http.ResponseWriter, r *http.Reque
 		h.writeAuthError(w, err)
 		return
 	}
-	h.recordAudit(r, userID, "auth.user.password_reset", map[string]any{"mustChangePassword": true})
+	h.recordAudit(r, userID, "auth.user.password_reset", map[string]any{"must_change_password": true})
 	writeJSON(w, http.StatusOK, iamapi.ResetManagedUserPasswordResponse{
 		UserId:             userID,
 		Reset:              true,

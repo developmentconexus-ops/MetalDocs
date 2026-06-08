@@ -100,19 +100,19 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 	out := make([]map[string]any, 0, len(items))
 	for _, item := range items {
 		entry := map[string]any{
-			"sessionId":   item.SessionID,
-			"userId":      item.UserID,
-			"displayName": item.DisplayName,
-			"createdAt":   nullTimeRFC3339(item.CreatedAt),
-			"lastSeenAt":  nullTimeRFC3339(item.LastSeenAt),
-			"expiresAt":   nullTimeRFC3339(item.ExpiresAt),
+			"session_id":   item.SessionID,
+			"user_id":      item.UserID,
+			"display_name": item.DisplayName,
+			"created_at":   nullTimeRFC3339(item.CreatedAt),
+			"last_seen_at":  nullTimeRFC3339(item.LastSeenAt),
+			"expires_at":   nullTimeRFC3339(item.ExpiresAt),
 		}
 		if item.IPAddress != "" {
-			entry["ipAddress"] = item.IPAddress
+			entry["ip_address"] = item.IPAddress
 		}
 		if item.UserAgent != "" {
-			entry["userAgent"] = item.UserAgent
-			entry["deviceLabel"] = useragent.Label(item.UserAgent)
+			entry["user_agent"] = item.UserAgent
+			entry["device_label"] = useragent.Label(item.UserAgent)
 		}
 		out = append(out, entry)
 	}
@@ -201,7 +201,7 @@ func (h *SessionsHandler) emitRevokeAudit(r *http.Request, session authdomain.Se
 		return
 	}
 	payload := map[string]any{
-		"sessionId":    session.SessionID,
+		"session_id":    session.SessionID,
 		"targetUserId": session.UserID,
 	}
 	if reason != "" {

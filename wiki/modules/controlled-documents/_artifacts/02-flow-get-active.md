@@ -66,7 +66,7 @@ SELECT id::text
  LIMIT 1
 ```
 
-If this secondary lookup returns `sql.ErrNoRows`, the response simply omits `approvalInstanceId`. Any other query failure is treated as `500 INTERNAL_ERROR` because the route would otherwise misrepresent review state.
+If this secondary lookup returns `sql.ErrNoRows`, the response simply omits `approval_instance_id`. Any other query failure is treated as `500 INTERNAL_ERROR` because the route would otherwise misrepresent review state.
 
 **Tripwire pairing audit:** VIOLATION.
 - No `metaldocs.assert_caps(...)` reference in this route SQL.
@@ -75,16 +75,16 @@ If this secondary lookup returns `sql.ErrNoRows`, the response simply omits `app
 
 ### 5. Response shape
 
-`controlleddocumentsapi.ActiveDocumentResponse` (generated at `api.gen.go:265-272`) — all fields optional:
+`controlleddocumentsapi.ActiveDocumentResponse` (generated at `internal/modules/controlleddocuments/api/api.gen.go:117`) — all fields optional:
 
 ```go
-type activeDocumentResponse struct {
-    DocumentID          *string `json:"documentId,omitempty"`
-    ApprovalState       *string `json:"approvalState,omitempty"`
-    ContentHash         *string `json:"contentHash,omitempty"`
-    RevisionVersion     *int    `json:"revisionVersion,omitempty"`
-    PublishedDocumentID *string `json:"publishedDocumentId,omitempty"`
-    ApprovalInstanceID  *string `json:"approvalInstanceId,omitempty"`
+type ActiveDocumentResponse struct {
+    ApprovalInstanceId  *openapi_types.UUID                  `json:"approval_instance_id,omitempty"`
+    ApprovalState       *ActiveDocumentResponseApprovalState `json:"approval_state,omitempty"`
+    ContentHash         *string                              `json:"content_hash,omitempty"`
+    DocumentId          *openapi_types.UUID                  `json:"document_id,omitempty"`
+    PublishedDocumentId *openapi_types.UUID                  `json:"published_document_id,omitempty"`
+    RevisionVersion     *int                                 `json:"revision_version,omitempty"`
 }
 ```
 

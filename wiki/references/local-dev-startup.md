@@ -1,6 +1,6 @@
 # Local Dev Startup
 
-**Last verified:** 2026-06-01
+**Last verified:** 2026-06-08 (Phase E1: PATCH reset-password body fields updated to snake_case; prior: 2026-06-01)
 
 ## TL;DR
 
@@ -154,7 +154,7 @@ The curated local bootstrap creates these users when `scripts/dev-bootstrap-base
 
 **SoD note:** templates lifecycle requires the approver's `userId` to differ from the author's `userId`. `admin` authors → `approver` approves (or `approver-test` for capability-gate-only checks). Two distinct seeded admin-role users (`admin` + `approver`) exist solely to satisfy this segregation locally; see [`migrations/0159_seed_dev_approver_user.sql`](../../migrations/0159_seed_dev_approver_user.sql).
 
-`approver-test` password was reset to `ApproverTest123!` on 2026-05-31 (template-editor QA Preview drive) via `PATCH /api/v1/iam/users/approver-test` `{"newPassword":"ApproverTest123!","mustChangePassword":false}` — required `Origin: http://localhost:8081` to bypass CSRF check.
+`approver-test` password was reset to `ApproverTest123!` on 2026-05-31 (template-editor QA Preview drive) via `PATCH /api/v1/iam/users/approver-test` `{"new_password":"ApproverTest123!","must_change_password":false}` — required `Origin: http://localhost:8081` to bypass CSRF check.
 
 **To reset local credentials:** rerun `scripts/dev-bootstrap-baseline.ps1 -WithDevSeed`. This rebuilds the curated local database and reapplies the local dev seed.
 

@@ -76,18 +76,18 @@ func (h *Handler) handleLockouts(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(items))
 	for _, l := range items {
 		row := map[string]any{
-			"userId":         l.UserID,
-			"displayName":    l.DisplayName,
-			"failedAttempts": l.FailedAttempts,
+			"user_id":         l.UserID,
+			"display_name":    l.DisplayName,
+			"failed_attempts": l.FailedAttempts,
 		}
 		if l.LockedUntil != nil {
-			row["lockedUntil"] = l.LockedUntil.Format(time.RFC3339)
+			row["locked_until"] = l.LockedUntil.Format(time.RFC3339)
 		}
 		if l.LastFailedAt != nil {
-			row["lastFailedAt"] = l.LastFailedAt.Format(time.RFC3339)
+			row["last_failed_at"] = l.LastFailedAt.Format(time.RFC3339)
 		}
 		if l.LastFailedIP != "" {
-			row["lastFailedIp"] = l.LastFailedIP
+			row["last_failed_ip"] = l.LastFailedIP
 		}
 		out = append(out, row)
 	}
@@ -116,11 +116,11 @@ func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(signals))
 	for _, s := range signals {
 		row := map[string]any{
-			"signalId":   s.SignalID,
+			"signal_id":   s.SignalID,
 			"kind":       s.Kind,
 			"severity":   s.Severity,
 			"summary":    s.Summary,
-			"detectedAt": s.DetectedAt.Format(time.RFC3339),
+			"detected_at": s.DetectedAt.Format(time.RFC3339),
 		}
 		if len(s.Evidence) > 0 {
 			row["evidence"] = s.Evidence
@@ -151,23 +151,23 @@ func mfaCoverageToJSON(c securitydomain.MfaCoverage) map[string]any {
 		byRole = append(byRole, map[string]any{
 			"role":       s.Role,
 			"total":      s.Total,
-			"mfaEnabled": s.MfaEnabled,
+			"mfa_enabled": s.MfaEnabled,
 			"pct":        s.Pct,
 		})
 	}
 	return map[string]any{
-		"totalUsers":    c.TotalUsers,
-		"mfaEnabled":    c.MfaEnabled,
-		"mfaEnabledPct": c.MfaEnabledPct,
-		"byRole":        byRole,
+		"total_users":    c.TotalUsers,
+		"mfa_enabled":    c.MfaEnabled,
+		"mfa_enabled_pct": c.MfaEnabledPct,
+		"by_role":        byRole,
 	}
 }
 
 func writeMfaCoverageZero(w http.ResponseWriter) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"totalUsers":    0,
-		"mfaEnabled":    0,
-		"mfaEnabledPct": 0,
-		"byRole":        []any{},
+		"total_users":    0,
+		"mfa_enabled":    0,
+		"mfa_enabled_pct": 0,
+		"by_role":        []any{},
 	})
 }

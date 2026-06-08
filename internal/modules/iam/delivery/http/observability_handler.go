@@ -89,15 +89,15 @@ func usageToJSON(u iamdomain.UsageSnapshot) map[string]any {
 			"allocated": u.Seats.Allocated,
 		},
 		"storage": map[string]any{
-			"usedBytes":      u.Storage.UsedBytes,
-			"allocatedBytes": u.Storage.AllocatedBytes,
+			"used_bytes":      u.Storage.UsedBytes,
+			"allocated_bytes": u.Storage.AllocatedBytes,
 		},
-		"apiCalls": map[string]any{
+		"api_calls": map[string]any{
 			"last24h": u.APICalls.Last24h,
 			"last7d":  u.APICalls.Last7d,
 			"last30d": u.APICalls.Last30d,
 		},
-		"activeUsers": map[string]any{
+		"active_users": map[string]any{
 			"last24h": u.ActiveUsers.Last24h,
 			"last7d":  u.ActiveUsers.Last7d,
 			"last30d": u.ActiveUsers.Last30d,
@@ -115,11 +115,11 @@ func kpiToJSON(k iamdomain.KpiSnapshot) map[string]any {
 		})
 	}
 	return map[string]any{
-		"lockedAccounts":       k.LockedAccounts,
-		"mfaCoveragePct":       k.MfaCoveragePct,
-		"failedLogins24h":      k.FailedLogins24h,
-		"dormantUsers30d":      k.DormantUsers30d,
-		"roleDistribution":     dist,
-		"auditEventsPerMinute": k.AuditEventsPerMinute,
+		"locked_accounts":       k.LockedAccounts,
+		"mfa_coverage_pct":       k.MfaCoveragePct,
+		"failed_logins24h":      k.FailedLogins24h,
+		"dormant_users30d":      k.DormantUsers30d,
+		"role_distribution":     dist,
+		"audit_events_per_minute": k.AuditEventsPerMinute,
 	}
 }

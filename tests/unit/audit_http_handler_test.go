@@ -57,10 +57,10 @@ func TestListAuditEventsByDocument(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
 	}
-	if !strings.Contains(rr.Body.String(), `"resourceId":"doc-1"`) {
+	if !strings.Contains(rr.Body.String(), `"resource_id":"doc-1"`) {
 		t.Fatalf("expected doc-1 in body: %s", rr.Body.String())
 	}
-	if strings.Contains(rr.Body.String(), `"resourceId":"doc-2"`) {
+	if strings.Contains(rr.Body.String(), `"resource_id":"doc-2"`) {
 		t.Fatalf("did not expect doc-2 in body: %s", rr.Body.String())
 	}
 	if !strings.Contains(rr.Body.String(), `"to_status":"IN_REVIEW"`) {

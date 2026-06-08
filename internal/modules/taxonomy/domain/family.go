@@ -11,8 +11,8 @@ type DocumentFamily struct {
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
 	// IsActive remains an exported field because taxonomy JSON responses bind it directly.
-	IsActive  bool      `json:"isActive"`
-	CreatedAt time.Time `json:"createdAt"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 var (

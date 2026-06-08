@@ -41,13 +41,13 @@ type Handler struct {
 
 type EventResponse struct {
 	ID           string         `json:"id"`
-	OccurredAt   string         `json:"occurredAt"`
-	ActorID      string         `json:"actorId"`
+	OccurredAt   string         `json:"occurred_at"`
+	ActorID      string         `json:"actor_id"`
 	Action       string         `json:"action"`
-	ResourceType string         `json:"resourceType"`
-	ResourceID   string         `json:"resourceId"`
+	ResourceType string         `json:"resource_type"`
+	ResourceID   string         `json:"resource_id"`
 	Payload      map[string]any `json:"payload"`
-	TraceID      string         `json:"traceId"`
+	TraceID      string         `json:"trace_id"`
 }
 
 func NewHandler(service AuditQuerier) *Handler {
@@ -113,10 +113,10 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(items) >= query.Limit {
 		last := items[len(items)-1]
-		resp["nextCursor"] = encodeCursor(domain.Cursor{OccurredAt: last.OccurredAt, ID: last.ID})
-		resp["hasMore"] = true
+		resp["next_cursor"] = encodeCursor(domain.Cursor{OccurredAt: last.OccurredAt, ID: last.ID})
+		resp["has_more"] = true
 	} else {
-		resp["hasMore"] = false
+		resp["has_more"] = false
 	}
 
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
@@ -140,12 +140,12 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Format string `json:"format"`
 		Filter struct {
-			ActorID        string `json:"actorId"`
+			ActorID        string `json:"actor_id"`
 			Action         string `json:"action"`
-			ResourceType   string `json:"resourceType"`
-			ResourceID     string `json:"resourceId"`
-			OccurredAfter  string `json:"occurredAfter"`
-			OccurredBefore string `json:"occurredBefore"`
+			ResourceType   string `json:"resource_type"`
+			ResourceID     string `json:"resource_id"`
+			OccurredAfter  string `json:"occurred_after"`
+			OccurredBefore string `json:"occurred_before"`
 			Q              string `json:"q"`
 		} `json:"filter"`
 	}
@@ -206,10 +206,10 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpresponse.WriteJSON(w, http.StatusAccepted, map[string]any{
-		"exportId":  job.ID,
+		"export_id":  job.ID,
 		"status":    string(job.Status),
-		"signedUrl": h.exporter.BuildSignedURL(job),
-		"expiresAt": job.ExpiresAt.UTC().Format(time.RFC3339),
+		"signed_url": h.exporter.BuildSignedURL(job),
+		"expires_at": job.ExpiresAt.UTC().Format(time.RFC3339),
 	})
 }
 
@@ -258,12 +258,12 @@ func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request
 		return
 	}
 	resp := map[string]any{
-		"exportId":  job.ID,
+		"export_id":  job.ID,
 		"status":    string(job.Status),
-		"signedUrl": h.exporter.BuildSignedURL(job),
+		"signed_url": h.exporter.BuildSignedURL(job),
 	}
 	if !job.ExpiresAt.IsZero() {
-		resp["expiresAt"] = job.ExpiresAt.UTC().Format(time.RFC3339)
+		resp["expires_at"] = job.ExpiresAt.UTC().Format(time.RFC3339)
 	}
 	if job.ErrorMessage != "" {
 		resp["error"] = job.ErrorMessage

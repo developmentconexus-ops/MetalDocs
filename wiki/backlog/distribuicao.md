@@ -1,6 +1,6 @@
 # Distribuição & Cobertura — Deferred Items
 
-> **Last verified:** 2026-05-29
+> **Last verified:** 2026-06-08 (Phase E1: planned endpoint field names normalised to snake_case; prior: 2026-05-29)
 > **Scope:** Deferred items for the Distribuição & Cobertura de Leitura screen (`/documents/:documentId/distribution`).
 > **Out of scope:** Published view deferred items (see `backlog/documento-publicado.md`), fanout render pipeline (see `modules/render-fanout.md`).
 > **Key files:**
@@ -32,9 +32,9 @@ Design per `wiki/architecture/backend-api-structure.md` + `wiki/architecture/api
 
 | Endpoint | Purpose | Priority |
 |---|---|---|
-| `GET /api/v1/documents/:id/distribution` | KPI rollup (`totalTargets`, `acknowledged`, `read`, `pending`, `overdue`) + sidebar facts (`publishedAt`, `readDeadline`, `policy`, `channel`, `remindersScheduled`, `groups[]`) | High |
-| `GET /api/v1/documents/:id/distribution/recipients?page=&pageSize=&status=` | Paginated recipient table (`userId`, `name`, `area`, `status`, `lastEventAt`, `readAt`, `acknowledgedAt`) — `X-Total-Count` + `Link` headers per library pagination pattern | High |
-| `GET /api/v1/documents/:id/distribution/coverage` | By-area breakdown (`areaCode`, `areaName`, `total`, `read`, `acknowledged`) | Medium |
+| `GET /api/v1/documents/:id/distribution` | KPI rollup (`total_targets`, `acknowledged`, `read`, `pending`, `overdue`) + sidebar facts (`published_at`, `read_deadline`, `policy`, `channel`, `reminders_scheduled`, `groups[]`) | High |
+| `GET /api/v1/documents/:id/distribution/recipients?page=&pageSize=&status=` | Paginated recipient table (`user_id`, `name`, `area`, `status`, `last_event_at`, `read_at`, `acknowledged_at`) — `X-Total-Count` + `Link` headers per library pagination pattern | High |
+| `GET /api/v1/documents/:id/distribution/coverage` | By-area breakdown (`area_code`, `area_name`, `total`, `read`, `acknowledged`) | Medium |
 | `GET /api/v1/documents/:id/distribution/timeline?granularity=day` | Cumulative daily read/ack series for adoption curve | Low |
 
 Wire via TanStack Query hooks in `features/documents/queries/` (`useDistributionSummaryQuery`, `useDistributionRecipientsQuery`, `useDistributionCoverageQuery`, `useDistributionTimelineQuery`) when endpoints exist. Generated FE types from `lib/api-types/`.

@@ -69,30 +69,30 @@ export default function LockoutsTable() {
       ) : (
         <ul className={styles.list} role="list">
           {items.map((l) => (
-            <li key={l.userId} className={styles.row}>
+            <li key={l.user_id} className={styles.row}>
               <div className={styles.user}>
-                <Avatar name={l.displayName} size="sm" />
-                <span className={styles.userName}>{l.displayName}</span>
+                <Avatar name={l.display_name} size="sm" />
+                <span className={styles.userName}>{l.display_name}</span>
               </div>
               <span className={styles.attempts}>
-                {l.failedAttempts} tent.
+                {l.failed_attempts} tent.
               </span>
               <span
                 className={styles.time}
                 title={
-                  l.lockedUntil
-                    ? SP_DATE_TIME_FORMATTER.format(new Date(l.lockedUntil))
+                  l.locked_until
+                    ? SP_DATE_TIME_FORMATTER.format(new Date(l.locked_until))
                     : undefined
                 }
               >
-                {l.lockedUntil ? `até ${getRelativeTime(l.lockedUntil)}` : "—"}
+                {l.locked_until ? `até ${getRelativeTime(l.locked_until)}` : "—"}
               </span>
               <button
                 type="button"
                 className={styles.unlockBtn}
-                onClick={() => handleUnlock(l.userId, l.displayName)}
+                onClick={() => handleUnlock(l.user_id, l.display_name)}
                 disabled={unlock.isPending}
-                aria-label={`Desbloquear ${l.displayName}`}
+                aria-label={`Desbloquear ${l.display_name}`}
               >
                 Desbloquear
               </button>

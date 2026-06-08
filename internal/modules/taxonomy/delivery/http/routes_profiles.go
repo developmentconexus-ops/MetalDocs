@@ -32,18 +32,18 @@ const (
 
 type profileUpsertRequest struct {
 	Code                     string  `json:"code"`
-	FamilyCode               string  `json:"familyCode"`
+	FamilyCode               string  `json:"family_code"`
 	Name                     string  `json:"name"`
 	Description              string  `json:"description"`
 	Alias                    string  `json:"alias"`
-	ReviewIntervalDays       int     `json:"reviewIntervalDays"`
-	DefaultTemplateVersionID *string `json:"defaultTemplateVersionId"`
-	OwnerUserID              *string `json:"ownerUserId"`
-	EditableByRole           string  `json:"editableByRole"`
+	ReviewIntervalDays       int     `json:"review_interval_days"`
+	DefaultTemplateVersionID *string `json:"default_template_version_id"`
+	OwnerUserID              *string `json:"owner_user_id"`
+	EditableByRole           string  `json:"editable_by_role"`
 }
 
 type setDefaultTemplateRequest struct {
-	TemplateVersionID string `json:"templateVersionId"`
+	TemplateVersionID string `json:"template_version_id"`
 }
 
 func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {

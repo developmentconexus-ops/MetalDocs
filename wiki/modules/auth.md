@@ -2,7 +2,7 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-28 FE login screen QA — qa/auth-login: post-login returnTo redirect consolidated in `LoginPage`, responsive breakpoint added) | **Owner:** unassigned | **Status:** active (RFC 9457 envelope; auth event audit emission wired) | **Maturity:** L2
+**Last verified:** 2026-06-08 (Phase E1 casing big-bang: create-user response `{userId}` → `{user_id}`; prior: 2026-06-01) | **Owner:** unassigned | **Status:** active (RFC 9457 envelope; auth event audit emission wired) | **Maturity:** L2
 
 > **Key files:**
 > - Current Phase 11 anchors: `internal/modules/auth/delivery/http/handler.go:181` (`recordAudit`), `internal/modules/auth/application/service.go:255` (`ResolveSession`), `service.go:381` (`CreateUserWithInput` shared-tx path), `internal/modules/auth/domain/model.go:145`/`:149` (`AuthenticatedSession` redactors), `internal/modules/auth/infrastructure/postgres/repository.go:98` (`GetUserTenants` ordering), `repository.go:121` (`TouchSession` grace window).
@@ -327,7 +327,7 @@ sequenceDiagram
     S->>DB: COMMIT (shared tx)
     RA-->>S: nil
     S-->>H: nil
-    H-->>C: 201 {userId}
+    H-->>C: 201 {user_id}
 ```
 
 State transitions:

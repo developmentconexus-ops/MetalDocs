@@ -318,11 +318,13 @@ Cross-cutting concern repeated per-handler. Should be applied at route registrat
 
 ---
 
-### 5b-M2 — `documentDetailResponse` JSON keys are PascalCase (`"ID"`, `"TenantID"`) inconsistent with rest of API
+### 5b-M2 — `documentDetailResponse` JSON keys are PascalCase (`"ID"`, `"TenantID"`) inconsistent with rest of API — **CLOSED Phase E1**
 
 **File:** `internal/modules/documents/delivery/http/handler.go:320-344`
 
 Fix: standardise on `snake_case`; add json tags; align with API design system.
+
+**Status:** Closed — Phase E1 (snake_case big-bang 2026-06-08) applied `snake_case` json tags across all document response structs including `DocumentDetailResponse`.
 
 ---
 

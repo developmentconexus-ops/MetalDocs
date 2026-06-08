@@ -114,7 +114,7 @@ export default function RolesCapsTab() {
 
   const userCountByRole = useMemo(() => {
     const m = new Map<string, number>();
-    for (const item of kpiQuery.data?.roleDistribution ?? []) {
+    for (const item of kpiQuery.data?.role_distribution ?? []) {
       m.set(item.role, item.count);
     }
     return m;

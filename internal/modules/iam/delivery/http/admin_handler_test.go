@@ -172,12 +172,12 @@ func TestHandleAdminOverview_DropsUsersField_ReturnsTypedShape(t *testing.T) {
 	if _, ok := body["presence"]; !ok {
 		t.Fatalf("response missing presence: %v", body)
 	}
-	if _, ok := body["recentActivities"]; !ok {
-		t.Fatalf("response missing recentActivities: %v", body)
+	if _, ok := body["recent_activities"]; !ok {
+		t.Fatalf("response missing recent_activities: %v", body)
 	}
 	kpi := body["kpi"].(map[string]any)
-	if kpi["lockedAccounts"] != float64(3) {
-		t.Fatalf("kpi.lockedAccounts = %v, want 3", kpi["lockedAccounts"])
+	if kpi["locked_accounts"] != float64(3) {
+		t.Fatalf("kpi.locked_accounts = %v, want 3", kpi["locked_accounts"])
 	}
 }
 

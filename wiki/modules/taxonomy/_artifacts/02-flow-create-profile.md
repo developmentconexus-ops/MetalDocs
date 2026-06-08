@@ -48,7 +48,7 @@ Trust chain for `tenant_id`: client header `X-Tenant-ID` → `tenantIDFromReques
 
 ## 5. Response shape
 
-- `201 Created` body: JSON encoding of `domain.DocumentProfile` (`domain/profile.go:8-21`). Fields: `code, tenantId, familyCode, name, description, alias, reviewIntervalDays, defaultTemplateVersionId, ownerUserId, editableByRole, archivedAt, createdAt`.
+- `201 Created` body: JSON encoding of `domain.DocumentProfile` (`domain/profile.go:8-21`). Fields: `code, tenant_id, family_code, name, description, alias, review_interval_days, default_template_version_id, owner_user_id, editable_by_role, archived_at, created_at`.
 - Error envelope (non-RFC9457): `{"code": "...", "message": "..."}` via `internal/platform/httpresponse/response.go:14-16`.
 
 | HTTP | Code | Source |

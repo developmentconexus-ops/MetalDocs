@@ -1929,14 +1929,14 @@ export interface components {
             password: string;
         };
         CurrentUser: {
-            userId: string;
+            user_id: string;
             /** Format: uuid */
-            tenantId: string;
-            tenantName: string;
+            tenant_id: string;
+            tenant_name: string;
             username: string;
             email?: string;
-            displayName: string;
-            mustChangePassword: boolean;
+            display_name: string;
+            must_change_password: boolean;
             roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
             /**
              * @description Capability codes the actor holds in the active tenant. UX hint only —
@@ -1949,7 +1949,7 @@ export interface components {
         AuthLoginResponse: {
             user: components["schemas"]["CurrentUser"];
             /** Format: date-time */
-            expiresAt: string;
+            expires_at: string;
         };
         HealthCheckItem: {
             name: string;
@@ -1965,8 +1965,8 @@ export interface components {
         };
         ChangePasswordRequest: {
             /** @description Obrigatoria para troca de senha em sessao normal; opcional no fluxo de primeiro acesso com troca obrigatoria. */
-            currentPassword?: string;
-            newPassword: string;
+            current_password?: string;
+            new_password: string;
         };
         ChangePasswordResponse: {
             changed: boolean;
@@ -1978,63 +1978,63 @@ export interface components {
          */
         UserRole: "system_admin" | "approver" | "author" | "editor" | "viewer" | "signer" | "area_admin" | "qms_admin";
         AreaMembership: {
-            userId: string;
-            areaCode: string;
+            user_id: string;
+            area_code: string;
             role: components["schemas"]["UserRole"];
             /** Format: date-time */
-            grantedAt?: string;
-            grantedBy?: string;
+            granted_at?: string;
+            granted_by?: string;
         };
         AreaMembershipInput: {
-            areaCode: string;
+            area_code: string;
             role: components["schemas"]["UserRole"];
         };
         /** @description Active area membership row returned by the tenant-scoped /iam/area-memberships listing. */
         AreaMembershipRow: {
-            userId: string;
-            tenantId: string;
-            areaCode: string;
+            user_id: string;
+            tenant_id: string;
+            area_code: string;
             role: components["schemas"]["UserRole"];
             /** Format: date-time */
-            effectiveFrom: string;
+            effective_from: string;
             /** Format: date-time */
-            effectiveTo?: string | null;
-            grantedBy?: string | null;
+            effective_to?: string | null;
+            granted_by?: string | null;
         };
         AreaMembershipListResponse: {
             items: components["schemas"]["AreaMembershipRow"][];
         };
         GrantAreaMembershipRequest: {
-            userId: string;
-            areaCode: string;
+            user_id: string;
+            area_code: string;
             role: components["schemas"]["UserRole"];
         };
         GrantAreaMembershipResponse: {
-            userId: string;
-            tenantId: string;
-            areaCode: string;
+            user_id: string;
+            tenant_id: string;
+            area_code: string;
             role: components["schemas"]["UserRole"];
         };
         /** @description Canonical user shape — single tenantRole + multi area memberships. */
         ManagedUserCore: {
-            userId: string;
+            user_id: string;
             username: string;
             email?: string;
-            displayName: string;
-            isActive: boolean;
-            mustChangePassword: boolean;
-            failedLoginAttempts: number;
+            display_name: string;
+            is_active: boolean;
+            must_change_password: boolean;
+            failed_login_attempts: number;
             /** Format: date-time */
-            lockedUntil?: string;
+            locked_until?: string;
             /** Format: date-time */
-            lastLoginAt?: string;
-            tenantRole: components["schemas"]["UserRole"];
-            areaMemberships: components["schemas"]["AreaMembership"][];
-            mfaEnabled?: boolean;
+            last_login_at?: string;
+            tenant_role: components["schemas"]["UserRole"];
+            area_memberships: components["schemas"]["AreaMembership"][];
+            mfa_enabled?: boolean;
             /** Format: date-time */
-            createdAt: string;
+            created_at: string;
             /** Format: date-time */
-            updatedAt: string;
+            updated_at: string;
         };
         CursorPage: {
             next_cursor: string | null;
@@ -2049,24 +2049,24 @@ export interface components {
             username: string;
             /** Format: email */
             email: string;
-            displayName: string;
-            tenantRole: components["schemas"]["UserRole"];
-            areaMemberships?: components["schemas"]["AreaMembershipInput"][];
+            display_name: string;
+            tenant_role: components["schemas"]["UserRole"];
+            area_memberships?: components["schemas"]["AreaMembershipInput"][];
         };
         /** @description tempPassword is returned one-time only and never persisted plaintext. */
         UserInviteResponse: {
-            userId: string;
-            tempPassword: string;
+            user_id: string;
+            temp_password: string;
         };
         /** @enum {string} */
         UserBulkActionKind: "activate" | "deactivate" | "unlock" | "force-logout";
         UserBulkActionRequest: {
-            userIds: string[];
+            user_ids: string[];
             action: components["schemas"]["UserBulkActionKind"];
             reason?: string;
         };
         UserBulkActionFailure: {
-            userId: string;
+            user_id: string;
             code: string;
             message: string;
         };
@@ -2110,19 +2110,19 @@ export interface components {
             count: number;
         };
         IamKpiSnapshot: {
-            lockedAccounts: number;
-            mfaCoveragePct: number;
-            failedLogins24h: number;
-            dormantUsers30d: number;
-            roleDistribution: components["schemas"]["IamKpiRoleCount"][];
-            auditEventsPerMinute: number;
+            locked_accounts: number;
+            mfa_coverage_pct: number;
+            failed_logins24h: number;
+            dormant_users30d: number;
+            role_distribution: components["schemas"]["IamKpiRoleCount"][];
+            audit_events_per_minute: number;
         };
         OnlinePresenceItem: {
-            userId: string;
+            user_id: string;
             username: string;
-            displayName: string;
+            display_name: string;
             /** Format: date-time */
-            lastSeenAt: string;
+            last_seen_at: string;
         };
         PresenceSnapshotResponse: {
             items: components["schemas"]["OnlinePresenceItem"][];
@@ -2130,57 +2130,57 @@ export interface components {
         AdminOverviewResponse: {
             kpi: components["schemas"]["IamKpiSnapshot"];
             presence: components["schemas"]["OnlinePresenceItem"][];
-            recentActivities: components["schemas"]["AuditEventItem"][];
+            recent_activities: components["schemas"]["AuditEventItem"][];
         };
         CreateManagedUserRequest: {
-            userId?: string;
+            user_id?: string;
             username: string;
             email?: string;
-            displayName: string;
+            display_name: string;
             password: string;
             roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
         };
         CreateManagedUserResponse: {
-            userId: string;
+            user_id: string;
         };
         /**
          * @description Atomic metadata + tenant role update. All fields optional;
          *     server applies only the supplied subset in a single transaction.
          */
         UpdateManagedUserRequest: {
-            displayName?: string;
+            display_name?: string;
             email?: string;
-            isActive?: boolean;
-            newPassword?: string;
-            mustChangePassword?: boolean;
-            tenantRole?: components["schemas"]["UserRole"];
+            is_active?: boolean;
+            new_password?: string;
+            must_change_password?: boolean;
+            tenant_role?: components["schemas"]["UserRole"];
         };
         ResetManagedUserPasswordRequest: {
-            newPassword: string;
+            new_password: string;
         };
         ResetManagedUserPasswordResponse: {
-            userId: string;
+            user_id: string;
             reset: boolean;
-            mustChangePassword: boolean;
+            must_change_password: boolean;
         };
         UnlockManagedUserResponse: {
-            userId: string;
+            user_id: string;
             unlocked: boolean;
         };
         ReplaceUserRolesRequest: {
-            displayName: string;
-            assignedBy?: string;
+            display_name: string;
+            assigned_by?: string;
             roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
         };
         ReplaceUserRolesResponse: {
-            userId: string;
-            displayName: string;
+            user_id: string;
+            display_name: string;
             roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
         };
         DocumentListResponse: {
             items: components["schemas"]["DocumentSummary"][];
             page: number;
-            pageSize: number;
+            page_size: number;
             /** Format: int64 */
             total: number;
         };
@@ -2218,81 +2218,81 @@ export interface components {
         };
         DocumentCheckpoint: {
             /** Format: uuid */
-            ID: string;
+            id: string;
             /** Format: uuid */
-            DocumentID: string;
+            document_id: string;
             /** Format: uuid */
-            RevisionID: string;
-            VersionNum: number;
-            Label: string;
+            revision_id: string;
+            version_num: number;
+            label: string;
             /** Format: date-time */
-            CreatedAt: string;
-            CreatedBy: string;
+            created_at: string;
+            created_by: string;
         };
         DocumentSummary: {
-            ID: string;
-            TenantID: string;
-            TemplateVersionID: string;
-            Name: string;
+            id: string;
+            tenant_id: string;
+            template_version_id: string;
+            name: string;
             /** @enum {string} */
-            Status: "draft" | "under_review" | "approved" | "rejected" | "scheduled" | "published" | "superseded" | "obsolete";
+            status: "draft" | "under_review" | "approved" | "rejected" | "scheduled" | "published" | "superseded" | "obsolete";
             /** Format: byte */
-            FormDataJSON: string;
-            CurrentRevisionID: string;
+            form_data_json: string;
+            current_revision_id: string;
             /** Format: int64 */
-            RevisionVersion: number;
+            revision_version: number;
             /** Format: int64 */
-            RevisionNumber: number;
-            ActiveSessionID: string;
+            revision_number: number;
+            active_session_id: string;
             /** Format: date-time */
-            ValuesFrozenAt?: string | null;
+            values_frozen_at?: string | null;
             /** Format: date-time */
-            ArchivedAt?: string | null;
+            archived_at?: string | null;
             /** Format: date-time */
-            CreatedAt: string;
+            created_at: string;
             /** Format: date-time */
-            UpdatedAt: string;
-            CreatedBy: string;
-            ControlledDocumentID?: string | null;
-            RevisionTitle?: string | null;
-            ProfileCodeSnapshot?: string | null;
-            ProcessAreaCodeSnapshot?: string | null;
-            Code: string;
+            updated_at: string;
+            created_by: string;
+            controlled_document_id?: string | null;
+            revision_title?: string | null;
+            profile_code_snapshot?: string | null;
+            process_area_code_snapshot?: string | null;
+            code: string;
         };
         DocumentDetailResponse: {
-            ID: string;
-            TenantID: string;
-            TemplateVersionID: string;
-            Name: string;
-            Status: string;
-            FormDataJSON: {
+            id: string;
+            tenant_id: string;
+            template_version_id: string;
+            name: string;
+            status: string;
+            form_data_json: {
                 [key: string]: unknown;
             };
-            CurrentRevisionID: string;
+            current_revision_id: string;
             /** Format: int64 */
-            RevisionVersion: number;
-            ActiveSessionID: string;
+            revision_version: number;
+            active_session_id: string;
             /** Format: date-time */
-            ValuesFrozenAt?: string | null;
+            values_frozen_at?: string | null;
             /** Format: date-time */
-            ArchivedAt?: string | null;
+            archived_at?: string | null;
             /** Format: date-time */
-            CreatedAt: string;
+            created_at: string;
             /** Format: date-time */
-            UpdatedAt: string;
-            CreatedBy: string;
+            updated_at: string;
+            created_by: string;
             /** Format: int64 */
-            RevisionNumber: number;
-            ControlledDocumentID?: string | null;
-            RevisionTitle?: string | null;
-            ProfileCodeSnapshot?: string | null;
-            ProcessAreaCodeSnapshot?: string | null;
-            Code: string;
+            revision_number: number;
+            controlled_document_id?: string | null;
+            revision_title?: string | null;
+            profile_code_snapshot?: string | null;
+            process_area_code_snapshot?: string | null;
+            code: string;
             /** Format: int64 */
-            currentRevisionFileSizeBytes?: number | null;
-            currentRevisionPageCount?: number | null;
+            current_revision_file_size_bytes?: number | null;
+            current_revision_page_count?: number | null;
             /** @enum {string|null} */
-            currentRevisionPageCountSource?: "eigenpal_client" | "server_renderer" | null;
+            current_revision_page_count_source?: "eigenpal_client" | "server_renderer" | null;
         };
         DocumentCommentContentNode: {
             [key: string]: unknown;
@@ -2324,10 +2324,10 @@ export interface components {
             done?: boolean;
         };
         DocumentStatsResponse: {
-            byStatus: {
+            by_status: {
                 [key: string]: number;
             };
-            byArea: {
+            by_area: {
                 [key: string]: number;
             };
         };
@@ -2341,16 +2341,16 @@ export interface components {
         };
         DocumentProfileItem: {
             code: string;
-            familyCode: string;
+            family_code: string;
             name: string;
             alias?: string;
             description: string;
-            reviewIntervalDays: number;
-            activeSchemaVersion: number;
-            workflowProfile: string;
-            approvalRequired: boolean;
-            retentionDays: number;
-            validityDays: number;
+            review_interval_days: number;
+            active_schema_version: number;
+            workflow_profile: string;
+            approval_required: boolean;
+            retention_days: number;
+            validity_days: number;
         };
         ListDocumentProfilesResponse: {
             items: components["schemas"]["DocumentProfileItem"][];
@@ -2366,15 +2366,15 @@ export interface components {
         AuditEventItem: {
             id: string;
             /** Format: date-time */
-            occurredAt: string;
-            actorId: string;
+            occurred_at: string;
+            actor_id: string;
             action: string;
-            resourceType: string;
-            resourceId: string;
+            resource_type: string;
+            resource_id: string;
             payload: {
                 [key: string]: unknown;
             };
-            traceId: string;
+            trace_id: string;
         };
         ListAuditEventsResponse: {
             items: components["schemas"]["AuditEventItem"][];
@@ -2383,14 +2383,14 @@ export interface components {
         };
         /** @description Multi-axis audit filter (mirrors GET /audit/events query params). */
         AuditFilter: {
-            actorId?: string;
+            actor_id?: string;
             action?: string;
-            resourceType?: string;
-            resourceId?: string;
+            resource_type?: string;
+            resource_id?: string;
             /** Format: date-time */
-            occurredAfter?: string;
+            occurred_after?: string;
             /** Format: date-time */
-            occurredBefore?: string;
+            occurred_before?: string;
             q?: string;
         };
         /** @enum {string} */
@@ -2400,34 +2400,34 @@ export interface components {
             filter: components["schemas"]["AuditFilter"];
         };
         AuditExportResponse: {
-            exportId: string;
+            export_id: string;
             /** Format: uri */
-            signedUrl: string;
+            signed_url: string;
             /** Format: date-time */
-            expiresAt: string;
+            expires_at: string;
         };
         AuditExportStatusResponse: {
-            exportId: string;
+            export_id: string;
             status: string;
             /** Format: uri */
-            signedUrl: string;
+            signed_url: string;
             /** Format: date-time */
-            expiresAt?: string;
+            expires_at?: string;
             error?: string;
         };
         SessionItem: {
-            sessionId: string;
-            userId: string;
-            displayName: string;
-            ipAddress?: string;
-            userAgent?: string;
-            deviceLabel?: string;
+            session_id: string;
+            user_id: string;
+            display_name: string;
+            ip_address?: string;
+            user_agent?: string;
+            device_label?: string;
             /** Format: date-time */
-            createdAt: string;
+            created_at: string;
             /** Format: date-time */
-            lastSeenAt: string;
+            last_seen_at: string;
             /** Format: date-time */
-            expiresAt: string;
+            expires_at: string;
         };
         ListSessionsResponse: {
             items: components["schemas"]["SessionItem"][];
@@ -2437,24 +2437,24 @@ export interface components {
         MfaCoverageRoleSlice: {
             role: components["schemas"]["UserRole"];
             total: number;
-            mfaEnabled: number;
+            mfa_enabled: number;
             pct: number;
         };
         MfaCoverage: {
-            totalUsers: number;
-            mfaEnabled: number;
-            mfaEnabledPct: number;
-            byRole: components["schemas"]["MfaCoverageRoleSlice"][];
+            total_users: number;
+            mfa_enabled: number;
+            mfa_enabled_pct: number;
+            by_role: components["schemas"]["MfaCoverageRoleSlice"][];
         };
         LockoutItem: {
-            userId: string;
-            displayName: string;
+            user_id: string;
+            display_name: string;
             /** Format: date-time */
-            lockedUntil?: string;
-            failedAttempts: number;
+            locked_until?: string;
+            failed_attempts: number;
             /** Format: date-time */
-            lastFailedAt?: string;
-            lastFailedIp?: string;
+            last_failed_at?: string;
+            last_failed_ip?: string;
         };
         ListLockoutsResponse: {
             items: components["schemas"]["LockoutItem"][];
@@ -2464,7 +2464,7 @@ export interface components {
         /** @enum {string} */
         SecuritySignalSeverity: "info" | "warn" | "critical";
         SecuritySignal: {
-            signalId: string;
+            signal_id: string;
             kind: components["schemas"]["SecuritySignalKind"];
             severity: components["schemas"]["SecuritySignalSeverity"];
             summary: string;
@@ -2472,7 +2472,7 @@ export interface components {
                 [key: string]: unknown;
             };
             /** Format: date-time */
-            detectedAt: string;
+            detected_at: string;
         };
         ListSecuritySignalsResponse: {
             items: components["schemas"]["SecuritySignal"][];
@@ -2488,41 +2488,41 @@ export interface components {
                 allocated: number;
             };
             storage: {
-                usedBytes: number;
-                allocatedBytes: number;
+                used_bytes: number;
+                allocated_bytes: number;
             };
-            apiCalls: components["schemas"]["UsageWindowCounts"];
-            activeUsers: components["schemas"]["UsageWindowCounts"];
+            api_calls: components["schemas"]["UsageWindowCounts"];
+            active_users: components["schemas"]["UsageWindowCounts"];
         };
         UpsertUserRoleRequest: {
-            displayName?: string;
+            display_name?: string;
             /** @enum {string} */
             role: "system_admin" | "approver" | "author" | "editor" | "viewer";
-            assignedBy?: string;
+            assigned_by?: string;
         };
         UpsertUserRoleResponse: {
-            userId: string;
+            user_id: string;
             role: string;
-            displayName?: string;
+            display_name?: string;
         };
         SearchDocumentItem: {
-            documentId: string;
+            document_id: string;
             title: string;
-            documentType: string;
-            documentProfile: string;
-            documentFamily: string;
-            documentSequence: number;
-            documentCode: string;
-            processArea?: string;
-            ownerId: string;
+            document_type: string;
+            document_profile: string;
+            document_family: string;
+            document_sequence: number;
+            document_code: string;
+            process_area?: string;
+            owner_id: string;
             department?: string;
             status: string;
             /** Format: date-time */
-            effectiveAt?: string;
+            effective_at?: string;
             /** Format: date-time */
-            expiryAt?: string;
+            expiry_at?: string;
             /** Format: date-time */
-            createdAt: string;
+            created_at: string;
         };
         SearchDocumentsResponse: {
             items: components["schemas"]["SearchDocumentItem"][];
@@ -2532,8 +2532,8 @@ export interface components {
             method: string;
             requests: number;
             errors: number;
-            durationTotalMs: number;
-            avgDurationMs: number;
+            duration_total_ms: number;
+            avg_duration_ms: number;
         };
         MetricsResponse: {
             items: components["schemas"]["MetricItem"][];
@@ -2551,9 +2551,9 @@ export interface components {
         };
         SystemBlankTemplateResponse: {
             /** Format: uuid */
-            templateId: string;
+            template_id: string;
             /** Format: uuid */
-            templateVersionId: string;
+            template_version_id: string;
             name: string;
         };
         TemplateDTO: {
@@ -2665,86 +2665,86 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
-            tenantId: string;
-            profileCode: string;
-            processAreaCode: string;
-            departmentCode?: string | null;
+            tenant_id: string;
+            profile_code: string;
+            process_area_code: string;
+            department_code?: string | null;
             code: string;
-            sequenceNum?: number | null;
+            sequence_num?: number | null;
             title: string;
-            ownerUserId: string;
+            owner_user_id: string;
             /** Format: uuid */
-            overrideTemplateVersionId?: string | null;
+            override_template_version_id?: string | null;
             /** @enum {string} */
             status: "active" | "obsolete" | "superseded";
             visibility: components["schemas"]["ControlledDocumentVisibility"];
             /** Format: date-time */
-            createdAt: string;
+            created_at: string;
             /** Format: date-time */
-            updatedAt: string;
+            updated_at: string;
         };
         ControlledDocumentVisibility: {
             /** @enum {string} */
             scope: "company" | "restricted";
-            areaCodes: string[];
-            userIds: string[];
+            area_codes: string[];
+            user_ids: string[];
         };
         DocumentRef: {
             /** Format: uuid */
             id: string;
-            contentHash: string;
+            content_hash: string;
         };
         CreateAtomicRequest: {
-            profileCode: string;
-            processAreaCode: string;
-            departmentCode?: string;
+            profile_code: string;
+            process_area_code: string;
+            department_code?: string;
             title: string;
-            ownerUserId: string;
-            documentName: string;
+            owner_user_id: string;
+            document_name: string;
             visibility: components["schemas"]["ControlledDocumentVisibility"];
             /** Format: uuid */
-            templateVersionId?: string;
-            formData?: {
+            template_version_id?: string;
+            form_data?: {
                 [key: string]: unknown;
             };
-            manualCode?: string;
-            manualCodeReason?: string;
+            manual_code?: string;
+            manual_code_reason?: string;
             /** Format: uuid */
-            overrideTemplateVersionId?: string;
-            overrideTemplateReason?: string;
+            override_template_version_id?: string;
+            override_template_reason?: string;
         };
         AtomicCreateResponse: {
-            controlledDocument: components["schemas"]["ControlledDocument"];
+            controlled_document: components["schemas"]["ControlledDocument"];
             document: components["schemas"]["DocumentRef"];
         };
         CreateRevisionRequest: {
             name: string;
-            formData?: {
+            form_data?: {
                 [key: string]: unknown;
             };
             /** Format: uuid */
-            templateVersionId?: string;
+            template_version_id?: string;
         };
         RevisionResponse: {
             document: components["schemas"]["DocumentRef"];
         };
         PreviewCodeResponse: {
-            profileCode: string;
-            areaCode: string;
-            nextSeq: number;
+            profile_code: string;
+            area_code: string;
+            next_seq: number;
             code: string;
         };
         ActiveDocumentResponse: {
             /** Format: uuid */
-            documentId?: string;
+            document_id?: string;
             /** @enum {string} */
-            approvalState?: "draft" | "under_review" | "approved" | "scheduled" | "rejected" | "cancelled";
-            contentHash?: string;
-            revisionVersion?: number;
+            approval_state?: "draft" | "under_review" | "approved" | "scheduled" | "rejected" | "cancelled";
+            content_hash?: string;
+            revision_version?: number;
             /** Format: uuid */
-            publishedDocumentId?: string;
+            published_document_id?: string;
             /** Format: uuid */
-            approvalInstanceId?: string;
+            approval_instance_id?: string;
         };
         ApprovalInstanceByDocumentResponse: {
             /** Format: uuid */
@@ -2796,18 +2796,18 @@ export interface components {
         };
         FinalizeDocumentRequest: {
             /** @description Required for governed revisions after REV00. Omit for REV00 to use the canonical initial title. */
-            revisionTitle?: string;
+            revision_title?: string;
         };
         DocumentRevisionHistoryItem: {
             /** Format: uuid */
-            documentId: string;
+            document_id: string;
             /** Format: int64 */
-            revisionNumber: number;
-            revisionTitle: string;
+            revision_number: number;
+            revision_title: string;
             status: string;
             /** Format: date-time */
-            createdAt: string;
-            isCurrent: boolean;
+            created_at: string;
+            is_current: boolean;
         };
         DocumentRevisionHistoryResponse: {
             items: components["schemas"]["DocumentRevisionHistoryItem"][];
@@ -5285,7 +5285,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** Format: uuid */
-                        instanceId: string;
+                        instance_id: string;
                     };
                 };
             };

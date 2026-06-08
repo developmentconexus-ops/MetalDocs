@@ -1,6 +1,6 @@
 # Workflow: Approval
 
-> **Last verified:** 2026-06-02 (PR-5 structural sweep: handler.go line anchors repaired)
+> **Last verified:** 2026-06-08 (Phase E1: `instanceId` → `instance_id` in finalize response; prior: 2026-06-02)
 > **Scope:** Submit → route assignment → signoffs → approval condition met → freeze trigger.
 > **Out of scope:** Freeze pipeline (see `workflows/freeze-and-fanout.md`), route admin (see `modules/approval.md`).
 > **Key files:**
@@ -30,7 +30,7 @@ Now `finalizeDocument` at `handler.go:316`:
 2. Reads `profile_code` from `controlled_documents`.
 3. Queries `approval_routes` for the most-recent active route for that profile (errors with 409 if none exists).
 4. Calls `SubmitRevisionForReview` — this single transaction creates the approval instance, stage instances, and transitions the document to `under_review`.
-5. Returns HTTP 201 with `{"instanceId": "<uuid>"}`.
+5. Returns HTTP 201 with `{"instance_id": "<uuid>"}`.
 
 `NewHandlerWithSubmit` at `handler.go:90` is required to wire `db` + `submitSvc`; if only `NewHandler` is used the legacy status-only path runs as fallback.
 

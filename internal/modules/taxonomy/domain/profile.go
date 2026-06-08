@@ -8,17 +8,17 @@ import (
 
 type DocumentProfile struct {
 	Code                     ProfileCode `json:"code"`
-	TenantID                 string      `json:"tenantId"`
-	FamilyCode               FamilyCode  `json:"familyCode"`
+	TenantID                 string      `json:"tenant_id"`
+	FamilyCode               FamilyCode  `json:"family_code"`
 	Name                     string      `json:"name"`
 	Description              string      `json:"description"`
 	Alias                    string      `json:"alias"`
-	ReviewIntervalDays       int         `json:"reviewIntervalDays"`
-	DefaultTemplateVersionID *string     `json:"defaultTemplateVersionId"`
-	OwnerUserID              *string     `json:"ownerUserId"`
-	EditableByRole           string      `json:"editableByRole"`
-	ArchivedAt               *time.Time  `json:"archivedAt"`
-	CreatedAt                time.Time   `json:"createdAt"`
+	ReviewIntervalDays       int         `json:"review_interval_days"`
+	DefaultTemplateVersionID *string     `json:"default_template_version_id"`
+	OwnerUserID              *string     `json:"owner_user_id"`
+	EditableByRole           string      `json:"editable_by_role"`
+	ArchivedAt               *time.Time  `json:"archived_at"`
+	CreatedAt                time.Time   `json:"created_at"`
 }
 
 var (

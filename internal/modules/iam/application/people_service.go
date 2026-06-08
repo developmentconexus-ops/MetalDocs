@@ -399,16 +399,16 @@ func (s *PeopleService) PatchAtomic(ctx context.Context, tenantID, actorID, user
 			return nil, err
 		}
 		if input.DisplayName != nil {
-			changes["displayName"] = *input.DisplayName
+			changes["display_name"] = *input.DisplayName
 		}
 		if input.Email != nil {
 			changes["email"] = *input.Email
 		}
 		if input.IsActive != nil {
-			changes["isActive"] = *input.IsActive
+			changes["is_active"] = *input.IsActive
 		}
 		if input.MustChangePassword != nil {
-			changes["mustChangePassword"] = *input.MustChangePassword
+			changes["must_change_password"] = *input.MustChangePassword
 		}
 	}
 
@@ -425,7 +425,7 @@ func (s *PeopleService) PatchAtomic(ctx context.Context, tenantID, actorID, user
 		if s.invalidator != nil {
 			s.invalidator.InvalidateUserTenant(userID, tenantID)
 		}
-		changes["tenantRole"] = string(*input.TenantRole)
+		changes["tenant_role"] = string(*input.TenantRole)
 	}
 
 	return changes, nil

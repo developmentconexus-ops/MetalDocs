@@ -21,19 +21,19 @@ const mockGet = api.GET as unknown as ReturnType<typeof vi.fn>;
 const mockPost = api.POST as unknown as ReturnType<typeof vi.fn>;
 
 type Membership = {
-  userId: string;
-  tenantId: string;
-  areaCode: string;
+  user_id: string;
+  tenant_id: string;
+  area_code: string;
   role: string;
-  effectiveFrom: string;
-  grantedBy?: string | null;
+  effective_from: string;
+  granted_by?: string | null;
 };
 
 type ManagedUserLite = {
-  userId: string;
+  user_id: string;
   username: string;
-  displayName: string;
-  areaMemberships: ReadonlyArray<{ areaCode: string }>;
+  display_name: string;
+  area_memberships: ReadonlyArray<{ area_code: string }>;
 };
 
 function makeUser(capabilities: string[]): CurrentUser {
@@ -76,18 +76,18 @@ function renderTab() {
 }
 
 const SAMPLE_USERS: ManagedUserLite[] = [
-  { userId: "u-1", username: "alice", displayName: "Alice", areaMemberships: [{ areaCode: "QUA" }] },
-  { userId: "u-2", username: "bob", displayName: "Bob", areaMemberships: [] },
+  { user_id: "u-1", username: "alice", display_name: "Alice", area_memberships: [{ area_code: "QUA" }] },
+  { user_id: "u-2", username: "bob", display_name: "Bob", area_memberships: [] },
 ];
 
 const SAMPLE_MEMBERSHIPS: Membership[] = [
   {
-    userId: "u-1",
-    tenantId: "t-1",
-    areaCode: "QUA",
+    user_id: "u-1",
+    tenant_id: "t-1",
+    area_code: "QUA",
     role: "editor",
-    effectiveFrom: "2026-01-01T00:00:00Z",
-    grantedBy: "actor-1",
+    effective_from: "2026-01-01T00:00:00Z",
+    granted_by: "actor-1",
   },
 ];
 
@@ -138,7 +138,7 @@ describe("MembershipsTab", () => {
     });
     primeApi(SAMPLE_MEMBERSHIPS, SAMPLE_USERS);
     mockPost.mockResolvedValue({
-      data: { userId: "u-2", tenantId: "t-1", areaCode: "PRD", role: "viewer" },
+      data: { user_id: "u-2", tenant_id: "t-1", area_code: "PRD", role: "viewer" },
       error: undefined,
     });
     renderTab();
@@ -157,7 +157,7 @@ describe("MembershipsTab", () => {
 
     await waitFor(() =>
       expect(mockPost).toHaveBeenCalledWith("/iam/area-memberships", {
-        body: { userId: "u-2", areaCode: "PRD", role: "viewer" },
+        body: { user_id: "u-2", area_code: "PRD", role: "viewer" },
       }),
     );
     await waitFor(() =>

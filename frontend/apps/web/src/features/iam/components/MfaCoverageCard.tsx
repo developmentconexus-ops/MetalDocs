@@ -56,14 +56,14 @@ export default function MfaCoverageCard() {
       ) : (
         <>
           <div className={styles.heroRow}>
-            <span className={styles.heroPct}>{formatPct(data.mfaEnabledPct)}</span>
+            <span className={styles.heroPct}>{formatPct(data.mfa_enabled_pct)}</span>
             <span className={styles.heroSuffix}>
-              {data.mfaEnabled} de {data.totalUsers} usuários
+              {data.mfa_enabled} de {data.total_users} usuários
             </span>
           </div>
 
           <div className={styles.roles} role="list">
-            {data.byRole.map((slice) => {
+            {data.by_role.map((slice) => {
               const isCritical = CRITICAL_ROLES.has(slice.role);
               const labelClass = isCritical
                 ? `${styles.roleLabel} ${styles.critical}`

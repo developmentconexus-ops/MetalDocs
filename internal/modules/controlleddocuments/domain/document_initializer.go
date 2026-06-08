@@ -50,7 +50,7 @@ func (r CloneTemplateRequest) FormData() map[string]any { return r.formData }
 // downstream code uses this to redirect to the editor or to enrich responses.
 type DocumentRef struct {
 	ID          string `json:"id"`
-	ContentHash string `json:"contentHash"`
+	ContentHash string `json:"content_hash"`
 }
 
 // DocumentInitializer is the controlled-documents-owned port that the documents module

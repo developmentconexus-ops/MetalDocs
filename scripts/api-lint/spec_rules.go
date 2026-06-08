@@ -54,7 +54,66 @@ func RunSpecRules(specPath string) ([]Violation, error) {
 			out = append(out, checkAuthz(specPath, opID, pathKey.Value, method, op)...)
 		}
 	}
+	// CASING-DRIFT walks the whole document (schemas + inline path bodies) for
+	// every declared `properties:` key and flags any that is not snake_case.
+	out = append(out, checkCasing(specPath, root)...)
 	return out, nil
+}
+
+// snakeCaseRE is the canonical snake_case identifier shape (api-design-system.md
+// §2.7 mini-conventions): lowercase start, words joined by single underscores,
+// digits allowed within a word.
+var snakeCaseRE = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
+
+// casingExemptKeys are schema property keys allowed to keep a non-snake_case form.
+//   - RFC 9457 Problem fields (type/title/status/detail/instance/code/errors) and
+//     FieldError fields (field/code/message) are already lowercase and pass the
+//     regex, so they need no explicit entry.
+//   - SCREAMING_SNAKE feature-flag keys intentionally mirror their env-var /
+//     flag-registry constant name (env METALDOCS_MDDM_NATIVE_EXPORT_ROLLOUT_PCT)
+//     and are consumed by a hand-written FE flag module by string (not the typed
+//     client); renaming the wire key would diverge it from the flag constant.
+var casingExemptKeys = map[string]struct{}{
+	"MDDM_NATIVE_EXPORT_ROLLOUT_PCT": {},
+}
+
+// checkCasing enforces snake_case for every declared schema property key, wherever
+// a `properties:` map appears (components/schemas and inline request/response
+// bodies). It does NOT walk free-form object content (additionalProperties values,
+// examples) — only declared property names. Blocking-by-default (api-contract-
+// hardening Phase E1): a re-introduced camelCase/PascalCase property turns CI red.
+func checkCasing(file string, root *yaml.Node) []Violation {
+	out := []Violation{}
+	var walk func(n *yaml.Node)
+	walk = func(n *yaml.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind {
+		case yaml.MappingNode:
+			for i := 0; i+1 < len(n.Content); i += 2 {
+				k, v := n.Content[i], n.Content[i+1]
+				if k.Value == "properties" && v.Kind == yaml.MappingNode {
+					for j := 0; j+1 < len(v.Content); j += 2 {
+						propKey := v.Content[j]
+						name := propKey.Value
+						if _, ok := casingExemptKeys[name]; !ok && !snakeCaseRE.MatchString(name) {
+							out = append(out, Violation{File: file, Line: propKey.Line, Rule: "CASING-DRIFT", Message: fmt.Sprintf("schema property %q is not snake_case", name)})
+						}
+						walk(v.Content[j+1]) // recurse into the property's own subtree
+					}
+					continue
+				}
+				walk(v)
+			}
+		case yaml.SequenceNode:
+			for _, c := range n.Content {
+				walk(c)
+			}
+		}
+	}
+	walk(root)
+	return out
 }
 
 // checkBasePrefix enforces AD-1: servers.url already carries the `/api/v1`

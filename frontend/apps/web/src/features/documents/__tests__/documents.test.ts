@@ -20,23 +20,23 @@ describe('documents with apiFetch', () => {
         JSON.stringify({
           items: [
             {
-              ID: '1',
-              TenantID: 'tenant-1',
-              TemplateVersionID: 'tv1',
-              Name: 'Doc',
-              Status: 'draft',
-              FormDataJSON: {},
-              CurrentRevisionID: 'rev-1',
-              RevisionVersion: 1,
-              ActiveSessionID: '',
-              CreatedAt: '2026-01-01T00:00:00Z',
-              UpdatedAt: '2026-01-01T00:00:00Z',
-              CreatedBy: 'user-1',
-              Code: 'DOC-1',
+              id: '1',
+              tenant_id: 'tenant-1',
+              template_version_id: 'tv1',
+              name: 'Doc',
+              status: 'draft',
+              form_data_json: {},
+              current_revision_id: 'rev-1',
+              revision_version: 1,
+              active_session_id: '',
+              created_at: '2026-01-01T00:00:00Z',
+              updated_at: '2026-01-01T00:00:00Z',
+              created_by: 'user-1',
+              code: 'DOC-1',
             },
           ],
           page: 1,
-          pageSize: 20,
+          page_size: 20,
           total: 1,
         }),
         { status: 200 },
@@ -44,34 +44,34 @@ describe('documents with apiFetch', () => {
     );
     const docs = await listDocuments();
     expect(docs).toHaveLength(1);
-    expect(docs[0].ID).toBe('1');
+    expect(docs[0].id).toBe('1');
   });
 
   it('finalizeDocument throws ApiError on 404 with parsed code', async () => {
     vi.spyOn(global, 'fetch').mockImplementation(() =>
       Promise.resolve(
         new Response(
-          JSON.stringify({ error: { code: 'not_found.route', message: 'no route' } }),
-          { status: 404 },
+          JSON.stringify({ type: 'about:blank', title: 'Not Found', status: 404, code: 'not_found.route' }),
+          { status: 404, headers: { 'Content-Type': 'application/problem+json' } },
         ),
       ),
     );
-    await expect(finalizeDocument('doc-1', { revisionTitle: 'Ajuste operacional' })).rejects.toBeInstanceOf(ApiError);
-    await expect(finalizeDocument('doc-1', { revisionTitle: 'Ajuste operacional' })).rejects.toMatchObject({ code: 'not_found.route', status: 404 });
+    await expect(finalizeDocument('doc-1', { revision_title: 'Ajuste operacional' })).rejects.toBeInstanceOf(ApiError);
+    await expect(finalizeDocument('doc-1', { revision_title: 'Ajuste operacional' })).rejects.toMatchObject({ code: 'not_found.route', status: 404 });
   });
 
   it('getDocument returns typed detail payload with embedded FormDataJSON', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
-          ID: 'doc-1',
-          Name: 'Doc',
-          Status: 'draft',
-          FormDataJSON: { foo: 'bar' },
-          CurrentRevisionID: 'rev-1',
-          RevisionVersion: 1,
-          CreatedBy: 'user-1',
-          Code: 'DOC-1',
+          id: 'doc-1',
+          name: 'Doc',
+          status: 'draft',
+          form_data_json: { foo: 'bar' },
+          current_revision_id: 'rev-1',
+          revision_version: 1,
+          created_by: 'user-1',
+          code: 'DOC-1',
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       ),
@@ -79,8 +79,8 @@ describe('documents with apiFetch', () => {
 
     const doc = await getDocument('doc-1');
 
-    expect(doc.FormDataJSON).toEqual({ foo: 'bar' });
-    expect(doc.CurrentRevisionID).toBe('rev-1');
+    expect(doc.form_data_json).toEqual({ foo: 'bar' });
+    expect(doc.current_revision_id).toBe('rev-1');
   });
 
   it('listComments returns typed comment payloads', async () => {
@@ -115,18 +115,18 @@ describe('documents with apiFetch', () => {
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
     const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
       new Response(
-        JSON.stringify({ instanceId: 'inst_1' }),
+        JSON.stringify({ instance_id: 'inst_1' }),
         { status: 201, headers: { 'content-type': 'application/json' } },
       ),
     );
 
-    const result = await finalizeDocument('doc-1', { revisionTitle: 'Ajuste operacional' });
+    const result = await finalizeDocument('doc-1', { revision_title: 'Ajuste operacional' });
 
-    expect(result).toEqual({ instanceId: 'inst_1' });
+    expect(result).toEqual({ instance_id: 'inst_1' });
     const [, init] = fetchSpy.mock.calls[0] ?? [];
     const headers = init?.headers as Record<string, string> | undefined;
     expect(headers).toMatchObject({ 'Idempotency-Key': '11111111-1111-4111-8111-111111111111' });
-    expect(JSON.parse(String(init?.body))).toEqual({ revisionTitle: 'Ajuste operacional' });
+    expect(JSON.parse(String(init?.body))).toEqual({ revision_title: 'Ajuste operacional' });
   });
 
   it('reads approval-instance with runtime-aligned statuses and signoff payload', async () => {

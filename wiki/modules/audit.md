@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-07 (Phase C dead-path prune: audit permissions.go anchor updated :211-221 → :229-231; T-001 noted closed in §8.1; prior: 2026-06-01) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-08 (Phase E1 casing big-bang: EventResponse wire keys updated to snake_case; prior: 2026-06-07) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/audit/domain/port.go:8-31` â€” `Event`, `ListEventsQuery`, `Writer`, `Reader`
@@ -145,7 +145,7 @@ C4Container
 | `internal/modules/audit/application/service.go:14` | `NewService(reader)` | func | constructor |
 | `internal/modules/audit/application/service.go:18` | `Service.ListEvents` | method | normalize + clamp `Limit` to `[1..200]`, default 50 |
 | `internal/modules/audit/delivery/http/handler.go:15` | `Handler` | struct | HTTP wrapper |
-| `internal/modules/audit/delivery/http/handler.go:19` | `EventResponse` | struct | wire shape: `id`, `occurredAt` (RFC3339 UTC), `actorId`, `action`, `resourceType`, `resourceId`, `payload` (decoded), `traceId` |
+| `internal/modules/audit/delivery/http/handler.go:19` | `EventResponse` | struct | wire shape: `id`, `occurred_at` (RFC3339 UTC), `actor_id`, `action`, `resource_type`, `resource_id`, `payload` (decoded), `trace_id` |
 | `internal/modules/audit/delivery/http/handler.go:30` | `NewHandler(service)` | func | constructor |
 | `internal/modules/audit/delivery/http/handler.go:34` | `Handler.RegisterRoutes` | method | mounts `GET /api/v1/audit/events` on a `*http.ServeMux` |
 | `internal/modules/audit/infrastructure/postgres/writer.go:12,16,20,44` | `postgres.Writer`, `NewWriter`, `Record`, `ListEvents` | type + methods | Postgres adapter (satisfies both Writer + Reader) |

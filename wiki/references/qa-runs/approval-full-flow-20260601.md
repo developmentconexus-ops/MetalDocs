@@ -1,5 +1,7 @@
 # Approval Full-Flow QA Run — 2026-06-01
 
+> **Casing note (2026-06-08):** Captured API responses in this document reflect the pre-Phase-E1 wire format (camelCase). After Phase E1 the same fields are `content_hash`, `revision_version`, `approval_state`. This record is preserved as-captured; run against E1+ code will show snake_case values.
+
 **Verdict:** PASS (post-fix, see §9) — F-001 + F-002 both confirmed fixed after commits `f52917495`, `1f9fed6fe` (ADR 0016), `aefb23ea8`, `f529c3f47` (ADR 0017). Original verdict was PASS-WITH-WARNINGS; retained in §1-§8 as historical record.
 
 ## 1. Environment

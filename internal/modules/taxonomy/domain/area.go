@@ -8,14 +8,14 @@ import (
 
 type ProcessArea struct {
 	Code                AreaCode   `json:"code"`
-	TenantID            string     `json:"tenantId"`
+	TenantID            string     `json:"tenant_id"`
 	Name                string     `json:"name"`
 	Description         string     `json:"description"`
-	ParentCode          *AreaCode  `json:"parentCode"`
-	OwnerUserID         *string    `json:"ownerUserId"`
-	DefaultApproverRole *string    `json:"defaultApproverRole"`
-	ArchivedAt          *time.Time `json:"archivedAt"`
-	CreatedAt           time.Time  `json:"createdAt"`
+	ParentCode          *AreaCode  `json:"parent_code"`
+	OwnerUserID         *string    `json:"owner_user_id"`
+	DefaultApproverRole *string    `json:"default_approver_role"`
+	ArchivedAt          *time.Time `json:"archived_at"`
+	CreatedAt           time.Time  `json:"created_at"`
 }
 
 var (

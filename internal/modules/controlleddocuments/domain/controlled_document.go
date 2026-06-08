@@ -17,19 +17,19 @@ const (
 
 type ControlledDocument struct {
 	ID                        string     `json:"id"`
-	TenantID                  string     `json:"tenantId"`
-	ProfileCode               string     `json:"profileCode"`
-	ProcessAreaCode           string     `json:"processAreaCode"`
-	DepartmentCode            *string    `json:"departmentCode"`
+	TenantID                  string     `json:"tenant_id"`
+	ProfileCode               string     `json:"profile_code"`
+	ProcessAreaCode           string     `json:"process_area_code"`
+	DepartmentCode            *string    `json:"department_code"`
 	Code                      string     `json:"code"`
-	SequenceNum               *int       `json:"sequenceNum"`
+	SequenceNum               *int       `json:"sequence_num"`
 	Title                     string     `json:"title"`
-	OwnerUserID               string     `json:"ownerUserId"`
-	OverrideTemplateVersionID *string    `json:"overrideTemplateVersionId"`
+	OwnerUserID               string     `json:"owner_user_id"`
+	OverrideTemplateVersionID *string    `json:"override_template_version_id"`
 	Visibility                Visibility `json:"visibility"`
 	Status                    CDStatus   `json:"status"`
-	CreatedAt                 time.Time  `json:"createdAt"`
-	UpdatedAt                 time.Time  `json:"updatedAt"`
+	CreatedAt                 time.Time  `json:"created_at"`
+	UpdatedAt                 time.Time  `json:"updated_at"`
 }
 
 var (

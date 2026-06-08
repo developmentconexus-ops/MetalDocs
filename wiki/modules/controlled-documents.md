@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-06-07 (Phase C dead-path prune: permissions.go :186-187 → :185-186; prior: 2026-06-01) | **Owner:** leandro | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-06-08 (Phase E1 casing big-bang: `ActiveDocumentResponse` json tags updated to snake_case in artifact; prior: 2026-06-07) | **Owner:** leandro | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/controlleddocuments/module.go:25` - module wiring (`New`, dependencies)
@@ -105,7 +105,7 @@ Controlled-documents owns the **identity** of every controlled document under QM
 - **Controlled-documents-owned port for the cross-module call**          driver: avoid circular imports. `domain/document_initializer.go:30` defines the interface; `documents/application/cd_initializer.go` implements it; main.go injects via `WithDocumentInitializer` post-construction.
 - **Per-(tenant, profile, area) sequence counter table**          driver: ADR 0011 (replaces single `profile_sequence_counters` keyed only on profile; no cross-area counter bleed).
 - **Shared idempotency platform on POST create + revisions**          driver: ADR 0011 (Stripe-style key replay; body-hash conflict detection).
-- **FULL OUTER JOIN for active-document lookup** - driver: E10 fix; published-only CDs must return 200 with `publishedDocumentId` so frontend renders download link.
+- **FULL OUTER JOIN for active-document lookup** - driver: E10 fix; published-only CDs must return 200 with `published_document_id` so frontend renders download link.
 
 ---
 
@@ -410,7 +410,7 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 | No orphan slot | `CreateDocumentTx` returns error mid-tx | `controlled_documents` row NOT visible; `next_seq` NOT advanced |
 | Replay safety | Replay POST with same `Idempotency-Key` and body | 201 with original CD payload; no new row |
 | Body-hash conflict | Same key, different body | 422 `IDEMPOTENCY_KEY_CONFLICT`; no new row |
-| Active-document publish-only | CD with only published revisions | 200 with `publishedDocumentId` set; `documentId` omitted |
+| Active-document publish-only | CD with only published revisions | 200 with `published_document_id` set; `document_id` omitted |
 | Active-document empty CD | CD with no revisions | 404 |
 | Lifecycle guard | `PUT .../obsolete` on already-obsolete CD | 409 `CONTROLLED_DOCUMENT_NOT_ACTIVE` |
 | Code immutability | Direct SQL `UPDATE controlled_documents SET code = ...` | Postgres trigger raises (`reject_code_update`) |
@@ -491,10 +491,10 @@ Top 3 (by severity, then blast-radius):
 - 2026-05-25 - Backend quality-bar sync: repository transaction ports now use the module-level `domain.DBTX` interface instead of exposing `*sql.Tx` in repository contracts; clone-template/document-ref constructors validate invalid zero-value port payloads; application/repository error paths wrap underlying errors with operation context and governance warnings use `slog.WarnContext` with tenant/actor fields.
 - 2026-05-21 - Runtime mount canonicalization: controlled-documents now mounts public routes through `controlleddocumentsapi.HandlerWithOptions`; idempotency remains route-scoped to the two POST operations, and missing `Idempotency-Key` is normalized to `IDEMPOTENCY_KEY_REQUIRED`.
 - 2026-05-20 - Create-revision conflict sync: `POST /api/v1/controlled-documents/{id}/revisions` now preserves the database-owned single-active-sibling invariant (`ux_documents_cd_active`) but translates that collision to `409 ACTIVE_REVISION_ALREADY_EXISTS` instead of surfacing a generic internal error when a second active revision is attempted concurrently.
-- 2026-05-20 - Active-document approval-instance hardening: `GET /api/v1/controlled-documents/{id}/active-document` now treats `documents.status` as the only source of truth for `approvalState`, enriches `approvalInstanceId` only when the active lineage row is actually `under_review`, and returns `500 INTERNAL_ERROR` if that secondary lookup fails instead of silently omitting review context.
-- 2026-05-20 - Active-document scheduled-state sync: `GET /api/v1/controlled-documents/{id}/active-document` now derives `approvalState` from the governed `documents.status` of the active lineage row, so a scheduled replacement remains visible to `/documents/:id` as `scheduled` instead of drifting back to `approved`.
+- 2026-05-20 - Active-document approval-instance hardening: `GET /api/v1/controlled-documents/{id}/active-document` now treats `documents.status` as the only source of truth for `approval_state`, enriches `approval_instance_id` only when the active lineage row is actually `under_review`, and returns `500 INTERNAL_ERROR` if that secondary lookup fails instead of silently omitting review context.
+- 2026-05-20 - Active-document scheduled-state sync: `GET /api/v1/controlled-documents/{id}/active-document` now derives `approval_state` from the governed `documents.status` of the active lineage row, so a scheduled replacement remains visible to `/documents/:id` as `scheduled` instead of drifting back to `approved`.
 - 2026-05-20 - Canonical sibling-state sync: `GET /api/v1/controlled-documents/{id}/active-document` remains the technical lookup consumed by `/documents/:id` to decide whether a revision branch is open; frontend now treats every returned active approval state (`draft`, `under_review`, `approved`, `scheduled`, `rejected`) as branch-active context.
-- 2026-05-20 - Active-document publish-only sync: `GET /api/v1/controlled-documents/{id}/active-document` no longer synthesizes `approvalState="draft"` when a controlled document has only a published revision. The controlled-documents FULL OUTER JOIN now leaves the active side absent in publish-only state and returns just `publishedDocumentId`, matching the OpenAPI contract and the canonical `/documents/:id` publish flow.
+- 2026-05-20 - Active-document publish-only sync: `GET /api/v1/controlled-documents/{id}/active-document` no longer synthesizes `approval_state="draft"` when a controlled document has only a published revision. The controlled-documents FULL OUTER JOIN now leaves the active side absent in publish-only state and returns just `published_document_id`, matching the OpenAPI contract and the canonical `/documents/:id` publish flow.
 - 2026-05-18 - Frontend contract sync: the controlled-document detail contract remains the source of truth for `visibility`, and the editor sidebar now consumes that runtime field directly through generated frontend types instead of a controlled-documents-local handwritten omission.
 - 2026-05-15 - Database foundation sync: removed startup migration alias references (`RunStartupMigrations`), confirmed legacy maintenance is explicit recovery-only, and aligned startup notes with the current DB bootstrap workflow.
 - 2026-05-15 - Runtime repair: atomic create now primes `metaldocs.tenant_id`/`metaldocs.actor_id` and asserts `registry.create` (legacy literal capability key) inside the caller-owned transaction before sequence/CD writes, restoring Plan 5 tripwire pairing for `/api/v1/controlled-documents`.

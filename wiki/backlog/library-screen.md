@@ -1,6 +1,6 @@
 # Library Screen — Deferred Backlog
 
-> **Last verified:** 2026-05-06
+> **Last verified:** 2026-06-08 (Phase E1: response shape fields updated to snake_case; prior: 2026-05-06)
 > **Scope:** Deferred implementation items for the `/documents` Library screen. These are intentional stubs — the screen ships with mock data in places while backend endpoints are designed.
 > **Out of scope:** Bug fixes (see `bugs/`), future screens.
 > **Key files:**
@@ -59,7 +59,7 @@
 - Endpoint exists: likely `GET /api/v2/audit` (check `internal/modules/audit/` or equivalent).
 - Not yet surfaced in OpenAPI spec / codegen types.
 - Needed query params: `scope=documents`, `limit=8h` (or `since=<ISO>`)
-- Response shape needed: `[{ actorID, actorName, action, targetCode, occurredAt }]`
+- Response shape needed: `[{ actor_id, actor_name, action, target_code, occurred_at }]`
 - Confirm with backend whether `isSystem` flag exists (for system-generated events like "gerou PDF").
 
 **Frontend work when ready:**
@@ -82,15 +82,15 @@
 - Extend `GET /api/v1/documents/stats` response schema:
   ```json
   {
-    "pendingMyApproval": 3,
-    "pendingMyApprovalDueSoon": 2
+    "pending_my_approval": 3,
+    "pending_my_approval_due_soon": 2
   }
   ```
 - Alternatively: derive from `useInboxQuery` result once Item 1 lands (count + due-soon filter).
 
 **Frontend work when ready:**
-- Wire `value` function to `statsQuery.data?.pendingMyApproval ?? 0`.
-- Wire `trend` to `"${pendingMyApprovalDueSoon} vencendo"` or hide if 0.
+- Wire `value` function to `statsQuery.data?.pending_my_approval ?? 0`.
+- Wire `trend` to `"${pending_my_approval_due_soon} vencendo"` or hide if 0.
 
 ---
 
@@ -106,15 +106,15 @@
 - Extend `GET /api/v1/documents/stats`:
   ```json
   {
-    "frozenThisMonth": 47,
-    "frozenThisMonthDelta": 12
+    "frozen_this_month": 47,
+    "frozen_this_month_delta": 12
   }
   ```
 - Backend calculates via `WHERE frozen_at >= date_trunc('month', NOW())`.
 - File a backend issue; this is a reporting query, low complexity.
 
 **Frontend work when ready:**
-- Wire `value` to `statsQuery.data?.frozenThisMonth ?? 0`.
+- Wire `value` to `statsQuery.data?.frozen_this_month ?? 0`.
 - Wire `trend` to `"+${delta}% vs anterior"` or `"=${delta}% vs anterior"`.
 
 ---

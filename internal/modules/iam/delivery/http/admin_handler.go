@@ -65,15 +65,15 @@ type AdminHandler struct {
 }
 
 type UpsertUserRoleRequest struct {
-	DisplayName string `json:"displayName"`
+	DisplayName string `json:"display_name"`
 	Role        string `json:"role"`
-	AssignedBy  string `json:"assignedBy,omitempty"`
+	AssignedBy  string `json:"assigned_by,omitempty"`
 }
 
 type ReplaceUserRolesRequest struct {
-	DisplayName string   `json:"displayName"`
+	DisplayName string   `json:"display_name"`
 	Roles       []string `json:"roles"`
-	AssignedBy  string   `json:"assignedBy,omitempty"`
+	AssignedBy  string   `json:"assigned_by,omitempty"`
 }
 
 func NewAdminHandler(service *iamapp.AdminService, authService UserAdminService, auditWriter ...auditdomain.Writer) *AdminHandler {
@@ -228,19 +228,19 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	if h.presence != nil {
 		for _, item := range presenceItems {
 			presenceOut = append(presenceOut, map[string]any{
-				"userId":      item.UserID,
-				"displayName": item.DisplayName,
-				"lastSeenAt":  item.LastSeenAt.UTC().Format(time.RFC3339),
+				"user_id":      item.UserID,
+				"display_name": item.DisplayName,
+				"last_seen_at":  item.LastSeenAt.UTC().Format(time.RFC3339),
 				"status":      string(item.Status),
 			})
 		}
 	} else {
 		for _, item := range onlineUsers {
 			presenceOut = append(presenceOut, map[string]any{
-				"userId":      item.UserID,
+				"user_id":      item.UserID,
 				"username":    item.Username,
-				"displayName": item.DisplayName,
-				"lastSeenAt":  item.LastSeenAt.UTC().Format(time.RFC3339),
+				"display_name": item.DisplayName,
+				"last_seen_at":  item.LastSeenAt.UTC().Format(time.RFC3339),
 			})
 		}
 	}
@@ -252,19 +252,19 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		}
 		eventOut = append(eventOut, map[string]any{
 			"id":           item.ID,
-			"occurredAt":   item.OccurredAt.UTC().Format(time.RFC3339),
-			"actorId":      item.ActorID,
+			"occurred_at":   item.OccurredAt.UTC().Format(time.RFC3339),
+			"actor_id":      item.ActorID,
 			"action":       item.Action,
-			"resourceType": item.ResourceType,
-			"resourceId":   item.ResourceID,
+			"resource_type": item.ResourceType,
+			"resource_id":   item.ResourceID,
 			"payload":      payload,
-			"traceId":      item.TraceID,
+			"trace_id":      item.TraceID,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"kpi":              kpiToOverviewJSON(kpiSnapshot),
 		"presence":         presenceOut,
-		"recentActivities": eventOut,
+		"recent_activities": eventOut,
 	})
 }
 
@@ -280,12 +280,12 @@ func kpiToOverviewJSON(k iamdomain.KpiSnapshot) map[string]any {
 		})
 	}
 	return map[string]any{
-		"lockedAccounts":       k.LockedAccounts,
-		"mfaCoveragePct":       k.MfaCoveragePct,
-		"failedLogins24h":      k.FailedLogins24h,
-		"dormantUsers30d":      k.DormantUsers30d,
-		"roleDistribution":     dist,
-		"auditEventsPerMinute": k.AuditEventsPerMinute,
+		"locked_accounts":       k.LockedAccounts,
+		"mfa_coverage_pct":       k.MfaCoveragePct,
+		"failed_logins24h":      k.FailedLogins24h,
+		"dormant_users30d":      k.DormantUsers30d,
+		"role_distribution":     dist,
+		"audit_events_per_minute": k.AuditEventsPerMinute,
 	}
 }
 
@@ -333,13 +333,13 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"userId":      userID,
+		"user_id":      userID,
 		"role":        string(role),
-		"displayName": strings.TrimSpace(req.DisplayName),
+		"display_name": strings.TrimSpace(req.DisplayName),
 	})
 	h.recordAudit(r, userID, "iam.user.role.upserted", map[string]any{
 		"role":       string(role),
-		"assignedBy": assignedBy,
+		"assigned_by": assignedBy,
 	})
 }
 
@@ -372,8 +372,8 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"userId":      userID,
-		"displayName": strings.TrimSpace(req.DisplayName),
+		"user_id":      userID,
+		"display_name": strings.TrimSpace(req.DisplayName),
 		"roles":       []string{string(role)},
 	})
 	h.recordAudit(r, userID, "iam.user.roles.replaced", map[string]any{

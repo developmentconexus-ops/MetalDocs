@@ -44,7 +44,7 @@ func TestListDocuments_Paginated_Envelope(t *testing.T) {
 	var out struct {
 		Items    []map[string]any `json:"items"`
 		Page     int              `json:"page"`
-		PageSize int              `json:"pageSize"`
+		PageSize int              `json:"page_size"`
 		Total    int64            `json:"total"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {

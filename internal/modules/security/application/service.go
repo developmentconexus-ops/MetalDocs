@@ -100,7 +100,7 @@ func (s *Service) ListSignals(ctx context.Context, tenantID string) ([]securityd
 			Kind:       "repeated-failed-login",
 			Severity:   "warn",
 			Summary:    fmt.Sprintf("%s — %d failed logins in the last %d min", summary.DisplayName, summary.FailCount, RepeatedFailedLoginWindowSec/60),
-			Evidence:   map[string]any{"userId": summary.UserID, "displayName": summary.DisplayName, "failCount": summary.FailCount, "lastFailedAt": summary.LastFailedAt},
+			Evidence:   map[string]any{"user_id": summary.UserID, "display_name": summary.DisplayName, "failCount": summary.FailCount, "last_failed_at": summary.LastFailedAt},
 			DetectedAt: now,
 		})
 	}
@@ -130,7 +130,7 @@ func (s *Service) ListSignals(ctx context.Context, tenantID string) ([]securityd
 			Kind:       "new-device-login",
 			Severity:   "info",
 			Summary:    fmt.Sprintf("%s logged in from a new device", d.DisplayName),
-			Evidence:   map[string]any{"userId": d.UserID, "displayName": d.DisplayName, "userAgent": d.UserAgent, "sessionId": d.SessionID, "createdAt": d.CreatedAt},
+			Evidence:   map[string]any{"user_id": d.UserID, "display_name": d.DisplayName, "user_agent": d.UserAgent, "session_id": d.SessionID, "created_at": d.CreatedAt},
 			DetectedAt: now,
 		})
 	}
@@ -145,7 +145,7 @@ func (s *Service) ListSignals(ctx context.Context, tenantID string) ([]securityd
 			Kind:       "off-hours-admin-action",
 			Severity:   "info",
 			Summary:    fmt.Sprintf("%s by %s (%s) outside business hours", e.Action, e.ActorID, e.ActorRole),
-			Evidence:   map[string]any{"eventId": e.EventID, "actorId": e.ActorID, "actorRole": e.ActorRole, "action": e.Action, "resourceType": e.ResourceType, "resourceId": e.ResourceID, "occurredAt": e.OccurredAt},
+			Evidence:   map[string]any{"eventId": e.EventID, "actor_id": e.ActorID, "actorRole": e.ActorRole, "action": e.Action, "resource_type": e.ResourceType, "resource_id": e.ResourceID, "occurred_at": e.OccurredAt},
 			DetectedAt: now,
 		})
 	}

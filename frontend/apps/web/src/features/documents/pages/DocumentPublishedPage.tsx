@@ -35,12 +35,12 @@ type DocumentStatusPresentation = {
 };
 
 type GovernedRevisionHistoryItem = {
-  documentId: string;
-  revisionNumber: number;
-  revisionTitle: string;
+  document_id: string;
+  revision_number: number;
+  revision_title: string;
   status: string;
-  createdAt: string;
-  isCurrent: boolean;
+  created_at: string;
+  is_current: boolean;
 };
 
 function getActiveSiblingCtaLabel(state: ActiveSiblingState): string {
@@ -130,9 +130,9 @@ export function DocumentPublishedPage() {
 
   const scheduledLifecycleRefetchInterval = 5_000;
   const docQuery = useDocumentDetailQuery(documentId, { pollScheduledLifecycle: true });
-  const shouldPollScheduledLifecycle = docQuery.data?.Status === 'scheduled';
+  const shouldPollScheduledLifecycle = docQuery.data?.status === 'scheduled';
   const approvalQuery = useApprovalInstanceQuery(documentId);
-  const controlledDocumentId = docQuery.data?.ControlledDocumentID ?? null;
+  const controlledDocumentId = docQuery.data?.controlled_document_id ?? null;
   const activeDocumentQuery = useControlledDocumentActiveDocumentQuery(controlledDocumentId, {
     refetchInterval: shouldPollScheduledLifecycle ? scheduledLifecycleRefetchInterval : false,
   });
@@ -177,18 +177,18 @@ export function DocumentPublishedPage() {
   const approval = approvalQuery.data ?? null;
 
   // Normalize response casing (API returns both PascalCase and snake_case)
-  const code            = doc.Code ?? '—';
-  const docName         = doc.Name;
-  const status          = doc.Status ?? '';
-  const createdByRaw    = doc.CreatedBy ?? '—';
+  const code            = doc.code ?? '—';
+  const docName         = doc.name;
+  const status          = doc.status ?? '';
+  const createdByRaw    = doc.created_by ?? '—';
   // TODO(backlog): API should return created_by_display_name snapshot — wiki/backlog/documento-publicado.md
   // Fallback: created_by stores user_id; if creator is the current user, use displayName
   const createdBy = (user?.userId && createdByRaw === user.userId)
     ? (user.displayName ?? createdByRaw)
     : createdByRaw;
-  const versionLabel = formatRevisionCode(doc.RevisionNumber);
-  const areaCode = doc.ProcessAreaCodeSnapshot ?? '';
-  const profileCode = doc.ProfileCodeSnapshot ?? '';
+  const versionLabel = formatRevisionCode(doc.revision_number);
+  const areaCode = doc.process_area_code_snapshot ?? '';
+  const profileCode = doc.profile_code_snapshot ?? '';
   const areaLabel = areaCode ? resolveAreaLabel(areaCode, areasQuery.data ?? []) : '—';
   const profileLabel = profileCode ? resolveProfileLabel(profileCode, profilesQuery.data ?? []) : '—';
 
@@ -200,12 +200,12 @@ export function DocumentPublishedPage() {
   const isPublished = status === 'published';
   const statusPresentation = getDocumentStatusPresentation(status, publishedAt);
   const activeSiblingDocumentId =
-    activeDocument?.documentId &&
-    activeDocument.documentId !== documentId &&
-    ACTIVE_SIBLING_STATES.includes(activeDocument.approvalState as ActiveSiblingState)
-      ? activeDocument.documentId
+    activeDocument?.document_id &&
+    activeDocument.document_id !== documentId &&
+    ACTIVE_SIBLING_STATES.includes(activeDocument.approval_state as ActiveSiblingState)
+      ? activeDocument.document_id
       : null;
-  const activeSiblingStateCandidate = activeDocument?.approvalState as ActiveSiblingState | undefined;
+  const activeSiblingStateCandidate = activeDocument?.approval_state as ActiveSiblingState | undefined;
   const activeSiblingState =
     activeSiblingDocumentId && activeSiblingStateCandidate && ACTIVE_SIBLING_STATES.includes(activeSiblingStateCandidate)
       ? activeSiblingStateCandidate
@@ -227,15 +227,15 @@ export function DocumentPublishedPage() {
   const canCreateRevision =
     canInitiateRevision &&
     isPublished &&
-    Boolean(doc.ControlledDocumentID) &&
+    Boolean(doc.controlled_document_id) &&
     activeSiblingDocumentId == null;
-  const canPublish = canInitiateRevision && isApproved && Boolean(activeDocument?.contentHash);
+  const canPublish = canInitiateRevision && isApproved && Boolean(activeDocument?.content_hash);
   const publishContextNotice =
     isApproved && !canInitiateRevision
       ? 'Seu perfil atual não pode publicar esta revisão.'
       : isApproved && activeDocumentQuery.isError
         ? 'Não foi possível confirmar o contexto ativo de publicação. Atualize a página e tente novamente antes de publicar.'
-        : isApproved && !activeDocument?.contentHash
+        : isApproved && !activeDocument?.content_hash
           ? 'A publicação está bloqueada porque o contexto ativo desta revisão ainda não foi confirmado.'
           : null;
 
@@ -246,19 +246,19 @@ export function DocumentPublishedPage() {
   const connectorSide = stageCount > 1 ? `${(100 / (2 * stageCount)).toFixed(2)}%` : '50%';
   const revisionHistoryItems = (revisionHistoryQuery.data?.items ?? []) as GovernedRevisionHistoryItem[];
   const revisionTimeline = revisionHistoryItems.map((item) => ({
-    v: `REV${String(item.revisionNumber ?? 0).padStart(2, '0')}`,
-    when: formatShortDate(item.createdAt) || '—',
+    v: `REV${String(item.revision_number ?? 0).padStart(2, '0')}`,
+    when: formatShortDate(item.created_at) || '—',
     author: item.status || '—',
-    current: Boolean(item.isCurrent),
-    summary: item.revisionTitle?.trim() || 'Sem título governado registrado.',
+    current: Boolean(item.is_current),
+    summary: item.revision_title?.trim() || 'Sem título governado registrado.',
   }));
 
   const currentPublishedHistoryItem =
-    status === 'scheduled' && activeDocument?.publishedDocumentId
-      ? revisionHistoryItems.find((item) => item.documentId === activeDocument.publishedDocumentId) ?? null
+    status === 'scheduled' && activeDocument?.published_document_id
+      ? revisionHistoryItems.find((item) => item.document_id === activeDocument.published_document_id) ?? null
       : null;
   const currentVersionLabel = currentPublishedHistoryItem
-    ? formatRevisionCode(currentPublishedHistoryItem.revisionNumber)
+    ? formatRevisionCode(currentPublishedHistoryItem.revision_number)
     : versionLabel;
   const currentVersionHint = currentPublishedHistoryItem
     ? '—'
@@ -308,15 +308,15 @@ export function DocumentPublishedPage() {
   };
 
   const handleCreateRevision = async () => {
-    if (!doc.ControlledDocumentID || !revisionName.trim()) {
+    if (!doc.controlled_document_id || !revisionName.trim()) {
       return;
     }
     setIsCreatingRevision(true);
     setRevisionError('');
     try {
       const response = await createRevision(
-        doc.ControlledDocumentID,
-        { name: revisionName.trim(), formData: {}, templateVersionId: doc.TemplateVersionID },
+        doc.controlled_document_id,
+        { name: revisionName.trim(), form_data: {}, template_version_id: doc.template_version_id },
         crypto.randomUUID(),
       );
       navigate(`/documents/${response.document.id}/edit`);
@@ -389,7 +389,7 @@ export function DocumentPublishedPage() {
                 title={
                   !canInitiateRevision
                     ? 'Sem permissÃ£o para publicar'
-                    : !activeDocument?.contentHash
+                    : !activeDocument?.content_hash
                       ? 'Aguardando contexto ativo para publicar'
                       : undefined
                 }
@@ -481,12 +481,12 @@ export function DocumentPublishedPage() {
         </div>
       )}
 
-      {showPublishDialog && activeDocument?.contentHash ? (
+      {showPublishDialog && activeDocument?.content_hash ? (
         <SupersedePublishDialog
           documentId={documentId}
-          contentHash={activeDocument.contentHash}
-          revisionVersion={activeDocument.revisionVersion}
-          publishedDocumentId={activeDocument.publishedDocumentId ?? undefined}
+          contentHash={activeDocument.content_hash}
+          revisionVersion={activeDocument.revision_version}
+          publishedDocumentId={activeDocument.published_document_id ?? undefined}
           onClose={() => setShowPublishDialog(false)}
           onSuccess={handlePublishSuccess}
         />

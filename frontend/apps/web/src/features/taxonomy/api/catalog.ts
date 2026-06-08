@@ -1,7 +1,13 @@
 import { request } from "../../../lib/api/client";
 import type { DocumentProfileItem } from "../../../lib/types";
+import type { components } from "../../../lib/api-types";
 
-type TaxonomyProfileItem = Pick<DocumentProfileItem, "code" | "name" | "description" | "familyCode"> & {
+// Wire shape from GET /taxonomy/profiles (snake_case per contract) + the
+// runtime-only `archived` flag not yet declared in the spec.
+type TaxonomyProfileItem = Pick<
+  components["schemas"]["DocumentProfileItem"],
+  "code" | "name" | "description" | "family_code"
+> & {
   archived?: boolean;
 };
 
@@ -31,7 +37,7 @@ export async function listTaxonomyProfiles(): Promise<{ items: DocumentProfileIt
           .map((item) =>
             normalizeDocumentProfile({
               code: item.code,
-              familyCode: item.familyCode,
+              familyCode: item.family_code,
               name: item.name,
               description: item.description,
             }),

@@ -283,12 +283,12 @@ func TestListAreaMemberships_ContractShape(t *testing.T) {
 		t.Fatalf("items=%d want 1; body=%s", len(resp.Items), rec.Body.String())
 	}
 	row := resp.Items[0]
-	for _, key := range []string{"userId", "tenantId", "areaCode", "role", "effectiveFrom"} {
+	for _, key := range []string{"user_id", "tenant_id", "area_code", "role", "effective_from"} {
 		if _, ok := row[key]; !ok {
-			t.Errorf("row missing %q (lowerCamel contract violation); row=%v", key, row)
+			t.Errorf("row missing %q (snake_case contract violation); row=%v", key, row)
 		}
 	}
-	if row["userId"] != targetID || row["tenantId"] != tenantAlpha || row["areaCode"] != "QMS" {
+	if row["user_id"] != targetID || row["tenant_id"] != tenantAlpha || row["area_code"] != "QMS" {
 		t.Errorf("row content mismatch: %v", row)
 	}
 }
@@ -356,7 +356,7 @@ func TestListAreaMemberships_NonAdminIsSelfScoped(t *testing.T) {
 	}
 	var resp struct {
 		Items []struct {
-			UserID string `json:"userId"`
+			UserID string `json:"user_id"`
 		} `json:"items"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
@@ -397,8 +397,8 @@ func TestListAreaMemberships_AreaAdminSeesManagedAreasOnly(t *testing.T) {
 	}
 	var resp struct {
 		Items []struct {
-			UserID   string `json:"userId"`
-			AreaCode string `json:"areaCode"`
+			UserID   string `json:"user_id"`
+			AreaCode string `json:"area_code"`
 		} `json:"items"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
@@ -443,8 +443,8 @@ func TestListAreaMemberships_AreaAndRoleFilters(t *testing.T) {
 	}
 	var resp struct {
 		Items []struct {
-			UserID   string `json:"userId"`
-			AreaCode string `json:"areaCode"`
+			UserID   string `json:"user_id"`
+			AreaCode string `json:"area_code"`
 			Role     string `json:"role"`
 		} `json:"items"`
 	}
@@ -460,7 +460,7 @@ func TestGrantMembership_EmitsAudit(t *testing.T) {
 	h := newHarness(t)
 	h.verifier.seed(tenantAlpha, targetID)
 
-	body := `{"userId":"` + targetID + `","areaCode":"QMS","role":"author"}`
+	body := `{"user_id":"` + targetID + `","area_code":"QMS","role":"author"}`
 	req := adminReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, adminID)
 	rec := httptest.NewRecorder()
 	h.mux.ServeHTTP(rec, req)
@@ -485,8 +485,8 @@ func TestGrantMembership_EmitsAudit(t *testing.T) {
 	if ev.TenantID != tenantAlpha {
 		t.Errorf("tenantID=%q want %q", ev.TenantID, tenantAlpha)
 	}
-	if !strings.Contains(ev.PayloadJSON, `"areaCode":"QMS"`) || !strings.Contains(ev.PayloadJSON, `"role":"author"`) {
-		t.Errorf("payload missing areaCode/role: %s", ev.PayloadJSON)
+	if !strings.Contains(ev.PayloadJSON, `"area_code":"QMS"`) || !strings.Contains(ev.PayloadJSON, `"role":"author"`) {
+		t.Errorf("payload missing area_code/role: %s", ev.PayloadJSON)
 	}
 }
 
@@ -527,7 +527,7 @@ func TestGrantMembership_DuplicateReturns409(t *testing.T) {
 	h := newHarness(t)
 	h.verifier.seed(tenantAlpha, targetID)
 
-	body := `{"userId":"` + targetID + `","areaCode":"QMS","role":"author"}`
+	body := `{"user_id":"` + targetID + `","area_code":"QMS","role":"author"}`
 
 	// First grant — 201.
 	req1 := adminReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, adminID)
@@ -592,8 +592,8 @@ func TestListAreaMemberships_AreaScopedUnderTenantIsolation(t *testing.T) {
 	}
 	var resp struct {
 		Items []struct {
-			TenantID string `json:"tenantId"`
-			AreaCode string `json:"areaCode"`
+			TenantID string `json:"tenant_id"`
+			AreaCode string `json:"area_code"`
 		} `json:"items"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
@@ -618,7 +618,7 @@ func TestGrantMembership_AreaAdminReachesServiceAfterGateRemoval(t *testing.T) {
 	h := newHarness(t)
 	h.verifier.seed(tenantAlpha, targetID)
 
-	body := `{"userId":"` + targetID + `","areaCode":"QMS","role":"author"}`
+	body := `{"user_id":"` + targetID + `","area_code":"QMS","role":"author"}`
 	req := userReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, "area-admin-1", iamdomain.RoleAreaAdmin)
 	rec := httptest.NewRecorder()
 	h.mux.ServeHTTP(rec, req)
@@ -656,7 +656,7 @@ func TestGrantMembership_AreaAdminSelfGrantStill403(t *testing.T) {
 	h := newHarness(t)
 	h.verifier.seed(tenantAlpha, "area-admin-1")
 
-	body := `{"userId":"area-admin-1","areaCode":"QMS","role":"approver"}`
+	body := `{"user_id":"area-admin-1","area_code":"QMS","role":"approver"}`
 	req := userReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, "area-admin-1", iamdomain.RoleAreaAdmin)
 	rec := httptest.NewRecorder()
 	h.mux.ServeHTTP(rec, req)
@@ -677,7 +677,7 @@ func TestGrantMembership_RejectsSelfGrant(t *testing.T) {
 	h := newHarness(t)
 	h.verifier.seed(tenantAlpha, adminID)
 
-	body := `{"userId":"` + adminID + `","areaCode":"QMS","role":"approver"}`
+	body := `{"user_id":"` + adminID + `","area_code":"QMS","role":"approver"}`
 	req := adminReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, adminID)
 	rec := httptest.NewRecorder()
 	h.mux.ServeHTTP(rec, req)

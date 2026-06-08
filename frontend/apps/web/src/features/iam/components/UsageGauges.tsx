@@ -238,21 +238,21 @@ export default function UsageGauges() {
         id="storage"
         title="Armazenamento"
         subtitle="Capacidade"
-        used={data.storage.usedBytes}
-        allocated={data.storage.allocatedBytes}
+        used={data.storage.used_bytes}
+        allocated={data.storage.allocated_bytes}
         isBytes
-        hint={`${formatBytes(Math.max(0, data.storage.allocatedBytes - data.storage.usedBytes)).value} ${formatBytes(Math.max(0, data.storage.allocatedBytes - data.storage.usedBytes)).unit} livres.`}
+        hint={`${formatBytes(Math.max(0, data.storage.allocated_bytes - data.storage.used_bytes)).value} ${formatBytes(Math.max(0, data.storage.allocated_bytes - data.storage.used_bytes)).unit} livres.`}
       />
 
       <StatsCard
         id="active-users"
         title="Usuários ativos"
         subtitle="Janelas"
-        data={data.activeUsers}
+        data={data.active_users}
         hint={
           data.seats.allocated <= 0
-            ? `Ativos vs. licenciados em 30 dias: ${integerFormatter.format(data.activeUsers.last30d)} (sem assentos provisionados).`
-            : `Ativos vs. licenciados em 30 dias: ${integerFormatter.format(data.activeUsers.last30d)} de ${integerFormatter.format(data.seats.allocated)}.`
+            ? `Ativos vs. licenciados em 30 dias: ${integerFormatter.format(data.active_users.last30d)} (sem assentos provisionados).`
+            : `Ativos vs. licenciados em 30 dias: ${integerFormatter.format(data.active_users.last30d)} de ${integerFormatter.format(data.seats.allocated)}.`
         }
       />
 
@@ -260,7 +260,7 @@ export default function UsageGauges() {
         id="api-calls"
         title="Chamadas de API"
         subtitle="Janelas"
-        data={data.apiCalls}
+        data={data.api_calls}
         hint="Volume agregado de requisições ao tenant."
       />
 

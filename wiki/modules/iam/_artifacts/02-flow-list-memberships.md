@@ -1,4 +1,4 @@
-> **Last verified:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: handler rewritten to use `ListByTenant` with admin/non-admin scope split; line numbers updated throughout)
+> **Last verified:** 2026-06-08 (Phase E1 casing big-bang: membershipDTO response field names updated to snake_case; prior: 2026-06-03)
 
 ## 1. Entry point
 | Layer | Symbol | File:line |
@@ -32,7 +32,7 @@ Tripwire pairing: N/A (read)
 ## 5. Response shape
 - Tier-1 gate: `membership.view` (held by every role per ADR 0016; directory scope further gated by `isMembershipDirectoryAdmin` inside the handler)
 - 2xx schema ref: OpenAPI `listAreaMemberships` response — `AreaMembershipListResponse` (`{items: AreaMembershipRow[]}`)
-- Concrete handler payload: `200` JSON `{"items": [membershipDTO...]}` from `routes_memberships.go:145`; `membershipDTO` fields: `userId`, `tenantId`, `areaCode`, `role`, `effectiveFrom`, `effectiveTo`, `grantedBy`
+- Concrete handler payload: `200` JSON `{"items": [membershipDTO...]}` from `routes_memberships.go:145`; `membershipDTO` fields: `user_id`, `tenant_id`, `area_code`, `role`, `effective_from`, `effective_to`, `granted_by`
 - Error responses: RFC 9457 Problem via `problem.Write` (`routes_memberships.go:273`); middleware 403 via `{error:{code,message,trace_id}}`
 
 ## 6. Cross-references

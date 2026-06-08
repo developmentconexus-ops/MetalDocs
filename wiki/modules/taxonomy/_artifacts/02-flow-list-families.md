@@ -41,7 +41,7 @@ Upstream tier-1 capability gate: `apps/api/cmd/metaldocs-api/permissions.go:177`
 ## 5. Response shape
 
 - `200 OK`: `{"items": [DocumentFamily, ...]}` via `writeJSON(w, http.StatusOK, ...)` (`routes_families.go:31`).
-- Element: `domain.DocumentFamily` (`domain/family.go:8-14`) — `code, name, description, isActive, createdAt`.
+- Element: `domain.DocumentFamily` (`domain/family.go:8-14`) — `code, name, description, is_active, created_at`.
 - No `next_cursor` / pagination fields.
 - Error envelope (non-RFC9457): `{"code": "...", "message": "..."}` (`internal/platform/httpresponse/response.go:14-16`).
 

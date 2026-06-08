@@ -22,24 +22,24 @@ type Searcher interface {
 }
 
 type SearchDocumentResponse struct {
-	DocumentID       string   `json:"documentId"`
+	DocumentID       string   `json:"document_id"`
 	Title            string   `json:"title"`
-	DocumentType     string   `json:"documentType"`
-	DocumentProfile  string   `json:"documentProfile"`
-	DocumentFamily   string   `json:"documentFamily"`
-	DocumentSequence int      `json:"documentSequence"`
-	DocumentCode     string   `json:"documentCode"`
-	ProcessArea      string   `json:"processArea,omitempty"`
+	DocumentType     string   `json:"document_type"`
+	DocumentProfile  string   `json:"document_profile"`
+	DocumentFamily   string   `json:"document_family"`
+	DocumentSequence int      `json:"document_sequence"`
+	DocumentCode     string   `json:"document_code"`
+	ProcessArea      string   `json:"process_area,omitempty"`
 	Subject          string   `json:"subject,omitempty"`
-	OwnerID          string   `json:"ownerId"`
-	BusinessUnit     string   `json:"businessUnit,omitempty"`
+	OwnerID          string   `json:"owner_id"`
+	BusinessUnit     string   `json:"business_unit,omitempty"`
 	Department       string   `json:"department,omitempty"`
 	Classification   string   `json:"classification,omitempty"`
 	Status           string   `json:"status"`
 	Tags             []string `json:"tags,omitempty"`
-	EffectiveAt      string   `json:"effectiveAt,omitempty"`
-	ExpiryAt         string   `json:"expiryAt,omitempty"`
-	CreatedAt        string   `json:"createdAt"`
+	EffectiveAt      string   `json:"effective_at,omitempty"`
+	ExpiryAt         string   `json:"expiry_at,omitempty"`
+	CreatedAt        string   `json:"created_at"`
 }
 
 func NewHandler(service Searcher) *Handler {

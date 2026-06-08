@@ -1,6 +1,6 @@
 # Planned Endpoints — spec-ready sketches
 
-> **Last verified:** 2026-06-07 (captured during API Contract Hardening Phase C)
+> **Last verified:** 2026-06-08 (Phase E1: all schema field names normalised to snake_case; prior: 2026-06-07)
 > **Status:** NOT served. NOT in the live OpenAPI contract.
 > **Origin:** These four operations previously sat in `api/openapi/v1/openapi.yaml` as *published-but-unserved* paths (no runtime handler). Per [`api-contract-hardening.md`](api-contract-hardening.md) **OD-2** (remove-all unserved + backlog-the-planned), an OpenAPI spec must describe only what the API *serves*. They were removed from the live contract in **Phase C** (an unserved path is an OWASP API9 liability and a lie to every SDK/consumer), but — unlike the dead legacy-taxonomy bloc — these map to **real planned features**, so their intended shape is preserved here.
 
@@ -31,23 +31,23 @@ Mark a notification as read. Path param `notificationId` (string, required).
 
 Response `200` → `MarkNotificationReadResponse`. `404` if not found.
 
-### Notifications schemas (as captured)
+### Notifications schemas (as captured, casing normalised to snake_case per E1)
 
 ```yaml
 NotificationItem:
   type: object
-  required: [id, recipientUserId, eventType, resourceType, resourceId, title, message, status, createdAt]
+  required: [id, recipient_user_id, event_type, resource_type, resource_id, title, message, status, created_at]
   properties:
     id: { type: string }
-    recipientUserId: { type: string }
-    eventType: { type: string }
-    resourceType: { type: string }
-    resourceId: { type: string }
+    recipient_user_id: { type: string }
+    event_type: { type: string }
+    resource_type: { type: string }
+    resource_id: { type: string }
     title: { type: string }
     message: { type: string }
     status: { type: string, enum: [PENDING, SENT, READ] }
-    createdAt: { type: string, format: date-time }
-    readAt: { type: string, format: date-time }
+    created_at: { type: string, format: date-time }
+    read_at: { type: string, format: date-time }
 
 ListNotificationsResponse:
   type: object
@@ -59,11 +59,11 @@ ListNotificationsResponse:
 
 MarkNotificationReadResponse:
   type: object
-  required: [id, status, readAt]
+  required: [id, status, read_at]
   properties:
     id: { type: string }
     status: { type: string, enum: [READ] }
-    readAt: { type: string, format: date-time }
+    read_at: { type: string, format: date-time }
 ```
 
 ---
@@ -84,42 +84,42 @@ List the approval trail for a document. Capability: **`CapDocumentView`**.
 
 Path param `documentId`. Response `200` → `ListWorkflowApprovalsResponse`.
 
-### Workflow schemas (as captured)
+### Workflow schemas (as captured, casing normalised to snake_case per E1)
 
 ```yaml
 WorkflowTransitionRequest:
   type: object
-  required: [toStatus]
+  required: [to_status]
   properties:
-    toStatus: { type: string, enum: [DRAFT, IN_REVIEW, APPROVED, PUBLISHED, ARCHIVED] }
+    to_status: { type: string, enum: [DRAFT, IN_REVIEW, APPROVED, PUBLISHED, ARCHIVED] }
     reason: { type: string }
-    assignedReviewer: { type: string }
+    assigned_reviewer: { type: string }
 
 WorkflowTransitionResponse:
   type: object
-  required: [documentId, fromStatus, toStatus]
+  required: [document_id, from_status, to_status]
   properties:
-    documentId: { type: string }
-    fromStatus: { type: string }
-    toStatus: { type: string }
-    approvalId: { type: string }
-    approvalStatus: { type: string, enum: [PENDING, APPROVED, REJECTED] }
-    assignedReviewer: { type: string }
+    document_id: { type: string }
+    from_status: { type: string }
+    to_status: { type: string }
+    approval_id: { type: string }
+    approval_status: { type: string, enum: [PENDING, APPROVED, REJECTED] }
+    assigned_reviewer: { type: string }
 
 WorkflowApprovalItem:
   type: object
-  required: [approvalId, documentId, requestedBy, assignedReviewer, status, requestedAt]
+  required: [approval_id, document_id, requested_by, assigned_reviewer, status, requested_at]
   properties:
-    approvalId: { type: string }
-    documentId: { type: string }
-    requestedBy: { type: string }
-    assignedReviewer: { type: string }
-    decisionBy: { type: string }
+    approval_id: { type: string }
+    document_id: { type: string }
+    requested_by: { type: string }
+    assigned_reviewer: { type: string }
+    decision_by: { type: string }
     status: { type: string, enum: [PENDING, APPROVED, REJECTED] }
-    requestReason: { type: string }
-    decisionReason: { type: string }
-    requestedAt: { type: string, format: date-time }
-    decidedAt: { type: string, format: date-time }
+    request_reason: { type: string }
+    decision_reason: { type: string }
+    requested_at: { type: string, format: date-time }
+    decided_at: { type: string, format: date-time }
 
 ListWorkflowApprovalsResponse:
   type: object

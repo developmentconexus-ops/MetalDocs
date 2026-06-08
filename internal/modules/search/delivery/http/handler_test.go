@@ -190,8 +190,8 @@ func TestHandleSearchDocumentsResponseIncludesAdvertisedFields(t *testing.T) {
 	if got := item["subject"]; got != "legacy-subject" {
 		t.Fatalf("subject = %#v, want legacy-subject", got)
 	}
-	if got := item["businessUnit"]; got != "legacy-bu" {
-		t.Fatalf("businessUnit = %#v, want legacy-bu", got)
+	if got := item["business_unit"]; got != "legacy-bu" {
+		t.Fatalf("business_unit = %#v, want legacy-bu", got)
 	}
 	if got := item["classification"]; got != "INTERNAL" {
 		t.Fatalf("classification = %#v, want INTERNAL", got)

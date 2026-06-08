@@ -1,7 +1,7 @@
 ﻿# API Design System
 
 > **Status:** accepted 2026-05-10
-> **Last verified:** 2026-06-07 (Phase D error-envelope unification: RFC 9457 `Problem` is the only error shape — `ApiErrorEnvelope` retired; all error responses use the shared `#/components/responses/*` set; `ENVELOPE-DRIFT` is now BLOCKING. Prior: Phase C dead-path prune — Problem schema at openapi.yaml:4332; 2026-05-21)
+> **Last verified:** 2026-06-08 (Phase E1 payload-casing big-bang: every declared JSON property is now `snake_case` end-to-end (spec + 6 generated Go packages + generated FE types + hand-written Go structs/map emitters + FE adapters/tests); the blocking `CASING-DRIFT` rule locks it. One documented exemption: the `MDDM_NATIVE_EXPORT_ROLLOUT_PCT` feature-flag key. Prior: Phase D error-envelope unification — RFC 9457 `Problem` is the only error shape, `ApiErrorEnvelope` retired, `ENVELOPE-DRIFT` BLOCKING; Phase C dead-path prune; Problem schema at openapi.yaml; 2026-05-21)
 > **Scope:** API design conventions for v1     error envelope, pagination, idempotency, two-tier authz, list filtering, naming.
 > **Out of scope:** Adoption     Plan 2 migrates handlers, paths, and module names. Frontend wiring is in Plan 1 only for the shared parser; per-page adoption is Plan 2.
 > **Key files:**
@@ -35,7 +35,7 @@ MetalDocs exposes a growing HTTP surface across 7 modules. Without a shared cont
 | 4 | Body validation | oapi-codegen per-op generated validation (not reflection middleware) | `cfg.yaml` `validate-against-spec: true`; strict-decode `DisallowUnknownFields` |
 | 5 | Two-tier authz | `security` + `x-authz-area` in spec; enforced by Postgres tripwire | `authz.Require`; tripwire trigger; `AUTHZ-DRIFT` + `authz-call-present` + `tripwire-pairing` CI rules |
 | 6 | List filtering | Stripe-flat params + per-resource allowlist + typed parser | oapi-codegen `parameters` per op; `UNKNOWN_FILTER` code |
-| 7 | Mini-conventions | UUIDv4, ISO 8601 UTC, snake_case, plural kebab paths, positive booleans, null-vs-absent, UUID-only path IDs, Bearer JWT | Codified in spec; enforced by codegen type alignment |
+| 7 | Mini-conventions | UUIDv4, ISO 8601 UTC, snake_case, plural kebab paths, positive booleans, null-vs-absent, UUID-only path IDs, Bearer JWT | Codified in spec; payload casing enforced by the blocking `CASING-DRIFT` rule (Phase E1); codegen type alignment |
 
 ---
 
@@ -228,6 +228,7 @@ Five rules in `scripts/api-lint/`, running in the `api-design-system-lint` job o
 | Rule | File | What it checks |
 |---|---|---|
 | `ENVELOPE-DRIFT` | `spec_rules.go` | **BLOCKING (Phase D).** Every response     400 with a body resolves to `Problem` — inline or via a `#/components/responses/*` `$ref`. Exempt: description-only responses, `/health/*` probes, and reviewed `x-error-envelope-exempt` bodies |
+| `CASING-DRIFT` | `spec_rules.go` | **BLOCKING (Phase E1).** Every declared schema `properties:` key (components/schemas + inline bodies) matches `^[a-z][a-z0-9]*(_[a-z0-9]+)*$`. Exempt: RFC 9457 Problem fields (already lowercase) and the SCREAMING_SNAKE feature-flag key `MDDM_NATIVE_EXPORT_ROLLOUT_PCT` (env-var-mirrored constant). Does not walk free-form object content |
 | `PAGINATION-DRIFT` | `spec_rules.go` | Every `list*` op declares `cursor`/`limit` params; response includes `page.next_cursor` + `page.has_more` |
 | `AUTHZ-DRIFT` | `spec_rules.go` | Every op declares `security`; state-transition ops declare `x-authz-area` or escape hatch |
 | `authz-call-present` | `code_rules.go` | Each op with `x-authz-area` has a matching `authz.Require` call in the handler body |

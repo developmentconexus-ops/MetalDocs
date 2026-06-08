@@ -207,9 +207,9 @@ describe('InboxPage', () => {
 
   it('Abrir documento navigates to the modern editor route', async () => {
     vi.mocked(getActiveDocumentContext).mockResolvedValue({
-      documentId: 'doc-123',
-      contentHash: 'hash-123',
-      approvalInstanceId: 'inst-123',
+      document_id: 'doc-123',
+      content_hash: 'hash-123',
+      approval_instance_id: 'inst-123',
     } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
@@ -229,9 +229,9 @@ describe('InboxPage', () => {
 
   it('Abrir documento keeps navigation in modern editor flow', async () => {
     vi.mocked(getActiveDocumentContext).mockResolvedValue({
-      documentId: 'doc-modern',
-      contentHash: 'hash-modern',
-      approvalInstanceId: 'inst-modern',
+      document_id: 'doc-modern',
+      content_hash: 'hash-modern',
+      approval_instance_id: 'inst-modern',
     } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-modern' })], total: 1 },
@@ -270,10 +270,10 @@ describe('InboxPage', () => {
 
   it('approve action opens signoff flow only when active-document context is complete', async () => {
     vi.mocked(getActiveDocumentContext).mockResolvedValue({
-      documentId: 'doc-1',
-      contentHash: 'hash-1',
-      approvalInstanceId: 'inst-1',
-      revisionVersion: 0,
+      document_id: 'doc-1',
+      content_hash: 'hash-1',
+      approval_instance_id: 'inst-1',
+      revision_version: 0,
     } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
@@ -314,10 +314,10 @@ describe('InboxPage', () => {
     const refetchSpy = vi.fn().mockResolvedValue(undefined);
     vi.mocked(signoff).mockResolvedValue(undefined as never);
     vi.mocked(getActiveDocumentContext).mockResolvedValue({
-      documentId: 'doc-1',
-      contentHash: 'hash-1',
-      approvalInstanceId: 'inst-1',
-      revisionVersion: 0,
+      document_id: 'doc-1',
+      content_hash: 'hash-1',
+      approval_instance_id: 'inst-1',
+      revision_version: 0,
     } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },

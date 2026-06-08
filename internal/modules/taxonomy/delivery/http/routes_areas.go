@@ -15,9 +15,9 @@ type areaUpsertRequest struct {
 	Code                string  `json:"code"`
 	Name                string  `json:"name"`
 	Description         string  `json:"description"`
-	ParentCode          *string `json:"parentCode"`
-	OwnerUserID         *string `json:"ownerUserId"`
-	DefaultApproverRole *string `json:"defaultApproverRole"`
+	ParentCode          *string `json:"parent_code"`
+	OwnerUserID         *string `json:"owner_user_id"`
+	DefaultApproverRole *string `json:"default_approver_role"`
 }
 
 func (h *Handler) listAreas(w http.ResponseWriter, r *http.Request) {

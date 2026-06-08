@@ -36,23 +36,23 @@ export function buildVisibilityPayload(
   state: WizardState,
 ): components['schemas']['ControlledDocumentVisibility'] {
   if (state.visibility === 'company') {
-    return { scope: 'company', areaCodes: [], userIds: [] };
+    return { scope: 'company', area_codes: [], user_ids: [] };
   }
   if (state.visibility === 'area') {
     return {
       scope: 'restricted',
-      areaCodes: state.visibilityAreaCodes,
-      userIds: [],
+      area_codes: state.visibilityAreaCodes,
+      user_ids: [],
     };
   }
   if (state.visibility === 'people') {
     return {
       scope: 'restricted',
-      areaCodes: state.visibilityAreaCodes,
-      userIds: state.invitees.map((row) => row.id),
+      area_codes: state.visibilityAreaCodes,
+      user_ids: state.invitees.map((row) => row.id),
     };
   }
-  return { scope: 'company', areaCodes: [], userIds: [] };
+  return { scope: 'company', area_codes: [], user_ids: [] };
 }
 
 function initialStateFromUrl(searchParams: URLSearchParams): WizardState {
@@ -115,8 +115,8 @@ export function NewDocumentWizardPage(): JSX.Element {
   );
   const blankTemplateSelected =
     blankTemplate !== null &&
-    state.templateID === blankTemplate.templateId &&
-    state.templateVersionID === blankTemplate.templateVersionId;
+    state.templateID === blankTemplate.template_id &&
+    state.templateVersionID === blankTemplate.template_version_id;
 
   // Derived: URL pre-filled `?profile=X` but profile is not in the loaded list.
   // TanStack Query v5 keeps isSuccess=true after first successful fetch (background refetches
@@ -155,12 +155,12 @@ export function NewDocumentWizardPage(): JSX.Element {
     }) => {
       return createControlledDocumentAtomic(
         {
-          profileCode: input.profileCode,
-          processAreaCode: input.areaCode,
+          profile_code: input.profileCode,
+          process_area_code: input.areaCode,
           title: input.title,
-          ownerUserId: input.ownerUserId,
-          documentName: input.title,
-          templateVersionId: input.templateVersionID,
+          owner_user_id: input.ownerUserId,
+          document_name: input.title,
+          template_version_id: input.templateVersionID,
           visibility: input.visibility,
         },
         input.idempotencyKey,
@@ -286,8 +286,8 @@ export function NewDocumentWizardPage(): JSX.Element {
           onRetry={() => void templatesQuery.refetch()}
           selectedTemplateID={state.templateID}
           selectedVersionID={state.templateVersionID}
-          blankTemplateID={blankTemplate?.templateId ?? null}
-          blankTemplateVersionID={blankTemplate?.templateVersionId ?? null}
+          blankTemplateID={blankTemplate?.template_id ?? null}
+          blankTemplateVersionID={blankTemplate?.template_version_id ?? null}
           blankTemplateName={blankTemplate?.name ?? 'Em branco'}
           onSelect={(templateID, versionID) =>
             dispatch({ type: 'selectTemplate', templateID, templateVersionID: versionID })

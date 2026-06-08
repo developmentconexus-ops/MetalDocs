@@ -94,7 +94,7 @@ export default function SecuritySignalsList() {
             const count = readCount(s.evidence);
             return (
               <li
-                key={s.signalId}
+                key={s.signal_id}
                 className={`${styles.signal} ${sev.signal}`}
                 role="listitem"
               >
@@ -113,10 +113,10 @@ export default function SecuritySignalsList() {
                   ) : null}
                   <time
                     className={styles.time}
-                    dateTime={s.detectedAt}
-                    title={SP_DATE_TIME_FORMATTER.format(new Date(s.detectedAt))}
+                    dateTime={s.detected_at}
+                    title={SP_DATE_TIME_FORMATTER.format(new Date(s.detected_at))}
                   >
-                    {getRelativeTime(s.detectedAt)}
+                    {getRelativeTime(s.detected_at)}
                   </time>
                 </div>
               </li>

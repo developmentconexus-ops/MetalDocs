@@ -48,17 +48,17 @@ export default function UserMembershipsTable({ userId }: UserMembershipsTablePro
         </thead>
         <tbody>
           {items.map((m) => (
-            <tr key={`${m.areaCode}:${m.role}`}>
+            <tr key={`${m.area_code}:${m.role}`}>
               <td>
-                <span className={styles.code}>{m.areaCode}</span>
+                <span className={styles.code}>{m.area_code}</span>
               </td>
               <td>
                 <span className={styles.role}>{m.role}</span>
               </td>
               <td>
-                {m.grantedAt ? SP_DATE_FORMATTER.format(new Date(m.grantedAt)) : "—"}
+                {m.granted_at ? SP_DATE_FORMATTER.format(new Date(m.granted_at)) : "—"}
               </td>
-              <td>{m.grantedBy ?? "—"}</td>
+              <td>{m.granted_by ?? "—"}</td>
             </tr>
           ))}
         </tbody>

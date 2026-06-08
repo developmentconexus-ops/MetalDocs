@@ -34,8 +34,8 @@ const dateTimeFmt = new Intl.DateTimeFormat('pt-BR', {
 
 type ControlledDocumentVisibility = {
   scope: 'company' | 'restricted';
-  areaCodes: string[];
-  userIds: string[];
+  area_codes: string[];
+  user_ids: string[];
 };
 
 export function hasSettledSidebarIdentity(input: {
@@ -114,11 +114,11 @@ export function buildVisibilityLabel(
 ): string {
   if (!visibility) return EM_DASH;
   if (visibility.scope === 'company') return 'Toda empresa';
-  if (visibility.userIds.length > 0) {
-    return `Restrito (${visibility.userIds.length} usuarios, ${visibility.areaCodes.length} areas)`;
+  if (visibility.user_ids.length > 0) {
+    return `Restrito (${visibility.user_ids.length} usuarios, ${visibility.area_codes.length} areas)`;
   }
-  if (visibility.areaCodes.length === 0) return 'Restrito';
-  const areaNames = visibility.areaCodes.map((code) => resolveAreaLabel(code, areas));
+  if (visibility.area_codes.length === 0) return 'Restrito';
+  const areaNames = visibility.area_codes.map((code) => resolveAreaLabel(code, areas));
   return `Restrito a area ${areaNames.join(', ')}`;
 }
 

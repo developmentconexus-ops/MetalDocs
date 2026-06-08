@@ -84,7 +84,7 @@ export default function MembershipsTab() {
   const userLabelById = useMemo(() => {
     const map = new Map<string, string>();
     for (const u of usersQuery.data?.items ?? []) {
-      map.set(u.userId, u.displayName || u.username);
+      map.set(u.user_id, u.display_name || u.username);
     }
     return map;
   }, [usersQuery.data]);
@@ -92,12 +92,12 @@ export default function MembershipsTab() {
   const rows: ReadonlyArray<MembershipRow> = useMemo(() => {
     const items = membershipsQuery.data?.items ?? [];
     return items.map((m) => ({
-      userId: m.userId,
-      userLabel: userLabelById.get(m.userId) ?? m.userId,
-      areaCode: m.areaCode,
+      userId: m.user_id,
+      userLabel: userLabelById.get(m.user_id) ?? m.user_id,
+      areaCode: m.area_code,
       role: m.role,
-      effectiveFrom: m.effectiveFrom,
-      grantedBy: m.grantedBy,
+      effectiveFrom: m.effective_from,
+      grantedBy: m.granted_by,
     }));
   }, [membershipsQuery.data, userLabelById]);
 
@@ -115,7 +115,7 @@ export default function MembershipsTab() {
     const set = new Set<string>();
     for (const r of rows) set.add(r.areaCode);
     for (const u of usersQuery.data?.items ?? []) {
-      for (const m of u.areaMemberships ?? []) set.add(m.areaCode);
+      for (const m of u.area_memberships ?? []) set.add(m.area_code);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [rows, usersQuery.data]);
@@ -124,8 +124,8 @@ export default function MembershipsTab() {
     // Self-grant is blocked server-side (403); drop the current user from the
     // grant dropdown so the action never offers a guaranteed-failing target.
     return (usersQuery.data?.items ?? [])
-      .filter((u) => u.userId !== currentUserId)
-      .map((u) => ({ userId: u.userId, label: u.displayName || u.username }))
+      .filter((u) => u.user_id !== currentUserId)
+      .map((u) => ({ userId: u.user_id, label: u.display_name || u.username }))
       .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [usersQuery.data, currentUserId]);
 
@@ -196,7 +196,7 @@ export default function MembershipsTab() {
   };
 
   const handleGrantSubmit = (payload: GrantMembershipPayload) => {
-    grantMutation.mutate(payload, {
+    grantMutation.mutate({ user_id: payload.userId, area_code: payload.areaCode, role: payload.role }, {
       onSuccess: () => {
         toast.success(`Membership concedida em ${payload.areaCode}.`);
         closeGrant();

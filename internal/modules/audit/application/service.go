@@ -176,7 +176,7 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 			"filterSummary": filterSummary(filter),
 			"estimatedRows": estimatedRows,
 			"actualRows":    job.ActualRows,
-			"exportId":      job.ID,
+			"export_id":      job.ID,
 		}
 		if event, evErr := domain.NewEvent(job.TenantID, "audit_export", job.ID, actorID, "audit.export.requested", summary); evErr == nil {
 			_ = s.writer.Record(ctx, event)
@@ -264,22 +264,22 @@ func (s *Service) fetchAll(ctx context.Context, baseQuery domain.ListEventsQuery
 func filterPayload(q domain.ListEventsQuery) map[string]any {
 	out := map[string]any{}
 	if v := strings.TrimSpace(q.ActorID); v != "" {
-		out["actorId"] = v
+		out["actor_id"] = v
 	}
 	if v := strings.TrimSpace(q.Action); v != "" {
 		out["action"] = v
 	}
 	if v := strings.TrimSpace(q.ResourceType); v != "" {
-		out["resourceType"] = v
+		out["resource_type"] = v
 	}
 	if v := strings.TrimSpace(q.ResourceID); v != "" {
-		out["resourceId"] = v
+		out["resource_id"] = v
 	}
 	if !q.OccurredAfter.IsZero() {
-		out["occurredAfter"] = q.OccurredAfter.UTC().Format(time.RFC3339)
+		out["occurred_after"] = q.OccurredAfter.UTC().Format(time.RFC3339)
 	}
 	if !q.OccurredBefore.IsZero() {
-		out["occurredBefore"] = q.OccurredBefore.UTC().Format(time.RFC3339)
+		out["occurred_before"] = q.OccurredBefore.UTC().Format(time.RFC3339)
 	}
 	if v := strings.TrimSpace(q.Query); v != "" {
 		out["q"] = v

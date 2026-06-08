@@ -37,11 +37,11 @@ type metricItem struct {
 	Method          string `json:"method"`
 	Requests        uint64 `json:"requests"`
 	Errors          uint64 `json:"errors"`
-	DurationTotalMs uint64 `json:"durationTotalMs"`
-	AvgDurationMs   uint64 `json:"avgDurationMs"`
-	P50DurationMs   uint64 `json:"p50DurationMs"`
-	P95DurationMs   uint64 `json:"p95DurationMs"`
-	P99DurationMs   uint64 `json:"p99DurationMs"`
+	DurationTotalMs uint64 `json:"duration_total_ms"`
+	AvgDurationMs   uint64 `json:"avg_duration_ms"`
+	P50DurationMs   uint64 `json:"p50_duration_ms"`
+	P95DurationMs   uint64 `json:"p95_duration_ms"`
+	P99DurationMs   uint64 `json:"p99_duration_ms"`
 }
 
 func NewHTTPObservability(runtimeProvider ...RuntimeStatusProvider) *HTTPObservability {

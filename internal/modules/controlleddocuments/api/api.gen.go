@@ -116,12 +116,12 @@ func (e ListControlledDocumentsParamsStatus) Valid() bool {
 
 // ActiveDocumentResponse defines model for ActiveDocumentResponse.
 type ActiveDocumentResponse struct {
-	ApprovalInstanceId  *openapi_types.UUID                  `json:"approvalInstanceId,omitempty"`
-	ApprovalState       *ActiveDocumentResponseApprovalState `json:"approvalState,omitempty"`
-	ContentHash         *string                              `json:"contentHash,omitempty"`
-	DocumentId          *openapi_types.UUID                  `json:"documentId,omitempty"`
-	PublishedDocumentId *openapi_types.UUID                  `json:"publishedDocumentId,omitempty"`
-	RevisionVersion     *int                                 `json:"revisionVersion,omitempty"`
+	ApprovalInstanceId  *openapi_types.UUID                  `json:"approval_instance_id,omitempty"`
+	ApprovalState       *ActiveDocumentResponseApprovalState `json:"approval_state,omitempty"`
+	ContentHash         *string                              `json:"content_hash,omitempty"`
+	DocumentId          *openapi_types.UUID                  `json:"document_id,omitempty"`
+	PublishedDocumentId *openapi_types.UUID                  `json:"published_document_id,omitempty"`
+	RevisionVersion     *int                                 `json:"revision_version,omitempty"`
 }
 
 // ActiveDocumentResponseApprovalState defines model for ActiveDocumentResponse.ApprovalState.
@@ -129,25 +129,25 @@ type ActiveDocumentResponseApprovalState string
 
 // AtomicCreateResponse defines model for AtomicCreateResponse.
 type AtomicCreateResponse struct {
-	ControlledDocument ControlledDocument `json:"controlledDocument"`
+	ControlledDocument ControlledDocument `json:"controlled_document"`
 	Document           DocumentRef        `json:"document"`
 }
 
 // ControlledDocument defines model for ControlledDocument.
 type ControlledDocument struct {
 	Code                      string                       `json:"code"`
-	CreatedAt                 time.Time                    `json:"createdAt"`
-	DepartmentCode            *string                      `json:"departmentCode,omitempty"`
+	CreatedAt                 time.Time                    `json:"created_at"`
+	DepartmentCode            *string                      `json:"department_code,omitempty"`
 	Id                        openapi_types.UUID           `json:"id"`
-	OverrideTemplateVersionId *openapi_types.UUID          `json:"overrideTemplateVersionId,omitempty"`
-	OwnerUserId               string                       `json:"ownerUserId"`
-	ProcessAreaCode           string                       `json:"processAreaCode"`
-	ProfileCode               string                       `json:"profileCode"`
-	SequenceNum               *int                         `json:"sequenceNum,omitempty"`
+	OverrideTemplateVersionId *openapi_types.UUID          `json:"override_template_version_id,omitempty"`
+	OwnerUserId               string                       `json:"owner_user_id"`
+	ProcessAreaCode           string                       `json:"process_area_code"`
+	ProfileCode               string                       `json:"profile_code"`
+	SequenceNum               *int                         `json:"sequence_num,omitempty"`
 	Status                    ControlledDocumentStatus     `json:"status"`
-	TenantId                  openapi_types.UUID           `json:"tenantId"`
+	TenantId                  openapi_types.UUID           `json:"tenant_id"`
 	Title                     string                       `json:"title"`
-	UpdatedAt                 time.Time                    `json:"updatedAt"`
+	UpdatedAt                 time.Time                    `json:"updated_at"`
 	Visibility                ControlledDocumentVisibility `json:"visibility"`
 }
 
@@ -156,9 +156,9 @@ type ControlledDocumentStatus string
 
 // ControlledDocumentVisibility defines model for ControlledDocumentVisibility.
 type ControlledDocumentVisibility struct {
-	AreaCodes []string                          `json:"areaCodes"`
+	AreaCodes []string                          `json:"area_codes"`
 	Scope     ControlledDocumentVisibilityScope `json:"scope"`
-	UserIds   []string                          `json:"userIds"`
+	UserIds   []string                          `json:"user_ids"`
 }
 
 // ControlledDocumentVisibilityScope defines model for ControlledDocumentVisibility.Scope.
@@ -166,31 +166,31 @@ type ControlledDocumentVisibilityScope string
 
 // CreateAtomicRequest defines model for CreateAtomicRequest.
 type CreateAtomicRequest struct {
-	DepartmentCode            *string                      `json:"departmentCode,omitempty"`
-	DocumentName              string                       `json:"documentName"`
-	FormData                  *map[string]interface{}      `json:"formData,omitempty"`
-	ManualCode                *string                      `json:"manualCode,omitempty"`
-	ManualCodeReason          *string                      `json:"manualCodeReason,omitempty"`
-	OverrideTemplateReason    *string                      `json:"overrideTemplateReason,omitempty"`
-	OverrideTemplateVersionId *openapi_types.UUID          `json:"overrideTemplateVersionId,omitempty"`
-	OwnerUserId               string                       `json:"ownerUserId"`
-	ProcessAreaCode           string                       `json:"processAreaCode"`
-	ProfileCode               string                       `json:"profileCode"`
-	TemplateVersionId         *openapi_types.UUID          `json:"templateVersionId,omitempty"`
+	DepartmentCode            *string                      `json:"department_code,omitempty"`
+	DocumentName              string                       `json:"document_name"`
+	FormData                  *map[string]interface{}      `json:"form_data,omitempty"`
+	ManualCode                *string                      `json:"manual_code,omitempty"`
+	ManualCodeReason          *string                      `json:"manual_code_reason,omitempty"`
+	OverrideTemplateReason    *string                      `json:"override_template_reason,omitempty"`
+	OverrideTemplateVersionId *openapi_types.UUID          `json:"override_template_version_id,omitempty"`
+	OwnerUserId               string                       `json:"owner_user_id"`
+	ProcessAreaCode           string                       `json:"process_area_code"`
+	ProfileCode               string                       `json:"profile_code"`
+	TemplateVersionId         *openapi_types.UUID          `json:"template_version_id,omitempty"`
 	Title                     string                       `json:"title"`
 	Visibility                ControlledDocumentVisibility `json:"visibility"`
 }
 
 // CreateRevisionRequest defines model for CreateRevisionRequest.
 type CreateRevisionRequest struct {
-	FormData          *map[string]interface{} `json:"formData,omitempty"`
+	FormData          *map[string]interface{} `json:"form_data,omitempty"`
 	Name              string                  `json:"name"`
-	TemplateVersionId *openapi_types.UUID     `json:"templateVersionId,omitempty"`
+	TemplateVersionId *openapi_types.UUID     `json:"template_version_id,omitempty"`
 }
 
 // DocumentRef defines model for DocumentRef.
 type DocumentRef struct {
-	ContentHash string             `json:"contentHash"`
+	ContentHash string             `json:"content_hash"`
 	Id          openapi_types.UUID `json:"id"`
 }
 
@@ -205,10 +205,10 @@ type FieldError struct {
 
 // PreviewCodeResponse defines model for PreviewCodeResponse.
 type PreviewCodeResponse struct {
-	AreaCode    string `json:"areaCode"`
+	AreaCode    string `json:"area_code"`
 	Code        string `json:"code"`
-	NextSeq     int    `json:"nextSeq"`
-	ProfileCode string `json:"profileCode"`
+	NextSeq     int    `json:"next_seq"`
+	ProfileCode string `json:"profile_code"`
 }
 
 // Problem defines model for Problem.
@@ -220,7 +220,7 @@ type Problem struct {
 	Instance *string       `json:"instance,omitempty"`
 	Status   int           `json:"status"`
 	Title    string        `json:"title"`
-	Type     string        `json:"type"`
+	Type     *string       `json:"type,omitempty"`
 }
 
 // RevisionResponse defines model for RevisionResponse.
@@ -1482,52 +1482,52 @@ func (sh *strictHandler) SupersedeControlledDocument(w http.ResponseWriter, r *h
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"AP//",
+	"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",
+	"d/8LAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

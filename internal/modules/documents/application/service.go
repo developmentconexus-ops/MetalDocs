@@ -510,8 +510,8 @@ func (s *Service) ListDocumentsForUser(ctx context.Context, tenantID, userID str
 }
 
 type DocumentStats struct {
-	ByStatus map[string]int64 `json:"byStatus"`
-	ByArea   map[string]int64 `json:"byArea"`
+	ByStatus map[string]int64 `json:"by_status"`
+	ByArea   map[string]int64 `json:"by_area"`
 }
 
 func (s *Service) ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts ListOptions) ([]*domain.Document, int64, error) {

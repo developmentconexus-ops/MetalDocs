@@ -347,12 +347,12 @@ func TestAtomicCreate_MissingAuthContext_Returns401NotFullTenant(t *testing.T) {
 	spy := &spyControlledDocumentService{}
 	handler := &Handler{svc: spy}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
-		"documentName":"Policy v1",
-		"visibility":{"scope":"company","areaCodes":[],"userIds":[]},
-		"profileCode":"DC",
-		"processAreaCode":"RH",
+		"document_name":"Policy v1",
+		"visibility":{"scope":"company","area_codes":[],"user_ids":[]},
+		"profile_code":"DC",
+		"process_area_code":"RH",
 		"title":"Policy",
-		"ownerUserId":"user-1"
+		"owner_user_id":"user-1"
 	}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
@@ -390,11 +390,11 @@ func TestWriteDomainError_TemplateArtifactInvariantUnconfiguredIs500(t *testing.
 func TestAtomicCreate_MissingDocumentName_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyControlledDocumentService{}}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
-		"visibility":{"scope":"restricted","areaCodes":["RH"],"userIds":[]},
-		"profileCode":"DC",
-		"processAreaCode":"RH",
+		"visibility":{"scope":"restricted","area_codes":["RH"],"user_ids":[]},
+		"profile_code":"DC",
+		"process_area_code":"RH",
 		"title":"Policy",
-		"ownerUserId":"user-1"
+		"owner_user_id":"user-1"
 	}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
@@ -404,20 +404,20 @@ func TestAtomicCreate_MissingDocumentName_Returns400(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "documentName") {
-		t.Fatalf("body %q does not mention documentName", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), "document_name") {
+		t.Fatalf("body %q does not mention document_name", rec.Body.String())
 	}
 }
 
 func TestAtomicCreate_UnknownField_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyControlledDocumentService{}}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
-		"documentName":"Policy v1",
-		"visibility":{"scope":"restricted","areaCodes":["RH"],"userIds":[]},
-		"profileCode":"DC",
-		"processAreaCode":"RH",
+		"document_name":"Policy v1",
+		"visibility":{"scope":"restricted","area_codes":["RH"],"user_ids":[]},
+		"profile_code":"DC",
+		"process_area_code":"RH",
 		"title":"Policy",
-		"ownerUserId":"user-1",
+		"owner_user_id":"user-1",
 		"evilField":true
 	}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -435,7 +435,7 @@ func TestAtomicCreate_UnknownField_Returns400(t *testing.T) {
 
 func TestAtomicCreate_BodyTooLarge_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyControlledDocumentService{}}
-	oversized := `{"documentName":"` + strings.Repeat("x", int(maxControlledDocumentsJSONBodyBytes)) + `","visibility":{"scope":"company","areaCodes":[],"userIds":[]},"profileCode":"DC","processAreaCode":"RH","title":"Policy","ownerUserId":"user-1"}`
+	oversized := `{"document_name":"` + strings.Repeat("x", int(maxControlledDocumentsJSONBodyBytes)) + `","visibility":{"scope":"company","area_codes":[],"user_ids":[]},"profile_code":"DC","process_area_code":"RH","title":"Policy","owner_user_id":"user-1"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(oversized))
 	ctx := tenant.WithTenantID(req.Context(), "test-tenant")
 	ctx = iamdomain.WithAuthContext(ctx, "actor-test", []iamdomain.Role{iamdomain.RoleSystemAdmin})
@@ -453,14 +453,14 @@ func TestAtomicCreate_ForwardsGeneratedOnlyFields(t *testing.T) {
 	spy := &spyControlledDocumentService{}
 	handler := &Handler{svc: spy}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
-		"documentName":"Policy v1",
-		"visibility":{"scope":"company","areaCodes":[],"userIds":[]},
-		"profileCode":"DC",
-		"processAreaCode":"RH",
+		"document_name":"Policy v1",
+		"visibility":{"scope":"company","area_codes":[],"user_ids":[]},
+		"profile_code":"DC",
+		"process_area_code":"RH",
 		"title":"Policy",
-		"ownerUserId":"user-1",
-		"templateVersionId":"11111111-1111-1111-1111-111111111111",
-		"formData":{"summary":"hello","count":2}
+		"owner_user_id":"user-1",
+		"template_version_id":"11111111-1111-1111-1111-111111111111",
+		"form_data":{"summary":"hello","count":2}
 	}`))
 	ctx := tenant.WithTenantID(req.Context(), "test-tenant")
 	ctx = iamdomain.WithAuthContext(ctx, "actor-test", []iamdomain.Role{iamdomain.RoleSystemAdmin})
@@ -526,7 +526,7 @@ func TestListControlledDocuments_UsesGeneratedParams(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"items"`) {
 		t.Fatalf("body %q does not contain generated items response", rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), `"userIds":["user-2"]`) {
+	if !strings.Contains(rec.Body.String(), `"user_ids":["user-2"]`) {
 		t.Fatalf("body %q does not contain persisted visibility user grants", rec.Body.String())
 	}
 }
@@ -629,8 +629,8 @@ func TestCreateControlledDocumentRevision_UsesGeneratedBody(t *testing.T) {
 	cdID := "22222222-2222-2222-2222-222222222222"
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents/"+cdID+"/revisions", strings.NewReader(`{
 		"name":"Revision 2",
-		"templateVersionId":"33333333-3333-3333-3333-333333333333",
-		"formData":{"field":"value"}
+		"template_version_id":"33333333-3333-3333-3333-333333333333",
+		"form_data":{"field":"value"}
 	}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
@@ -690,7 +690,7 @@ func TestCreateControlledDocumentRevision_MissingName_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyControlledDocumentService{}}
 	cdID := "22222222-2222-2222-2222-222222222222"
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents/"+cdID+"/revisions", strings.NewReader(`{
-		"formData":{"field":"value"}
+		"form_data":{"field":"value"}
 	}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
@@ -811,8 +811,8 @@ func TestActiveDocumentResponse_IncludesApprovalInstanceID(t *testing.T) {
 	if err := json.Unmarshal(body, &got); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if got["approvalInstanceId"] != approvalInstanceID.String() {
-		t.Fatalf("approvalInstanceId = %v, want %s", got["approvalInstanceId"], approvalInstanceID)
+	if got["approval_instance_id"] != approvalInstanceID.String() {
+		t.Fatalf("approval_instance_id = %v, want %s", got["approval_instance_id"], approvalInstanceID)
 	}
 }
 
@@ -859,14 +859,14 @@ func TestActiveDocument_OnlyPublished_Returns200_WithPublishedID(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body["publishedDocumentId"] != publishedDocID {
-		t.Errorf("publishedDocumentId = %v, want %s", body["publishedDocumentId"], publishedDocID)
+	if body["published_document_id"] != publishedDocID {
+		t.Errorf("published_document_id = %v, want %s", body["published_document_id"], publishedDocID)
 	}
-	if _, ok := body["documentId"]; ok {
-		t.Errorf("documentId should be absent (omitempty), got %v", body["documentId"])
+	if _, ok := body["document_id"]; ok {
+		t.Errorf("document_id should be absent (omitempty), got %v", body["document_id"])
 	}
-	if _, ok := body["approvalState"]; ok {
-		t.Errorf("approvalState should be absent when no active document exists, got %v", body["approvalState"])
+	if _, ok := body["approval_state"]; ok {
+		t.Errorf("approval_state should be absent when no active document exists, got %v", body["approval_state"])
 	}
 }
 
@@ -912,14 +912,14 @@ func TestActiveDocument_BothActiveAndPublished_Returns200_WithBoth(t *testing.T)
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body["documentId"] != activeDocID {
-		t.Errorf("documentId = %v, want %s", body["documentId"], activeDocID)
+	if body["document_id"] != activeDocID {
+		t.Errorf("document_id = %v, want %s", body["document_id"], activeDocID)
 	}
-	if body["publishedDocumentId"] != publishedDocID {
-		t.Errorf("publishedDocumentId = %v, want %s", body["publishedDocumentId"], publishedDocID)
+	if body["published_document_id"] != publishedDocID {
+		t.Errorf("published_document_id = %v, want %s", body["published_document_id"], publishedDocID)
 	}
-	if _, ok := body["approvalInstanceId"]; ok {
-		t.Errorf("approvalInstanceId should be absent when no in-progress instance exists, got %v", body["approvalInstanceId"])
+	if _, ok := body["approval_instance_id"]; ok {
+		t.Errorf("approval_instance_id should be absent when no in-progress instance exists, got %v", body["approval_instance_id"])
 	}
 }
 
@@ -962,11 +962,11 @@ func TestActiveDocument_ScheduledActive_ReturnsScheduledState(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body["approvalState"] != approvalState {
-		t.Fatalf("approvalState = %v, want %s", body["approvalState"], approvalState)
+	if body["approval_state"] != approvalState {
+		t.Fatalf("approval_state = %v, want %s", body["approval_state"], approvalState)
 	}
-	if _, ok := body["approvalInstanceId"]; ok {
-		t.Errorf("approvalInstanceId should be absent when no in-progress instance exists, got %v", body["approvalInstanceId"])
+	if _, ok := body["approval_instance_id"]; ok {
+		t.Errorf("approval_instance_id should be absent when no in-progress instance exists, got %v", body["approval_instance_id"])
 	}
 }
 
@@ -1014,11 +1014,11 @@ func TestActiveDocument_UnderReview_ReturnsApprovalInstanceID(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body["approvalState"] != approvalState {
-		t.Fatalf("approvalState = %v, want %s", body["approvalState"], approvalState)
+	if body["approval_state"] != approvalState {
+		t.Fatalf("approval_state = %v, want %s", body["approval_state"], approvalState)
 	}
-	if body["approvalInstanceId"] != approvalInstanceID {
-		t.Fatalf("approvalInstanceId = %v, want %s", body["approvalInstanceId"], approvalInstanceID)
+	if body["approval_instance_id"] != approvalInstanceID {
+		t.Fatalf("approval_instance_id = %v, want %s", body["approval_instance_id"], approvalInstanceID)
 	}
 }
 
@@ -1069,6 +1069,9 @@ func TestActiveDocument_UnderReviewApprovalLookupFailure_Returns500(t *testing.T
 	}
 }
 
+// TestPreviewCode tests below use snake_case params which are query params (not JSON body)
+// so they don't need migration from the femap
+
 // TestPostControlledDocuments_MissingIdempotencyKey_400: POST to atomic-create
 // endpoint without Idempotency-Key header must return 400 with code IDEMPOTENCY_KEY_REQUIRED.
 func TestPostControlledDocuments_MissingIdempotencyKey_400(t *testing.T) {
@@ -1112,7 +1115,7 @@ func TestGetPreviewCode_200(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	for _, field := range []string{"profileCode", "areaCode", "nextSeq", "code"} {
+	for _, field := range []string{"profile_code", "area_code", "next_seq", "code"} {
 		if _, ok := body[field]; !ok {
 			t.Errorf("missing field %q in response: %s", field, rec.Body.String())
 		}

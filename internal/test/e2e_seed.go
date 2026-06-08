@@ -37,13 +37,13 @@ type seedHandler struct {
 }
 
 type seedRequest struct {
-	TenantID string   `json:"tenantId"`
+	TenantID string   `json:"tenant_id"`
 	DocID    string   `json:"docId"`
 	Roles    []string `json:"roles"`
 }
 
 type resetRequest struct {
-	TenantID string `json:"tenantId"`
+	TenantID string `json:"tenant_id"`
 }
 
 type governanceEventRow struct {
@@ -68,7 +68,7 @@ type seededUser struct {
 }
 
 type seedResponse struct {
-	TenantID string `json:"tenantId"`
+	TenantID string `json:"tenant_id"`
 	DocID    string `json:"docId"`
 	Users    struct {
 		Author   seededUser `json:"author"`

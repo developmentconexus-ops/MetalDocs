@@ -33,8 +33,8 @@ type loginRequest struct {
 }
 
 type changePasswordRequest struct {
-	CurrentPassword string `json:"currentPassword"`
-	NewPassword     string `json:"newPassword"`
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
 }
 
 func (r loginRequest) String() string {
@@ -86,7 +86,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, h.service.SessionCookie(session.RawToken, session.ExpiresAt))
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
 		"user":      session.CurrentUser,
-		"expiresAt": session.ExpiresAt.UTC().Format(time.RFC3339),
+		"expires_at": session.ExpiresAt.UTC().Format(time.RFC3339),
 	})
 	h.recordAudit(r, session.CurrentUser.UserID, "auth.login", session.CurrentUser.UserID, map[string]any{
 		"tenant_id": session.CurrentUser.TenantID,

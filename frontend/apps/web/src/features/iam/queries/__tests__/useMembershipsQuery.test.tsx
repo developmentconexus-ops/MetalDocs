@@ -46,12 +46,12 @@ describe("useMembershipsQuery", () => {
   it("calls the listing endpoint with the params as query and returns items", async () => {
     const items = [
       {
-        userId: "u-1",
-        tenantId: "t-1",
-        areaCode: "QUA",
+        user_id: "u-1",
+        tenant_id: "t-1",
+        area_code: "QUA",
         role: "editor",
-        effectiveFrom: "2026-01-01T00:00:00Z",
-        grantedBy: "admin",
+        effective_from: "2026-01-01T00:00:00Z",
+        granted_by: "admin",
       },
     ];
     mockGet.mockResolvedValue({ data: { items }, error: undefined });
@@ -62,7 +62,7 @@ describe("useMembershipsQuery", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.items).toHaveLength(1);
-    expect(result.current.data?.items[0].areaCode).toBe("QUA");
+    expect(result.current.data?.items[0].area_code).toBe("QUA");
     expect(mockGet).toHaveBeenCalledWith("/iam/area-memberships", {
       params: { query: { areaCode: "QUA" } },
     });

@@ -7,9 +7,9 @@ export type DerivedStatus = "active" | "pending" | "suspended" | "locked";
 
 export function deriveStatus(u: ManagedUser): DerivedStatus {
   const now = Date.now();
-  if (u.lockedUntil && new Date(u.lockedUntil).getTime() > now) return "locked";
-  if (!u.isActive) return "suspended";
-  if (u.mustChangePassword && !u.lastLoginAt) return "pending";
+  if (u.locked_until && new Date(u.locked_until).getTime() > now) return "locked";
+  if (!u.is_active) return "suspended";
+  if (u.must_change_password && !u.last_login_at) return "pending";
   return "active";
 }
 
@@ -38,18 +38,18 @@ const WINDOW_MS: Record<LastLoginFacet, number> = {
 
 export function matchesLastLogin(u: ManagedUser, facet?: LastLoginFacet): boolean {
   if (!facet) return true;
-  if (!u.lastLoginAt) return false;
-  const ageMs = Date.now() - new Date(u.lastLoginAt).getTime();
+  if (!u.last_login_at) return false;
+  const ageMs = Date.now() - new Date(u.last_login_at).getTime();
   return ageMs >= 0 && ageMs <= WINDOW_MS[facet];
 }
 
 export function matchesMfa(u: ManagedUser, facet?: "on" | "off"): boolean {
   if (!facet) return true;
-  const enabled = u.mfaEnabled === true;
+  const enabled = u.mfa_enabled === true;
   return facet === "on" ? enabled : !enabled;
 }
 
 export function matchesArea(u: ManagedUser, area?: string): boolean {
   if (!area) return true;
-  return u.areaMemberships.some((m) => m.areaCode === area);
+  return u.area_memberships.some((m) => m.area_code === area);
 }

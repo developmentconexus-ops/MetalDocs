@@ -106,7 +106,7 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, map[string]any{
-		"controlledDocument": res.ControlledDocument,
+		"controlled_document": res.ControlledDocument,
 		"document":           res.DocumentRef,
 	})
 }
@@ -129,15 +129,15 @@ func decodeStrictJSON(r *http.Request, dst any) error {
 func missingAtomicCreateField(req controlleddocumentsapi.CreateAtomicRequest) string {
 	switch {
 	case strings.TrimSpace(req.DocumentName) == "":
-		return "documentName"
+		return "document_name"
 	case strings.TrimSpace(req.ProfileCode) == "":
-		return "profileCode"
+		return "profile_code"
 	case strings.TrimSpace(req.ProcessAreaCode) == "":
-		return "processAreaCode"
+		return "process_area_code"
 	case strings.TrimSpace(req.Title) == "":
 		return "title"
 	case strings.TrimSpace(req.OwnerUserId) == "":
-		return "ownerUserId"
+		return "owner_user_id"
 	case strings.TrimSpace(string(req.Visibility.Scope)) == "":
 		return "visibility.scope"
 	default:

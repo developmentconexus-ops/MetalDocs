@@ -46,20 +46,20 @@ func TestPasswordChangePreservesSessionAndClearsMustChangePassword(t *testing.T)
 	}
 	loginPayload := decodeMap(t, loginResp.Body.String())
 	userPayload := loginPayload["user"].(map[string]any)
-	if userPayload["mustChangePassword"] != true {
-		t.Fatalf("expected mustChangePassword=true on first login, got %#v", userPayload["mustChangePassword"])
+	if userPayload["must_change_password"] != true {
+		t.Fatalf("expected must_change_password=true on first login, got %#v", userPayload["must_change_password"])
 	}
 
 	sessionCookie := findCookie(t, loginResp.Result().Cookies(), cfg.SessionCookieName)
-	changeResp := performJSONRequest(t, handler, http.MethodPost, "/api/v1/auth/change-password", `{"newPassword":"abc12346"}`, sessionCookie)
+	changeResp := performJSONRequest(t, handler, http.MethodPost, "/api/v1/auth/change-password", `{"new_password":"abc12346"}`, sessionCookie)
 	if changeResp.Code != http.StatusOK {
 		t.Fatalf("expected change password 200, got %d body=%s", changeResp.Code, changeResp.Body.String())
 	}
 
 	changePayload := decodeMap(t, changeResp.Body.String())
 	rotatedUser := changePayload["user"].(map[string]any)
-	if rotatedUser["mustChangePassword"] != false {
-		t.Fatalf("expected mustChangePassword=false after password change, got %#v", rotatedUser["mustChangePassword"])
+	if rotatedUser["must_change_password"] != false {
+		t.Fatalf("expected must_change_password=false after password change, got %#v", rotatedUser["must_change_password"])
 	}
 
 	meResp := performJSONRequest(t, handler, http.MethodGet, "/api/v1/auth/me", "", sessionCookie)
@@ -78,8 +78,8 @@ func TestPasswordChangePreservesSessionAndClearsMustChangePassword(t *testing.T)
 	}
 	newLoginPayload := decodeMap(t, newLoginResp.Body.String())
 	newUserPayload := newLoginPayload["user"].(map[string]any)
-	if newUserPayload["mustChangePassword"] != false {
-		t.Fatalf("expected mustChangePassword=false after relogin, got %#v", newUserPayload["mustChangePassword"])
+	if newUserPayload["must_change_password"] != false {
+		t.Fatalf("expected must_change_password=false after relogin, got %#v", newUserPayload["must_change_password"])
 	}
 }
 

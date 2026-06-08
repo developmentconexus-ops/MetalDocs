@@ -1,6 +1,6 @@
 # Documents + Approval Deep QA Matrix
 
-Date: 2026-05-20
+Date: 2026-05-20 (field names updated to snake_case 2026-06-08 per Phase E1)
 Status: active execution artifact
 Canonical home: `wiki/quality/deep-qa/matrix.md`
 Compatibility path: `wiki/references/documents-approval-deep-qa/matrix.md`
@@ -25,20 +25,20 @@ Each non-proved scenario must record:
 - Governed history comes from `documents` lineage by `controlled_document_id`.
 - `document_revisions` is technical autosave/artifact history only.
 - `revision_title` belongs to `documents` and is born at finalize / submit-for-review.
-- `GET /api/v1/controlled-documents/{id}/active-document` uses `documents.status` as the source of truth for `approvalState`.
-- `approvalInstanceId` is enriched only for `under_review` and secondary lookup failures are explicit `500`.
+- `GET /api/v1/controlled-documents/{id}/active-document` uses `documents.status` as the source of truth for `approval_state`.
+- `approval_instance_id` is enriched only for `under_review` and secondary lookup failures are explicit `500`.
 - Published replacement lineage uses `documents.superseded_document_id` and scheduler cutover transitions old head to `superseded`.
 
 ## Scenario matrix
 
 | ID | Category | Scenario | Owner Boundary | Preconditions | Action | Expected result | Evidence Standard | Status | Classification | Artifact Links |
 |---|---|---|---|---|---|---|---|---|---|---|
-| R1 | Route truth | Publish-only controlled document | `documents active-document route` | CD has latest `published`; no active sibling | GET `active-document` | 200 with `publishedDocumentId`; no `documentId`; no `approvalState`; no `approvalInstanceId` | runtime |  |  |  |
-| R2 | Route truth | Draft sibling active | `documents active-document route` | CD has `draft` + prior `published` | GET `active-document` | 200 with active `documentId`, `approvalState=draft`, `publishedDocumentId`; no approval lookup side effects | runtime |  |  |  |
-| R3 | Route truth | Under-review sibling active | `documents active-document route` | CD has `under_review` and single `in_progress` approval instance | GET `active-document` | 200 with `approvalState=under_review` and `approvalInstanceId` | runtime |  |  |  |
-| R4 | Route truth | Approved sibling active before publish | `documents active-document route` | CD has `approved` + prior `published` | GET `active-document` | 200 with `approvalState=approved`; no `approvalInstanceId` | runtime |  |  |  |
-| R5 | Route truth | Scheduled sibling active | `documents active-document route` | CD has `scheduled` + prior `published` | GET `active-document` | 200 with `approvalState=scheduled`; no `approvalInstanceId` | runtime |  |  |  |
-| R6 | Route truth | Rejected sibling active | `documents active-document route` | CD has `rejected` + prior `published` | GET `active-document` | 200 with `approvalState=rejected`; no `approvalInstanceId` | runtime |  |  |  |
+| R1 | Route truth | Publish-only controlled document | `documents active-document route` | CD has latest `published`; no active sibling | GET `active-document` | 200 with `published_document_id`; no `document_id`; no `approval_state`; no `approval_instance_id` | runtime |  |  |  |
+| R2 | Route truth | Draft sibling active | `documents active-document route` | CD has `draft` + prior `published` | GET `active-document` | 200 with active `document_id`, `approval_state=draft`, `published_document_id`; no approval lookup side effects | runtime |  |  |  |
+| R3 | Route truth | Under-review sibling active | `documents active-document route` | CD has `under_review` and single `in_progress` approval instance | GET `active-document` | 200 with `approval_state=under_review` and `approval_instance_id` | runtime |  |  |  |
+| R4 | Route truth | Approved sibling active before publish | `documents active-document route` | CD has `approved` + prior `published` | GET `active-document` | 200 with `approval_state=approved`; no `approval_instance_id` | runtime |  |  |  |
+| R5 | Route truth | Scheduled sibling active | `documents active-document route` | CD has `scheduled` + prior `published` | GET `active-document` | 200 with `approval_state=scheduled`; no `approval_instance_id` | runtime |  |  |  |
+| R6 | Route truth | Rejected sibling active | `documents active-document route` | CD has `rejected` + prior `published` | GET `active-document` | 200 with `approval_state=rejected`; no `approval_instance_id` | runtime |  |  |  |
 | R7 | Route failure | Under-review enrichment query fails | `documents active-document route` | Active row is `under_review`; DB error on approval lookup | GET `active-document` | 500 `INTERNAL_ERROR`; no silent omission | runtime |  |  |  |
 | R8 | Route failure | No active or published lineage row | `documents active-document route` | CD has no documents | GET `active-document` | 404 `NO_ACTIVE_INSTANCE` | runtime |  |  |  |
 | C1 | Canonical screen | Published doc starts revision | `canonical /documents/:id screen` | Viewing `/documents/:id` for `published` doc, no active sibling | Click `Iniciar revisao` | Composer opens with `Nome do documento` prefilled from current name | runtime+api |  |  |  |

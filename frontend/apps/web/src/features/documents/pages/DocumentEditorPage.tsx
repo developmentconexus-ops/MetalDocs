@@ -69,9 +69,9 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       status: submitStatusOverride,
     };
   }, [baseDoc, submitStatusOverride]);
-  const docStatus = doc?.Status ?? '';
+  const docStatus = doc?.status ?? '';
   const session = useDocumentSession(documentID, { enabled: docStatus === 'draft' });
-  const controlledDocumentId = doc?.ControlledDocumentID ?? '';
+  const controlledDocumentId = doc?.controlled_document_id ?? '';
   const profilesQuery = useProfilesQuery();
   const areasQuery = useAreasQuery();
   const controlledDocumentQuery = useControlledDocumentDetailQuery(controlledDocumentId);
@@ -82,7 +82,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   }, [documentID]);
 
   useEffect(() => {
-    if ((baseDoc?.Status ?? '') !== 'draft') {
+    if ((baseDoc?.status ?? '') !== 'draft') {
       setSubmitStatusOverride(null);
     }
   }, [baseDoc]);
@@ -107,14 +107,14 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       return;
     }
 
-    const name = doc.Name ?? 'Document';
-    const revisionID = doc.CurrentRevisionID ?? '';
+    const name = doc.name ?? 'Document';
+    const revisionID = doc.current_revision_id ?? '';
     let cancelled = false;
 
     setDocumentName(name);
     setArtifactMetadata({
-      fileSizeBytes: doc.currentRevisionFileSizeBytes ?? null,
-      pageCount: doc.currentRevisionPageCount ?? null,
+      fileSizeBytes: doc.current_revision_file_size_bytes ?? null,
+      pageCount: doc.current_revision_page_count ?? null,
     });
     setEditorLoadError(null);
     setBuffer(undefined);
@@ -237,7 +237,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   async function handleSave(buf: ArrayBuffer) {
     if (!doc) return;
     const pageCount = editorRef.current?.getPageCount() ?? null;
-    await autosave.queue(buf, doc.FormDataJSON ?? null, pageCount);
+    await autosave.queue(buf, doc.form_data_json ?? null, pageCount);
     setEditorDirty(false);
   }
 
@@ -256,7 +256,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
         const latestBuf = await editorRef.current?.saveNow();
         if (latestBuf) {
           const pageCount = editorRef.current?.getPageCount() ?? null;
-          await autosave.queue(latestBuf, doc.FormDataJSON ?? null, pageCount);
+          await autosave.queue(latestBuf, doc.form_data_json ?? null, pageCount);
         }
         const flushOk = await autosave.flush();
         if (!flushOk) {
@@ -266,7 +266,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
         setEditorDirty(false);
       }
       const trimmedRevisionTitle = revisionTitle?.trim();
-      await finalizeDocument(documentID, trimmedRevisionTitle ? { revisionTitle: trimmedRevisionTitle } : {});
+      await finalizeDocument(documentID, trimmedRevisionTitle ? { revision_title: trimmedRevisionTitle } : {});
       setSubmitStatusOverride('under_review');
       queryClient.setQueryData(QK.documents.detail(documentID), (current: DocumentDetail | undefined) => {
         if (!current) return current;
@@ -317,7 +317,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   }
 
   function handleFinalize() {
-    if ((doc?.RevisionNumber ?? 0) === 0) {
+    if ((doc?.revision_number ?? 0) === 0) {
       void submitForReview();
       return;
     }
@@ -342,10 +342,10 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   });
   const canEditContent = session.state.phase === 'writer' && docStatus === 'draft';
   const canComment = Boolean(doc) && (docStatus === 'draft' || docStatus === 'under_review' || docStatus === 'rejected');
-  const docCode = doc?.Code ?? '';
-  const revisionBadge = doc?.RevisionNumber != null ? formatRevisionCode(doc.RevisionNumber) : null;
+  const docCode = doc?.code ?? '';
+  const revisionBadge = doc?.revision_number != null ? formatRevisionCode(doc.revision_number) : null;
   const displayName = documentName.replace(/\.docx$/i, '');
-  const userID = doc?.CreatedBy ?? '';
+  const userID = doc?.created_by ?? '';
   const authorDisplay = String(userID);
   const commentsHook = useDocumentComments(documentID, authorDisplay);
   const canUseComments = canComment && !commentsHook.loadError;
@@ -372,11 +372,11 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     return (allowed as string[]).includes(docStatus) ? (docStatus as DocumentStatus) : null;
   })();
 
-  const profileLabel = doc?.ProfileCodeSnapshot && profilesQuery.data
-    ? resolveProfileLabel(doc.ProfileCodeSnapshot, profilesQuery.data)
+  const profileLabel = doc?.profile_code_snapshot && profilesQuery.data
+    ? resolveProfileLabel(doc.profile_code_snapshot, profilesQuery.data)
     : null;
-  const areaLabel = doc?.ProcessAreaCodeSnapshot && areasQuery.data
-    ? resolveAreaLabel(doc.ProcessAreaCodeSnapshot, areasQuery.data)
+  const areaLabel = doc?.process_area_code_snapshot && areasQuery.data
+    ? resolveAreaLabel(doc.process_area_code_snapshot, areasQuery.data)
     : null;
   const visibilityLabel = areasQuery.data && controlledDocumentQuery.data?.visibility
     ? buildVisibilityLabel(controlledDocumentQuery.data.visibility, areasQuery.data)
@@ -388,12 +388,12 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     visibilityLabel,
   });
   const sidebarHistory = (revisionHistoryQuery.data?.items ?? []).map((item) => ({
-    documentId: item.documentId,
-    revisionCode: formatRevisionCode(item.revisionNumber),
-    revisionTitle: item.revisionTitle,
+    documentId: item.document_id,
+    revisionCode: formatRevisionCode(item.revision_number),
+    revisionTitle: item.revision_title,
     status: item.status,
-    createdAt: item.createdAt,
-    isCurrent: item.isCurrent,
+    createdAt: item.created_at,
+    isCurrent: item.is_current,
   }));
 
   return (

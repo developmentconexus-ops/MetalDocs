@@ -21,7 +21,7 @@ export default function UserSessionsTable({ userId }: UserSessionsTableProps) {
   const bulkRevoke = useBulkUsersMutation();
 
   const userSessions = useMemo(
-    () => (data?.items ?? []).filter((s) => s.userId === userId),
+    () => (data?.items ?? []).filter((s) => s.user_id === userId),
     [data, userId],
   );
 
@@ -46,7 +46,7 @@ export default function UserSessionsTable({ userId }: UserSessionsTableProps) {
     // Optimistic: drop locally first.
     qc.setQueryData(QK.iam.sessions({ limit: 200 }), {
       ...data,
-      items: previousList.filter((s) => s.sessionId !== sessionId),
+      items: previousList.filter((s) => s.session_id !== sessionId),
     });
     revoke.mutate(sessionId, {
       onError: (err) => {
@@ -108,34 +108,34 @@ export default function UserSessionsTable({ userId }: UserSessionsTableProps) {
           </thead>
           <tbody>
             {userSessions.map((s) => (
-              <tr key={s.sessionId}>
+              <tr key={s.session_id}>
                 <td className={styles.device}>
-                  {s.deviceLabel ?? s.userAgent ?? "Dispositivo desconhecido"}
+                  {s.device_label ?? s.user_agent ?? "Dispositivo desconhecido"}
                 </td>
                 <td>
-                  <span className={styles.ip}>{s.ipAddress ?? "—"}</span>
+                  <span className={styles.ip}>{s.ip_address ?? "—"}</span>
                 </td>
                 <td>
                   <span
                     className={styles.time}
-                    title={SP_DATE_TIME_FORMATTER.format(new Date(s.createdAt))}
+                    title={SP_DATE_TIME_FORMATTER.format(new Date(s.created_at))}
                   >
-                    {getRelativeTime(s.createdAt)}
+                    {getRelativeTime(s.created_at)}
                   </span>
                 </td>
                 <td>
                   <span
                     className={styles.time}
-                    title={SP_DATE_TIME_FORMATTER.format(new Date(s.lastSeenAt))}
+                    title={SP_DATE_TIME_FORMATTER.format(new Date(s.last_seen_at))}
                   >
-                    {getRelativeTime(s.lastSeenAt)}
+                    {getRelativeTime(s.last_seen_at)}
                   </span>
                 </td>
                 <td>
                   <button
                     type="button"
                     className={styles.revokeBtn}
-                    onClick={() => handleRevoke(s.sessionId)}
+                    onClick={() => handleRevoke(s.session_id)}
                     disabled={revoke.isPending}
                     aria-label="Revogar esta sessão"
                   >

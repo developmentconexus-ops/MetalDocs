@@ -1853,9 +1853,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [instanceId]
+                required: [instance_id]
                 properties:
-                  instanceId: { type: string, format: uuid }
+                  instance_id: { type: string, format: uuid }
         '409': { description: invalid_state_transition }
   /documents/{id}/archive:
     post:
@@ -2583,22 +2583,22 @@ components:
           type: string
     CurrentUser:
       type: object
-      required: [userId, tenantId, tenantName, username, displayName, mustChangePassword, roles, capabilities]
+      required: [user_id, tenant_id, tenant_name, username, display_name, must_change_password, roles, capabilities]
       properties:
-        userId:
+        user_id:
           type: string
-        tenantId:
+        tenant_id:
           type: string
           format: uuid
-        tenantName:
+        tenant_name:
           type: string
         username:
           type: string
         email:
           type: string
-        displayName:
+        display_name:
           type: string
-        mustChangePassword:
+        must_change_password:
           type: boolean
         roles:
           type: array
@@ -2616,11 +2616,11 @@ components:
             type: string
     AuthLoginResponse:
       type: object
-      required: [user, expiresAt]
+      required: [user, expires_at]
       properties:
         user:
           $ref: '#/components/schemas/CurrentUser'
-        expiresAt:
+        expires_at:
           type: string
           format: date-time
     HealthCheckItem:
@@ -2651,12 +2651,12 @@ components:
             $ref: '#/components/schemas/HealthCheckItem'
     ChangePasswordRequest:
       type: object
-      required: [newPassword]
+      required: [new_password]
       properties:
-        currentPassword:
+        current_password:
           type: string
           description: Obrigatoria para troca de senha em sessao normal; opcional no fluxo de primeiro acesso com troca obrigatoria.
-        newPassword:
+        new_password:
           type: string
     ChangePasswordResponse:
       type: object
@@ -2672,39 +2672,39 @@ components:
       enum: [system_admin, approver, author, editor, viewer, signer, area_admin, qms_admin]
     AreaMembership:
       type: object
-      required: [userId, areaCode, role]
+      required: [user_id, area_code, role]
       properties:
-        userId: { type: string }
-        areaCode: { type: string }
+        user_id: { type: string }
+        area_code: { type: string }
         role: { $ref: '#/components/schemas/UserRole' }
-        grantedAt:
+        granted_at:
           type: string
           format: date-time
-        grantedBy:
+        granted_by:
           type: string
     AreaMembershipInput:
       type: object
-      required: [areaCode, role]
+      required: [area_code, role]
       properties:
-        areaCode: { type: string }
+        area_code: { type: string }
         role: { $ref: '#/components/schemas/UserRole' }
     AreaMembershipRow:
       type: object
       description: Active area membership row returned by the tenant-scoped /iam/area-memberships listing.
-      required: [userId, tenantId, areaCode, role, effectiveFrom]
+      required: [user_id, tenant_id, area_code, role, effective_from]
       properties:
-        userId: { type: string }
-        tenantId: { type: string }
-        areaCode: { type: string }
+        user_id: { type: string }
+        tenant_id: { type: string }
+        area_code: { type: string }
         role: { $ref: '#/components/schemas/UserRole' }
-        effectiveFrom:
+        effective_from:
           type: string
           format: date-time
-        effectiveTo:
+        effective_to:
           type: string
           format: date-time
           nullable: true
-        grantedBy:
+        granted_by:
           type: string
           nullable: true
     AreaMembershipListResponse:
@@ -2717,59 +2717,59 @@ components:
             $ref: '#/components/schemas/AreaMembershipRow'
     GrantAreaMembershipRequest:
       type: object
-      required: [userId, areaCode, role]
+      required: [user_id, area_code, role]
       properties:
-        userId: { type: string }
-        areaCode: { type: string }
+        user_id: { type: string }
+        area_code: { type: string }
         role: { $ref: '#/components/schemas/UserRole' }
     GrantAreaMembershipResponse:
       type: object
-      required: [userId, tenantId, areaCode, role]
+      required: [user_id, tenant_id, area_code, role]
       properties:
-        userId: { type: string }
-        tenantId: { type: string }
-        areaCode: { type: string }
+        user_id: { type: string }
+        tenant_id: { type: string }
+        area_code: { type: string }
         role: { $ref: '#/components/schemas/UserRole' }
     ManagedUserCore:
       type: object
       description: Canonical user shape — single tenantRole + multi area memberships.
       required:
-        - userId
+        - user_id
         - username
-        - displayName
-        - isActive
-        - mustChangePassword
-        - failedLoginAttempts
-        - tenantRole
-        - areaMemberships
-        - createdAt
-        - updatedAt
+        - display_name
+        - is_active
+        - must_change_password
+        - failed_login_attempts
+        - tenant_role
+        - area_memberships
+        - created_at
+        - updated_at
       properties:
-        userId: { type: string }
+        user_id: { type: string }
         username: { type: string }
         email: { type: string }
-        displayName: { type: string }
-        isActive: { type: boolean }
-        mustChangePassword: { type: boolean }
-        failedLoginAttempts: { type: integer }
-        lockedUntil:
+        display_name: { type: string }
+        is_active: { type: boolean }
+        must_change_password: { type: boolean }
+        failed_login_attempts: { type: integer }
+        locked_until:
           type: string
           format: date-time
-        lastLoginAt:
+        last_login_at:
           type: string
           format: date-time
-        tenantRole:
+        tenant_role:
           $ref: '#/components/schemas/UserRole'
-        areaMemberships:
+        area_memberships:
           type: array
           items:
             $ref: '#/components/schemas/AreaMembership'
-        mfaEnabled:
+        mfa_enabled:
           type: boolean
-        createdAt:
+        created_at:
           type: string
           format: date-time
-        updatedAt:
+        updated_at:
           type: string
           format: date-time
     CursorPage:
@@ -2796,31 +2796,31 @@ components:
           minimum: 0
     UserInviteRequest:
       type: object
-      required: [username, email, displayName, tenantRole]
+      required: [username, email, display_name, tenant_role]
       properties:
         username: { type: string, minLength: 1 }
         email: { type: string, format: email }
-        displayName: { type: string, minLength: 1 }
-        tenantRole: { $ref: '#/components/schemas/UserRole' }
-        areaMemberships:
+        display_name: { type: string, minLength: 1 }
+        tenant_role: { $ref: '#/components/schemas/UserRole' }
+        area_memberships:
           type: array
           items:
             $ref: '#/components/schemas/AreaMembershipInput'
     UserInviteResponse:
       type: object
-      required: [userId, tempPassword]
+      required: [user_id, temp_password]
       description: tempPassword is returned one-time only and never persisted plaintext.
       properties:
-        userId: { type: string }
-        tempPassword: { type: string }
+        user_id: { type: string }
+        temp_password: { type: string }
     UserBulkActionKind:
       type: string
       enum: [activate, deactivate, unlock, force-logout]
     UserBulkActionRequest:
       type: object
-      required: [userIds, action]
+      required: [user_ids, action]
       properties:
-        userIds:
+        user_ids:
           type: array
           minItems: 1
           maxItems: 500
@@ -2831,9 +2831,9 @@ components:
           type: string
     UserBulkActionFailure:
       type: object
-      required: [userId, code, message]
+      required: [user_id, code, message]
       properties:
-        userId: { type: string }
+        user_id: { type: string }
         code: { type: string }
         message: { type: string }
     UserBulkActionResult:
@@ -2912,30 +2912,30 @@ components:
     IamKpiSnapshot:
       type: object
       required:
-        - lockedAccounts
-        - mfaCoveragePct
-        - failedLogins24h
-        - dormantUsers30d
-        - roleDistribution
-        - auditEventsPerMinute
+        - locked_accounts
+        - mfa_coverage_pct
+        - failed_logins24h
+        - dormant_users30d
+        - role_distribution
+        - audit_events_per_minute
       properties:
-        lockedAccounts: { type: integer, minimum: 0 }
-        mfaCoveragePct: { type: number, minimum: 0, maximum: 100 }
-        failedLogins24h: { type: integer, minimum: 0 }
-        dormantUsers30d: { type: integer, minimum: 0 }
-        roleDistribution:
+        locked_accounts: { type: integer, minimum: 0 }
+        mfa_coverage_pct: { type: number, minimum: 0, maximum: 100 }
+        failed_logins24h: { type: integer, minimum: 0 }
+        dormant_users30d: { type: integer, minimum: 0 }
+        role_distribution:
           type: array
           items:
             $ref: '#/components/schemas/IamKpiRoleCount'
-        auditEventsPerMinute: { type: number, minimum: 0 }
+        audit_events_per_minute: { type: number, minimum: 0 }
     OnlinePresenceItem:
       type: object
-      required: [userId, username, displayName, lastSeenAt]
+      required: [user_id, username, display_name, last_seen_at]
       properties:
-        userId: { type: string }
+        user_id: { type: string }
         username: { type: string }
-        displayName: { type: string }
-        lastSeenAt:
+        display_name: { type: string }
+        last_seen_at:
           type: string
           format: date-time
     PresenceSnapshotResponse:
@@ -2948,7 +2948,7 @@ components:
             $ref: '#/components/schemas/OnlinePresenceItem'
     AdminOverviewResponse:
       type: object
-      required: [kpi, presence, recentActivities]
+      required: [kpi, presence, recent_activities]
       properties:
         kpi:
           $ref: '#/components/schemas/IamKpiSnapshot'
@@ -2956,21 +2956,21 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OnlinePresenceItem'
-        recentActivities:
+        recent_activities:
           type: array
           items:
             $ref: '#/components/schemas/AuditEventItem'
     CreateManagedUserRequest:
       type: object
-      required: [username, displayName, password, roles]
+      required: [username, display_name, password, roles]
       properties:
-        userId:
+        user_id:
           type: string
         username:
           type: string
         email:
           type: string
-        displayName:
+        display_name:
           type: string
         password:
           type: string
@@ -2983,9 +2983,9 @@ components:
             enum: [system_admin, approver, author, editor, viewer]
     CreateManagedUserResponse:
       type: object
-      required: [userId]
+      required: [user_id]
       properties:
-        userId:
+        user_id:
           type: string
     UpdateManagedUserRequest:
       type: object
@@ -2993,49 +2993,49 @@ components:
         Atomic metadata + tenant role update. All fields optional;
         server applies only the supplied subset in a single transaction.
       properties:
-        displayName:
+        display_name:
           type: string
         email:
           type: string
-        isActive:
+        is_active:
           type: boolean
-        newPassword:
+        new_password:
           type: string
-        mustChangePassword:
+        must_change_password:
           type: boolean
-        tenantRole:
+        tenant_role:
           $ref: '#/components/schemas/UserRole'
     ResetManagedUserPasswordRequest:
       type: object
-      required: [newPassword]
+      required: [new_password]
       properties:
-        newPassword:
+        new_password:
           type: string
     ResetManagedUserPasswordResponse:
       type: object
-      required: [userId, reset, mustChangePassword]
+      required: [user_id, reset, must_change_password]
       properties:
-        userId:
+        user_id:
           type: string
         reset:
           type: boolean
-        mustChangePassword:
+        must_change_password:
           type: boolean
     UnlockManagedUserResponse:
       type: object
-      required: [userId, unlocked]
+      required: [user_id, unlocked]
       properties:
-        userId:
+        user_id:
           type: string
         unlocked:
           type: boolean
     ReplaceUserRolesRequest:
       type: object
-      required: [displayName, roles]
+      required: [display_name, roles]
       properties:
-        displayName:
+        display_name:
           type: string
-        assignedBy:
+        assigned_by:
           type: string
         roles:
           type: array
@@ -3046,11 +3046,11 @@ components:
             enum: [system_admin, approver, author, editor, viewer]
     ReplaceUserRolesResponse:
       type: object
-      required: [userId, displayName, roles]
+      required: [user_id, display_name, roles]
       properties:
-        userId:
+        user_id:
           type: string
-        displayName:
+        display_name:
           type: string
         roles:
           type: array
@@ -3059,7 +3059,7 @@ components:
             enum: [system_admin, approver, author, editor, viewer]
     DocumentListResponse:
       type: object
-      required: [items, page, pageSize, total]
+      required: [items, page, page_size, total]
       properties:
         items:
           type: array
@@ -3067,7 +3067,7 @@ components:
             $ref: '#/components/schemas/DocumentSummary'
         page:
           type: integer
-        pageSize:
+        page_size:
           type: integer
         total:
           type: integer
@@ -3127,152 +3127,152 @@ components:
           format: date-time
     DocumentCheckpoint:
       type: object
-      required: [ID, DocumentID, RevisionID, VersionNum, Label, CreatedAt, CreatedBy]
+      required: [id, document_id, revision_id, version_num, label, created_at, created_by]
       properties:
-        ID:
+        id:
           type: string
           format: uuid
-        DocumentID:
+        document_id:
           type: string
           format: uuid
-        RevisionID:
+        revision_id:
           type: string
           format: uuid
-        VersionNum:
+        version_num:
           type: integer
           minimum: 1
-        Label:
+        label:
           type: string
-        CreatedAt:
+        created_at:
           type: string
           format: date-time
-        CreatedBy:
+        created_by:
           type: string
     DocumentSummary:
       type: object
-      required: [ID, TenantID, TemplateVersionID, Name, Status, FormDataJSON, CurrentRevisionID, RevisionVersion, RevisionNumber, ActiveSessionID, CreatedAt, UpdatedAt, CreatedBy, Code]
+      required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, revision_number, active_session_id, created_at, updated_at, created_by, code]
       properties:
-        ID:
+        id:
           type: string
-        TenantID:
+        tenant_id:
           type: string
-        TemplateVersionID:
+        template_version_id:
           type: string
-        Name:
+        name:
           type: string
-        Status:
+        status:
           type: string
           enum: [draft, under_review, approved, rejected, scheduled, published, superseded, obsolete]
-        FormDataJSON:
+        form_data_json:
           type: string
           format: byte
-        CurrentRevisionID:
+        current_revision_id:
           type: string
-        RevisionVersion:
+        revision_version:
           type: integer
           format: int64
-        RevisionNumber:
+        revision_number:
           type: integer
           format: int64
-        ActiveSessionID:
+        active_session_id:
           type: string
-        ValuesFrozenAt:
-          type: string
-          format: date-time
-          nullable: true
-        ArchivedAt:
+        values_frozen_at:
           type: string
           format: date-time
           nullable: true
-        CreatedAt:
+        archived_at:
           type: string
           format: date-time
-        UpdatedAt:
+          nullable: true
+        created_at:
           type: string
           format: date-time
-        CreatedBy:
+        updated_at:
           type: string
-        ControlledDocumentID:
+          format: date-time
+        created_by:
           type: string
-          nullable: true
-        RevisionTitle:
-          type: string
-          nullable: true
-        ProfileCodeSnapshot:
+        controlled_document_id:
           type: string
           nullable: true
-        ProcessAreaCodeSnapshot:
+        revision_title:
           type: string
           nullable: true
-        Code:
+        profile_code_snapshot:
+          type: string
+          nullable: true
+        process_area_code_snapshot:
+          type: string
+          nullable: true
+        code:
           type: string
     DocumentDetailResponse:
       type: object
-      required: [ID, TenantID, TemplateVersionID, Name, Status, FormDataJSON, CurrentRevisionID, RevisionVersion, ActiveSessionID, CreatedAt, UpdatedAt, CreatedBy, RevisionNumber, Code]
+      required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, active_session_id, created_at, updated_at, created_by, revision_number, code]
       properties:
-        ID:
+        id:
           type: string
-        TenantID:
+        tenant_id:
           type: string
-        TemplateVersionID:
+        template_version_id:
           type: string
-        Name:
+        name:
           type: string
-        Status:
+        status:
           type: string
-        FormDataJSON:
+        form_data_json:
           type: object
           additionalProperties: true
-        CurrentRevisionID:
+        current_revision_id:
           type: string
-        RevisionVersion:
+        revision_version:
           type: integer
           format: int64
-        ActiveSessionID:
+        active_session_id:
           type: string
-        ValuesFrozenAt:
-          type: string
-          format: date-time
-          nullable: true
-        ArchivedAt:
+        values_frozen_at:
           type: string
           format: date-time
           nullable: true
-        CreatedAt:
+        archived_at:
           type: string
           format: date-time
-        UpdatedAt:
+          nullable: true
+        created_at:
           type: string
           format: date-time
-        CreatedBy:
+        updated_at:
           type: string
-        RevisionNumber:
+          format: date-time
+        created_by:
+          type: string
+        revision_number:
           type: integer
           format: int64
-        ControlledDocumentID:
+        controlled_document_id:
           type: string
           nullable: true
-        RevisionTitle:
+        revision_title:
           type: string
           nullable: true
-        ProfileCodeSnapshot:
+        profile_code_snapshot:
           type: string
           nullable: true
-        ProcessAreaCodeSnapshot:
+        process_area_code_snapshot:
           type: string
           nullable: true
-        Code:
+        code:
           type: string
-        currentRevisionFileSizeBytes:
+        current_revision_file_size_bytes:
           type: integer
           format: int64
           minimum: 0
           nullable: true
-        currentRevisionPageCount:
+        current_revision_page_count:
           type: integer
           minimum: 1
           nullable: true
-        currentRevisionPageCountSource:
+        current_revision_page_count_source:
           type: string
           nullable: true
           enum: [eigenpal_client, server_renderer]
@@ -3337,14 +3337,14 @@ components:
           type: boolean
     DocumentStatsResponse:
       type: object
-      required: [byStatus, byArea]
+      required: [by_status, by_area]
       properties:
-        byStatus:
+        by_status:
           type: object
           additionalProperties:
             type: integer
             format: int64
-        byArea:
+        by_area:
           type: object
           additionalProperties:
             type: integer
@@ -3369,11 +3369,11 @@ components:
             $ref: '#/components/schemas/DocumentFamilyItem'
     DocumentProfileItem:
       type: object
-      required: [code, familyCode, name, description, reviewIntervalDays, activeSchemaVersion, workflowProfile, approvalRequired, retentionDays, validityDays]
+      required: [code, family_code, name, description, review_interval_days, active_schema_version, workflow_profile, approval_required, retention_days, validity_days]
       properties:
         code:
           type: string
-        familyCode:
+        family_code:
           type: string
         name:
           type: string
@@ -3383,20 +3383,20 @@ components:
           maxLength: 24
         description:
           type: string
-        reviewIntervalDays:
+        review_interval_days:
           type: integer
           minimum: 1
-        activeSchemaVersion:
+        active_schema_version:
           type: integer
           minimum: 1
-        workflowProfile:
+        workflow_profile:
           type: string
-        approvalRequired:
+        approval_required:
           type: boolean
-        retentionDays:
+        retention_days:
           type: integer
           minimum: 0
-        validityDays:
+        validity_days:
           type: integer
           minimum: 0
     ListDocumentProfilesResponse:
@@ -3427,25 +3427,25 @@ components:
             $ref: '#/components/schemas/ProcessAreaItem'
     AuditEventItem:
       type: object
-      required: [id, occurredAt, actorId, action, resourceType, resourceId, payload, traceId]
+      required: [id, occurred_at, actor_id, action, resource_type, resource_id, payload, trace_id]
       properties:
         id:
           type: string
-        occurredAt:
+        occurred_at:
           type: string
           format: date-time
-        actorId:
+        actor_id:
           type: string
         action:
           type: string
-        resourceType:
+        resource_type:
           type: string
-        resourceId:
+        resource_id:
           type: string
         payload:
           type: object
           additionalProperties: true
-        traceId:
+        trace_id:
           type: string
     ListAuditEventsResponse:
       type: object
@@ -3464,14 +3464,14 @@ components:
       type: object
       description: Multi-axis audit filter (mirrors GET /audit/events query params).
       properties:
-        actorId: { type: string }
+        actor_id: { type: string }
         action: { type: string }
-        resourceType: { type: string }
-        resourceId: { type: string }
-        occurredAfter:
+        resource_type: { type: string }
+        resource_id: { type: string }
+        occurred_after:
           type: string
           format: date-time
-        occurredBefore:
+        occurred_before:
           type: string
           format: date-time
         q: { type: string }
@@ -3486,41 +3486,41 @@ components:
         filter: { $ref: '#/components/schemas/AuditFilter' }
     AuditExportResponse:
       type: object
-      required: [exportId, signedUrl, expiresAt]
+      required: [export_id, signed_url, expires_at]
       properties:
-        exportId: { type: string }
-        signedUrl: { type: string, format: uri }
-        expiresAt:
+        export_id: { type: string }
+        signed_url: { type: string, format: uri }
+        expires_at:
           type: string
           format: date-time
     AuditExportStatusResponse:
       type: object
-      required: [exportId, status, signedUrl]
+      required: [export_id, status, signed_url]
       properties:
-        exportId: { type: string }
+        export_id: { type: string }
         status: { type: string }
-        signedUrl: { type: string, format: uri }
-        expiresAt:
+        signed_url: { type: string, format: uri }
+        expires_at:
           type: string
           format: date-time
         error: { type: string }
     SessionItem:
       type: object
-      required: [sessionId, userId, displayName, createdAt, lastSeenAt, expiresAt]
+      required: [session_id, user_id, display_name, created_at, last_seen_at, expires_at]
       properties:
-        sessionId: { type: string }
-        userId: { type: string }
-        displayName: { type: string }
-        ipAddress: { type: string }
-        userAgent: { type: string }
-        deviceLabel: { type: string }
-        createdAt:
+        session_id: { type: string }
+        user_id: { type: string }
+        display_name: { type: string }
+        ip_address: { type: string }
+        user_agent: { type: string }
+        device_label: { type: string }
+        created_at:
           type: string
           format: date-time
-        lastSeenAt:
+        last_seen_at:
           type: string
           format: date-time
-        expiresAt:
+        expires_at:
           type: string
           format: date-time
     ListSessionsResponse:
@@ -3538,37 +3538,37 @@ components:
           minimum: 0
     MfaCoverageRoleSlice:
       type: object
-      required: [role, total, mfaEnabled, pct]
+      required: [role, total, mfa_enabled, pct]
       properties:
         role: { $ref: '#/components/schemas/UserRole' }
         total: { type: integer, minimum: 0 }
-        mfaEnabled: { type: integer, minimum: 0 }
+        mfa_enabled: { type: integer, minimum: 0 }
         pct: { type: number, minimum: 0, maximum: 100 }
     MfaCoverage:
       type: object
-      required: [totalUsers, mfaEnabled, mfaEnabledPct, byRole]
+      required: [total_users, mfa_enabled, mfa_enabled_pct, by_role]
       properties:
-        totalUsers: { type: integer, minimum: 0 }
-        mfaEnabled: { type: integer, minimum: 0 }
-        mfaEnabledPct: { type: number, minimum: 0, maximum: 100 }
-        byRole:
+        total_users: { type: integer, minimum: 0 }
+        mfa_enabled: { type: integer, minimum: 0 }
+        mfa_enabled_pct: { type: number, minimum: 0, maximum: 100 }
+        by_role:
           type: array
           items:
             $ref: '#/components/schemas/MfaCoverageRoleSlice'
     LockoutItem:
       type: object
-      required: [userId, displayName, failedAttempts]
+      required: [user_id, display_name, failed_attempts]
       properties:
-        userId: { type: string }
-        displayName: { type: string }
-        lockedUntil:
+        user_id: { type: string }
+        display_name: { type: string }
+        locked_until:
           type: string
           format: date-time
-        failedAttempts: { type: integer, minimum: 0 }
-        lastFailedAt:
+        failed_attempts: { type: integer, minimum: 0 }
+        last_failed_at:
           type: string
           format: date-time
-        lastFailedIp: { type: string }
+        last_failed_ip: { type: string }
     ListLockoutsResponse:
       type: object
       required: [items]
@@ -3589,16 +3589,16 @@ components:
       enum: [info, warn, critical]
     SecuritySignal:
       type: object
-      required: [signalId, kind, severity, summary, detectedAt]
+      required: [signal_id, kind, severity, summary, detected_at]
       properties:
-        signalId: { type: string }
+        signal_id: { type: string }
         kind: { $ref: '#/components/schemas/SecuritySignalKind' }
         severity: { $ref: '#/components/schemas/SecuritySignalSeverity' }
         summary: { type: string }
         evidence:
           type: object
           additionalProperties: true
-        detectedAt:
+        detected_at:
           type: string
           format: date-time
     ListSecuritySignalsResponse:
@@ -3618,7 +3618,7 @@ components:
         last30d: { type: integer, minimum: 0 }
     UsageSnapshot:
       type: object
-      required: [seats, storage, apiCalls, activeUsers]
+      required: [seats, storage, api_calls, active_users]
       properties:
         seats:
           type: object
@@ -3628,69 +3628,69 @@ components:
             allocated: { type: integer, minimum: 0 }
         storage:
           type: object
-          required: [usedBytes, allocatedBytes]
+          required: [used_bytes, allocated_bytes]
           properties:
-            usedBytes: { type: integer, minimum: 0 }
-            allocatedBytes: { type: integer, minimum: 0 }
-        apiCalls:
+            used_bytes: { type: integer, minimum: 0 }
+            allocated_bytes: { type: integer, minimum: 0 }
+        api_calls:
           $ref: '#/components/schemas/UsageWindowCounts'
-        activeUsers:
+        active_users:
           $ref: '#/components/schemas/UsageWindowCounts'
     UpsertUserRoleRequest:
       type: object
       required: [role]
       properties:
-        displayName:
+        display_name:
           type: string
         role:
           type: string
           enum: [system_admin, approver, author, editor, viewer]
-        assignedBy:
+        assigned_by:
           type: string
     UpsertUserRoleResponse:
       type: object
-      required: [userId, role]
+      required: [user_id, role]
       properties:
-        userId:
+        user_id:
           type: string
         role:
           type: string
-        displayName:
+        display_name:
           type: string
     SearchDocumentItem:
       type: object
-      required: [documentId, title, documentType, documentProfile, documentFamily, documentSequence, documentCode, ownerId, status, createdAt]
+      required: [document_id, title, document_type, document_profile, document_family, document_sequence, document_code, owner_id, status, created_at]
       properties:
-        documentId:
+        document_id:
           type: string
         title:
           type: string
-        documentType:
+        document_type:
           type: string
-        documentProfile:
+        document_profile:
           type: string
-        documentFamily:
+        document_family:
           type: string
-        documentSequence:
+        document_sequence:
           type: integer
           minimum: 1
-        documentCode:
+        document_code:
           type: string
-        processArea:
+        process_area:
           type: string
-        ownerId:
+        owner_id:
           type: string
         department:
           type: string
         status:
           type: string
-        effectiveAt:
+        effective_at:
           type: string
           format: date-time
-        expiryAt:
+        expiry_at:
           type: string
           format: date-time
-        createdAt:
+        created_at:
           type: string
           format: date-time
     SearchDocumentsResponse:
@@ -3703,7 +3703,7 @@ components:
             $ref: '#/components/schemas/SearchDocumentItem'
     MetricItem:
       type: object
-      required: [route, method, requests, errors, durationTotalMs, avgDurationMs]
+      required: [route, method, requests, errors, duration_total_ms, avg_duration_ms]
       properties:
         route:
           type: string
@@ -3713,9 +3713,9 @@ components:
           type: integer
         errors:
           type: integer
-        durationTotalMs:
+        duration_total_ms:
           type: integer
-        avgDurationMs:
+        avg_duration_ms:
           type: integer
     MetricsResponse:
       type: object
@@ -3744,10 +3744,10 @@ components:
     # â”€â”€ Registry schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     SystemBlankTemplateResponse:
       type: object
-      required: [templateId, templateVersionId, name]
+      required: [template_id, template_version_id, name]
       properties:
-        templateId: { type: string, format: uuid }
-        templateVersionId: { type: string, format: uuid }
+        template_id: { type: string, format: uuid }
+        template_version_id: { type: string, format: uuid }
         name: { type: string }
     TemplateDTO:
       type: object
@@ -3874,67 +3874,67 @@ components:
             $ref: '#/components/schemas/PlaceholderCatalogEntry'
     ControlledDocument:
       type: object
-      required: [id, tenantId, profileCode, processAreaCode, code, title, ownerUserId, status, visibility, createdAt, updatedAt]
+      required: [id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status, visibility, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
-        tenantId: { type: string, format: uuid }
-        profileCode: { type: string }
-        processAreaCode: { type: string }
-        departmentCode: { type: string, nullable: true }
+        tenant_id: { type: string, format: uuid }
+        profile_code: { type: string }
+        process_area_code: { type: string }
+        department_code: { type: string, nullable: true }
         code: { type: string }
-        sequenceNum: { type: integer, nullable: true }
+        sequence_num: { type: integer, nullable: true }
         title: { type: string }
-        ownerUserId: { type: string }
-        overrideTemplateVersionId: { type: string, format: uuid, nullable: true }
+        owner_user_id: { type: string }
+        override_template_version_id: { type: string, format: uuid, nullable: true }
         status: { type: string, enum: [active, obsolete, superseded] }
         visibility:
           $ref: '#/components/schemas/ControlledDocumentVisibility'
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
 
     ControlledDocumentVisibility:
       type: object
-      required: [scope, areaCodes, userIds]
+      required: [scope, area_codes, user_ids]
       properties:
         scope: { type: string, enum: [company, restricted] }
-        areaCodes:
+        area_codes:
           type: array
           items: { type: string }
-        userIds:
+        user_ids:
           type: array
           items: { type: string }
 
     DocumentRef:
       type: object
-      required: [id, contentHash]
+      required: [id, content_hash]
       properties:
         id: { type: string, format: uuid }
-        contentHash: { type: string }
+        content_hash: { type: string }
 
     CreateAtomicRequest:
       type: object
-      required: [profileCode, processAreaCode, title, ownerUserId, documentName, visibility]
+      required: [profile_code, process_area_code, title, owner_user_id, document_name, visibility]
       properties:
-        profileCode: { type: string, minLength: 1 }
-        processAreaCode: { type: string, minLength: 1 }
-        departmentCode: { type: string }
+        profile_code: { type: string, minLength: 1 }
+        process_area_code: { type: string, minLength: 1 }
+        department_code: { type: string }
         title: { type: string, minLength: 1 }
-        ownerUserId: { type: string, minLength: 1 }
-        documentName: { type: string, minLength: 1 }
+        owner_user_id: { type: string, minLength: 1 }
+        document_name: { type: string, minLength: 1 }
         visibility:
           $ref: '#/components/schemas/ControlledDocumentVisibility'
-        templateVersionId: { type: string, format: uuid }
-        formData: { type: object, additionalProperties: true }
-        manualCode: { type: string }
-        manualCodeReason: { type: string }
-        overrideTemplateVersionId: { type: string, format: uuid }
-        overrideTemplateReason: { type: string }
+        template_version_id: { type: string, format: uuid }
+        form_data: { type: object, additionalProperties: true }
+        manual_code: { type: string }
+        manual_code_reason: { type: string }
+        override_template_version_id: { type: string, format: uuid }
+        override_template_reason: { type: string }
 
     AtomicCreateResponse:
       type: object
-      required: [controlledDocument, document]
+      required: [controlled_document, document]
       properties:
-        controlledDocument:
+        controlled_document:
           $ref: '#/components/schemas/ControlledDocument'
         document:
           $ref: '#/components/schemas/DocumentRef'
@@ -3944,8 +3944,8 @@ components:
       required: [name]
       properties:
         name: { type: string, minLength: 1 }
-        formData: { type: object, additionalProperties: true }
-        templateVersionId: { type: string, format: uuid }
+        form_data: { type: object, additionalProperties: true }
+        template_version_id: { type: string, format: uuid }
 
     RevisionResponse:
       type: object
@@ -3956,22 +3956,22 @@ components:
 
     PreviewCodeResponse:
       type: object
-      required: [profileCode, areaCode, nextSeq, code]
+      required: [profile_code, area_code, next_seq, code]
       properties:
-        profileCode: { type: string }
-        areaCode: { type: string }
-        nextSeq: { type: integer, minimum: 1 }
+        profile_code: { type: string }
+        area_code: { type: string }
+        next_seq: { type: integer, minimum: 1 }
         code: { type: string }
 
     ActiveDocumentResponse:
       type: object
       properties:
-        documentId: { type: string, format: uuid }
-        approvalState: { type: string, enum: [draft, under_review, approved, scheduled, rejected, cancelled] }
-        contentHash: { type: string }
-        revisionVersion: { type: integer, minimum: 1 }
-        publishedDocumentId: { type: string, format: uuid }
-        approvalInstanceId: { type: string, format: uuid }
+        document_id: { type: string, format: uuid }
+        approval_state: { type: string, enum: [draft, under_review, approved, scheduled, rejected, cancelled] }
+        content_hash: { type: string }
+        revision_version: { type: integer, minimum: 1 }
+        published_document_id: { type: string, format: uuid }
+        approval_instance_id: { type: string, format: uuid }
     ApprovalInstanceByDocumentResponse:
       type: object
       required: [id, document_id, route_id, tenant_id, status, submitted_by, submitted_at, stages, etag]
@@ -4040,28 +4040,28 @@ components:
     FinalizeDocumentRequest:
       type: object
       properties:
-        revisionTitle:
+        revision_title:
           type: string
           minLength: 1
           description: Required for governed revisions after REV00. Omit for REV00 to use the canonical initial title.
     DocumentRevisionHistoryItem:
       type: object
-      required: [documentId, revisionNumber, revisionTitle, status, createdAt, isCurrent]
+      required: [document_id, revision_number, revision_title, status, created_at, is_current]
       properties:
-        documentId:
+        document_id:
           type: string
           format: uuid
-        revisionNumber:
+        revision_number:
           type: integer
           format: int64
-        revisionTitle:
+        revision_title:
           type: string
         status:
           type: string
-        createdAt:
+        created_at:
           type: string
           format: date-time
-        isCurrent:
+        is_current:
           type: boolean
     DocumentRevisionHistoryResponse:
       type: object

@@ -11,7 +11,7 @@ export function useResetPasswordMutation() {
     mutationFn: async ({ userId, newPassword }: ResetPasswordVariables) => {
       const { data, error } = await api.POST("/iam/users/{userId}/reset-password", {
         params: { path: { userId } },
-        body: { newPassword },
+        body: { new_password: newPassword },
       });
       if (error) throw error;
       return data;

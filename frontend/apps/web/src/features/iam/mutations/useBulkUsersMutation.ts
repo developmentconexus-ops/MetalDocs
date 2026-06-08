@@ -11,7 +11,9 @@ export function useBulkUsersMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: BulkUsersBody) => {
-      const { data, error } = await api.POST("/iam/users/bulk", { body });
+      const { data, error } = await api.POST("/iam/users/bulk", {
+        body: { user_ids: body.userIds, action: body.action },
+      });
       if (error) throw error;
       return data;
     },

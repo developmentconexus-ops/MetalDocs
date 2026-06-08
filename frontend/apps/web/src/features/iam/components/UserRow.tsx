@@ -28,18 +28,18 @@ export default function UserRow({
   onOpen,
 }: UserRowProps) {
   const status = deriveStatus(user);
-  const mfaOn = user.mfaEnabled === true;
+  const mfaOn = user.mfa_enabled === true;
 
   const handleRowClick = (e: MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     if (target.closest("input,button,a,label")) return;
-    onOpen(user.userId);
+    onOpen(user.user_id);
   };
 
   const handleKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      onOpen(user.userId);
+      onOpen(user.user_id);
     }
   };
 
@@ -50,23 +50,23 @@ export default function UserRow({
       className={`${styles.row} ${selected ? styles.selected : ""}`}
       onClick={handleRowClick}
       onKeyDown={handleKey}
-      data-testid={`user-row-${user.userId}`}
-      data-user-id={user.userId}
+      data-testid={`user-row-${user.user_id}`}
+      data-user-id={user.user_id}
     >
       <div role="cell" className={styles.cell}>
         <input
           type="checkbox"
           className={styles.checkbox}
           checked={selected}
-          onChange={() => onToggleSelect(user.userId)}
-          aria-label={`Selecionar ${user.displayName}`}
+          onChange={() => onToggleSelect(user.user_id)}
+          aria-label={`Selecionar ${user.display_name}`}
         />
       </div>
       <div role="cell" className={styles.cell}>
         <div className={styles.identity}>
-          <Avatar name={user.displayName || user.username} size="sm" />
+          <Avatar name={user.display_name || user.username} size="sm" />
           <div className={styles.who}>
-            <span className={styles.name}>{user.displayName || user.username}</span>
+            <span className={styles.name}>{user.display_name || user.username}</span>
             <span className={styles.username}>@{user.username}</span>
           </div>
         </div>
@@ -76,16 +76,16 @@ export default function UserRow({
       </div>
       <div role="cell" className={styles.cell}>
         <span
-          className={`${styles.roleChip} ${styles[user.tenantRole] ?? ""}`}
-          title={user.tenantRole}
+          className={`${styles.roleChip} ${styles[user.tenant_role] ?? ""}`}
+          title={user.tenant_role}
         >
-          {user.tenantRole}
+          {user.tenant_role}
         </span>
       </div>
       <div role="cell" className={styles.cell}>
         <span className={styles.areaCount}>
-          {user.areaMemberships.length}{" "}
-          {user.areaMemberships.length === 1 ? "área" : "áreas"}
+          {user.area_memberships.length}{" "}
+          {user.area_memberships.length === 1 ? "área" : "áreas"}
         </span>
       </div>
       <div role="cell" className={styles.cell}>
@@ -94,9 +94,9 @@ export default function UserRow({
       <div role="cell" className={styles.cell}>
         <span
           className={styles.lastLogin}
-          title={user.lastLoginAt ? SP_DATE_TIME_FORMATTER.format(new Date(user.lastLoginAt)) : "Sem registro"}
+          title={user.last_login_at ? SP_DATE_TIME_FORMATTER.format(new Date(user.last_login_at)) : "Sem registro"}
         >
-          {formatLastLogin(user.lastLoginAt)}
+          {formatLastLogin(user.last_login_at)}
         </span>
       </div>
       <div role="cell" className={styles.cell}>
@@ -109,8 +109,8 @@ export default function UserRow({
           <button
             type="button"
             className={styles.iconBtn}
-            aria-label={`Abrir detalhes de ${user.displayName}`}
-            onClick={() => onOpen(user.userId)}
+            aria-label={`Abrir detalhes de ${user.display_name}`}
+            onClick={() => onOpen(user.user_id)}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 6l6 6-6 6" />

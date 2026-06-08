@@ -1,7 +1,7 @@
 # ADR — Audit Events Cursor Shape Drift
 
 > **Date:** 2026-06-03
-> **Status:** Open
+> **Status:** Open (casing drift resolved by Phase E1; nesting shape still open)
 > **Owner:** Backend audit module
 > **Scope:** `GET /audit/events` response shape
 
@@ -24,10 +24,12 @@ But the runtime server (current `main`) emits a flat shape:
 ```jsonc
 {
   "items": [ /* ... */ ],
-  "nextCursor": "…",
-  "hasMore": true
+  "next_cursor": "…",
+  "has_more": true
 }
 ```
+
+> **Phase E1 note (2026-06-08):** The flat-shape field names were `nextCursor`/`hasMore` at time of writing; Phase E1 snake_case big-bang renamed them to `next_cursor`/`has_more`. The nesting drift (flat vs. nested `page.{...}`) remains open.
 
 The frontend audit hook (`features/iam/queries/useAuditEventsQuery.ts`) sits on
 both shapes via an `adaptPage()` helper. This unblocks PR-12 Fase 5 (Audit

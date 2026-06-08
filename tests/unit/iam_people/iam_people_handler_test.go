@@ -367,7 +367,7 @@ func TestListUsers_PaginationBoundaryAndQFilter(t *testing.T) {
 func TestInviteUser_ReturnsTempPasswordAndMeetsPolicy(t *testing.T) {
 	mux, _, audit := newHandlerForTest(t)
 
-	body := `{"username":"new.user","email":"new.user@example.com","displayName":"New User","tenantRole":"author"}`
+	body := `{"username":"new.user","email":"new.user@example.com","display_name":"New User","tenant_role":"author"}`
 	req := withTenant(httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/invite", strings.NewReader(body)), testTenantID)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -375,8 +375,8 @@ func TestInviteUser_ReturnsTempPasswordAndMeetsPolicy(t *testing.T) {
 		t.Fatalf("invite status = %d body=%s", rec.Code, rec.Body.String())
 	}
 	var resp struct {
-		UserId       string `json:"userId"`
-		TempPassword string `json:"tempPassword"`
+		UserId       string `json:"user_id"`
+		TempPassword string `json:"temp_password"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -427,7 +427,7 @@ func assertPasswordPolicy(password string) error {
 func TestInviteUser_MissingTenantContext(t *testing.T) {
 	mux, _, _ := newHandlerForTest(t)
 
-	body := `{"username":"x","email":"x@example.com","displayName":"X","tenantRole":"author"}`
+	body := `{"username":"x","email":"x@example.com","display_name":"X","tenant_role":"author"}`
 	// Note: NO tenant in context.
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/invite", strings.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -445,9 +445,9 @@ func TestInviteUser_InvalidAreaRoleReturns400(t *testing.T) {
 	body := `{
 		"username":"x.user",
 		"email":"x.user@example.com",
-		"displayName":"X User",
-		"tenantRole":"author",
-		"areaMemberships":[{"areaCode":"AREA1","role":"viewer"}]
+		"display_name":"X User",
+		"tenant_role":"author",
+		"area_memberships":[{"area_code":"AREA1","role":"viewer"}]
 	}`
 	req := withTenant(httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/invite", strings.NewReader(body)), testTenantID)
 	rec := httptest.NewRecorder()
@@ -466,7 +466,7 @@ func TestPatchUser_EmitsAuditWithoutPassword(t *testing.T) {
 		Roles: []iamdomain.Role{iamdomain.RoleAuthor},
 	})
 
-	body := `{"displayName":"Alice Renamed","newPassword":"NEVER_LOG_THIS_SECRET_42!"}`
+	body := `{"display_name":"Alice Renamed","new_password":"NEVER_LOG_THIS_SECRET_42!"}`
 	req := withTenant(httptest.NewRequest(http.MethodPatch, "/api/v1/iam/users/alice", strings.NewReader(body)), testTenantID)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -485,7 +485,7 @@ func TestPatchUser_EmitsAuditWithoutPassword(t *testing.T) {
 func TestBulkUsers_ForceLogoutReturns501NotImplemented(t *testing.T) {
 	mux, _, _ := newHandlerForTest(t)
 
-	body := `{"userIds":["alice"],"action":"force-logout"}`
+	body := `{"user_ids":["alice"],"action":"force-logout"}`
 	req := withTenant(httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/bulk", strings.NewReader(body)), testTenantID)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -509,7 +509,7 @@ func TestBulkUsers_PerUserIsolation(t *testing.T) {
 	}
 
 	// Mix one valid + one missing — both run, only the valid one succeeds.
-	body := `{"userIds":["alice","does-not-exist","bob"],"action":"deactivate"}`
+	body := `{"user_ids":["alice","does-not-exist","bob"],"action":"deactivate"}`
 	req := withTenant(httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/bulk", strings.NewReader(body)), testTenantID)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -519,7 +519,7 @@ func TestBulkUsers_PerUserIsolation(t *testing.T) {
 	var resp struct {
 		Succeeded []string `json:"succeeded"`
 		Failed    []struct {
-			UserId  string `json:"userId"`
+			UserId  string `json:"user_id"`
 			Code    string `json:"code"`
 			Message string `json:"message"`
 		} `json:"failed"`

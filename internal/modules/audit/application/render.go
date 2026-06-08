@@ -65,12 +65,12 @@ func renderJSONL(events []domain.Event) ([]byte, error) {
 		}
 		obj := map[string]any{
 			"id":           e.ID,
-			"occurredAt":   e.OccurredAt.UTC().Format(time.RFC3339Nano),
-			"actorId":      e.ActorID,
+			"occurred_at":   e.OccurredAt.UTC().Format(time.RFC3339Nano),
+			"actor_id":      e.ActorID,
 			"action":       e.Action,
-			"resourceType": e.ResourceType,
-			"resourceId":   e.ResourceID,
-			"traceId":      e.TraceID,
+			"resource_type": e.ResourceType,
+			"resource_id":   e.ResourceID,
+			"trace_id":      e.TraceID,
 			"payload":      payload,
 		}
 		encoded, err := json.Marshal(obj)

@@ -201,10 +201,10 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"items":    items,
-		"page":     opts.Page,
-		"pageSize": opts.PageSize,
-		"total":    total,
+		"items":     items,
+		"page":      opts.Page,
+		"page_size": opts.PageSize,
+		"total":     total,
 	})
 }
 
@@ -331,29 +331,29 @@ func (h *Handler) getDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 type documentDetailResponse struct {
-	ID                             string                `json:"ID"`
-	TenantID                       string                `json:"TenantID"`
-	TemplateVersionID              string                `json:"TemplateVersionID"`
-	Name                           string                `json:"Name"`
-	Status                         domain.DocumentStatus `json:"Status"`
-	FormDataJSON                   json.RawMessage       `json:"FormDataJSON"`
-	CurrentRevisionID              string                `json:"CurrentRevisionID"`
-	RevisionVersion                int64                 `json:"RevisionVersion"`
-	ActiveSessionID                string                `json:"ActiveSessionID"`
-	ValuesFrozenAt                 *time.Time            `json:"ValuesFrozenAt"`
-	ArchivedAt                     *time.Time            `json:"ArchivedAt"`
-	CreatedAt                      time.Time             `json:"CreatedAt"`
-	UpdatedAt                      time.Time             `json:"UpdatedAt"`
-	CreatedBy                      string                `json:"CreatedBy"`
-	RevisionNumber                 int64                 `json:"RevisionNumber"`
-	ControlledDocumentID           *string               `json:"ControlledDocumentID"`
-	RevisionTitle                  *string               `json:"RevisionTitle"`
-	ProfileCodeSnapshot            *string               `json:"ProfileCodeSnapshot"`
-	ProcessAreaCodeSnapshot        *string               `json:"ProcessAreaCodeSnapshot"`
-	Code                           string                `json:"Code"`
-	CurrentRevisionFileSizeBytes   *int64                `json:"currentRevisionFileSizeBytes,omitempty"`
-	CurrentRevisionPageCount       *int                  `json:"currentRevisionPageCount,omitempty"`
-	CurrentRevisionPageCountSource *string               `json:"currentRevisionPageCountSource,omitempty"`
+	ID                             string                `json:"id"`
+	TenantID                       string                `json:"tenant_id"`
+	TemplateVersionID              string                `json:"template_version_id"`
+	Name                           string                `json:"name"`
+	Status                         domain.DocumentStatus `json:"status"`
+	FormDataJSON                   json.RawMessage       `json:"form_data_json"`
+	CurrentRevisionID              string                `json:"current_revision_id"`
+	RevisionVersion                int64                 `json:"revision_version"`
+	ActiveSessionID                string                `json:"active_session_id"`
+	ValuesFrozenAt                 *time.Time            `json:"values_frozen_at"`
+	ArchivedAt                     *time.Time            `json:"archived_at"`
+	CreatedAt                      time.Time             `json:"created_at"`
+	UpdatedAt                      time.Time             `json:"updated_at"`
+	CreatedBy                      string                `json:"created_by"`
+	RevisionNumber                 int64                 `json:"revision_number"`
+	ControlledDocumentID           *string               `json:"controlled_document_id"`
+	RevisionTitle                  *string               `json:"revision_title"`
+	ProfileCodeSnapshot            *string               `json:"profile_code_snapshot"`
+	ProcessAreaCodeSnapshot        *string               `json:"process_area_code_snapshot"`
+	Code                           string                `json:"code"`
+	CurrentRevisionFileSizeBytes   *int64                `json:"current_revision_file_size_bytes,omitempty"`
+	CurrentRevisionPageCount       *int                  `json:"current_revision_page_count,omitempty"`
+	CurrentRevisionPageCountSource *string               `json:"current_revision_page_count_source,omitempty"`
 }
 
 func toDocumentDetailResponse(doc domain.Document) (*documentDetailResponse, error) {
@@ -429,7 +429,7 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	var reqBody struct {
-		RevisionTitle string `json:"revisionTitle"`
+		RevisionTitle string `json:"revision_title"`
 	}
 
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
@@ -582,7 +582,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	respBody := map[string]string{"instanceId": result.InstanceID}
+	respBody := map[string]string{"instance_id": result.InstanceID}
 	if idempStore != nil && idempHandle != nil {
 		body, err := json.Marshal(respBody)
 		if err != nil {
@@ -865,12 +865,12 @@ func (h *Handler) listRevisionHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 type revisionHistoryItemResponse struct {
-	DocumentID     string    `json:"documentId"`
-	RevisionNumber int64     `json:"revisionNumber"`
-	RevisionTitle  string    `json:"revisionTitle"`
+	DocumentID     string    `json:"document_id"`
+	RevisionNumber int64     `json:"revision_number"`
+	RevisionTitle  string    `json:"revision_title"`
 	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"createdAt"`
-	IsCurrent      bool      `json:"isCurrent"`
+	CreatedAt      time.Time `json:"created_at"`
+	IsCurrent      bool      `json:"is_current"`
 }
 
 func toRevisionHistoryResponse(items []domain.RevisionHistoryItem) []revisionHistoryItemResponse {

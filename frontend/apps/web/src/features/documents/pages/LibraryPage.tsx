@@ -88,8 +88,8 @@ export default function LibraryPage(): JSX.Element {
   const items = libraryQuery.data?.items ?? [];
   const total = libraryQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const statsByStatus = statsQuery.data?.byStatus ?? {};
-  const statsByArea = statsQuery.data?.byArea ?? {};
+  const statsByStatus = statsQuery.data?.by_status ?? {};
+  const statsByArea = statsQuery.data?.by_area ?? {};
 
   const errorMessage =
     libraryQuery.isError
@@ -184,24 +184,24 @@ export default function LibraryPage(): JSX.Element {
 
           {items.map((d) => (
             <div
-              key={d.ID}
+              key={d.id}
               role="button"
               tabIndex={0}
               className={styles.row}
-              onClick={() => openDocument(d.ID)}
+              onClick={() => openDocument(d.id)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  openDocument(d.ID);
+                  openDocument(d.id);
                 }
               }}
             >
-              <span className={styles.codeLink}>{d.Code}</span>
-              <span className={styles.nameCell}>{d.Name}</span>
-              <span className={styles.metaCell}>{d.ProcessAreaCodeSnapshot ?? '–'}</span>
-              <StatusPill status={d.Status} />
-              <AuthorCell name={d.CreatedBy} />
-              <span className={styles.monoCell}>REV{String(d.RevisionNumber).padStart(2, '0')}</span>
+              <span className={styles.codeLink}>{d.code}</span>
+              <span className={styles.nameCell}>{d.name}</span>
+              <span className={styles.metaCell}>{d.process_area_code_snapshot ?? '–'}</span>
+              <StatusPill status={d.status} />
+              <AuthorCell name={d.created_by} />
+              <span className={styles.monoCell}>REV{String(d.revision_number).padStart(2, '0')}</span>
               <button
                 type="button"
                 className={styles.moreBtn}

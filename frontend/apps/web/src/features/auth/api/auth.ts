@@ -1,5 +1,8 @@
 import type { CurrentUser, UserRole } from "../../../lib/types";
+import type { components } from "../../../lib/api-types";
 import { request } from "../../../lib/api/client";
+
+type WireCurrentUser = components["schemas"]["CurrentUser"];
 
 const allowedRoles = new Set<UserRole>(["system_admin", "editor", "approver", "author", "viewer", "signer", "area_admin", "qms_admin"]);
 
@@ -17,22 +20,22 @@ function normalizeCapabilities(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === "string");
 }
 
-function normalizeCurrentUser(value: CurrentUser): CurrentUser {
+function normalizeCurrentUser(value: WireCurrentUser): CurrentUser {
   return {
-    userId: value?.userId ?? "",
-    tenantId: value?.tenantId ?? "",
-    tenantName: value?.tenantName ?? "",
+    userId: value?.user_id ?? "",
+    tenantId: value?.tenant_id ?? "",
+    tenantName: value?.tenant_name ?? "",
     username: value?.username ?? "",
     email: value?.email ?? "",
-    displayName: value?.displayName ?? value?.username ?? "",
-    mustChangePassword: Boolean(value?.mustChangePassword),
+    displayName: value?.display_name ?? value?.username ?? "",
+    mustChangePassword: Boolean(value?.must_change_password),
     roles: normalizeRoles(value?.roles),
     capabilities: normalizeCapabilities((value as { capabilities?: unknown })?.capabilities),
   };
 }
 
 export async function login(body: { identifier: string; password: string }) {
-  const response = await request<{ user: CurrentUser; expiresAt: string }>("/auth/login", {
+  const response = await request<{ user: WireCurrentUser; expires_at: string }>("/auth/login", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -44,13 +47,13 @@ export function logout() {
 }
 
 export async function me() {
-  return normalizeCurrentUser(await request<CurrentUser>("/auth/me"));
+  return normalizeCurrentUser(await request<WireCurrentUser>("/auth/me"));
 }
 
 export async function changePassword(body: { currentPassword: string; newPassword: string }) {
-  const response = await request<{ changed: boolean; user: CurrentUser }>("/auth/change-password", {
+  const response = await request<{ changed: boolean; user: WireCurrentUser }>("/auth/change-password", {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify({ current_password: body.currentPassword, new_password: body.newPassword }),
   });
   return { ...response, user: normalizeCurrentUser(response.user) };
 }

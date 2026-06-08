@@ -50,11 +50,11 @@ export function CheckpointsPanel({ documentID, onRestored, disabled }: Checkpoin
 
   async function handleRestore(c: Checkpoint) {
     if (disabled) return;
-    if (!window.confirm(`Restore checkpoint v${c.VersionNum}?`)) return;
+    if (!window.confirm(`Restore checkpoint v${c.version_num}?`)) return;
     setBusy(true);
     setError('');
     try {
-      const res = await restoreCheckpoint(documentID, c.VersionNum);
+      const res = await restoreCheckpoint(documentID, c.version_num);
       onRestored(res.new_revision_id);
       await refresh();
     } catch (e: any) {
@@ -92,12 +92,12 @@ export function CheckpointsPanel({ documentID, onRestored, disabled }: Checkpoin
       )}
       <ul>
         {items.map((checkpoint) => (
-          <li key={checkpoint.ID}>
-            <span>v{checkpoint.VersionNum}</span>
-            <span>{checkpoint.Label}</span>
+          <li key={checkpoint.id}>
+            <span>v{checkpoint.version_num}</span>
+            <span>{checkpoint.label}</span>
             <button
               type="button"
-              data-restore-version={checkpoint.VersionNum}
+              data-restore-version={checkpoint.version_num}
               disabled={disabled || busy}
               onClick={() => void handleRestore(checkpoint)}
             >

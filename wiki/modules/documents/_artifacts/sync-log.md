@@ -200,7 +200,7 @@
 - **Context:** commits `ccdf7e16`, `14cd2005`, and `f1cf7988` from the 2026-05-19 artifact metadata plan; migration 0206/0207, documents API contract, generated frontend types, EigenPal wrapper page count, autosave commit plumbing, and editor sidebar rendering.
 - **Mode:** structural refresh
 - **Anchors moved:** none
-- **Public surface:** `DocumentDetailResponse` now exposes `currentRevisionFileSizeBytes`, `currentRevisionPageCount`, and `currentRevisionPageCountSource`; autosave commit response includes `file_size_bytes`, `page_count`, and `page_count_source`; `MetalDocsEditorRef` includes `getPageCount()`.
+- **Public surface:** `DocumentDetailResponse` now exposes `current_revision_file_size_bytes`, `current_revision_page_count`, and `current_revision_page_count_source` (renamed from camelCase originals by Phase E1 2026-06-08); autosave commit response includes `file_size_bytes`, `page_count`, and `page_count_source`; `MetalDocsEditorRef` includes `getPageCount()`.
 - **Routes/API:** `POST /api/v1/documents/{id}/autosave/commit` accepts `page_count`; `GET /api/v1/documents/{id}` reads current-head artifact metadata through `documents.current_revision_id -> document_revisions`.
 - **Runtime flows:** editor autosave collects EigenPal page count client-side, backend computes saved DOCX size server-side, and sidebar renders pages/size from real API/runtime data only.
 - **Persistence:** `public.document_revisions` carries technical artifact metadata (`file_size_bytes`, `page_count`, `page_count_source`); governed revision history remains sourced from `public.documents` lineage by `controlled_document_id`.

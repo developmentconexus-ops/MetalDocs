@@ -45,7 +45,7 @@ export default function PeopleDetailDrawer() {
   const userQuery = useUsersQuery({ limit: 500 });
 
   const user: ManagedUser | undefined = useMemo(
-    () => userQuery.data?.items?.find((u) => u.userId === userId),
+    () => userQuery.data?.items?.find((u) => u.user_id === userId),
     [userQuery.data, userId],
   );
 
@@ -109,12 +109,12 @@ export default function PeopleDetailDrawer() {
             {activeTab === "profile" ? <ProfilePanel user={user} /> : null}
             {activeTab === "roles" ? <RolesPanel user={user} /> : null}
             {activeTab === "areas" ? (
-              <UserMembershipsTable userId={user.userId} />
+              <UserMembershipsTable userId={user.user_id} />
             ) : null}
             {activeTab === "sessions" ? (
-              <UserSessionsTable userId={user.userId} />
+              <UserSessionsTable userId={user.user_id} />
             ) : null}
-            {activeTab === "activity" ? <ActivityPanel userId={user.userId} /> : null}
+            {activeTab === "activity" ? <ActivityPanel userId={user.user_id} /> : null}
             {activeTab === "security" ? (
               <SecurityPanel
                 user={user}
@@ -138,17 +138,17 @@ function ProfilePanel({ user }: { user: ManagedUser }) {
         <dt>Username</dt>
         <dd>@{user.username}</dd>
         <dt>Nome</dt>
-        <dd>{user.displayName}</dd>
+        <dd>{user.display_name}</dd>
         <dt>E-mail</dt>
         <dd>{user.email ?? "—"}</dd>
         <dt>Criado em</dt>
-        <dd>{titleFormatter.format(new Date(user.createdAt))}</dd>
+        <dd>{titleFormatter.format(new Date(user.created_at))}</dd>
         <dt>Atualizado em</dt>
-        <dd>{titleFormatter.format(new Date(user.updatedAt))}</dd>
+        <dd>{titleFormatter.format(new Date(user.updated_at))}</dd>
         <dt>Último acesso</dt>
         <dd>
-          {user.lastLoginAt
-            ? `${titleFormatter.format(new Date(user.lastLoginAt))} (${getRelativeTime(user.lastLoginAt)})`
+          {user.last_login_at
+            ? `${titleFormatter.format(new Date(user.last_login_at))} (${getRelativeTime(user.last_login_at)})`
             : "Nunca"}
         </dd>
       </dl>
@@ -158,16 +158,16 @@ function ProfilePanel({ user }: { user: ManagedUser }) {
 
 function RolesPanel({ user }: { user: ManagedUser }) {
   const qc = useQueryClient();
-  const [tenantRole, setTenantRole] = useState<IamRole>(user.tenantRole);
+  const [tenantRole, setTenantRole] = useState<IamRole>(user.tenant_role);
   const patch = usePatchUserMutation();
-  const dirty = tenantRole !== user.tenantRole;
+  const dirty = tenantRole !== user.tenant_role;
 
   useEffect(() => {
-    setTenantRole(user.tenantRole);
-  }, [user.tenantRole, user.userId]);
+    setTenantRole(user.tenant_role);
+  }, [user.tenant_role, user.user_id]);
 
   const handleSave = () => {
-    const previous = user.tenantRole;
+    const previous = user.tenant_role;
     // Optimistic on cached entries.
     const snapshot = qc.getQueriesData<{ items: ManagedUser[] }>({
       queryKey: ["iam", "admin", "users"],
@@ -177,12 +177,12 @@ function RolesPanel({ user }: { user: ManagedUser }) {
       qc.setQueryData(key, {
         ...value,
         items: value.items.map((u) =>
-          u.userId === user.userId ? { ...u, tenantRole } : u,
+          u.user_id === user.user_id ? { ...u, tenantRole } : u,
         ),
       });
     }
     patch.mutate(
-      { userId: user.userId, body: { tenantRole } },
+      { userId: user.user_id, body: { tenantRole } },
       {
         onSuccess: () => {
           toast.success("Função atualizada.");
@@ -230,7 +230,7 @@ function RolesPanel({ user }: { user: ManagedUser }) {
         <button
           type="button"
           className={styles.secondaryBtn}
-          onClick={() => setTenantRole(user.tenantRole)}
+          onClick={() => setTenantRole(user.tenant_role)}
           disabled={!dirty || patch.isPending}
         >
           Descartar
@@ -303,10 +303,10 @@ function SecurityPanel({
 }) {
   const unlock = useUnlockUserMutation();
   const [resetOpen, setResetOpen] = useState(false);
-  const isLocked = !!user.lockedUntil && new Date(user.lockedUntil).getTime() > Date.now();
+  const isLocked = !!user.locked_until && new Date(user.locked_until).getTime() > Date.now();
 
   const handleUnlock = () => {
-    unlock.mutate(user.userId, {
+    unlock.mutate(user.user_id, {
       onSuccess: () => {
         toast.success("Usuário desbloqueado.");
         onChanged();
@@ -325,7 +325,7 @@ function SecurityPanel({
           <div className={styles.securityMeta}>
             <span className={styles.securityLabel}>MFA</span>
             <span className={styles.securityValue}>
-              {user.mfaEnabled
+              {user.mfa_enabled
                 ? "Ativo — usuário possui segundo fator configurado."
                 : "Não configurado."}
             </span>
@@ -335,7 +335,7 @@ function SecurityPanel({
           <div className={styles.securityMeta}>
             <span className={styles.securityLabel}>Falhas de login</span>
             <span className={styles.securityValue}>
-              {user.failedLoginAttempts} tentativa(s) acumulada(s).
+              {user.failed_login_attempts} tentativa(s) acumulada(s).
             </span>
           </div>
         </li>
@@ -344,7 +344,7 @@ function SecurityPanel({
             <span className={styles.securityLabel}>Bloqueio</span>
             <span className={styles.securityValue}>
               {isLocked
-                ? `Bloqueado até ${titleFormatter.format(new Date(user.lockedUntil!))}`
+                ? `Bloqueado até ${titleFormatter.format(new Date(user.locked_until!))}`
                 : "Sem bloqueio ativo."}
             </span>
           </div>
@@ -361,7 +361,7 @@ function SecurityPanel({
           <div className={styles.securityMeta}>
             <span className={styles.securityLabel}>Senha</span>
             <span className={styles.securityValue}>
-              {user.mustChangePassword
+              {user.must_change_password
                 ? "Usuário deve trocar a senha no próximo acesso."
                 : "Sem obrigação de troca."}
             </span>
@@ -378,8 +378,8 @@ function SecurityPanel({
 
       <ResetPasswordDialog
         open={resetOpen}
-        userId={user.userId}
-        displayName={user.displayName}
+        userId={user.user_id}
+        displayName={user.display_name}
         onClose={() => setResetOpen(false)}
       />
     </section>

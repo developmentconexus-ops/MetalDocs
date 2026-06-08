@@ -17,7 +17,7 @@ export function useGrantMembershipMutation() {
       void qc.invalidateQueries({ queryKey: QK.iam.memberships.all });
       // The users listing embeds areaMemberships and the per-user membership
       // view is keyed separately — both go stale on a grant.
-      void qc.invalidateQueries({ queryKey: QK.iam.userMemberships(vars.userId) });
+      void qc.invalidateQueries({ queryKey: QK.iam.userMemberships(vars.user_id) });
     },
   });
 }

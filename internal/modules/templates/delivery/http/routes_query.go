@@ -95,8 +95,8 @@ func (h *Handler) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"templateId":        tpl.ID,
-		"templateVersionId": ver.ID,
+		"template_id":        tpl.ID,
+		"template_version_id": ver.ID,
 		"name":              tpl.Name,
 	})
 }

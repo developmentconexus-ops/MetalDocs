@@ -54,20 +54,20 @@ export default function AuditExportButton({ filter }: AuditExportButtonProps) {
       { format, filter },
       {
         onSuccess: (data) => {
-          if (!data?.exportId || !data?.signedUrl) {
+          if (!data?.export_id || !data?.signed_url) {
             toast.error("Resposta inesperada do servidor.");
             return;
           }
-          const safeUrl = safeDownloadUrl(data.signedUrl);
+          const safeUrl = safeDownloadUrl(data.signed_url);
           if (!safeUrl) {
             toast.error("URL de download inválida recebida do servidor.");
             return;
           }
           setJob({
-            exportId: data.exportId,
+            exportId: data.export_id,
             signedUrl: safeUrl,
             format,
-            expiresAt: data.expiresAt,
+            expiresAt: data.expires_at,
           });
           toast.success("Exportação pronta para download.");
         },

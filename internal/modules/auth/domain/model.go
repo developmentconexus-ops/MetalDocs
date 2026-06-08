@@ -131,13 +131,13 @@ type BootstrapAdminParams struct {
 
 // CurrentUser fields are PII; do not log this struct directly.
 type CurrentUser struct {
-	UserID             string           `json:"userId"`
-	TenantID           string           `json:"tenantId"`
-	TenantName         string           `json:"tenantName"`
+	UserID             string           `json:"user_id"`
+	TenantID           string           `json:"tenant_id"`
+	TenantName         string           `json:"tenant_name"`
 	Username           string           `json:"username"`
 	Email              string           `json:"email,omitempty"`
-	DisplayName        string           `json:"displayName"`
-	MustChangePassword bool             `json:"mustChangePassword"`
+	DisplayName        string           `json:"display_name"`
+	MustChangePassword bool             `json:"must_change_password"`
 	Roles              []iamdomain.Role `json:"roles"`
 	// Capabilities is the union of capability codes the actor holds in the
 	// active tenant. UX hint only — backend remains the sole trust boundary
@@ -160,7 +160,7 @@ func (s AuthenticatedSession) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		RawToken    string      `json:"rawToken"`
 		CurrentUser CurrentUser `json:"currentUser"`
-		ExpiresAt   time.Time   `json:"expiresAt"`
+		ExpiresAt   time.Time   `json:"expires_at"`
 	}{
 		RawToken:    "***",
 		CurrentUser: s.CurrentUser,

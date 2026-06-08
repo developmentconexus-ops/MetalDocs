@@ -44,7 +44,7 @@ Postgres tripwire note (0142b):
 - `approval_signoffs` pairing: trigger installed `migrations/0142b_role_capabilities_v2_enforce.sql:207`; this finalize flow does not execute signoff INSERT.
 
 ### 5. Response shape
-- 201 body struct definition: (unclear: no named struct; handler writes anonymous `map[string]string{"instanceId": result.InstanceID}` at `internal/modules/documents/delivery/http/handler.go:420`).
+- 201 body struct definition: (no named struct; handler writes `map[string]string{"instance_id": result.InstanceID}` at `internal/modules/documents/delivery/http/handler.go:585`).
 - Error responses (trigger + return statements):
   - 400: profile missing -> `http.Error(w, "{\"error\":\"profile not found\"}", http.StatusBadRequest)` (`internal/modules/documents/delivery/http/handler.go:370`).
   - 401: (unclear: no explicit 401 return in `finalizeDocument` path).

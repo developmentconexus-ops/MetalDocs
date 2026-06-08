@@ -101,7 +101,7 @@ vi.mock('../queries/useAreasQuery', () => ({
 
 vi.mock('../../controlled-documents/queries/useControlledDocumentDetailQuery', () => ({
   useControlledDocumentDetailQuery: () => ({
-    data: { visibility: { scope: 'restricted', areaCodes: ['RH'], userIds: [] } },
+    data: { visibility: { scope: 'restricted', area_codes: ['RH'], user_ids: [] } },
   }),
 }));
 
@@ -110,12 +110,12 @@ vi.mock('../queries/useDocumentRevisionHistoryQuery', () => ({
     data: {
       items: [
         {
-          documentId: 'doc-2',
-          revisionNumber: 2,
-          revisionTitle: 'Ajuste operacional',
+          document_id: 'doc-2',
+          revision_number: 2,
+          revision_title: 'Ajuste operacional',
           status: 'draft',
-          createdAt: '2026-05-18T12:00:00Z',
-          isCurrent: true,
+          created_at: '2026-05-18T12:00:00Z',
+          is_current: true,
         },
       ],
     },
@@ -165,16 +165,14 @@ function makeDoc(status: string, overrides: Record<string, unknown> = {}) {
   return {
     Status: status,
     status,
-    CurrentRevisionID: 'r1',
     current_revision_id: 'r1',
     Name: 'Original.docx',
     name: 'Original.docx',
     Code: 'C-001',
     code: 'C-001',
-    ControlledDocumentID: 'cd-1',
-    ProfileCodeSnapshot: 'POP',
-    ProcessAreaCodeSnapshot: 'RH',
-    RevisionVersion: 0,
+    controlled_document_id: 'cd-1',
+    profile_code_snapshot: 'POP',
+    process_area_code_snapshot: 'RH',
     revision_version: 0,
     ...overrides,
   };
@@ -223,8 +221,6 @@ afterEach(() => {
 describe('DocumentEditorPage E1 gate', () => {
   it('shows governed revision badge and avoids raw v1 label', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('under_review', {
-      RevisionNumber: 0,
-      RevisionVersion: 1,
       revision_number: 0,
       revision_version: 1,
     }) as never);
@@ -321,16 +317,11 @@ describe('DocumentEditorPage autosave wiring', () => {
     const onDone = vi.fn();
     vi.mocked(api.getDocument)
       .mockResolvedValueOnce(makeDoc('draft', {
-        RevisionNumber: 0,
-        RevisionVersion: 0,
         revision_number: 0,
         revision_version: 0,
       }) as never)
       .mockResolvedValueOnce(makeDoc('under_review', {
-        CurrentRevisionID: 'r2',
         current_revision_id: 'r2',
-        RevisionNumber: 0,
-        RevisionVersion: 1,
         revision_number: 0,
         revision_version: 1,
       }) as never);
@@ -381,8 +372,8 @@ describe('DocumentEditorPage autosave wiring', () => {
 
   it('queues the buffer provided by MetalDocsEditor without re-reading the editor ref', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
-      FormDataJSON: { foo: 'bar' },
-      form_data: { foo: 'bar' },
+      form_data_json: { foo: 'bar' },
+      current_revision_page_count: 3,
     }) as never);
 
     renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
@@ -404,9 +395,9 @@ describe('DocumentEditorPage autosave wiring', () => {
 
   it('renders server-provided artifact metadata on first draft load', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
-      currentRevisionFileSizeBytes: 1304,
-      currentRevisionPageCount: 3,
-      currentRevisionPageCountSource: 'eigenpal_client',
+      current_revision_file_size_bytes: 1304,
+      current_revision_page_count: 3,
+      current_revision_page_count_source: 'eigenpal_client',
     }) as never);
 
     renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
@@ -423,10 +414,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     const onDone = vi.fn();
     const latestBuffer = new Uint8Array([1, 2, 3]).buffer;
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
-      FormDataJSON: { foo: 'bar' },
-      form_data: { foo: 'bar' },
-      RevisionNumber: 1,
-      RevisionVersion: 1,
+      form_data_json: { foo: 'bar' },
       revision_number: 1,
       revision_version: 1,
     }) as never);
@@ -453,7 +441,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
     expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(latestBuffer, { foo: 'bar' }, 3);
     expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', { revisionTitle: 'Atualizacao de procedimento' }));
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', { revision_title: 'Atualizacao de procedimento' }));
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
   });
 
@@ -511,10 +499,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     const onDone = vi.fn();
     const latestBuffer = new Uint8Array([4, 5, 6]).buffer;
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
-      FormDataJSON: { foo: 'bar' },
-      form_data: { foo: 'bar' },
-      RevisionNumber: 1,
-      RevisionVersion: 1,
+      form_data_json: { foo: 'bar' },
       revision_number: 1,
       revision_version: 1,
     }) as never);
@@ -549,8 +534,6 @@ describe('DocumentEditorPage autosave wiring', () => {
 
   it('blocks submit confirmation when revision title is blank', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
-      RevisionNumber: 1,
-      RevisionVersion: 1,
       revision_number: 1,
       revision_version: 1,
     }) as never);

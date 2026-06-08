@@ -33,14 +33,14 @@ export default function SessionsTable() {
     const u = userFilter.trim().toLowerCase();
     const ip = ipFilter.trim().toLowerCase();
     return items.filter((s) => {
-      if (u && !s.displayName.toLowerCase().includes(u)) return false;
-      if (ip && !(s.ipAddress ?? "").toLowerCase().includes(ip)) return false;
+      if (u && !s.display_name.toLowerCase().includes(u)) return false;
+      if (ip && !(s.ip_address ?? "").toLowerCase().includes(ip)) return false;
       return true;
     });
   }, [items, userFilter, ipFilter]);
 
   const allSelected =
-    filtered.length > 0 && filtered.every((s) => selected.has(s.sessionId));
+    filtered.length > 0 && filtered.every((s) => selected.has(s.session_id));
   const someSelected = selected.size > 0 && !allSelected;
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function SessionsTable() {
     if (allSelected) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(filtered.map((s) => s.sessionId)));
+      setSelected(new Set(filtered.map((s) => s.session_id)));
     }
   };
 
@@ -90,7 +90,7 @@ export default function SessionsTable() {
     if (!prev) return () => {};
     qc.setQueryData(key, {
       ...prev,
-      items: prev.items.filter((s) => !ids.has(s.sessionId)),
+      items: prev.items.filter((s) => !ids.has(s.session_id)),
     });
     return (succeededIds?: ReadonlySet<string>) => {
       const current = qc.getQueryData<typeof data>(key);
@@ -103,7 +103,7 @@ export default function SessionsTable() {
         return;
       }
       // Re-insert only the ids that failed; keep succeeded ones dropped.
-      const restored = prev.items.filter((s) => !succeededIds.has(s.sessionId));
+      const restored = prev.items.filter((s) => !succeededIds.has(s.session_id));
       qc.setQueryData(key, { ...prev, items: restored });
     };
   };
@@ -245,43 +245,43 @@ export default function SessionsTable() {
             </thead>
             <tbody>
               {filtered.map((s) => (
-                <tr key={s.sessionId}>
+                <tr key={s.session_id}>
                   <td>
                     <input
                       type="checkbox"
                       className={styles.checkbox}
-                      checked={selected.has(s.sessionId)}
-                      onChange={() => toggleOne(s.sessionId)}
-                      aria-label={`Selecionar sessão de ${s.displayName}`}
+                      checked={selected.has(s.session_id)}
+                      onChange={() => toggleOne(s.session_id)}
+                      aria-label={`Selecionar sessão de ${s.display_name}`}
                     />
                   </td>
                   <td>
                     <div className={styles.userCell}>
-                      <Avatar name={s.displayName} size="sm" />
-                      <span className={styles.userName}>{s.displayName}</span>
+                      <Avatar name={s.display_name} size="sm" />
+                      <span className={styles.userName}>{s.display_name}</span>
                     </div>
                   </td>
                   <td className={styles.device}>
-                    {s.deviceLabel ?? getDeviceLabel(s.userAgent)}
+                    {s.device_label ?? getDeviceLabel(s.user_agent)}
                   </td>
                   <td>
-                    <span className={styles.mono}>{s.ipAddress ?? "—"}</span>
+                    <span className={styles.mono}>{s.ip_address ?? "—"}</span>
                   </td>
                   <td className={styles.mono}>—</td>
                   <td>
                     <span
                       className={styles.time}
-                      title={SP_DATE_TIME_FORMATTER.format(new Date(s.createdAt))}
+                      title={SP_DATE_TIME_FORMATTER.format(new Date(s.created_at))}
                     >
-                      {getRelativeTime(s.createdAt)}
+                      {getRelativeTime(s.created_at)}
                     </span>
                   </td>
                   <td>
                     <span
                       className={styles.time}
-                      title={SP_DATE_TIME_FORMATTER.format(new Date(s.lastSeenAt))}
+                      title={SP_DATE_TIME_FORMATTER.format(new Date(s.last_seen_at))}
                     >
-                      {getRelativeTime(s.lastSeenAt)}
+                      {getRelativeTime(s.last_seen_at)}
                     </span>
                   </td>
                   <td>
@@ -291,9 +291,9 @@ export default function SessionsTable() {
                     <button
                       type="button"
                       className={styles.revokeBtn}
-                      onClick={() => handleRevoke(s.sessionId)}
+                      onClick={() => handleRevoke(s.session_id)}
                       disabled={revoke.isPending}
-                      aria-label={`Revogar sessão de ${s.displayName}`}
+                      aria-label={`Revogar sessão de ${s.display_name}`}
                     >
                       Revogar
                     </button>

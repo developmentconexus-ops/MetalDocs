@@ -154,13 +154,13 @@ type DocumentAutosavePresignResponse struct {
 
 // DocumentCheckpoint defines model for DocumentCheckpoint.
 type DocumentCheckpoint struct {
-	CreatedAt  time.Time          `json:"CreatedAt"`
-	CreatedBy  string             `json:"CreatedBy"`
-	DocumentID openapi_types.UUID `json:"DocumentID"`
-	ID         openapi_types.UUID `json:"ID"`
-	Label      string             `json:"Label"`
-	RevisionID openapi_types.UUID `json:"RevisionID"`
-	VersionNum int                `json:"VersionNum"`
+	CreatedAt  time.Time          `json:"created_at"`
+	CreatedBy  string             `json:"created_by"`
+	DocumentId openapi_types.UUID `json:"document_id"`
+	Id         openapi_types.UUID `json:"id"`
+	Label      string             `json:"label"`
+	RevisionId openapi_types.UUID `json:"revision_id"`
+	VersionNum int                `json:"version_num"`
 }
 
 // DocumentCommentContentNode defines model for DocumentCommentContentNode.
@@ -203,29 +203,29 @@ type DocumentCreateResult struct {
 
 // DocumentDetailResponse defines model for DocumentDetailResponse.
 type DocumentDetailResponse struct {
-	ActiveSessionID                string                                                `json:"ActiveSessionID"`
-	ArchivedAt                     *time.Time                                            `json:"ArchivedAt,omitempty"`
-	Code                           string                                                `json:"Code"`
-	ControlledDocumentID           *string                                               `json:"ControlledDocumentID,omitempty"`
-	CreatedAt                      time.Time                                             `json:"CreatedAt"`
-	CreatedBy                      string                                                `json:"CreatedBy"`
-	CurrentRevisionID              string                                                `json:"CurrentRevisionID"`
-	FormDataJSON                   map[string]interface{}                                `json:"FormDataJSON"`
-	ID                             string                                                `json:"ID"`
-	Name                           string                                                `json:"Name"`
-	ProcessAreaCodeSnapshot        *string                                               `json:"ProcessAreaCodeSnapshot,omitempty"`
-	ProfileCodeSnapshot            *string                                               `json:"ProfileCodeSnapshot,omitempty"`
-	RevisionNumber                 int64                                                 `json:"RevisionNumber"`
-	RevisionTitle                  *string                                               `json:"RevisionTitle,omitempty"`
-	RevisionVersion                int64                                                 `json:"RevisionVersion"`
-	Status                         string                                                `json:"Status"`
-	TemplateVersionID              string                                                `json:"TemplateVersionID"`
-	TenantID                       string                                                `json:"TenantID"`
-	UpdatedAt                      time.Time                                             `json:"UpdatedAt"`
-	ValuesFrozenAt                 *time.Time                                            `json:"ValuesFrozenAt,omitempty"`
-	CurrentRevisionFileSizeBytes   *int64                                                `json:"currentRevisionFileSizeBytes,omitempty"`
-	CurrentRevisionPageCount       *int                                                  `json:"currentRevisionPageCount,omitempty"`
-	CurrentRevisionPageCountSource *DocumentDetailResponseCurrentRevisionPageCountSource `json:"currentRevisionPageCountSource,omitempty"`
+	ActiveSessionId                string                                                `json:"active_session_id"`
+	ArchivedAt                     *time.Time                                            `json:"archived_at,omitempty"`
+	Code                           string                                                `json:"code"`
+	ControlledDocumentId           *string                                               `json:"controlled_document_id,omitempty"`
+	CreatedAt                      time.Time                                             `json:"created_at"`
+	CreatedBy                      string                                                `json:"created_by"`
+	CurrentRevisionFileSizeBytes   *int64                                                `json:"current_revision_file_size_bytes,omitempty"`
+	CurrentRevisionId              string                                                `json:"current_revision_id"`
+	CurrentRevisionPageCount       *int                                                  `json:"current_revision_page_count,omitempty"`
+	CurrentRevisionPageCountSource *DocumentDetailResponseCurrentRevisionPageCountSource `json:"current_revision_page_count_source,omitempty"`
+	FormDataJson                   map[string]interface{}                                `json:"form_data_json"`
+	Id                             string                                                `json:"id"`
+	Name                           string                                                `json:"name"`
+	ProcessAreaCodeSnapshot        *string                                               `json:"process_area_code_snapshot,omitempty"`
+	ProfileCodeSnapshot            *string                                               `json:"profile_code_snapshot,omitempty"`
+	RevisionNumber                 int64                                                 `json:"revision_number"`
+	RevisionTitle                  *string                                               `json:"revision_title,omitempty"`
+	RevisionVersion                int64                                                 `json:"revision_version"`
+	Status                         string                                                `json:"status"`
+	TemplateVersionId              string                                                `json:"template_version_id"`
+	TenantId                       string                                                `json:"tenant_id"`
+	UpdatedAt                      time.Time                                             `json:"updated_at"`
+	ValuesFrozenAt                 *time.Time                                            `json:"values_frozen_at,omitempty"`
 }
 
 // DocumentDetailResponseCurrentRevisionPageCountSource defines model for DocumentDetailResponse.CurrentRevisionPageCountSource.
@@ -235,17 +235,17 @@ type DocumentDetailResponseCurrentRevisionPageCountSource string
 type DocumentListResponse struct {
 	Items    []DocumentSummary `json:"items"`
 	Page     int               `json:"page"`
-	PageSize int               `json:"pageSize"`
+	PageSize int               `json:"page_size"`
 	Total    int64             `json:"total"`
 }
 
 // DocumentRevisionHistoryItem defines model for DocumentRevisionHistoryItem.
 type DocumentRevisionHistoryItem struct {
-	CreatedAt      time.Time          `json:"createdAt"`
-	DocumentId     openapi_types.UUID `json:"documentId"`
-	IsCurrent      bool               `json:"isCurrent"`
-	RevisionNumber int64              `json:"revisionNumber"`
-	RevisionTitle  string             `json:"revisionTitle"`
+	CreatedAt      time.Time          `json:"created_at"`
+	DocumentId     openapi_types.UUID `json:"document_id"`
+	IsCurrent      bool               `json:"is_current"`
+	RevisionNumber int64              `json:"revision_number"`
+	RevisionTitle  string             `json:"revision_title"`
 	Status         string             `json:"status"`
 }
 
@@ -277,32 +277,32 @@ type DocumentSessionWriterResponseMode string
 
 // DocumentStatsResponse defines model for DocumentStatsResponse.
 type DocumentStatsResponse struct {
-	ByArea   map[string]int64 `json:"byArea"`
-	ByStatus map[string]int64 `json:"byStatus"`
+	ByArea   map[string]int64 `json:"by_area"`
+	ByStatus map[string]int64 `json:"by_status"`
 }
 
 // DocumentSummary defines model for DocumentSummary.
 type DocumentSummary struct {
-	ActiveSessionID         string                `json:"ActiveSessionID"`
-	ArchivedAt              *time.Time            `json:"ArchivedAt,omitempty"`
-	Code                    string                `json:"Code"`
-	ControlledDocumentID    *string               `json:"ControlledDocumentID,omitempty"`
-	CreatedAt               time.Time             `json:"CreatedAt"`
-	CreatedBy               string                `json:"CreatedBy"`
-	CurrentRevisionID       string                `json:"CurrentRevisionID"`
-	FormDataJSON            []byte                `json:"FormDataJSON"`
-	ID                      string                `json:"ID"`
-	Name                    string                `json:"Name"`
-	ProcessAreaCodeSnapshot *string               `json:"ProcessAreaCodeSnapshot,omitempty"`
-	ProfileCodeSnapshot     *string               `json:"ProfileCodeSnapshot,omitempty"`
-	RevisionNumber          int64                 `json:"RevisionNumber"`
-	RevisionTitle           *string               `json:"RevisionTitle,omitempty"`
-	RevisionVersion         int64                 `json:"RevisionVersion"`
-	Status                  DocumentSummaryStatus `json:"Status"`
-	TemplateVersionID       string                `json:"TemplateVersionID"`
-	TenantID                string                `json:"TenantID"`
-	UpdatedAt               time.Time             `json:"UpdatedAt"`
-	ValuesFrozenAt          *time.Time            `json:"ValuesFrozenAt,omitempty"`
+	ActiveSessionId         string                `json:"active_session_id"`
+	ArchivedAt              *time.Time            `json:"archived_at,omitempty"`
+	Code                    string                `json:"code"`
+	ControlledDocumentId    *string               `json:"controlled_document_id,omitempty"`
+	CreatedAt               time.Time             `json:"created_at"`
+	CreatedBy               string                `json:"created_by"`
+	CurrentRevisionId       string                `json:"current_revision_id"`
+	FormDataJson            []byte                `json:"form_data_json"`
+	Id                      string                `json:"id"`
+	Name                    string                `json:"name"`
+	ProcessAreaCodeSnapshot *string               `json:"process_area_code_snapshot,omitempty"`
+	ProfileCodeSnapshot     *string               `json:"profile_code_snapshot,omitempty"`
+	RevisionNumber          int64                 `json:"revision_number"`
+	RevisionTitle           *string               `json:"revision_title,omitempty"`
+	RevisionVersion         int64                 `json:"revision_version"`
+	Status                  DocumentSummaryStatus `json:"status"`
+	TemplateVersionId       string                `json:"template_version_id"`
+	TenantId                string                `json:"tenant_id"`
+	UpdatedAt               time.Time             `json:"updated_at"`
+	ValuesFrozenAt          *time.Time            `json:"values_frozen_at,omitempty"`
 }
 
 // DocumentSummaryStatus defines model for DocumentSummary.Status.
@@ -320,7 +320,7 @@ type FieldError struct {
 // FinalizeDocumentRequest defines model for FinalizeDocumentRequest.
 type FinalizeDocumentRequest struct {
 	// RevisionTitle Required for governed revisions after REV00. Omit for REV00 to use the canonical initial title.
-	RevisionTitle *string `json:"revisionTitle,omitempty"`
+	RevisionTitle *string `json:"revision_title,omitempty"`
 }
 
 // Problem defines model for Problem.
@@ -332,7 +332,7 @@ type Problem struct {
 	Instance *string       `json:"instance,omitempty"`
 	Status   int           `json:"status"`
 	Title    string        `json:"title"`
-	Type     string        `json:"type"`
+	Type     *string       `json:"type,omitempty"`
 }
 
 // BadRequest defines model for BadRequest.
@@ -2346,7 +2346,7 @@ type FinalizeDocument201ResponseHeaders struct {
 
 type FinalizeDocument201JSONResponse struct {
 	Body struct {
-		InstanceId openapi_types.UUID `json:"instanceId"`
+		InstanceId openapi_types.UUID `json:"instance_id"`
 	}
 	Headers FinalizeDocument201ResponseHeaders
 }
@@ -3588,78 +3588,77 @@ func (sh *strictHandler) ViewDocument(w http.ResponseWriter, r *http.Request, id
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

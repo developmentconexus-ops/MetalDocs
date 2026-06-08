@@ -248,13 +248,13 @@ describe('NewDocumentWizardPage — submit guard via UI', () => {
 
     const [payload, idempotencyKey] = vi.mocked(cdApi.createControlledDocumentAtomic).mock.calls[0];
     expect(payload).toMatchObject({
-      profileCode: 'PRC',
-      processAreaCode: 'TI',
+      profile_code: 'PRC',
+      process_area_code: 'TI',
       title: 'My Document',
-      ownerUserId: 'user-1',
-      documentName: 'My Document',
-      templateVersionId: 'blank-tv-1',
-      visibility: { scope: 'company', areaCodes: [], userIds: [] },
+      owner_user_id: 'user-1',
+      document_name: 'My Document',
+      template_version_id: 'blank-tv-1',
+      visibility: { scope: 'company', area_codes: [], user_ids: [] },
     });
     expect(typeof idempotencyKey).toBe('string');
   });
@@ -380,7 +380,7 @@ describe('buildVisibilityPayload', () => {
         error: null,
       } satisfies WizardState),
     });
-    expect(payload).toEqual({ scope: 'company', areaCodes: [], userIds: [] });
+    expect(payload).toEqual({ scope: 'company', area_codes: [], user_ids: [] });
   });
 
   it('returns restricted scope with areas and users for people visibility', () => {
@@ -406,8 +406,8 @@ describe('buildVisibilityPayload', () => {
     });
     expect(payload).toEqual({
       scope: 'restricted',
-      areaCodes: ['TI', 'QA'],
-      userIds: ['u1', 'u2'],
+      area_codes: ['TI', 'QA'],
+      user_ids: ['u1', 'u2'],
     });
   });
 
@@ -431,8 +431,8 @@ describe('buildVisibilityPayload', () => {
     });
     expect(payload).toEqual({
       scope: 'restricted',
-      areaCodes: ['QA', 'RH'],
-      userIds: [],
+      area_codes: ['QA', 'RH'],
+      user_ids: [],
     });
   });
 });

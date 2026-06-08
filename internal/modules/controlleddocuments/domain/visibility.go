@@ -15,8 +15,8 @@ const (
 
 type Visibility struct {
 	Scope     VisibilityScope `json:"scope"`
-	AreaCodes []string        `json:"areaCodes"`
-	UserIDs   []string        `json:"userIds"`
+	AreaCodes []string        `json:"area_codes"`
+	UserIDs   []string        `json:"user_ids"`
 }
 
 var (

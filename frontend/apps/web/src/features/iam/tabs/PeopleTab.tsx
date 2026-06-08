@@ -112,7 +112,7 @@ export default function PeopleTab() {
   const areaCodes = useMemo(() => {
     const set = new Set<string>();
     for (const u of allLoaded) {
-      for (const m of u.areaMemberships) set.add(m.areaCode);
+      for (const m of u.area_memberships) set.add(m.area_code);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [allLoaded]);
@@ -120,7 +120,7 @@ export default function PeopleTab() {
   useEffect(() => {
     // Drop selections that fall outside the current filtered set.
     if (selectedIds.length === 0) return;
-    const visibleIds = new Set(filtered.map((u) => u.userId));
+    const visibleIds = new Set(filtered.map((u) => u.user_id));
     const next = selectedIds.filter((id) => visibleIds.has(id));
     if (next.length !== selectedIds.length) setSelectedIds(next);
   }, [filtered, selectedIds]);
@@ -183,7 +183,7 @@ export default function PeopleTab() {
 
   const handleToggleSelectAll = useCallback(() => {
     setSelectedIds((prev) => {
-      const visibleIds = filtered.map((u) => u.userId);
+      const visibleIds = filtered.map((u) => u.user_id);
       const allSelected = visibleIds.every((id) => prev.includes(id));
       if (allSelected) return prev.filter((id) => !visibleIds.includes(id));
       const set = new Set([...prev, ...visibleIds]);

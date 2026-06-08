@@ -598,10 +598,10 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"items":    items,
-		"page":     opts.Page,
-		"pageSize": opts.Limit(),
-		"total":    total,
+		"items":     items,
+		"page":      opts.Page,
+		"page_size": opts.PageSize,
+		"total":     total,
 	})
 }
 

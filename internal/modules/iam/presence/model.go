@@ -52,9 +52,9 @@ const (
 
 // Item is one entry in a presence snapshot.
 type Item struct {
-	UserID      string    `json:"userId"`
-	DisplayName string    `json:"displayName"`
-	LastSeenAt  time.Time `json:"lastSeenAt"`
+	UserID      string    `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+	LastSeenAt  time.Time `json:"last_seen_at"`
 	Status      Status    `json:"status"`
 }
 
@@ -62,9 +62,9 @@ type Item struct {
 // type's payload remain zero-valued and are omitted by the JSON encoder.
 type Event struct {
 	Type        string    `json:"type"`
-	UserID      string    `json:"userId,omitempty"`
-	DisplayName string    `json:"displayName,omitempty"`
-	LastSeenAt  time.Time `json:"lastSeenAt,omitempty"`
+	UserID      string    `json:"user_id,omitempty"`
+	DisplayName string    `json:"display_name,omitempty"`
+	LastSeenAt  time.Time `json:"last_seen_at,omitempty"`
 	Status      Status    `json:"status,omitempty"`
 	Presence    []Item    `json:"presence,omitempty"`
 }

@@ -70,9 +70,9 @@ export function DocumentDistributionPage() {
   }
 
   const doc = docQuery.data;
-  const code = doc.Code ?? EM_DASH;
-  const docName = doc.Name;
-  const versionLabel = formatRevisionCode(doc.RevisionNumber);
+  const code = doc.code ?? EM_DASH;
+  const docName = doc.name;
+  const versionLabel = formatRevisionCode(doc.revision_number);
 
   return (
     <div className={styles.page}>

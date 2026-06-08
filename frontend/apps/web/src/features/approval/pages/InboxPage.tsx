@@ -57,11 +57,11 @@ export function InboxPage() {
     setActionError(null);
     try {
       const active = await getActiveDocumentContext(item.controlled_document_id);
-      if (!active?.documentId) {
+      if (!active?.document_id) {
         setActionError('Documento indisponivel no editor moderno no momento.');
         return;
       }
-      navigate(`/documents/${active.documentId}/edit`);
+      navigate(`/documents/${active.document_id}/edit`);
     } catch {
       setActionError('Documento indisponivel no editor moderno no momento.');
     }
@@ -72,20 +72,20 @@ export function InboxPage() {
     try {
       const active = await getActiveDocumentContext(item.controlled_document_id);
       if (
-        !active?.documentId ||
-        !active?.contentHash ||
-        !active?.approvalInstanceId ||
-        active?.revisionVersion == null
+        !active?.document_id ||
+        !active?.content_hash ||
+        !active?.approval_instance_id ||
+        active?.revision_version == null
       ) {
         setActionError('Fluxo de aprovação indisponível para este documento no momento.');
         return;
       }
 
       setDialogState({
-        documentId: active.documentId,
-        contentHash: active.contentHash,
-        instanceId: active.approvalInstanceId,
-        revisionVersion: active.revisionVersion,
+        documentId: active.document_id,
+        contentHash: active.content_hash,
+        instanceId: active.approval_instance_id,
+        revisionVersion: active.revision_version,
         initialDecision,
       });
     } catch {

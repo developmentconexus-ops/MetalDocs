@@ -32,7 +32,7 @@
 - Tripwire scope: N/A for this auth/iam admin flow (no tripwire-specific logic referenced in these functions).
 
 ## 5. Response shape
-- On success, `handleCreateUser` returns HTTP `201 Created` with JSON body `{"userId": strings.TrimSpace(defaultString(req.UserID, req.Username))}` (`internal/modules/iam/delivery/http/admin_handler.go:284`).
+- On success, `handleCreateUser` returns HTTP `201 Created` with JSON body `{"user_id": ...}` via `UserInviteResponse` (`internal/modules/iam/api/api.gen.go:746`; field `UserId string json:"user_id"`).
 - Error responses are delegated to `h.writeAuthError(...)` from this handler path (`internal/modules/iam/delivery/http/admin_handler.go:281`).
 
 ## 6. Cross-refs

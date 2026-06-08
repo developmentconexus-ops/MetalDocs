@@ -30,6 +30,8 @@ func TestRules(t *testing.T) {
 		{name: "envelope_shared_responses", spec: "envelope_shared_responses.openapi.yaml"},
 		{name: "envelope_unresolved_ref", spec: "envelope_unresolved_ref.openapi.yaml", want: []wantViolation{{Rule: "ENVELOPE-DRIFT", MessageContains: "unresolved $ref"}}},
 		{name: "missing_cursor", spec: "missing_cursor.openapi.yaml", want: []wantViolation{{Rule: "PAGINATION-DRIFT", MessageContains: "missing query param cursor"}}},
+		{name: "casing_bad", spec: "casing_bad.openapi.yaml", want: []wantViolation{{Rule: "CASING-DRIFT", MessageContains: "is not snake_case"}}},
+		{name: "casing_exempt_good", spec: "casing_exempt_good.openapi.yaml"},
 		{name: "missing_security", spec: "missing_security.openapi.yaml", want: []wantViolation{{Rule: "AUTHZ-DRIFT", MessageContains: "missing security declaration"}}},
 		{name: "state_transition_no_area", spec: "state_transition_no_area.openapi.yaml", want: []wantViolation{{Rule: "AUTHZ-DRIFT", MessageContains: "state-transition op"}}},
 		{name: "state_transition_skip_area", spec: "state_transition_skip_area.openapi.yaml"},

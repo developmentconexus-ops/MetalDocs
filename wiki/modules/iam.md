@@ -9,7 +9,7 @@
 **Prior verification — 2026-06-02 (PR-4):** People-tab backend slice — `PeopleHandler` registered via Go 1.22 typed mux patterns owns `GET /iam/users`, `POST /iam/users/invite`, `PATCH /iam/users/{userId}`, `POST /iam/users/bulk`, `POST /iam/users/{userId}/reset-password`, `POST /iam/users/{userId}/unlock`, `GET /iam/users/{userId}/memberships`; legacy `handleUserRoute` suffix dispatcher + `POST /iam/users` create retired; migration 0219 adds last-login context columns to `iam_users`; canonical-roles catalog grew to 8 (added `signer`, `area_admin`, `qms_admin` in `internal/modules/iam/domain/model.go`). T-004 noted closed — `authz.Require(CapUserManage)` already lives inside both `UpsertUserAndAssignRole` and `ReplaceUserRolesTx` in `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:47,99`. Prior verification line preserved below.)
 **Prior verification — 2026-06-02 (PR-2):** added `CapSessionManage`; broadened `CapAuditRead` grants to qms_admin/area_admin/approver via migration 0210; registry size 27 → 28; ADR 0019 documents the read-only-by-design naming exception.
 
-**Prior verification — 2026-06-02 (PR-1):** T-005 (audit emission) + T-006 (RFC 9457 envelope) closed; §5.3 + §6.2 + §6.3 + §6.4 cap columns refreshed against `apps/api/cmd/metaldocs-api/permissions.go:102-116` (ADR 0016 view-grade split). | **Last verified:** 2026-06-07 (Phase C dead-path prune: permissions.go anchors :54,196 → :112,202; openapi.yaml schemas :5043,5054 → :3871,3882) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
+**Prior verification — 2026-06-02 (PR-1):** T-005 (audit emission) + T-006 (RFC 9457 envelope) closed; §5.3 + §6.2 + §6.3 + §6.4 cap columns refreshed against `apps/api/cmd/metaldocs-api/permissions.go:102-116` (ADR 0016 view-grade split). | **Last verified:** 2026-06-08 (Phase E1 casing big-bang: grant/list membership response field names snake_case; upsertUserRole request snake_case; prior: 2026-06-07) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
 
 **Prior verification — 2026-06-01:** Approval route admin PR-3 spike: confirmed `GET /api/v1/iam/roles` does **not** exist today — role catalogue is hard-coded in `internal/modules/iam/domain/model.go:10-16` (`approver`, `author`, `editor`, `system_admin`, `viewer`). Proposed endpoint shape `{roles:[{code,label}]}` gated by `CapMembershipView` is documented in [ADR 0018 §"IAM roles source"](../decisions/0018-approval-route-lifecycle.md); implementation deferred to PR-4 of approval route admin work or its own micro-PR. Frontend hard-codes the same list at `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:10` as `STAGE_ROLES`.
 
@@ -282,7 +282,7 @@ sequenceDiagram
     participant S as AreaMembershipService
     participant R as UserAreaRepository
     participant DB as Postgres
-    C->>MW: POST body {userId,areaCode,role,grantedBy}
+    C->>MW: POST body {user_id,area_code,role,granted_by}
     MW->>MW: tier-1 CanDo("membership.manage")
     MW->>H: grantMembership
     H->>S: Grant(userID, tenantID, areaCode, role, grantedBy)
@@ -296,7 +296,7 @@ sequenceDiagram
     R-->>S: nil
     S->>S: governance logger (nil in prod) â€” skipped
     S-->>H: nil
-    H-->>C: 201 {userId,tenantId,areaCode,role}
+    H-->>C: 201 {user_id,tenant_id,area_code,role}
 ```
 
 State transitions:
@@ -320,7 +320,7 @@ sequenceDiagram
     participant R as RoleAdminRepository (pg)
     participant Cache as CachedRoleProvider
     participant DB as Postgres
-    C->>MW: POST {userId, role}
+    C->>MW: POST {role}
     MW->>MW: tier-1 CanDo("user.manage")
     MW->>H: handleUserRoleUpsert
     H->>S: UpsertUserAndAssignRole(userID, displayName, tenantID, role, assignedBy)

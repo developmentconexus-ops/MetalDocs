@@ -82,8 +82,8 @@ export default function InviteUserDialog({ open, onClose }: InviteUserDialogProp
       {
         onSuccess: (data) => {
           toast.success(`Convite enviado para ${form.displayName}`, {
-            description: data?.tempPassword
-              ? `Senha temporária: ${data.tempPassword}`
+            description: data?.temp_password
+              ? `Senha temporária: ${data.temp_password}`
               : "Usuário deverá trocar a senha no primeiro acesso.",
             duration: 8000,
           });

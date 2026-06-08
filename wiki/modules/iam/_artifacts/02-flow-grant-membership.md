@@ -1,4 +1,4 @@
-> **Last verified:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: line numbers updated; `authz.Require` now confirmed present in repository; `GrantAtomic` UPDATE sets `revoked_by`; OpenAPI contract confirmed declared)
+> **Last verified:** 2026-06-08 (Phase E1 casing big-bang: response field names updated to snake_case; prior: 2026-06-03)
 
 ## 1. Entry point
 
@@ -54,7 +54,7 @@ Tripwire pairing anchors:
 
 ## 5. Response shape
 
-- 2xx schema ref: OpenAPI `grantAreaMembership` — `GrantAreaMembershipResponse` (HTTP 201 JSON `{userId, tenantId, areaCode, role}`)
+- 2xx schema ref: OpenAPI `grantAreaMembership` — `GrantAreaMembershipResponse` (HTTP 201 JSON `{user_id, tenant_id, area_code, role}`)
 - Error responses (RFC 9457 Problem):
   - 400 `VALIDATION_ERROR` — missing/blank fields
   - 403 `AUTH_FORBIDDEN` — self-grant or insufficient manage scope

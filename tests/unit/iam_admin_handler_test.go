@@ -139,7 +139,7 @@ func TestIAMAdminHandlerResetPassword(t *testing.T) {
 	mux := http.NewServeMux()
 	registerPeopleHandlerForTest(t, mux, authService, roleAdminRepo, inv)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/test-user/reset-password", strings.NewReader(`{"newPassword":"Reset1234"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/test-user/reset-password", strings.NewReader(`{"new_password":"Reset1234"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), testTenantID))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-User-Id", "admin-local")

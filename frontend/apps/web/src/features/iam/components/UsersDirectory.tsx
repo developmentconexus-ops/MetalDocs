@@ -47,18 +47,18 @@ const COLUMNS: ReadonlyArray<{
 function compareUsers(a: ManagedUser, b: ManagedUser, key: SortKey): number {
   switch (key) {
     case "displayName":
-      return (a.displayName || a.username).localeCompare(b.displayName || b.username, "pt-BR");
+      return (a.display_name || a.username).localeCompare(b.display_name || b.username, "pt-BR");
     case "email":
       return (a.email ?? "").localeCompare(b.email ?? "", "pt-BR");
     case "tenantRole":
-      return a.tenantRole.localeCompare(b.tenantRole);
+      return a.tenant_role.localeCompare(b.tenant_role);
     case "lastLoginAt": {
-      const av = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
-      const bv = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
+      const av = a.last_login_at ? new Date(a.last_login_at).getTime() : 0;
+      const bv = b.last_login_at ? new Date(b.last_login_at).getTime() : 0;
       return av - bv;
     }
     case "mfa":
-      return Number(!!a.mfaEnabled) - Number(!!b.mfaEnabled);
+      return Number(!!a.mfa_enabled) - Number(!!b.mfa_enabled);
   }
 }
 
@@ -90,7 +90,7 @@ export default function UsersDirectory({
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
-  const allOnPageSelected = sorted.length > 0 && sorted.every((u) => selectedSet.has(u.userId));
+  const allOnPageSelected = sorted.length > 0 && sorted.every((u) => selectedSet.has(u.user_id));
 
   return (
     <div
@@ -189,9 +189,9 @@ export default function UsersDirectory({
 
           {sorted.map((user) => (
             <UserRow
-              key={user.userId}
+              key={user.user_id}
               user={user}
-              selected={selectedSet.has(user.userId)}
+              selected={selectedSet.has(user.user_id)}
               onToggleSelect={onToggleSelect}
               onOpen={onOpen}
             />

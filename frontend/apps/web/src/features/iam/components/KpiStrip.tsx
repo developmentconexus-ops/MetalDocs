@@ -23,10 +23,10 @@ export default function KpiStrip() {
   const sessions = useSessionsQuery({ limit: 1 });
 
   const snapshot = kpi.data;
-  const totalUsers = sumRoleDistribution(snapshot?.roleDistribution);
-  const failedLogins = snapshot?.failedLogins24h;
-  const lockedAccounts = snapshot?.lockedAccounts;
-  const mfaPct = snapshot?.mfaCoveragePct;
+  const totalUsers = sumRoleDistribution(snapshot?.role_distribution);
+  const failedLogins = snapshot?.failed_logins24h;
+  const lockedAccounts = snapshot?.locked_accounts;
+  const mfaPct = snapshot?.mfa_coverage_pct;
   const sessionsTotal = sessions.data?.total ?? sessions.data?.items?.length;
 
   const isLoading = kpi.isLoading;

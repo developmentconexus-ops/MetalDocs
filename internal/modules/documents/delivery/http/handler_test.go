@@ -342,12 +342,12 @@ func TestGetDocument_EmbedsFormDataJSON(t *testing.T) {
 		t.Fatalf("unmarshal body: %v", err)
 	}
 
-	formData, ok := body["FormDataJSON"].(map[string]any)
+	formData, ok := body["form_data_json"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected FormDataJSON object, got %#v", body["FormDataJSON"])
+		t.Fatalf("expected form_data_json object, got %#v", body["form_data_json"])
 	}
 	if got := formData["foo"]; got != "bar" {
-		t.Fatalf("expected FormDataJSON.foo=bar, got %#v", got)
+		t.Fatalf("expected form_data_json.foo=bar, got %#v", got)
 	}
 }
 
@@ -384,14 +384,14 @@ func TestGetDocument_ReturnsCurrentRevisionArtifactMetadata(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal body: %v", err)
 	}
-	if got := body["currentRevisionFileSizeBytes"]; got != float64(1304) {
-		t.Fatalf("currentRevisionFileSizeBytes = %v", got)
+	if got := body["current_revision_file_size_bytes"]; got != float64(1304) {
+		t.Fatalf("current_revision_file_size_bytes = %v", got)
 	}
-	if got := body["currentRevisionPageCount"]; got != float64(3) {
-		t.Fatalf("currentRevisionPageCount = %v", got)
+	if got := body["current_revision_page_count"]; got != float64(3) {
+		t.Fatalf("current_revision_page_count = %v", got)
 	}
-	if got := body["currentRevisionPageCountSource"]; got != "eigenpal_client" {
-		t.Fatalf("currentRevisionPageCountSource = %v", got)
+	if got := body["current_revision_page_count_source"]; got != "eigenpal_client" {
+		t.Fatalf("current_revision_page_count_source = %v", got)
 	}
 }
 
@@ -719,7 +719,7 @@ func TestFinalizeDocument_ProfileNotFoundUsesProblemEnvelope(t *testing.T) {
 
 func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	key := "11111111-1111-4111-8111-111111111111"
-	body := []byte(`{"instanceId":"inst_1"}`)
+	body := []byte(`{"instance_id":"inst_1"}`)
 
 	submitter := &fakeApprovalSubmitter{}
 	store := &fakeFinalizeIdempotencyStore{replay: &idempotency.Replay{Status: http.StatusCreated, Body: body}}
@@ -749,8 +749,8 @@ func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if got, _ := out["instanceId"].(string); got != "inst_1" {
-		t.Fatalf("expected instanceId=inst_1, got %q", got)
+	if got, _ := out["instance_id"].(string); got != "inst_1" {
+		t.Fatalf("expected instance_id=inst_1, got %q", got)
 	}
 	if submitter.called {
 		t.Fatalf("submit service should not be called on replay")
@@ -925,11 +925,11 @@ func TestListRevisionHistory_ReturnsGovernedItems(t *testing.T) {
 
 	var body struct {
 		Items []struct {
-			DocumentID     string `json:"documentId"`
-			RevisionNumber int64  `json:"revisionNumber"`
-			RevisionTitle  string `json:"revisionTitle"`
+			DocumentID     string `json:"document_id"`
+			RevisionNumber int64  `json:"revision_number"`
+			RevisionTitle  string `json:"revision_title"`
 			Status         string `json:"status"`
-			IsCurrent      bool   `json:"isCurrent"`
+			IsCurrent      bool   `json:"is_current"`
 		} `json:"items"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {

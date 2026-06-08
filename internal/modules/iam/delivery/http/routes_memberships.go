@@ -49,19 +49,19 @@ type MembershipHandler struct {
 }
 
 type grantMembershipRequest struct {
-	UserID   string `json:"userId"`
-	AreaCode string `json:"areaCode"`
+	UserID   string `json:"user_id"`
+	AreaCode string `json:"area_code"`
 	Role     string `json:"role"`
 }
 
 type membershipDTO struct {
-	UserID        string  `json:"userId"`
-	TenantID      string  `json:"tenantId"`
-	AreaCode      string  `json:"areaCode"`
+	UserID        string  `json:"user_id"`
+	TenantID      string  `json:"tenant_id"`
+	AreaCode      string  `json:"area_code"`
 	Role          string  `json:"role"`
-	EffectiveFrom string  `json:"effectiveFrom"`
-	EffectiveTo   *string `json:"effectiveTo"`
-	GrantedBy     *string `json:"grantedBy"`
+	EffectiveFrom string  `json:"effective_from"`
+	EffectiveTo   *string `json:"effective_to"`
+	GrantedBy     *string `json:"granted_by"`
 }
 
 func toMembershipDTO(m iamdomain.UserProcessArea) membershipDTO {
@@ -229,16 +229,16 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 	}
 
 	h.recordMembershipAudit(r, userID, "iam.area_membership.granted", map[string]any{
-		"userId":   userID,
-		"tenantId": tenantID,
-		"areaCode": areaCode,
+		"user_id":   userID,
+		"tenant_id": tenantID,
+		"area_code": areaCode,
 		"role":     role,
 	})
 
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"userId":   userID,
-		"tenantId": tenantID,
-		"areaCode": areaCode,
+		"user_id":   userID,
+		"tenant_id": tenantID,
+		"area_code": areaCode,
 		"role":     role,
 	})
 }
@@ -283,9 +283,9 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 	}
 
 	h.recordMembershipAudit(r, userID, "iam.area_membership.revoked", map[string]any{
-		"userId":   userID,
-		"tenantId": tenantID,
-		"areaCode": areaCode,
+		"user_id":   userID,
+		"tenant_id": tenantID,
+		"area_code": areaCode,
 	})
 
 	w.WriteHeader(http.StatusNoContent)

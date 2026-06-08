@@ -229,7 +229,7 @@ Evidence used:
 
 - `cd frontend/apps/web; pnpm.cmd tsc --noEmit -p tsconfig.build.json`
 - `cd frontend/apps/web; pnpm.cmd vitest run src/features/documents/pages/DocumentEditorPage.test.tsx src/features/documents/hooks/editor/__tests__/useDocumentComments.load.test.tsx src/features/approval/components/SignoffDialog.test.tsx`
-- Finalize prerequisite repair verified on 2026-05-18: `api/openapi/v1/openapi.yaml`, generated frontend types, `frontend/apps/web/src/features/documents/api/documents.ts`, and `internal/modules/documents/delivery/http/handler.go` now agree on required `Idempotency-Key` and `201 { instanceId }`
+- Finalize prerequisite repair verified on 2026-05-18: `api/openapi/v1/openapi.yaml`, generated frontend types, `frontend/apps/web/src/features/documents/api/documents.ts`, and `internal/modules/documents/delivery/http/handler.go` now agree on required `Idempotency-Key` and `201 { instance_id }` (field renamed from `instanceId` by Phase E1)
 
 ## Integration Audit (2026-05-18 Sidebar)
 
