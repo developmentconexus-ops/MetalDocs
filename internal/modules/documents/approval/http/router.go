@@ -21,7 +21,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs", wrapper.RecordApprovalStageSignoff)
 	mux.HandleFunc("GET /api/v1/approval/routes", wrapper.ListApprovalRoutes)
 	mux.HandleFunc("POST /api/v1/approval/routes", wrapper.CreateApprovalRoute)
-	mux.HandleFunc("DELETE /api/v1/approval/routes/{id}", wrapper.DeactivateApprovalRoute)
+	// F-DELETE-SHAPE (api-contract-hardening Phase E2): deactivation carries a
+	// reason body + If-Match/Idempotency headers, so it is a POST action
+	// sub-resource rather than a DELETE-with-body.
+	mux.HandleFunc("POST /api/v1/approval/routes/{id}/deactivate", wrapper.DeactivateApprovalRoute)
 	mux.HandleFunc("PUT /api/v1/approval/routes/{id}", wrapper.UpdateApprovalRoute)
 	mux.HandleFunc("GET /api/v1/documents/{id}/approval-instance", wrapper.GetApprovalInstanceByDocument)
 	mux.HandleFunc("POST /api/v1/documents/{id}/cancel", wrapper.CancelDocumentApproval)

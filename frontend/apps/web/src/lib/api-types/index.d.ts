@@ -12,26 +12,7 @@ export interface paths {
             cookie?: never;
         };
         /** Liveness check */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description API em execucao */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["HealthResponse"];
-                    };
-                };
-            };
-        };
+        get: operations["checkLiveness"];
         put?: never;
         post?: never;
         delete?: never;
@@ -48,35 +29,7 @@ export interface paths {
             cookie?: never;
         };
         /** Readiness check */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Dependencias prontas */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["HealthResponse"];
-                    };
-                };
-                /** @description Dependencias indisponiveis ou degradadas */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["HealthResponse"];
-                    };
-                };
-            };
-        };
+        get: operations["checkReadiness"];
         put?: never;
         post?: never;
         delete?: never;
@@ -93,29 +46,7 @@ export interface paths {
             cookie?: never;
         };
         /** HTTP RED metrics por rota */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Metricas de requests, erros e duracao */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["MetricsResponse"];
-                    };
-                };
-                401: components["responses"]["Unauthorized"];
-                403: components["responses"]["Forbidden"];
-                500: components["responses"]["InternalServerError"];
-            };
-        };
+        get: operations["getMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -592,42 +523,7 @@ export interface paths {
             cookie?: never;
         };
         /** Pesquisa documentos por filtros */
-        get: {
-            parameters: {
-                query?: {
-                    q?: string;
-                    ownerId?: string;
-                    documentType?: "po" | "it" | "rg";
-                    documentProfile?: string;
-                    documentFamily?: string;
-                    processArea?: string;
-                    department?: string;
-                    status?: string;
-                    expiryBefore?: string;
-                    expiryAfter?: string;
-                    limit?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Lista filtrada de documentos */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["SearchDocumentsResponse"];
-                    };
-                };
-                400: components["responses"]["BadRequest"];
-                401: components["responses"]["Unauthorized"];
-                403: components["responses"]["Forbidden"];
-                500: components["responses"]["InternalServerError"];
-            };
-        };
+        get: operations["searchDocuments"];
         put?: never;
         post?: never;
         delete?: never;
@@ -666,6 +562,22 @@ export interface paths {
         put?: never;
         /** Grant an active area membership */
         post: operations["grantAreaMembership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/area-memberships/{user_id}/{area_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
         /** Revoke an active area membership */
         delete: operations["revokeAreaMembership"];
         options?: never;
@@ -842,6 +754,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Create template version */
         post: operations["createTemplateVersion"];
         delete?: never;
         options?: never;
@@ -857,6 +770,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** Update template schema */
         put: operations["updateTemplateSchema"];
         post?: never;
         delete?: never;
@@ -874,6 +788,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Presign template autosave */
         post: operations["presignTemplateAutosave"];
         delete?: never;
         options?: never;
@@ -890,6 +805,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Commit template autosave */
         post: operations["commitTemplateAutosave"];
         delete?: never;
         options?: never;
@@ -906,6 +822,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Submit template version */
         post: operations["submitTemplateVersion"];
         delete?: never;
         options?: never;
@@ -922,6 +839,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Review template version */
         post: operations["reviewTemplateVersion"];
         delete?: never;
         options?: never;
@@ -938,6 +856,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Approve template version */
         post: operations["approveTemplateVersion"];
         delete?: never;
         options?: never;
@@ -954,6 +873,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Archive template */
         post: operations["archiveTemplate"];
         delete?: never;
         options?: never;
@@ -969,6 +889,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** Upsert template approval config */
         put: operations["upsertTemplateApprovalConfig"];
         post?: never;
         delete?: never;
@@ -984,6 +905,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get template */
         get: operations["getTemplate"];
         put?: never;
         post?: never;
@@ -1000,6 +922,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get template DOCX URL */
         get: operations["getTemplateDocxUrl"];
         put?: never;
         post?: never;
@@ -1016,6 +939,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List template audit */
         get: operations["listTemplateAudit"];
         put?: never;
         post?: never;
@@ -1032,6 +956,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List template placeholder catalog */
         get: operations["listTemplatePlaceholderCatalog"];
         put?: never;
         post?: never;
@@ -1048,8 +973,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List taxonomy profiles */
         get: operations["listTaxonomyProfiles"];
         put?: never;
+        /** Create taxonomy profile */
         post: operations["createTaxonomyProfile"];
         delete?: never;
         options?: never;
@@ -1064,12 +991,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get taxonomy profile */
         get: operations["getTaxonomyProfile"];
         put?: never;
         post?: never;
+        /** Archive taxonomy profile */
         delete: operations["archiveTaxonomyProfile"];
         options?: never;
         head?: never;
+        /** Update taxonomy profile */
         patch: operations["updateTaxonomyProfile"];
         trace?: never;
     };
@@ -1081,6 +1011,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** Set taxonomy profile default template */
         put: operations["setTaxonomyProfileDefaultTemplate"];
         post?: never;
         delete?: never;
@@ -1096,8 +1027,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List taxonomy areas */
         get: operations["listTaxonomyAreas"];
         put?: never;
+        /** Create taxonomy area */
         post: operations["createTaxonomyArea"];
         delete?: never;
         options?: never;
@@ -1112,9 +1045,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get taxonomy area */
         get: operations["getTaxonomyArea"];
+        /** Update taxonomy area */
         put: operations["updateTaxonomyArea"];
         post?: never;
+        /** Archive taxonomy area */
         delete: operations["archiveTaxonomyArea"];
         options?: never;
         head?: never;
@@ -1128,8 +1064,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List taxonomy families */
         get: operations["listTaxonomyFamilies"];
         put?: never;
+        /** Create taxonomy family */
         post: operations["createTaxonomyFamily"];
         delete?: never;
         options?: never;
@@ -1144,12 +1082,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get taxonomy family */
         get: operations["getTaxonomyFamily"];
         put?: never;
         post?: never;
+        /** Deactivate taxonomy family */
         delete: operations["deactivateTaxonomyFamily"];
         options?: never;
         head?: never;
+        /** Update taxonomy family */
         patch: operations["updateTaxonomyFamily"];
         trace?: never;
     };
@@ -1297,12 +1238,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get document */
         get: operations["getDocument"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
+        /** Rename document */
         patch: operations["renameDocument"];
         trace?: never;
     };
@@ -1315,6 +1258,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Finalize document */
         post: operations["finalizeDocument"];
         delete?: never;
         options?: never;
@@ -1331,6 +1275,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Archive document */
         post: operations["archiveDocument"];
         delete?: never;
         options?: never;
@@ -1345,6 +1290,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get document revision history */
         get: operations["getDocumentRevisionHistory"];
         put?: never;
         post?: never;
@@ -1363,6 +1309,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Duplicate document */
         post: operations["duplicateDocument"];
         delete?: never;
         options?: never;
@@ -1396,6 +1343,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Acquire document session */
         post: operations["acquireDocumentSession"];
         delete?: never;
         options?: never;
@@ -1412,6 +1360,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Heartbeat document session */
         post: operations["heartbeatDocumentSession"];
         delete?: never;
         options?: never;
@@ -1428,6 +1377,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Release document session */
         post: operations["releaseDocumentSession"];
         delete?: never;
         options?: never;
@@ -1444,6 +1394,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Force release document session */
         post: operations["forceReleaseDocumentSession"];
         delete?: never;
         options?: never;
@@ -1460,6 +1411,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Presign document autosave */
         post: operations["presignDocumentAutosave"];
         delete?: never;
         options?: never;
@@ -1476,6 +1428,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Commit document autosave */
         post: operations["commitDocumentAutosave"];
         delete?: never;
         options?: never;
@@ -1490,8 +1443,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List document checkpoints */
         get: operations["listDocumentCheckpoints"];
         put?: never;
+        /** Create document checkpoint */
         post: operations["createDocumentCheckpoint"];
         delete?: never;
         options?: never;
@@ -1523,6 +1478,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get document revision URL */
         get: operations["getDocumentRevisionUrl"];
         put?: never;
         post?: never;
@@ -1539,8 +1495,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List document comments */
         get: operations["listDocumentComments"];
         put?: never;
+        /** Create document comment */
         post: operations["createDocumentComment"];
         delete?: never;
         options?: never;
@@ -1558,9 +1516,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
+        /** Delete document comment */
         delete: operations["deleteDocumentComment"];
         options?: never;
         head?: never;
+        /** Update document comment */
         patch: operations["updateDocumentComment"];
         trace?: never;
     };
@@ -1573,6 +1533,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Export document PDF */
         post: operations["exportDocumentPDF"];
         delete?: never;
         options?: never;
@@ -1587,6 +1548,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get document DOCX URL */
         get: operations["getDocumentDocxURL"];
         put?: never;
         post?: never;
@@ -1603,6 +1565,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get document fill-in schema */
         get: operations["getDocumentFillInSchema"];
         put?: never;
         post?: never;
@@ -1619,6 +1582,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List document placeholder values */
         get: operations["listDocumentPlaceholderValues"];
         put?: never;
         post?: never;
@@ -1636,6 +1600,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** Put document placeholder value */
         put: operations["putDocumentPlaceholderValue"];
         post?: never;
         delete?: never;
@@ -1651,6 +1616,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** View document */
         get: operations["viewDocument"];
         put?: never;
         post?: never;
@@ -1669,6 +1635,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Reconstruct document */
         post: operations["reconstructDocument"];
         delete?: never;
         options?: never;
@@ -1683,6 +1650,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get document placeholder options */
         get: operations["getDocumentPlaceholderOptions"];
         put?: never;
         post?: never;
@@ -1701,6 +1669,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Submit document for approval */
         post: operations["submitDocumentForApproval"];
         delete?: never;
         options?: never;
@@ -1717,6 +1686,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Record approval stage signoff */
         post: operations["recordApprovalStageSignoff"];
         delete?: never;
         options?: never;
@@ -1733,6 +1703,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Publish document */
         post: operations["publishDocument"];
         delete?: never;
         options?: never;
@@ -1749,6 +1720,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Schedule document publish */
         post: operations["scheduleDocumentPublish"];
         delete?: never;
         options?: never;
@@ -1765,6 +1737,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Supersede document */
         post: operations["supersedeDocument"];
         delete?: never;
         options?: never;
@@ -1781,6 +1754,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Obsolete document */
         post: operations["obsoleteDocument"];
         delete?: never;
         options?: never;
@@ -1797,6 +1771,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Cancel approval instance */
         post: operations["cancelApprovalInstance"];
         delete?: never;
         options?: never;
@@ -1811,6 +1786,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get approval instance */
         get: operations["getApprovalInstance"];
         put?: never;
         post?: never;
@@ -1827,6 +1803,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Get approval instance by document */
         get: operations["getApprovalInstanceByDocument"];
         put?: never;
         post?: never;
@@ -1843,6 +1820,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List approval inbox */
         get: operations["listApprovalInbox"];
         put?: never;
         post?: never;
@@ -1861,6 +1839,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Record document signoff */
         post: operations["recordDocumentSignoff"];
         delete?: never;
         options?: never;
@@ -1877,6 +1856,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Cancel document approval */
         post: operations["cancelDocumentApproval"];
         delete?: never;
         options?: never;
@@ -1913,8 +1893,24 @@ export interface paths {
         /** Update an approval route (new version) */
         put: operations["updateApprovalRoute"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approval/routes/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         /** Deactivate an approval route */
-        delete: operations["deactivateApprovalRoute"];
+        post: operations["deactivateApprovalRoute"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2989,6 +2985,78 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    checkLiveness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description API em execucao */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    checkReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dependencias prontas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description Dependencias indisponiveis ou degradadas */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    getMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Metricas de requests, erros e duracao */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricsResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -3031,6 +3099,8 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getCurrentUser: {
@@ -3135,6 +3205,11 @@ export interface operations {
                     "application/json": components["schemas"]["CreateManagedUserResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     patchUser: {
@@ -3707,6 +3782,42 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    searchDocuments: {
+        parameters: {
+            query?: {
+                q?: string;
+                ownerId?: string;
+                documentType?: "po" | "it" | "rg";
+                documentProfile?: string;
+                documentFamily?: string;
+                processArea?: string;
+                department?: string;
+                status?: string;
+                expiryBefore?: string;
+                expiryAfter?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista filtrada de documentos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchDocumentsResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     replaceUserRoles: {
         parameters: {
             query?: never;
@@ -3831,12 +3942,12 @@ export interface operations {
     };
     revokeAreaMembership: {
         parameters: {
-            query: {
-                userId: string;
-                areaCode: string;
-            };
+            query?: never;
             header?: never;
-            path?: never;
+            path: {
+                user_id: string;
+                area_code: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -3939,6 +4050,11 @@ export interface operations {
                     "application/json": components["schemas"]["CreateTemplateResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getSystemBlankTemplate: {
@@ -4020,6 +4136,11 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     presignTemplateSchemaUploadUrl: {
@@ -4046,6 +4167,11 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     redirectSignedUrl: {
@@ -4181,6 +4307,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     updateTemplateSchema: {
@@ -4273,6 +4405,11 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     commitTemplateAutosave: {
@@ -4294,6 +4431,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     submitTemplateVersion: {
@@ -4317,6 +4460,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     reviewTemplateVersion: {
@@ -4340,6 +4489,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     approveTemplateVersion: {
@@ -4365,6 +4520,12 @@ export interface operations {
                     "application/json": components["schemas"]["ApproveTemplateVersionResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     archiveTemplate: {
@@ -4385,6 +4546,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     upsertTemplateApprovalConfig: {
@@ -4405,6 +4572,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getTemplate: {
@@ -4425,6 +4598,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getTemplateDocxUrl: {
@@ -4446,6 +4623,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listTemplateAudit: {
@@ -4466,6 +4647,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listTemplatePlaceholderCatalog: {
@@ -4486,6 +4671,9 @@ export interface operations {
                     "application/json": components["schemas"]["PlaceholderCatalogResponse"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listTaxonomyProfiles: {
@@ -4506,6 +4694,9 @@ export interface operations {
                     "application/json": components["schemas"]["ListDocumentProfilesResponse"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     createTaxonomyProfile: {
@@ -4526,6 +4717,11 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentProfileItem"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getTaxonomyProfile: {
@@ -4548,6 +4744,10 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentProfileItem"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     archiveTaxonomyProfile: {
@@ -4568,6 +4768,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     updateTaxonomyProfile: {
@@ -4590,6 +4796,11 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentProfileItem"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     setTaxonomyProfileDefaultTemplate: {
@@ -4610,6 +4821,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listTaxonomyAreas: {
@@ -4630,6 +4847,9 @@ export interface operations {
                     "application/json": components["schemas"]["ListProcessAreasResponse"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     createTaxonomyArea: {
@@ -4650,6 +4870,11 @@ export interface operations {
                     "application/json": components["schemas"]["ProcessAreaItem"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getTaxonomyArea: {
@@ -4672,6 +4897,10 @@ export interface operations {
                     "application/json": components["schemas"]["ProcessAreaItem"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     updateTaxonomyArea: {
@@ -4694,6 +4923,11 @@ export interface operations {
                     "application/json": components["schemas"]["ProcessAreaItem"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     archiveTaxonomyArea: {
@@ -4714,6 +4948,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listTaxonomyFamilies: {
@@ -4736,6 +4976,10 @@ export interface operations {
                     "application/json": components["schemas"]["ListDocumentFamiliesResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     createTaxonomyFamily: {
@@ -4756,6 +5000,11 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentFamilyItem"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getTaxonomyFamily: {
@@ -4778,6 +5027,10 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentFamilyItem"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     deactivateTaxonomyFamily: {
@@ -4798,6 +5051,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     updateTaxonomyFamily: {
@@ -4820,6 +5079,11 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentFamilyItem"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listControlledDocuments: {
@@ -5256,6 +5520,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     finalizeDocument: {
@@ -5316,6 +5586,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getDocumentRevisionHistory: {
@@ -5338,6 +5614,10 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentRevisionHistoryResponse"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     duplicateDocument: {
@@ -5360,6 +5640,12 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentCreateResult"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     documentStats: {
@@ -5419,6 +5705,12 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentSessionWriterResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     heartbeatDocumentSession: {
@@ -5466,6 +5758,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     forceReleaseDocumentSession: {
@@ -5634,6 +5932,10 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentCheckpoint"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     createDocumentCheckpoint: {
@@ -5662,6 +5964,11 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentCheckpoint"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     restoreDocumentCheckpoint: {
@@ -5727,6 +6034,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listDocumentComments: {
@@ -5749,6 +6060,10 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentCommentResponse"][];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     createDocumentComment: {
@@ -5775,6 +6090,11 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentCommentResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     deleteDocumentComment: {
@@ -5796,6 +6116,11 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     updateDocumentComment: {
@@ -5823,6 +6148,11 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentCommentResponse"];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     exportDocumentPDF: {
@@ -5942,6 +6272,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listDocumentPlaceholderValues: {
@@ -5962,6 +6296,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     putDocumentPlaceholderValue: {
@@ -5987,6 +6325,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     viewDocument: {
@@ -6007,6 +6351,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     reconstructDocument: {
@@ -6031,6 +6379,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getDocumentPlaceholderOptions: {
@@ -6052,6 +6406,10 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     submitDocumentForApproval: {
@@ -6075,6 +6433,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     recordApprovalStageSignoff: {
@@ -6100,6 +6464,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     publishDocument: {
@@ -6120,6 +6490,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     scheduleDocumentPublish: {
@@ -6140,6 +6516,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     supersedeDocument: {
@@ -6160,6 +6542,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     obsoleteDocument: {
@@ -6180,6 +6568,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     cancelApprovalInstance: {
@@ -6200,6 +6594,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getApprovalInstance: {
@@ -6266,6 +6666,9 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     recordDocumentSignoff: {
@@ -6290,6 +6693,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     cancelDocumentApproval: {
@@ -6310,6 +6719,12 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listApprovalRoutes: {

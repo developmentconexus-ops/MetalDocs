@@ -83,8 +83,8 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 	}
 	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
 		limit, perr := strconv.Atoi(v)
-		if perr != nil || limit < 1 || limit > 200 {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "limit must be between 1 and 200"))
+		if perr != nil || limit < 1 || limit > 100 {
+			h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "limit must be between 1 and 100"))
 			return
 		}
 		q.Limit = limit

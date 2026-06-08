@@ -94,8 +94,8 @@ func normalizeQuery(query domain.ListEventsQuery) (domain.ListEventsQuery, error
 	if normalized.Limit <= 0 {
 		normalized.Limit = 50
 	}
-	if normalized.Limit > 200 {
-		normalized.Limit = 200
+	if normalized.Limit > 100 {
+		normalized.Limit = 100
 	}
 	return normalized, nil
 }

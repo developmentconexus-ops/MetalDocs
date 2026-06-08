@@ -1,0 +1,37 @@
+openapi: 3.0.3
+info:
+  title: global-security-good
+  version: 1.0.0
+# Root-level security is inherited by every op; getWidget declares no per-op
+# security yet must NOT raise AUTHZ-DRIFT (Phase E2 F-NO-GLOBAL-SEC).
+security:
+  - sessionCookie: []
+paths:
+  /widgets/{id}:
+    get:
+      operationId: getWidget
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: missing
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: metaldocs_session
+  schemas:
+    Problem:
+      type: object
+      properties:
+        title:
+          type: string

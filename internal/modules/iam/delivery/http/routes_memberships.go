@@ -87,7 +87,9 @@ func NewMembershipHandler(svc *iamapp.AreaMembershipService, verifier Membership
 func (h *MembershipHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/iam/area-memberships", h.listMemberships)
 	mux.HandleFunc("POST /api/v1/iam/area-memberships", h.grantMembership)
-	mux.HandleFunc("DELETE /api/v1/iam/area-memberships", h.revokeMembership)
+	// F-DELETE-SHAPE (api-contract-hardening Phase E2): the revoked membership is
+	// identified by path parameters (resource identity) rather than query params.
+	mux.HandleFunc("DELETE /api/v1/iam/area-memberships/{user_id}/{area_code}", h.revokeMembership)
 }
 
 // listMemberships — operationId listAreaMemberships.
@@ -250,10 +252,10 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	userID := strings.TrimSpace(r.URL.Query().Get("userId"))
-	areaCode := strings.TrimSpace(r.URL.Query().Get("areaCode"))
+	userID := strings.TrimSpace(r.PathValue("user_id"))
+	areaCode := strings.TrimSpace(r.PathValue("area_code"))
 	if userID == "" || areaCode == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId and areaCode are required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id and area_code are required"))
 		return
 	}
 	// ADR 0022 Phase 3: tier-2 area enforcement (repository authz.Require with the

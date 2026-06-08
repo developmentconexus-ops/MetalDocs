@@ -502,7 +502,7 @@ func TestRevokeMembership_RejectsCrossTenantUserWith404(t *testing.T) {
 		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
 	})
 
-	req := adminReq(http.MethodDelete, "/api/v1/iam/area-memberships?userId="+targetID+"&areaCode=QMS", "", tenantAlpha, adminID)
+	req := adminReq(http.MethodDelete, "/api/v1/iam/area-memberships/"+targetID+"/QMS", "", tenantAlpha, adminID)
 	rec := httptest.NewRecorder()
 	h.mux.ServeHTTP(rec, req)
 
@@ -641,7 +641,7 @@ func TestRevokeMembership_AreaAdminReachesServiceAfterGateRemoval(t *testing.T) 
 		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
 	})
 
-	req := userReq(http.MethodDelete, "/api/v1/iam/area-memberships?userId="+targetID+"&areaCode=QMS", "", tenantAlpha, "area-admin-1", iamdomain.RoleAreaAdmin)
+	req := userReq(http.MethodDelete, "/api/v1/iam/area-memberships/"+targetID+"/QMS", "", tenantAlpha, "area-admin-1", iamdomain.RoleAreaAdmin)
 	rec := httptest.NewRecorder()
 	h.mux.ServeHTTP(rec, req)
 

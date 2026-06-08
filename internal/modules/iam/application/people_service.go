@@ -512,7 +512,7 @@ func (s *PeopleService) ListFiltered(ctx context.Context, tenantID string, filte
 		return ListResult{}, fmt.Errorf("%w: tenant required", ErrPeopleValidation)
 	}
 	limit := filters.Limit
-	if limit <= 0 || limit > 200 {
+	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
 	managed, err := s.auth.ListUsers(ctx, tenantID)

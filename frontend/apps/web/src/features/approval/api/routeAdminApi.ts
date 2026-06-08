@@ -78,8 +78,8 @@ export function deactivateRoute(
   opts?: MutateOptions,
 ): Promise<RouteResponse> {
   return mutate<DeactivateRouteRequest, RouteResponse>(
-    'DELETE',
-    `${BASE}/${encodeURIComponent(routeId)}`,
+    'POST',
+    `${BASE}/${encodeURIComponent(routeId)}/deactivate`,
     body,
     { resourceId: routeId, ...opts },
   );

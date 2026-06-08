@@ -16,12 +16,12 @@ import (
 // ENVELOPE-DRIFT graduated to BLOCKING in api-contract-hardening Phase D: the
 // whole spec now serves a single RFC 9457 Problem error shape (AD-2) via the
 // shared #/components/responses/* set, so a re-introduced non-Problem error body
-// turns CI red. AUTHZ-DRIFT and PAGINATION-DRIFT remain reported-only — they are
-// owned by Phase E and must not gate yet.
-var reportedOnlyRules = map[string]struct{}{
-	"AUTHZ-DRIFT":      {},
-	"PAGINATION-DRIFT": {},
-}
+// turns CI red. AUTHZ-DRIFT and PAGINATION-DRIFT graduated to BLOCKING in Phase
+// E2: a root-level `security:` requirement now makes every op secure-by-default
+// in-doc (F-NO-GLOBAL-SEC) and every list op is cursor-paginated or carries a
+// reviewed `x-pagination-exempt` reason (F-PAGINATION), so both families sit at
+// zero and a regression turns CI red. No spec-drift family remains reported-only.
+var reportedOnlyRules = map[string]struct{}{}
 
 func isBlocking(rule string) bool {
 	_, reported := reportedOnlyRules[rule]

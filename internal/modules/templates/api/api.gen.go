@@ -24,6 +24,10 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+const (
+	SessionCookieScopes sessionCookieContextKey = "sessionCookie.Scopes"
+)
+
 // Defines values for VersionDTOStatus.
 const (
 	Approved  VersionDTOStatus = "approved"
@@ -76,6 +80,15 @@ type CreateTemplateResponse struct {
 	} `json:"data"`
 }
 
+// FieldError defines model for FieldError.
+type FieldError struct {
+	Code string `json:"code"`
+
+	// Field JSON pointer or dot path
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
 // PlaceholderCatalogEntry defines model for PlaceholderCatalogEntry.
 type PlaceholderCatalogEntry struct {
 	Description string `json:"description"`
@@ -86,6 +99,18 @@ type PlaceholderCatalogEntry struct {
 // PlaceholderCatalogResponse defines model for PlaceholderCatalogResponse.
 type PlaceholderCatalogResponse struct {
 	Items []PlaceholderCatalogEntry `json:"items"`
+}
+
+// Problem defines model for Problem.
+type Problem struct {
+	// Code Machine-readable code from canonical taxonomy
+	Code     string        `json:"code"`
+	Detail   *string       `json:"detail,omitempty"`
+	Errors   *[]FieldError `json:"errors,omitempty"`
+	Instance *string       `json:"instance,omitempty"`
+	Status   int           `json:"status"`
+	Title    string        `json:"title"`
+	Type     *string       `json:"type,omitempty"`
 }
 
 // SystemBlankTemplateResponse defines model for SystemBlankTemplateResponse.
@@ -148,6 +173,24 @@ type VersionDTO struct {
 
 // VersionDTOStatus defines model for VersionDTO.Status.
 type VersionDTOStatus string
+
+// BadRequest defines model for BadRequest.
+type BadRequest = Problem
+
+// Conflict defines model for Conflict.
+type Conflict = Problem
+
+// Forbidden defines model for Forbidden.
+type Forbidden = Problem
+
+// InternalServerError defines model for InternalServerError.
+type InternalServerError = Problem
+
+// NotFound defines model for NotFound.
+type NotFound = Problem
+
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = Problem
 
 // sessionCookieContextKey is the context key for sessionCookie security scheme
 type sessionCookieContextKey string
@@ -238,43 +281,43 @@ type ServerInterface interface {
 	// Create template (docx)
 	// (POST /templates)
 	CreateTemplate(w http.ResponseWriter, r *http.Request, params CreateTemplateParams)
-
+	// List template placeholder catalog
 	// (GET /templates/placeholder-catalog)
 	ListTemplatePlaceholderCatalog(w http.ResponseWriter, r *http.Request)
 	// Get system-owned blank template
 	// (GET /templates/system/blank)
 	GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request)
-
+	// Get template
 	// (GET /templates/{id})
 	GetTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
+	// Upsert template approval config
 	// (PUT /templates/{id}/approval-config)
 	UpsertTemplateApprovalConfig(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
+	// Archive template
 	// (POST /templates/{id}/archive)
 	ArchiveTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
+	// List template audit
 	// (GET /templates/{id}/audit)
 	ListTemplateAudit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
+	// Create template version
 	// (POST /templates/{id}/versions)
 	CreateTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Get template version metadata (docx)
 	// (GET /templates/{id}/versions/{n})
 	GetTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int)
-
+	// Approve template version
 	// (POST /templates/{id}/versions/{n}/approve)
 	ApproveTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ApproveTemplateVersionParams)
-
+	// Commit template autosave
 	// (POST /templates/{id}/versions/{n}/autosave/commit)
 	CommitTemplateAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
-
+	// Presign template autosave
 	// (POST /templates/{id}/versions/{n}/autosave/presign)
 	PresignTemplateAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 	// Presign PUT URL for draft .docx upload
 	// (POST /templates/{id}/versions/{n}/docx-upload-url)
 	PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int)
-
+	// Get template DOCX URL
 	// (GET /templates/{id}/versions/{n}/docx-url)
 	GetTemplateDocxUrl(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 	// Save draft (CAS via expected_lock_version)
@@ -283,16 +326,16 @@ type ServerInterface interface {
 	// Publish draft (validates template tokens)
 	// (POST /templates/{id}/versions/{n}/publish)
 	PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, params PublishTemplateVersionParams)
-
+	// Review template version
 	// (POST /templates/{id}/versions/{n}/review)
 	ReviewTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ReviewTemplateVersionParams)
-
+	// Update template schema
 	// (PUT /templates/{id}/versions/{n}/schema)
 	UpdateTemplateSchema(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 	// Presign PUT URL for draft schema.json upload
 	// (POST /templates/{id}/versions/{n}/schema-upload-url)
 	PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int)
-
+	// Submit template version
 	// (POST /templates/{id}/versions/{n}/submit)
 	SubmitTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionParams)
 }
@@ -342,6 +385,12 @@ func (siw *ServerInterfaceWrapper) RedirectSignedUrl(w http.ResponseWriter, r *h
 // ListTemplates operation middleware
 func (siw *ServerInterfaceWrapper) ListTemplates(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListTemplates(w, r)
 	}))
@@ -358,6 +407,12 @@ func (siw *ServerInterfaceWrapper) CreateTemplate(w http.ResponseWriter, r *http
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateTemplateParams
@@ -401,6 +456,12 @@ func (siw *ServerInterfaceWrapper) CreateTemplate(w http.ResponseWriter, r *http
 // ListTemplatePlaceholderCatalog operation middleware
 func (siw *ServerInterfaceWrapper) ListTemplatePlaceholderCatalog(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListTemplatePlaceholderCatalog(w, r)
 	}))
@@ -414,6 +475,12 @@ func (siw *ServerInterfaceWrapper) ListTemplatePlaceholderCatalog(w http.Respons
 
 // GetSystemBlankTemplate operation middleware
 func (siw *ServerInterfaceWrapper) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetSystemBlankTemplate(w, r)
@@ -441,6 +508,12 @@ func (siw *ServerInterfaceWrapper) GetTemplate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetTemplate(w, r, id)
 	}))
@@ -466,6 +539,12 @@ func (siw *ServerInterfaceWrapper) UpsertTemplateApprovalConfig(w http.ResponseW
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpsertTemplateApprovalConfig(w, r, id)
@@ -493,6 +572,12 @@ func (siw *ServerInterfaceWrapper) ArchiveTemplate(w http.ResponseWriter, r *htt
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ArchiveTemplate(w, r, id)
 	}))
@@ -519,6 +604,12 @@ func (siw *ServerInterfaceWrapper) ListTemplateAudit(w http.ResponseWriter, r *h
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListTemplateAudit(w, r, id)
 	}))
@@ -544,6 +635,12 @@ func (siw *ServerInterfaceWrapper) CreateTemplateVersion(w http.ResponseWriter, 
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateTemplateVersion(w, r, id)
@@ -580,6 +677,12 @@ func (siw *ServerInterfaceWrapper) GetTemplateVersion(w http.ResponseWriter, r *
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetTemplateVersion(w, r, id, n)
 	}))
@@ -614,6 +717,12 @@ func (siw *ServerInterfaceWrapper) ApproveTemplateVersion(w http.ResponseWriter,
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ApproveTemplateVersionParams
@@ -678,6 +787,12 @@ func (siw *ServerInterfaceWrapper) CommitTemplateAutosave(w http.ResponseWriter,
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CommitTemplateAutosave(w, r, id, n)
 	}))
@@ -712,6 +827,12 @@ func (siw *ServerInterfaceWrapper) PresignTemplateAutosave(w http.ResponseWriter
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PresignTemplateAutosave(w, r, id, n)
@@ -748,6 +869,12 @@ func (siw *ServerInterfaceWrapper) PresignTemplateDocxUploadUrl(w http.ResponseW
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PresignTemplateDocxUploadUrl(w, r, id, n)
 	}))
@@ -782,6 +909,12 @@ func (siw *ServerInterfaceWrapper) GetTemplateDocxUrl(w http.ResponseWriter, r *
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetTemplateDocxUrl(w, r, id, n)
@@ -818,6 +951,12 @@ func (siw *ServerInterfaceWrapper) SaveTemplateDraft(w http.ResponseWriter, r *h
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SaveTemplateDraft(w, r, id, n)
 	}))
@@ -852,6 +991,12 @@ func (siw *ServerInterfaceWrapper) PublishTemplateVersion(w http.ResponseWriter,
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params PublishTemplateVersionParams
@@ -916,6 +1061,12 @@ func (siw *ServerInterfaceWrapper) ReviewTemplateVersion(w http.ResponseWriter, 
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ReviewTemplateVersionParams
 
@@ -979,6 +1130,12 @@ func (siw *ServerInterfaceWrapper) UpdateTemplateSchema(w http.ResponseWriter, r
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateTemplateSchema(w, r, id, n)
 	}))
@@ -1014,6 +1171,12 @@ func (siw *ServerInterfaceWrapper) PresignTemplateSchemaUploadUrl(w http.Respons
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PresignTemplateSchemaUploadUrl(w, r, id, n)
 	}))
@@ -1048,6 +1211,12 @@ func (siw *ServerInterfaceWrapper) SubmitTemplateVersion(w http.ResponseWriter, 
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params SubmitTemplateVersionParams
@@ -1234,6 +1403,18 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	return m
 }
 
+type BadRequestApplicationProblemPlusJSONResponse Problem
+
+type ConflictApplicationProblemPlusJSONResponse Problem
+
+type ForbiddenApplicationProblemPlusJSONResponse Problem
+
+type InternalServerErrorApplicationProblemPlusJSONResponse Problem
+
+type NotFoundApplicationProblemPlusJSONResponse Problem
+
+type UnauthorizedApplicationProblemPlusJSONResponse Problem
+
 type RedirectSignedUrlRequestObject struct {
 	Params RedirectSignedUrlParams
 }
@@ -1302,6 +1483,86 @@ func (response CreateTemplate201JSONResponse) VisitCreateTemplateResponse(w http
 	return err
 }
 
+type CreateTemplate400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplate400ApplicationProblemPlusJSONResponse) VisitCreateTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTemplate401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplate401ApplicationProblemPlusJSONResponse) VisitCreateTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTemplate403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplate403ApplicationProblemPlusJSONResponse) VisitCreateTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTemplate409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplate409ApplicationProblemPlusJSONResponse) VisitCreateTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTemplate500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplate500ApplicationProblemPlusJSONResponse) VisitCreateTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListTemplatePlaceholderCatalogRequestObject struct {
 }
 
@@ -1319,6 +1580,54 @@ func (response ListTemplatePlaceholderCatalog200JSONResponse) VisitListTemplateP
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTemplatePlaceholderCatalog401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTemplatePlaceholderCatalog401ApplicationProblemPlusJSONResponse) VisitListTemplatePlaceholderCatalogResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTemplatePlaceholderCatalog403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListTemplatePlaceholderCatalog403ApplicationProblemPlusJSONResponse) VisitListTemplatePlaceholderCatalogResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTemplatePlaceholderCatalog500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListTemplatePlaceholderCatalog500ApplicationProblemPlusJSONResponse) VisitListTemplatePlaceholderCatalogResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1368,6 +1677,70 @@ func (response GetTemplate200Response) VisitGetTemplateResponse(w http.ResponseW
 	return nil
 }
 
+type GetTemplate401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetTemplate401ApplicationProblemPlusJSONResponse) VisitGetTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTemplate403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetTemplate403ApplicationProblemPlusJSONResponse) VisitGetTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTemplate404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetTemplate404ApplicationProblemPlusJSONResponse) VisitGetTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTemplate500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetTemplate500ApplicationProblemPlusJSONResponse) VisitGetTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpsertTemplateApprovalConfigRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1382,6 +1755,102 @@ type UpsertTemplateApprovalConfig200Response struct {
 func (response UpsertTemplateApprovalConfig200Response) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
+}
+
+type UpsertTemplateApprovalConfig400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpsertTemplateApprovalConfig400ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertTemplateApprovalConfig401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpsertTemplateApprovalConfig401ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertTemplateApprovalConfig403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpsertTemplateApprovalConfig403ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertTemplateApprovalConfig404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpsertTemplateApprovalConfig404ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertTemplateApprovalConfig409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpsertTemplateApprovalConfig409ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpsertTemplateApprovalConfig500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response UpsertTemplateApprovalConfig500ApplicationProblemPlusJSONResponse) VisitUpsertTemplateApprovalConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ArchiveTemplateRequestObject struct {
@@ -1400,6 +1869,102 @@ func (response ArchiveTemplate200Response) VisitArchiveTemplateResponse(w http.R
 	return nil
 }
 
+type ArchiveTemplate400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTemplate400ApplicationProblemPlusJSONResponse) VisitArchiveTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTemplate401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTemplate401ApplicationProblemPlusJSONResponse) VisitArchiveTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTemplate403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTemplate403ApplicationProblemPlusJSONResponse) VisitArchiveTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTemplate404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTemplate404ApplicationProblemPlusJSONResponse) VisitArchiveTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTemplate409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTemplate409ApplicationProblemPlusJSONResponse) VisitArchiveTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTemplate500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTemplate500ApplicationProblemPlusJSONResponse) VisitArchiveTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListTemplateAuditRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1416,6 +1981,70 @@ func (response ListTemplateAudit200Response) VisitListTemplateAuditResponse(w ht
 	return nil
 }
 
+type ListTemplateAudit401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTemplateAudit401ApplicationProblemPlusJSONResponse) VisitListTemplateAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTemplateAudit403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListTemplateAudit403ApplicationProblemPlusJSONResponse) VisitListTemplateAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTemplateAudit404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListTemplateAudit404ApplicationProblemPlusJSONResponse) VisitListTemplateAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTemplateAudit500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListTemplateAudit500ApplicationProblemPlusJSONResponse) VisitListTemplateAuditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CreateTemplateVersionRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1430,6 +2059,102 @@ type CreateTemplateVersion200Response struct {
 func (response CreateTemplateVersion200Response) VisitCreateTemplateVersionResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
+}
+
+type CreateTemplateVersion400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplateVersion400ApplicationProblemPlusJSONResponse) VisitCreateTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTemplateVersion401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplateVersion401ApplicationProblemPlusJSONResponse) VisitCreateTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTemplateVersion403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplateVersion403ApplicationProblemPlusJSONResponse) VisitCreateTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTemplateVersion404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplateVersion404ApplicationProblemPlusJSONResponse) VisitCreateTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTemplateVersion409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplateVersion409ApplicationProblemPlusJSONResponse) VisitCreateTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTemplateVersion500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTemplateVersion500ApplicationProblemPlusJSONResponse) VisitCreateTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetTemplateVersionRequestObject struct {
@@ -1481,6 +2206,102 @@ func (response ApproveTemplateVersion200JSONResponse) VisitApproveTemplateVersio
 	return err
 }
 
+type ApproveTemplateVersion400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveTemplateVersion400ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveTemplateVersion401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveTemplateVersion401ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveTemplateVersion403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveTemplateVersion403ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveTemplateVersion404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveTemplateVersion404ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveTemplateVersion409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveTemplateVersion409ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ApproveTemplateVersion500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ApproveTemplateVersion500ApplicationProblemPlusJSONResponse) VisitApproveTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CommitTemplateAutosaveRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 	N  int                `json:"n"`
@@ -1498,6 +2319,102 @@ func (response CommitTemplateAutosave200Response) VisitCommitTemplateAutosaveRes
 	return nil
 }
 
+type CommitTemplateAutosave400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CommitTemplateAutosave400ApplicationProblemPlusJSONResponse) VisitCommitTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitTemplateAutosave401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CommitTemplateAutosave401ApplicationProblemPlusJSONResponse) VisitCommitTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitTemplateAutosave403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CommitTemplateAutosave403ApplicationProblemPlusJSONResponse) VisitCommitTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitTemplateAutosave404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CommitTemplateAutosave404ApplicationProblemPlusJSONResponse) VisitCommitTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitTemplateAutosave409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CommitTemplateAutosave409ApplicationProblemPlusJSONResponse) VisitCommitTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CommitTemplateAutosave500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CommitTemplateAutosave500ApplicationProblemPlusJSONResponse) VisitCommitTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PresignTemplateAutosaveRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 	N  int                `json:"n"`
@@ -1513,6 +2430,86 @@ type PresignTemplateAutosave200Response struct {
 func (response PresignTemplateAutosave200Response) VisitPresignTemplateAutosaveResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
+}
+
+type PresignTemplateAutosave400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateAutosave400ApplicationProblemPlusJSONResponse) VisitPresignTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateAutosave401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateAutosave401ApplicationProblemPlusJSONResponse) VisitPresignTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateAutosave403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateAutosave403ApplicationProblemPlusJSONResponse) VisitPresignTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateAutosave404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateAutosave404ApplicationProblemPlusJSONResponse) VisitPresignTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateAutosave500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateAutosave500ApplicationProblemPlusJSONResponse) VisitPresignTemplateAutosaveResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type PresignTemplateDocxUploadUrlRequestObject struct {
@@ -1541,6 +2538,86 @@ func (response PresignTemplateDocxUploadUrl200JSONResponse) VisitPresignTemplate
 	return err
 }
 
+type PresignTemplateDocxUploadUrl400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateDocxUploadUrl400ApplicationProblemPlusJSONResponse) VisitPresignTemplateDocxUploadUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateDocxUploadUrl401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateDocxUploadUrl401ApplicationProblemPlusJSONResponse) VisitPresignTemplateDocxUploadUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateDocxUploadUrl403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateDocxUploadUrl403ApplicationProblemPlusJSONResponse) VisitPresignTemplateDocxUploadUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateDocxUploadUrl404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateDocxUploadUrl404ApplicationProblemPlusJSONResponse) VisitPresignTemplateDocxUploadUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateDocxUploadUrl500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateDocxUploadUrl500ApplicationProblemPlusJSONResponse) VisitPresignTemplateDocxUploadUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetTemplateDocxUrlRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 	N  int                `json:"n"`
@@ -1556,6 +2633,70 @@ type GetTemplateDocxUrl200Response struct {
 func (response GetTemplateDocxUrl200Response) VisitGetTemplateDocxUrlResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
+}
+
+type GetTemplateDocxUrl401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetTemplateDocxUrl401ApplicationProblemPlusJSONResponse) VisitGetTemplateDocxUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTemplateDocxUrl403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetTemplateDocxUrl403ApplicationProblemPlusJSONResponse) VisitGetTemplateDocxUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTemplateDocxUrl404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetTemplateDocxUrl404ApplicationProblemPlusJSONResponse) VisitGetTemplateDocxUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTemplateDocxUrl500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetTemplateDocxUrl500ApplicationProblemPlusJSONResponse) VisitGetTemplateDocxUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type SaveTemplateDraftRequestObject struct {
@@ -1658,6 +2799,102 @@ func (response ReviewTemplateVersion200Response) VisitReviewTemplateVersionRespo
 	return nil
 }
 
+type ReviewTemplateVersion400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewTemplateVersion400ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewTemplateVersion401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewTemplateVersion401ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewTemplateVersion403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewTemplateVersion403ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewTemplateVersion404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewTemplateVersion404ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewTemplateVersion409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewTemplateVersion409ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReviewTemplateVersion500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ReviewTemplateVersion500ApplicationProblemPlusJSONResponse) VisitReviewTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateTemplateSchemaRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	N    int                `json:"n"`
@@ -1744,6 +2981,86 @@ func (response PresignTemplateSchemaUploadUrl200JSONResponse) VisitPresignTempla
 	return err
 }
 
+type PresignTemplateSchemaUploadUrl400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateSchemaUploadUrl400ApplicationProblemPlusJSONResponse) VisitPresignTemplateSchemaUploadUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateSchemaUploadUrl401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateSchemaUploadUrl401ApplicationProblemPlusJSONResponse) VisitPresignTemplateSchemaUploadUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateSchemaUploadUrl403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateSchemaUploadUrl403ApplicationProblemPlusJSONResponse) VisitPresignTemplateSchemaUploadUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateSchemaUploadUrl404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateSchemaUploadUrl404ApplicationProblemPlusJSONResponse) VisitPresignTemplateSchemaUploadUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PresignTemplateSchemaUploadUrl500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response PresignTemplateSchemaUploadUrl500ApplicationProblemPlusJSONResponse) VisitPresignTemplateSchemaUploadUrlResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SubmitTemplateVersionRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	N      int                `json:"n"`
@@ -1762,6 +3079,102 @@ func (response SubmitTemplateVersion200Response) VisitSubmitTemplateVersionRespo
 	return nil
 }
 
+type SubmitTemplateVersion400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersion400ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersion401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersion401ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersion403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersion403ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersion404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersion404ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersion409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersion409ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitTemplateVersion500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitTemplateVersion500ApplicationProblemPlusJSONResponse) VisitSubmitTemplateVersionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Redirect to presigned GET URL for a stored object
@@ -1773,43 +3186,43 @@ type StrictServerInterface interface {
 	// Create template (docx)
 	// (POST /templates)
 	CreateTemplate(ctx context.Context, request CreateTemplateRequestObject) (CreateTemplateResponseObject, error)
-
+	// List template placeholder catalog
 	// (GET /templates/placeholder-catalog)
 	ListTemplatePlaceholderCatalog(ctx context.Context, request ListTemplatePlaceholderCatalogRequestObject) (ListTemplatePlaceholderCatalogResponseObject, error)
 	// Get system-owned blank template
 	// (GET /templates/system/blank)
 	GetSystemBlankTemplate(ctx context.Context, request GetSystemBlankTemplateRequestObject) (GetSystemBlankTemplateResponseObject, error)
-
+	// Get template
 	// (GET /templates/{id})
 	GetTemplate(ctx context.Context, request GetTemplateRequestObject) (GetTemplateResponseObject, error)
-
+	// Upsert template approval config
 	// (PUT /templates/{id}/approval-config)
 	UpsertTemplateApprovalConfig(ctx context.Context, request UpsertTemplateApprovalConfigRequestObject) (UpsertTemplateApprovalConfigResponseObject, error)
-
+	// Archive template
 	// (POST /templates/{id}/archive)
 	ArchiveTemplate(ctx context.Context, request ArchiveTemplateRequestObject) (ArchiveTemplateResponseObject, error)
-
+	// List template audit
 	// (GET /templates/{id}/audit)
 	ListTemplateAudit(ctx context.Context, request ListTemplateAuditRequestObject) (ListTemplateAuditResponseObject, error)
-
+	// Create template version
 	// (POST /templates/{id}/versions)
 	CreateTemplateVersion(ctx context.Context, request CreateTemplateVersionRequestObject) (CreateTemplateVersionResponseObject, error)
 	// Get template version metadata (docx)
 	// (GET /templates/{id}/versions/{n})
 	GetTemplateVersion(ctx context.Context, request GetTemplateVersionRequestObject) (GetTemplateVersionResponseObject, error)
-
+	// Approve template version
 	// (POST /templates/{id}/versions/{n}/approve)
 	ApproveTemplateVersion(ctx context.Context, request ApproveTemplateVersionRequestObject) (ApproveTemplateVersionResponseObject, error)
-
+	// Commit template autosave
 	// (POST /templates/{id}/versions/{n}/autosave/commit)
 	CommitTemplateAutosave(ctx context.Context, request CommitTemplateAutosaveRequestObject) (CommitTemplateAutosaveResponseObject, error)
-
+	// Presign template autosave
 	// (POST /templates/{id}/versions/{n}/autosave/presign)
 	PresignTemplateAutosave(ctx context.Context, request PresignTemplateAutosaveRequestObject) (PresignTemplateAutosaveResponseObject, error)
 	// Presign PUT URL for draft .docx upload
 	// (POST /templates/{id}/versions/{n}/docx-upload-url)
 	PresignTemplateDocxUploadUrl(ctx context.Context, request PresignTemplateDocxUploadUrlRequestObject) (PresignTemplateDocxUploadUrlResponseObject, error)
-
+	// Get template DOCX URL
 	// (GET /templates/{id}/versions/{n}/docx-url)
 	GetTemplateDocxUrl(ctx context.Context, request GetTemplateDocxUrlRequestObject) (GetTemplateDocxUrlResponseObject, error)
 	// Save draft (CAS via expected_lock_version)
@@ -1818,16 +3231,16 @@ type StrictServerInterface interface {
 	// Publish draft (validates template tokens)
 	// (POST /templates/{id}/versions/{n}/publish)
 	PublishTemplateVersion(ctx context.Context, request PublishTemplateVersionRequestObject) (PublishTemplateVersionResponseObject, error)
-
+	// Review template version
 	// (POST /templates/{id}/versions/{n}/review)
 	ReviewTemplateVersion(ctx context.Context, request ReviewTemplateVersionRequestObject) (ReviewTemplateVersionResponseObject, error)
-
+	// Update template schema
 	// (PUT /templates/{id}/versions/{n}/schema)
 	UpdateTemplateSchema(ctx context.Context, request UpdateTemplateSchemaRequestObject) (UpdateTemplateSchemaResponseObject, error)
 	// Presign PUT URL for draft schema.json upload
 	// (POST /templates/{id}/versions/{n}/schema-upload-url)
 	PresignTemplateSchemaUploadUrl(ctx context.Context, request PresignTemplateSchemaUploadUrlRequestObject) (PresignTemplateSchemaUploadUrlResponseObject, error)
-
+	// Submit template version
 	// (POST /templates/{id}/versions/{n}/submit)
 	SubmitTemplateVersion(ctx context.Context, request SubmitTemplateVersionRequestObject) (SubmitTemplateVersionResponseObject, error)
 }
@@ -2476,61 +3889,81 @@ func (sh *strictHandler) SubmitTemplateVersion(w http.ResponseWriter, r *http.Re
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"WHjUEN1+uf3fAAAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

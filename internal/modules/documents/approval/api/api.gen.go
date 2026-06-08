@@ -391,16 +391,16 @@ type CreateApprovalRouteParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
 }
 
-// DeactivateApprovalRouteParams defines parameters for DeactivateApprovalRoute.
-type DeactivateApprovalRouteParams struct {
+// UpdateApprovalRouteParams defines parameters for UpdateApprovalRoute.
+type UpdateApprovalRouteParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
 
 	// IfMatch Expected route version ETag in the form "v<N>"
 	IfMatch string `json:"If-Match"`
 }
 
-// UpdateApprovalRouteParams defines parameters for UpdateApprovalRoute.
-type UpdateApprovalRouteParams struct {
+// DeactivateApprovalRouteParams defines parameters for DeactivateApprovalRoute.
+type DeactivateApprovalRouteParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
 
 	// IfMatch Expected route version ETag in the form "v<N>"
@@ -424,11 +424,11 @@ type SubmitDocumentForApprovalParams struct {
 // CreateApprovalRouteJSONRequestBody defines body for CreateApprovalRoute for application/json ContentType.
 type CreateApprovalRouteJSONRequestBody = CreateRouteRequest
 
-// DeactivateApprovalRouteJSONRequestBody defines body for DeactivateApprovalRoute for application/json ContentType.
-type DeactivateApprovalRouteJSONRequestBody = DeactivateRouteRequest
-
 // UpdateApprovalRouteJSONRequestBody defines body for UpdateApprovalRoute for application/json ContentType.
 type UpdateApprovalRouteJSONRequestBody = UpdateRouteRequest
+
+// DeactivateApprovalRouteJSONRequestBody defines body for DeactivateApprovalRoute for application/json ContentType.
+type DeactivateApprovalRouteJSONRequestBody = DeactivateRouteRequest
 
 // Getter for additional properties for CreateRouteRequest. Returns the specified
 // element and whether it was found
@@ -1325,16 +1325,16 @@ func (a UpdateRouteRequest) MarshalJSON() ([]byte, error) {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-
+	// List approval inbox
 	// (GET /approval/inbox)
 	ListApprovalInbox(w http.ResponseWriter, r *http.Request)
-
+	// Get approval instance
 	// (GET /approval/instances/{instance_id})
 	GetApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
-
+	// Cancel approval instance
 	// (POST /approval/instances/{instance_id}/cancel)
 	CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
-
+	// Record approval stage signoff
 	// (POST /approval/instances/{instance_id}/stages/{stage_id}/signoffs)
 	RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params RecordApprovalStageSignoffParams)
 	// List approval routes for the active tenant
@@ -1343,34 +1343,34 @@ type ServerInterface interface {
 	// Create an approval route for the active tenant
 	// (POST /approval/routes)
 	CreateApprovalRoute(w http.ResponseWriter, r *http.Request, params CreateApprovalRouteParams)
-	// Deactivate an approval route
-	// (DELETE /approval/routes/{id})
-	DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params DeactivateApprovalRouteParams)
 	// Update an approval route (new version)
 	// (PUT /approval/routes/{id})
 	UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params UpdateApprovalRouteParams)
-
+	// Deactivate an approval route
+	// (POST /approval/routes/{id}/deactivate)
+	DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params DeactivateApprovalRouteParams)
+	// Get approval instance by document
 	// (GET /documents/{id}/approval-instance)
 	GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
+	// Cancel document approval
 	// (POST /documents/{id}/cancel)
 	CancelDocumentApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
+	// Obsolete document
 	// (POST /documents/{id}/obsolete)
 	ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
+	// Publish document
 	// (POST /documents/{id}/publish)
 	PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
+	// Schedule document publish
 	// (POST /documents/{id}/schedule-publish)
 	ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
+	// Record document signoff
 	// (POST /documents/{id}/signoff)
 	RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params RecordDocumentSignoffParams)
-
+	// Submit document for approval
 	// (POST /documents/{id}/submit)
 	SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SubmitDocumentForApprovalParams)
-
+	// Supersede document
 	// (POST /documents/{id}/supersede)
 	SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
@@ -1386,6 +1386,12 @@ type MiddlewareFunc func(http.Handler) http.Handler
 
 // ListApprovalInbox operation middleware
 func (siw *ServerInterfaceWrapper) ListApprovalInbox(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListApprovalInbox(w, r)
@@ -1413,6 +1419,12 @@ func (siw *ServerInterfaceWrapper) GetApprovalInstance(w http.ResponseWriter, r 
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetApprovalInstance(w, r, instanceId)
 	}))
@@ -1438,6 +1450,12 @@ func (siw *ServerInterfaceWrapper) CancelApprovalInstance(w http.ResponseWriter,
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "instance_id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CancelApprovalInstance(w, r, instanceId)
@@ -1473,6 +1491,12 @@ func (siw *ServerInterfaceWrapper) RecordApprovalStageSignoff(w http.ResponseWri
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "stage_id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params RecordApprovalStageSignoffParams
@@ -1607,89 +1631,6 @@ func (siw *ServerInterfaceWrapper) CreateApprovalRoute(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
-// DeactivateApprovalRoute operation middleware
-func (siw *ServerInterfaceWrapper) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params DeactivateApprovalRouteParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "Idempotency-Key" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
-		var IdempotencyKey string
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
-			return
-		}
-
-		params.IdempotencyKey = IdempotencyKey
-
-	} else {
-		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
-		return
-	}
-
-	// ------------- Required header parameter "If-Match" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
-		var IfMatch string
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
-			return
-		}
-
-		params.IfMatch = IfMatch
-
-	} else {
-		err := fmt.Errorf("Header parameter If-Match is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeactivateApprovalRoute(w, r, id, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // UpdateApprovalRoute operation middleware
 func (siw *ServerInterfaceWrapper) UpdateApprovalRoute(w http.ResponseWriter, r *http.Request) {
 
@@ -1773,6 +1714,89 @@ func (siw *ServerInterfaceWrapper) UpdateApprovalRoute(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// DeactivateApprovalRoute operation middleware
+func (siw *ServerInterfaceWrapper) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeactivateApprovalRouteParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeactivateApprovalRoute(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetApprovalInstanceByDocument operation middleware
 func (siw *ServerInterfaceWrapper) GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request) {
 
@@ -1787,6 +1811,12 @@ func (siw *ServerInterfaceWrapper) GetApprovalInstanceByDocument(w http.Response
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetApprovalInstanceByDocument(w, r, id)
@@ -1814,6 +1844,12 @@ func (siw *ServerInterfaceWrapper) CancelDocumentApproval(w http.ResponseWriter,
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CancelDocumentApproval(w, r, id)
 	}))
@@ -1839,6 +1875,12 @@ func (siw *ServerInterfaceWrapper) ObsoleteDocument(w http.ResponseWriter, r *ht
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ObsoleteDocument(w, r, id)
@@ -1866,6 +1908,12 @@ func (siw *ServerInterfaceWrapper) PublishDocument(w http.ResponseWriter, r *htt
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PublishDocument(w, r, id)
 	}))
@@ -1892,6 +1940,12 @@ func (siw *ServerInterfaceWrapper) ScheduleDocumentPublish(w http.ResponseWriter
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ScheduleDocumentPublish(w, r, id)
 	}))
@@ -1917,6 +1971,12 @@ func (siw *ServerInterfaceWrapper) RecordDocumentSignoff(w http.ResponseWriter, 
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params RecordDocumentSignoffParams
@@ -1995,6 +2055,12 @@ func (siw *ServerInterfaceWrapper) SubmitDocumentForApproval(w http.ResponseWrit
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params SubmitDocumentForApprovalParams
 
@@ -2048,6 +2114,12 @@ func (siw *ServerInterfaceWrapper) SupersedeDocument(w http.ResponseWriter, r *h
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SupersedeDocument(w, r, id)
@@ -2186,8 +2258,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/approval/instances/{instance_id}/stages/{stage_id}/signoffs", wrapper.RecordApprovalStageSignoff)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/approval/routes", wrapper.ListApprovalRoutes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/approval/routes", wrapper.CreateApprovalRoute)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/approval/routes/{id}", wrapper.DeactivateApprovalRoute)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/approval/routes/{id}", wrapper.UpdateApprovalRoute)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/approval/routes/{id}/deactivate", wrapper.DeactivateApprovalRoute)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/documents/{id}/approval-instance", wrapper.GetApprovalInstanceByDocument)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/cancel", wrapper.CancelDocumentApproval)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/obsolete", wrapper.ObsoleteDocument)
@@ -2225,6 +2297,54 @@ type ListApprovalInbox200Response struct {
 func (response ListApprovalInbox200Response) VisitListApprovalInboxResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
+}
+
+type ListApprovalInbox401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListApprovalInbox401ApplicationProblemPlusJSONResponse) VisitListApprovalInboxResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListApprovalInbox403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListApprovalInbox403ApplicationProblemPlusJSONResponse) VisitListApprovalInboxResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListApprovalInbox500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListApprovalInbox500ApplicationProblemPlusJSONResponse) VisitListApprovalInboxResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetApprovalInstanceRequestObject struct {
@@ -2297,6 +2417,102 @@ func (response CancelApprovalInstance200Response) VisitCancelApprovalInstanceRes
 	return nil
 }
 
+type CancelApprovalInstance400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CancelApprovalInstance400ApplicationProblemPlusJSONResponse) VisitCancelApprovalInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelApprovalInstance401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CancelApprovalInstance401ApplicationProblemPlusJSONResponse) VisitCancelApprovalInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelApprovalInstance403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CancelApprovalInstance403ApplicationProblemPlusJSONResponse) VisitCancelApprovalInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelApprovalInstance404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CancelApprovalInstance404ApplicationProblemPlusJSONResponse) VisitCancelApprovalInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelApprovalInstance409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CancelApprovalInstance409ApplicationProblemPlusJSONResponse) VisitCancelApprovalInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelApprovalInstance500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CancelApprovalInstance500ApplicationProblemPlusJSONResponse) VisitCancelApprovalInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RecordApprovalStageSignoffRequestObject struct {
 	InstanceId openapi_types.UUID `json:"instance_id"`
 	StageId    openapi_types.UUID `json:"stage_id"`
@@ -2313,6 +2529,102 @@ type RecordApprovalStageSignoff200Response struct {
 func (response RecordApprovalStageSignoff200Response) VisitRecordApprovalStageSignoffResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
+}
+
+type RecordApprovalStageSignoff400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RecordApprovalStageSignoff400ApplicationProblemPlusJSONResponse) VisitRecordApprovalStageSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordApprovalStageSignoff401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RecordApprovalStageSignoff401ApplicationProblemPlusJSONResponse) VisitRecordApprovalStageSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordApprovalStageSignoff403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RecordApprovalStageSignoff403ApplicationProblemPlusJSONResponse) VisitRecordApprovalStageSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordApprovalStageSignoff404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RecordApprovalStageSignoff404ApplicationProblemPlusJSONResponse) VisitRecordApprovalStageSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordApprovalStageSignoff409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RecordApprovalStageSignoff409ApplicationProblemPlusJSONResponse) VisitRecordApprovalStageSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordApprovalStageSignoff500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RecordApprovalStageSignoff500ApplicationProblemPlusJSONResponse) VisitRecordApprovalStageSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ListApprovalRoutesRequestObject struct {
@@ -2487,126 +2799,6 @@ func (response CreateApprovalRoute500ApplicationProblemPlusJSONResponse) VisitCr
 	return err
 }
 
-type DeactivateApprovalRouteRequestObject struct {
-	Id     openapi_types.UUID `json:"id"`
-	Params DeactivateApprovalRouteParams
-	Body   *DeactivateApprovalRouteJSONRequestBody
-}
-
-type DeactivateApprovalRouteResponseObject interface {
-	VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error
-}
-
-type DeactivateApprovalRoute200JSONResponse RouteResponse
-
-func (response DeactivateApprovalRoute200JSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeactivateApprovalRoute400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response DeactivateApprovalRoute400ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeactivateApprovalRoute401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response DeactivateApprovalRoute401ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeactivateApprovalRoute403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response DeactivateApprovalRoute403ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeactivateApprovalRoute404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response DeactivateApprovalRoute404ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeactivateApprovalRoute409ApplicationProblemPlusJSONResponse struct {
-	ConflictApplicationProblemPlusJSONResponse
-}
-
-func (response DeactivateApprovalRoute409ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DeactivateApprovalRoute500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response DeactivateApprovalRoute500ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
 type UpdateApprovalRouteRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	Params UpdateApprovalRouteParams
@@ -2727,6 +2919,126 @@ func (response UpdateApprovalRoute500ApplicationProblemPlusJSONResponse) VisitUp
 	return err
 }
 
+type DeactivateApprovalRouteRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params DeactivateApprovalRouteParams
+	Body   *DeactivateApprovalRouteJSONRequestBody
+}
+
+type DeactivateApprovalRouteResponseObject interface {
+	VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error
+}
+
+type DeactivateApprovalRoute200JSONResponse RouteResponse
+
+func (response DeactivateApprovalRoute200JSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateApprovalRoute400ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateApprovalRoute401ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateApprovalRoute403ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateApprovalRoute404ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateApprovalRoute409ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateApprovalRoute500ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetApprovalInstanceByDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -2797,6 +3109,102 @@ func (response CancelDocumentApproval200Response) VisitCancelDocumentApprovalRes
 	return nil
 }
 
+type CancelDocumentApproval400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CancelDocumentApproval400ApplicationProblemPlusJSONResponse) VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelDocumentApproval401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CancelDocumentApproval401ApplicationProblemPlusJSONResponse) VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelDocumentApproval403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CancelDocumentApproval403ApplicationProblemPlusJSONResponse) VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelDocumentApproval404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CancelDocumentApproval404ApplicationProblemPlusJSONResponse) VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelDocumentApproval409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CancelDocumentApproval409ApplicationProblemPlusJSONResponse) VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelDocumentApproval500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CancelDocumentApproval500ApplicationProblemPlusJSONResponse) VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ObsoleteDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -2811,6 +3219,102 @@ type ObsoleteDocument200Response struct {
 func (response ObsoleteDocument200Response) VisitObsoleteDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
+}
+
+type ObsoleteDocument400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ObsoleteDocument400ApplicationProblemPlusJSONResponse) VisitObsoleteDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObsoleteDocument401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ObsoleteDocument401ApplicationProblemPlusJSONResponse) VisitObsoleteDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObsoleteDocument403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ObsoleteDocument403ApplicationProblemPlusJSONResponse) VisitObsoleteDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObsoleteDocument404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ObsoleteDocument404ApplicationProblemPlusJSONResponse) VisitObsoleteDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObsoleteDocument409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ObsoleteDocument409ApplicationProblemPlusJSONResponse) VisitObsoleteDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObsoleteDocument500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ObsoleteDocument500ApplicationProblemPlusJSONResponse) VisitObsoleteDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type PublishDocumentRequestObject struct {
@@ -2829,6 +3333,102 @@ func (response PublishDocument200Response) VisitPublishDocumentResponse(w http.R
 	return nil
 }
 
+type PublishDocument400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PublishDocument400ApplicationProblemPlusJSONResponse) VisitPublishDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishDocument401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PublishDocument401ApplicationProblemPlusJSONResponse) VisitPublishDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishDocument403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PublishDocument403ApplicationProblemPlusJSONResponse) VisitPublishDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishDocument404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PublishDocument404ApplicationProblemPlusJSONResponse) VisitPublishDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishDocument409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PublishDocument409ApplicationProblemPlusJSONResponse) VisitPublishDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PublishDocument500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response PublishDocument500ApplicationProblemPlusJSONResponse) VisitPublishDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ScheduleDocumentPublishRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -2843,6 +3443,102 @@ type ScheduleDocumentPublish200Response struct {
 func (response ScheduleDocumentPublish200Response) VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
+}
+
+type ScheduleDocumentPublish400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ScheduleDocumentPublish400ApplicationProblemPlusJSONResponse) VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScheduleDocumentPublish401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ScheduleDocumentPublish401ApplicationProblemPlusJSONResponse) VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScheduleDocumentPublish403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ScheduleDocumentPublish403ApplicationProblemPlusJSONResponse) VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScheduleDocumentPublish404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ScheduleDocumentPublish404ApplicationProblemPlusJSONResponse) VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScheduleDocumentPublish409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ScheduleDocumentPublish409ApplicationProblemPlusJSONResponse) VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ScheduleDocumentPublish500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ScheduleDocumentPublish500ApplicationProblemPlusJSONResponse) VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type RecordDocumentSignoffRequestObject struct {
@@ -2862,6 +3558,102 @@ func (response RecordDocumentSignoff200Response) VisitRecordDocumentSignoffRespo
 	return nil
 }
 
+type RecordDocumentSignoff400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RecordDocumentSignoff400ApplicationProblemPlusJSONResponse) VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordDocumentSignoff401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response RecordDocumentSignoff401ApplicationProblemPlusJSONResponse) VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordDocumentSignoff403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RecordDocumentSignoff403ApplicationProblemPlusJSONResponse) VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordDocumentSignoff404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RecordDocumentSignoff404ApplicationProblemPlusJSONResponse) VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordDocumentSignoff409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RecordDocumentSignoff409ApplicationProblemPlusJSONResponse) VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RecordDocumentSignoff500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response RecordDocumentSignoff500ApplicationProblemPlusJSONResponse) VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SubmitDocumentForApprovalRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	Params SubmitDocumentForApprovalParams
@@ -2877,6 +3669,102 @@ type SubmitDocumentForApproval201Response struct {
 func (response SubmitDocumentForApproval201Response) VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error {
 	w.WriteHeader(201)
 	return nil
+}
+
+type SubmitDocumentForApproval400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitDocumentForApproval400ApplicationProblemPlusJSONResponse) VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitDocumentForApproval401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitDocumentForApproval401ApplicationProblemPlusJSONResponse) VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitDocumentForApproval403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitDocumentForApproval403ApplicationProblemPlusJSONResponse) VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitDocumentForApproval404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitDocumentForApproval404ApplicationProblemPlusJSONResponse) VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitDocumentForApproval409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitDocumentForApproval409ApplicationProblemPlusJSONResponse) VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SubmitDocumentForApproval500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SubmitDocumentForApproval500ApplicationProblemPlusJSONResponse) VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type SupersedeDocumentRequestObject struct {
@@ -2895,18 +3783,114 @@ func (response SupersedeDocument200Response) VisitSupersedeDocumentResponse(w ht
 	return nil
 }
 
+type SupersedeDocument400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SupersedeDocument400ApplicationProblemPlusJSONResponse) VisitSupersedeDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SupersedeDocument401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SupersedeDocument401ApplicationProblemPlusJSONResponse) VisitSupersedeDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SupersedeDocument403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SupersedeDocument403ApplicationProblemPlusJSONResponse) VisitSupersedeDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SupersedeDocument404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SupersedeDocument404ApplicationProblemPlusJSONResponse) VisitSupersedeDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SupersedeDocument409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SupersedeDocument409ApplicationProblemPlusJSONResponse) VisitSupersedeDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SupersedeDocument500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SupersedeDocument500ApplicationProblemPlusJSONResponse) VisitSupersedeDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-
+	// List approval inbox
 	// (GET /approval/inbox)
 	ListApprovalInbox(ctx context.Context, request ListApprovalInboxRequestObject) (ListApprovalInboxResponseObject, error)
-
+	// Get approval instance
 	// (GET /approval/instances/{instance_id})
 	GetApprovalInstance(ctx context.Context, request GetApprovalInstanceRequestObject) (GetApprovalInstanceResponseObject, error)
-
+	// Cancel approval instance
 	// (POST /approval/instances/{instance_id}/cancel)
 	CancelApprovalInstance(ctx context.Context, request CancelApprovalInstanceRequestObject) (CancelApprovalInstanceResponseObject, error)
-
+	// Record approval stage signoff
 	// (POST /approval/instances/{instance_id}/stages/{stage_id}/signoffs)
 	RecordApprovalStageSignoff(ctx context.Context, request RecordApprovalStageSignoffRequestObject) (RecordApprovalStageSignoffResponseObject, error)
 	// List approval routes for the active tenant
@@ -2915,34 +3899,34 @@ type StrictServerInterface interface {
 	// Create an approval route for the active tenant
 	// (POST /approval/routes)
 	CreateApprovalRoute(ctx context.Context, request CreateApprovalRouteRequestObject) (CreateApprovalRouteResponseObject, error)
-	// Deactivate an approval route
-	// (DELETE /approval/routes/{id})
-	DeactivateApprovalRoute(ctx context.Context, request DeactivateApprovalRouteRequestObject) (DeactivateApprovalRouteResponseObject, error)
 	// Update an approval route (new version)
 	// (PUT /approval/routes/{id})
 	UpdateApprovalRoute(ctx context.Context, request UpdateApprovalRouteRequestObject) (UpdateApprovalRouteResponseObject, error)
-
+	// Deactivate an approval route
+	// (POST /approval/routes/{id}/deactivate)
+	DeactivateApprovalRoute(ctx context.Context, request DeactivateApprovalRouteRequestObject) (DeactivateApprovalRouteResponseObject, error)
+	// Get approval instance by document
 	// (GET /documents/{id}/approval-instance)
 	GetApprovalInstanceByDocument(ctx context.Context, request GetApprovalInstanceByDocumentRequestObject) (GetApprovalInstanceByDocumentResponseObject, error)
-
+	// Cancel document approval
 	// (POST /documents/{id}/cancel)
 	CancelDocumentApproval(ctx context.Context, request CancelDocumentApprovalRequestObject) (CancelDocumentApprovalResponseObject, error)
-
+	// Obsolete document
 	// (POST /documents/{id}/obsolete)
 	ObsoleteDocument(ctx context.Context, request ObsoleteDocumentRequestObject) (ObsoleteDocumentResponseObject, error)
-
+	// Publish document
 	// (POST /documents/{id}/publish)
 	PublishDocument(ctx context.Context, request PublishDocumentRequestObject) (PublishDocumentResponseObject, error)
-
+	// Schedule document publish
 	// (POST /documents/{id}/schedule-publish)
 	ScheduleDocumentPublish(ctx context.Context, request ScheduleDocumentPublishRequestObject) (ScheduleDocumentPublishResponseObject, error)
-
+	// Record document signoff
 	// (POST /documents/{id}/signoff)
 	RecordDocumentSignoff(ctx context.Context, request RecordDocumentSignoffRequestObject) (RecordDocumentSignoffResponseObject, error)
-
+	// Submit document for approval
 	// (POST /documents/{id}/submit)
 	SubmitDocumentForApproval(ctx context.Context, request SubmitDocumentForApprovalRequestObject) (SubmitDocumentForApprovalResponseObject, error)
-
+	// Supersede document
 	// (POST /documents/{id}/supersede)
 	SupersedeDocument(ctx context.Context, request SupersedeDocumentRequestObject) (SupersedeDocumentResponseObject, error)
 }
@@ -3137,6 +4121,40 @@ func (sh *strictHandler) CreateApprovalRoute(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// UpdateApprovalRoute operation middleware
+func (sh *strictHandler) UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params UpdateApprovalRouteParams) {
+	var request UpdateApprovalRouteRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body UpdateApprovalRouteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateApprovalRoute(ctx, request.(UpdateApprovalRouteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateApprovalRoute")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateApprovalRouteResponseObject); ok {
+		if err := validResponse.VisitUpdateApprovalRouteResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeactivateApprovalRoute operation middleware
 func (sh *strictHandler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params DeactivateApprovalRouteParams) {
 	var request DeactivateApprovalRouteRequestObject
@@ -3167,40 +4185,6 @@ func (sh *strictHandler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DeactivateApprovalRouteResponseObject); ok {
 		if err := validResponse.VisitDeactivateApprovalRouteResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// UpdateApprovalRoute operation middleware
-func (sh *strictHandler) UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params UpdateApprovalRouteParams) {
-	var request UpdateApprovalRouteRequestObject
-
-	request.Id = id
-	request.Params = params
-
-	var body UpdateApprovalRouteJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateApprovalRoute(ctx, request.(UpdateApprovalRouteRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateApprovalRoute")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateApprovalRouteResponseObject); ok {
-		if err := validResponse.VisitUpdateApprovalRouteResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3423,64 +4407,73 @@ func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"q02TO7jhSfhCKXm4fvjfAAAA//8=",
+	"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",
+	"Vn8l6f76/n8DAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

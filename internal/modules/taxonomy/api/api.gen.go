@@ -22,6 +22,10 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+const (
+	SessionCookieScopes sessionCookieContextKey = "sessionCookie.Scopes"
+)
+
 // DocumentFamilyItem defines model for DocumentFamilyItem.
 type DocumentFamilyItem struct {
 	Code        string `json:"code"`
@@ -44,6 +48,15 @@ type DocumentProfileItem struct {
 	WorkflowProfile     string  `json:"workflow_profile"`
 }
 
+// FieldError defines model for FieldError.
+type FieldError struct {
+	Code string `json:"code"`
+
+	// Field JSON pointer or dot path
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
 // ListDocumentFamiliesResponse defines model for ListDocumentFamiliesResponse.
 type ListDocumentFamiliesResponse struct {
 	Items []DocumentFamilyItem `json:"items"`
@@ -59,12 +72,42 @@ type ListProcessAreasResponse struct {
 	Items []ProcessAreaItem `json:"items"`
 }
 
+// Problem defines model for Problem.
+type Problem struct {
+	// Code Machine-readable code from canonical taxonomy
+	Code     string        `json:"code"`
+	Detail   *string       `json:"detail,omitempty"`
+	Errors   *[]FieldError `json:"errors,omitempty"`
+	Instance *string       `json:"instance,omitempty"`
+	Status   int           `json:"status"`
+	Title    string        `json:"title"`
+	Type     *string       `json:"type,omitempty"`
+}
+
 // ProcessAreaItem defines model for ProcessAreaItem.
 type ProcessAreaItem struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
 	Name        string `json:"name"`
 }
+
+// BadRequest defines model for BadRequest.
+type BadRequest = Problem
+
+// Conflict defines model for Conflict.
+type Conflict = Problem
+
+// Forbidden defines model for Forbidden.
+type Forbidden = Problem
+
+// InternalServerError defines model for InternalServerError.
+type InternalServerError = Problem
+
+// NotFound defines model for NotFound.
+type NotFound = Problem
+
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = Problem
 
 // sessionCookieContextKey is the context key for sessionCookie security scheme
 type sessionCookieContextKey string
@@ -76,52 +119,52 @@ type ListTaxonomyFamiliesParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-
+	// List taxonomy areas
 	// (GET /taxonomy/areas)
 	ListTaxonomyAreas(w http.ResponseWriter, r *http.Request)
-
+	// Create taxonomy area
 	// (POST /taxonomy/areas)
 	CreateTaxonomyArea(w http.ResponseWriter, r *http.Request)
-
+	// Archive taxonomy area
 	// (DELETE /taxonomy/areas/{code})
 	ArchiveTaxonomyArea(w http.ResponseWriter, r *http.Request, code string)
-
+	// Get taxonomy area
 	// (GET /taxonomy/areas/{code})
 	GetTaxonomyArea(w http.ResponseWriter, r *http.Request, code string)
-
+	// Update taxonomy area
 	// (PUT /taxonomy/areas/{code})
 	UpdateTaxonomyArea(w http.ResponseWriter, r *http.Request, code string)
-
+	// List taxonomy families
 	// (GET /taxonomy/families)
 	ListTaxonomyFamilies(w http.ResponseWriter, r *http.Request, params ListTaxonomyFamiliesParams)
-
+	// Create taxonomy family
 	// (POST /taxonomy/families)
 	CreateTaxonomyFamily(w http.ResponseWriter, r *http.Request)
-
+	// Deactivate taxonomy family
 	// (DELETE /taxonomy/families/{code})
 	DeactivateTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string)
-
+	// Get taxonomy family
 	// (GET /taxonomy/families/{code})
 	GetTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string)
-
+	// Update taxonomy family
 	// (PATCH /taxonomy/families/{code})
 	UpdateTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string)
-
+	// List taxonomy profiles
 	// (GET /taxonomy/profiles)
 	ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request)
-
+	// Create taxonomy profile
 	// (POST /taxonomy/profiles)
 	CreateTaxonomyProfile(w http.ResponseWriter, r *http.Request)
-
+	// Archive taxonomy profile
 	// (DELETE /taxonomy/profiles/{code})
 	ArchiveTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string)
-
+	// Get taxonomy profile
 	// (GET /taxonomy/profiles/{code})
 	GetTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string)
-
+	// Update taxonomy profile
 	// (PATCH /taxonomy/profiles/{code})
 	UpdateTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string)
-
+	// Set taxonomy profile default template
 	// (PUT /taxonomy/profiles/{code}/default-template)
 	SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter, r *http.Request, code string)
 }
@@ -138,6 +181,12 @@ type MiddlewareFunc func(http.Handler) http.Handler
 // ListTaxonomyAreas operation middleware
 func (siw *ServerInterfaceWrapper) ListTaxonomyAreas(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListTaxonomyAreas(w, r)
 	}))
@@ -151,6 +200,12 @@ func (siw *ServerInterfaceWrapper) ListTaxonomyAreas(w http.ResponseWriter, r *h
 
 // CreateTaxonomyArea operation middleware
 func (siw *ServerInterfaceWrapper) CreateTaxonomyArea(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateTaxonomyArea(w, r)
@@ -178,6 +233,12 @@ func (siw *ServerInterfaceWrapper) ArchiveTaxonomyArea(w http.ResponseWriter, r 
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ArchiveTaxonomyArea(w, r, code)
 	}))
@@ -203,6 +264,12 @@ func (siw *ServerInterfaceWrapper) GetTaxonomyArea(w http.ResponseWriter, r *htt
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetTaxonomyArea(w, r, code)
@@ -230,6 +297,12 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyArea(w http.ResponseWriter, r *
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateTaxonomyArea(w, r, code)
 	}))
@@ -246,6 +319,12 @@ func (siw *ServerInterfaceWrapper) ListTaxonomyFamilies(w http.ResponseWriter, r
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListTaxonomyFamiliesParams
@@ -277,6 +356,12 @@ func (siw *ServerInterfaceWrapper) ListTaxonomyFamilies(w http.ResponseWriter, r
 // CreateTaxonomyFamily operation middleware
 func (siw *ServerInterfaceWrapper) CreateTaxonomyFamily(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateTaxonomyFamily(w, r)
 	}))
@@ -302,6 +387,12 @@ func (siw *ServerInterfaceWrapper) DeactivateTaxonomyFamily(w http.ResponseWrite
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeactivateTaxonomyFamily(w, r, code)
@@ -329,6 +420,12 @@ func (siw *ServerInterfaceWrapper) GetTaxonomyFamily(w http.ResponseWriter, r *h
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetTaxonomyFamily(w, r, code)
 	}))
@@ -355,6 +452,12 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyFamily(w http.ResponseWriter, r
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateTaxonomyFamily(w, r, code)
 	}))
@@ -369,6 +472,12 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyFamily(w http.ResponseWriter, r
 // ListTaxonomyProfiles operation middleware
 func (siw *ServerInterfaceWrapper) ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request) {
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListTaxonomyProfiles(w, r)
 	}))
@@ -382,6 +491,12 @@ func (siw *ServerInterfaceWrapper) ListTaxonomyProfiles(w http.ResponseWriter, r
 
 // CreateTaxonomyProfile operation middleware
 func (siw *ServerInterfaceWrapper) CreateTaxonomyProfile(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateTaxonomyProfile(w, r)
@@ -409,6 +524,12 @@ func (siw *ServerInterfaceWrapper) ArchiveTaxonomyProfile(w http.ResponseWriter,
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ArchiveTaxonomyProfile(w, r, code)
 	}))
@@ -434,6 +555,12 @@ func (siw *ServerInterfaceWrapper) GetTaxonomyProfile(w http.ResponseWriter, r *
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetTaxonomyProfile(w, r, code)
@@ -461,6 +588,12 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyProfile(w http.ResponseWriter, 
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateTaxonomyProfile(w, r, code)
 	}))
@@ -486,6 +619,12 @@ func (siw *ServerInterfaceWrapper) SetTaxonomyProfileDefaultTemplate(w http.Resp
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetTaxonomyProfileDefaultTemplate(w, r, code)
@@ -638,6 +777,18 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	return m
 }
 
+type BadRequestApplicationProblemPlusJSONResponse Problem
+
+type ConflictApplicationProblemPlusJSONResponse Problem
+
+type ForbiddenApplicationProblemPlusJSONResponse Problem
+
+type InternalServerErrorApplicationProblemPlusJSONResponse Problem
+
+type NotFoundApplicationProblemPlusJSONResponse Problem
+
+type UnauthorizedApplicationProblemPlusJSONResponse Problem
+
 type ListTaxonomyAreasRequestObject struct {
 }
 
@@ -655,6 +806,54 @@ func (response ListTaxonomyAreas200JSONResponse) VisitListTaxonomyAreasResponse(
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaxonomyAreas401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaxonomyAreas401ApplicationProblemPlusJSONResponse) VisitListTaxonomyAreasResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaxonomyAreas403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaxonomyAreas403ApplicationProblemPlusJSONResponse) VisitListTaxonomyAreasResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaxonomyAreas500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaxonomyAreas500ApplicationProblemPlusJSONResponse) VisitListTaxonomyAreasResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -680,6 +879,86 @@ func (response CreateTaxonomyArea201JSONResponse) VisitCreateTaxonomyAreaRespons
 	return err
 }
 
+type CreateTaxonomyArea400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyArea400ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyArea401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyArea401ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyArea403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyArea403ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyArea409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyArea409ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyArea500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyArea500ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ArchiveTaxonomyAreaRequestObject struct {
 	Code string `json:"code"`
 }
@@ -694,6 +973,102 @@ type ArchiveTaxonomyArea204Response struct {
 func (response ArchiveTaxonomyArea204Response) VisitArchiveTaxonomyAreaResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type ArchiveTaxonomyArea400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyArea400ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTaxonomyArea401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyArea401ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTaxonomyArea403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyArea403ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTaxonomyArea404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyArea404ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTaxonomyArea409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyArea409ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTaxonomyArea500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyArea500ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetTaxonomyAreaRequestObject struct {
@@ -714,6 +1089,70 @@ func (response GetTaxonomyArea200JSONResponse) VisitGetTaxonomyAreaResponse(w ht
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyArea401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyArea401ApplicationProblemPlusJSONResponse) VisitGetTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyArea403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyArea403ApplicationProblemPlusJSONResponse) VisitGetTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyArea404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyArea404ApplicationProblemPlusJSONResponse) VisitGetTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyArea500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyArea500ApplicationProblemPlusJSONResponse) VisitGetTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -740,6 +1179,86 @@ func (response UpdateTaxonomyArea200JSONResponse) VisitUpdateTaxonomyAreaRespons
 	return err
 }
 
+type UpdateTaxonomyArea400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyArea400ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyArea401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyArea401ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyArea403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyArea403ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyArea404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyArea404ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyArea500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyArea500ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyAreaResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListTaxonomyFamiliesRequestObject struct {
 	Params ListTaxonomyFamiliesParams
 }
@@ -758,6 +1277,70 @@ func (response ListTaxonomyFamilies200JSONResponse) VisitListTaxonomyFamiliesRes
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaxonomyFamilies400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaxonomyFamilies400ApplicationProblemPlusJSONResponse) VisitListTaxonomyFamiliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaxonomyFamilies401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaxonomyFamilies401ApplicationProblemPlusJSONResponse) VisitListTaxonomyFamiliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaxonomyFamilies403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaxonomyFamilies403ApplicationProblemPlusJSONResponse) VisitListTaxonomyFamiliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaxonomyFamilies500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaxonomyFamilies500ApplicationProblemPlusJSONResponse) VisitListTaxonomyFamiliesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -783,6 +1366,86 @@ func (response CreateTaxonomyFamily201JSONResponse) VisitCreateTaxonomyFamilyRes
 	return err
 }
 
+type CreateTaxonomyFamily400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyFamily400ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyFamily401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyFamily401ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyFamily403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyFamily403ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyFamily409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyFamily409ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyFamily500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyFamily500ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeactivateTaxonomyFamilyRequestObject struct {
 	Code string `json:"code"`
 }
@@ -797,6 +1460,102 @@ type DeactivateTaxonomyFamily204Response struct {
 func (response DeactivateTaxonomyFamily204Response) VisitDeactivateTaxonomyFamilyResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type DeactivateTaxonomyFamily400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateTaxonomyFamily400ApplicationProblemPlusJSONResponse) VisitDeactivateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateTaxonomyFamily401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateTaxonomyFamily401ApplicationProblemPlusJSONResponse) VisitDeactivateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateTaxonomyFamily403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateTaxonomyFamily403ApplicationProblemPlusJSONResponse) VisitDeactivateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateTaxonomyFamily404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateTaxonomyFamily404ApplicationProblemPlusJSONResponse) VisitDeactivateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateTaxonomyFamily409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateTaxonomyFamily409ApplicationProblemPlusJSONResponse) VisitDeactivateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateTaxonomyFamily500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateTaxonomyFamily500ApplicationProblemPlusJSONResponse) VisitDeactivateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetTaxonomyFamilyRequestObject struct {
@@ -817,6 +1576,70 @@ func (response GetTaxonomyFamily200JSONResponse) VisitGetTaxonomyFamilyResponse(
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyFamily401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyFamily401ApplicationProblemPlusJSONResponse) VisitGetTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyFamily403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyFamily403ApplicationProblemPlusJSONResponse) VisitGetTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyFamily404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyFamily404ApplicationProblemPlusJSONResponse) VisitGetTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyFamily500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyFamily500ApplicationProblemPlusJSONResponse) VisitGetTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -843,6 +1666,86 @@ func (response UpdateTaxonomyFamily200JSONResponse) VisitUpdateTaxonomyFamilyRes
 	return err
 }
 
+type UpdateTaxonomyFamily400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyFamily400ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyFamily401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyFamily401ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyFamily403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyFamily403ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyFamily404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyFamily404ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyFamily500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyFamily500ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyFamilyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListTaxonomyProfilesRequestObject struct {
 }
 
@@ -860,6 +1763,54 @@ func (response ListTaxonomyProfiles200JSONResponse) VisitListTaxonomyProfilesRes
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaxonomyProfiles401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaxonomyProfiles401ApplicationProblemPlusJSONResponse) VisitListTaxonomyProfilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaxonomyProfiles403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaxonomyProfiles403ApplicationProblemPlusJSONResponse) VisitListTaxonomyProfilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTaxonomyProfiles500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListTaxonomyProfiles500ApplicationProblemPlusJSONResponse) VisitListTaxonomyProfilesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -885,6 +1836,86 @@ func (response CreateTaxonomyProfile201JSONResponse) VisitCreateTaxonomyProfileR
 	return err
 }
 
+type CreateTaxonomyProfile400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyProfile400ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyProfile401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyProfile401ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyProfile403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyProfile403ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyProfile409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyProfile409ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTaxonomyProfile500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTaxonomyProfile500ApplicationProblemPlusJSONResponse) VisitCreateTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ArchiveTaxonomyProfileRequestObject struct {
 	Code string `json:"code"`
 }
@@ -899,6 +1930,102 @@ type ArchiveTaxonomyProfile204Response struct {
 func (response ArchiveTaxonomyProfile204Response) VisitArchiveTaxonomyProfileResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type ArchiveTaxonomyProfile400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyProfile400ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTaxonomyProfile401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyProfile401ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTaxonomyProfile403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyProfile403ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTaxonomyProfile404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyProfile404ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTaxonomyProfile409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyProfile409ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveTaxonomyProfile500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveTaxonomyProfile500ApplicationProblemPlusJSONResponse) VisitArchiveTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetTaxonomyProfileRequestObject struct {
@@ -919,6 +2046,70 @@ func (response GetTaxonomyProfile200JSONResponse) VisitGetTaxonomyProfileRespons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyProfile401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyProfile401ApplicationProblemPlusJSONResponse) VisitGetTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyProfile403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyProfile403ApplicationProblemPlusJSONResponse) VisitGetTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyProfile404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyProfile404ApplicationProblemPlusJSONResponse) VisitGetTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTaxonomyProfile500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetTaxonomyProfile500ApplicationProblemPlusJSONResponse) VisitGetTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -945,6 +2136,86 @@ func (response UpdateTaxonomyProfile200JSONResponse) VisitUpdateTaxonomyProfileR
 	return err
 }
 
+type UpdateTaxonomyProfile400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyProfile400ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyProfile401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyProfile401ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyProfile403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyProfile403ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyProfile404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyProfile404ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTaxonomyProfile500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTaxonomyProfile500ApplicationProblemPlusJSONResponse) VisitUpdateTaxonomyProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SetTaxonomyProfileDefaultTemplateRequestObject struct {
 	Code string `json:"code"`
 }
@@ -961,54 +2232,150 @@ func (response SetTaxonomyProfileDefaultTemplate200Response) VisitSetTaxonomyPro
 	return nil
 }
 
+type SetTaxonomyProfileDefaultTemplate400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SetTaxonomyProfileDefaultTemplate400ApplicationProblemPlusJSONResponse) VisitSetTaxonomyProfileDefaultTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetTaxonomyProfileDefaultTemplate401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response SetTaxonomyProfileDefaultTemplate401ApplicationProblemPlusJSONResponse) VisitSetTaxonomyProfileDefaultTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetTaxonomyProfileDefaultTemplate403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SetTaxonomyProfileDefaultTemplate403ApplicationProblemPlusJSONResponse) VisitSetTaxonomyProfileDefaultTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetTaxonomyProfileDefaultTemplate404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SetTaxonomyProfileDefaultTemplate404ApplicationProblemPlusJSONResponse) VisitSetTaxonomyProfileDefaultTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetTaxonomyProfileDefaultTemplate409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SetTaxonomyProfileDefaultTemplate409ApplicationProblemPlusJSONResponse) VisitSetTaxonomyProfileDefaultTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetTaxonomyProfileDefaultTemplate500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response SetTaxonomyProfileDefaultTemplate500ApplicationProblemPlusJSONResponse) VisitSetTaxonomyProfileDefaultTemplateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-
+	// List taxonomy areas
 	// (GET /taxonomy/areas)
 	ListTaxonomyAreas(ctx context.Context, request ListTaxonomyAreasRequestObject) (ListTaxonomyAreasResponseObject, error)
-
+	// Create taxonomy area
 	// (POST /taxonomy/areas)
 	CreateTaxonomyArea(ctx context.Context, request CreateTaxonomyAreaRequestObject) (CreateTaxonomyAreaResponseObject, error)
-
+	// Archive taxonomy area
 	// (DELETE /taxonomy/areas/{code})
 	ArchiveTaxonomyArea(ctx context.Context, request ArchiveTaxonomyAreaRequestObject) (ArchiveTaxonomyAreaResponseObject, error)
-
+	// Get taxonomy area
 	// (GET /taxonomy/areas/{code})
 	GetTaxonomyArea(ctx context.Context, request GetTaxonomyAreaRequestObject) (GetTaxonomyAreaResponseObject, error)
-
+	// Update taxonomy area
 	// (PUT /taxonomy/areas/{code})
 	UpdateTaxonomyArea(ctx context.Context, request UpdateTaxonomyAreaRequestObject) (UpdateTaxonomyAreaResponseObject, error)
-
+	// List taxonomy families
 	// (GET /taxonomy/families)
 	ListTaxonomyFamilies(ctx context.Context, request ListTaxonomyFamiliesRequestObject) (ListTaxonomyFamiliesResponseObject, error)
-
+	// Create taxonomy family
 	// (POST /taxonomy/families)
 	CreateTaxonomyFamily(ctx context.Context, request CreateTaxonomyFamilyRequestObject) (CreateTaxonomyFamilyResponseObject, error)
-
+	// Deactivate taxonomy family
 	// (DELETE /taxonomy/families/{code})
 	DeactivateTaxonomyFamily(ctx context.Context, request DeactivateTaxonomyFamilyRequestObject) (DeactivateTaxonomyFamilyResponseObject, error)
-
+	// Get taxonomy family
 	// (GET /taxonomy/families/{code})
 	GetTaxonomyFamily(ctx context.Context, request GetTaxonomyFamilyRequestObject) (GetTaxonomyFamilyResponseObject, error)
-
+	// Update taxonomy family
 	// (PATCH /taxonomy/families/{code})
 	UpdateTaxonomyFamily(ctx context.Context, request UpdateTaxonomyFamilyRequestObject) (UpdateTaxonomyFamilyResponseObject, error)
-
+	// List taxonomy profiles
 	// (GET /taxonomy/profiles)
 	ListTaxonomyProfiles(ctx context.Context, request ListTaxonomyProfilesRequestObject) (ListTaxonomyProfilesResponseObject, error)
-
+	// Create taxonomy profile
 	// (POST /taxonomy/profiles)
 	CreateTaxonomyProfile(ctx context.Context, request CreateTaxonomyProfileRequestObject) (CreateTaxonomyProfileResponseObject, error)
-
+	// Archive taxonomy profile
 	// (DELETE /taxonomy/profiles/{code})
 	ArchiveTaxonomyProfile(ctx context.Context, request ArchiveTaxonomyProfileRequestObject) (ArchiveTaxonomyProfileResponseObject, error)
-
+	// Get taxonomy profile
 	// (GET /taxonomy/profiles/{code})
 	GetTaxonomyProfile(ctx context.Context, request GetTaxonomyProfileRequestObject) (GetTaxonomyProfileResponseObject, error)
-
+	// Update taxonomy profile
 	// (PATCH /taxonomy/profiles/{code})
 	UpdateTaxonomyProfile(ctx context.Context, request UpdateTaxonomyProfileRequestObject) (UpdateTaxonomyProfileResponseObject, error)
-
+	// Set taxonomy profile default template
 	// (PUT /taxonomy/profiles/{code}/default-template)
 	SetTaxonomyProfileDefaultTemplate(ctx context.Context, request SetTaxonomyProfileDefaultTemplateRequestObject) (SetTaxonomyProfileDefaultTemplateResponseObject, error)
 }
@@ -1453,34 +2820,51 @@ func (sh *strictHandler) SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"v93/LwAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -1,7 +1,7 @@
 ﻿# API Design System
 
 > **Status:** accepted 2026-05-10
-> **Last verified:** 2026-06-08 (Phase E1 payload-casing big-bang: every declared JSON property is now `snake_case` end-to-end (spec + 6 generated Go packages + generated FE types + hand-written Go structs/map emitters + FE adapters/tests); the blocking `CASING-DRIFT` rule locks it. One documented exemption: the `MDDM_NATIVE_EXPORT_ROLLOUT_PCT` feature-flag key. Prior: Phase D error-envelope unification — RFC 9457 `Problem` is the only error shape, `ApiErrorEnvelope` retired, `ENVELOPE-DRIFT` BLOCKING; Phase C dead-path prune; Problem schema at openapi.yaml; 2026-05-21)
+> **Last verified:** 2026-06-08 (Phase E2 spec hygiene: root-level `security: [sessionCookie]` makes every op secure-by-default in-doc with explicit `security: []` on public ops; top-level `tags` + every op tagged/`operationId`'d/`summary`'d; one pagination convention — cursor canonical, bounded/offset lists `x-pagination-exempt` with reason, `limit` max clamped 100 in spec+runtime; 64 zero-error ops now document their actual error modes via the shared `#/components/responses/*` set; two non-standard methods fixed (`DELETE /iam/area-memberships` → path-param `…/{user_id}/{area_code}`, `DELETE /approval/routes/{id}` → `POST …/{id}/deactivate`); `bearerAuth` myth corrected to the real `sessionCookie` scheme; `AUTHZ-DRIFT` + `PAGINATION-DRIFT` both driven to 0 and flipped BLOCKING. Prior: Phase E1 payload-casing big-bang — every declared JSON property is `snake_case` end-to-end, blocking `CASING-DRIFT` (one exemption `MDDM_NATIVE_EXPORT_ROLLOUT_PCT`); Phase D error-envelope unification — RFC 9457 `Problem` only, `ENVELOPE-DRIFT` BLOCKING; Phase C dead-path prune; 2026-05-21)
 > **Scope:** API design conventions for v1     error envelope, pagination, idempotency, two-tier authz, list filtering, naming.
 > **Out of scope:** Adoption     Plan 2 migrates handlers, paths, and module names. Frontend wiring is in Plan 1 only for the shared parser; per-page adoption is Plan 2.
 > **Key files:**
@@ -35,7 +35,7 @@ MetalDocs exposes a growing HTTP surface across 7 modules. Without a shared cont
 | 4 | Body validation | oapi-codegen per-op generated validation (not reflection middleware) | `cfg.yaml` `validate-against-spec: true`; strict-decode `DisallowUnknownFields` |
 | 5 | Two-tier authz | `security` + `x-authz-area` in spec; enforced by Postgres tripwire | `authz.Require`; tripwire trigger; `AUTHZ-DRIFT` + `authz-call-present` + `tripwire-pairing` CI rules |
 | 6 | List filtering | Stripe-flat params + per-resource allowlist + typed parser | oapi-codegen `parameters` per op; `UNKNOWN_FILTER` code |
-| 7 | Mini-conventions | UUIDv4, ISO 8601 UTC, snake_case, plural kebab paths, positive booleans, null-vs-absent, UUID-only path IDs, Bearer JWT | Codified in spec; payload casing enforced by the blocking `CASING-DRIFT` rule (Phase E1); codegen type alignment |
+| 7 | Mini-conventions | UUIDv4, ISO 8601 UTC, snake_case, plural kebab paths, positive booleans, null-vs-absent, UUID-only path IDs, session-cookie auth | Codified in spec; payload casing enforced by the blocking `CASING-DRIFT` rule (Phase E1); codegen type alignment |
 
 ---
 
@@ -173,9 +173,9 @@ See also: `wiki/decisions/0007-two-tier-authz.md` and its 2026-05-10 codegen-rej
 **Tier 1     capability (HTTP-level):**
 ```yaml
 security:
-  - bearerAuth: [template.create]
+  - sessionCookie: []
 ```
-Existing `CapabilityService` middleware reads `security`, calls `CapabilityService.CanDo` before the handler runs.
+Authentication is the `sessionCookie` apiKey scheme (a `metaldocs_session` cookie issued by `POST /api/v1/auth/login`); there is **no** bearer/JWT scheme — MetalDocs is session-cookie only. A root-level `security: [- sessionCookie: []]` makes every operation authenticated by default (api-contract-hardening Phase E2, F-NO-GLOBAL-SEC); truly public ops (login, health/readiness probes, feature flags, signed-URL downloads) opt out with an explicit `security: []`. Capabilities are **not** carried as OpenAPI security scopes: the route→capability map lives in `apps/api/cmd/metaldocs-api/permissions.go` and the `CapabilityService` middleware enforces it before the handler runs. The `AUTHZ-DRIFT` lint rule (now BLOCKING, Phase E2) treats the inherited global `security` as satisfying each op.
 
 **Tier 2     area (in-transaction):**
 ```yaml
@@ -229,8 +229,8 @@ Five rules in `scripts/api-lint/`, running in the `api-design-system-lint` job o
 |---|---|---|
 | `ENVELOPE-DRIFT` | `spec_rules.go` | **BLOCKING (Phase D).** Every response     400 with a body resolves to `Problem` — inline or via a `#/components/responses/*` `$ref`. Exempt: description-only responses, `/health/*` probes, and reviewed `x-error-envelope-exempt` bodies |
 | `CASING-DRIFT` | `spec_rules.go` | **BLOCKING (Phase E1).** Every declared schema `properties:` key (components/schemas + inline bodies) matches `^[a-z][a-z0-9]*(_[a-z0-9]+)*$`. Exempt: RFC 9457 Problem fields (already lowercase) and the SCREAMING_SNAKE feature-flag key `MDDM_NATIVE_EXPORT_ROLLOUT_PCT` (env-var-mirrored constant). Does not walk free-form object content |
-| `PAGINATION-DRIFT` | `spec_rules.go` | Every `list*` op declares `cursor`/`limit` params; response includes `page.next_cursor` + `page.has_more` |
-| `AUTHZ-DRIFT` | `spec_rules.go` | Every op declares `security`; state-transition ops declare `x-authz-area` or escape hatch |
+| `PAGINATION-DRIFT` | `spec_rules.go` | **BLOCKING (Phase E2).** Every `list*` op declares `cursor`/`limit` params with a `page.next_cursor` + `page.has_more` response, OR carries a reviewed `x-pagination-exempt: true` + non-empty `x-pagination-exempt-reason` (bounded/offset lists). `limit` max is clamped to 100 in spec and runtime |
+| `AUTHZ-DRIFT` | `spec_rules.go` | **BLOCKING (Phase E2).** Every op is secure-in-doc via its own `security` (incl. `security: []` public opt-out) or the inherited root-level `security`; state-transition ops declare `x-authz-area` or an escape hatch |
 | `authz-call-present` | `code_rules.go` | Each op with `x-authz-area` has a matching `authz.Require` call in the handler body |
 | `tripwire-pairing` | `code_rules.go` | Every mutating SQL in `*repository*.go` lives in a function that also calls `authz.Require` |
 

@@ -201,7 +201,9 @@ var routeRules = []routeRule{
 	// is grant + revoke only; role changes go via revoke-then-grant.
 	{method: http.MethodGet, pathExact: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathExact: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodDelete, pathExact: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// F-DELETE-SHAPE (Phase E2): revoke moved to /iam/area-memberships/{user_id}/{area_code};
+	// the trailing slash on the prefix keeps it from matching the GET/POST collection path.
+	{method: http.MethodDelete, pathPrefix: "/api/v1/iam/area-memberships/", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Signed-URL relay.
 	{method: http.MethodGet, pathExact: "/api/v1/signed", capability: iamdomain.CapTemplateView, visibility: iamdelivery.VisibilityPermissionGuarded},
@@ -214,10 +216,11 @@ var routeRules = []routeRule{
 	// while tier-2 demands route.manage — the F4 cross-tier divergence. route.manage
 	// is tenant-grade, so all four ops (incl. the GET list, whose tier-2 List check
 	// is also route.manage) map to it.
+	// POST covers both create (/approval/routes) and the F-DELETE-SHAPE (Phase E2)
+	// deactivate action (/approval/routes/{id}/deactivate); no DELETE under this prefix anymore.
 	{method: http.MethodGet, pathPrefix: "/api/v1/approval/routes", capability: iamdomain.CapRouteManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/approval/routes", capability: iamdomain.CapRouteManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/approval/routes", capability: iamdomain.CapRouteManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodDelete, pathPrefix: "/api/v1/approval/routes", capability: iamdomain.CapRouteManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Approval (legacy mount).
 	{method: http.MethodGet, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},

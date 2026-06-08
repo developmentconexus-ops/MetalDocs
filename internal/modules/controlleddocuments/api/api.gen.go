@@ -24,6 +24,10 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+const (
+	SessionCookieScopes sessionCookieContextKey = "sessionCookie.Scopes"
+)
+
 // Defines values for ActiveDocumentResponseApprovalState.
 const (
 	Approved    ActiveDocumentResponseApprovalState = "approved"
@@ -317,6 +321,12 @@ func (siw *ServerInterfaceWrapper) ListControlledDocuments(w http.ResponseWriter
 	var err error
 	_ = err
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListControlledDocumentsParams
 
@@ -441,6 +451,12 @@ func (siw *ServerInterfaceWrapper) AtomicCreateControlledDocument(w http.Respons
 	var err error
 	_ = err
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params AtomicCreateControlledDocumentParams
 
@@ -485,6 +501,12 @@ func (siw *ServerInterfaceWrapper) PreviewControlledDocumentCode(w http.Response
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params PreviewControlledDocumentCodeParams
@@ -541,6 +563,12 @@ func (siw *ServerInterfaceWrapper) GetControlledDocument(w http.ResponseWriter, 
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetControlledDocument(w, r, id)
 	}))
@@ -566,6 +594,12 @@ func (siw *ServerInterfaceWrapper) GetActiveDocument(w http.ResponseWriter, r *h
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetActiveDocument(w, r, id)
@@ -593,6 +627,12 @@ func (siw *ServerInterfaceWrapper) ObsoleteControlledDocument(w http.ResponseWri
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ObsoleteControlledDocument(w, r, id)
 	}))
@@ -618,6 +658,12 @@ func (siw *ServerInterfaceWrapper) CreateControlledDocumentRevision(w http.Respo
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateControlledDocumentRevisionParams
@@ -672,6 +718,12 @@ func (siw *ServerInterfaceWrapper) SupersedeControlledDocument(w http.ResponseWr
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SupersedeControlledDocument(w, r, id)
@@ -1482,52 +1534,60 @@ func (sh *strictHandler) SupersedeControlledDocument(w http.ResponseWriter, r *h
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"d/8LAAD//w==",
+	"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",
+	"BgAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

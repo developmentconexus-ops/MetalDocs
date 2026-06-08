@@ -92,7 +92,7 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/iam/area-memberships?userId=user-1&areaCode=ops&revokedBy=attacker", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/iam/area-memberships/user-1/ops", nil)
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "session-user", []iamdomain.Role{iamdomain.RoleAreaAdmin}))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
@@ -121,7 +121,7 @@ func TestMembershipsHandler_SystemAdminCanTargetOtherUser(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/iam/area-memberships?userId=user-1&areaCode=ops", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/iam/area-memberships/user-1/ops", nil)
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "admin-1", []iamdomain.Role{iamdomain.RoleSystemAdmin}))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()

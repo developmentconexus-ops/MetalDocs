@@ -111,7 +111,7 @@ func TestPermissionResolver(t *testing.T) {
 		// --- Permission-guarded: misc (F-001 split: area-memberships GET=view, writes=manage) ---
 		{name: "iam area memberships list", method: http.MethodGet, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam area memberships create", method: http.MethodPost, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "iam area memberships delete", method: http.MethodDelete, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "iam area memberships delete", method: http.MethodDelete, path: "/api/v1/iam/area-memberships/u-1/quality", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "signed download", method: http.MethodGet, path: "/api/v1/signed", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval get", method: http.MethodGet, path: "/api/v1/approval/instances/a-1", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval post", method: http.MethodPost, path: "/api/v1/approval/instances/a-1/decisions", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -122,7 +122,7 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "approval routes list", method: http.MethodGet, path: "/api/v1/approval/routes", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval routes create", method: http.MethodPost, path: "/api/v1/approval/routes", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval routes update", method: http.MethodPut, path: "/api/v1/approval/routes/r-1", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "approval routes deactivate", method: http.MethodDelete, path: "/api/v1/approval/routes/r-1", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "approval routes deactivate", method: http.MethodPost, path: "/api/v1/approval/routes/r-1/deactivate", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "audit events", method: http.MethodGet, path: "/api/v1/audit/events", wantCap: iamdomain.CapAuditRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "metrics", method: http.MethodGet, path: "/api/v1/metrics", wantCap: iamdomain.CapMetricsView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 	}
@@ -248,7 +248,7 @@ func TestRouteCoverage(t *testing.T) {
 		// iamdelivery.NewMembershipHandler(...).RegisterRoutes (main.go:238)
 		{"area-memberships", http.MethodGet, "/api/v1/iam/area-memberships"},
 		{"area-memberships", http.MethodPost, "/api/v1/iam/area-memberships"},
-		{"area-memberships", http.MethodDelete, "/api/v1/iam/area-memberships"},
+		{"area-memberships", http.MethodDelete, "/api/v1/iam/area-memberships/u-1/quality"},
 
 		// docMod.RegisterRoutes (main.go:379)
 		{"documents", http.MethodGet, "/api/v1/documents"},
@@ -437,7 +437,7 @@ func TestPermissionResolver_AreaMembershipRoutes(t *testing.T) {
 	}{
 		{http.MethodGet, "/api/v1/iam/area-memberships", iamdomain.CapMembershipView},
 		{http.MethodPost, "/api/v1/iam/area-memberships", iamdomain.CapMembershipManage},
-		{http.MethodDelete, "/api/v1/iam/area-memberships", iamdomain.CapMembershipManage},
+		{http.MethodDelete, "/api/v1/iam/area-memberships/u-1/quality", iamdomain.CapMembershipManage},
 	}
 	for _, tc := range cases {
 		gotCap, gotVis := resolver(tc.method, tc.path)

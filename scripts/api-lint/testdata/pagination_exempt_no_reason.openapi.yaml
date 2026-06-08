@@ -1,0 +1,31 @@
+openapi: 3.0.3
+info:
+  title: pagination-exempt-no-reason
+  version: 1.0.0
+security:
+  - sessionCookie: []
+paths:
+  /widgets:
+    get:
+      operationId: listWidgets
+      # Exempt without a reason is spec-fiction → PAGINATION-DRIFT.
+      x-pagination-exempt: true
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: metaldocs_session
+  schemas:
+    Problem:
+      type: object
+      properties:
+        title:
+          type: string

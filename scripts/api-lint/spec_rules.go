@@ -38,6 +38,13 @@ func RunSpecRules(specPath string) ([]Violation, error) {
 	components := mapGet(root, "components")
 	schemas := mapGet(components, "schemas")
 	responsesComp := mapGet(components, "responses")
+	// A root-level `security:` requirement is inherited by every operation that
+	// does not override it (OpenAPI 3.x semantics). When it is present and
+	// non-empty, an operation is secure-by-default in-doc without restating
+	// `security` itself — so AUTHZ-DRIFT must treat global security as satisfying
+	// the per-op requirement (api-contract-hardening Phase E2, F-NO-GLOBAL-SEC).
+	globalSecurity := mapGet(root, "security")
+	hasGlobalSecurity := globalSecurity != nil && globalSecurity.Kind == yaml.SequenceNode && len(globalSecurity.Content) > 0
 	out := []Violation{}
 	for i := 0; i+1 < len(paths.Content); i += 2 {
 		pathKey, pathVal := paths.Content[i], paths.Content[i+1]
@@ -51,7 +58,7 @@ func RunSpecRules(specPath string) ([]Violation, error) {
 			}
 			out = append(out, checkEnvelope(specPath, opID, pathKey.Value, op, responsesComp)...)
 			out = append(out, checkPagination(specPath, opID, op, schemas)...)
-			out = append(out, checkAuthz(specPath, opID, pathKey.Value, method, op)...)
+			out = append(out, checkAuthz(specPath, opID, pathKey.Value, method, op, hasGlobalSecurity)...)
 		}
 	}
 	// CASING-DRIFT walks the whole document (schemas + inline path bodies) for
@@ -260,9 +267,12 @@ func checkPagination(file, opID string, op, schemas *yaml.Node) []Violation {
 	return out
 }
 
-func checkAuthz(file, opID, path, method string, op *yaml.Node) []Violation {
+func checkAuthz(file, opID, path, method string, op *yaml.Node, hasGlobalSecurity bool) []Violation {
 	out := []Violation{}
-	if mapGet(op, "security") == nil {
+	// An op is secure-in-doc when it declares its own `security` (including an
+	// explicit `security: []` opt-out for a public endpoint) OR inherits a
+	// non-empty global `security` requirement.
+	if mapGet(op, "security") == nil && !hasGlobalSecurity {
 		out = append(out, Violation{File: file, Line: op.Line, Rule: "AUTHZ-DRIFT", Message: fmt.Sprintf("op %s missing security declaration", opID)})
 	}
 	if method == "POST" && stateTransitionPathRE.MatchString(path) {

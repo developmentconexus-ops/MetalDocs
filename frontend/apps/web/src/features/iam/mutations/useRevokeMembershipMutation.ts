@@ -11,9 +11,10 @@ export function useRevokeMembershipMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, areaCode }: RevokeMembershipVars) => {
-      const { data, error } = await api.DELETE("/iam/area-memberships", {
-        params: { query: { userId, areaCode } },
-      });
+      const { data, error } = await api.DELETE(
+        "/iam/area-memberships/{user_id}/{area_code}",
+        { params: { path: { user_id: userId, area_code: areaCode } } },
+      );
       if (error) throw error;
       return data;
     },

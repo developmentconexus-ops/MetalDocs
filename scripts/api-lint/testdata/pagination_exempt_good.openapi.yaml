@@ -1,0 +1,33 @@
+openapi: 3.0.3
+info:
+  title: pagination-exempt-good
+  version: 1.0.0
+security:
+  - sessionCookie: []
+paths:
+  /widgets:
+    get:
+      operationId: listWidgets
+      # Bounded list opts out of cursor pagination with a reviewed reason →
+      # no PAGINATION-DRIFT (Phase E2 F-PAGINATION).
+      x-pagination-exempt: true
+      x-pagination-exempt-reason: 'Fixed reference catalog: bounded enumeration returned in full.'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: metaldocs_session
+  schemas:
+    Problem:
+      type: object
+      properties:
+        title:
+          type: string
