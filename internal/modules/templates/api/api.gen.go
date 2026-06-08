@@ -24,171 +24,6 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-// Defines values for DocumentTemplateFieldSlotNodeResponseFieldKind.
-const (
-	Scalar DocumentTemplateFieldSlotNodeResponseFieldKind = "scalar"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateFieldSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateFieldSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Scalar:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateFieldSlotNodeResponseType.
-const (
-	FieldSlot DocumentTemplateFieldSlotNodeResponseType = "field-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateFieldSlotNodeResponseType enum.
-func (e DocumentTemplateFieldSlotNodeResponseType) Valid() bool {
-	switch e {
-	case FieldSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateLabelNodeResponseType.
-const (
-	Label DocumentTemplateLabelNodeResponseType = "label"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateLabelNodeResponseType enum.
-func (e DocumentTemplateLabelNodeResponseType) Valid() bool {
-	switch e {
-	case Label:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplatePageNodeResponseType.
-const (
-	Page DocumentTemplatePageNodeResponseType = "page"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplatePageNodeResponseType enum.
-func (e DocumentTemplatePageNodeResponseType) Valid() bool {
-	switch e {
-	case Page:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRepeatSlotNodeResponseFieldKind.
-const (
-	Repeat DocumentTemplateRepeatSlotNodeResponseFieldKind = "repeat"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRepeatSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateRepeatSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Repeat:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRepeatSlotNodeResponseType.
-const (
-	RepeatSlot DocumentTemplateRepeatSlotNodeResponseType = "repeat-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRepeatSlotNodeResponseType enum.
-func (e DocumentTemplateRepeatSlotNodeResponseType) Valid() bool {
-	switch e {
-	case RepeatSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRichSlotNodeResponseFieldKind.
-const (
-	Rich DocumentTemplateRichSlotNodeResponseFieldKind = "rich"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRichSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateRichSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Rich:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRichSlotNodeResponseType.
-const (
-	RichSlot DocumentTemplateRichSlotNodeResponseType = "rich-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRichSlotNodeResponseType enum.
-func (e DocumentTemplateRichSlotNodeResponseType) Valid() bool {
-	switch e {
-	case RichSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateSectionFrameNodeResponseType.
-const (
-	SectionFrame DocumentTemplateSectionFrameNodeResponseType = "section-frame"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateSectionFrameNodeResponseType enum.
-func (e DocumentTemplateSectionFrameNodeResponseType) Valid() bool {
-	switch e {
-	case SectionFrame:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateTableSlotNodeResponseFieldKind.
-const (
-	Table DocumentTemplateTableSlotNodeResponseFieldKind = "table"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateTableSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateTableSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Table:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateTableSlotNodeResponseType.
-const (
-	TableSlot DocumentTemplateTableSlotNodeResponseType = "table-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateTableSlotNodeResponseType enum.
-func (e DocumentTemplateTableSlotNodeResponseType) Valid() bool {
-	switch e {
-	case TableSlot:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for VersionDTOStatus.
 const (
 	Approved  VersionDTOStatus = "approved"
@@ -240,98 +75,6 @@ type CreateTemplateResponse struct {
 		Version  VersionDTO  `json:"version"`
 	} `json:"data"`
 }
-
-// DocumentTemplateFieldSlotNodeResponse defines model for DocumentTemplateFieldSlotNodeResponse.
-type DocumentTemplateFieldSlotNodeResponse struct {
-	FieldKind DocumentTemplateFieldSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                         `json:"id"`
-	Path      string                                         `json:"path"`
-	Type      DocumentTemplateFieldSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateFieldSlotNodeResponseFieldKind defines model for DocumentTemplateFieldSlotNodeResponse.FieldKind.
-type DocumentTemplateFieldSlotNodeResponseFieldKind string
-
-// DocumentTemplateFieldSlotNodeResponseType defines model for DocumentTemplateFieldSlotNodeResponse.Type.
-type DocumentTemplateFieldSlotNodeResponseType string
-
-// DocumentTemplateLabelNodeResponse defines model for DocumentTemplateLabelNodeResponse.
-type DocumentTemplateLabelNodeResponse struct {
-	Id   string                                `json:"id"`
-	Text string                                `json:"text"`
-	Type DocumentTemplateLabelNodeResponseType `json:"type"`
-}
-
-// DocumentTemplateLabelNodeResponseType defines model for DocumentTemplateLabelNodeResponse.Type.
-type DocumentTemplateLabelNodeResponseType string
-
-// DocumentTemplateNodeResponse Pilot subset/subconjunto pilotado da MetalDocs template DSL, intencionalmente limitado a page, section-frame, label, field-slot, rich-slot, repeat-slot e table-slot.
-type DocumentTemplateNodeResponse struct {
-	union json.RawMessage
-}
-
-// DocumentTemplatePageNodeResponse defines model for DocumentTemplatePageNodeResponse.
-type DocumentTemplatePageNodeResponse struct {
-	Children []DocumentTemplateNodeResponse       `json:"children"`
-	Id       string                               `json:"id"`
-	Type     DocumentTemplatePageNodeResponseType `json:"type"`
-}
-
-// DocumentTemplatePageNodeResponseType defines model for DocumentTemplatePageNodeResponse.Type.
-type DocumentTemplatePageNodeResponseType string
-
-// DocumentTemplateRepeatSlotNodeResponse defines model for DocumentTemplateRepeatSlotNodeResponse.
-type DocumentTemplateRepeatSlotNodeResponse struct {
-	FieldKind DocumentTemplateRepeatSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                          `json:"id"`
-	Path      string                                          `json:"path"`
-	Type      DocumentTemplateRepeatSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateRepeatSlotNodeResponseFieldKind defines model for DocumentTemplateRepeatSlotNodeResponse.FieldKind.
-type DocumentTemplateRepeatSlotNodeResponseFieldKind string
-
-// DocumentTemplateRepeatSlotNodeResponseType defines model for DocumentTemplateRepeatSlotNodeResponse.Type.
-type DocumentTemplateRepeatSlotNodeResponseType string
-
-// DocumentTemplateRichSlotNodeResponse defines model for DocumentTemplateRichSlotNodeResponse.
-type DocumentTemplateRichSlotNodeResponse struct {
-	FieldKind DocumentTemplateRichSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                        `json:"id"`
-	Path      string                                        `json:"path"`
-	Type      DocumentTemplateRichSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateRichSlotNodeResponseFieldKind defines model for DocumentTemplateRichSlotNodeResponse.FieldKind.
-type DocumentTemplateRichSlotNodeResponseFieldKind string
-
-// DocumentTemplateRichSlotNodeResponseType defines model for DocumentTemplateRichSlotNodeResponse.Type.
-type DocumentTemplateRichSlotNodeResponseType string
-
-// DocumentTemplateSectionFrameNodeResponse defines model for DocumentTemplateSectionFrameNodeResponse.
-type DocumentTemplateSectionFrameNodeResponse struct {
-	Children []DocumentTemplateNodeResponse               `json:"children"`
-	Id       string                                       `json:"id"`
-	Title    *string                                      `json:"title,omitempty"`
-	Type     DocumentTemplateSectionFrameNodeResponseType `json:"type"`
-}
-
-// DocumentTemplateSectionFrameNodeResponseType defines model for DocumentTemplateSectionFrameNodeResponse.Type.
-type DocumentTemplateSectionFrameNodeResponseType string
-
-// DocumentTemplateTableSlotNodeResponse defines model for DocumentTemplateTableSlotNodeResponse.
-type DocumentTemplateTableSlotNodeResponse struct {
-	FieldKind DocumentTemplateTableSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                         `json:"id"`
-	Path      string                                         `json:"path"`
-	Type      DocumentTemplateTableSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateTableSlotNodeResponseFieldKind defines model for DocumentTemplateTableSlotNodeResponse.FieldKind.
-type DocumentTemplateTableSlotNodeResponseFieldKind string
-
-// DocumentTemplateTableSlotNodeResponseType defines model for DocumentTemplateTableSlotNodeResponse.Type.
-type DocumentTemplateTableSlotNodeResponseType string
 
 // PlaceholderCatalogEntry defines model for PlaceholderCatalogEntry.
 type PlaceholderCatalogEntry struct {
@@ -484,312 +227,73 @@ type PublishTemplateVersionJSONRequestBody PublishTemplateVersionJSONBody
 // UpdateTemplateSchemaJSONRequestBody defines body for UpdateTemplateSchema for application/json ContentType.
 type UpdateTemplateSchemaJSONRequestBody UpdateTemplateSchemaJSONBody
 
-// AsDocumentTemplatePageNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplatePageNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplatePageNodeResponse() (DocumentTemplatePageNodeResponse, error) {
-	var body DocumentTemplatePageNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplatePageNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplatePageNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplatePageNodeResponse(v DocumentTemplatePageNodeResponse) error {
-	v.Type = "page"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplatePageNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplatePageNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplatePageNodeResponse(v DocumentTemplatePageNodeResponse) error {
-	v.Type = "page"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateSectionFrameNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateSectionFrameNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateSectionFrameNodeResponse() (DocumentTemplateSectionFrameNodeResponse, error) {
-	var body DocumentTemplateSectionFrameNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateSectionFrameNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateSectionFrameNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateSectionFrameNodeResponse(v DocumentTemplateSectionFrameNodeResponse) error {
-	v.Type = "section-frame"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateSectionFrameNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateSectionFrameNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateSectionFrameNodeResponse(v DocumentTemplateSectionFrameNodeResponse) error {
-	v.Type = "section-frame"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateLabelNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateLabelNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateLabelNodeResponse() (DocumentTemplateLabelNodeResponse, error) {
-	var body DocumentTemplateLabelNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateLabelNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateLabelNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateLabelNodeResponse(v DocumentTemplateLabelNodeResponse) error {
-	v.Type = "label"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateLabelNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateLabelNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateLabelNodeResponse(v DocumentTemplateLabelNodeResponse) error {
-	v.Type = "label"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateFieldSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateFieldSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateFieldSlotNodeResponse() (DocumentTemplateFieldSlotNodeResponse, error) {
-	var body DocumentTemplateFieldSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateFieldSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateFieldSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateFieldSlotNodeResponse(v DocumentTemplateFieldSlotNodeResponse) error {
-	v.Type = "field-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateFieldSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateFieldSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateFieldSlotNodeResponse(v DocumentTemplateFieldSlotNodeResponse) error {
-	v.Type = "field-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateRichSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateRichSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateRichSlotNodeResponse() (DocumentTemplateRichSlotNodeResponse, error) {
-	var body DocumentTemplateRichSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateRichSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateRichSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateRichSlotNodeResponse(v DocumentTemplateRichSlotNodeResponse) error {
-	v.Type = "rich-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateRichSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateRichSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateRichSlotNodeResponse(v DocumentTemplateRichSlotNodeResponse) error {
-	v.Type = "rich-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateRepeatSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateRepeatSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateRepeatSlotNodeResponse() (DocumentTemplateRepeatSlotNodeResponse, error) {
-	var body DocumentTemplateRepeatSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateRepeatSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateRepeatSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateRepeatSlotNodeResponse(v DocumentTemplateRepeatSlotNodeResponse) error {
-	v.Type = "repeat-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateRepeatSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateRepeatSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateRepeatSlotNodeResponse(v DocumentTemplateRepeatSlotNodeResponse) error {
-	v.Type = "repeat-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateTableSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateTableSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateTableSlotNodeResponse() (DocumentTemplateTableSlotNodeResponse, error) {
-	var body DocumentTemplateTableSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateTableSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateTableSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateTableSlotNodeResponse(v DocumentTemplateTableSlotNodeResponse) error {
-	v.Type = "table-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateTableSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateTableSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateTableSlotNodeResponse(v DocumentTemplateTableSlotNodeResponse) error {
-	v.Type = "table-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t DocumentTemplateNodeResponse) Discriminator() (string, error) {
-	var discriminator struct {
-		Discriminator string `json:"type"`
-	}
-	err := json.Unmarshal(t.union, &discriminator)
-	return discriminator.Discriminator, err
-}
-
-func (t DocumentTemplateNodeResponse) ValueByDiscriminator() (interface{}, error) {
-	discriminator, err := t.Discriminator()
-	if err != nil {
-		return nil, err
-	}
-	switch discriminator {
-	case "field-slot":
-		return t.AsDocumentTemplateFieldSlotNodeResponse()
-	case "label":
-		return t.AsDocumentTemplateLabelNodeResponse()
-	case "page":
-		return t.AsDocumentTemplatePageNodeResponse()
-	case "repeat-slot":
-		return t.AsDocumentTemplateRepeatSlotNodeResponse()
-	case "rich-slot":
-		return t.AsDocumentTemplateRichSlotNodeResponse()
-	case "section-frame":
-		return t.AsDocumentTemplateSectionFrameNodeResponse()
-	case "table-slot":
-		return t.AsDocumentTemplateTableSlotNodeResponse()
-	default:
-		return nil, errors.New("unknown discriminator value: " + discriminator)
-	}
-}
-
-func (t DocumentTemplateNodeResponse) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Redirect to presigned GET URL for a stored object
-	// (GET /api/v1/signed)
+	// (GET /signed)
 	RedirectSignedUrl(w http.ResponseWriter, r *http.Request, params RedirectSignedUrlParams)
 	// List templates for tenant (docx)
-	// (GET /api/v1/templates)
+	// (GET /templates)
 	ListTemplates(w http.ResponseWriter, r *http.Request)
 	// Create template (docx)
-	// (POST /api/v1/templates)
+	// (POST /templates)
 	CreateTemplate(w http.ResponseWriter, r *http.Request, params CreateTemplateParams)
 
-	// (GET /api/v1/templates/placeholder-catalog)
+	// (GET /templates/placeholder-catalog)
 	ListTemplatePlaceholderCatalog(w http.ResponseWriter, r *http.Request)
 	// Get system-owned blank template
-	// (GET /api/v1/templates/system/blank)
+	// (GET /templates/system/blank)
 	GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request)
 
-	// (GET /api/v1/templates/{id})
+	// (GET /templates/{id})
 	GetTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (PUT /api/v1/templates/{id}/approval-config)
+	// (PUT /templates/{id}/approval-config)
 	UpsertTemplateApprovalConfig(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v1/templates/{id}/archive)
+	// (POST /templates/{id}/archive)
 	ArchiveTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (GET /api/v1/templates/{id}/audit)
+	// (GET /templates/{id}/audit)
 	ListTemplateAudit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v1/templates/{id}/versions)
+	// (POST /templates/{id}/versions)
 	CreateTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Get template version metadata (docx)
-	// (GET /api/v1/templates/{id}/versions/{n})
+	// (GET /templates/{id}/versions/{n})
 	GetTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int)
 
-	// (POST /api/v1/templates/{id}/versions/{n}/approve)
+	// (POST /templates/{id}/versions/{n}/approve)
 	ApproveTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ApproveTemplateVersionParams)
 
-	// (POST /api/v1/templates/{id}/versions/{n}/autosave/commit)
+	// (POST /templates/{id}/versions/{n}/autosave/commit)
 	CommitTemplateAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 
-	// (POST /api/v1/templates/{id}/versions/{n}/autosave/presign)
+	// (POST /templates/{id}/versions/{n}/autosave/presign)
 	PresignTemplateAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 	// Presign PUT URL for draft .docx upload
-	// (POST /api/v1/templates/{id}/versions/{n}/docx-upload-url)
+	// (POST /templates/{id}/versions/{n}/docx-upload-url)
 	PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int)
 
-	// (GET /api/v1/templates/{id}/versions/{n}/docx-url)
+	// (GET /templates/{id}/versions/{n}/docx-url)
 	GetTemplateDocxUrl(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 	// Save draft (CAS via expected_lock_version)
-	// (PUT /api/v1/templates/{id}/versions/{n}/draft)
+	// (PUT /templates/{id}/versions/{n}/draft)
 	SaveTemplateDraft(w http.ResponseWriter, r *http.Request, id string, n int)
 	// Publish draft (validates template tokens)
-	// (POST /api/v1/templates/{id}/versions/{n}/publish)
+	// (POST /templates/{id}/versions/{n}/publish)
 	PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, params PublishTemplateVersionParams)
 
-	// (POST /api/v1/templates/{id}/versions/{n}/review)
+	// (POST /templates/{id}/versions/{n}/review)
 	ReviewTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ReviewTemplateVersionParams)
 
-	// (PUT /api/v1/templates/{id}/versions/{n}/schema)
+	// (PUT /templates/{id}/versions/{n}/schema)
 	UpdateTemplateSchema(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 	// Presign PUT URL for draft schema.json upload
-	// (POST /api/v1/templates/{id}/versions/{n}/schema-upload-url)
+	// (POST /templates/{id}/versions/{n}/schema-upload-url)
 	PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int)
 
-	// (POST /api/v1/templates/{id}/versions/{n}/submit)
+	// (POST /templates/{id}/versions/{n}/submit)
 	SubmitTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionParams)
 }
 
@@ -1704,28 +1208,28 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/signed", wrapper.RedirectSignedUrl)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/templates", wrapper.ListTemplates)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates", wrapper.CreateTemplate)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/templates/placeholder-catalog", wrapper.ListTemplatePlaceholderCatalog)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/templates/system/blank", wrapper.GetSystemBlankTemplate)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/templates/{id}", wrapper.GetTemplate)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/templates/{id}/approval-config", wrapper.UpsertTemplateApprovalConfig)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates/{id}/archive", wrapper.ArchiveTemplate)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/templates/{id}/audit", wrapper.ListTemplateAudit)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates/{id}/versions", wrapper.CreateTemplateVersion)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}", wrapper.GetTemplateVersion)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/approve", wrapper.ApproveTemplateVersion)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/autosave/commit", wrapper.CommitTemplateAutosave)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/autosave/presign", wrapper.PresignTemplateAutosave)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/docx-upload-url", wrapper.PresignTemplateDocxUploadUrl)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/docx-url", wrapper.GetTemplateDocxUrl)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/draft", wrapper.SaveTemplateDraft)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/publish", wrapper.PublishTemplateVersion)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/review", wrapper.ReviewTemplateVersion)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/schema", wrapper.UpdateTemplateSchema)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/schema-upload-url", wrapper.PresignTemplateSchemaUploadUrl)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/templates/{id}/versions/{n}/submit", wrapper.SubmitTemplateVersion)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/signed", wrapper.RedirectSignedUrl)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates", wrapper.ListTemplates)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates", wrapper.CreateTemplate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/placeholder-catalog", wrapper.ListTemplatePlaceholderCatalog)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/system/blank", wrapper.GetSystemBlankTemplate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/{id}", wrapper.GetTemplate)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/templates/{id}/approval-config", wrapper.UpsertTemplateApprovalConfig)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/archive", wrapper.ArchiveTemplate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/{id}/audit", wrapper.ListTemplateAudit)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions", wrapper.CreateTemplateVersion)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/{id}/versions/{n}", wrapper.GetTemplateVersion)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/approve", wrapper.ApproveTemplateVersion)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/autosave/commit", wrapper.CommitTemplateAutosave)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/autosave/presign", wrapper.PresignTemplateAutosave)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/docx-upload-url", wrapper.PresignTemplateDocxUploadUrl)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/templates/{id}/versions/{n}/docx-url", wrapper.GetTemplateDocxUrl)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/templates/{id}/versions/{n}/draft", wrapper.SaveTemplateDraft)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/publish", wrapper.PublishTemplateVersion)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/review", wrapper.ReviewTemplateVersion)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/templates/{id}/versions/{n}/schema", wrapper.UpdateTemplateSchema)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/schema-upload-url", wrapper.PresignTemplateSchemaUploadUrl)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/templates/{id}/versions/{n}/submit", wrapper.SubmitTemplateVersion)
 
 	return m
 }
@@ -2261,70 +1765,70 @@ func (response SubmitTemplateVersion200Response) VisitSubmitTemplateVersionRespo
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Redirect to presigned GET URL for a stored object
-	// (GET /api/v1/signed)
+	// (GET /signed)
 	RedirectSignedUrl(ctx context.Context, request RedirectSignedUrlRequestObject) (RedirectSignedUrlResponseObject, error)
 	// List templates for tenant (docx)
-	// (GET /api/v1/templates)
+	// (GET /templates)
 	ListTemplates(ctx context.Context, request ListTemplatesRequestObject) (ListTemplatesResponseObject, error)
 	// Create template (docx)
-	// (POST /api/v1/templates)
+	// (POST /templates)
 	CreateTemplate(ctx context.Context, request CreateTemplateRequestObject) (CreateTemplateResponseObject, error)
 
-	// (GET /api/v1/templates/placeholder-catalog)
+	// (GET /templates/placeholder-catalog)
 	ListTemplatePlaceholderCatalog(ctx context.Context, request ListTemplatePlaceholderCatalogRequestObject) (ListTemplatePlaceholderCatalogResponseObject, error)
 	// Get system-owned blank template
-	// (GET /api/v1/templates/system/blank)
+	// (GET /templates/system/blank)
 	GetSystemBlankTemplate(ctx context.Context, request GetSystemBlankTemplateRequestObject) (GetSystemBlankTemplateResponseObject, error)
 
-	// (GET /api/v1/templates/{id})
+	// (GET /templates/{id})
 	GetTemplate(ctx context.Context, request GetTemplateRequestObject) (GetTemplateResponseObject, error)
 
-	// (PUT /api/v1/templates/{id}/approval-config)
+	// (PUT /templates/{id}/approval-config)
 	UpsertTemplateApprovalConfig(ctx context.Context, request UpsertTemplateApprovalConfigRequestObject) (UpsertTemplateApprovalConfigResponseObject, error)
 
-	// (POST /api/v1/templates/{id}/archive)
+	// (POST /templates/{id}/archive)
 	ArchiveTemplate(ctx context.Context, request ArchiveTemplateRequestObject) (ArchiveTemplateResponseObject, error)
 
-	// (GET /api/v1/templates/{id}/audit)
+	// (GET /templates/{id}/audit)
 	ListTemplateAudit(ctx context.Context, request ListTemplateAuditRequestObject) (ListTemplateAuditResponseObject, error)
 
-	// (POST /api/v1/templates/{id}/versions)
+	// (POST /templates/{id}/versions)
 	CreateTemplateVersion(ctx context.Context, request CreateTemplateVersionRequestObject) (CreateTemplateVersionResponseObject, error)
 	// Get template version metadata (docx)
-	// (GET /api/v1/templates/{id}/versions/{n})
+	// (GET /templates/{id}/versions/{n})
 	GetTemplateVersion(ctx context.Context, request GetTemplateVersionRequestObject) (GetTemplateVersionResponseObject, error)
 
-	// (POST /api/v1/templates/{id}/versions/{n}/approve)
+	// (POST /templates/{id}/versions/{n}/approve)
 	ApproveTemplateVersion(ctx context.Context, request ApproveTemplateVersionRequestObject) (ApproveTemplateVersionResponseObject, error)
 
-	// (POST /api/v1/templates/{id}/versions/{n}/autosave/commit)
+	// (POST /templates/{id}/versions/{n}/autosave/commit)
 	CommitTemplateAutosave(ctx context.Context, request CommitTemplateAutosaveRequestObject) (CommitTemplateAutosaveResponseObject, error)
 
-	// (POST /api/v1/templates/{id}/versions/{n}/autosave/presign)
+	// (POST /templates/{id}/versions/{n}/autosave/presign)
 	PresignTemplateAutosave(ctx context.Context, request PresignTemplateAutosaveRequestObject) (PresignTemplateAutosaveResponseObject, error)
 	// Presign PUT URL for draft .docx upload
-	// (POST /api/v1/templates/{id}/versions/{n}/docx-upload-url)
+	// (POST /templates/{id}/versions/{n}/docx-upload-url)
 	PresignTemplateDocxUploadUrl(ctx context.Context, request PresignTemplateDocxUploadUrlRequestObject) (PresignTemplateDocxUploadUrlResponseObject, error)
 
-	// (GET /api/v1/templates/{id}/versions/{n}/docx-url)
+	// (GET /templates/{id}/versions/{n}/docx-url)
 	GetTemplateDocxUrl(ctx context.Context, request GetTemplateDocxUrlRequestObject) (GetTemplateDocxUrlResponseObject, error)
 	// Save draft (CAS via expected_lock_version)
-	// (PUT /api/v1/templates/{id}/versions/{n}/draft)
+	// (PUT /templates/{id}/versions/{n}/draft)
 	SaveTemplateDraft(ctx context.Context, request SaveTemplateDraftRequestObject) (SaveTemplateDraftResponseObject, error)
 	// Publish draft (validates template tokens)
-	// (POST /api/v1/templates/{id}/versions/{n}/publish)
+	// (POST /templates/{id}/versions/{n}/publish)
 	PublishTemplateVersion(ctx context.Context, request PublishTemplateVersionRequestObject) (PublishTemplateVersionResponseObject, error)
 
-	// (POST /api/v1/templates/{id}/versions/{n}/review)
+	// (POST /templates/{id}/versions/{n}/review)
 	ReviewTemplateVersion(ctx context.Context, request ReviewTemplateVersionRequestObject) (ReviewTemplateVersionResponseObject, error)
 
-	// (PUT /api/v1/templates/{id}/versions/{n}/schema)
+	// (PUT /templates/{id}/versions/{n}/schema)
 	UpdateTemplateSchema(ctx context.Context, request UpdateTemplateSchemaRequestObject) (UpdateTemplateSchemaResponseObject, error)
 	// Presign PUT URL for draft schema.json upload
-	// (POST /api/v1/templates/{id}/versions/{n}/schema-upload-url)
+	// (POST /templates/{id}/versions/{n}/schema-upload-url)
 	PresignTemplateSchemaUploadUrl(ctx context.Context, request PresignTemplateSchemaUploadUrlRequestObject) (PresignTemplateSchemaUploadUrlResponseObject, error)
 
-	// (POST /api/v1/templates/{id}/versions/{n}/submit)
+	// (POST /templates/{id}/versions/{n}/submit)
 	SubmitTemplateVersion(ctx context.Context, request SubmitTemplateVersionRequestObject) (SubmitTemplateVersionResponseObject, error)
 }
 
@@ -2972,70 +2476,61 @@ func (sh *strictHandler) SubmitTemplateVersion(w http.ResponseWriter, r *http.Re
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

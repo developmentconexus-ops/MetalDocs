@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"metaldocs/internal/platform/tenant"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeOptionsSchemaReader struct {
@@ -87,9 +87,8 @@ func TestPlaceholderOptions_TextType_Returns400(t *testing.T) {
 	}
 	var body map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
-	errBody, _ := body["error"].(map[string]any)
-	if errBody["code"] != "not_a_choice_placeholder" {
-		t.Errorf("code=%v, want not_a_choice_placeholder", errBody["code"])
+	if body["code"] != "not_a_choice_placeholder" {
+		t.Errorf("code=%v, want not_a_choice_placeholder", body["code"])
 	}
 }
 

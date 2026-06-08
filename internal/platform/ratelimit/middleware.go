@@ -2,7 +2,7 @@ package ratelimit
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/netip"
@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/security"
 )
 
@@ -255,12 +256,11 @@ func (m *Middleware) loadOrInsert(lk string, interval time.Duration, quota int, 
 }
 
 func writeRateLimitError(w http.ResponseWriter, quota, retryAfterSec int) {
-	w.Header().Set("content-type", "application/json")
-	w.Header().Set("retry-after", strconv.Itoa(retryAfterSec))
-	w.WriteHeader(http.StatusTooManyRequests)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"error":               "rate_limited",
-		"quota_per_minute":    quota,
-		"retry_after_seconds": retryAfterSec,
-	})
+	// RFC 9457 (AD-2): one error shape across the API. The quota/retry detail
+	// the legacy body carried is preserved via the standard Retry-After header
+	// plus the human-readable detail string.
+	w.Header().Set("Retry-After", strconv.Itoa(retryAfterSec))
+	prob := problem.New(http.StatusTooManyRequests, problem.CodeRateLimited, "Too many requests").
+		WithDetail(fmt.Sprintf("Rate limit of %d requests per minute exceeded; retry after %d seconds.", quota, retryAfterSec))
+	_ = problem.Write(w, prob)
 }

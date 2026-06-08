@@ -22,171 +22,6 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
-// Defines values for DocumentTemplateFieldSlotNodeResponseFieldKind.
-const (
-	Scalar DocumentTemplateFieldSlotNodeResponseFieldKind = "scalar"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateFieldSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateFieldSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Scalar:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateFieldSlotNodeResponseType.
-const (
-	FieldSlot DocumentTemplateFieldSlotNodeResponseType = "field-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateFieldSlotNodeResponseType enum.
-func (e DocumentTemplateFieldSlotNodeResponseType) Valid() bool {
-	switch e {
-	case FieldSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateLabelNodeResponseType.
-const (
-	Label DocumentTemplateLabelNodeResponseType = "label"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateLabelNodeResponseType enum.
-func (e DocumentTemplateLabelNodeResponseType) Valid() bool {
-	switch e {
-	case Label:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplatePageNodeResponseType.
-const (
-	Page DocumentTemplatePageNodeResponseType = "page"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplatePageNodeResponseType enum.
-func (e DocumentTemplatePageNodeResponseType) Valid() bool {
-	switch e {
-	case Page:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRepeatSlotNodeResponseFieldKind.
-const (
-	Repeat DocumentTemplateRepeatSlotNodeResponseFieldKind = "repeat"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRepeatSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateRepeatSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Repeat:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRepeatSlotNodeResponseType.
-const (
-	RepeatSlot DocumentTemplateRepeatSlotNodeResponseType = "repeat-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRepeatSlotNodeResponseType enum.
-func (e DocumentTemplateRepeatSlotNodeResponseType) Valid() bool {
-	switch e {
-	case RepeatSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRichSlotNodeResponseFieldKind.
-const (
-	Rich DocumentTemplateRichSlotNodeResponseFieldKind = "rich"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRichSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateRichSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Rich:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRichSlotNodeResponseType.
-const (
-	RichSlot DocumentTemplateRichSlotNodeResponseType = "rich-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRichSlotNodeResponseType enum.
-func (e DocumentTemplateRichSlotNodeResponseType) Valid() bool {
-	switch e {
-	case RichSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateSectionFrameNodeResponseType.
-const (
-	SectionFrame DocumentTemplateSectionFrameNodeResponseType = "section-frame"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateSectionFrameNodeResponseType enum.
-func (e DocumentTemplateSectionFrameNodeResponseType) Valid() bool {
-	switch e {
-	case SectionFrame:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateTableSlotNodeResponseFieldKind.
-const (
-	Table DocumentTemplateTableSlotNodeResponseFieldKind = "table"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateTableSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateTableSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Table:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateTableSlotNodeResponseType.
-const (
-	TableSlot DocumentTemplateTableSlotNodeResponseType = "table-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateTableSlotNodeResponseType enum.
-func (e DocumentTemplateTableSlotNodeResponseType) Valid() bool {
-	switch e {
-	case TableSlot:
-		return true
-	default:
-		return false
-	}
-}
-
 // DocumentFamilyItem defines model for DocumentFamilyItem.
 type DocumentFamilyItem struct {
 	Code        string `json:"code"`
@@ -208,98 +43,6 @@ type DocumentProfileItem struct {
 	ValidityDays        int     `json:"validityDays"`
 	WorkflowProfile     string  `json:"workflowProfile"`
 }
-
-// DocumentTemplateFieldSlotNodeResponse defines model for DocumentTemplateFieldSlotNodeResponse.
-type DocumentTemplateFieldSlotNodeResponse struct {
-	FieldKind DocumentTemplateFieldSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                         `json:"id"`
-	Path      string                                         `json:"path"`
-	Type      DocumentTemplateFieldSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateFieldSlotNodeResponseFieldKind defines model for DocumentTemplateFieldSlotNodeResponse.FieldKind.
-type DocumentTemplateFieldSlotNodeResponseFieldKind string
-
-// DocumentTemplateFieldSlotNodeResponseType defines model for DocumentTemplateFieldSlotNodeResponse.Type.
-type DocumentTemplateFieldSlotNodeResponseType string
-
-// DocumentTemplateLabelNodeResponse defines model for DocumentTemplateLabelNodeResponse.
-type DocumentTemplateLabelNodeResponse struct {
-	Id   string                                `json:"id"`
-	Text string                                `json:"text"`
-	Type DocumentTemplateLabelNodeResponseType `json:"type"`
-}
-
-// DocumentTemplateLabelNodeResponseType defines model for DocumentTemplateLabelNodeResponse.Type.
-type DocumentTemplateLabelNodeResponseType string
-
-// DocumentTemplateNodeResponse Pilot subset/subconjunto pilotado da MetalDocs template DSL, intencionalmente limitado a page, section-frame, label, field-slot, rich-slot, repeat-slot e table-slot.
-type DocumentTemplateNodeResponse struct {
-	union json.RawMessage
-}
-
-// DocumentTemplatePageNodeResponse defines model for DocumentTemplatePageNodeResponse.
-type DocumentTemplatePageNodeResponse struct {
-	Children []DocumentTemplateNodeResponse       `json:"children"`
-	Id       string                               `json:"id"`
-	Type     DocumentTemplatePageNodeResponseType `json:"type"`
-}
-
-// DocumentTemplatePageNodeResponseType defines model for DocumentTemplatePageNodeResponse.Type.
-type DocumentTemplatePageNodeResponseType string
-
-// DocumentTemplateRepeatSlotNodeResponse defines model for DocumentTemplateRepeatSlotNodeResponse.
-type DocumentTemplateRepeatSlotNodeResponse struct {
-	FieldKind DocumentTemplateRepeatSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                          `json:"id"`
-	Path      string                                          `json:"path"`
-	Type      DocumentTemplateRepeatSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateRepeatSlotNodeResponseFieldKind defines model for DocumentTemplateRepeatSlotNodeResponse.FieldKind.
-type DocumentTemplateRepeatSlotNodeResponseFieldKind string
-
-// DocumentTemplateRepeatSlotNodeResponseType defines model for DocumentTemplateRepeatSlotNodeResponse.Type.
-type DocumentTemplateRepeatSlotNodeResponseType string
-
-// DocumentTemplateRichSlotNodeResponse defines model for DocumentTemplateRichSlotNodeResponse.
-type DocumentTemplateRichSlotNodeResponse struct {
-	FieldKind DocumentTemplateRichSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                        `json:"id"`
-	Path      string                                        `json:"path"`
-	Type      DocumentTemplateRichSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateRichSlotNodeResponseFieldKind defines model for DocumentTemplateRichSlotNodeResponse.FieldKind.
-type DocumentTemplateRichSlotNodeResponseFieldKind string
-
-// DocumentTemplateRichSlotNodeResponseType defines model for DocumentTemplateRichSlotNodeResponse.Type.
-type DocumentTemplateRichSlotNodeResponseType string
-
-// DocumentTemplateSectionFrameNodeResponse defines model for DocumentTemplateSectionFrameNodeResponse.
-type DocumentTemplateSectionFrameNodeResponse struct {
-	Children []DocumentTemplateNodeResponse               `json:"children"`
-	Id       string                                       `json:"id"`
-	Title    *string                                      `json:"title,omitempty"`
-	Type     DocumentTemplateSectionFrameNodeResponseType `json:"type"`
-}
-
-// DocumentTemplateSectionFrameNodeResponseType defines model for DocumentTemplateSectionFrameNodeResponse.Type.
-type DocumentTemplateSectionFrameNodeResponseType string
-
-// DocumentTemplateTableSlotNodeResponse defines model for DocumentTemplateTableSlotNodeResponse.
-type DocumentTemplateTableSlotNodeResponse struct {
-	FieldKind DocumentTemplateTableSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                         `json:"id"`
-	Path      string                                         `json:"path"`
-	Type      DocumentTemplateTableSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateTableSlotNodeResponseFieldKind defines model for DocumentTemplateTableSlotNodeResponse.FieldKind.
-type DocumentTemplateTableSlotNodeResponseFieldKind string
-
-// DocumentTemplateTableSlotNodeResponseType defines model for DocumentTemplateTableSlotNodeResponse.Type.
-type DocumentTemplateTableSlotNodeResponseType string
 
 // ListDocumentFamiliesResponse defines model for ListDocumentFamiliesResponse.
 type ListDocumentFamiliesResponse struct {
@@ -331,294 +74,55 @@ type ListTaxonomyFamiliesParams struct {
 	IncludeInactive *bool `form:"includeInactive,omitempty" json:"includeInactive,omitempty"`
 }
 
-// AsDocumentTemplatePageNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplatePageNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplatePageNodeResponse() (DocumentTemplatePageNodeResponse, error) {
-	var body DocumentTemplatePageNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplatePageNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplatePageNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplatePageNodeResponse(v DocumentTemplatePageNodeResponse) error {
-	v.Type = "page"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplatePageNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplatePageNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplatePageNodeResponse(v DocumentTemplatePageNodeResponse) error {
-	v.Type = "page"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateSectionFrameNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateSectionFrameNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateSectionFrameNodeResponse() (DocumentTemplateSectionFrameNodeResponse, error) {
-	var body DocumentTemplateSectionFrameNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateSectionFrameNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateSectionFrameNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateSectionFrameNodeResponse(v DocumentTemplateSectionFrameNodeResponse) error {
-	v.Type = "section-frame"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateSectionFrameNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateSectionFrameNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateSectionFrameNodeResponse(v DocumentTemplateSectionFrameNodeResponse) error {
-	v.Type = "section-frame"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateLabelNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateLabelNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateLabelNodeResponse() (DocumentTemplateLabelNodeResponse, error) {
-	var body DocumentTemplateLabelNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateLabelNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateLabelNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateLabelNodeResponse(v DocumentTemplateLabelNodeResponse) error {
-	v.Type = "label"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateLabelNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateLabelNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateLabelNodeResponse(v DocumentTemplateLabelNodeResponse) error {
-	v.Type = "label"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateFieldSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateFieldSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateFieldSlotNodeResponse() (DocumentTemplateFieldSlotNodeResponse, error) {
-	var body DocumentTemplateFieldSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateFieldSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateFieldSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateFieldSlotNodeResponse(v DocumentTemplateFieldSlotNodeResponse) error {
-	v.Type = "field-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateFieldSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateFieldSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateFieldSlotNodeResponse(v DocumentTemplateFieldSlotNodeResponse) error {
-	v.Type = "field-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateRichSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateRichSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateRichSlotNodeResponse() (DocumentTemplateRichSlotNodeResponse, error) {
-	var body DocumentTemplateRichSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateRichSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateRichSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateRichSlotNodeResponse(v DocumentTemplateRichSlotNodeResponse) error {
-	v.Type = "rich-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateRichSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateRichSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateRichSlotNodeResponse(v DocumentTemplateRichSlotNodeResponse) error {
-	v.Type = "rich-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateRepeatSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateRepeatSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateRepeatSlotNodeResponse() (DocumentTemplateRepeatSlotNodeResponse, error) {
-	var body DocumentTemplateRepeatSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateRepeatSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateRepeatSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateRepeatSlotNodeResponse(v DocumentTemplateRepeatSlotNodeResponse) error {
-	v.Type = "repeat-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateRepeatSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateRepeatSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateRepeatSlotNodeResponse(v DocumentTemplateRepeatSlotNodeResponse) error {
-	v.Type = "repeat-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateTableSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateTableSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateTableSlotNodeResponse() (DocumentTemplateTableSlotNodeResponse, error) {
-	var body DocumentTemplateTableSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateTableSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateTableSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateTableSlotNodeResponse(v DocumentTemplateTableSlotNodeResponse) error {
-	v.Type = "table-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateTableSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateTableSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateTableSlotNodeResponse(v DocumentTemplateTableSlotNodeResponse) error {
-	v.Type = "table-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t DocumentTemplateNodeResponse) Discriminator() (string, error) {
-	var discriminator struct {
-		Discriminator string `json:"type"`
-	}
-	err := json.Unmarshal(t.union, &discriminator)
-	return discriminator.Discriminator, err
-}
-
-func (t DocumentTemplateNodeResponse) ValueByDiscriminator() (interface{}, error) {
-	discriminator, err := t.Discriminator()
-	if err != nil {
-		return nil, err
-	}
-	switch discriminator {
-	case "field-slot":
-		return t.AsDocumentTemplateFieldSlotNodeResponse()
-	case "label":
-		return t.AsDocumentTemplateLabelNodeResponse()
-	case "page":
-		return t.AsDocumentTemplatePageNodeResponse()
-	case "repeat-slot":
-		return t.AsDocumentTemplateRepeatSlotNodeResponse()
-	case "rich-slot":
-		return t.AsDocumentTemplateRichSlotNodeResponse()
-	case "section-frame":
-		return t.AsDocumentTemplateSectionFrameNodeResponse()
-	case "table-slot":
-		return t.AsDocumentTemplateTableSlotNodeResponse()
-	default:
-		return nil, errors.New("unknown discriminator value: " + discriminator)
-	}
-}
-
-func (t DocumentTemplateNodeResponse) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /api/v1/taxonomy/areas)
+	// (GET /taxonomy/areas)
 	ListTaxonomyAreas(w http.ResponseWriter, r *http.Request)
 
-	// (POST /api/v1/taxonomy/areas)
+	// (POST /taxonomy/areas)
 	CreateTaxonomyArea(w http.ResponseWriter, r *http.Request)
 
-	// (DELETE /api/v1/taxonomy/areas/{code})
+	// (DELETE /taxonomy/areas/{code})
 	ArchiveTaxonomyArea(w http.ResponseWriter, r *http.Request, code string)
 
-	// (GET /api/v1/taxonomy/areas/{code})
+	// (GET /taxonomy/areas/{code})
 	GetTaxonomyArea(w http.ResponseWriter, r *http.Request, code string)
 
-	// (PUT /api/v1/taxonomy/areas/{code})
+	// (PUT /taxonomy/areas/{code})
 	UpdateTaxonomyArea(w http.ResponseWriter, r *http.Request, code string)
 
-	// (GET /api/v1/taxonomy/families)
+	// (GET /taxonomy/families)
 	ListTaxonomyFamilies(w http.ResponseWriter, r *http.Request, params ListTaxonomyFamiliesParams)
 
-	// (POST /api/v1/taxonomy/families)
+	// (POST /taxonomy/families)
 	CreateTaxonomyFamily(w http.ResponseWriter, r *http.Request)
 
-	// (DELETE /api/v1/taxonomy/families/{code})
+	// (DELETE /taxonomy/families/{code})
 	DeactivateTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string)
 
-	// (GET /api/v1/taxonomy/families/{code})
+	// (GET /taxonomy/families/{code})
 	GetTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string)
 
-	// (PATCH /api/v1/taxonomy/families/{code})
+	// (PATCH /taxonomy/families/{code})
 	UpdateTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string)
 
-	// (GET /api/v1/taxonomy/profiles)
+	// (GET /taxonomy/profiles)
 	ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request)
 
-	// (POST /api/v1/taxonomy/profiles)
+	// (POST /taxonomy/profiles)
 	CreateTaxonomyProfile(w http.ResponseWriter, r *http.Request)
 
-	// (DELETE /api/v1/taxonomy/profiles/{code})
+	// (DELETE /taxonomy/profiles/{code})
 	ArchiveTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string)
 
-	// (GET /api/v1/taxonomy/profiles/{code})
+	// (GET /taxonomy/profiles/{code})
 	GetTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string)
 
-	// (PATCH /api/v1/taxonomy/profiles/{code})
+	// (PATCH /taxonomy/profiles/{code})
 	UpdateTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string)
 
-	// (PUT /api/v1/taxonomy/profiles/{code}/default-template)
+	// (PUT /taxonomy/profiles/{code}/default-template)
 	SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter, r *http.Request, code string)
 }
 
@@ -1114,22 +618,22 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/areas", wrapper.ListTaxonomyAreas)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/areas", wrapper.CreateTaxonomyArea)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.ArchiveTaxonomyArea)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.GetTaxonomyArea)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.UpdateTaxonomyArea)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/families", wrapper.ListTaxonomyFamilies)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/families", wrapper.CreateTaxonomyFamily)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.DeactivateTaxonomyFamily)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.GetTaxonomyFamily)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.UpdateTaxonomyFamily)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/profiles", wrapper.ListTaxonomyProfiles)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/profiles", wrapper.CreateTaxonomyProfile)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.ArchiveTaxonomyProfile)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.GetTaxonomyProfile)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.UpdateTaxonomyProfile)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}/default-template", wrapper.SetTaxonomyProfileDefaultTemplate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/taxonomy/areas", wrapper.ListTaxonomyAreas)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/taxonomy/areas", wrapper.CreateTaxonomyArea)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/taxonomy/areas/{code}", wrapper.ArchiveTaxonomyArea)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/taxonomy/areas/{code}", wrapper.GetTaxonomyArea)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/taxonomy/areas/{code}", wrapper.UpdateTaxonomyArea)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/taxonomy/families", wrapper.ListTaxonomyFamilies)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/taxonomy/families", wrapper.CreateTaxonomyFamily)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/taxonomy/families/{code}", wrapper.DeactivateTaxonomyFamily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/taxonomy/families/{code}", wrapper.GetTaxonomyFamily)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/taxonomy/families/{code}", wrapper.UpdateTaxonomyFamily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/taxonomy/profiles", wrapper.ListTaxonomyProfiles)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/taxonomy/profiles", wrapper.CreateTaxonomyProfile)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/taxonomy/profiles/{code}", wrapper.ArchiveTaxonomyProfile)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/taxonomy/profiles/{code}", wrapper.GetTaxonomyProfile)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/taxonomy/profiles/{code}", wrapper.UpdateTaxonomyProfile)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/taxonomy/profiles/{code}/default-template", wrapper.SetTaxonomyProfileDefaultTemplate)
 
 	return m
 }
@@ -1460,52 +964,52 @@ func (response SetTaxonomyProfileDefaultTemplate200Response) VisitSetTaxonomyPro
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
-	// (GET /api/v1/taxonomy/areas)
+	// (GET /taxonomy/areas)
 	ListTaxonomyAreas(ctx context.Context, request ListTaxonomyAreasRequestObject) (ListTaxonomyAreasResponseObject, error)
 
-	// (POST /api/v1/taxonomy/areas)
+	// (POST /taxonomy/areas)
 	CreateTaxonomyArea(ctx context.Context, request CreateTaxonomyAreaRequestObject) (CreateTaxonomyAreaResponseObject, error)
 
-	// (DELETE /api/v1/taxonomy/areas/{code})
+	// (DELETE /taxonomy/areas/{code})
 	ArchiveTaxonomyArea(ctx context.Context, request ArchiveTaxonomyAreaRequestObject) (ArchiveTaxonomyAreaResponseObject, error)
 
-	// (GET /api/v1/taxonomy/areas/{code})
+	// (GET /taxonomy/areas/{code})
 	GetTaxonomyArea(ctx context.Context, request GetTaxonomyAreaRequestObject) (GetTaxonomyAreaResponseObject, error)
 
-	// (PUT /api/v1/taxonomy/areas/{code})
+	// (PUT /taxonomy/areas/{code})
 	UpdateTaxonomyArea(ctx context.Context, request UpdateTaxonomyAreaRequestObject) (UpdateTaxonomyAreaResponseObject, error)
 
-	// (GET /api/v1/taxonomy/families)
+	// (GET /taxonomy/families)
 	ListTaxonomyFamilies(ctx context.Context, request ListTaxonomyFamiliesRequestObject) (ListTaxonomyFamiliesResponseObject, error)
 
-	// (POST /api/v1/taxonomy/families)
+	// (POST /taxonomy/families)
 	CreateTaxonomyFamily(ctx context.Context, request CreateTaxonomyFamilyRequestObject) (CreateTaxonomyFamilyResponseObject, error)
 
-	// (DELETE /api/v1/taxonomy/families/{code})
+	// (DELETE /taxonomy/families/{code})
 	DeactivateTaxonomyFamily(ctx context.Context, request DeactivateTaxonomyFamilyRequestObject) (DeactivateTaxonomyFamilyResponseObject, error)
 
-	// (GET /api/v1/taxonomy/families/{code})
+	// (GET /taxonomy/families/{code})
 	GetTaxonomyFamily(ctx context.Context, request GetTaxonomyFamilyRequestObject) (GetTaxonomyFamilyResponseObject, error)
 
-	// (PATCH /api/v1/taxonomy/families/{code})
+	// (PATCH /taxonomy/families/{code})
 	UpdateTaxonomyFamily(ctx context.Context, request UpdateTaxonomyFamilyRequestObject) (UpdateTaxonomyFamilyResponseObject, error)
 
-	// (GET /api/v1/taxonomy/profiles)
+	// (GET /taxonomy/profiles)
 	ListTaxonomyProfiles(ctx context.Context, request ListTaxonomyProfilesRequestObject) (ListTaxonomyProfilesResponseObject, error)
 
-	// (POST /api/v1/taxonomy/profiles)
+	// (POST /taxonomy/profiles)
 	CreateTaxonomyProfile(ctx context.Context, request CreateTaxonomyProfileRequestObject) (CreateTaxonomyProfileResponseObject, error)
 
-	// (DELETE /api/v1/taxonomy/profiles/{code})
+	// (DELETE /taxonomy/profiles/{code})
 	ArchiveTaxonomyProfile(ctx context.Context, request ArchiveTaxonomyProfileRequestObject) (ArchiveTaxonomyProfileResponseObject, error)
 
-	// (GET /api/v1/taxonomy/profiles/{code})
+	// (GET /taxonomy/profiles/{code})
 	GetTaxonomyProfile(ctx context.Context, request GetTaxonomyProfileRequestObject) (GetTaxonomyProfileResponseObject, error)
 
-	// (PATCH /api/v1/taxonomy/profiles/{code})
+	// (PATCH /taxonomy/profiles/{code})
 	UpdateTaxonomyProfile(ctx context.Context, request UpdateTaxonomyProfileRequestObject) (UpdateTaxonomyProfileResponseObject, error)
 
-	// (PUT /api/v1/taxonomy/profiles/{code}/default-template)
+	// (PUT /taxonomy/profiles/{code}/default-template)
 	SetTaxonomyProfileDefaultTemplate(ctx context.Context, request SetTaxonomyProfileDefaultTemplateRequestObject) (SetTaxonomyProfileDefaultTemplateResponseObject, error)
 }
 
@@ -1949,44 +1453,34 @@ func (sh *strictHandler) SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"aeDXmaAel4Y/as2uDMHAToq/Wsnx7vhHAAAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

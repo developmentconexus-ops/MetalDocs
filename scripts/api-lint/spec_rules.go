@@ -37,6 +37,7 @@ func RunSpecRules(specPath string) ([]Violation, error) {
 	}
 	components := mapGet(root, "components")
 	schemas := mapGet(components, "schemas")
+	responsesComp := mapGet(components, "responses")
 	out := []Violation{}
 	for i := 0; i+1 < len(paths.Content); i += 2 {
 		pathKey, pathVal := paths.Content[i], paths.Content[i+1]
@@ -48,7 +49,7 @@ func RunSpecRules(specPath string) ([]Violation, error) {
 			if opID == "" {
 				opID = method + " " + pathKey.Value
 			}
-			out = append(out, checkEnvelope(specPath, opID, op)...)
+			out = append(out, checkEnvelope(specPath, opID, pathKey.Value, op, responsesComp)...)
 			out = append(out, checkPagination(specPath, opID, op, schemas)...)
 			out = append(out, checkAuthz(specPath, opID, pathKey.Value, method, op)...)
 		}
@@ -73,7 +74,21 @@ func checkBasePrefix(file string, pathKey *yaml.Node) []Violation {
 	return nil
 }
 
-func checkEnvelope(file, opID string, op *yaml.Node) []Violation {
+// checkEnvelope enforces AD-2: RFC 9457 Problem is the only error shape. A
+// response >= 400 that declares a body MUST resolve to the Problem schema —
+// either inline, or (canonically, api-contract-hardening Phase D) through a
+// $ref to one of the shared #/components/responses/* definitions, which all
+// reference Problem. Two principled carve-outs keep the gate honest without
+// pulling in Phase E spec-hygiene scope:
+//   - A description-only response (no `content`) advertises no body, so there
+//     is no envelope to drift. Documenting a body for every bare status is a
+//     Phase E hygiene task, not an AD-2 violation.
+//   - The health/liveness probes return their health document (HealthResponse)
+//     on 503 by convention, not an RFC 9457 error — exempt by path.
+func checkEnvelope(file, opID, path string, op, responsesComp *yaml.Node) []Violation {
+	if strings.HasPrefix(path, "/health/") {
+		return nil
+	}
 	out := []Violation{}
 	responses := mapGet(op, "responses")
 	for i := 0; responses != nil && i+1 < len(responses.Content); i += 2 {
@@ -82,7 +97,31 @@ func checkEnvelope(file, opID string, op *yaml.Node) []Violation {
 		if err != nil || code < 400 || code > 599 {
 			continue
 		}
-		content := mapGet(resp, "content")
+		// A bespoke (non-Problem) error body may opt out with an explicit,
+		// reviewed reason — mirroring x-pagination-exempt. The marker is read off
+		// the operation's OWN response node (not the resolved shared component),
+		// so an exemption can never silently blanket every op that $refs a shared
+		// response; it scopes to the one reviewed endpoint.
+		if reason := strings.TrimSpace(scalarValue(mapGet(resp, "x-error-envelope-exempt"))); reason != "" {
+			continue
+		}
+		resolved := resp
+		if ref := mapGet(resp, "$ref"); ref != nil {
+			resolved = lookupResponseRef(ref.Value, responsesComp)
+			if resolved == nil {
+				// An error response whose $ref does not resolve to a known shared
+				// response cannot be proven to carry Problem. A BLOCKING gate must
+				// fail closed here, not degrade to the contentless-exempt path
+				// (a typo'd ref would otherwise slip a non-Problem body through).
+				out = append(out, Violation{File: file, Line: statusNode.Line, Rule: "ENVELOPE-DRIFT", Message: fmt.Sprintf("response %s %s has an unresolved $ref %q; cannot verify Problem envelope", opID, statusNode.Value, scalarValue(mapGet(resp, "$ref")))})
+				continue
+			}
+		}
+		content := mapGet(resolved, "content")
+		if content == nil {
+			// Description-only error response: no body, no envelope to drift.
+			continue
+		}
 		media := mapGet(content, "application/problem+json")
 		if media == nil {
 			media = mapGet(content, "application/json")
@@ -92,6 +131,18 @@ func checkEnvelope(file, opID string, op *yaml.Node) []Violation {
 		}
 	}
 	return out
+}
+
+// lookupResponseRef resolves a response-level $ref into components/responses.
+// Returns nil for a non-local or unknown ref; redocly lint independently gates
+// dangling refs, so an unresolved ref degrades to the contentless (exempt) path
+// rather than a false ENVELOPE-DRIFT hit.
+func lookupResponseRef(ref string, responsesComp *yaml.Node) *yaml.Node {
+	const p = "#/components/responses/"
+	if !strings.HasPrefix(ref, p) {
+		return nil
+	}
+	return mapGet(responsesComp, strings.TrimPrefix(ref, p))
 }
 
 func checkPagination(file, opID string, op, schemas *yaml.Node) []Violation {

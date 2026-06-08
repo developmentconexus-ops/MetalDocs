@@ -42,6 +42,9 @@ type Handler struct {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	taxonomyapi.HandlerWithOptions(h, taxonomyapi.StdHTTPServerOptions{
 		BaseRouter: mux,
+		// AD-1: spec path keys are relative; the generated router prepends this
+		// base so served routes stay /api/v1/* and the codegen matches the spec.
+		BaseURL: "/api/v1",
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		},

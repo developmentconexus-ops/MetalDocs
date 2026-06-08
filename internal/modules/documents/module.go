@@ -121,6 +121,7 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 		dhttp.NewGeneratedServerAdapter(legacyMux),
 		documentsapi.StdHTTPServerOptions{
 			BaseRouter: mux,
+			BaseURL:    "/api/v1",
 			ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 				_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
 			},
@@ -134,6 +135,7 @@ func (m *Module) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.M
 		dhttp.NewGeneratedServerAdapter(legacyMux),
 		documentsapi.StdHTTPServerOptions{
 			BaseRouter: mux,
+			BaseURL:    "/api/v1",
 			ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 				_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
 			},

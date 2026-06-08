@@ -13,8 +13,12 @@ import (
 // dialect bans, and tripwire-pairing — is BLOCKING: a regression turns the build
 // red. This is Principle 5 ("the model is bound by CI, not by discipline") made
 // real. A NEW rule defaults to blocking by omission, which is the safe default.
+// ENVELOPE-DRIFT graduated to BLOCKING in api-contract-hardening Phase D: the
+// whole spec now serves a single RFC 9457 Problem error shape (AD-2) via the
+// shared #/components/responses/* set, so a re-introduced non-Problem error body
+// turns CI red. AUTHZ-DRIFT and PAGINATION-DRIFT remain reported-only — they are
+// owned by Phase E and must not gate yet.
 var reportedOnlyRules = map[string]struct{}{
-	"ENVELOPE-DRIFT":   {},
 	"AUTHZ-DRIFT":      {},
 	"PAGINATION-DRIFT": {},
 }

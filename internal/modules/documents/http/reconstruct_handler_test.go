@@ -12,8 +12,8 @@ import (
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	"metaldocs/internal/platform/tenant"
 	"metaldocs/internal/modules/render/fanout"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeReconstructService struct {

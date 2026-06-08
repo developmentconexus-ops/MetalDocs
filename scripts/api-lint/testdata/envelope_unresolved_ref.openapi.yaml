@@ -1,0 +1,40 @@
+openapi: 3.0.3
+info:
+  title: envelope-unresolved-ref
+  version: 1.0.0
+# A 4xx response whose $ref does not resolve to a known shared response must FAIL
+# the (now BLOCKING) ENVELOPE-DRIFT gate, not silently pass via the exempt path.
+paths:
+  /widgets/{id}:
+    get:
+      operationId: getWidget
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { type: object }
+        '401':
+          $ref: '#/components/responses/Nonexistent'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    Unauthorized:
+      description: unauthorized
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      properties:
+        title:
+          type: string
+        status:
+          type: integer

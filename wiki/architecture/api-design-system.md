@@ -1,7 +1,7 @@
 ﻿# API Design System
 
 > **Status:** accepted 2026-05-10
-> **Last verified:** 2026-06-07 (Phase C dead-path prune: Problem schema line in openapi.yaml updated :5382 → :4332; prior: 2026-05-21)
+> **Last verified:** 2026-06-07 (Phase D error-envelope unification: RFC 9457 `Problem` is the only error shape — `ApiErrorEnvelope` retired; all error responses use the shared `#/components/responses/*` set; `ENVELOPE-DRIFT` is now BLOCKING. Prior: Phase C dead-path prune — Problem schema at openapi.yaml:4332; 2026-05-21)
 > **Scope:** API design conventions for v1     error envelope, pagination, idempotency, two-tier authz, list filtering, naming.
 > **Out of scope:** Adoption     Plan 2 migrates handlers, paths, and module names. Frontend wiring is in Plan 1 only for the shared parser; per-page adoption is Plan 2.
 > **Key files:**
@@ -40,6 +40,8 @@ MetalDocs exposes a growing HTTP surface across 7 modules. Without a shared cont
 ---
 
 ## 3. Error envelope (RFC 9457)
+
+RFC 9457 `Problem` is the **only** error shape (AD-2, api-contract-hardening Phase D). The legacy `ApiErrorEnvelope` (`{error:{code,message,details,trace_id}}`) is retired — deleted from the spec and the frontend. Error responses reference one shared set of `#/components/responses/*` definitions (`BadRequest`/`Unauthorized`/`Forbidden`/`NotFound`/`Conflict`/`UnprocessableEntity`/`InternalServerError`), each `application/problem+json` → `Problem`; operations that document failures also document a `500`. A bespoke (non-Problem) error body may opt out only via a reviewed `x-error-envelope-exempt: "<reason>"` marker (mirrors `x-pagination-exempt-reason`).
 
 All 4xx/5xx responses MUST use `Content-Type: application/problem+json` with this shape:
 
@@ -225,7 +227,7 @@ Five rules in `scripts/api-lint/`, running in the `api-design-system-lint` job o
 
 | Rule | File | What it checks |
 |---|---|---|
-| `ENVELOPE-DRIFT` | `spec_rules.go` | Every response     400 references `#/components/schemas/Problem` |
+| `ENVELOPE-DRIFT` | `spec_rules.go` | **BLOCKING (Phase D).** Every response     400 with a body resolves to `Problem` — inline or via a `#/components/responses/*` `$ref`. Exempt: description-only responses, `/health/*` probes, and reviewed `x-error-envelope-exempt` bodies |
 | `PAGINATION-DRIFT` | `spec_rules.go` | Every `list*` op declares `cursor`/`limit` params; response includes `page.next_cursor` + `page.has_more` |
 | `AUTHZ-DRIFT` | `spec_rules.go` | Every op declares `security`; state-transition ops declare `x-authz-area` or escape hatch |
 | `authz-call-present` | `code_rules.go` | Each op with `x-authz-area` has a matching `authz.Require` call in the handler body |

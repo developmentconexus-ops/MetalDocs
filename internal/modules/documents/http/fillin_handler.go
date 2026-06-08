@@ -16,6 +16,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -118,68 +119,49 @@ func (h *FillInHandler) PutPlaceholderValue(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-type fillInErrorResponse struct {
-	Error     fillInErrorBody `json:"error"`
-	RequestID string          `json:"request_id"`
-}
-
-type fillInErrorBody struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
 var ErrBadContentType = errors.New("content-type must be application/json")
 
-func mapFillInError(err error) (int, fillInErrorResponse) {
-	status := http.StatusInternalServerError
-	code := "internal.unknown"
-
+// mapFillInError maps a service error to its RFC 9457 (status, code) pair. The
+// codes are the module's dot-notation taxonomy (see internal/platform/problem).
+func mapFillInError(err error) (int, problem.Code) {
 	switch {
 	case errors.As(err, &authz.ErrCapDenied{}):
-		status = http.StatusForbidden
-		code = "authz.capability_denied"
+		return http.StatusForbidden, "authz.capability_denied"
 	case errors.As(err, &notChoicePlaceholderError{}):
-		status = http.StatusBadRequest
-		code = "not_a_choice_placeholder"
+		return http.StatusBadRequest, "not_a_choice_placeholder"
 	case errors.Is(err, v2domain.ErrNotFound):
-		status = http.StatusNotFound
-		code = "not_found.revision"
+		return http.StatusNotFound, "not_found.revision"
 	case errors.Is(err, v2domain.ErrInvalidStateTransition):
-		status = http.StatusConflict
-		code = "state.revision_not_draft"
+		return http.StatusConflict, "state.revision_not_draft"
 	case errors.Is(err, v2domain.ErrValidationFailed):
-		status = http.StatusUnprocessableEntity
-		code = "validation.failed"
+		return http.StatusUnprocessableEntity, "validation.failed"
 	case errors.Is(err, io.EOF):
-		status = http.StatusBadRequest
-		code = "validation.empty_body"
+		return http.StatusBadRequest, "validation.empty_body"
 	case errors.Is(err, ErrBadContentType):
-		status = http.StatusUnsupportedMediaType
-		code = "validation.bad_content_type"
+		return http.StatusUnsupportedMediaType, "validation.bad_content_type"
 	case looksLikeDecodeError(err):
-		status = http.StatusBadRequest
-		code = "validation.json_decode"
-	}
-
-	return status, fillInErrorResponse{
-		Error: fillInErrorBody{
-			Code:    code,
-			Message: errorMessage(err, status),
-		},
+		return http.StatusBadRequest, "validation.json_decode"
+	default:
+		return http.StatusInternalServerError, "internal.unknown"
 	}
 }
 
+// writeFillInError emits the unified RFC 9457 application/problem+json error
+// shape (AD-2). The request id, when present, rides in the Problem `instance`.
 func writeFillInError(w http.ResponseWriter, reqID string, err error) {
-	status, body := mapFillInError(err)
-	body.RequestID = reqID
-	writeFillInJSON(w, status, body)
+	status, code := mapFillInError(err)
+	prob := problem.New(status, code, errorMessage(err, status))
+	if reqID != "" {
+		prob = prob.WithInstance(reqID)
+	}
+	_ = problem.Write(w, prob)
 }
 
 func writeFillInJSON(w http.ResponseWriter, status int, payload any) {
 	data, err := json.Marshal(payload)
 	if err != nil {
-		status = http.StatusInternalServerError
-		data = []byte(`{"error":{"code":"internal.unknown","message":"internal error"}}`)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "internal.unknown", "internal error"))
+		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

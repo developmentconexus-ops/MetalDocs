@@ -64,19 +64,17 @@ async function assertApiResponse(res: Response) {
       throw new ApiError(problem);
     }
 
-    let body: { error?: { code?: string; message?: string; details?: unknown } } | undefined;
-
-    try {
-      body = await res.json();
-    } catch {
-      body = undefined;
-    }
-
-    const code = body?.error?.code ?? `http_${res.status}`;
-    const message = body?.error?.message ?? `Não foi possível concluir a ação. Código: ${code}`;
-
-    console.warn("[api] legacy error envelope from", res.url, "code=", code);
-    throw ApiError.fromLegacy(code, res.status, message, body?.error?.details);
+    // The whole API emits application/problem+json (api-contract-hardening
+    // Phase D — RFC 9457 is the only error shape). A missing Problem body means
+    // the failure did not originate from a MetalDocs handler (e.g. an
+    // infrastructure 502/504 or a bodyless response), so synthesize a generic
+    // error from the status alone — there is no legacy envelope to parse.
+    const code = `http_${res.status}`;
+    throw ApiError.fromLegacy(
+      code,
+      res.status,
+      `Não foi possível concluir a ação. Código: ${code}`,
+    );
   }
 }
 

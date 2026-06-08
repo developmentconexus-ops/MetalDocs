@@ -18,10 +18,13 @@ export const errorMessages: Record<string, string> = {
   UNKNOWN_FILTER: 'Foi informado um filtro não suportado para esta consulta.',
   INVALID_SORT_FIELD: 'O campo de ordenação informado não é válido.',
   INVALID_CURSOR: 'O cursor informado é inválido ou expirou.',
+  CURSOR_EXPIRED: 'O cursor de paginação expirou. Recomece a listagem.',
   INCLUDE_NOT_SUPPORTED: 'O include informado não é suportado para este endpoint.',
   'validation.body_too_large': 'O corpo da requisição excede o tamanho permitido.',
+  'validation.bad_content_type': 'Tipo de conteúdo inválido. Use application/json.',
   'validation.content_type': 'Tipo de conteúdo inválido.',
   'validation.empty_body': 'O corpo da requisição não pode estar vazio.',
+  'validation.failed': 'A validação dos dados informados falhou.',
   'validation.header_required': 'Um cabeçalho obrigatório não foi enviado.',
   'validation.if_match_malformed': 'A revisão informada é inválida.',
   'validation.json_decode': 'Não foi possível ler o JSON enviado.',
@@ -72,12 +75,15 @@ export const errorMessages: Record<string, string> = {
   'idempotency.key_conflict': 'A chave de idempotência já foi usada com outro conteúdo.',
   'idempotency.key_required': 'Identificador de operação ausente. Recarregue e tente novamente.',
   RATE_LIMITED: 'Muitas requisições em sequência. Tente novamente em instantes.',
+  'authn.rate_limited': 'Muitas tentativas de autenticação. Tente novamente em instantes.',
   timeout: 'A operação demorou mais que o esperado. Tente novamente.',
 
   // ─── Platform: not-found / already-exists / state ─────────────────────────
   NOT_FOUND: 'O recurso solicitado não foi encontrado.',
+  'not_found.revision': 'Revisão do documento não encontrada.',
   ALREADY_EXISTS: 'O recurso informado já existe.',
   STATE_TRANSITION_INVALID: 'A transição de estado solicitada não é permitida.',
+  'state.revision_not_draft': 'A revisão não está em rascunho e não pode ser alterada.',
 
   // ─── Platform: internal ───────────────────────────────────────────────────
   INTERNAL_ERROR: 'Ocorreu um erro interno. Tente novamente.',
@@ -86,6 +92,8 @@ export const errorMessages: Record<string, string> = {
   'internal.unknown': 'Ocorreu um erro interno. Tente novamente.',
   'internal.db_privilege_missing': 'O servidor não tem privilégio suficiente para concluir esta operação.',
   'internal.db_unknown': 'Falha inesperada no banco de dados. Tente novamente.',
+  'internal.signature_misconfigured': 'Falha de configuração na verificação de assinatura. Contate o administrador.',
+  NOT_IMPLEMENTED: 'Funcionalidade ainda não disponível.',
 
   // ─── Templates module ─────────────────────────────────────────────────────
   archived: 'Este template está arquivado e não pode ser alterado.',
@@ -127,6 +135,7 @@ export const errorMessages: Record<string, string> = {
   controlled_document_required: 'Informe o documento controlado para esta operação.',
   document_not_found: 'Documento não encontrado.',
   docx_missing: 'O arquivo DOCX do documento não foi encontrado.',
+  not_a_choice_placeholder: 'Este campo não é uma lista de opções.',
   expired_upload: 'O upload expirou. Tente enviar o arquivo novamente.',
   gotenberg_failed: 'Falha ao gerar o PDF. Tente novamente.',
   misbound: 'O documento está vinculado a outro recurso. Recarregue e tente novamente.',
@@ -168,6 +177,7 @@ export const errorMessages: Record<string, string> = {
   TEMPLATE_PROFILE_MISMATCH: 'A versão do template pertence a outro perfil.',
 
   // ─── IAM ──────────────────────────────────────────────────────────────────
+  MEMBERSHIP_EXISTS: 'Já existe um vínculo ativo para este usuário nesta área.',
   MEMBERSHIP_NOT_FOUND: 'Vínculo de usuário não encontrado.',
   UNKNOWN_ROLE: 'Papel informado é desconhecido.',
 };

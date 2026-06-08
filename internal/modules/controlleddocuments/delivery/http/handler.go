@@ -94,6 +94,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	controlleddocumentsapi.HandlerWithOptions(h, controlleddocumentsapi.StdHTTPServerOptions{
 		BaseRouter: mux,
+		// AD-1: spec path keys are relative; the generated router prepends this
+		// base so served routes stay /api/v1/* and the codegen matches the spec.
+		BaseURL: "/api/v1",
 		Middlewares: []controlleddocumentsapi.MiddlewareFunc{
 			middleware,
 		},

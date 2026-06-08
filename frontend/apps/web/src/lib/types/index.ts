@@ -269,12 +269,3 @@ export interface AuditEventItem {
   payload: Record<string, unknown>;
   traceId: string;
 }
-
-export interface ApiErrorEnvelope {
-  error: {
-    code: string;
-    message: string;
-    details: Record<string, unknown>;
-    trace_id: string;
-  };
-}

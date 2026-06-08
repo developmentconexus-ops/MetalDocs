@@ -24,7 +24,7 @@ const (
 	CodeConcurrentModification Code = "CONCURRENT_MODIFICATION"
 	CodeIdempotencyKeyReused   Code = "IDEMPOTENCY_KEY_REUSED"
 	CodeIdempotencyReplay      Code = "IDEMPOTENCY_REPLAY"
-	CodeRateLimited            Code = "RATE_LIMITED" // reserved; not enforced yet
+	CodeRateLimited            Code = "RATE_LIMITED" // emitted by the rate-limit middlewares (platform/ratelimit + platform/security)
 	CodeInternalError          Code = "INTERNAL_ERROR"
 	CodeConflict               Code = "CONFLICT_ERROR"
 	CodeIdempotencyKeyRequired Code = "IDEMPOTENCY_KEY_REQUIRED"

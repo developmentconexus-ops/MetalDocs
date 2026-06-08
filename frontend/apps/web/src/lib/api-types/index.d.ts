@@ -111,24 +111,9 @@ export interface paths {
                         "application/json": components["schemas"]["MetricsResponse"];
                     };
                 };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                500: components["responses"]["InternalServerError"];
             };
         };
         put?: never;
@@ -637,33 +622,10 @@ export interface paths {
                         "application/json": components["schemas"]["SearchDocumentsResponse"];
                     };
                 };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                500: components["responses"]["InternalServerError"];
             };
         };
         put?: never;
@@ -2579,17 +2541,6 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        ApiErrorEnvelope: {
-            error: components["schemas"]["ApiError"];
-        };
-        ApiError: {
-            code: string;
-            message: string;
-            details: {
-                [key: string]: unknown;
-            };
-            trace_id: string;
-        };
         /** @description Server-controlled feature flag values exposed to the frontend. */
         FeatureFlagsResponse: {
             /**
@@ -2869,7 +2820,7 @@ export interface components {
         };
         Problem: {
             /** Format: uri */
-            type: string;
+            type?: string;
             title: string;
             status: number;
             detail?: string;
@@ -2966,7 +2917,71 @@ export interface components {
             [key: string]: unknown;
         };
     };
-    responses: never;
+    responses: {
+        /** @description Requisicao invalida */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Nao autenticado */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Sem permissao */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Recurso nao encontrado */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Conflito de estado */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Entidade nao processavel */
+        UnprocessableEntity: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Erro interno do servidor */
+        InternalServerError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+    };
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -2996,15 +3011,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuthLoginResponse"];
                 };
             };
-            /** @description Credenciais invalidas */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     logout: {
@@ -3043,15 +3051,8 @@ export interface operations {
                     "application/json": components["schemas"]["CurrentUser"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     changePassword: {
@@ -3076,24 +3077,9 @@ export interface operations {
                     "application/json": components["schemas"]["ChangePasswordResponse"];
                 };
             };
-            /** @description Requisicao invalida */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listUsers: {
@@ -3122,24 +3108,9 @@ export interface operations {
                     "application/json": components["schemas"]["ListUsersResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     createManagedUser: {
@@ -3190,42 +3161,11 @@ export interface operations {
                     "application/json": components["schemas"]["ManagedUserCore"];
                 };
             };
-            /** @description Requisicao invalida */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Usuario nao encontrado */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     resetPassword: {
@@ -3252,33 +3192,10 @@ export interface operations {
                     "application/json": components["schemas"]["ResetManagedUserPasswordResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Usuario nao encontrado */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     unlockUser: {
@@ -3301,33 +3218,10 @@ export interface operations {
                     "application/json": components["schemas"]["UnlockManagedUserResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Usuario nao encontrado */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getIamAdminOverview: {
@@ -3348,24 +3242,9 @@ export interface operations {
                     "application/json": components["schemas"]["AdminOverviewResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     inviteUser: {
@@ -3390,42 +3269,11 @@ export interface operations {
                     "application/json": components["schemas"]["UserInviteResponse"];
                 };
             };
-            /** @description Requisicao invalida */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Conflito (username/email ja em uso) */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     bulkUsers: {
@@ -3450,33 +3298,10 @@ export interface operations {
                     "application/json": components["schemas"]["UserBulkActionResult"];
                 };
             };
-            /** @description Requisicao invalida */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listMemberships: {
@@ -3499,33 +3324,10 @@ export interface operations {
                     "application/json": components["schemas"]["ListMembershipsResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Usuario nao encontrado */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listRoles: {
@@ -3546,24 +3348,9 @@ export interface operations {
                     "application/json": components["schemas"]["ListRolesResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listCapabilities: {
@@ -3584,24 +3371,9 @@ export interface operations {
                     "application/json": components["schemas"]["ListCapabilitiesResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listRoleCapabilities: {
@@ -3622,24 +3394,9 @@ export interface operations {
                     "application/json": components["schemas"]["ListRoleCapabilitiesResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getKpi: {
@@ -3660,24 +3417,9 @@ export interface operations {
                     "application/json": components["schemas"]["IamKpiSnapshot"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getUsage: {
@@ -3698,24 +3440,9 @@ export interface operations {
                     "application/json": components["schemas"]["UsageSnapshot"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getPresenceSnapshot: {
@@ -3736,24 +3463,9 @@ export interface operations {
                     "application/json": components["schemas"]["PresenceSnapshotResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     exportAuditEvents: {
@@ -3778,33 +3490,10 @@ export interface operations {
                     "application/json": components["schemas"]["AuditExportResponse"];
                 };
             };
-            /** @description Requisicao invalida */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getAuditExportStatus: {
@@ -3827,33 +3516,10 @@ export interface operations {
                     "application/json": components["schemas"]["AuditExportStatusResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Exportacao nao encontrada */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     downloadAuditExport: {
@@ -3878,42 +3544,11 @@ export interface operations {
                     "application/octet-stream": string;
                 };
             };
-            /** @description Token ausente ou invalido */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Exportacao nao encontrada ou token expirado */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listSessions: {
@@ -3939,24 +3574,9 @@ export interface operations {
                     "application/json": components["schemas"]["ListSessionsResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     revokeSession: {
@@ -3977,33 +3597,10 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sessao nao encontrada */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getMfaCoverage: {
@@ -4024,24 +3621,9 @@ export interface operations {
                     "application/json": components["schemas"]["MfaCoverage"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listLockouts: {
@@ -4062,24 +3644,9 @@ export interface operations {
                     "application/json": components["schemas"]["ListLockoutsResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listSecuritySignals: {
@@ -4100,24 +3667,9 @@ export interface operations {
                     "application/json": components["schemas"]["ListSecuritySignalsResponse"];
                 };
             };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listAuditEvents: {
@@ -4149,33 +3701,10 @@ export interface operations {
                     "application/json": components["schemas"]["ListAuditEventsResponse"];
                 };
             };
-            /** @description Parametro invalido */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     replaceUserRoles: {
@@ -4202,33 +3731,10 @@ export interface operations {
                     "application/json": components["schemas"]["ReplaceUserRolesResponse"];
                 };
             };
-            /** @description Requisicao invalida */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     upsertUserRole: {
@@ -4255,33 +3761,10 @@ export interface operations {
                     "application/json": components["schemas"]["UpsertUserRoleResponse"];
                 };
             };
-            /** @description Requisicao invalida */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listAreaMemberships: {
@@ -4309,42 +3792,11 @@ export interface operations {
                     "application/json": components["schemas"]["AreaMembershipListResponse"];
                 };
             };
-            /** @description Validation failure */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Target user not in tenant */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     grantAreaMembership: {
@@ -4369,51 +3821,12 @@ export interface operations {
                     "application/json": components["schemas"]["GrantAreaMembershipResponse"];
                 };
             };
-            /** @description Validation failure (missing fields, unknown role) */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Target user not in tenant */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Active membership for (user, area) already exists with the same role */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     revokeAreaMembership: {
@@ -4435,42 +3848,11 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation failure */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Target user not in tenant, or no active membership for (user, area) */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getFeatureFlags: {
@@ -5530,15 +4912,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description code_taken or domain conflict, including template artifact missing */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            409: components["responses"]["Conflict"];
             /** @description template_invalid */
             422: {
                 headers: {
@@ -5546,6 +4920,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            500: components["responses"]["InternalServerError"];
         };
     };
     previewControlledDocumentCode: {
@@ -5822,33 +5197,10 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentListResponse"];
                 };
             };
-            /** @description Requisicao invalida */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getDocument: {
@@ -6032,33 +5384,10 @@ export interface operations {
                     "application/json": components["schemas"]["DocumentStatsResponse"];
                 };
             };
-            /** @description Requisicao invalida */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Nao autenticado */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Sem permissao */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     acquireDocumentSession: {
@@ -6893,15 +6222,8 @@ export interface operations {
                     "application/json": components["schemas"]["ApprovalInstanceByDocumentResponse"];
                 };
             };
-            /** @description no_active_instance */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getApprovalInstanceByDocument: {
@@ -6924,15 +6246,8 @@ export interface operations {
                     "application/json": components["schemas"]["ApprovalInstanceByDocumentResponse"];
                 };
             };
-            /** @description no_active_instance */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     listApprovalInbox: {
@@ -7015,24 +6330,9 @@ export interface operations {
                     "application/json": components["schemas"]["ListRoutesResponse"];
                 };
             };
-            /** @description unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     createApprovalRoute: {
@@ -7059,42 +6359,11 @@ export interface operations {
                     "application/json": components["schemas"]["RouteResponse"];
                 };
             };
-            /** @description validation_error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description idempotency_replay_or_conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     updateApprovalRoute: {
@@ -7125,51 +6394,12 @@ export interface operations {
                     "application/json": components["schemas"]["RouteResponse"];
                 };
             };
-            /** @description validation_error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description route_not_found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description version_conflict_or_replay */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     deactivateApprovalRoute: {
@@ -7200,51 +6430,12 @@ export interface operations {
                     "application/json": components["schemas"]["RouteResponse"];
                 };
             };
-            /** @description validation_error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description route_not_found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description version_conflict_or_replay */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
         };
     };
 }

@@ -1,7 +1,6 @@
 package security
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/netip"
@@ -13,6 +12,7 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/config"
+	"metaldocs/internal/platform/problem"
 )
 
 // defaultMaxRateLimitEntries caps the in-memory identity map to bound memory
@@ -100,7 +100,7 @@ func (r *RateLimiter) Wrap(next http.Handler) http.Handler {
 		allowed, retryAfter := r.allow(identity)
 		if !allowed {
 			w.Header().Set("Retry-After", retryAfter)
-			writeAPIError(w, http.StatusTooManyRequests, "RATE_LIMITED", "Too many requests", requestTraceID(req))
+			_ = problem.Write(w, problem.New(http.StatusTooManyRequests, problem.CodeRateLimited, "Too many requests"))
 			return
 		}
 
@@ -189,26 +189,6 @@ func (r *RateLimiter) requestIdentity(req *http.Request) string {
 		return "ip:" + addr.String()
 	}
 	return "ip:unknown"
-}
-
-func requestTraceID(r *http.Request) string {
-	if traceID := strings.TrimSpace(r.Header.Get("X-Trace-Id")); traceID != "" {
-		return traceID
-	}
-	return "trace-local"
-}
-
-func writeAPIError(w http.ResponseWriter, status int, code, message, traceID string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"error": map[string]any{
-			"code":     code,
-			"message":  message,
-			"details":  map[string]any{},
-			"trace_id": traceID,
-		},
-	})
 }
 
 func strconvSecondsCeil(d time.Duration) string {

@@ -44,17 +44,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/MetricsResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /auth/login:
     post:
       summary: Autentica usuario local e cria sessao por cookie
@@ -74,11 +68,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthLoginResponse'
         '401':
-          description: Credenciais invalidas
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /auth/logout:
     post:
       summary: Revoga a sessao atual
@@ -100,11 +92,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/CurrentUser'
         '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /auth/change-password:
     post:
       summary: Troca a senha do usuario autenticado
@@ -124,17 +114,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ChangePasswordResponse'
         '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/users:
     get:
       summary: List tenant users (cursor-paginated, filterable)
@@ -175,15 +159,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListUsersResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     post:
       summary: Cria usuario interno com credencial local inicial (legacy; prefer POST /iam/users/invite)
       tags: [iam]
@@ -226,25 +206,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ManagedUserCore'
         '400':
-          description: Requisicao invalida
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Usuario nao encontrado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/users/{userId}/reset-password:
     post:
       summary: Admin password reset (forces must-change-on-first-login)
@@ -270,20 +240,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ResetManagedUserPasswordResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Usuario nao encontrado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/users/{userId}/unlock:
     post:
       summary: Clear operational lock + failed-login counter for a user
@@ -303,20 +266,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/UnlockManagedUserResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Usuario nao encontrado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/admin/overview:
     get:
       summary: Composed Admin Center overview (KPI strip + presence + recent activity)
@@ -330,17 +286,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdminOverviewResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/users/invite:
     post:
       summary: Invite a new user (server-generated temp password, must change on first login)
@@ -360,25 +310,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserInviteResponse'
         '400':
-          description: Requisicao invalida
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '409':
-          description: Conflito (username/email ja em uso)
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/users/bulk:
     post:
       summary: Bulk action over a set of users (activate, deactivate, unlock, force-logout)
@@ -398,20 +338,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserBulkActionResult'
         '400':
-          description: Requisicao invalida
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/users/{userId}/memberships:
     get:
       summary: List area memberships for a user
@@ -430,20 +363,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListMembershipsResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Usuario nao encontrado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/roles:
     get:
       summary: List canonical tenant roles (read-only)
@@ -457,15 +383,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListRolesResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/capabilities:
     get:
       summary: List capability registry (read-only)
@@ -479,15 +401,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListCapabilitiesResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/role-capabilities:
     get:
       summary: List role-capability matrix rows (read-only)
@@ -501,15 +419,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListRoleCapabilitiesResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/kpi:
     get:
       summary: Tenant KPI snapshot for the Overview strip
@@ -523,15 +437,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/IamKpiSnapshot'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/usage:
     get:
       summary: Tenant consumption snapshot (seats, storage, API, active users)
@@ -545,15 +455,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/UsageSnapshot'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/presence/snapshot:
     get:
       summary: Online presence snapshot (HTTP fallback when WebSocket unavailable)
@@ -567,15 +473,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/PresenceSnapshotResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /audit/events/export:
     post:
       summary: Export filtered audit events as CSV or JSONL (signed URL, async if large)
@@ -595,20 +497,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuditExportResponse'
         '400':
-          description: Requisicao invalida
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /audit/events/export/{exportId}:
     get:
       summary: Read the status of an audit export job
@@ -627,20 +522,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuditExportStatusResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Exportacao nao encontrada
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /audit/events/export/{exportId}/download:
     get:
       summary: Download the rendered audit export payload via a signed token
@@ -664,25 +552,15 @@ paths:
                 type: string
                 format: binary
         '400':
-          description: Token ausente ou invalido
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Exportacao nao encontrada ou token expirado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /auth/sessions:
     get:
       summary: List active sessions in the current tenant
@@ -713,15 +591,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListSessionsResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /auth/sessions/{sessionId}:
     delete:
       summary: Revoke (force-logout) a specific session. Gate CapSessionManage.
@@ -736,20 +610,13 @@ paths:
         '204':
           description: Sessao revogada
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Sessao nao encontrada
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /security/mfa-coverage:
     get:
       summary: MFA enrollment coverage by tenant + by role
@@ -763,15 +630,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/MfaCoverage'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /security/lockouts:
     get:
       summary: Current account lockouts (locked-until window)
@@ -785,15 +648,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListLockoutsResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /security/signals:
     get:
       summary: Anomaly cards (repeated-failed-login, new-device-login, lockout-spike, off-hours-admin-action)
@@ -807,15 +666,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListSecuritySignalsResponse'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /audit/events:
     get:
       summary: Lista eventos de auditoria append-only (multi-axis filter, cursor-paginated)
@@ -870,20 +725,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListAuditEventsResponse'
         '400':
-          description: Parametro invalido
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /search/documents:
     get:
       summary: Pesquisa documentos por filtros
@@ -956,23 +804,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/SearchDocumentsResponse'
         '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/users/{userId}/roles:
     post:
       summary: Cria/atualiza usuario IAM e atribui role
@@ -998,23 +836,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/UpsertUserRoleResponse'
         '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     put:
       summary: Reconcilia o conjunto de roles de um usuario interno
       tags: [iam]
@@ -1039,23 +867,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReplaceUserRolesResponse'
         '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/area-memberships:
     get:
       summary: List active area memberships for the current tenant
@@ -1088,25 +906,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/AreaMembershipListResponse'
         '400':
-          description: Validation failure
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Target user not in tenant
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     post:
       summary: Grant an active area membership
       tags: [iam]
@@ -1130,30 +938,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/GrantAreaMembershipResponse'
         '400':
-          description: Validation failure (missing fields, unknown role)
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Target user not in tenant
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
         '409':
-          description: Active membership for (user, area) already exists with the same role
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       summary: Revoke an active area membership
       tags: [iam]
@@ -1176,25 +971,15 @@ paths:
         '204':
           description: Membership revoked
         '400':
-          description: Validation failure
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: Target user not in tenant, or no active membership for (user, area)
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /feature-flags:
     get:
       summary: Return server-controlled feature flag values
@@ -1390,6 +1175,12 @@ paths:
                   next_draft_version_num: { type: integer }
         '422':
           description: template invalid
+          # AD-2 exemption (api-contract-hardening Phase D): bespoke template-token
+          # validation result, not the RFC 9457 error shape. Consumed by the template
+          # editor FE (features/templates/api/templates.ts) to render parse errors +
+          # missing tokens; migrating it to Problem.errors[] is a coupled spec+runtime+FE
+          # change owned by the templates-module contract refresh (Phase E/F).
+          x-error-envelope-exempt: "Legacy template-token validation payload (valid/parse_errors/missing_tokens) consumed by the template editor; Problem migration tracked for the templates-module contract refresh."
           content:
             application/json:
               schema:
@@ -1804,12 +1595,10 @@ paths:
         '400': { description: validation_error }
         '401': { description: unauthenticated }
         '409':
-          description: code_taken or domain conflict, including template artifact missing
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
+          $ref: '#/components/responses/Conflict'
         '422': { description: template_invalid }
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /controlled-documents/preview-code:
     get:
@@ -1995,23 +1784,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentListResponse'
         '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /documents/{id}:
     get:
@@ -2138,23 +1917,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentStatsResponse'
         '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /documents/{id}/session/acquire:
     post:
@@ -2571,11 +2340,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApprovalInstanceByDocumentResponse'
         '404':
-          description: no_active_instance
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /documents/{id}/approval-instance:
     get:
       tags: [approval]
@@ -2589,11 +2356,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApprovalInstanceByDocumentResponse'
         '404':
-          description: no_active_instance
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /approval/inbox:
     get:
       tags: [approval]
@@ -2643,25 +2408,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/RouteResponse'
         '400':
-          description: validation_error
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: unauthenticated
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: forbidden
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '409':
-          description: idempotency_replay_or_conflict
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     get:
       summary: List approval routes for the active tenant
       tags: [approval]
@@ -2684,15 +2439,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ListRoutesResponse'
         '401':
-          description: unauthenticated
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: forbidden
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /approval/routes/{id}:
     put:
       summary: Update an approval route (new version)
@@ -2718,30 +2469,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/RouteResponse'
         '400':
-          description: validation_error
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: unauthenticated
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: forbidden
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: route_not_found
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
         '409':
-          description: version_conflict_or_replay
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
     delete:
       summary: Deactivate an approval route
       tags: [approval]
@@ -2766,30 +2504,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/RouteResponse'
         '400':
-          description: validation_error
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: unauthenticated
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: forbidden
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Forbidden'
         '404':
-          description: route_not_found
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/NotFound'
         '409':
-          description: version_conflict_or_replay
-          content:
-            application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
 components:
   securitySchemes:
@@ -2803,6 +2528,49 @@ components:
       in: cookie
       name: metaldocs_session
       description: Session cookie issued by POST /api/v1/auth/login.
+  responses:
+    BadRequest:
+      description: Requisicao invalida
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: Nao autenticado
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: Sem permissao
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Recurso nao encontrado
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: Conflito de estado
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnprocessableEntity:
+      description: Entidade nao processavel
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalServerError:
+      description: Erro interno do servidor
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
   parameters:
   schemas:
     AuthLoginRequest:
@@ -3960,25 +3728,6 @@ components:
         runtime:
           type: object
           additionalProperties: true
-    ApiErrorEnvelope:
-      type: object
-      required: [error]
-      properties:
-        error:
-          $ref: '#/components/schemas/ApiError'
-    ApiError:
-      type: object
-      required: [code, message, details, trace_id]
-      properties:
-        code:
-          type: string
-        message:
-          type: string
-        details:
-          type: object
-          additionalProperties: true
-        trace_id:
-          type: string
     FeatureFlagsResponse:
       type: object
       description: Server-controlled feature flag values exposed to the frontend.
@@ -4331,7 +4080,10 @@ components:
         message: { type: string }
     Problem:
       type: object
-      required: [type, title, status, code]
+      # RFC 9457 §3.1: `type` is optional (absent ⇒ "about:blank"). The Go helper
+      # (internal/platform/problem) omits it unless WithType is called, so it is
+      # not in the required set — required mirrors what every emitter guarantees.
+      required: [title, status, code]
       properties:
         type: { type: string, format: uri }
         title: { type: string }

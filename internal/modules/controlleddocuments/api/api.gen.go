@@ -93,171 +93,6 @@ func (e ControlledDocumentVisibilityScope) Valid() bool {
 	}
 }
 
-// Defines values for DocumentTemplateFieldSlotNodeResponseFieldKind.
-const (
-	Scalar DocumentTemplateFieldSlotNodeResponseFieldKind = "scalar"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateFieldSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateFieldSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Scalar:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateFieldSlotNodeResponseType.
-const (
-	FieldSlot DocumentTemplateFieldSlotNodeResponseType = "field-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateFieldSlotNodeResponseType enum.
-func (e DocumentTemplateFieldSlotNodeResponseType) Valid() bool {
-	switch e {
-	case FieldSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateLabelNodeResponseType.
-const (
-	Label DocumentTemplateLabelNodeResponseType = "label"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateLabelNodeResponseType enum.
-func (e DocumentTemplateLabelNodeResponseType) Valid() bool {
-	switch e {
-	case Label:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplatePageNodeResponseType.
-const (
-	Page DocumentTemplatePageNodeResponseType = "page"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplatePageNodeResponseType enum.
-func (e DocumentTemplatePageNodeResponseType) Valid() bool {
-	switch e {
-	case Page:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRepeatSlotNodeResponseFieldKind.
-const (
-	Repeat DocumentTemplateRepeatSlotNodeResponseFieldKind = "repeat"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRepeatSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateRepeatSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Repeat:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRepeatSlotNodeResponseType.
-const (
-	RepeatSlot DocumentTemplateRepeatSlotNodeResponseType = "repeat-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRepeatSlotNodeResponseType enum.
-func (e DocumentTemplateRepeatSlotNodeResponseType) Valid() bool {
-	switch e {
-	case RepeatSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRichSlotNodeResponseFieldKind.
-const (
-	Rich DocumentTemplateRichSlotNodeResponseFieldKind = "rich"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRichSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateRichSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Rich:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRichSlotNodeResponseType.
-const (
-	RichSlot DocumentTemplateRichSlotNodeResponseType = "rich-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRichSlotNodeResponseType enum.
-func (e DocumentTemplateRichSlotNodeResponseType) Valid() bool {
-	switch e {
-	case RichSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateSectionFrameNodeResponseType.
-const (
-	SectionFrame DocumentTemplateSectionFrameNodeResponseType = "section-frame"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateSectionFrameNodeResponseType enum.
-func (e DocumentTemplateSectionFrameNodeResponseType) Valid() bool {
-	switch e {
-	case SectionFrame:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateTableSlotNodeResponseFieldKind.
-const (
-	Table DocumentTemplateTableSlotNodeResponseFieldKind = "table"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateTableSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateTableSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Table:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateTableSlotNodeResponseType.
-const (
-	TableSlot DocumentTemplateTableSlotNodeResponseType = "table-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateTableSlotNodeResponseType enum.
-func (e DocumentTemplateTableSlotNodeResponseType) Valid() bool {
-	switch e {
-	case TableSlot:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for ListControlledDocumentsParamsStatus.
 const (
 	ListControlledDocumentsParamsStatusActive     ListControlledDocumentsParamsStatus = "active"
@@ -359,98 +194,6 @@ type DocumentRef struct {
 	Id          openapi_types.UUID `json:"id"`
 }
 
-// DocumentTemplateFieldSlotNodeResponse defines model for DocumentTemplateFieldSlotNodeResponse.
-type DocumentTemplateFieldSlotNodeResponse struct {
-	FieldKind DocumentTemplateFieldSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                         `json:"id"`
-	Path      string                                         `json:"path"`
-	Type      DocumentTemplateFieldSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateFieldSlotNodeResponseFieldKind defines model for DocumentTemplateFieldSlotNodeResponse.FieldKind.
-type DocumentTemplateFieldSlotNodeResponseFieldKind string
-
-// DocumentTemplateFieldSlotNodeResponseType defines model for DocumentTemplateFieldSlotNodeResponse.Type.
-type DocumentTemplateFieldSlotNodeResponseType string
-
-// DocumentTemplateLabelNodeResponse defines model for DocumentTemplateLabelNodeResponse.
-type DocumentTemplateLabelNodeResponse struct {
-	Id   string                                `json:"id"`
-	Text string                                `json:"text"`
-	Type DocumentTemplateLabelNodeResponseType `json:"type"`
-}
-
-// DocumentTemplateLabelNodeResponseType defines model for DocumentTemplateLabelNodeResponse.Type.
-type DocumentTemplateLabelNodeResponseType string
-
-// DocumentTemplateNodeResponse Pilot subset/subconjunto pilotado da MetalDocs template DSL, intencionalmente limitado a page, section-frame, label, field-slot, rich-slot, repeat-slot e table-slot.
-type DocumentTemplateNodeResponse struct {
-	union json.RawMessage
-}
-
-// DocumentTemplatePageNodeResponse defines model for DocumentTemplatePageNodeResponse.
-type DocumentTemplatePageNodeResponse struct {
-	Children []DocumentTemplateNodeResponse       `json:"children"`
-	Id       string                               `json:"id"`
-	Type     DocumentTemplatePageNodeResponseType `json:"type"`
-}
-
-// DocumentTemplatePageNodeResponseType defines model for DocumentTemplatePageNodeResponse.Type.
-type DocumentTemplatePageNodeResponseType string
-
-// DocumentTemplateRepeatSlotNodeResponse defines model for DocumentTemplateRepeatSlotNodeResponse.
-type DocumentTemplateRepeatSlotNodeResponse struct {
-	FieldKind DocumentTemplateRepeatSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                          `json:"id"`
-	Path      string                                          `json:"path"`
-	Type      DocumentTemplateRepeatSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateRepeatSlotNodeResponseFieldKind defines model for DocumentTemplateRepeatSlotNodeResponse.FieldKind.
-type DocumentTemplateRepeatSlotNodeResponseFieldKind string
-
-// DocumentTemplateRepeatSlotNodeResponseType defines model for DocumentTemplateRepeatSlotNodeResponse.Type.
-type DocumentTemplateRepeatSlotNodeResponseType string
-
-// DocumentTemplateRichSlotNodeResponse defines model for DocumentTemplateRichSlotNodeResponse.
-type DocumentTemplateRichSlotNodeResponse struct {
-	FieldKind DocumentTemplateRichSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                        `json:"id"`
-	Path      string                                        `json:"path"`
-	Type      DocumentTemplateRichSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateRichSlotNodeResponseFieldKind defines model for DocumentTemplateRichSlotNodeResponse.FieldKind.
-type DocumentTemplateRichSlotNodeResponseFieldKind string
-
-// DocumentTemplateRichSlotNodeResponseType defines model for DocumentTemplateRichSlotNodeResponse.Type.
-type DocumentTemplateRichSlotNodeResponseType string
-
-// DocumentTemplateSectionFrameNodeResponse defines model for DocumentTemplateSectionFrameNodeResponse.
-type DocumentTemplateSectionFrameNodeResponse struct {
-	Children []DocumentTemplateNodeResponse               `json:"children"`
-	Id       string                                       `json:"id"`
-	Title    *string                                      `json:"title,omitempty"`
-	Type     DocumentTemplateSectionFrameNodeResponseType `json:"type"`
-}
-
-// DocumentTemplateSectionFrameNodeResponseType defines model for DocumentTemplateSectionFrameNodeResponse.Type.
-type DocumentTemplateSectionFrameNodeResponseType string
-
-// DocumentTemplateTableSlotNodeResponse defines model for DocumentTemplateTableSlotNodeResponse.
-type DocumentTemplateTableSlotNodeResponse struct {
-	FieldKind DocumentTemplateTableSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                         `json:"id"`
-	Path      string                                         `json:"path"`
-	Type      DocumentTemplateTableSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateTableSlotNodeResponseFieldKind defines model for DocumentTemplateTableSlotNodeResponse.FieldKind.
-type DocumentTemplateTableSlotNodeResponseFieldKind string
-
-// DocumentTemplateTableSlotNodeResponseType defines model for DocumentTemplateTableSlotNodeResponse.Type.
-type DocumentTemplateTableSlotNodeResponseType string
-
 // FieldError defines model for FieldError.
 type FieldError struct {
 	Code string `json:"code"`
@@ -484,6 +227,12 @@ type Problem struct {
 type RevisionResponse struct {
 	Document DocumentRef `json:"document"`
 }
+
+// Conflict defines model for Conflict.
+type Conflict = Problem
+
+// InternalServerError defines model for InternalServerError.
+type InternalServerError = Problem
 
 // sessionCookieContextKey is the context key for sessionCookie security scheme
 type sessionCookieContextKey string
@@ -525,270 +274,31 @@ type AtomicCreateControlledDocumentJSONRequestBody = CreateAtomicRequest
 // CreateControlledDocumentRevisionJSONRequestBody defines body for CreateControlledDocumentRevision for application/json ContentType.
 type CreateControlledDocumentRevisionJSONRequestBody = CreateRevisionRequest
 
-// AsDocumentTemplatePageNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplatePageNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplatePageNodeResponse() (DocumentTemplatePageNodeResponse, error) {
-	var body DocumentTemplatePageNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplatePageNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplatePageNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplatePageNodeResponse(v DocumentTemplatePageNodeResponse) error {
-	v.Type = "page"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplatePageNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplatePageNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplatePageNodeResponse(v DocumentTemplatePageNodeResponse) error {
-	v.Type = "page"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateSectionFrameNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateSectionFrameNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateSectionFrameNodeResponse() (DocumentTemplateSectionFrameNodeResponse, error) {
-	var body DocumentTemplateSectionFrameNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateSectionFrameNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateSectionFrameNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateSectionFrameNodeResponse(v DocumentTemplateSectionFrameNodeResponse) error {
-	v.Type = "section-frame"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateSectionFrameNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateSectionFrameNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateSectionFrameNodeResponse(v DocumentTemplateSectionFrameNodeResponse) error {
-	v.Type = "section-frame"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateLabelNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateLabelNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateLabelNodeResponse() (DocumentTemplateLabelNodeResponse, error) {
-	var body DocumentTemplateLabelNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateLabelNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateLabelNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateLabelNodeResponse(v DocumentTemplateLabelNodeResponse) error {
-	v.Type = "label"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateLabelNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateLabelNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateLabelNodeResponse(v DocumentTemplateLabelNodeResponse) error {
-	v.Type = "label"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateFieldSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateFieldSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateFieldSlotNodeResponse() (DocumentTemplateFieldSlotNodeResponse, error) {
-	var body DocumentTemplateFieldSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateFieldSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateFieldSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateFieldSlotNodeResponse(v DocumentTemplateFieldSlotNodeResponse) error {
-	v.Type = "field-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateFieldSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateFieldSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateFieldSlotNodeResponse(v DocumentTemplateFieldSlotNodeResponse) error {
-	v.Type = "field-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateRichSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateRichSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateRichSlotNodeResponse() (DocumentTemplateRichSlotNodeResponse, error) {
-	var body DocumentTemplateRichSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateRichSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateRichSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateRichSlotNodeResponse(v DocumentTemplateRichSlotNodeResponse) error {
-	v.Type = "rich-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateRichSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateRichSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateRichSlotNodeResponse(v DocumentTemplateRichSlotNodeResponse) error {
-	v.Type = "rich-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateRepeatSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateRepeatSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateRepeatSlotNodeResponse() (DocumentTemplateRepeatSlotNodeResponse, error) {
-	var body DocumentTemplateRepeatSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateRepeatSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateRepeatSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateRepeatSlotNodeResponse(v DocumentTemplateRepeatSlotNodeResponse) error {
-	v.Type = "repeat-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateRepeatSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateRepeatSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateRepeatSlotNodeResponse(v DocumentTemplateRepeatSlotNodeResponse) error {
-	v.Type = "repeat-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateTableSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateTableSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateTableSlotNodeResponse() (DocumentTemplateTableSlotNodeResponse, error) {
-	var body DocumentTemplateTableSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateTableSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateTableSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateTableSlotNodeResponse(v DocumentTemplateTableSlotNodeResponse) error {
-	v.Type = "table-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateTableSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateTableSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateTableSlotNodeResponse(v DocumentTemplateTableSlotNodeResponse) error {
-	v.Type = "table-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t DocumentTemplateNodeResponse) Discriminator() (string, error) {
-	var discriminator struct {
-		Discriminator string `json:"type"`
-	}
-	err := json.Unmarshal(t.union, &discriminator)
-	return discriminator.Discriminator, err
-}
-
-func (t DocumentTemplateNodeResponse) ValueByDiscriminator() (interface{}, error) {
-	discriminator, err := t.Discriminator()
-	if err != nil {
-		return nil, err
-	}
-	switch discriminator {
-	case "field-slot":
-		return t.AsDocumentTemplateFieldSlotNodeResponse()
-	case "label":
-		return t.AsDocumentTemplateLabelNodeResponse()
-	case "page":
-		return t.AsDocumentTemplatePageNodeResponse()
-	case "repeat-slot":
-		return t.AsDocumentTemplateRepeatSlotNodeResponse()
-	case "rich-slot":
-		return t.AsDocumentTemplateRichSlotNodeResponse()
-	case "section-frame":
-		return t.AsDocumentTemplateSectionFrameNodeResponse()
-	case "table-slot":
-		return t.AsDocumentTemplateTableSlotNodeResponse()
-	default:
-		return nil, errors.New("unknown discriminator value: " + discriminator)
-	}
-}
-
-func (t DocumentTemplateNodeResponse) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// List controlled documents
-	// (GET /api/v1/controlled-documents)
+	// (GET /controlled-documents)
 	ListControlledDocuments(w http.ResponseWriter, r *http.Request, params ListControlledDocumentsParams)
 	// Atomically create controlled document and initial revision
-	// (POST /api/v1/controlled-documents)
+	// (POST /controlled-documents)
 	AtomicCreateControlledDocument(w http.ResponseWriter, r *http.Request, params AtomicCreateControlledDocumentParams)
 	// Preview the next auto-generated document code without allocating it
-	// (GET /api/v1/controlled-documents/preview-code)
+	// (GET /controlled-documents/preview-code)
 	PreviewControlledDocumentCode(w http.ResponseWriter, r *http.Request, params PreviewControlledDocumentCodeParams)
 	// Get controlled document by ID
-	// (GET /api/v1/controlled-documents/{id})
+	// (GET /controlled-documents/{id})
 	GetControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Get the active document instance for a controlled document
-	// (GET /api/v1/controlled-documents/{id}/active-document)
+	// (GET /controlled-documents/{id}/active-document)
 	GetActiveDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Mark controlled document as obsolete
-	// (PUT /api/v1/controlled-documents/{id}/obsolete)
+	// (PUT /controlled-documents/{id}/obsolete)
 	ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Create a new revision for a controlled document
-	// (POST /api/v1/controlled-documents/{id}/revisions)
+	// (POST /controlled-documents/{id}/revisions)
 	CreateControlledDocumentRevision(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params CreateControlledDocumentRevisionParams)
 	// Mark controlled document as superseded
-	// (PUT /api/v1/controlled-documents/{id}/supersede)
+	// (PUT /controlled-documents/{id}/supersede)
 	SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
@@ -1294,17 +804,21 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/controlled-documents", wrapper.ListControlledDocuments)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/controlled-documents", wrapper.AtomicCreateControlledDocument)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/controlled-documents/preview-code", wrapper.PreviewControlledDocumentCode)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/controlled-documents/{id}", wrapper.GetControlledDocument)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/controlled-documents/{id}/active-document", wrapper.GetActiveDocument)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/controlled-documents/{id}/obsolete", wrapper.ObsoleteControlledDocument)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/controlled-documents/{id}/revisions", wrapper.CreateControlledDocumentRevision)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/controlled-documents/{id}/supersede", wrapper.SupersedeControlledDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/controlled-documents", wrapper.ListControlledDocuments)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/controlled-documents", wrapper.AtomicCreateControlledDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/controlled-documents/preview-code", wrapper.PreviewControlledDocumentCode)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/controlled-documents/{id}", wrapper.GetControlledDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/controlled-documents/{id}/active-document", wrapper.GetActiveDocument)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/controlled-documents/{id}/obsolete", wrapper.ObsoleteControlledDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/controlled-documents/{id}/revisions", wrapper.CreateControlledDocumentRevision)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/controlled-documents/{id}/supersede", wrapper.SupersedeControlledDocument)
 
 	return m
 }
+
+type ConflictApplicationProblemPlusJSONResponse Problem
+
+type InternalServerErrorApplicationProblemPlusJSONResponse Problem
 
 type ListControlledDocumentsRequestObject struct {
 	Params ListControlledDocumentsParams
@@ -1393,7 +907,9 @@ func (response AtomicCreateControlledDocument401Response) VisitAtomicCreateContr
 	return nil
 }
 
-type AtomicCreateControlledDocument409ApplicationProblemPlusJSONResponse Problem
+type AtomicCreateControlledDocument409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
 
 func (response AtomicCreateControlledDocument409ApplicationProblemPlusJSONResponse) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
 
@@ -1413,6 +929,22 @@ type AtomicCreateControlledDocument422Response struct {
 func (response AtomicCreateControlledDocument422Response) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(422)
 	return nil
+}
+
+type AtomicCreateControlledDocument500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response AtomicCreateControlledDocument500ApplicationProblemPlusJSONResponse) VisitAtomicCreateControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type PreviewControlledDocumentCodeRequestObject struct {
@@ -1668,28 +1200,28 @@ func (response SupersedeControlledDocument409Response) VisitSupersedeControlledD
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// List controlled documents
-	// (GET /api/v1/controlled-documents)
+	// (GET /controlled-documents)
 	ListControlledDocuments(ctx context.Context, request ListControlledDocumentsRequestObject) (ListControlledDocumentsResponseObject, error)
 	// Atomically create controlled document and initial revision
-	// (POST /api/v1/controlled-documents)
+	// (POST /controlled-documents)
 	AtomicCreateControlledDocument(ctx context.Context, request AtomicCreateControlledDocumentRequestObject) (AtomicCreateControlledDocumentResponseObject, error)
 	// Preview the next auto-generated document code without allocating it
-	// (GET /api/v1/controlled-documents/preview-code)
+	// (GET /controlled-documents/preview-code)
 	PreviewControlledDocumentCode(ctx context.Context, request PreviewControlledDocumentCodeRequestObject) (PreviewControlledDocumentCodeResponseObject, error)
 	// Get controlled document by ID
-	// (GET /api/v1/controlled-documents/{id})
+	// (GET /controlled-documents/{id})
 	GetControlledDocument(ctx context.Context, request GetControlledDocumentRequestObject) (GetControlledDocumentResponseObject, error)
 	// Get the active document instance for a controlled document
-	// (GET /api/v1/controlled-documents/{id}/active-document)
+	// (GET /controlled-documents/{id}/active-document)
 	GetActiveDocument(ctx context.Context, request GetActiveDocumentRequestObject) (GetActiveDocumentResponseObject, error)
 	// Mark controlled document as obsolete
-	// (PUT /api/v1/controlled-documents/{id}/obsolete)
+	// (PUT /controlled-documents/{id}/obsolete)
 	ObsoleteControlledDocument(ctx context.Context, request ObsoleteControlledDocumentRequestObject) (ObsoleteControlledDocumentResponseObject, error)
 	// Create a new revision for a controlled document
-	// (POST /api/v1/controlled-documents/{id}/revisions)
+	// (POST /controlled-documents/{id}/revisions)
 	CreateControlledDocumentRevision(ctx context.Context, request CreateControlledDocumentRevisionRequestObject) (CreateControlledDocumentRevisionResponseObject, error)
 	// Mark controlled document as superseded
-	// (PUT /api/v1/controlled-documents/{id}/supersede)
+	// (PUT /controlled-documents/{id}/supersede)
 	SupersedeControlledDocument(ctx context.Context, request SupersedeControlledDocumentRequestObject) (SupersedeControlledDocumentResponseObject, error)
 }
 
@@ -1950,61 +1482,52 @@ func (sh *strictHandler) SupersedeControlledDocument(w http.ResponseWriter, r *h
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"RFWb6hTL5aUqKQX7T/v/BQAA//8=",
+	"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",
+	"AP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
