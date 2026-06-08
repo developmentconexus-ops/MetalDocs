@@ -3,8 +3,9 @@
 // encodes the last row's (primary-sort-value, id) tuple; the repository filters
 // `(sort_col, id) < (cursor_sort, cursor_id)` under `ORDER BY sort_col DESC,
 // id DESC` and fetches limit+1 rows to derive has_more. This mirrors the audit
-// module's proven keyset shape; audit predates this package and keeps its own
-// helper (its cursor is occurred_at-specific) — adopting this is a later tidy.
+// module's proven keyset shape; the audit list handler now encodes its
+// occurred_at-specific cursor through these shared helpers too, so all list
+// endpoints share one base64 dialect (Family 2 · B2).
 package pagination
 
 import (
@@ -36,9 +37,15 @@ func ClampLimit(limit int) int {
 
 // EncodeCursor builds an opaque forward cursor from a keyset tuple: a primary
 // sort value already formatted as a stable string (e.g. an RFC3339Nano
-// timestamp) plus the row id tiebreaker.
+// timestamp) plus the row id tiebreaker. Uses URL-safe base64 without padding so
+// the cursor survives a query string untouched.
+//
+// NOTE: switching the base64 dialect (or the "|" framing) invalidates any
+// in-flight cursor a client already holds. That is acceptable — cursors are
+// opaque and short-lived, and this is pre-production. Do not change it casually
+// once cursors are persisted or shared across long-lived clients.
 func EncodeCursor(sortValue, id string) string {
-	return base64.StdEncoding.EncodeToString([]byte(sortValue + "|" + id))
+	return base64.RawURLEncoding.EncodeToString([]byte(sortValue + "|" + id))
 }
 
 // DecodeCursor splits an opaque cursor back into (sortValue, id). A blank cursor
@@ -49,7 +56,7 @@ func DecodeCursor(cursor string) (sortValue, id string, err error) {
 	if c == "" {
 		return "", "", nil
 	}
-	raw, err := base64.StdEncoding.DecodeString(c)
+	raw, err := base64.RawURLEncoding.DecodeString(c)
 	if err != nil {
 		return "", "", ErrInvalidCursor
 	}

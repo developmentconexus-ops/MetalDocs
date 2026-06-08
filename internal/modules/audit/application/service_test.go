@@ -13,9 +13,9 @@ type captureReader struct {
 	query domain.ListEventsQuery
 }
 
-func (r *captureReader) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]domain.Event, error) {
+func (r *captureReader) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]domain.Event, bool, error) {
 	r.query = query
-	return nil, nil
+	return nil, false, nil
 }
 
 func TestNewServicePanicsWithoutReader(t *testing.T) {
@@ -35,7 +35,7 @@ func TestListEventsFailsWhenServiceReaderMissing(t *testing.T) {
 
 	service := &application.Service{}
 
-	_, err := service.ListEvents(context.Background(), domain.ListEventsQuery{TenantID: "tenant-a"})
+	_, _, err := service.ListEvents(context.Background(), domain.ListEventsQuery{TenantID: "tenant-a"})
 
 	if !errors.Is(err, application.ErrReaderRequired) {
 		t.Fatalf("expected ErrReaderRequired, got %v", err)
@@ -47,7 +47,7 @@ func TestListEventsRequiresTenantID(t *testing.T) {
 
 	service := application.NewService(&captureReader{})
 
-	_, err := service.ListEvents(t.Context(), domain.ListEventsQuery{})
+	_, _, err := service.ListEvents(t.Context(), domain.ListEventsQuery{})
 
 	if !errors.Is(err, application.ErrTenantRequired) {
 		t.Fatalf("expected ErrTenantRequired, got %v", err)
@@ -60,7 +60,7 @@ func TestListEventsPreservesTenantIDDuringNormalization(t *testing.T) {
 	reader := &captureReader{}
 	service := application.NewService(reader)
 
-	_, err := service.ListEvents(t.Context(), domain.ListEventsQuery{
+	_, _, err := service.ListEvents(t.Context(), domain.ListEventsQuery{
 		ResourceType: " document ",
 		ResourceID:   " doc-1 ",
 		TenantID:     " tenant-a ",

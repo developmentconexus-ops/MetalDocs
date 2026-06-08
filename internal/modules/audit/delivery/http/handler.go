@@ -2,7 +2,6 @@ package httpdelivery
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,13 +16,16 @@ import (
 	"metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
-// AuditQuerier is the minimum the list handler needs.
+// AuditQuerier is the minimum the list handler needs. ListEvents returns the
+// page plus hasMore so the handler emits next_cursor only on a genuine further
+// page (limit+1 probe — see domain.Reader).
 type AuditQuerier interface {
-	ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, error)
+	ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, bool, error)
 }
 
 // AuditExporter captures the service surface for export/status/download.
@@ -90,7 +92,7 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := h.service.ListEvents(r.Context(), query)
+	items, hasMore, err := h.service.ListEvents(r.Context(), query)
 	if err != nil {
 		if errors.Is(err, application.ErrTenantRequired) {
 			writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Tenant claim required"))
@@ -112,8 +114,10 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	// every other list op): {items, page:{next_cursor, has_more}}. Previously this
 	// emitted next_cursor/has_more at the top level — a spec↔runtime drift the FE
 	// bridged with a dual-shape adapter (closed: ADR 2026-06-03-audit-events-cursor-shape).
+	// has_more now comes from the reader's limit+1 probe, so an exact-multiple last
+	// page no longer falsely advertises a next page (AIP-158).
 	page := map[string]any{"next_cursor": nil, "has_more": false}
-	if len(items) >= query.Limit {
+	if hasMore && len(items) > 0 {
 		last := items[len(items)-1]
 		page["next_cursor"] = encodeCursor(domain.Cursor{OccurredAt: last.OccurredAt, ID: last.ID})
 		page["has_more"] = true
@@ -319,6 +323,10 @@ func parseListQuery(r *http.Request, tenantID string) (domain.ListEventsQuery, *
 		}
 		limit = parsed
 	}
+	// Clamp the upper bound to the design-system max (100), matching documents /
+	// controlled-documents. The unset default (50) is below MaxLimit so it passes
+	// through unchanged.
+	limit = pagination.ClampLimit(limit)
 
 	occurredAfter, perr := parseTime("occurredAfter", q.Get("occurredAfter"))
 	if perr != nil {
@@ -360,32 +368,33 @@ func parseTime(field, raw string) (time.Time, *problem.Problem) {
 	return t.UTC(), nil
 }
 
+// encodeCursor maps the audit (occurred_at, id) anchor onto the shared opaque
+// keyset codec (pagination.EncodeCursor), so all three list endpoints share one
+// base64 dialect and can no longer diverge. The sort value is the RFC3339Nano
+// occurred_at; a zero cursor encodes to "".
 func encodeCursor(c domain.Cursor) string {
 	if c.IsZero() {
 		return ""
 	}
-	raw := c.OccurredAt.UTC().Format(time.RFC3339Nano) + "|" + c.ID
-	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+	return pagination.EncodeCursor(c.OccurredAt.UTC().Format(time.RFC3339Nano), c.ID)
 }
 
+// decodeCursor reverses encodeCursor via the shared codec, re-parsing the sort
+// value back into occurred_at. A blank cursor is the first page; a malformed one
+// (bad base64 / shape, or an unparseable timestamp) is a VALIDATION_ERROR.
 func decodeCursor(raw string) (domain.Cursor, *problem.Problem) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	sortValue, id, err := pagination.DecodeCursor(raw)
+	if err != nil {
+		return domain.Cursor{}, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid cursor")
+	}
+	if sortValue == "" {
 		return domain.Cursor{}, nil
 	}
-	decoded, err := base64.RawURLEncoding.DecodeString(raw)
+	ts, err := time.Parse(time.RFC3339Nano, sortValue)
 	if err != nil {
 		return domain.Cursor{}, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid cursor")
 	}
-	parts := strings.SplitN(string(decoded), "|", 2)
-	if len(parts) != 2 {
-		return domain.Cursor{}, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid cursor")
-	}
-	ts, err := time.Parse(time.RFC3339Nano, parts[0])
-	if err != nil {
-		return domain.Cursor{}, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid cursor")
-	}
-	return domain.Cursor{OccurredAt: ts, ID: parts[1]}, nil
+	return domain.Cursor{OccurredAt: ts, ID: id}, nil
 }
 
 func buildEventResponses(items []domain.Event) ([]EventResponse, error) {

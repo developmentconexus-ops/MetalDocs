@@ -62,14 +62,14 @@ func (s *Service) WithExports(counter domain.Counter, repo domain.ExportJobRepos
 	return s
 }
 
-func (s *Service) ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, error) {
+func (s *Service) ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, bool, error) {
 	if s == nil || s.reader == nil {
-		return nil, ErrReaderRequired
+		return nil, false, ErrReaderRequired
 	}
 
 	normalized, err := normalizeQuery(query)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	return s.reader.ListEvents(ctx, normalized)
@@ -244,7 +244,7 @@ func (s *Service) fetchAll(ctx context.Context, baseQuery domain.ListEventsQuery
 		q := baseQuery
 		q.Limit = pageSize
 		q.Cursor = cursor
-		page, err := s.reader.ListEvents(ctx, q)
+		page, hasMore, err := s.reader.ListEvents(ctx, q)
 		if err != nil {
 			return nil, err
 		}
@@ -252,7 +252,7 @@ func (s *Service) fetchAll(ctx context.Context, baseQuery domain.ListEventsQuery
 			break
 		}
 		all = append(all, page...)
-		if len(page) < pageSize {
+		if !hasMore {
 			break
 		}
 		last := page[len(page)-1]

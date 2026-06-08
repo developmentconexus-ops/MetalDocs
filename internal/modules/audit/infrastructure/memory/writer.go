@@ -31,7 +31,7 @@ func (w *Writer) RecordTx(ctx context.Context, tx *sql.Tx, event domain.Event) e
 	return w.Record(ctx, event)
 }
 
-func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]domain.Event, error) {
+func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]domain.Event, bool, error) {
 	w.mu.Lock()
 	snapshot := make([]domain.Event, len(w.events))
 	copy(snapshot, w.events)
@@ -49,7 +49,9 @@ func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]
 		return snapshot[i].OccurredAt.After(snapshot[j].OccurredAt)
 	})
 
-	items := make([]domain.Event, 0, len(snapshot))
+	// Collect one extra row past the page (limit+1 probe) to mirror the postgres
+	// reader's hasMore semantics; trim the probe before returning.
+	items := make([]domain.Event, 0, limit+1)
 	for _, event := range snapshot {
 		if !matches(event, query) {
 			continue
@@ -63,11 +65,14 @@ func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]
 			}
 		}
 		items = append(items, event)
-		if len(items) >= limit {
+		if len(items) > limit {
 			break
 		}
 	}
-	return items, nil
+	if len(items) > limit {
+		return items[:limit], true, nil
+	}
+	return items, false, nil
 }
 
 func (w *Writer) CountEvents(_ context.Context, query domain.ListEventsQuery) (int64, error) {

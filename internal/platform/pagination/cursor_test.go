@@ -1,6 +1,9 @@
 package pagination
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestEncodeDecodeCursor_RoundTrips(t *testing.T) {
 	enc := EncodeCursor("2026-06-08T11:00:00.123456789Z", "doc-1")
@@ -10,6 +13,26 @@ func TestEncodeDecodeCursor_RoundTrips(t *testing.T) {
 	}
 	if sv != "2026-06-08T11:00:00.123456789Z" || id != "doc-1" {
 		t.Fatalf("round-trip mismatch: sv=%q id=%q", sv, id)
+	}
+}
+
+// TestEncodeCursor_URLSafe is the B2 guard: the cursor must use the URL-safe
+// base64 dialect (no +, /, or = padding) so it survives a query string. A value
+// whose StdEncoding output would contain all three confirms the dialect switch.
+func TestEncodeCursor_URLSafe(t *testing.T) {
+	// "2026-06-08T11:00:00.123456789Z" + "|" + this id is a length that needs
+	// padding under StdEncoding, and the high bytes map to + and / there.
+	enc := EncodeCursor("2026-06-08T11:00:00.123456789Z", string([]byte{0xfb, 0xff, 0xfe, 0x01}))
+	if strings.ContainsAny(enc, "+/=") {
+		t.Fatalf("cursor %q is not URL-safe (contains +, / or =)", enc)
+	}
+	// And it must still round-trip under the same dialect.
+	sv, id, err := DecodeCursor(enc)
+	if err != nil {
+		t.Fatalf("decode URL-safe cursor: %v", err)
+	}
+	if sv != "2026-06-08T11:00:00.123456789Z" || id != string([]byte{0xfb, 0xff, 0xfe, 0x01}) {
+		t.Fatalf("URL-safe round-trip mismatch: sv=%q id=%q", sv, id)
 	}
 }
 

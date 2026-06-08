@@ -138,20 +138,22 @@ ORDER BY audit_sequence
 	return issues, nil
 }
 
-func (w *Writer) ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, error) {
+func (w *Writer) ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, bool, error) {
 	limit := query.Limit
 	if limit <= 0 {
 		limit = 50
 	}
 
-	sqlText, args := buildListQuery(query, limit)
+	// +1 probe row to detect hasMore: a trailing row beyond the page means a
+	// further page exists. Trimmed below so the caller never sees the probe.
+	sqlText, args := buildListQuery(query, limit+1)
 	rows, err := w.db.QueryContext(ctx, sqlText, args...)
 	if err != nil {
-		return nil, fmt.Errorf("list audit events: %w", err)
+		return nil, false, fmt.Errorf("list audit events: %w", err)
 	}
 	defer rows.Close()
 
-	items := make([]domain.Event, 0, limit)
+	items := make([]domain.Event, 0, limit+1)
 	for rows.Next() {
 		var event domain.Event
 		if err := rows.Scan(
@@ -165,14 +167,17 @@ func (w *Writer) ListEvents(ctx context.Context, query domain.ListEventsQuery) (
 			&event.TraceID,
 			&event.TenantID,
 		); err != nil {
-			return nil, fmt.Errorf("scan audit event: %w", err)
+			return nil, false, fmt.Errorf("scan audit event: %w", err)
 		}
 		items = append(items, event)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate audit events: %w", err)
+		return nil, false, fmt.Errorf("iterate audit events: %w", err)
 	}
-	return items, nil
+	if len(items) > limit {
+		return items[:limit], true, nil
+	}
+	return items, false, nil
 }
 
 // CountEvents counts rows matching the same filter (cursor / limit ignored).

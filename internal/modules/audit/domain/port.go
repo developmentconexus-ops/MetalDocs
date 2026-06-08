@@ -100,8 +100,12 @@ type Writer interface {
 
 // ListEvents intentionally lives on Reader rather than Writer so write-only
 // implementations are allowed even when they do not support query workloads.
+// It returns up to query.Limit events plus hasMore: implementations fetch a
+// limit+1 probe row and report hasMore=true only when that extra row exists, so
+// an exact-multiple last page no longer falsely advertises a next page
+// (AIP-158; matches the documents / controlled-documents keyset shape).
 type Reader interface {
-	ListEvents(ctx context.Context, query ListEventsQuery) ([]Event, error)
+	ListEvents(ctx context.Context, query ListEventsQuery) (items []Event, hasMore bool, err error)
 }
 
 // Counter estimates how many rows a filter yields. Used to decide whether an

@@ -53,6 +53,75 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	}
 	out = append(out, registry...)
 
+	// Family 2 · B2 — keyset cursors must share one base64 dialect so the list
+	// endpoints cannot diverge again.
+	codec, err := checkPaginationCodec(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, codec...)
+
+	return out, nil
+}
+
+// paginationCursorFile is the ONE file allowed to name base64.StdEncoding's
+// sibling — actually it owns the canonical codec and now uses RawURLEncoding, so
+// it is allow-listed defensively in case a future edit reaches for the wrong
+// dialect there (the unit tests in cursor_test.go are the behavioral guard).
+const paginationCursorFile = "internal/platform/pagination/cursor.go"
+
+// checkPaginationCodec flags any non-generated source that references
+// base64.StdEncoding. Keyset cursors must use the shared URL-safe codec in
+// internal/platform/pagination (RawURLEncoding); a StdEncoding cursor would be
+// padding-/+/-fragile in a query string and incompatible with the shared
+// helpers. Generated *.gen.go files are exempt: oapi-codegen uses StdEncoding to
+// gunzip embedded specs, which is unrelated to cursors and contract-owned.
+func checkPaginationCodec(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
+	out := []Violation{}
+	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".claude", "node_modules", "vendor", "testdata":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		lower := strings.ToLower(path)
+		if !strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, "_test.go") || strings.HasSuffix(lower, ".gen.go") {
+			return nil
+		}
+		if strings.HasSuffix(filepath.ToSlash(path), paginationCursorFile) {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			sel, ok := n.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "StdEncoding" {
+				return true
+			}
+			x, ok := sel.X.(*ast.Ident)
+			if !ok || x.Name != "base64" {
+				return true
+			}
+			out = append(out, Violation{
+				File:    path,
+				Line:    fset.Position(sel.Pos()).Line,
+				Rule:    "pagination-codec",
+				Message: "base64.StdEncoding outside internal/platform/pagination/cursor.go — keyset cursors must use the shared URL-safe codec (pagination.EncodeCursor/DecodeCursor); StdEncoding is query-string-fragile (Family 2 · B2)",
+			})
+			return true
+		})
+		return nil
+	})
+	if walkErr != nil {
+		return nil, walkErr
+	}
 	return out, nil
 }
 

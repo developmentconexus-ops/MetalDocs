@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -168,13 +169,142 @@ func TestAuditHandler_InvalidStoredPayloadFailsHonestly(t *testing.T) {
 	}
 }
 
-type fakeAuditQuerier struct {
-	items []domain.Event
-	err   error
+// TestAuditHandler_ExactPageOmitsNextCursor is the B1 handler-boundary guard:
+// when the reader reports hasMore=false (exact-multiple last page), the page
+// envelope must carry has_more=false and a null next_cursor.
+func TestAuditHandler_ExactPageOmitsNextCursor(t *testing.T) {
+	t.Parallel()
+
+	handler := httpdelivery.NewHandler(fakeAuditQuerier{
+		items: []domain.Event{{
+			ID:           "evt-a",
+			OccurredAt:   time.Now().UTC(),
+			ActorID:      "actor-a",
+			Action:       "audit.test",
+			ResourceType: "document",
+			ResourceID:   "doc-a",
+			PayloadJSON:  `{}`,
+			TenantID:     "tenant-a",
+		}},
+		hasMore: false,
+	})
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events", "tenant-a")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Page struct {
+			NextCursor *string `json:"next_cursor"`
+			HasMore    bool    `json:"has_more"`
+		} `json:"page"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body.Page.HasMore {
+		t.Fatalf("has_more = true on exact page, want false")
+	}
+	if body.Page.NextCursor != nil {
+		t.Fatalf("next_cursor = %q on exact page, want null", *body.Page.NextCursor)
+	}
 }
 
-func (f fakeAuditQuerier) ListEvents(context.Context, domain.ListEventsQuery) ([]domain.Event, error) {
-	return f.items, f.err
+// TestAuditHandler_HasMoreEmitsNextCursor is the B1 handler-boundary guard for
+// the next-page case: hasMore=true yields has_more=true and a non-empty,
+// URL-safe next_cursor.
+func TestAuditHandler_HasMoreEmitsNextCursor(t *testing.T) {
+	t.Parallel()
+
+	handler := httpdelivery.NewHandler(fakeAuditQuerier{
+		items: []domain.Event{{
+			ID:           "evt-a",
+			OccurredAt:   time.Now().UTC(),
+			ActorID:      "actor-a",
+			Action:       "audit.test",
+			ResourceType: "document",
+			ResourceID:   "doc-a",
+			PayloadJSON:  `{}`,
+			TenantID:     "tenant-a",
+		}},
+		hasMore: true,
+	})
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events", "tenant-a")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Page struct {
+			NextCursor *string `json:"next_cursor"`
+			HasMore    bool    `json:"has_more"`
+		} `json:"page"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if !body.Page.HasMore {
+		t.Fatalf("has_more = false with probe row, want true")
+	}
+	if body.Page.NextCursor == nil || *body.Page.NextCursor == "" {
+		t.Fatalf("next_cursor empty with has_more=true, want a cursor")
+	}
+	if strings.ContainsAny(*body.Page.NextCursor, "+/=") {
+		t.Fatalf("next_cursor %q is not URL-safe (has +, / or =)", *body.Page.NextCursor)
+	}
+}
+
+// TestAuditHandler_LimitClampedToMax is the B3 regression guard: a limit above
+// the design-system max (100) is clamped to 100 before reaching the reader.
+func TestAuditHandler_LimitClampedToMax(t *testing.T) {
+	t.Parallel()
+
+	capture := &queryCaptureQuerier{}
+	handler := httpdelivery.NewHandler(capture)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events?limit=500", "tenant-a")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	if capture.query.Limit != 100 {
+		t.Fatalf("clamped limit = %d, want 100", capture.query.Limit)
+	}
+}
+
+type fakeAuditQuerier struct {
+	items   []domain.Event
+	hasMore bool
+	err     error
+}
+
+func (f fakeAuditQuerier) ListEvents(context.Context, domain.ListEventsQuery) ([]domain.Event, bool, error) {
+	return f.items, f.hasMore, f.err
+}
+
+// queryCaptureQuerier records the query it receives so a test can assert the
+// handler's parse/clamp behavior.
+type queryCaptureQuerier struct {
+	query domain.ListEventsQuery
+}
+
+func (q *queryCaptureQuerier) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]domain.Event, bool, error) {
+	q.query = query
+	return nil, false, nil
 }
 
 func authenticatedAuditRequest(method, target, tenantID string) *http.Request {

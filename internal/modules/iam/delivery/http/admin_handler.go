@@ -37,7 +37,7 @@ type UserAdminService interface {
 // to the small surface the handler actually needs so tests can pass fakes
 // without depending on the full audit reader/counter/export plumbing.
 type AuditEventLister interface {
-	ListEvents(ctx context.Context, query auditdomain.ListEventsQuery) ([]auditdomain.Event, error)
+	ListEvents(ctx context.Context, query auditdomain.ListEventsQuery) ([]auditdomain.Event, bool, error)
 }
 
 // KpiReader is the narrow port the overview uses to fold the KPI snapshot
@@ -210,7 +210,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		if h.auditEvents == nil {
 			return nil
 		}
-		events, err := h.auditEvents.ListEvents(gctx, auditdomain.ListEventsQuery{Limit: 25, TenantID: tenantID})
+		events, _, err := h.auditEvents.ListEvents(gctx, auditdomain.ListEventsQuery{Limit: 25, TenantID: tenantID})
 		if err != nil {
 			return err
 		}

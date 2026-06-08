@@ -124,12 +124,12 @@ type stubAuditLister struct {
 	events   []auditdomain.Event
 }
 
-func (s *stubAuditLister) ListEvents(_ context.Context, q auditdomain.ListEventsQuery) ([]auditdomain.Event, error) {
+func (s *stubAuditLister) ListEvents(_ context.Context, q auditdomain.ListEventsQuery) ([]auditdomain.Event, bool, error) {
 	s.tenantID = q.TenantID
 	if s.delay > 0 {
 		time.Sleep(s.delay)
 	}
-	return s.events, nil
+	return s.events, false, nil
 }
 
 type delayedOnlineService struct {

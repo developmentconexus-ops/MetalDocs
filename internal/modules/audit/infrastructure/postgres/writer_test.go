@@ -62,6 +62,80 @@ func TestWriterRecordTxStoresHashChainColumns(t *testing.T) {
 	}
 }
 
+func auditListRows(n int) *sqlmock.Rows {
+	rows := sqlmock.NewRows([]string{
+		"id", "occurred_at", "actor_id", "action",
+		"resource_type", "resource_id", "payload", "trace_id", "tenant_id",
+	})
+	now := time.Now().UTC()
+	for i := 0; i < n; i++ {
+		rows.AddRow("evt", now, "actor", "audit.test", "document", "doc", `{}`, "trace", "tenant-1")
+	}
+	return rows
+}
+
+// TestWriterListEventsExactPageHasNoMore is the B1 regression guard: an
+// exact-multiple last page (rows == limit) must report hasMore=false. The old
+// handler-side `len(items) >= limit` heuristic reported a false next page here.
+func TestWriterListEventsExactPageHasNoMore(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	// limit=3 → reader probes for limit+1 (4); only 3 rows exist → no probe row.
+	mock.ExpectQuery("FROM metaldocs.audit_events").
+		WithArgs("tenant-1", 4).
+		WillReturnRows(auditListRows(3))
+
+	writer := NewWriter(db)
+	items, hasMore, err := writer.ListEvents(context.Background(), domain.ListEventsQuery{TenantID: "tenant-1", Limit: 3})
+	if err != nil {
+		t.Fatalf("ListEvents: %v", err)
+	}
+	if hasMore {
+		t.Fatalf("hasMore = true on exact-multiple page, want false")
+	}
+	if len(items) != 3 {
+		t.Fatalf("len(items) = %d, want 3", len(items))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sql expectations: %v", err)
+	}
+}
+
+// TestWriterListEventsTrimsProbeRow is the B1 regression guard for the
+// next-page case: when the limit+1 probe row exists, hasMore=true and the probe
+// is trimmed so the caller sees exactly limit rows.
+func TestWriterListEventsTrimsProbeRow(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	// limit=3 → probe for 4; 4 rows returned → trimmed to 3 + hasMore=true.
+	mock.ExpectQuery("FROM metaldocs.audit_events").
+		WithArgs("tenant-1", 4).
+		WillReturnRows(auditListRows(4))
+
+	writer := NewWriter(db)
+	items, hasMore, err := writer.ListEvents(context.Background(), domain.ListEventsQuery{TenantID: "tenant-1", Limit: 3})
+	if err != nil {
+		t.Fatalf("ListEvents: %v", err)
+	}
+	if !hasMore {
+		t.Fatalf("hasMore = false with probe row present, want true")
+	}
+	if len(items) != 3 {
+		t.Fatalf("len(items) = %d, want 3 (probe row trimmed)", len(items))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sql expectations: %v", err)
+	}
+}
+
 func TestWriterValidateIntegrityReportsBrokenChain(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
