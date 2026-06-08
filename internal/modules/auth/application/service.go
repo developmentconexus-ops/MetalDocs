@@ -231,6 +231,12 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 		if err != nil {
 			return err
 		}
+		// Run the bcrypt comparison before branching so a locked or inactive account
+		// spends the same time as an active one — the fast no-bcrypt path would
+		// otherwise leak account state by wall-clock (OWASP Authentication Cheat
+		// Sheet — equalize work on every failure path). The distinct locked/inactive
+		// errors are kept deliberately (admin UX), only the timing is equalized.
+		passwordOK := bcrypt.CompareHashAndPassword([]byte(state.PasswordHash), []byte(password)) == nil
 		if state.LockedUntil != nil && state.LockedUntil.After(s.now().UTC()) {
 			outcome = loginLocked
 			return nil
@@ -239,7 +245,7 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 			outcome = loginInactive
 			return nil
 		}
-		if bcrypt.CompareHashAndPassword([]byte(state.PasswordHash), []byte(password)) != nil {
+		if !passwordOK {
 			if _, _, err := tx.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds()), s.remoteIP(r)); err != nil {
 				return fmt.Errorf("record failed login: %w", err)
 			}

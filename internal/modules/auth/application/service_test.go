@@ -292,6 +292,56 @@ func TestAuthenticate_TimingConstant(t *testing.T) {
 	}
 }
 
+// TestAuthenticate_InactiveConstantTime proves the inactive (and, by the same
+// code path, locked) branch is checked AFTER the bcrypt comparison, so an
+// inactive account cannot be distinguished from an active wrong-password attempt
+// by wall-clock. The distinct ErrIdentityInactive is intentionally kept (admin
+// UX, operator decision) — only the timing is equalized.
+func TestAuthenticate_InactiveConstantTime(t *testing.T) {
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	ctx := context.Background()
+
+	const userID = "inactive-user"
+	knownHash, err := bcrypt.GenerateFromPassword([]byte("CorrectPassword123!"), 12)
+	if err != nil {
+		t.Fatalf("GenerateFromPassword: %v", err)
+	}
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:       userID,
+		Username:     userID,
+		Email:        "inactive@example.com",
+		DisplayName:  "Inactive User",
+		PasswordHash: authdomain.PasswordHash(string(knownHash)),
+		PasswordAlgo: "bcrypt",
+		IsActive:     false,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          testSessionSecret,
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 100,
+		LoginLockDuration:      15 * time.Minute,
+		AllowDevTenantFallback: true,
+	})
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+
+	start := time.Now()
+	_, gotErr := svc.Authenticate(ctx, userID, "WrongPassword!", req)
+	elapsed := time.Since(start)
+	if !errors.Is(gotErr, authdomain.ErrIdentityInactive) {
+		t.Fatalf("Authenticate(inactive) error = %v, want ErrIdentityInactive", gotErr)
+	}
+	if elapsed < 50*time.Millisecond {
+		t.Fatalf("inactive path too fast (%v): bcrypt not run before the inactive check — timing leak", elapsed)
+	}
+}
+
 // TestAuthenticate_ConcurrentWrongPasswordBoundedByLock proves the lockout is
 // atomic: firing many parallel wrong-password attempts must NOT drive
 // failed_login_attempts past the threshold. Pre-fix (stale-snapshot lock check),
