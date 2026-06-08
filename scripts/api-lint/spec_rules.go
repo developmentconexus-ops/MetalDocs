@@ -97,17 +97,25 @@ func checkEnvelope(file, opID, path string, op, responsesComp *yaml.Node) []Viol
 		if err != nil || code < 400 || code > 599 {
 			continue
 		}
+		// A bespoke (non-Problem) error body may opt out with an explicit,
+		// reviewed reason — mirroring x-pagination-exempt. The marker is read off
+		// the operation's OWN response node (not the resolved shared component),
+		// so an exemption can never silently blanket every op that $refs a shared
+		// response; it scopes to the one reviewed endpoint.
+		if reason := strings.TrimSpace(scalarValue(mapGet(resp, "x-error-envelope-exempt"))); reason != "" {
+			continue
+		}
 		resolved := resp
 		if ref := mapGet(resp, "$ref"); ref != nil {
 			resolved = lookupResponseRef(ref.Value, responsesComp)
-		}
-		// A bespoke (non-Problem) error body may opt out with an explicit,
-		// reviewed reason — mirroring x-pagination-exempt. Used for a legacy
-		// domain payload whose Problem migration is coupled to a runtime + FE
-		// change tracked in a later phase, so it is documented rather than
-		// silently tolerated.
-		if reason := strings.TrimSpace(scalarValue(mapGet(resolved, "x-error-envelope-exempt"))); reason != "" {
-			continue
+			if resolved == nil {
+				// An error response whose $ref does not resolve to a known shared
+				// response cannot be proven to carry Problem. A BLOCKING gate must
+				// fail closed here, not degrade to the contentless-exempt path
+				// (a typo'd ref would otherwise slip a non-Problem body through).
+				out = append(out, Violation{File: file, Line: statusNode.Line, Rule: "ENVELOPE-DRIFT", Message: fmt.Sprintf("response %s %s has an unresolved $ref %q; cannot verify Problem envelope", opID, statusNode.Value, scalarValue(mapGet(resp, "$ref")))})
+				continue
+			}
 		}
 		content := mapGet(resolved, "content")
 		if content == nil {

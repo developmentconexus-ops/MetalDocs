@@ -4080,7 +4080,10 @@ components:
         message: { type: string }
     Problem:
       type: object
-      required: [type, title, status, code]
+      # RFC 9457 §3.1: `type` is optional (absent ⇒ "about:blank"). The Go helper
+      # (internal/platform/problem) omits it unless WithType is called, so it is
+      # not in the required set — required mirrors what every emitter guarantees.
+      required: [title, status, code]
       properties:
         type: { type: string, format: uri }
         title: { type: string }

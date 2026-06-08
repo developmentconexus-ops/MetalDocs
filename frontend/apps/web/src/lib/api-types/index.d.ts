@@ -2820,7 +2820,7 @@ export interface components {
         };
         Problem: {
             /** Format: uri */
-            type: string;
+            type?: string;
             title: string;
             status: number;
             detail?: string;

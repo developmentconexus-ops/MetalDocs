@@ -1,6 +1,6 @@
 # Architecture: Rate Limiting
 
-> **Last verified:** 2026-05-22 (commit H2 fix)
+> **Last verified:** 2026-06-07 (api-contract-hardening Phase D: both limiters now emit RFC 9457 `application/problem+json` with code `RATE_LIMITED` + `Retry-After`, replacing the legacy `{error:…}` JSON bodies. Prior: 2026-05-22 commit H2 fix)
 > **Scope:** the two parallel rate-limiter implementations currently live in the API, what each one keys on, which routes each one protects, and the bounded-memory contract both honor (review finding **C2**).
 > **Out of scope:** circuit-breakers on downstream calls, infrastructure-layer (CDN / WAF) limiting, per-tenant quota enforcement, billing-driven throttling. Merging the two limiters is intentionally **deferred** to a separate refactor — see "Known duplication" below.
 > **Key files:**
@@ -46,7 +46,7 @@ apps/api/cmd/metaldocs-api/main.go:471
 
 - Health probes (`/api/v1/health/live`, `/api/v1/health/ready`) are skipped via `shouldSkipRateLimit`.
 - Identity preference order: authenticated user → IAM-context user → trusted-proxy-resolved client IP → `ip:unknown`.
-- On rejection: `HTTP 429` with `Retry-After` (seconds until window rolls) and the standard `RATE_LIMITED` envelope body.
+- On rejection: `HTTP 429` with `Retry-After` (seconds until window rolls) and an RFC 9457 `application/problem+json` body, code `RATE_LIMITED`.
 
 ### 2.2 `ratelimit.Middleware` — per-route token bucket
 
