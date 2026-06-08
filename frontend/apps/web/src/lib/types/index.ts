@@ -24,7 +24,6 @@ export type UserRole =
   | "signer"
   | "area_admin"
   | "qms_admin";
-export type DocumentContentSource = "native" | "docx_upload" | "browser_editor";
 
 export interface CurrentUser {
   userId: string;
@@ -46,13 +45,6 @@ export interface AreaMembership {
   areaName: string;
   roleInArea: UserRole;
   grantedAt: string;
-}
-
-export interface OnlineUserItem {
-  userId: string;
-  username: string;
-  displayName: string;
-  lastSeenAt: string;
 }
 
 export interface DocumentTypeItem {
@@ -162,23 +154,6 @@ export interface DocumentListItem {
 export interface SearchDocumentItem extends DocumentListItem {
 }
 
-export type RendererPin = {
-  renderer_version: string;
-  layout_ir_hash: string;
-  template_key: string;
-  template_version: number;
-  pinned_at?: string; // ISO timestamp
-};
-
-export interface VersionListItem {
-  documentId: string;
-  version: number;
-  contentHash: string;
-  changeSummary: string;
-  createdAt: string;
-  renderer_pin?: RendererPin | null;
-}
-
 export interface WorkflowApprovalItem {
   approvalId: string;
   documentId: string;
@@ -192,58 +167,12 @@ export interface WorkflowApprovalItem {
   decidedAt?: string;
 }
 
-export interface CollaborationPresenceItem {
-  documentId: string;
-  userId: string;
-  displayName: string;
-  lastSeenAt: string;
-}
-
-export interface DocumentEditLockItem {
-  documentId: string;
-  lockedBy: string;
-  displayName: string;
-  lockReason: string;
-  acquiredAt: string;
-  expiresAt: string;
-}
-
-export interface MDDMTemplateTheme {
-  accent?: string;
-  accentLight?: string;
-  accentDark?: string;
-  accentBorder?: string;
-}
-
 export interface DocumentTemplateSnapshotItem {
   templateKey: string;
   version: number;
   profileCode: string;
   schemaVersion: number;
   definition: Record<string, unknown>;
-}
-
-export interface DocumentBrowserTemplateSnapshotItem {
-  templateKey: string;
-  version: number;
-  profileCode: string;
-  schemaVersion: number;
-  editor: "mddm-blocknote";
-  contentFormat: "mddm";
-  body: string;
-  definition?: {
-    type?: string;
-    id?: string;
-    children?: unknown[];
-    theme?: MDDMTemplateTheme;
-  } & Record<string, unknown>;
-}
-
-export interface DocumentTemplateAssignmentItem {
-  documentId: string;
-  templateKey: string;
-  templateVersion: number;
-  assignedAt: string;
 }
 
 export interface NotificationItem {
