@@ -53,7 +53,7 @@ type PasswordReauthProvider struct {
 }
 
 // NewPasswordReauthProvider creates the provider.
-func NewPasswordReauthProvider(_ context.Context, reader IamUserReader, emitter EventEmitterStub, limiter AuthFailureRateLimiter) *PasswordReauthProvider {
+func NewPasswordReauthProvider(reader IamUserReader, emitter EventEmitterStub, limiter AuthFailureRateLimiter) *PasswordReauthProvider {
 	return &PasswordReauthProvider{
 		reader:  reader,
 		emitter: emitter,

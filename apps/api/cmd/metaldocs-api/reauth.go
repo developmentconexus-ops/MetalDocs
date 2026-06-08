@@ -44,7 +44,6 @@ func (slogReauthEmitter) EmitAuthFailed(ctx context.Context, actorUserID, reason
 func newSignoffReauthRegistry(repo authdomain.Repository) *signature.Registry {
 	registry := signature.NewRegistry()
 	registry.Register(signature.NewPasswordReauthProvider(
-		context.Background(),
 		authPasswordHashReader{repo: repo},
 		slogReauthEmitter{},
 		signature.NewInMemoryAuthFailureRateLimiter(),

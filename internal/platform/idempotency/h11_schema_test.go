@@ -57,20 +57,6 @@ func TestCompleteReplay_OversizedBodyReturnsError(t *testing.T) {
 	_ = s.FailReplay(handle2, nil)
 }
 
-// TestRecordReplay_OversizedBodyReturnsError proves the legacy path also
-// enforces the cap.
-func TestRecordReplay_OversizedBodyReturnsError(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
-	s := idempotency.New(db, "POST /h11/{id}")
-	ctx := context.Background()
-
-	big := bytes.Repeat([]byte("z"), 64*1024+1)
-	err := s.RecordReplay(ctx, h11Tenant, h11Actor, uniqueKey("rec-oversized"), "hash-a", 200, big)
-	if err == nil {
-		t.Fatal("expected error for oversized body in RecordReplay, got nil")
-	}
-}
-
 // TestCompleteReplay_NonJSONBodyRoundTrips proves that BYTEA stores arbitrary
 // bytes faithfully — no JSON coercion that would fail on binary or plain-text
 // response bodies.

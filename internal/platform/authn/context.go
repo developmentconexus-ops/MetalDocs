@@ -13,20 +13,15 @@ import (
 // false signals "no authenticated principal" so callers can fail-closed
 // instead of silently treating an empty id as a permissive default.
 //
-// Deprecated: callers should prefer iamdomain.UserIDFromContext combined with
-// their own presence handling. This wrapper is retained until M6 cleanup.
+// This is the canonical presence-aware accessor: it centralises the trim +
+// empty-check that every delivery handler needs, so a missing principal is one
+// uniform fail-closed decision rather than 27 hand-rolled copies. (The bare
+// iamdomain.UserIDFromContext returns only the string and pushes that check
+// onto each caller.)
 func UserIDFromContext(ctx context.Context) (string, bool) {
 	raw := strings.TrimSpace(iamdomain.UserIDFromContext(ctx))
 	if raw == "" {
 		return "", false
 	}
 	return raw, true
-}
-
-// RolesFromContext resolves authenticated roles as normalized lowercase strings.
-//
-// Deprecated: see M6 — callers should consume iamdomain.RolesFromContext
-// directly to preserve the iamdomain.Role enum.
-func RolesFromContext(ctx context.Context) []iamdomain.Role {
-	return iamdomain.RolesFromContext(ctx)
 }

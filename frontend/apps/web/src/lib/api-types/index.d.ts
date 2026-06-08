@@ -5463,8 +5463,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description ok */
-            200: {
+            /** @description archived */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5608,8 +5608,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description ok */
-            200: {
+            /** @description heartbeat accepted */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5634,8 +5634,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description ok */
-            200: {
+            /** @description released */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5660,8 +5660,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description ok */
-            200: {
+            /** @description released */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

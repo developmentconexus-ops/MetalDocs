@@ -383,7 +383,7 @@ func main() {
 		fanoutCfg.freezeService = docapp.NewFreezeService(
 			schemaReader, fillInRepo, fillInRepo,
 			resolverReg, snapRepo, ctxBuilder,
-			snapRepo, snapRepo, fillInRepo, fanoutCfg.client,
+			snapRepo, snapRepo, fanoutCfg.client,
 		)
 		if deps.Publisher != nil {
 			pdfDispatcher := fanout.NewPDFDispatcher(deps.Publisher)

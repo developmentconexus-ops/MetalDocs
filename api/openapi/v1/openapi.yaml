@@ -2472,8 +2472,8 @@ paths:
           (migration 0142b) is the backstop.
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '200':
-          description: ok
+        '204':
+          description: archived
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2613,8 +2613,8 @@ paths:
       operationId: heartbeatDocumentSession
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '200':
-          description: ok
+        '204':
+          description: heartbeat accepted
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2634,8 +2634,8 @@ paths:
       operationId: releaseDocumentSession
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '200':
-          description: ok
+        '204':
+          description: released
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2655,8 +2655,8 @@ paths:
       operationId: forceReleaseDocumentSession
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '200':
-          description: ok
+        '204':
+          description: released
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

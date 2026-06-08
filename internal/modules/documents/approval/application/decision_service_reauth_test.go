@@ -43,7 +43,6 @@ func (r reauthFakeUserReader) GetPasswordHash(_ context.Context, userID string) 
 func newReauthRegistry(reader signature.IamUserReader) *signature.Registry {
 	reg := signature.NewRegistry()
 	reg.Register(signature.NewPasswordReauthProvider(
-		context.Background(),
 		reader,
 		nil,
 		signature.NewInMemoryAuthFailureRateLimiter(),

@@ -42,7 +42,7 @@ func (e *fakeEmitter) EmitAuthFailed(_ context.Context, actorID, _ string) {
 
 func newProvider(users map[string]string) (*PasswordReauthProvider, *fakeEmitter) {
 	em := &fakeEmitter{}
-	p := NewPasswordReauthProvider(context.Background(), newFakeReader(users), em, NewInMemoryAuthFailureRateLimiter())
+	p := NewPasswordReauthProvider(newFakeReader(users), em, NewInMemoryAuthFailureRateLimiter())
 	return p, em
 }
 
@@ -127,7 +127,7 @@ func TestPasswordReauthRateLimitResetAfterWindow(t *testing.T) {
 
 func TestPasswordReauthFailsClosedWhenLimiterMissing(t *testing.T) {
 	em := &fakeEmitter{}
-	p := NewPasswordReauthProvider(context.Background(), newFakeReader(map[string]string{"u1": "secret"}), em, nil)
+	p := NewPasswordReauthProvider(newFakeReader(map[string]string{"u1": "secret"}), em, nil)
 	_, err := p.Sign(context.Background(), SignRequest{
 		ActorUserID: "u1",
 		Credentials: map[string]string{"password": "secret"},
