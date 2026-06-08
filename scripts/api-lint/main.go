@@ -7,45 +7,23 @@ import (
 	"path/filepath"
 )
 
-// reportedOnlyRules are the spec-contract-drift families (ADR 0022) intentionally
-// deferred to a dedicated spec-hygiene phase. They are surfaced and counted but
-// MUST NOT gate CI yet. EVERY other rule — the registry-binding guards, the
-// dialect bans, and tripwire-pairing — is BLOCKING: a regression turns the build
-// red. This is Principle 5 ("the model is bound by CI, not by discipline") made
-// real. A NEW rule defaults to blocking by omission, which is the safe default.
-// ENVELOPE-DRIFT graduated to BLOCKING in api-contract-hardening Phase D: the
-// whole spec now serves a single RFC 9457 Problem error shape (AD-2) via the
-// shared #/components/responses/* set, so a re-introduced non-Problem error body
-// turns CI red. AUTHZ-DRIFT and PAGINATION-DRIFT graduated to BLOCKING in Phase
-// E2: a root-level `security:` requirement now makes every op secure-by-default
-// in-doc (F-NO-GLOBAL-SEC) and every list op is cursor-paginated or carries a
-// reviewed `x-pagination-exempt` reason (F-PAGINATION), so both families sit at
-// zero and a regression turns CI red. No spec-drift family remains reported-only.
-var reportedOnlyRules = map[string]struct{}{}
-
-func isBlocking(rule string) bool {
-	_, reported := reportedOnlyRules[rule]
-	return !reported
-}
+// EVERY rule this linter emits is BLOCKING: any violation fails CI. There is no
+// reported-only/deferred tier — the spec-contract-drift families (ENVELOPE-,
+// AUTHZ-, PAGINATION-DRIFT) all graduated to blocking across api-contract-
+// hardening Phases D/E2 and the deferral backlog is empty, so a separate
+// non-blocking exit class would only let a real regression be silently bypassed
+// (CWE-693). A NEW rule is blocking by construction. This is Principle 5 ("the
+// model is bound by CI, not by discipline") made real.
 
 func main() {
 	strict := flag.Bool("strict", false,
 		"hard-error when an EXPECTED core registry file (model.go, seed sql, tripwire allow-list, wiki authz doc) is missing instead of treating it as an empty set. Use for production/CI runs so a wrong modulesRoot can never masquerade as a clean pass (ADR 0022 Phase 13).")
-	enforce := flag.String("enforce", "all",
-		"which rule-set determines the exit code: all|blocking|reported. blocking = only the binding/dialect/tripwire guards gate (spec-drift printed but non-fatal); reported = only the deferred spec-drift families gate; all = any violation (back-compat default).")
 	only := flag.String("only", "", "if set, report only violations for this rule (e.g. PATH-BASE-PREFIX)")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: api-lint [-strict] [-enforce=all|blocking|reported] [-only RULE] <openapi.yaml> [<repo-root>]")
+		fmt.Fprintln(os.Stderr, "usage: api-lint [-strict] [-only RULE] <openapi.yaml> [<repo-root>]")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-
-	switch *enforce {
-	case "all", "blocking", "reported":
-	default:
-		fmt.Fprintf(os.Stderr, "invalid -enforce=%q (want all|blocking|reported)\n", *enforce)
-		os.Exit(2)
-	}
 
 	args := flag.Args()
 	if len(args) < 1 || len(args) > 2 {
@@ -93,35 +71,12 @@ func main() {
 		violations = kept
 	}
 
-	var blockingCount, reportedCount int
 	for _, v := range violations {
-		if isBlocking(v.Rule) {
-			blockingCount++
-		} else {
-			reportedCount++
-		}
+		fmt.Printf("%s:%d: %s: %s\n", v.File, v.Line, v.Rule, v.Message)
 	}
+	fmt.Printf("%d violation(s)\n", len(violations))
 
-	for _, v := range violations {
-		show := *enforce == "all" ||
-			(*enforce == "blocking" && isBlocking(v.Rule)) ||
-			(*enforce == "reported" && !isBlocking(v.Rule))
-		if show {
-			fmt.Printf("%s:%d: %s: %s\n", v.File, v.Line, v.Rule, v.Message)
-		}
-	}
-	fmt.Printf("%d blocking violation(s), %d reported-only/deferred violation(s)\n", blockingCount, reportedCount)
-
-	var fail bool
-	switch *enforce {
-	case "blocking":
-		fail = blockingCount > 0
-	case "reported":
-		fail = reportedCount > 0
-	default:
-		fail = len(violations) > 0
-	}
-	if fail {
+	if len(violations) > 0 {
 		os.Exit(1)
 	}
 }

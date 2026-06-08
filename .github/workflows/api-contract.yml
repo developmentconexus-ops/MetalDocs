@@ -70,16 +70,14 @@ jobs:
         run: go run ./scripts/api-lint -only PATH-BASE-PREFIX api/openapi/v1/openapi.yaml
 
   api-design-system-lint:
-    # ADR 0022 Phase 13 — Principle 5 enforced. Two rule-sets, one job:
-    #
-    #   BLOCKING (gates this job): the registry-binding guards, the dialect bans
-    #   (no-inline / no-rawstring / no-rolestring), authz-area-scope-binding, and
-    #   tripwire-pairing. These are 0 on a clean tree; a real drift/dialect
-    #   regression turns the build RED.
-    #
-    #   REPORTED-ONLY (continue-on-error step): the spec-contract-drift families
-    #   (ENVELOPE-/AUTHZ-/PAGINATION-DRIFT), ~397 pre-existing hits deferred to a
-    #   dedicated spec-hygiene phase. Surfaced + counted, never blocking yet.
+    # ADR 0022 Phase 13 — Principle 5 enforced. EVERY api-lint rule is BLOCKING:
+    # the registry-binding guards, the dialect bans (no-inline / no-rawstring /
+    # no-rolestring), authz-area-scope-binding, tripwire-pairing, AND the spec-
+    # contract-drift families (ENVELOPE-/AUTHZ-/PAGINATION-DRIFT, which all
+    # graduated to blocking in Phases D/E2). These are 0 on a clean tree; any
+    # violation turns the build RED. There is no reported-only/non-blocking tier —
+    # the deferral backlog is empty, so a continue-on-error step would only let a
+    # real regression be silently bypassed.
     #
     # CRITICAL: pass the REPO ROOT (`.`), not `./internal/modules`. Every binding
     # helper joins its core files off the repo root (internal/modules/...,
@@ -93,8 +91,5 @@ jobs:
         with: { go-version: 1.25.x, cache: true }
       - name: api-lint unit tests (incl. e2e self-test)
         run: go test ./scripts/api-lint/... -count=1
-      - name: api-lint binding/dialect/tripwire guards (BLOCKING)
-        run: go run ./scripts/api-lint/ -strict -enforce=blocking api/openapi/v1/openapi.yaml .
-      - name: api-lint spec-contract-drift backlog (reported-only, non-blocking)
-        continue-on-error: true
-        run: go run ./scripts/api-lint/ -enforce=reported api/openapi/v1/openapi.yaml .
+      - name: api-lint guards (BLOCKING — any violation fails)
+        run: go run ./scripts/api-lint/ -strict api/openapi/v1/openapi.yaml .
