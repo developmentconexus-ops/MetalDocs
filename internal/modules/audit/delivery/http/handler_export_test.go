@@ -63,7 +63,7 @@ func TestAuditHandler_MultiAxisFilter(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := authedRequest(t, http.MethodGet, "/api/v1/audit/events?actorId=alice&action=auth.*", "tenant-a", "actor-test", "")
+	req := authedRequest(t, http.MethodGet, "/api/v1/audit/events?actor_id=alice&action=auth.*", "tenant-a", "actor-test", "")
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {

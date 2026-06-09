@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../../lib/api/client";
 import { QK } from "../../../lib/queryKeys";
-import type { IamRole } from "../types";
+import type { operations } from "../../../lib/api-types";
 
 const STALE_30S = 30_000;
 
-export type MembershipsQueryParams = {
-  userId?: string;
-  areaCode?: string;
-  role?: IamRole;
-};
+// Derived from the generated contract so the snake_case wire keys
+// (user_id, area_code) can never drift from the spec.
+export type MembershipsQueryParams = NonNullable<
+  operations["listAreaMemberships"]["parameters"]["query"]
+>;
 
 export function useMembershipsQuery(params: MembershipsQueryParams = {}) {
   return useQuery({

@@ -45,7 +45,7 @@ func NewPeopleHandler(service *iamapp.PeopleService, authSvc UserAdminService, a
 }
 
 // RegisterRoutes attaches People-tab routes with Go 1.22 typed mux patterns.
-// The path-param wildcard {userId} is extracted via r.PathValue.
+// The path-param wildcard {user_id} is extracted via r.PathValue.
 func (h *PeopleHandler) RegisterRoutes(mux *http.ServeMux) {
 	if h == nil {
 		return
@@ -53,10 +53,10 @@ func (h *PeopleHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc(http.MethodGet+" /api/v1/iam/users", h.handleListUsers)
 	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/invite", h.handleInvite)
 	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/bulk", h.handleBulk)
-	mux.HandleFunc(http.MethodPatch+" /api/v1/iam/users/{userId}", h.handlePatch)
-	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{userId}/reset-password", h.handleResetPassword)
-	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{userId}/unlock", h.handleUnlock)
-	mux.HandleFunc(http.MethodGet+" /api/v1/iam/users/{userId}/memberships", h.handleListMemberships)
+	mux.HandleFunc(http.MethodPatch+" /api/v1/iam/users/{user_id}", h.handlePatch)
+	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{user_id}/reset-password", h.handleResetPassword)
+	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{user_id}/unlock", h.handleUnlock)
+	mux.HandleFunc(http.MethodGet+" /api/v1/iam/users/{user_id}/memberships", h.handleListMemberships)
 }
 
 // ─── GET /iam/users ─────────────────────────────────────────────────────────
@@ -72,10 +72,10 @@ func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	filters := iamapp.ListFilters{
-		IsActive: parseOptionalBool(r.URL.Query().Get("isActive")),
+		IsActive: parseOptionalBool(r.URL.Query().Get("is_active")),
 		Q:        nonEmptyPtr(r.URL.Query().Get("q")),
 		Cursor:   nonEmptyPtr(r.URL.Query().Get("cursor")),
-		AreaCode: nonEmptyPtr(r.URL.Query().Get("areaCode")),
+		AreaCode: nonEmptyPtr(r.URL.Query().Get("area_code")),
 		Limit:    parseLimit(r.URL.Query().Get("limit")),
 	}
 	if rawRole := strings.TrimSpace(r.URL.Query().Get("role")); rawRole != "" {
@@ -177,7 +177,7 @@ func (h *PeopleHandler) handleInvite(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ─── PATCH /iam/users/{userId} ─────────────────────────────────────────────
+// ─── PATCH /iam/users/{user_id} ─────────────────────────────────────────────
 
 func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
@@ -189,7 +189,7 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
-	userID := strings.TrimSpace(r.PathValue("userId"))
+	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
 		return
@@ -232,14 +232,14 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ─── POST /iam/users/{userId}/reset-password ──────────────────────────────
+// ─── POST /iam/users/{user_id}/reset-password ──────────────────────────────
 
 func (h *PeopleHandler) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	if h.authSvc == nil {
 		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Auth service is not configured"))
 		return
 	}
-	userID := strings.TrimSpace(r.PathValue("userId"))
+	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
 		return
@@ -264,14 +264,14 @@ func (h *PeopleHandler) handleResetPassword(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-// ─── POST /iam/users/{userId}/unlock ──────────────────────────────────────
+// ─── POST /iam/users/{user_id}/unlock ──────────────────────────────────────
 
 func (h *PeopleHandler) handleUnlock(w http.ResponseWriter, r *http.Request) {
 	if h.authSvc == nil {
 		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Auth service is not configured"))
 		return
 	}
-	userID := strings.TrimSpace(r.PathValue("userId"))
+	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
 		return
@@ -351,7 +351,7 @@ func (h *PeopleHandler) handleBulk(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// ─── GET /iam/users/{userId}/memberships ──────────────────────────────────
+// ─── GET /iam/users/{user_id}/memberships ──────────────────────────────────
 
 func (h *PeopleHandler) handleListMemberships(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
@@ -363,7 +363,7 @@ func (h *PeopleHandler) handleListMemberships(w http.ResponseWriter, r *http.Req
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
-	userID := strings.TrimSpace(r.PathValue("userId"))
+	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
 		return

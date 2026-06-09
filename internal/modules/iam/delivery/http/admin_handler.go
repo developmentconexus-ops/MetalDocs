@@ -118,13 +118,13 @@ func (h *AdminHandler) WithPresenceReader(r PresenceReader) *AdminHandler {
 // because PR-5 (Roles & Caps matrix) owns them and will restructure them
 // next.
 func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{userId}/roles", h.handleUserRoleUpsertTyped)
-	mux.HandleFunc(http.MethodPut+" /api/v1/iam/users/{userId}/roles", h.handleReplaceUserRolesTyped)
+	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{user_id}/roles", h.handleUserRoleUpsertTyped)
+	mux.HandleFunc(http.MethodPut+" /api/v1/iam/users/{user_id}/roles", h.handleReplaceUserRolesTyped)
 	mux.HandleFunc("/api/v1/iam/admin/overview", h.handleAdminOverview)
 }
 
 func (h *AdminHandler) handleUserRoleUpsertTyped(w http.ResponseWriter, r *http.Request) {
-	userID := strings.TrimSpace(r.PathValue("userId"))
+	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
 		return
@@ -133,7 +133,7 @@ func (h *AdminHandler) handleUserRoleUpsertTyped(w http.ResponseWriter, r *http.
 }
 
 func (h *AdminHandler) handleReplaceUserRolesTyped(w http.ResponseWriter, r *http.Request) {
-	userID := strings.TrimSpace(r.PathValue("userId"))
+	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
 		return

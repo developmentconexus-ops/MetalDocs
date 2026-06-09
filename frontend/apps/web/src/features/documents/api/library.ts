@@ -1,19 +1,15 @@
 import { api } from '../../../lib/api/client';
 import { ApiError } from '../../../lib/api/errors';
-import type { components } from '../../../lib/api-types';
+import type { components, operations } from '../../../lib/api-types';
 
 export type DocumentListResponse = components['schemas']['DocumentListResponse'];
 export type DocumentStatsResponse = components['schemas']['DocumentStatsResponse'];
 
-type DocumentListQueryParams = {
-  cursor?: string;
-  limit?: number;
-  status?: string;
-  areaCode?: string;
-  profileCode?: string;
-  q?: string;
-  includeArchived?: boolean;
-};
+// Derived from the generated contract so the snake_case wire keys
+// (area_code, profile_code, include_archived) can never drift from the spec.
+export type DocumentListQueryParams = NonNullable<
+  operations['listDocuments']['parameters']['query']
+>;
 
 function cleanParams(params: DocumentListQueryParams): DocumentListQueryParams {
   return Object.fromEntries(

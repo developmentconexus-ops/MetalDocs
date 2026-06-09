@@ -105,8 +105,8 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	userID := strings.TrimSpace(r.URL.Query().Get("userId"))
-	areaCode := strings.TrimSpace(r.URL.Query().Get("areaCode"))
+	userID := strings.TrimSpace(r.URL.Query().Get("user_id"))
+	areaCode := strings.TrimSpace(r.URL.Query().Get("area_code"))
 	role := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("role")))
 
 	// Directory scope (ADR 0022 Phase 4 — capability/area-aware, resolved at the

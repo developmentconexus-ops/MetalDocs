@@ -56,7 +56,7 @@ describe("useMembershipsQuery", () => {
     ];
     mockGet.mockResolvedValue({ data: { items }, error: undefined });
 
-    const { result } = renderHook(() => useMembershipsQuery({ areaCode: "QUA" }), {
+    const { result } = renderHook(() => useMembershipsQuery({ area_code: "QUA" }), {
       wrapper: wrapper(),
     });
 
@@ -64,7 +64,7 @@ describe("useMembershipsQuery", () => {
     expect(result.current.data?.items).toHaveLength(1);
     expect(result.current.data?.items[0].area_code).toBe("QUA");
     expect(mockGet).toHaveBeenCalledWith("/iam/area-memberships", {
-      params: { query: { areaCode: "QUA" } },
+      params: { query: { area_code: "QUA" } },
     });
   });
 

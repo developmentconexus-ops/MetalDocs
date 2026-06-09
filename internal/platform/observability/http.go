@@ -197,13 +197,13 @@ func normalizeRoute(path string) string {
 		return "/api/v1/workflow/documents/{documentId}/transitions"
 	}
 	if strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/roles") {
-		return "/api/v1/iam/users/{userId}/roles"
+		return "/api/v1/iam/users/{user_id}/roles"
 	}
 	if strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/reset-password") {
-		return "/api/v1/iam/users/{userId}/reset-password"
+		return "/api/v1/iam/users/{user_id}/reset-password"
 	}
 	if strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/unlock") {
-		return "/api/v1/iam/users/{userId}/unlock"
+		return "/api/v1/iam/users/{user_id}/unlock"
 	}
 	return path
 }

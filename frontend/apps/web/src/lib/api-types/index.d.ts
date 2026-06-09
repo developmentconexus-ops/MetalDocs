@@ -141,7 +141,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/iam/users/{userId}": {
+    "/iam/users/{user_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -158,7 +158,7 @@ export interface paths {
         patch: operations["patchUser"];
         trace?: never;
     };
-    "/iam/users/{userId}/reset-password": {
+    "/iam/users/{user_id}/reset-password": {
         parameters: {
             query?: never;
             header?: never;
@@ -175,7 +175,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/iam/users/{userId}/unlock": {
+    "/iam/users/{user_id}/unlock": {
         parameters: {
             query?: never;
             header?: never;
@@ -243,7 +243,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/iam/users/{userId}/memberships": {
+    "/iam/users/{user_id}/memberships": {
         parameters: {
             query?: never;
             header?: never;
@@ -379,7 +379,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/audit/events/export/{exportId}": {
+    "/audit/events/export/{export_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -396,7 +396,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/audit/events/export/{exportId}/download": {
+    "/audit/events/export/{export_id}/download": {
         parameters: {
             query?: never;
             header?: never;
@@ -430,7 +430,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/sessions/{sessionId}": {
+    "/auth/sessions/{session_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -532,7 +532,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/iam/users/{userId}/roles": {
+    "/iam/users/{user_id}/roles": {
         parameters: {
             query?: never;
             header?: never;
@@ -1506,7 +1506,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/documents/{id}/comments/{libraryID}": {
+    "/documents/{id}/comments/{library_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3193,9 +3193,9 @@ export interface operations {
     listUsers: {
         parameters: {
             query?: {
-                isActive?: boolean;
+                is_active?: boolean;
                 role?: components["schemas"]["UserRole"];
-                areaCode?: string;
+                area_code?: string;
                 /** @description Free-text search across displayName, username, email */
                 q?: string;
                 cursor?: string;
@@ -3255,7 +3255,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                userId: string;
+                user_id: string;
             };
             cookie?: never;
         };
@@ -3286,7 +3286,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                userId: string;
+                user_id: string;
             };
             cookie?: never;
         };
@@ -3316,7 +3316,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                userId: string;
+                user_id: string;
             };
             cookie?: never;
         };
@@ -3422,7 +3422,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                userId: string;
+                user_id: string;
             };
             cookie?: never;
         };
@@ -3614,7 +3614,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                exportId: string;
+                export_id: string;
             };
             cookie?: never;
         };
@@ -3642,7 +3642,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                exportId: string;
+                export_id: string;
             };
             cookie?: never;
         };
@@ -3667,8 +3667,8 @@ export interface operations {
     listSessions: {
         parameters: {
             query?: {
-                userId?: string;
-                isActive?: boolean;
+                user_id?: string;
+                is_active?: boolean;
                 cursor?: string;
                 limit?: number;
             };
@@ -3697,7 +3697,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                sessionId: string;
+                session_id: string;
             };
             cookie?: never;
         };
@@ -3788,12 +3788,12 @@ export interface operations {
     listAuditEvents: {
         parameters: {
             query?: {
-                actorId?: string;
+                actor_id?: string;
                 action?: string;
-                resourceType?: string;
-                resourceId?: string;
-                occurredAfter?: string;
-                occurredBefore?: string;
+                resource_type?: string;
+                resource_id?: string;
+                occurred_after?: string;
+                occurred_before?: string;
                 /** @description Free-text search on action / payload summary */
                 q?: string;
                 cursor?: string;
@@ -3824,15 +3824,15 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string;
-                ownerId?: string;
-                documentType?: "po" | "it" | "rg";
-                documentProfile?: string;
-                documentFamily?: string;
-                processArea?: string;
+                owner_id?: string;
+                document_type?: "po" | "it" | "rg";
+                document_profile?: string;
+                document_family?: string;
+                process_area?: string;
                 department?: string;
                 status?: string;
-                expiryBefore?: string;
-                expiryAfter?: string;
+                expiry_before?: string;
+                expiry_after?: string;
                 limit?: number;
             };
             header?: never;
@@ -3861,7 +3861,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                userId: string;
+                user_id: string;
             };
             cookie?: never;
         };
@@ -3891,7 +3891,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                userId: string;
+                user_id: string;
             };
             cookie?: never;
         };
@@ -3919,10 +3919,10 @@ export interface operations {
     listAreaMemberships: {
         parameters: {
             query?: {
-                /** @description Filter by target userId. System admins omitting userId receive the full tenant directory; non-admins are always scoped to their own memberships regardless of this value. */
-                userId?: string;
+                /** @description Filter by target user_id. System admins omitting user_id receive the full tenant directory; non-admins are always scoped to their own memberships regardless of this value. */
+                user_id?: string;
                 /** @description Optional exact-match filter on the process area code. */
-                areaCode?: string;
+                area_code?: string;
                 /** @description Optional exact-match filter on the membership role. */
                 role?: components["schemas"]["UserRole"];
             };
@@ -4952,7 +4952,7 @@ export interface operations {
     listTaxonomyFamilies: {
         parameters: {
             query?: {
-                includeInactive?: boolean;
+                include_inactive?: boolean;
             };
             header?: never;
             path?: never;
@@ -5082,10 +5082,10 @@ export interface operations {
     listControlledDocuments: {
         parameters: {
             query?: {
-                profileCode?: string;
-                processAreaCode?: string;
-                departmentCode?: string;
-                ownerUserId?: string;
+                profile_code?: string;
+                process_area_code?: string;
+                department_code?: string;
+                owner_user_id?: string;
                 q?: string;
                 status?: "active" | "obsolete" | "superseded";
                 /** @description Opaque forward keyset cursor from a prior page's page.next_cursor. */
@@ -5151,8 +5151,8 @@ export interface operations {
     previewControlledDocumentCode: {
         parameters: {
             query: {
-                profileCode: string;
-                areaCode: string;
+                profile_code: string;
+                area_code: string;
             };
             header?: never;
             path?: never;
@@ -5321,10 +5321,10 @@ export interface operations {
                 limit?: number;
                 /** @description CSV status filter, also accepts repeated query params */
                 status?: string;
-                areaCode?: string;
-                profileCode?: string;
+                area_code?: string;
+                profile_code?: string;
                 q?: string;
-                includeArchived?: boolean;
+                include_archived?: boolean;
             };
             header?: never;
             path?: never;
@@ -5528,8 +5528,8 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string;
-                areaCode?: string;
-                profileCode?: string;
+                area_code?: string;
+                profile_code?: string;
             };
             header?: never;
             path?: never;
@@ -5939,7 +5939,7 @@ export interface operations {
             header?: never;
             path: {
                 id: string;
-                libraryID: number;
+                library_id: number;
             };
             cookie?: never;
         };
@@ -5965,7 +5965,7 @@ export interface operations {
             header?: never;
             path: {
                 id: string;
-                libraryID: number;
+                library_id: number;
             };
             cookie?: never;
         };

@@ -328,11 +328,11 @@ func parseListQuery(r *http.Request, tenantID string) (domain.ListEventsQuery, *
 	// through unchanged.
 	limit = pagination.ClampLimit(limit)
 
-	occurredAfter, perr := parseTime("occurredAfter", q.Get("occurredAfter"))
+	occurredAfter, perr := parseTime("occurred_after", q.Get("occurred_after"))
 	if perr != nil {
 		return domain.ListEventsQuery{}, perr
 	}
-	occurredBefore, perr := parseTime("occurredBefore", q.Get("occurredBefore"))
+	occurredBefore, perr := parseTime("occurred_before", q.Get("occurred_before"))
 	if perr != nil {
 		return domain.ListEventsQuery{}, perr
 	}
@@ -344,9 +344,9 @@ func parseListQuery(r *http.Request, tenantID string) (domain.ListEventsQuery, *
 
 	return domain.ListEventsQuery{
 		TenantID:       tenantID,
-		ResourceType:   strings.TrimSpace(q.Get("resourceType")),
-		ResourceID:     strings.TrimSpace(q.Get("resourceId")),
-		ActorID:        strings.TrimSpace(q.Get("actorId")),
+		ResourceType:   strings.TrimSpace(q.Get("resource_type")),
+		ResourceID:     strings.TrimSpace(q.Get("resource_id")),
+		ActorID:        strings.TrimSpace(q.Get("actor_id")),
 		Action:         strings.TrimSpace(q.Get("action")),
 		Query:          strings.TrimSpace(q.Get("q")),
 		OccurredAfter:  occurredAfter,

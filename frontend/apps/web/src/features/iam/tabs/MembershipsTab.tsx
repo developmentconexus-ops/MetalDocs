@@ -74,7 +74,7 @@ export default function MembershipsTab() {
   const [revokeTarget, setRevokeTarget] = useState<MembershipRow | null>(null);
 
   const membershipsQuery = useMembershipsQuery({
-    areaCode: filterValue.areaCode,
+    area_code: filterValue.areaCode,
     role: filterValue.role,
   });
   const usersQuery = useUsersQuery({ limit: USERS_LIMIT });

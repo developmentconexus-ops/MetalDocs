@@ -11,8 +11,8 @@ export function usePatchUserMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, body }: PatchUserVariables) => {
-      const { data, error } = await api.PATCH("/iam/users/{userId}", {
-        params: { path: { userId } },
+      const { data, error } = await api.PATCH("/iam/users/{user_id}", {
+        params: { path: { user_id: userId } },
         body,
       });
       if (error) throw error;

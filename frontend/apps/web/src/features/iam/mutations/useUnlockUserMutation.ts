@@ -15,8 +15,8 @@ export function useUnlockUserMutation() {
   const qc = useQueryClient();
   return useMutation<unknown, Error, string, Context>({
     mutationFn: async (userId: string) => {
-      const { data, error } = await api.POST("/iam/users/{userId}/unlock", {
-        params: { path: { userId } },
+      const { data, error } = await api.POST("/iam/users/{user_id}/unlock", {
+        params: { path: { user_id: userId } },
       });
       if (error) throw error;
       return data;

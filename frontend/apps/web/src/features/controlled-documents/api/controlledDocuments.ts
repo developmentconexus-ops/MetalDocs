@@ -12,8 +12,8 @@ export async function fetchControlledDocuments(filter?: {
   cursor?: string;
 }): Promise<ControlledDocument[]> {
   const params = new URLSearchParams();
-  if (filter?.profileCode) params.set("profileCode", filter.profileCode);
-  if (filter?.processAreaCode) params.set("processAreaCode", filter.processAreaCode);
+  if (filter?.profileCode) params.set("profile_code", filter.profileCode);
+  if (filter?.processAreaCode) params.set("process_area_code", filter.processAreaCode);
   if (filter?.status) params.set("status", filter.status);
   if (filter?.limit != null) params.set("limit", String(filter.limit));
   if (filter?.cursor) params.set("cursor", filter.cursor);
@@ -68,7 +68,7 @@ export async function previewCode(
   profileCode: string,
   areaCode: string,
 ): Promise<PreviewCodeResponse> {
-  const qs = new URLSearchParams({ profileCode, areaCode }).toString();
+  const qs = new URLSearchParams({ profile_code: profileCode, area_code: areaCode }).toString();
   return apiFetch<PreviewCodeResponse>(`${BASE}/preview-code?${qs}`);
 }
 

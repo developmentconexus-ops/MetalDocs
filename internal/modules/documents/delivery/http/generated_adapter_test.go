@@ -41,7 +41,7 @@ func TestGeneratedServerAdapter_ForwardsToLegacyMux(t *testing.T) {
 			name:    "UpdateDocumentComment",
 			method:  http.MethodPatch,
 			path:    "/api/v1/documents/11111111-1111-4111-8111-111111111111/comments/7",
-			pattern: "PATCH /api/v1/documents/{id}/comments/{libraryID}",
+			pattern: "PATCH /api/v1/documents/{id}/comments/{library_id}",
 			invoke: func(a *GeneratedServerAdapter, w http.ResponseWriter, r *http.Request) {
 				var id openapi_types.UUID
 				a.UpdateDocumentComment(w, r, id, 7)

@@ -8,8 +8,8 @@ export function useUserMembershipsQuery(userId: string) {
   return useQuery({
     queryKey: QK.iam.userMemberships(userId),
     queryFn: async () => {
-      const { data, error } = await api.GET("/iam/users/{userId}/memberships", {
-        params: { path: { userId } },
+      const { data, error } = await api.GET("/iam/users/{user_id}/memberships", {
+        params: { path: { user_id: userId } },
       });
       if (error) throw error;
       return data;

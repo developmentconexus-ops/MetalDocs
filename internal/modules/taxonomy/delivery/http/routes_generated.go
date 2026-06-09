@@ -57,9 +57,9 @@ func (h *Handler) ListTaxonomyFamilies(w http.ResponseWriter, r *http.Request, p
 	if params.IncludeInactive != nil {
 		q, _ := url.ParseQuery(r.URL.RawQuery)
 		if *params.IncludeInactive {
-			q.Set("includeInactive", "true")
+			q.Set("include_inactive", "true")
 		} else {
-			q.Set("includeInactive", "false")
+			q.Set("include_inactive", "false")
 		}
 		r.URL.RawQuery = q.Encode()
 	}

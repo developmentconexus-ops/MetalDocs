@@ -257,5 +257,5 @@ func tenantIDFromRequest(r *http.Request) (string, error) {
 }
 
 func parseIncludeArchived(r *http.Request) (bool, error) {
-	return parseBool(r.URL.Query().Get("includeArchived"))
+	return parseBool(r.URL.Query().Get("include_archived"))
 }

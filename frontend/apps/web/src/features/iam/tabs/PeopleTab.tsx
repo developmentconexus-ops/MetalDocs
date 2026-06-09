@@ -91,8 +91,8 @@ export default function PeopleTab() {
     limit,
     q: q.trim() || undefined,
     role: filterValue.role,
-    areaCode: filterValue.area,
-    isActive: serverIsActive,
+    area_code: filterValue.area,
+    is_active: serverIsActive,
   });
 
   const bulkMutation = useBulkUsersMutation();

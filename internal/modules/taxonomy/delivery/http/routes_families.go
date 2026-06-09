@@ -18,9 +18,9 @@ type familyUpsertRequest struct {
 }
 
 func (h *Handler) listFamilies(w http.ResponseWriter, r *http.Request) {
-	includeInactive, err := parseBool(r.URL.Query().Get("includeInactive"))
+	includeInactive, err := parseBool(r.URL.Query().Get("include_inactive"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "includeInactive must be true or false")
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "include_inactive must be true or false")
 		return
 	}
 	items, err := h.families.List(r.Context(), includeInactive)

@@ -84,7 +84,7 @@ func TestHandleSearchDocumentsPassesTenantContext(t *testing.T) {
 func TestHandleSearchDocumentsMapsAdvertisedFilters(t *testing.T) {
 	reader := &handlerStubReader{}
 	h := NewHandler(searchapp.NewService(reader))
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/search/documents?q=manual&documentType=po&documentProfile=qa-doc&documentFamily=sop&processArea=quality&ownerId=user-42&department=qa&status=ARCHIVED&expiryBefore=2026-12-01T00:00:00Z&expiryAfter=2026-01-01T00:00:00Z&limit=7&subject=deviation&businessUnit=ops&classification=INTERNAL&tag=tag-a", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/search/documents?q=manual&document_type=po&document_profile=qa-doc&document_family=sop&process_area=quality&owner_id=user-42&department=qa&status=ARCHIVED&expiry_before=2026-12-01T00:00:00Z&expiry_after=2026-01-01T00:00:00Z&limit=7&subject=deviation&businessUnit=ops&classification=INTERNAL&tag=tag-a", nil)
 	ctx := iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{iamdomain.RoleViewer})
 	ctx = tenant.WithTenantID(ctx, "tenant-1")
 	req = req.WithContext(ctx)

@@ -778,12 +778,12 @@ type sessionCookieContextKey string
 
 // ListAuditEventsParams defines parameters for ListAuditEvents.
 type ListAuditEventsParams struct {
-	ActorId        *string    `form:"actorId,omitempty" json:"actorId,omitempty"`
+	ActorId        *string    `form:"actor_id,omitempty" json:"actor_id,omitempty"`
 	Action         *string    `form:"action,omitempty" json:"action,omitempty"`
-	ResourceType   *string    `form:"resourceType,omitempty" json:"resourceType,omitempty"`
-	ResourceId     *string    `form:"resourceId,omitempty" json:"resourceId,omitempty"`
-	OccurredAfter  *time.Time `form:"occurredAfter,omitempty" json:"occurredAfter,omitempty"`
-	OccurredBefore *time.Time `form:"occurredBefore,omitempty" json:"occurredBefore,omitempty"`
+	ResourceType   *string    `form:"resource_type,omitempty" json:"resource_type,omitempty"`
+	ResourceId     *string    `form:"resource_id,omitempty" json:"resource_id,omitempty"`
+	OccurredAfter  *time.Time `form:"occurred_after,omitempty" json:"occurred_after,omitempty"`
+	OccurredBefore *time.Time `form:"occurred_before,omitempty" json:"occurred_before,omitempty"`
 
 	// Q Free-text search on action / payload summary
 	Q      *string `form:"q,omitempty" json:"q,omitempty"`
@@ -798,19 +798,19 @@ type DownloadAuditExportParams struct {
 
 // ListSessionsParams defines parameters for ListSessions.
 type ListSessionsParams struct {
-	UserId   *string `form:"userId,omitempty" json:"userId,omitempty"`
-	IsActive *bool   `form:"isActive,omitempty" json:"isActive,omitempty"`
+	UserId   *string `form:"user_id,omitempty" json:"user_id,omitempty"`
+	IsActive *bool   `form:"is_active,omitempty" json:"is_active,omitempty"`
 	Cursor   *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 	Limit    *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListAreaMembershipsParams defines parameters for ListAreaMemberships.
 type ListAreaMembershipsParams struct {
-	// UserId Filter by target userId. System admins omitting userId receive the full tenant directory; non-admins are always scoped to their own memberships regardless of this value.
-	UserId *string `form:"userId,omitempty" json:"userId,omitempty"`
+	// UserId Filter by target user_id. System admins omitting user_id receive the full tenant directory; non-admins are always scoped to their own memberships regardless of this value.
+	UserId *string `form:"user_id,omitempty" json:"user_id,omitempty"`
 
 	// AreaCode Optional exact-match filter on the process area code.
-	AreaCode *string `form:"areaCode,omitempty" json:"areaCode,omitempty"`
+	AreaCode *string `form:"area_code,omitempty" json:"area_code,omitempty"`
 
 	// Role Optional exact-match filter on the membership role.
 	Role *UserRole `form:"role,omitempty" json:"role,omitempty"`
@@ -818,9 +818,9 @@ type ListAreaMembershipsParams struct {
 
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
-	IsActive *bool     `form:"isActive,omitempty" json:"isActive,omitempty"`
+	IsActive *bool     `form:"is_active,omitempty" json:"is_active,omitempty"`
 	Role     *UserRole `form:"role,omitempty" json:"role,omitempty"`
-	AreaCode *string   `form:"areaCode,omitempty" json:"areaCode,omitempty"`
+	AreaCode *string   `form:"area_code,omitempty" json:"area_code,omitempty"`
 
 	// Q Free-text search across displayName, username, email
 	Q      *string `form:"q,omitempty" json:"q,omitempty"`
@@ -864,16 +864,16 @@ type ServerInterface interface {
 	// (POST /audit/events/export)
 	ExportAuditEvents(w http.ResponseWriter, r *http.Request)
 	// Read the status of an audit export job
-	// (GET /audit/events/export/{exportId})
+	// (GET /audit/events/export/{export_id})
 	GetAuditExportStatus(w http.ResponseWriter, r *http.Request, exportId string)
 	// Download the rendered audit export payload via a signed token
-	// (GET /audit/events/export/{exportId}/download)
+	// (GET /audit/events/export/{export_id}/download)
 	DownloadAuditExport(w http.ResponseWriter, r *http.Request, exportId string, params DownloadAuditExportParams)
 	// List active sessions in the current tenant
 	// (GET /auth/sessions)
 	ListSessions(w http.ResponseWriter, r *http.Request, params ListSessionsParams)
 	// Revoke (force-logout) a specific session. Gate CapSessionManage.
-	// (DELETE /auth/sessions/{sessionId})
+	// (DELETE /auth/sessions/{session_id})
 	RevokeSession(w http.ResponseWriter, r *http.Request, sessionId string)
 	// Composed Admin Center overview (KPI strip + presence + recent activity)
 	// (GET /iam/admin/overview)
@@ -918,22 +918,22 @@ type ServerInterface interface {
 	// (POST /iam/users/invite)
 	InviteUser(w http.ResponseWriter, r *http.Request)
 	// Atomic metadata + tenant role update (single tx)
-	// (PATCH /iam/users/{userId})
+	// (PATCH /iam/users/{user_id})
 	PatchUser(w http.ResponseWriter, r *http.Request, userId string)
 	// List area memberships for a user
-	// (GET /iam/users/{userId}/memberships)
+	// (GET /iam/users/{user_id}/memberships)
 	ListMemberships(w http.ResponseWriter, r *http.Request, userId string)
 	// Admin password reset (forces must-change-on-first-login)
-	// (POST /iam/users/{userId}/reset-password)
+	// (POST /iam/users/{user_id}/reset-password)
 	ResetPassword(w http.ResponseWriter, r *http.Request, userId string)
 	// Cria/atualiza usuario IAM e atribui role
-	// (POST /iam/users/{userId}/roles)
+	// (POST /iam/users/{user_id}/roles)
 	UpsertUserRole(w http.ResponseWriter, r *http.Request, userId string)
 	// Reconcilia o conjunto de roles de um usuario interno
-	// (PUT /iam/users/{userId}/roles)
+	// (PUT /iam/users/{user_id}/roles)
 	ReplaceUserRoles(w http.ResponseWriter, r *http.Request, userId string)
 	// Clear operational lock + failed-login counter for a user
-	// (POST /iam/users/{userId}/unlock)
+	// (POST /iam/users/{user_id}/unlock)
 	UnlockUser(w http.ResponseWriter, r *http.Request, userId string)
 	// Current account lockouts (locked-until window)
 	// (GET /security/lockouts)
@@ -970,15 +970,15 @@ func (siw *ServerInterfaceWrapper) ListAuditEvents(w http.ResponseWriter, r *htt
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListAuditEventsParams
 
-	// ------------- Optional query parameter "actorId" -------------
+	// ------------- Optional query parameter "actor_id" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "actorId", r.URL.Query(), &params.ActorId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actor_id", r.URL.Query(), &params.ActorId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actorId"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor_id"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actorId", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor_id", Err: err})
 		}
 		return
 	}
@@ -996,54 +996,54 @@ func (siw *ServerInterfaceWrapper) ListAuditEvents(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// ------------- Optional query parameter "resourceType" -------------
+	// ------------- Optional query parameter "resource_type" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceType", r.URL.Query(), &params.ResourceType, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resource_type", r.URL.Query(), &params.ResourceType, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceType"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resource_type"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceType", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resource_type", Err: err})
 		}
 		return
 	}
 
-	// ------------- Optional query parameter "resourceId" -------------
+	// ------------- Optional query parameter "resource_id" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "resourceId", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "resource_id", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resourceId"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resource_id"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resourceId", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resource_id", Err: err})
 		}
 		return
 	}
 
-	// ------------- Optional query parameter "occurredAfter" -------------
+	// ------------- Optional query parameter "occurred_after" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "occurredAfter", r.URL.Query(), &params.OccurredAfter, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "occurred_after", r.URL.Query(), &params.OccurredAfter, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "occurredAfter"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "occurred_after"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "occurredAfter", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "occurred_after", Err: err})
 		}
 		return
 	}
 
-	// ------------- Optional query parameter "occurredBefore" -------------
+	// ------------- Optional query parameter "occurred_before" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "occurredBefore", r.URL.Query(), &params.OccurredBefore, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "occurred_before", r.URL.Query(), &params.OccurredBefore, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "occurredBefore"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "occurred_before"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "occurredBefore", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "occurred_before", Err: err})
 		}
 		return
 	}
@@ -1124,12 +1124,12 @@ func (siw *ServerInterfaceWrapper) GetAuditExportStatus(w http.ResponseWriter, r
 	var err error
 	_ = err
 
-	// ------------- Path parameter "exportId" -------------
+	// ------------- Path parameter "export_id" -------------
 	var exportId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "exportId", r.PathValue("exportId"), &exportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "export_id", r.PathValue("export_id"), &exportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "exportId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "export_id", Err: err})
 		return
 	}
 
@@ -1156,12 +1156,12 @@ func (siw *ServerInterfaceWrapper) DownloadAuditExport(w http.ResponseWriter, r 
 	var err error
 	_ = err
 
-	// ------------- Path parameter "exportId" -------------
+	// ------------- Path parameter "export_id" -------------
 	var exportId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "exportId", r.PathValue("exportId"), &exportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "export_id", r.PathValue("export_id"), &exportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "exportId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "export_id", Err: err})
 		return
 	}
 
@@ -1213,28 +1213,28 @@ func (siw *ServerInterfaceWrapper) ListSessions(w http.ResponseWriter, r *http.R
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListSessionsParams
 
-	// ------------- Optional query parameter "userId" -------------
+	// ------------- Optional query parameter "user_id" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "userId", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "userId"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
 		}
 		return
 	}
 
-	// ------------- Optional query parameter "isActive" -------------
+	// ------------- Optional query parameter "is_active" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "isActive", r.URL.Query(), &params.IsActive, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "is_active", r.URL.Query(), &params.IsActive, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "isActive"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "is_active"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "isActive", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "is_active", Err: err})
 		}
 		return
 	}
@@ -1282,12 +1282,12 @@ func (siw *ServerInterfaceWrapper) RevokeSession(w http.ResponseWriter, r *http.
 	var err error
 	_ = err
 
-	// ------------- Path parameter "sessionId" -------------
+	// ------------- Path parameter "session_id" -------------
 	var sessionId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", r.PathValue("sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "session_id", r.PathValue("session_id"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "session_id", Err: err})
 		return
 	}
 
@@ -1343,28 +1343,28 @@ func (siw *ServerInterfaceWrapper) ListAreaMemberships(w http.ResponseWriter, r 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListAreaMembershipsParams
 
-	// ------------- Optional query parameter "userId" -------------
+	// ------------- Optional query parameter "user_id" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "userId", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "user_id", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "userId"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
 		}
 		return
 	}
 
-	// ------------- Optional query parameter "areaCode" -------------
+	// ------------- Optional query parameter "area_code" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "areaCode", r.URL.Query(), &params.AreaCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "area_code", r.URL.Query(), &params.AreaCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "areaCode"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "area_code"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "areaCode", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "area_code", Err: err})
 		}
 		return
 	}
@@ -1589,15 +1589,15 @@ func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Requ
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListUsersParams
 
-	// ------------- Optional query parameter "isActive" -------------
+	// ------------- Optional query parameter "is_active" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "isActive", r.URL.Query(), &params.IsActive, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "is_active", r.URL.Query(), &params.IsActive, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "isActive"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "is_active"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "isActive", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "is_active", Err: err})
 		}
 		return
 	}
@@ -1615,15 +1615,15 @@ func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// ------------- Optional query parameter "areaCode" -------------
+	// ------------- Optional query parameter "area_code" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "areaCode", r.URL.Query(), &params.AreaCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "area_code", r.URL.Query(), &params.AreaCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "areaCode"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "area_code"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "areaCode", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "area_code", Err: err})
 		}
 		return
 	}
@@ -1744,12 +1744,12 @@ func (siw *ServerInterfaceWrapper) PatchUser(w http.ResponseWriter, r *http.Requ
 	var err error
 	_ = err
 
-	// ------------- Path parameter "userId" -------------
+	// ------------- Path parameter "user_id" -------------
 	var userId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
 		return
 	}
 
@@ -1776,12 +1776,12 @@ func (siw *ServerInterfaceWrapper) ListMemberships(w http.ResponseWriter, r *htt
 	var err error
 	_ = err
 
-	// ------------- Path parameter "userId" -------------
+	// ------------- Path parameter "user_id" -------------
 	var userId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
 		return
 	}
 
@@ -1808,12 +1808,12 @@ func (siw *ServerInterfaceWrapper) ResetPassword(w http.ResponseWriter, r *http.
 	var err error
 	_ = err
 
-	// ------------- Path parameter "userId" -------------
+	// ------------- Path parameter "user_id" -------------
 	var userId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
 		return
 	}
 
@@ -1840,12 +1840,12 @@ func (siw *ServerInterfaceWrapper) UpsertUserRole(w http.ResponseWriter, r *http
 	var err error
 	_ = err
 
-	// ------------- Path parameter "userId" -------------
+	// ------------- Path parameter "user_id" -------------
 	var userId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
 		return
 	}
 
@@ -1872,12 +1872,12 @@ func (siw *ServerInterfaceWrapper) ReplaceUserRoles(w http.ResponseWriter, r *ht
 	var err error
 	_ = err
 
-	// ------------- Path parameter "userId" -------------
+	// ------------- Path parameter "user_id" -------------
 	var userId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
 		return
 	}
 
@@ -1904,12 +1904,12 @@ func (siw *ServerInterfaceWrapper) UnlockUser(w http.ResponseWriter, r *http.Req
 	var err error
 	_ = err
 
-	// ------------- Path parameter "userId" -------------
+	// ------------- Path parameter "user_id" -------------
 	var userId string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
 		return
 	}
 
@@ -2112,10 +2112,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events", wrapper.ListAuditEvents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/audit/events/export", wrapper.ExportAuditEvents)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events/export/{exportId}", wrapper.GetAuditExportStatus)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events/export/{exportId}/download", wrapper.DownloadAuditExport)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events/export/{export_id}", wrapper.GetAuditExportStatus)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events/export/{export_id}/download", wrapper.DownloadAuditExport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/sessions", wrapper.ListSessions)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/auth/sessions/{sessionId}", wrapper.RevokeSession)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/auth/sessions/{session_id}", wrapper.RevokeSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/iam/admin/overview", wrapper.GetIamAdminOverview)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/iam/area-memberships", wrapper.ListAreaMemberships)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/area-memberships", wrapper.GrantAreaMembership)
@@ -2130,12 +2130,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users", wrapper.CreateManagedUser)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users/bulk", wrapper.BulkUsers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users/invite", wrapper.InviteUser)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/iam/users/{userId}", wrapper.PatchUser)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/iam/users/{userId}/memberships", wrapper.ListMemberships)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users/{userId}/reset-password", wrapper.ResetPassword)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users/{userId}/roles", wrapper.UpsertUserRole)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/iam/users/{userId}/roles", wrapper.ReplaceUserRoles)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users/{userId}/unlock", wrapper.UnlockUser)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/iam/users/{user_id}", wrapper.PatchUser)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/iam/users/{user_id}/memberships", wrapper.ListMemberships)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users/{user_id}/reset-password", wrapper.ResetPassword)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users/{user_id}/roles", wrapper.UpsertUserRole)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/iam/users/{user_id}/roles", wrapper.ReplaceUserRoles)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users/{user_id}/unlock", wrapper.UnlockUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/security/lockouts", wrapper.ListLockouts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/security/mfa-coverage", wrapper.GetMfaCoverage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/security/signals", wrapper.ListSecuritySignals)
@@ -2328,7 +2328,7 @@ func (response ExportAuditEvents500ApplicationProblemPlusJSONResponse) VisitExpo
 }
 
 type GetAuditExportStatusRequestObject struct {
-	ExportId string `json:"exportId"`
+	ExportId string `json:"export_id"`
 }
 
 type GetAuditExportStatusResponseObject interface {
@@ -2414,7 +2414,7 @@ func (response GetAuditExportStatus500ApplicationProblemPlusJSONResponse) VisitG
 }
 
 type DownloadAuditExportRequestObject struct {
-	ExportId string `json:"exportId"`
+	ExportId string `json:"export_id"`
 	Params   DownloadAuditExportParams
 }
 
@@ -2593,7 +2593,7 @@ func (response ListSessions500ApplicationProblemPlusJSONResponse) VisitListSessi
 }
 
 type RevokeSessionRequestObject struct {
-	SessionId string `json:"sessionId"`
+	SessionId string `json:"session_id"`
 }
 
 type RevokeSessionResponseObject interface {
@@ -3833,7 +3833,7 @@ func (response InviteUser500ApplicationProblemPlusJSONResponse) VisitInviteUserR
 }
 
 type PatchUserRequestObject struct {
-	UserId string `json:"userId"`
+	UserId string `json:"user_id"`
 	Body   *PatchUserJSONRequestBody
 }
 
@@ -3936,7 +3936,7 @@ func (response PatchUser500ApplicationProblemPlusJSONResponse) VisitPatchUserRes
 }
 
 type ListMembershipsRequestObject struct {
-	UserId string `json:"userId"`
+	UserId string `json:"user_id"`
 }
 
 type ListMembershipsResponseObject interface {
@@ -4022,7 +4022,7 @@ func (response ListMemberships500ApplicationProblemPlusJSONResponse) VisitListMe
 }
 
 type ResetPasswordRequestObject struct {
-	UserId string `json:"userId"`
+	UserId string `json:"user_id"`
 	Body   *ResetPasswordJSONRequestBody
 }
 
@@ -4109,7 +4109,7 @@ func (response ResetPassword500ApplicationProblemPlusJSONResponse) VisitResetPas
 }
 
 type UpsertUserRoleRequestObject struct {
-	UserId string `json:"userId"`
+	UserId string `json:"user_id"`
 	Body   *UpsertUserRoleJSONRequestBody
 }
 
@@ -4196,7 +4196,7 @@ func (response UpsertUserRole500ApplicationProblemPlusJSONResponse) VisitUpsertU
 }
 
 type ReplaceUserRolesRequestObject struct {
-	UserId string `json:"userId"`
+	UserId string `json:"user_id"`
 	Body   *ReplaceUserRolesJSONRequestBody
 }
 
@@ -4283,7 +4283,7 @@ func (response ReplaceUserRoles500ApplicationProblemPlusJSONResponse) VisitRepla
 }
 
 type UnlockUserRequestObject struct {
-	UserId string `json:"userId"`
+	UserId string `json:"user_id"`
 }
 
 type UnlockUserResponseObject interface {
@@ -4584,16 +4584,16 @@ type StrictServerInterface interface {
 	// (POST /audit/events/export)
 	ExportAuditEvents(ctx context.Context, request ExportAuditEventsRequestObject) (ExportAuditEventsResponseObject, error)
 	// Read the status of an audit export job
-	// (GET /audit/events/export/{exportId})
+	// (GET /audit/events/export/{export_id})
 	GetAuditExportStatus(ctx context.Context, request GetAuditExportStatusRequestObject) (GetAuditExportStatusResponseObject, error)
 	// Download the rendered audit export payload via a signed token
-	// (GET /audit/events/export/{exportId}/download)
+	// (GET /audit/events/export/{export_id}/download)
 	DownloadAuditExport(ctx context.Context, request DownloadAuditExportRequestObject) (DownloadAuditExportResponseObject, error)
 	// List active sessions in the current tenant
 	// (GET /auth/sessions)
 	ListSessions(ctx context.Context, request ListSessionsRequestObject) (ListSessionsResponseObject, error)
 	// Revoke (force-logout) a specific session. Gate CapSessionManage.
-	// (DELETE /auth/sessions/{sessionId})
+	// (DELETE /auth/sessions/{session_id})
 	RevokeSession(ctx context.Context, request RevokeSessionRequestObject) (RevokeSessionResponseObject, error)
 	// Composed Admin Center overview (KPI strip + presence + recent activity)
 	// (GET /iam/admin/overview)
@@ -4638,22 +4638,22 @@ type StrictServerInterface interface {
 	// (POST /iam/users/invite)
 	InviteUser(ctx context.Context, request InviteUserRequestObject) (InviteUserResponseObject, error)
 	// Atomic metadata + tenant role update (single tx)
-	// (PATCH /iam/users/{userId})
+	// (PATCH /iam/users/{user_id})
 	PatchUser(ctx context.Context, request PatchUserRequestObject) (PatchUserResponseObject, error)
 	// List area memberships for a user
-	// (GET /iam/users/{userId}/memberships)
+	// (GET /iam/users/{user_id}/memberships)
 	ListMemberships(ctx context.Context, request ListMembershipsRequestObject) (ListMembershipsResponseObject, error)
 	// Admin password reset (forces must-change-on-first-login)
-	// (POST /iam/users/{userId}/reset-password)
+	// (POST /iam/users/{user_id}/reset-password)
 	ResetPassword(ctx context.Context, request ResetPasswordRequestObject) (ResetPasswordResponseObject, error)
 	// Cria/atualiza usuario IAM e atribui role
-	// (POST /iam/users/{userId}/roles)
+	// (POST /iam/users/{user_id}/roles)
 	UpsertUserRole(ctx context.Context, request UpsertUserRoleRequestObject) (UpsertUserRoleResponseObject, error)
 	// Reconcilia o conjunto de roles de um usuario interno
-	// (PUT /iam/users/{userId}/roles)
+	// (PUT /iam/users/{user_id}/roles)
 	ReplaceUserRoles(ctx context.Context, request ReplaceUserRolesRequestObject) (ReplaceUserRolesResponseObject, error)
 	// Clear operational lock + failed-login counter for a user
-	// (POST /iam/users/{userId}/unlock)
+	// (POST /iam/users/{user_id}/unlock)
 	UnlockUser(ctx context.Context, request UnlockUserRequestObject) (UnlockUserResponseObject, error)
 	// Current account lockouts (locked-until window)
 	// (GET /security/lockouts)
@@ -5489,115 +5489,114 @@ func (sh *strictHandler) ListSecuritySignals(w http.ResponseWriter, r *http.Requ
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
-	"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",
-	"AP//",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

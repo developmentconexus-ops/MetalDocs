@@ -135,8 +135,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/documents/{id}/revisions/{rid}/url", h.signedRevisionURL)
 	mux.HandleFunc("GET /api/v1/documents/{id}/comments", h.listComments)
 	mux.HandleFunc("POST /api/v1/documents/{id}/comments", h.createComment)
-	mux.HandleFunc("PATCH /api/v1/documents/{id}/comments/{libraryID}", h.updateComment)
-	mux.HandleFunc("DELETE /api/v1/documents/{id}/comments/{libraryID}", h.deleteComment)
+	mux.HandleFunc("PATCH /api/v1/documents/{id}/comments/{library_id}", h.updateComment)
+	mux.HandleFunc("DELETE /api/v1/documents/{id}/comments/{library_id}", h.deleteComment)
 }
 
 func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
@@ -171,8 +171,8 @@ func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.
 	mux.HandleFunc("GET /api/v1/documents/{id}/revisions/{rid}/url", h.signedRevisionURL)
 	mux.HandleFunc("GET /api/v1/documents/{id}/comments", h.listComments)
 	mux.HandleFunc("POST /api/v1/documents/{id}/comments", h.createComment)
-	mux.HandleFunc("PATCH /api/v1/documents/{id}/comments/{libraryID}", h.updateComment)
-	mux.HandleFunc("DELETE /api/v1/documents/{id}/comments/{libraryID}", h.deleteComment)
+	mux.HandleFunc("PATCH /api/v1/documents/{id}/comments/{library_id}", h.updateComment)
+	mux.HandleFunc("DELETE /api/v1/documents/{id}/comments/{library_id}", h.deleteComment)
 }
 
 func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
@@ -291,15 +291,15 @@ func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (appli
 		opts.Status = statuses
 	}
 
-	opts.AreaCode = strings.TrimSpace(query.Get("areaCode"))
-	opts.ProfileCode = strings.TrimSpace(query.Get("profileCode"))
+	opts.AreaCode = strings.TrimSpace(query.Get("area_code"))
+	opts.ProfileCode = strings.TrimSpace(query.Get("profile_code"))
 	opts.Q = strings.TrimSpace(query.Get("q"))
 
-	includeArchived := strings.TrimSpace(query.Get("includeArchived"))
+	includeArchived := strings.TrimSpace(query.Get("include_archived"))
 	if includeArchived != "" {
 		v, err := strconv.ParseBool(includeArchived)
 		if err != nil {
-			return opts, "", errors.New("includeArchived must be a valid boolean")
+			return opts, "", errors.New("include_archived must be a valid boolean")
 		}
 		opts.IncludeArchived = v
 	}
@@ -1029,7 +1029,7 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	libraryID, err := strconv.Atoi(r.PathValue("libraryID"))
+	libraryID, err := strconv.Atoi(r.PathValue("library_id"))
 	if err != nil {
 		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
@@ -1063,7 +1063,7 @@ func (h *Handler) deleteComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	libraryID, err := strconv.Atoi(r.PathValue("libraryID"))
+	libraryID, err := strconv.Atoi(r.PathValue("library_id"))
 	if err != nil {
 		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return

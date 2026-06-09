@@ -32,6 +32,10 @@ func TestRules(t *testing.T) {
 		{name: "missing_cursor", spec: "missing_cursor.openapi.yaml", want: []wantViolation{{Rule: "PAGINATION-DRIFT", MessageContains: "missing query param cursor"}}},
 		{name: "casing_bad", spec: "casing_bad.openapi.yaml", want: []wantViolation{{Rule: "CASING-DRIFT", MessageContains: "is not snake_case"}}},
 		{name: "casing_exempt_good", spec: "casing_exempt_good.openapi.yaml"},
+		// Parameter-name casing (Family 5): a camelCase query/path param is drift; a
+		// snake param is clean, and header params are skipped (kebab/Pascal allowed).
+		{name: "casing_param_bad", spec: "casing_param_bad.openapi.yaml", want: []wantViolation{{Rule: "CASING-DRIFT", MessageContains: `query parameter "includeArchived" is not snake_case`}}},
+		{name: "casing_param_good", spec: "casing_param_good.openapi.yaml"},
 		{name: "missing_security", spec: "missing_security.openapi.yaml", want: []wantViolation{{Rule: "AUTHZ-DRIFT", MessageContains: "missing security declaration"}}},
 		{name: "global_security_good", spec: "global_security_good.openapi.yaml"},
 		{name: "state_transition_no_area", spec: "state_transition_no_area.openapi.yaml", want: []wantViolation{{Rule: "AUTHZ-DRIFT", MessageContains: "state-transition op"}}},

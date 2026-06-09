@@ -264,10 +264,10 @@ type sessionCookieContextKey string
 
 // ListControlledDocumentsParams defines parameters for ListControlledDocuments.
 type ListControlledDocumentsParams struct {
-	ProfileCode     *string                              `form:"profileCode,omitempty" json:"profileCode,omitempty"`
-	ProcessAreaCode *string                              `form:"processAreaCode,omitempty" json:"processAreaCode,omitempty"`
-	DepartmentCode  *string                              `form:"departmentCode,omitempty" json:"departmentCode,omitempty"`
-	OwnerUserId     *string                              `form:"ownerUserId,omitempty" json:"ownerUserId,omitempty"`
+	ProfileCode     *string                              `form:"profile_code,omitempty" json:"profile_code,omitempty"`
+	ProcessAreaCode *string                              `form:"process_area_code,omitempty" json:"process_area_code,omitempty"`
+	DepartmentCode  *string                              `form:"department_code,omitempty" json:"department_code,omitempty"`
+	OwnerUserId     *string                              `form:"owner_user_id,omitempty" json:"owner_user_id,omitempty"`
 	Q               *string                              `form:"q,omitempty" json:"q,omitempty"`
 	Status          *ListControlledDocumentsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
 
@@ -286,8 +286,8 @@ type AtomicCreateControlledDocumentParams struct {
 
 // PreviewControlledDocumentCodeParams defines parameters for PreviewControlledDocumentCode.
 type PreviewControlledDocumentCodeParams struct {
-	ProfileCode string `form:"profileCode" json:"profileCode"`
-	AreaCode    string `form:"areaCode" json:"areaCode"`
+	ProfileCode string `form:"profile_code" json:"profile_code"`
+	AreaCode    string `form:"area_code" json:"area_code"`
 }
 
 // CreateControlledDocumentRevisionParams defines parameters for CreateControlledDocumentRevision.
@@ -353,54 +353,54 @@ func (siw *ServerInterfaceWrapper) ListControlledDocuments(w http.ResponseWriter
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListControlledDocumentsParams
 
-	// ------------- Optional query parameter "profileCode" -------------
+	// ------------- Optional query parameter "profile_code" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "profileCode", r.URL.Query(), &params.ProfileCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "profile_code", r.URL.Query(), &params.ProfileCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "profileCode"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "profile_code"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "profileCode", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "profile_code", Err: err})
 		}
 		return
 	}
 
-	// ------------- Optional query parameter "processAreaCode" -------------
+	// ------------- Optional query parameter "process_area_code" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "processAreaCode", r.URL.Query(), &params.ProcessAreaCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "process_area_code", r.URL.Query(), &params.ProcessAreaCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "processAreaCode"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "process_area_code"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "processAreaCode", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "process_area_code", Err: err})
 		}
 		return
 	}
 
-	// ------------- Optional query parameter "departmentCode" -------------
+	// ------------- Optional query parameter "department_code" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "departmentCode", r.URL.Query(), &params.DepartmentCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "department_code", r.URL.Query(), &params.DepartmentCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "departmentCode"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "department_code"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "departmentCode", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "department_code", Err: err})
 		}
 		return
 	}
 
-	// ------------- Optional query parameter "ownerUserId" -------------
+	// ------------- Optional query parameter "owner_user_id" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "ownerUserId", r.URL.Query(), &params.OwnerUserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "owner_user_id", r.URL.Query(), &params.OwnerUserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "ownerUserId"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "owner_user_id"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ownerUserId", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "owner_user_id", Err: err})
 		}
 		return
 	}
@@ -534,28 +534,28 @@ func (siw *ServerInterfaceWrapper) PreviewControlledDocumentCode(w http.Response
 	// Parameter object where we will unmarshal all parameters from the context
 	var params PreviewControlledDocumentCodeParams
 
-	// ------------- Required query parameter "profileCode" -------------
+	// ------------- Required query parameter "profile_code" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, true, "profileCode", r.URL.Query(), &params.ProfileCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "profile_code", r.URL.Query(), &params.ProfileCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "profileCode"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "profile_code"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "profileCode", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "profile_code", Err: err})
 		}
 		return
 	}
 
-	// ------------- Required query parameter "areaCode" -------------
+	// ------------- Required query parameter "area_code" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, true, "areaCode", r.URL.Query(), &params.AreaCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "area_code", r.URL.Query(), &params.AreaCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "areaCode"})
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "area_code"})
 		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "areaCode", Err: err})
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "area_code", Err: err})
 		}
 		return
 	}
@@ -2023,38 +2023,38 @@ var swaggerSpec = []string{
 	"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",
-	"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",
+	"GEylFG056Bo/FqqiTKe49j3o3aEU70ohdf9MunV/Q84MQ6VU3PJcAG3A9SrNVsCXOC1BqVshO1NWG3cG",
+	"RKXDkQLDL6+WKjaWbv1/Ab1td2RaG51VjyVaAzaGbXuCFzQ5S35kSu8nh8qqlYQCNRqv+W7rbOd9hXLT",
+	"ms5OeGh7inuuqRd/L7M8epHd0ukBS+xVwscu8P4hSI1nbjEf3OMwe3Q90+sS3ldIFkLegqTkBjcKNXHp",
+	"oIupQErJhCQlLPH/lP1zEuSMjcPcIbvJKI8+cM4KpjuITYR8YmLiYOfyetK9T3p6ejrQ7t5vc3cjWpME",
+	"HJQNxDuZu1lB6TPGwZXaUmAvI7aU+GUiQXKvAy9uzK7PHB9imzb8SoPLN4vyZBylc9Nhkb4ZR2pvs+4n",
+	"ybeHUBa7ebIJQVUUIDfeQ5HWpxEa+CgNS9VtCAcu79rIRKiI0wtb3hHZxn3fCoGibLX5gmJRCo0820xN",
+	"lhBK05VnrfKN1UbXDhmV/l7QzVF6PahtkdbTfVfvDKX3e6b15KOREL1diCizbzN+3hr97PS7cYzmbtkg",
+	"PH16CF37F3kfz3ycACDPN8TxOGZLBDg1eaw2eWx9qTRqX5PkbmpY+vvUBHCr5670jgZ2LkySlpxLhKnt",
+	"olJP0BnRKyQa5BJ1fZNIDCZhyk550yAlbEyeRewuE4J8IWSGlIAmmqGcPiWMW4RAXUkOG5Tkq/MXb8jp",
+	"6dOn5HIFCslfvjbhTYlKZq7lQn2aH82e0tLV7tO6bo2mUk2Bv+tQnvs+2tEJVb9DGexn9cXfUBoPXfpD",
+	"w/DwbfN+h+SPG/c8N6xCm7SMQKXFdInc6Fxou7ZLcsv0SlSaQJ4Lw3y+JDbXGomQvRrvC6+4pv+A+uCw",
+	"6VtsXgUZ/fA4+Ym0L5bk9SvfI8WbZ+MYzQOZj6d6P2A04yLzDbl48YFKlbraZhr2lPqUrPt25EtXsJ6X",
+	"MH9kJbPB2rKlVbK6jWRKVwIxPfxQDWyKalMWVhHVe+0BPhcn92y/8Vif4bPPmI9UrqNT7I+kjT+BvIln",
+	"xooETZhjE2KKkq2RzhZSFLb3vPdwSZ0cmixDeVTKazICN2VSaZM4I3WNHzMYOQCR4pZ89er1G/LL5Yvz",
+	"ty+//ivhuMamW1Sn4Tb9Hsuo9d1QPm3NsK4zrJLHC/W+Ev1NW6J8cnOcfOn1/+71+iN3APaul77c6v8L",
+	"8WVO7AQIx9ummv904bRpTPfG06sa4jMOqEF7/U8t/NQRNWD2nzH1+JgaXut1vlOlITIa3KLuFmP+UnUa",
+	"PGmIgclsxdZ9k5UWCtZoFKVgegSolKjYksehOnfMu3MrzG7s+x01CpBu/c25yTKUdu+rYiiiiPOxM5tu",
+	"czaXIDezXj7SyqlKzz7+1piK7G5ayXwQqKSL+PyC5UZO08bxRWE45Oz3HjKCwicyW+aQ4UrkFOVUWLeo",
+	"0m3Ze+QAXI1DDK7kfv8Qn5SYCa60rDLdB+AC3HTFjKQ3w1Aq3Urz3SuF+ich00Gq/K17CpkNSsNA1r9M",
+	"JeYIagR0hSD1HEEPgw2v5R5a9ExW814bDQN5ZNr+fMbNLBB0JXG6yK3vtmMrhFyv0rz1E35EItBaKgyK",
+	"FGjBeCrWKIMV7YTxzAUWc5RqxUo1MJVu/W39fbptfPx9gJBBCfbhKcNwnZuSBV/GFyHPMFUcSrUSOpiT",
+	"IsdpzypmLvyu/GPB9ru1ieY7nVf5zd4g42um93Db4/XPpHFO7UKZI+rdhyhRwL1DdecrnousPkCBWrKs",
+	"BldoAsReWKofdaUGUVT748UCpplRhJZ9zZzRYsgbFLbkWFNfPwG0WqGig+k2VIhmbgEFy1tZ7o33oPlr",
+	"GdU3PoLmp1OKC6hyPa1fG9fw/lPtfnc8cgYacrHcg1EbpbFI5znwm73JIPB3B9vAnwm+YMseoE7Y352s",
+	"aONIdqZ88FXDs+mW349DeErxEMhoInIQRjcrGUJxMbw0uV8QyscxDgO1v1gch+vGpiFI/6vHccBOVjEO",
+	"eBwL2qgTvPW01d7OK89316ZaU7aocOWg3SDx7zkTM+vrhb4HoaZYcL+TtYn7f/71b2Kf3E2Ie2g3sZfd",
+	"Nl+vpESup8bFkVKKOZ4El6WVXiX7z6ouKNobersIZPauugAOS7TpvtnNOs4Jsf50QsIQMiH1uz1HhK0i",
+	"AjcebM+giOz+1v7gi1jTm9oXiURpiVDY5VwCqTqHMDa6v86VFwFp6nRlSYcsExXXpHbYdtlaXsS75GD9",
+	"RpSxLYwMp0EB6DxN5fazK/s0gtg0Ili2AxlZu24ekEbnJqTWtwnxjSfPYu/nursHe7Xed2gf79Itk2q3",
+	"PrHy8/vUESRcuX6pvr/w80ilmLMFZpssR7uevdStL3M7BEfL5AHafcOBLzva5x3fhNRFzoSE6fqkR6GG",
+	"djyvWe0e6E6amxwjE7bkU7FY+IUjh9YSuLI/7OkosF8zxkMplGrZ53KQjm6agQjij2yN3L4x4ZSY5JTZ",
+	"L+sAwr1d+prEnlZ6o4Gc/O3t20vis6EAV8yND4P6B1bX9/8NAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

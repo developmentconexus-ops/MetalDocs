@@ -47,7 +47,7 @@ func TestListAuditEventsByDocument(t *testing.T) {
 		TenantID:     "test-tenant",
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit/events?resourceType=document&resourceId=doc-1&limit=10", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit/events?resource_type=document&resource_id=doc-1&limit=10", nil)
 	ctx := iamdomain.WithAuthContext(req.Context(), "viewer-1", []iamdomain.Role{iamdomain.RoleViewer})
 	ctx = tenant.WithTenantID(ctx, "test-tenant")
 	req = req.WithContext(ctx)

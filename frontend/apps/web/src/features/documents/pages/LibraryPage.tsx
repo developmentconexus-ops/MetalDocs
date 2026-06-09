@@ -87,7 +87,7 @@ export default function LibraryPage(): JSX.Element {
     cursor: activeCursor || undefined,
     limit: pageSize,
     status,
-    areaCode: selectedArea ?? undefined,
+    area_code: selectedArea ?? undefined,
     q: debouncedQuery.trim() || undefined,
   });
   const statsQuery = useLibraryStatsQuery();

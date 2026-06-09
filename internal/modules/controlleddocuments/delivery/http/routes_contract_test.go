@@ -1103,7 +1103,7 @@ func TestGetPreviewCode_200(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/preview-code?profileCode=DC&areaCode=RH", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/preview-code?profile_code=DC&area_code=RH", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -1129,7 +1129,7 @@ func TestGetPreviewCode_MissingParams_400(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/preview-code?profileCode=DC", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/preview-code?profile_code=DC", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)

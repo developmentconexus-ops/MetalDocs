@@ -266,7 +266,7 @@ func TestListAreaMemberships_ContractShape(t *testing.T) {
 		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
 	})
 
-	req := adminReq(http.MethodGet, "/api/v1/iam/area-memberships?userId="+targetID, "", tenantAlpha, adminID)
+	req := adminReq(http.MethodGet, "/api/v1/iam/area-memberships?user_id="+targetID, "", tenantAlpha, adminID)
 	rec := httptest.NewRecorder()
 	h.mux.ServeHTTP(rec, req)
 
@@ -416,7 +416,7 @@ func TestListAreaMemberships_AreaAdminSeesManagedAreasOnly(t *testing.T) {
 
 func TestListAreaMemberships_NonAdminCannotTargetOther(t *testing.T) {
 	h := newHarness(t)
-	req := userReq(http.MethodGet, "/api/v1/iam/area-memberships?userId="+targetID, "", tenantAlpha, "carol", iamdomain.RoleViewer)
+	req := userReq(http.MethodGet, "/api/v1/iam/area-memberships?user_id="+targetID, "", tenantAlpha, "carol", iamdomain.RoleViewer)
 	rec := httptest.NewRecorder()
 	h.mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusForbidden {
@@ -435,7 +435,7 @@ func TestListAreaMemberships_AreaAndRoleFilters(t *testing.T) {
 		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
 	})
 
-	req := adminReq(http.MethodGet, "/api/v1/iam/area-memberships?areaCode=RH&role=approver", "", tenantAlpha, adminID)
+	req := adminReq(http.MethodGet, "/api/v1/iam/area-memberships?area_code=RH&role=approver", "", tenantAlpha, adminID)
 	rec := httptest.NewRecorder()
 	h.mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -584,7 +584,7 @@ func TestListAreaMemberships_AreaScopedUnderTenantIsolation(t *testing.T) {
 	})
 
 	// List from tenantAlpha context — must only see QMS row.
-	req := adminReq(http.MethodGet, "/api/v1/iam/area-memberships?userId="+targetID, "", tenantAlpha, adminID)
+	req := adminReq(http.MethodGet, "/api/v1/iam/area-memberships?user_id="+targetID, "", tenantAlpha, adminID)
 	rec := httptest.NewRecorder()
 	h.mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {

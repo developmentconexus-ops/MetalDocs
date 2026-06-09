@@ -170,7 +170,7 @@ paths:
       tags: [iam]
       operationId: listUsers
       parameters:
-        - name: isActive
+        - name: is_active
           in: query
           required: false
           schema: { type: boolean }
@@ -179,7 +179,7 @@ paths:
           required: false
           schema:
             $ref: '#/components/schemas/UserRole'
-        - name: areaCode
+        - name: area_code
           in: query
           required: false
           schema: { type: string }
@@ -236,13 +236,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /iam/users/{userId}:
+  /iam/users/{user_id}:
     patch:
       summary: Atomic metadata + tenant role update (single tx)
       tags: [iam]
       operationId: patchUser
       parameters:
-        - name: userId
+        - name: user_id
           in: path
           required: true
           schema:
@@ -270,13 +270,13 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /iam/users/{userId}/reset-password:
+  /iam/users/{user_id}/reset-password:
     post:
       summary: Admin password reset (forces must-change-on-first-login)
       tags: [iam]
       operationId: resetPassword
       parameters:
-        - name: userId
+        - name: user_id
           in: path
           required: true
           schema:
@@ -302,13 +302,13 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /iam/users/{userId}/unlock:
+  /iam/users/{user_id}/unlock:
     post:
       summary: Clear operational lock + failed-login counter for a user
       tags: [iam]
       operationId: unlockUser
       parameters:
-        - name: userId
+        - name: user_id
           in: path
           required: true
           schema:
@@ -400,7 +400,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /iam/users/{userId}/memberships:
+  /iam/users/{user_id}/memberships:
     get:
       x-pagination-exempt: true
       x-pagination-exempt-reason: 'Bounded per-user set: a single user''s active area memberships; not a growing collection.'
@@ -408,7 +408,7 @@ paths:
       tags: [iam]
       operationId: listMemberships
       parameters:
-        - name: userId
+        - name: user_id
           in: path
           required: true
           schema: { type: string }
@@ -567,13 +567,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /audit/events/export/{exportId}:
+  /audit/events/export/{export_id}:
     get:
       summary: Read the status of an audit export job
       tags: [audit]
       operationId: getAuditExportStatus
       parameters:
-        - name: exportId
+        - name: export_id
           in: path
           required: true
           schema: { type: string }
@@ -592,13 +592,13 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /audit/events/export/{exportId}/download:
+  /audit/events/export/{export_id}/download:
     get:
       summary: Download the rendered audit export payload via a signed token
       tags: [audit]
       operationId: downloadAuditExport
       parameters:
-        - name: exportId
+        - name: export_id
           in: path
           required: true
           schema: { type: string }
@@ -630,11 +630,11 @@ paths:
       tags: [iam]
       operationId: listSessions
       parameters:
-        - name: userId
+        - name: user_id
           in: query
           required: false
           schema: { type: string }
-        - name: isActive
+        - name: is_active
           in: query
           required: false
           schema: { type: boolean }
@@ -659,13 +659,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /auth/sessions/{sessionId}:
+  /auth/sessions/{session_id}:
     delete:
       summary: Revoke (force-logout) a specific session. Gate CapSessionManage.
       tags: [iam]
       operationId: revokeSession
       parameters:
-        - name: sessionId
+        - name: session_id
           in: path
           required: true
           schema: { type: string }
@@ -744,7 +744,7 @@ paths:
       tags: [audit]
       operationId: listAuditEvents
       parameters:
-        - name: actorId
+        - name: actor_id
           in: query
           required: false
           schema: { type: string }
@@ -752,19 +752,19 @@ paths:
           in: query
           required: false
           schema: { type: string }
-        - name: resourceType
+        - name: resource_type
           in: query
           required: false
           schema: { type: string }
-        - name: resourceId
+        - name: resource_id
           in: query
           required: false
           schema: { type: string }
-        - name: occurredAfter
+        - name: occurred_after
           in: query
           required: false
           schema: { type: string, format: date-time }
-        - name: occurredBefore
+        - name: occurred_before
           in: query
           required: false
           schema: { type: string, format: date-time }
@@ -810,28 +810,28 @@ paths:
           required: false
           schema:
             type: string
-        - name: ownerId
+        - name: owner_id
           in: query
           required: false
           schema:
             type: string
-        - name: documentType
+        - name: document_type
           in: query
           required: false
           schema:
             type: string
             enum: [po, it, rg]
-        - name: documentProfile
+        - name: document_profile
           in: query
           required: false
           schema:
             type: string
-        - name: documentFamily
+        - name: document_family
           in: query
           required: false
           schema:
             type: string
-        - name: processArea
+        - name: process_area
           in: query
           required: false
           schema:
@@ -846,13 +846,13 @@ paths:
           required: false
           schema:
             type: string
-        - name: expiryBefore
+        - name: expiry_before
           in: query
           required: false
           schema:
             type: string
             format: date-time
-        - name: expiryAfter
+        - name: expiry_after
           in: query
           required: false
           schema:
@@ -880,13 +880,13 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /iam/users/{userId}/roles:
+  /iam/users/{user_id}/roles:
     post:
       summary: Cria/atualiza usuario IAM e atribui role
       tags: [iam]
       operationId: upsertUserRole
       parameters:
-        - name: userId
+        - name: user_id
           in: path
           required: true
           schema:
@@ -917,7 +917,7 @@ paths:
       tags: [iam]
       operationId: replaceUserRoles
       parameters:
-        - name: userId
+        - name: user_id
           in: path
           required: true
           schema:
@@ -951,15 +951,15 @@ paths:
       tags: [iam]
       operationId: listAreaMemberships
       parameters:
-        - name: userId
+        - name: user_id
           in: query
           required: false
           schema: { type: string }
           description: >-
-            Filter by target userId. System admins omitting userId receive the
+            Filter by target user_id. System admins omitting user_id receive the
             full tenant directory; non-admins are always scoped to their own
             memberships regardless of this value.
-        - name: areaCode
+        - name: area_code
           in: query
           required: false
           schema: { type: string }
@@ -1899,7 +1899,7 @@ paths:
       tags: [taxonomy]
       operationId: listTaxonomyFamilies
       parameters:
-        - name: includeInactive
+        - name: include_inactive
           in: query
           schema: { type: boolean }
       responses:
@@ -2010,16 +2010,16 @@ paths:
       tags: [controlled-documents]
       operationId: listControlledDocuments
       parameters:
-        - name: profileCode
+        - name: profile_code
           in: query
           schema: { type: string }
-        - name: processAreaCode
+        - name: process_area_code
           in: query
           schema: { type: string }
-        - name: departmentCode
+        - name: department_code
           in: query
           schema: { type: string }
-        - name: ownerUserId
+        - name: owner_user_id
           in: query
           schema: { type: string }
         - name: q
@@ -2105,11 +2105,11 @@ paths:
       tags: [controlled-documents]
       operationId: previewControlledDocumentCode
       parameters:
-        - name: profileCode
+        - name: profile_code
           in: query
           required: true
           schema: { type: string, minLength: 1 }
-        - name: areaCode
+        - name: area_code
           in: query
           required: true
           schema: { type: string, minLength: 1 }
@@ -2307,11 +2307,11 @@ paths:
           description: CSV status filter, also accepts repeated query params
           schema:
             type: string
-        - name: areaCode
+        - name: area_code
           in: query
           schema:
             type: string
-        - name: profileCode
+        - name: profile_code
           in: query
           schema:
             type: string
@@ -2319,7 +2319,7 @@ paths:
           in: query
           schema:
             type: string
-        - name: includeArchived
+        - name: include_archived
           in: query
           schema:
             type: boolean
@@ -2535,11 +2535,11 @@ paths:
           in: query
           schema:
             type: string
-        - name: areaCode
+        - name: area_code
           in: query
           schema:
             type: string
-        - name: profileCode
+        - name: profile_code
           in: query
           schema:
             type: string
@@ -2903,14 +2903,14 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /documents/{id}/comments/{libraryID}:
+  /documents/{id}/comments/{library_id}:
     patch:
       summary: Update document comment
       tags: [documents]
       operationId: updateDocumentComment
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: libraryID, in: path, required: true, schema: { type: integer } }
+        - { name: library_id, in: path, required: true, schema: { type: integer } }
       requestBody:
         required: true
         content:
@@ -2940,7 +2940,7 @@ paths:
       operationId: deleteDocumentComment
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: libraryID, in: path, required: true, schema: { type: integer } }
+        - { name: library_id, in: path, required: true, schema: { type: integer } }
       responses:
         '204':
           description: deleted

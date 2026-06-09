@@ -250,7 +250,7 @@ function RolesPanel({ user }: { user: ManagedUser }) {
 
 function ActivityPanel({ userId }: { userId: string }) {
   const { data, isLoading, error, refetch } = useAuditEventsQuery({
-    actorId: userId,
+    actor_id: userId,
     limit: 50,
   });
   const items = data?.pages[0]?.items ?? [];

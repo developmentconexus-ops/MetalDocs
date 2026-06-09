@@ -76,26 +76,26 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 		limit = n
 	}
 
-	expiryBefore, err := parseOptionalDateTimeQuery(r, "expiryBefore")
+	expiryBefore, err := parseOptionalDateTimeQuery(r, "expiry_before")
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid expiryBefore value")
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid expiry_before value")
 		return
 	}
-	expiryAfter, err := parseOptionalDateTimeQuery(r, "expiryAfter")
+	expiryAfter, err := parseOptionalDateTimeQuery(r, "expiry_after")
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid expiryAfter value")
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid expiry_after value")
 		return
 	}
 
 	items, err := h.service.SearchDocuments(r.Context(), searchdomain.Query{
 		TenantID:        tenantID,
 		Text:            r.URL.Query().Get("q"),
-		DocumentType:    r.URL.Query().Get("documentType"),
-		DocumentProfile: r.URL.Query().Get("documentProfile"),
-		DocumentFamily:  r.URL.Query().Get("documentFamily"),
-		ProcessArea:     r.URL.Query().Get("processArea"),
+		DocumentType:    r.URL.Query().Get("document_type"),
+		DocumentProfile: r.URL.Query().Get("document_profile"),
+		DocumentFamily:  r.URL.Query().Get("document_family"),
+		ProcessArea:     r.URL.Query().Get("process_area"),
 		Subject:         r.URL.Query().Get("subject"),
-		OwnerID:         r.URL.Query().Get("ownerId"),
+		OwnerID:         r.URL.Query().Get("owner_id"),
 		BusinessUnit:    r.URL.Query().Get("businessUnit"),
 		Department:      r.URL.Query().Get("department"),
 		Classification:  searchdomain.Classification(r.URL.Query().Get("classification")),

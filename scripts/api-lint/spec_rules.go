@@ -84,11 +84,14 @@ var casingExemptKeys = map[string]struct{}{
 	"MDDM_NATIVE_EXPORT_ROLLOUT_PCT": {},
 }
 
-// checkCasing enforces snake_case for every declared schema property key, wherever
-// a `properties:` map appears (components/schemas and inline request/response
-// bodies). It does NOT walk free-form object content (additionalProperties values,
-// examples) — only declared property names. Blocking-by-default (api-contract-
-// hardening Phase E1): a re-introduced camelCase/PascalCase property turns CI red.
+// checkCasing enforces snake_case for every declared schema property key (wherever
+// a `properties:` map appears — components/schemas and inline request/response
+// bodies) AND every query/path parameter name (wherever a `parameters:` sequence
+// appears — path-item and operation level). It does NOT walk free-form object
+// content (additionalProperties values, examples) — only declared property names —
+// and skips header parameters, whose canonical form is kebab/Pascal (Content-Type,
+// X-Trace-Id), not snake_case. Blocking-by-default (api-contract-hardening Phase
+// E1): a re-introduced camelCase/PascalCase property or query/path param turns CI red.
 func checkCasing(file string, root *yaml.Node) []Violation {
 	out := []Violation{}
 	var walk func(n *yaml.Node)
@@ -111,6 +114,16 @@ func checkCasing(file string, root *yaml.Node) []Violation {
 					}
 					continue
 				}
+				// A `parameters:` sequence is an OpenAPI parameter list (path-item or
+				// operation level); components/parameters is a MAP, so the SequenceNode
+				// guard scopes this to real parameter lists only.
+				if k.Value == "parameters" && v.Kind == yaml.SequenceNode {
+					for _, item := range v.Content {
+						out = append(out, checkParamCasing(file, item)...)
+						walk(item) // recurse into the param's own subtree (e.g. schema)
+					}
+					continue
+				}
 				walk(v)
 			}
 		case yaml.SequenceNode:
@@ -121,6 +134,26 @@ func checkCasing(file string, root *yaml.Node) []Violation {
 	}
 	walk(root)
 	return out
+}
+
+// checkParamCasing flags a single query/path parameter whose name is not
+// snake_case. Header parameters are skipped (kebab/Pascal is canonical for
+// headers). A param given only as a `$ref` carries no inline name and is left to
+// the referenced component (and redocly) to validate.
+func checkParamCasing(file string, param *yaml.Node) []Violation {
+	if param == nil || param.Kind != yaml.MappingNode {
+		return nil
+	}
+	in := strings.ToLower(strings.TrimSpace(scalarValue(mapGet(param, "in"))))
+	if in != "query" && in != "path" {
+		return nil
+	}
+	nameNode := mapGet(param, "name")
+	name := scalarValue(nameNode)
+	if name == "" || snakeCaseRE.MatchString(name) {
+		return nil
+	}
+	return []Violation{{File: file, Line: nameNode.Line, Rule: "CASING-DRIFT", Message: fmt.Sprintf("%s parameter %q is not snake_case", in, name)}}
 }
 
 // checkBasePrefix enforces AD-1: servers.url already carries the `/api/v1`

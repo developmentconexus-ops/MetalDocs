@@ -6,8 +6,8 @@ export function useRevokeSessionMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (sessionId: string) => {
-      const { data, error } = await api.DELETE("/auth/sessions/{sessionId}", {
-        params: { path: { sessionId } },
+      const { data, error } = await api.DELETE("/auth/sessions/{session_id}", {
+        params: { path: { session_id: sessionId } },
       });
       if (error) throw error;
       return data;

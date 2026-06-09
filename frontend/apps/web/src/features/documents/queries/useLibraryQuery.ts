@@ -1,16 +1,8 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { fetchLibrary } from '../api/library';
+import { fetchLibrary, type DocumentListQueryParams } from '../api/library';
 import { QK } from '../../../lib/queryKeys';
 
-type LibraryQueryParams = {
-  cursor?: string;
-  limit?: number;
-  status?: string;
-  areaCode?: string;
-  profileCode?: string;
-  q?: string;
-  includeArchived?: boolean;
-};
+type LibraryQueryParams = DocumentListQueryParams;
 
 export function useLibraryQuery(params: LibraryQueryParams) {
   return useQuery({

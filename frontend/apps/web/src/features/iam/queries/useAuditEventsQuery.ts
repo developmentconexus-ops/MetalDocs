@@ -1,19 +1,16 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../../../lib/api/client";
 import { QK } from "../../../lib/queryKeys";
+import type { operations } from "../../../lib/api-types";
 
 const STALE_30S = 30_000;
 
-export type AuditEventsQueryParams = {
-  limit?: number;
-  action?: string;
-  actorId?: string;
-  resourceType?: string;
-  resourceId?: string;
-  occurredAfter?: string;
-  occurredBefore?: string;
-  q?: string;
-};
+// Derived from the generated contract so the snake_case wire keys (actor_id,
+// resource_type, resource_id, occurred_after, occurred_before) can never drift
+// from the spec.
+export type AuditEventsQueryParams = NonNullable<
+  operations["listAuditEvents"]["parameters"]["query"]
+>;
 
 export type AuditEventItem = {
   id: string;

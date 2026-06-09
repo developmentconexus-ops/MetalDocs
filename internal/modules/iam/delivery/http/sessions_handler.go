@@ -69,14 +69,14 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 
 	q := authpg.SessionAdminQuery{
 		TenantID: tenantID,
-		UserID:   strings.TrimSpace(r.URL.Query().Get("userId")),
+		UserID:   strings.TrimSpace(r.URL.Query().Get("user_id")),
 	}
-	// Default: active sessions only. ?isActive=false toggles to include revoked
+	// Default: active sessions only. ?is_active=false toggles to include revoked
 	// + expired rows so admins can audit recent session activity.
-	if v := strings.TrimSpace(r.URL.Query().Get("isActive")); v != "" {
+	if v := strings.TrimSpace(r.URL.Query().Get("is_active")); v != "" {
 		active, perr := strconv.ParseBool(v)
 		if perr != nil {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "isActive must be a boolean"))
+			h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "is_active must be a boolean"))
 			return
 		}
 		q.IncludeRevoked = !active
