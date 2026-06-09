@@ -1,10 +1,12 @@
 package main
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 // This is the Family 3 · C1 regression guard for the api-lint exit-code contract
@@ -22,7 +24,23 @@ import (
 // fast exec and isolates the exit code from the go toolchain's own.
 func buildLinter(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "api-lint")
+	dir, err := os.MkdirTemp("", "api-lint-test")
+	if err != nil {
+		t.Fatalf("mkdir temp: %v", err)
+	}
+	t.Cleanup(func() {
+		// Windows may briefly hold a scan/exec lock on the just-built .exe, so a
+		// plain RemoveAll (what t.TempDir does) can fail with "Access is denied".
+		// Retry, then swallow a persistent failure rather than failing the test on
+		// a cleanup race (a stray temp dir is harmless).
+		for i := 0; i < 10; i++ {
+			if rmErr := os.RemoveAll(dir); rmErr == nil {
+				return
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+	})
+	bin := filepath.Join(dir, "api-lint")
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
@@ -31,6 +49,27 @@ func buildLinter(t *testing.T) string {
 		t.Fatalf("go build api-lint: %v\n%s", err, out)
 	}
 	return bin
+}
+
+// runLinter execs the built binary, retrying transient Windows launch failures.
+// Windows Defender holds an exclusive scan lock on a freshly written .exe, which
+// surfaces as "Access is denied" on fork/exec; that is a launch failure, not a
+// program result, so retry it. A real *exec.ExitError (the process ran and
+// exited) is returned immediately.
+func runLinter(bin string, args ...string) ([]byte, error) {
+	var out []byte
+	var err error
+	for attempt := 0; attempt < 8; attempt++ {
+		out, err = exec.Command(bin, args...).CombinedOutput()
+		if err == nil {
+			return out, nil
+		}
+		if _, isExit := err.(*exec.ExitError); isExit {
+			return out, err
+		}
+		time.Sleep(150 * time.Millisecond)
+	}
+	return out, err
 }
 
 // repoRoot resolves the repository root from this package (scripts/api-lint),
@@ -93,8 +132,7 @@ func TestExitCode_FailsOnAnyViolationZeroOnCleanSpec(t *testing.T) {
 		c := c
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			cmd := exec.Command(bin, c.args...)
-			out, err := cmd.CombinedOutput()
+			out, err := runLinter(bin, c.args...)
 			exitErr, isExit := err.(*exec.ExitError)
 			switch {
 			case c.wantNonZeroExit && err == nil:
