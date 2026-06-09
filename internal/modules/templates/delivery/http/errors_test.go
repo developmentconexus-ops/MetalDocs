@@ -18,22 +18,22 @@ func TestMapErr(t *testing.T) {
 		wantStatus int
 		wantCode   problem.Code
 	}{
-		{name: "not found", err: domain.ErrNotFound, wantStatus: http.StatusNotFound, wantCode: "not_found"},
-		{name: "key conflict", err: domain.ErrKeyConflict, wantStatus: http.StatusConflict, wantCode: "key_conflict"},
-		{name: "invalid state transition", err: domain.ErrInvalidStateTransition, wantStatus: http.StatusConflict, wantCode: "invalid_state_transition"},
-		{name: "stale base", err: domain.ErrStaleBase, wantStatus: http.StatusConflict, wantCode: "stale_base"},
-		{name: "stale lock version", err: domain.ErrStaleLockVersion, wantStatus: http.StatusPreconditionFailed, wantCode: "stale_lock_version"},
-		{name: "content hash mismatch", err: domain.ErrContentHashMismatch, wantStatus: http.StatusConflict, wantCode: "content_hash_mismatch"},
-		{name: "upload missing", err: domain.ErrUploadMissing, wantStatus: http.StatusConflict, wantCode: "upload_missing"},
-		{name: "iso segregation violation", err: domain.ErrISOSegregationViolation, wantStatus: http.StatusForbidden, wantCode: "iso_segregation_violation"},
-		{name: "forbidden role", err: domain.ErrForbiddenRole, wantStatus: http.StatusForbidden, wantCode: "forbidden_role"},
-		{name: "forbidden", err: domain.ErrForbidden, wantStatus: http.StatusForbidden, wantCode: "forbidden"},
-		{name: "system template immutable", err: domain.ErrSystemTemplateImmutable, wantStatus: http.StatusConflict, wantCode: "SYSTEM_TEMPLATE_IMMUTABLE"},
-		{name: "archived", err: domain.ErrArchived, wantStatus: http.StatusConflict, wantCode: "archived"},
-		{name: "invalid approval config", err: domain.ErrInvalidApprovalConfig, wantStatus: http.StatusBadRequest, wantCode: "invalid_approval_config"},
-		{name: "placeholder name invalid", err: domain.ErrPlaceholderNameInvalid, wantStatus: http.StatusUnprocessableEntity, wantCode: "placeholder_name_invalid"},
-		{name: "duplicate placeholder name", err: domain.ErrDuplicatePlaceholderName, wantStatus: http.StatusUnprocessableEntity, wantCode: "duplicate_placeholder_name"},
-		{name: "default", err: errors.New("boom"), wantStatus: http.StatusInternalServerError, wantCode: "internal_error"},
+		{name: "not found", err: domain.ErrNotFound, wantStatus: http.StatusNotFound, wantCode: problem.CodeNotFound},
+		{name: "key conflict", err: domain.ErrKeyConflict, wantStatus: http.StatusConflict, wantCode: problem.CodeAlreadyExists},
+		{name: "invalid state transition", err: domain.ErrInvalidStateTransition, wantStatus: http.StatusConflict, wantCode: problem.CodeStateTransitionInvalid},
+		{name: "stale base", err: domain.ErrStaleBase, wantStatus: http.StatusConflict, wantCode: problem.CodeStaleBase},
+		{name: "stale lock version", err: domain.ErrStaleLockVersion, wantStatus: http.StatusPreconditionFailed, wantCode: problem.CodeConcurrentModification},
+		{name: "content hash mismatch", err: domain.ErrContentHashMismatch, wantStatus: http.StatusConflict, wantCode: problem.CodeConflict},
+		{name: "upload missing", err: domain.ErrUploadMissing, wantStatus: http.StatusConflict, wantCode: problem.CodeUploadMissing},
+		{name: "iso segregation violation", err: domain.ErrISOSegregationViolation, wantStatus: http.StatusForbidden, wantCode: problem.CodeISOSegregationViolation},
+		{name: "forbidden role", err: domain.ErrForbiddenRole, wantStatus: http.StatusForbidden, wantCode: problem.CodeForbiddenCapability},
+		{name: "forbidden", err: domain.ErrForbidden, wantStatus: http.StatusForbidden, wantCode: problem.CodeAuthForbidden},
+		{name: "system template immutable", err: domain.ErrSystemTemplateImmutable, wantStatus: http.StatusConflict, wantCode: problem.CodeSystemTemplateImmutable},
+		{name: "archived", err: domain.ErrArchived, wantStatus: http.StatusConflict, wantCode: problem.CodeStateTransitionInvalid},
+		{name: "invalid approval config", err: domain.ErrInvalidApprovalConfig, wantStatus: http.StatusBadRequest, wantCode: problem.CodeValidationError},
+		{name: "placeholder name invalid", err: domain.ErrPlaceholderNameInvalid, wantStatus: http.StatusUnprocessableEntity, wantCode: problem.CodeValidationError},
+		{name: "duplicate placeholder name", err: domain.ErrDuplicatePlaceholderName, wantStatus: http.StatusUnprocessableEntity, wantCode: problem.CodeAlreadyExists},
+		{name: "default", err: errors.New("boom"), wantStatus: http.StatusInternalServerError, wantCode: problem.CodeInternalError},
 	}
 
 	for _, tc := range tests {

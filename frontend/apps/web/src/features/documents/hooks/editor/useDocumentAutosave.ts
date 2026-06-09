@@ -10,7 +10,7 @@ export interface AutosaveArgs {
   baseRevisionID: string;
   onAdvanceBase: (newRevisionID: string) => void;
   onArtifactMetadata?: (metadata: { fileSizeBytes?: number | null; pageCount?: number | null }) => void;
-  onSessionLost: (reason: 'stale_base' | 'session_inactive' | 'force_released') => void;
+  onSessionLost: (reason: 'CONCURRENT_MODIFICATION' | 'CONFLICT_ERROR' | 'force_released') => void;
 }
 
 const SYNC_DEBOUNCE_MS = 3_000;
@@ -84,20 +84,22 @@ export function useDocumentAutosave(args: AutosaveArgs) {
       return true;
     } catch (e: any) {
       if (e?.status === 409) {
-        const body = e?.body ? (() => { try { return JSON.parse(e.body); } catch { return {}; } })() : {};
-        if (body?.error === 'stale_base') { onSessionLost('stale_base'); setStatus('stale'); return false; }
-        if (body?.error === 'session_inactive' || body?.error === 'session_not_holder') {
-          onSessionLost('session_inactive'); setStatus('session_lost'); return false;
+        // presign/commit emit RFC 9457 Problem; ApiError.code carries the
+        // canonical code. CONCURRENT_MODIFICATION = stale base; CONFLICT_ERROR =
+        // session inactive / not holder.
+        if (e?.code === 'CONCURRENT_MODIFICATION') { onSessionLost('CONCURRENT_MODIFICATION'); setStatus('stale'); return false; }
+        if (e?.code === 'CONFLICT_ERROR') {
+          onSessionLost('CONFLICT_ERROR'); setStatus('session_lost'); return false;
         }
       }
       if (e?.status === 410) {
-        // upload_missing or expired_upload: the S3 object is gone.
+        // UPLOAD_MISSING or UPLOAD_EXPIRED: the S3 object is gone.
         try { await deletePending(documentID, hash); } catch { /* ignore */ }
         pending.current = null; pendingHash.current = ''; pendingPageCount.current = null;
         setStatus('error'); return false;
       }
       if (e?.status === 422) {
-        // content_hash_mismatch: discard local pending.
+        // VALIDATION_ERROR (server-side content-hash mismatch): discard local pending.
         try { await deletePending(documentID, hash); } catch { /* ignore */ }
         pending.current = null; pendingHash.current = ''; pendingPageCount.current = null;
         setStatus('error'); return false;

@@ -134,8 +134,8 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "invalid_state_transition" {
-		t.Fatalf("expected error.code=invalid_state_transition, got %q", out.Code)
+	if out.Code != "STATE_TRANSITION_INVALID" {
+		t.Fatalf("expected error.code=STATE_TRANSITION_INVALID, got %q", out.Code)
 	}
 }
 
@@ -167,8 +167,8 @@ func TestSubmitForReview_NoUpload(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "upload_missing" {
-		t.Fatalf("expected error.code=upload_missing, got %q", out.Code)
+	if out.Code != "UPLOAD_MISSING" {
+		t.Fatalf("expected error.code=UPLOAD_MISSING, got %q", out.Code)
 	}
 }
 
@@ -417,7 +417,7 @@ func TestArchiveTemplate_SystemOwnedTemplateImmutable(t *testing.T) {
 // TestPublishTemplateVersion_ForbiddenRoleRFC9457 verifies that POST /publish
 // rejects an actor who holds the template.publish capability but lacks the
 // version's PendingApproverRole binding, returning RFC 9457 problem+json with
-// `code: "forbidden_role"` and HTTP 403. Closes residual T-004 contract gap.
+// `code: "FORBIDDEN_CAPABILITY"` and HTTP 403. Closes residual T-004 contract gap.
 func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
 	repo := newFakeRepo()
 	templateID := "11111111-1111-1111-1111-111111111111"
@@ -455,8 +455,8 @@ func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "forbidden_role" {
-		t.Fatalf("expected error.code=forbidden_role, got %q (body=%s)", out.Code, rr.Body.String())
+	if out.Code != "FORBIDDEN_CAPABILITY" {
+		t.Fatalf("expected error.code=FORBIDDEN_CAPABILITY, got %q (body=%s)", out.Code, rr.Body.String())
 	}
 
 	stored := repo.versions["ver-1"]

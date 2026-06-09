@@ -65,7 +65,7 @@ func TestListTemplates_LimitOver200Rejected(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "invalid_limit" {
-		t.Fatalf("expected error.code=invalid_limit, got %q", out.Code)
+	if out.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected error.code=VALIDATION_ERROR, got %q", out.Code)
 	}
 }

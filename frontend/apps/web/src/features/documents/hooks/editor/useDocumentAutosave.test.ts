@@ -63,52 +63,52 @@ describe('useDocumentAutosave', () => {
     expect(args.onArtifactMetadata).toHaveBeenCalledWith({ fileSizeBytes: 1304, pageCount: 3 });
   });
 
-  it('409 stale_base -> onSessionLost stale_base, status stale', async () => {
+  it('409 CONCURRENT_MODIFICATION -> onSessionLost CONCURRENT_MODIFICATION, status stale', async () => {
     const args = baseArgs();
     vi.mocked(api.presignAutosave).mockRejectedValueOnce(
-      Object.assign(new Error(), { status: 409, body: JSON.stringify({ error: 'stale_base' }) })
+      Object.assign(new Error(), { status: 409, code: 'CONCURRENT_MODIFICATION' })
     );
     const { result } = renderHook(() => useDocumentAutosave(args));
     await act(async () => {
       await result.current.queue(new ArrayBuffer(4), null);
       await result.current.flush();
     });
-    expect(args.onSessionLost).toHaveBeenCalledWith('stale_base');
+    expect(args.onSessionLost).toHaveBeenCalledWith('CONCURRENT_MODIFICATION');
     expect(result.current.status).toBe('stale');
   });
 
-  it('409 session_inactive -> onSessionLost session_inactive, status session_lost', async () => {
+  it('409 CONFLICT_ERROR (session inactive) -> onSessionLost CONFLICT_ERROR, status session_lost', async () => {
     const args = baseArgs();
     vi.mocked(api.presignAutosave).mockRejectedValueOnce(
-      Object.assign(new Error(), { status: 409, body: JSON.stringify({ error: 'session_inactive' }) })
+      Object.assign(new Error(), { status: 409, code: 'CONFLICT_ERROR' })
     );
     const { result } = renderHook(() => useDocumentAutosave(args));
     await act(async () => {
       await result.current.queue(new ArrayBuffer(4), null);
       await result.current.flush();
     });
-    expect(args.onSessionLost).toHaveBeenCalledWith('session_inactive');
+    expect(args.onSessionLost).toHaveBeenCalledWith('CONFLICT_ERROR');
     expect(result.current.status).toBe('session_lost');
   });
 
-  it('409 session_not_holder → onSessionLost session_inactive, status session_lost', async () => {
+  it('409 CONFLICT_ERROR (session not holder) → onSessionLost CONFLICT_ERROR, status session_lost', async () => {
     const args = baseArgs();
     vi.mocked(api.presignAutosave).mockRejectedValueOnce(
-      Object.assign(new Error(), { status: 409, body: JSON.stringify({ error: 'session_not_holder' }) })
+      Object.assign(new Error(), { status: 409, code: 'CONFLICT_ERROR' })
     );
     const { result } = renderHook(() => useDocumentAutosave(args));
     await act(async () => {
       await result.current.queue(new ArrayBuffer(4), null);
       await result.current.flush();
     });
-    expect(args.onSessionLost).toHaveBeenCalledWith('session_inactive');
+    expect(args.onSessionLost).toHaveBeenCalledWith('CONFLICT_ERROR');
     expect(result.current.status).toBe('session_lost');
   });
 
-  it('410 upload_missing -> status error, IndexedDB deleted, pending cleared', async () => {
+  it('410 UPLOAD_MISSING -> status error, IndexedDB deleted, pending cleared', async () => {
     const args = baseArgs();
     vi.mocked(api.commitAutosave).mockRejectedValueOnce(
-      Object.assign(new Error(), { status: 410, body: JSON.stringify({ error: 'upload_missing' }) })
+      Object.assign(new Error(), { status: 410, code: 'UPLOAD_MISSING' })
     );
     const { result } = renderHook(() => useDocumentAutosave(args));
     await act(async () => {
@@ -137,10 +137,10 @@ describe('useDocumentAutosave', () => {
     expect(vi.mocked(idb.deletePending)).not.toHaveBeenCalled();
   });
 
-  it('410 expired_upload -> status error, pending cleared', async () => {
+  it('410 UPLOAD_EXPIRED -> status error, pending cleared', async () => {
     const args = baseArgs();
     vi.mocked(api.commitAutosave).mockRejectedValueOnce(
-      Object.assign(new Error(), { status: 410, body: JSON.stringify({ error: 'expired_upload' }) })
+      Object.assign(new Error(), { status: 410, code: 'UPLOAD_EXPIRED' })
     );
     const { result } = renderHook(() => useDocumentAutosave(args));
     await act(async () => {
@@ -151,10 +151,10 @@ describe('useDocumentAutosave', () => {
     expect(vi.mocked(idb.deletePending)).toHaveBeenCalled();
   });
 
-  it('422 content_hash_mismatch -> status error, pending cleared', async () => {
+  it('422 VALIDATION_ERROR (content-hash mismatch) -> status error, pending cleared', async () => {
     const args = baseArgs();
     vi.mocked(api.commitAutosave).mockRejectedValueOnce(
-      Object.assign(new Error(), { status: 422, body: JSON.stringify({ error: 'content_hash_mismatch' }) })
+      Object.assign(new Error(), { status: 422, code: 'VALIDATION_ERROR' })
     );
     const { result } = renderHook(() => useDocumentAutosave(args));
     await act(async () => {

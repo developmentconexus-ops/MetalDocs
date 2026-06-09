@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"metaldocs/internal/platform/problem"
 )
 
 // PDFWriter persists PDF-completion columns on documents.
@@ -49,60 +51,60 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 	r.Body = http.MaxBytesReader(w, r.Body, pdfWebhookMaxBytes)
 	raw, err := io.ReadAll(r.Body)
 	if err != nil {
-		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "read_body"})
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "could not read request body")
 		return
 	}
 	defer r.Body.Close()
 
 	sig := r.Header.Get("X-Docgen-Signature")
 	if !validSignature(raw, sig, h.secret) {
-		writeFillInJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid_signature"})
+		writePDFWebhookErr(w, http.StatusUnauthorized, problem.CodeUnauthenticated, "invalid webhook signature")
 		return
 	}
 
 	var body pdfCompleteBody
 	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&body); err != nil {
-		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json"})
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON body")
 		return
 	}
 	if !isValidFinalPDFS3Key(body.FinalPDFS3Key) {
-		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_final_pdf_s3_key"})
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "invalid final_pdf_s3_key")
 		return
 	}
 	if body.PDFHash == "" || body.PDFGeneratedAt == "" {
-		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "missing_fields"})
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "pdf_hash and pdf_generated_at are required")
 		return
 	}
 	docID := r.PathValue("id")
 	canonicalTenantID, err := h.writer.ResolveTenantByDocumentID(r.Context(), docID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			writeFillInJSON(w, http.StatusNotFound, map[string]any{"error": "document_not_found"})
+			writePDFWebhookErr(w, http.StatusNotFound, problem.CodeNotFound, "document not found")
 			return
 		}
-		writeFillInJSON(w, http.StatusInternalServerError, map[string]any{"error": "persist_failed"})
+		writePDFWebhookErr(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to persist pdf completion")
 		return
 	}
 	if strings.TrimSpace(body.TenantID) != "" && strings.TrimSpace(body.TenantID) != canonicalTenantID {
-		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "tenant_mismatch"})
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "tenant_id does not match document")
 		return
 	}
 
 	hashBytes, err := hex.DecodeString(body.PDFHash)
 	if err != nil {
-		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_pdf_hash"})
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "invalid pdf_hash encoding")
 		return
 	}
 
 	generatedAt, err := time.Parse(time.RFC3339, body.PDFGeneratedAt)
 	if err != nil {
-		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_generated_at"})
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "invalid pdf_generated_at format")
 		return
 	}
 	generatedAt = generatedAt.UTC()
 
 	if err := h.writer.WritePDF(r.Context(), canonicalTenantID, docID, body.FinalPDFS3Key, hashBytes, generatedAt); err != nil {
-		writeFillInJSON(w, http.StatusInternalServerError, map[string]any{"error": "persist_failed"})
+		writePDFWebhookErr(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to persist pdf completion")
 		return
 	}
 
@@ -110,6 +112,13 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 		"document_id":      docID,
 		"final_pdf_s3_key": body.FinalPDFS3Key,
 	})
+}
+
+// writePDFWebhookErr emits a canonical RFC 9457 problem for the internal
+// HMAC webhook. The route stays off the OpenAPI spec (Phase C wont-fix) but
+// its error codes draw from the shared catalog.
+func writePDFWebhookErr(w http.ResponseWriter, status int, code problem.Code, detail string) {
+	_ = problem.Write(w, problem.New(status, code, string(code)).WithDetail(detail))
 }
 
 func validSignature(body []byte, sigHex, secret string) bool {

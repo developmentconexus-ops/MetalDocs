@@ -8,6 +8,7 @@ import (
 
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/ratelimit"
 )
 
@@ -53,7 +54,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 	userID := userIDFromReq(r)
@@ -61,7 +62,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 	req := exportPDFReq{PaperSize: "A4"}
 	if r.ContentLength != 0 {
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			httpErr(w, http.StatusBadRequest, "invalid_body")
+			httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 			return
 		}
 		if req.PaperSize == "" {
@@ -69,7 +70,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !isAllowedPaperSize(req.PaperSize) {
-		httpErr(w, http.StatusBadRequest, "VALIDATION_ERROR")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -85,7 +86,7 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 
 	signedURL, err := h.svc.SignExportURL(r.Context(), res.Export.StorageKey)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 
@@ -103,7 +104,7 @@ func (h *ExportHandler) exportDocxURL(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 	userID := userIDFromReq(r)
@@ -128,18 +129,18 @@ func (h *ExportHandler) exportDocxURL(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func mapExportErr(err error) (int, string) {
+func mapExportErr(err error) (int, problem.Code) {
 	switch {
 	case errors.Is(err, domain.ErrInvalidExport):
-		return http.StatusBadRequest, "VALIDATION_ERROR"
+		return http.StatusBadRequest, problem.CodeValidationError
 	case errors.Is(err, domain.ErrExportDocxMissing):
-		return http.StatusConflict, "docx_missing"
+		return http.StatusConflict, problem.CodeConflict
 	case errors.Is(err, domain.ErrExportGotenbergFailed):
-		return http.StatusBadGateway, "gotenberg_failed"
+		return http.StatusBadGateway, problem.CodeInternalError
 	case errors.Is(err, domain.ErrNotFound):
-		return http.StatusNotFound, "document_not_found"
+		return http.StatusNotFound, problem.CodeNotFound
 	default:
-		return http.StatusInternalServerError, "internal"
+		return http.StatusInternalServerError, problem.CodeInternalError
 	}
 }
 

@@ -19,7 +19,7 @@ func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templatesapi.CreateTemplateParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	actorID := userIDFromReq(r)
@@ -30,11 +30,11 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 
 	var req templatesapi.CreateTemplateJSONRequestBody
 	if err := readStrictJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid_body", err.Error())
+		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
 		return
 	}
 	if field := missingCreateTemplateField(req); field != "" {
-		writeErr(w, http.StatusBadRequest, "invalid_body", "field "+field+" is required")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "field "+field+" is required")
 		return
 	}
 
@@ -98,7 +98,7 @@ func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.
 func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, id string, n int, storageKey string) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	actorID := userIDFromReq(r)
@@ -127,7 +127,7 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 func (h *Handler) RedirectSignedUrl(w http.ResponseWriter, r *http.Request, params templatesapi.RedirectSignedUrlParams) {
 	key := strings.TrimSpace(params.Key)
 	if key == "" {
-		writeErr(w, http.StatusBadRequest, "invalid_request", "key query parameter is required")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidRequest, "key query parameter is required")
 		return
 	}
 	url, err := h.svc.PresignStoredObject(r.Context(), key)
@@ -141,7 +141,7 @@ func (h *Handler) RedirectSignedUrl(w http.ResponseWriter, r *http.Request, para
 func (h *Handler) SaveTemplateDraft(w http.ResponseWriter, r *http.Request, id string, n int) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	actorID := userIDFromReq(r)
@@ -152,11 +152,11 @@ func (h *Handler) SaveTemplateDraft(w http.ResponseWriter, r *http.Request, id s
 
 	var req templatesapi.SaveTemplateDraftJSONRequestBody
 	if err := readStrictJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid_body", err.Error())
+		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
 		return
 	}
 	if field := missingSaveTemplateDraftField(req); field != "" {
-		writeErr(w, http.StatusBadRequest, "invalid_body", "field "+field+" is required")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "field "+field+" is required")
 		return
 	}
 
@@ -196,7 +196,7 @@ func missingSaveTemplateDraftField(req templatesapi.SaveTemplateDraftJSONRequest
 func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	actorID := userIDFromReq(r)
@@ -207,11 +207,11 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 
 	var req templatesapi.PublishTemplateVersionJSONRequestBody
 	if err := readStrictJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid_body", err.Error())
+		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
 		return
 	}
 	if field := missingPublishTemplateVersionField(req); field != "" {
-		writeErr(w, http.StatusBadRequest, "invalid_body", "field "+field+" is required")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "field "+field+" is required")
 		return
 	}
 

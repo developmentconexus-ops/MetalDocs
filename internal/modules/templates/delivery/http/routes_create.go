@@ -11,7 +11,7 @@ import (
 func (h *Handler) createNextVersion(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	actorID := userIDFromReq(r)

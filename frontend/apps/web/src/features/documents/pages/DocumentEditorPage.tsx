@@ -38,7 +38,7 @@ export type DocumentEditorPageProps = {
   onDone: () => void;
 };
 
-type EditorDocumentDetail = DocumentDetail & { RevisionTitle?: string | null };
+type EditorDocumentDetail = DocumentDetail;
 type ArtifactMetadata = { fileSizeBytes?: number | null; pageCount?: number | null };
 
 export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPageProps): React.ReactElement {
@@ -144,12 +144,12 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     const err = docQuery.error;
     if (!docQuery.isError || !err) return null;
     if (err instanceof ApiError) {
-      return err.code === 'not_found' ? 'Documento não encontrado.' : resolveErrorMessage(err.code, err.message);
+      return err.code === 'NOT_FOUND' ? 'Documento não encontrado.' : resolveErrorMessage(err.code, err.message);
     }
     if (err && typeof err === 'object' && 'code' in err) {
       const code = (err as { code?: string }).code;
       const message = 'message' in err ? (err as { message?: string }).message : undefined;
-      return code === 'not_found' ? 'Documento não encontrado.' : resolveErrorMessage(code, message);
+      return code === 'NOT_FOUND' ? 'Documento não encontrado.' : resolveErrorMessage(code, message);
     }
     if (err instanceof Error && err.message.trim()) {
       return err.message;
@@ -321,7 +321,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       void submitForReview();
       return;
     }
-    setRevisionTitleInput(doc?.RevisionTitle ?? '');
+    setRevisionTitleInput(doc?.revision_title ?? '');
     setRevisionTitleError(null);
     setRevisionTitleDialogOpen(true);
   }

@@ -157,8 +157,8 @@ func TestUpdateTemplateSchema_StaleLockVersion_412(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &problem); err != nil {
 		t.Fatalf("decode problem: %v", err)
 	}
-	if problem.Code != "stale_lock_version" {
-		t.Fatalf("expected code stale_lock_version, got %q", problem.Code)
+	if problem.Code != "CONCURRENT_MODIFICATION" {
+		t.Fatalf("expected code CONCURRENT_MODIFICATION, got %q", problem.Code)
 	}
 }
 

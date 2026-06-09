@@ -10,23 +10,26 @@ import (
 )
 
 const (
-	codeTplNotFound               problem.Code = "not_found"
-	codeTplKeyConflict            problem.Code = "key_conflict"
-	codeTplInvalidStateTransition problem.Code = "invalid_state_transition"
-	codeTplStaleBase              problem.Code = "stale_base"
-	codeTplStaleLockVersion       problem.Code = "stale_lock_version"
-	codeTplContentHashMismatch    problem.Code = "content_hash_mismatch"
-	codeTplUploadMissing          problem.Code = "upload_missing"
-	codeTplISOSegregation         problem.Code = "iso_segregation_violation"
-	codeTplForbiddenRole          problem.Code = "forbidden_role"
-	codeTplForbidden              problem.Code = "forbidden"
-	codeTplSystemImmutable        problem.Code = "SYSTEM_TEMPLATE_IMMUTABLE"
-	codeTplArchived               problem.Code = "archived"
-	codeTplInvalidApprovalConfig  problem.Code = "invalid_approval_config"
-	codeTplPlaceholderNameInvalid problem.Code = "placeholder_name_invalid"
-	codeTplDuplicatePlaceholder   problem.Code = "duplicate_placeholder_name"
-	codeTplInternalError          problem.Code = "internal_error"
-	codeTplInvalidRequest         problem.Code = "invalid_request"
+	codeTplNotFound               = problem.CodeNotFound
+	codeTplKeyConflict            = problem.CodeAlreadyExists
+	codeTplInvalidStateTransition = problem.CodeStateTransitionInvalid
+	codeTplStaleBase              = problem.CodeStaleBase
+	codeTplStaleLockVersion       = problem.CodeConcurrentModification
+	codeTplContentHashMismatch    = problem.CodeConflict
+	codeTplUploadMissing          = problem.CodeUploadMissing
+	codeTplISOSegregation         = problem.CodeISOSegregationViolation
+	codeTplForbiddenRole          = problem.CodeForbiddenCapability
+	codeTplForbidden              = problem.CodeAuthForbidden
+	codeTplSystemImmutable        = problem.CodeSystemTemplateImmutable
+	codeTplArchived               = problem.CodeStateTransitionInvalid
+	codeTplInvalidApprovalConfig  = problem.CodeValidationError
+	codeTplPlaceholderNameInvalid = problem.CodeValidationError
+	codeTplDuplicatePlaceholder   = problem.CodeAlreadyExists
+	codeTplInternalError          = problem.CodeInternalError
+	codeTplInvalidRequest         = problem.CodeValidationError
+	codeTplInvalidBody            = problem.CodeValidationError
+	codeTplInvalidLimit           = problem.CodeValidationError
+	codeTplInvalidParam           = problem.CodeValidationError
 )
 
 func MapErr(err error) (httpStatus int, code problem.Code) {
@@ -50,7 +53,7 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 	case errors.Is(err, domain.ErrISOSegregationViolation):
 		return http.StatusForbidden, codeTplISOSegregation
 	case errors.As(err, new(iamauthz.ErrCapDenied)):
-		return http.StatusForbidden, "capability_denied"
+		return http.StatusForbidden, problem.CodeForbiddenCapability
 	case errors.Is(err, domain.ErrForbiddenRole):
 		return http.StatusForbidden, codeTplForbiddenRole
 	case errors.Is(err, domain.ErrForbidden):

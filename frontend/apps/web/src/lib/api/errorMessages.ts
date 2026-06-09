@@ -37,12 +37,6 @@ export const errorMessages: Record<string, string> = {
     'O perfil informado não está cadastrado para este tenant. Verifique o código do perfil.',
   'validation.reason_required': 'Informe o motivo para continuar.',
   'validation.request_invalid': 'A requisição enviada é inválida.',
-  invalid_request: 'A requisição enviada é inválida.',
-  invalid_name: 'O nome informado é inválido.',
-  invalid_page_count: 'O número de páginas informado é inválido.',
-  form_data_invalid: 'Os dados do formulário são inválidos.',
-  comment_invalid: 'O comentário informado é inválido.',
-  revision_title_required: 'Informe o título da revisão.',
 
   // ─── Platform: auth / session ─────────────────────────────────────────────
   'authn.expired': 'Sua sessão expirou. Faça login novamente.',
@@ -59,12 +53,9 @@ export const errorMessages: Record<string, string> = {
 
   // ─── Platform: authz / capability ─────────────────────────────────────────
   'authz.capability_denied': 'Você não tem permissão para executar esta ação.',
-  capability_denied: 'Você não tem permissão para executar esta ação.',
   FORBIDDEN_CAPABILITY: 'Você não tem permissão para executar esta ação.',
   FORBIDDEN_AREA: 'Você não tem permissão para atuar nesta área.',
   FORBIDDEN_ORIGIN: 'Origem da requisição não autorizada.',
-  forbidden: 'Você não tem permissão para executar esta ação.',
-  forbidden_role: 'Você não possui o papel necessário para esta ação.',
 
   // ─── Platform: concurrency / idempotency / rate ───────────────────────────
   CONCURRENT_MODIFICATION: 'O recurso foi alterado por outro usuário. Recarregue para continuar.',
@@ -87,28 +78,18 @@ export const errorMessages: Record<string, string> = {
 
   // ─── Platform: internal ───────────────────────────────────────────────────
   INTERNAL_ERROR: 'Ocorreu um erro interno. Tente novamente.',
-  internal: 'Ocorreu um erro interno. Tente novamente.',
-  internal_error: 'Ocorreu um erro interno. Tente novamente.',
   'internal.unknown': 'Ocorreu um erro interno. Tente novamente.',
   'internal.db_privilege_missing': 'O servidor não tem privilégio suficiente para concluir esta operação.',
   'internal.db_unknown': 'Falha inesperada no banco de dados. Tente novamente.',
   'internal.signature_misconfigured': 'Falha de configuração na verificação de assinatura. Contate o administrador.',
   NOT_IMPLEMENTED: 'Funcionalidade ainda não disponível.',
 
-  // ─── Templates module ─────────────────────────────────────────────────────
-  archived: 'Este template está arquivado e não pode ser alterado.',
-  content_hash_mismatch: 'O conteúdo do arquivo mudou desde o carregamento. Reenvie o documento.',
-  duplicate_placeholder_name: 'Há placeholders com o mesmo nome. Use nomes únicos.',
-  invalid_approval_config: 'A configuração de aprovação do template é inválida.',
-  invalid_state_transition: 'A versão não está no estado certo para esta ação.',
-  iso_segregation_violation: 'Você não pode atuar nesta etapa porque participou de uma etapa anterior do mesmo fluxo.',
-  key_conflict: 'Já existe um template com esta chave.',
-  not_found: 'O recurso solicitado não foi encontrado.',
-  placeholder_name_invalid: 'O nome do placeholder é inválido.',
-  stale_base: 'A base da versão mudou. Recarregue e tente novamente.',
-  stale_lock_version: 'Outro usuário alterou este recurso. Recarregue para continuar.',
+  // ─── Templates / documents domain-specific codes ──────────────────────────
+  ISO_SEGREGATION_VIOLATION: 'Você não pode atuar nesta etapa porque participou de uma etapa anterior do mesmo fluxo.',
+  STALE_BASE: 'A base da versão mudou. Recarregue e tente novamente.',
   SYSTEM_TEMPLATE_IMMUTABLE: 'Templates do sistema não podem ser alterados.',
-  upload_missing: 'Arquivo do template ainda não foi enviado. Faça o upload antes de prosseguir.',
+  UPLOAD_EXPIRED: 'O upload expirou. Tente enviar o arquivo novamente.',
+  UPLOAD_MISSING: 'O arquivo enviado não foi encontrado. Faça o upload novamente.',
 
   // ─── Approval / workflow ──────────────────────────────────────────────────
   'approval.unresolved_comments': 'Resolva os comentários pendentes antes de aprovar ou liberar este documento.',
@@ -130,19 +111,8 @@ export const errorMessages: Record<string, string> = {
   'state.route_inactive': 'Esta rota está inativa e não pode ser usada.',
 
   // ─── Documents (instances / sessions / checkpoints) ───────────────────────
-  checkpoint_not_found: 'Checkpoint não encontrado.',
-  comment_not_found: 'Comentário não encontrado.',
-  controlled_document_required: 'Informe o documento controlado para esta operação.',
-  document_not_found: 'Documento não encontrado.',
-  docx_missing: 'O arquivo DOCX do documento não foi encontrado.',
+  APPROVAL_ROUTE_MISSING: 'Nenhuma rota de aprovação configurada para este perfil. Configure uma rota antes de continuar.',
   not_a_choice_placeholder: 'Este campo não é uma lista de opções.',
-  expired_upload: 'O upload expirou. Tente enviar o arquivo novamente.',
-  gotenberg_failed: 'Falha ao gerar o PDF. Tente novamente.',
-  misbound: 'O documento está vinculado a outro recurso. Recarregue e tente novamente.',
-  pending_not_found: 'Pendência não encontrada.',
-  session_inactive: 'Sessão de edição inativa. Reabra o documento para continuar.',
-  session_not_holder: 'Outro usuário detém o controle desta sessão de edição.',
-  session_taken: 'Outro usuário iniciou uma sessão de edição neste documento.',
 
   // ─── Controlled documents ─────────────────────────────────────────────────
   ACTIVE_REVISION_ALREADY_EXISTS: 'Já existe uma revisão ativa para este documento.',
@@ -160,9 +130,6 @@ export const errorMessages: Record<string, string> = {
   OVERRIDE_TEMPLATE_NOT_PUBLISHED: 'O template de substituição não está publicado.',
   PROFILE_NO_DEFAULT_TEMPLATE: 'O perfil não possui template padrão definido.',
   VISIBILITY_SCOPE_INVALID: 'O escopo de visibilidade informado é inválido.',
-  controlled_document_not_active: 'O documento controlado não está ativo.',
-  controlled_document_not_found: 'Documento controlado não encontrado.',
-  profile_has_no_default_template: 'O perfil não possui template padrão definido.',
   'template.artifact_invariant_unconfigured': 'A configuração do artefato do template está incompleta. Contate o administrador.',
   'template.artifact_missing': 'Não foi possível criar o documento porque o template base não está disponível no momento.',
   template_invalid: 'A versão do template não corresponde ao perfil do documento.',

@@ -580,8 +580,8 @@ func TestCommitAutosave_InvalidPageCountUsesProblemEnvelope(t *testing.T) {
 	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
 		t.Fatalf("want application/problem+json, got %s", ct)
 	}
-	if !strings.Contains(rr.Body.String(), "invalid_page_count") {
-		t.Fatalf("expected invalid_page_count problem, got %s", rr.Body.String())
+	if !strings.Contains(rr.Body.String(), "VALIDATION_ERROR") {
+		t.Fatalf("expected VALIDATION_ERROR problem, got %s", rr.Body.String())
 	}
 }
 
@@ -709,8 +709,8 @@ func TestFinalizeDocument_ProfileNotFoundUsesProblemEnvelope(t *testing.T) {
 	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
 		t.Fatalf("want application/problem+json, got %s", ct)
 	}
-	if !strings.Contains(rr.Body.String(), "profile_not_found") {
-		t.Fatalf("expected profile_not_found problem, got %s", rr.Body.String())
+	if !strings.Contains(rr.Body.String(), "VALIDATION_ERROR") {
+		t.Fatalf("expected VALIDATION_ERROR problem, got %s", rr.Body.String())
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("sqlmock expectations: %v", err)

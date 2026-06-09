@@ -337,9 +337,9 @@ function placeholderToWire(p: Placeholder): WirePlaceholder {
 }
 
 export class StaleLockVersionError extends Error {
-  readonly code = 'stale_lock_version';
+  readonly code = 'CONCURRENT_MODIFICATION';
   constructor(message?: string) {
-    super(message ?? 'stale_lock_version');
+    super(message ?? 'Concurrent modification: the template schema changed since you loaded it.');
     this.name = 'StaleLockVersionError';
   }
 }
@@ -387,10 +387,10 @@ export async function putTemplateSchemas(
     const next = body?.data?.version?.lock_version;
     return { lockVersion: typeof next === 'number' ? next : expectedLockVersion + 1 };
   } catch (err) {
-    // The optimistic-lock conflict surfaces as RFC 9457 412/stale_lock_version
+    // The optimistic-lock conflict surfaces as RFC 9457 412/CONCURRENT_MODIFICATION
     // through the shared transport; re-raise as the typed domain error so the
     // editor can prompt a refresh.
-    if (err instanceof ApiError && (err.code === 'stale_lock_version' || err.status === 412)) {
+    if (err instanceof ApiError && (err.code === 'CONCURRENT_MODIFICATION' || err.status === 412)) {
       throw new StaleLockVersionError(err.message);
     }
     throw err;

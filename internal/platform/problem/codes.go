@@ -39,6 +39,16 @@ const (
 	CodeAuthForbidden              Code = "AUTH_FORBIDDEN"
 )
 
+// Documents/templates domain-specific codes (used in Problem.code).
+const (
+	CodeApprovalRouteMissing    Code = "APPROVAL_ROUTE_MISSING"
+	CodeUploadExpired           Code = "UPLOAD_EXPIRED"
+	CodeUploadMissing           Code = "UPLOAD_MISSING"
+	CodeStaleBase               Code = "STALE_BASE"
+	CodeISOSegregationViolation Code = "ISO_SEGREGATION_VIOLATION"
+	CodeSystemTemplateImmutable Code = "SYSTEM_TEMPLATE_IMMUTABLE"
+)
+
 // Field-level codes (used in FieldError.code).
 const (
 	FieldCodeRequired      Code = "REQUIRED"

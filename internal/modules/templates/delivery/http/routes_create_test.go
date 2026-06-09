@@ -380,8 +380,8 @@ func TestCreateTemplate_RejectUnknownField(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "invalid_body" {
-		t.Fatalf("expected error.code=invalid_body, got %q", out.Code)
+	if out.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected error.code=VALIDATION_ERROR, got %q", out.Code)
 	}
 }
 
@@ -411,8 +411,8 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 	if err := json.Unmarshal(secondRR.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Code != "key_conflict" {
-		t.Fatalf("expected error.code=key_conflict, got %q", out.Code)
+	if out.Code != "ALREADY_EXISTS" {
+		t.Fatalf("expected error.code=ALREADY_EXISTS, got %q", out.Code)
 	}
 }
 

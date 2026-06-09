@@ -178,26 +178,26 @@ func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.
 func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 	callerUserID := userIDFromReq(r)
 	isAdmin, err := h.isSystemAdmin(r.Context(), callerUserID, tenantID)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
 		log.Printf("documents listDocuments invalid query params: %v", err)
-		httpErr(w, http.StatusBadRequest, "bad_request")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
 	items, total, hasMore, err := h.svc.ListDocumentsPaginated(r.Context(), tenantID, effectiveUserID, opts)
 	if err != nil {
 		if errors.Is(err, pagination.ErrInvalidCursor) {
-			httpErr(w, http.StatusBadRequest, "invalid_cursor")
+			httpErr(w, http.StatusBadRequest, problem.CodeInvalidCursor)
 			return
 		}
 		status, msg := mapErr(err)
@@ -224,19 +224,19 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 	callerUserID := userIDFromReq(r)
 	isAdmin, err := h.isSystemAdmin(r.Context(), callerUserID, tenantID)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
 		log.Printf("documents documentStats invalid query params: %v", err)
-		httpErr(w, http.StatusBadRequest, "bad_request")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -329,7 +329,7 @@ func (h *Handler) getDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := toDocumentDetailResponse(*doc)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
@@ -409,11 +409,11 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 		Name string `json:"name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 	if !isValidBoundedText(req.Name, 255) {
-		httpErr(w, http.StatusBadRequest, "VALIDATION_ERROR")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -439,28 +439,28 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempotencyKey == "" {
-		httpErr(w, http.StatusBadRequest, "IDEMPOTENCY_KEY_REQUIRED")
+		httpErr(w, http.StatusBadRequest, problem.CodeIdempotencyKeyRequired)
 		return
 	}
 	if !idempotency.IsValidKey(idempotencyKey) {
-		httpErr(w, http.StatusBadRequest, "IDEMPOTENCY_KEY_INVALID")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
 	payloadHash, err := idempotency.RequestHash(r)
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 	revisionTitle := strings.TrimSpace(reqBody.RevisionTitle)
 
 	tenantForReplay, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 	actorForReplay := userIDFromReq(r)
@@ -473,12 +473,12 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	if idempStore != nil {
 		handle, replay, err := idempStore.BeginReplay(r.Context(), tenantForReplay, actorForReplay, idempotencyKey, payloadHash)
 		if errors.Is(err, idempotency.ErrConflict) {
-			httpErr(w, http.StatusUnprocessableEntity, "IDEMPOTENCY_KEY_REUSED")
+			httpErr(w, http.StatusUnprocessableEntity, problem.CodeIdempotencyKeyReused)
 			return
 		}
 		if err != nil {
 			log.Printf("documents finalize idempotency begin error: %v", err)
-			httpErr(w, http.StatusInternalServerError, "internal_error")
+			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 			return
 		}
 		if replay != nil {
@@ -516,9 +516,9 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		docID, tenantID,
 	).Scan(&revisionVersion, &revisionNumber, &cdID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			httpErr(w, http.StatusConflict, "document not in draft state")
+			httpErr(w, http.StatusConflict, problem.CodeStateTransitionInvalid)
 		} else {
-			httpErr(w, http.StatusInternalServerError, "internal error")
+			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		}
 		return
 	}
@@ -530,12 +530,12 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 			`SELECT profile_code FROM controlled_documents WHERE id = $1 AND tenant_id = $2`,
 			cdID.String, tenantID,
 		).Scan(&profileCode); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			httpErr(w, http.StatusInternalServerError, "internal error")
+			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 			return
 		}
 	}
 	if profileCode == "" {
-		httpErr(w, http.StatusBadRequest, "profile_not_found")
+		httpErrDetail(w, http.StatusBadRequest, problem.CodeValidationError, "controlled document has no profile configured")
 		return
 	}
 
@@ -552,9 +552,9 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		tenantID, profileCode,
 	).Scan(&routeID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			httpErr(w, http.StatusConflict, "no active approval route for profile "+profileCode)
+			httpErrDetail(w, http.StatusConflict, problem.CodeApprovalRouteMissing, "no active approval route for profile "+profileCode)
 		} else {
-			httpErr(w, http.StatusInternalServerError, "internal error")
+			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		}
 		return
 	}
@@ -568,7 +568,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		docID,
 	).Scan(&contentHash); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		log.Printf("documents finalize load content hash error: doc_id=%s tenant_id=%s err=%v", docID, tenantID, err)
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 
@@ -591,7 +591,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	if idempStore != nil && idempHandle != nil {
 		body, err := json.Marshal(respBody)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "internal_error")
+			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 			return
 		}
 		if err := idempStore.CompleteReplay(idempHandle, http.StatusCreated, body); err != nil {
@@ -687,7 +687,7 @@ func (h *Handler) heartbeatSession(w http.ResponseWriter, r *http.Request) {
 		SessionID string `json:"session_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -711,7 +711,7 @@ func (h *Handler) releaseSession(w http.ResponseWriter, r *http.Request) {
 		SessionID string `json:"session_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -728,7 +728,7 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 	adminID := userIDFromReq(r)
@@ -737,7 +737,7 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 		SessionID string `json:"session_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -763,7 +763,7 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 		ContentHash    string `json:"content_hash"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -802,7 +802,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		PageCount        *int            `json:"page_count"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -905,11 +905,11 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 		Label string `json:"label"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 	if !isValidBoundedText(req.Label, 255) {
-		httpErr(w, http.StatusBadRequest, "VALIDATION_ERROR")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -932,7 +932,7 @@ func (h *Handler) restoreCheckpoint(w http.ResponseWriter, r *http.Request) {
 
 	versionNum, err := strconv.Atoi(r.PathValue("version"))
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_version")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -1003,7 +1003,7 @@ func (h *Handler) createComment(w http.ResponseWriter, r *http.Request) {
 		Content          json.RawMessage `json:"content"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -1031,7 +1031,7 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 
 	libraryID, err := strconv.Atoi(r.PathValue("libraryID"))
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_library_comment_id")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 	var req struct {
@@ -1039,7 +1039,7 @@ func (h *Handler) updateComment(w http.ResponseWriter, r *http.Request) {
 		Done    *bool            `json:"done"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 
@@ -1065,7 +1065,7 @@ func (h *Handler) deleteComment(w http.ResponseWriter, r *http.Request) {
 
 	libraryID, err := strconv.Atoi(r.PathValue("libraryID"))
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_library_comment_id")
+		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
 	if err := h.svc.DeleteDocumentComment(r.Context(), tenantID, userID, docID, libraryID); err != nil {
@@ -1107,13 +1107,13 @@ func toCommentResponse(c domain.Comment) commentResponse {
 func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request, docID string) (tenantID string, userID string, ok bool) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return "", "", false
 	}
 	userID = userIDFromReq(r)
 	admin, err := h.isSystemAdmin(r.Context(), userID, tenantID)
 	if err != nil {
-		httpErr(w, http.StatusInternalServerError, "internal_error")
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return "", "", false
 	}
 	if admin {
@@ -1127,7 +1127,7 @@ func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request,
 		return "", "", false
 	}
 	if !owner {
-		httpErr(w, http.StatusForbidden, "forbidden")
+		httpErr(w, http.StatusForbidden, problem.CodeAuthForbidden)
 		return "", "", false
 	}
 	return tenantID, userID, true
@@ -1155,65 +1155,58 @@ func userIDFromReq(r *http.Request) string {
 	return iamdomain.UserIDFromContext(r.Context())
 }
 
-func mapErr(err error) (int, string) {
+func mapErr(err error) (int, problem.Code) {
 	switch {
 	case err == nil:
 		return http.StatusOK, ""
 	case errors.Is(err, domain.ErrForbidden), errors.Is(err, domain.ErrDocumentNotOwner):
-		return http.StatusForbidden, "forbidden"
-	case errors.Is(err, domain.ErrPendingNotFound):
-		return http.StatusNotFound, "pending_not_found"
-	case errors.Is(err, domain.ErrCheckpointNotFound):
-		return http.StatusNotFound, "checkpoint_not_found"
-	case errors.Is(err, domain.ErrCommentNotFound):
-		return http.StatusNotFound, "comment_not_found"
-	case errors.Is(err, domain.ErrNotFound):
-		return http.StatusNotFound, "not_found"
-	case errors.Is(err, domain.ErrInvalidName):
-		return http.StatusBadRequest, "invalid_name"
-	case errors.Is(err, domain.ErrInvalidPageCount):
-		return http.StatusBadRequest, "invalid_page_count"
-	case errors.Is(err, application.ErrControlledDocumentRequired):
-		return http.StatusBadRequest, "controlled_document_required"
-	case errors.Is(err, approvalapp.ErrRevisionTitleRequired):
-		return http.StatusBadRequest, "revision_title_required"
-	case errors.Is(err, domain.ErrCommentInvalid):
-		return http.StatusBadRequest, "comment_invalid"
+		return http.StatusForbidden, problem.CodeAuthForbidden
+	case errors.Is(err, domain.ErrPendingNotFound),
+		errors.Is(err, domain.ErrCheckpointNotFound),
+		errors.Is(err, domain.ErrCommentNotFound),
+		errors.Is(err, domain.ErrNotFound),
+		errors.Is(err, controlleddocumentsdomain.ErrCDNotFound):
+		return http.StatusNotFound, problem.CodeNotFound
+	case errors.Is(err, domain.ErrInvalidName),
+		errors.Is(err, domain.ErrInvalidPageCount),
+		errors.Is(err, application.ErrControlledDocumentRequired),
+		errors.Is(err, approvalapp.ErrRevisionTitleRequired),
+		errors.Is(err, domain.ErrCommentInvalid):
+		return http.StatusBadRequest, problem.CodeValidationError
 	case errors.Is(err, iamapp.ErrCapabilityDenied):
-		return http.StatusForbidden, "forbidden"
+		return http.StatusForbidden, problem.CodeForbiddenCapability
 	case errors.Is(err, domain.ErrExpiredUpload):
-		return http.StatusGone, "expired_upload"
+		return http.StatusGone, problem.CodeUploadExpired
 	case errors.Is(err, domain.ErrUploadMissing):
-		return http.StatusGone, "upload_missing"
+		return http.StatusGone, problem.CodeUploadMissing
 	case errors.Is(err, domain.ErrContentHashMismatch):
-		return http.StatusUnprocessableEntity, "content_hash_mismatch"
-	case errors.Is(err, domain.ErrSessionTaken):
-		return http.StatusConflict, "session_taken"
-	case errors.Is(err, domain.ErrSessionInactive):
-		return http.StatusConflict, "session_inactive"
-	case errors.Is(err, domain.ErrSessionNotHolder):
-		return http.StatusConflict, "session_not_holder"
+		return http.StatusUnprocessableEntity, problem.CodeValidationError
+	case errors.Is(err, domain.ErrSessionTaken),
+		errors.Is(err, domain.ErrSessionInactive),
+		errors.Is(err, domain.ErrSessionNotHolder),
+		errors.Is(err, domain.ErrMisbound),
+		errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
+		return http.StatusConflict, problem.CodeConflict
 	case errors.Is(err, domain.ErrStaleBase):
-		return http.StatusConflict, "stale_base"
-	case errors.Is(err, domain.ErrMisbound):
-		return http.StatusConflict, "misbound"
-	case errors.Is(err, domain.ErrInvalidStateTransition):
-		return http.StatusConflict, "invalid_state_transition"
-	case errors.Is(err, controlleddocumentsdomain.ErrCDNotFound):
-		return http.StatusNotFound, "controlled_document_not_found"
-	case errors.Is(err, controlleddocumentsdomain.ErrCDNotActive):
-		return http.StatusConflict, "controlled_document_not_active"
-	case errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
-		return http.StatusConflict, "profile_has_no_default_template"
+		return http.StatusConflict, problem.CodeConcurrentModification
+	case errors.Is(err, domain.ErrInvalidStateTransition),
+		errors.Is(err, controlleddocumentsdomain.ErrCDNotActive):
+		return http.StatusConflict, problem.CodeStateTransitionInvalid
 	case strings.HasPrefix(err.Error(), "form_data_invalid"):
-		return http.StatusUnprocessableEntity, "form_data_invalid"
+		return http.StatusUnprocessableEntity, problem.CodeValidationError
 	default:
-		return http.StatusInternalServerError, "internal_error"
+		return http.StatusInternalServerError, problem.CodeInternalError
 	}
 }
 
-func httpErr(w http.ResponseWriter, status int, msg string) {
-	_ = problem.Write(w, problem.New(status, problem.Code(msg), msg))
+func httpErr(w http.ResponseWriter, status int, code problem.Code) {
+	_ = problem.Write(w, problem.New(status, code, string(code)))
+}
+
+// httpErrDetail writes a canonical-code problem carrying runtime context in the
+// RFC 9457 detail field (never in the code field).
+func httpErrDetail(w http.ResponseWriter, status int, code problem.Code, detail string) {
+	_ = problem.Write(w, problem.New(status, code, string(code)).WithDetail(detail))
 }
 
 func isKnownDocumentStatus(status string) bool {

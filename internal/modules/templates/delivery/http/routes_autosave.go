@@ -11,14 +11,14 @@ import (
 func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid_version_number", "version must be an integer")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "version must be an integer")
 		return
 	}
 
@@ -50,14 +50,14 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid_version_number", "version must be an integer")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "version must be an integer")
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		ExpectedContentHash string `json:"expected_content_hash"`
 	}
 	if err := readJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid_body", err.Error())
+		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
 		return
 	}
 

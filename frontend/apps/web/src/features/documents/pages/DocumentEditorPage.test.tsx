@@ -560,8 +560,8 @@ describe('DocumentEditorPage autosave wiring', () => {
 describe('DocumentEditorPage load failure state', () => {
   it('shows an inline not-found style error and does not render metadata chrome when the document fetch fails', async () => {
     vi.mocked(api.getDocument).mockRejectedValueOnce({
-      code: 'not_found',
-      message: 'not_found',
+      code: 'NOT_FOUND',
+      message: 'not found',
     });
 
     renderPage(<DocumentEditorPage documentID="missing-doc" onDone={() => {}} />);

@@ -17,7 +17,7 @@ const (
 func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
@@ -28,16 +28,16 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 
 	limit, ok := readQueryInt(q.Get("limit"), 50)
 	if !ok {
-		writeErr(w, http.StatusBadRequest, "invalid_limit", "limit must be an integer")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidLimit, "limit must be an integer")
 		return
 	}
 	if limit > 200 {
-		writeErr(w, http.StatusBadRequest, "invalid_limit", "limit must be less than or equal to 200")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidLimit, "limit must be less than or equal to 200")
 		return
 	}
 	offset, ok := readQueryInt(q.Get("offset"), 0)
 	if !ok {
-		writeErr(w, http.StatusBadRequest, "invalid_offset", "offset must be an integer")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "offset must be an integer")
 		return
 	}
 
@@ -77,7 +77,7 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
@@ -95,16 +95,16 @@ func (h *Handler) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"template_id":        tpl.ID,
+		"template_id":         tpl.ID,
 		"template_version_id": ver.ID,
-		"name":              tpl.Name,
+		"name":                tpl.Name,
 	})
 }
 
 func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	templateID := r.PathValue("id")
@@ -136,7 +136,7 @@ func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	templateID := r.PathValue("id")
@@ -146,7 +146,7 @@ func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
 	}
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid_version_number", "version must be an integer")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "version must be an integer")
 		return
 	}
 
@@ -166,7 +166,7 @@ func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	templateID := r.PathValue("id")
@@ -176,7 +176,7 @@ func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {
 	}
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
 	if err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid_version_number", "version must be an integer")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "version must be an integer")
 		return
 	}
 
@@ -198,7 +198,7 @@ func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
 	templateID := r.PathValue("id")
@@ -210,12 +210,12 @@ func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 
 	limit, ok := readQueryInt(q.Get("limit"), 50)
 	if !ok {
-		writeErr(w, http.StatusBadRequest, "invalid_limit", "limit must be an integer")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidLimit, "limit must be an integer")
 		return
 	}
 	offset, ok := readQueryInt(q.Get("offset"), 0)
 	if !ok {
-		writeErr(w, http.StatusBadRequest, "invalid_offset", "offset must be an integer")
+		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "offset must be an integer")
 		return
 	}
 
