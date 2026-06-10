@@ -126,7 +126,7 @@ func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
 func (h *AdminHandler) handleUserRoleUpsertTyped(w http.ResponseWriter, r *http.Request) {
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id required"))
 		return
 	}
 	h.handleUserRoleUpsert(w, r, userID)
@@ -135,7 +135,7 @@ func (h *AdminHandler) handleUserRoleUpsertTyped(w http.ResponseWriter, r *http.
 func (h *AdminHandler) handleReplaceUserRolesTyped(w http.ResponseWriter, r *http.Request) {
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id required"))
 		return
 	}
 	h.handleReplaceUserRoles(w, r, userID)

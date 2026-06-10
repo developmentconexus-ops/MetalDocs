@@ -1,22 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
 import { api } from "../../../lib/api/client";
+import type { components } from "../../../lib/api-types";
 
-type AuditExportFormat = "csv" | "jsonl";
-
-type AuditFilter = {
-  actorId?: string;
-  action?: string;
-  resourceType?: string;
-  resourceId?: string;
-  occurredAfter?: string;
-  occurredBefore?: string;
-  q?: string;
-};
-
-type ExportAuditBody = {
-  format: AuditExportFormat;
-  filter: AuditFilter;
-};
+// Derived from the generated contract so the SERIALIZED body keys are exactly
+// what the handler reads (filter.actor_id/resource_type/occurred_after/…). A
+// hand-rolled camelCase shape here would launder past tsc and be silently
+// dropped by the snake-reading Go decoder — the bug class this rename fixed.
+export type AuditExportFilter = components["schemas"]["AuditFilter"];
+export type ExportAuditBody = components["schemas"]["AuditExportRequest"];
 
 export function useExportAuditMutation() {
   return useMutation({

@@ -6,6 +6,7 @@ import AuditFilterBar, {
   type AuditDatePreset,
   type AuditFilterValue,
 } from "../components/AuditFilterBar";
+import type { AuditExportFilter } from "../mutations/useExportAuditMutation";
 import {
   useAuditEventsQuery,
   type AuditEventsQueryParams,
@@ -104,17 +105,23 @@ export default function AuditTab() {
     ],
   );
 
-  const queryParams: AuditEventsQueryParams = useMemo(
-    () => ({
-      limit: PAGE_SIZE,
-      actorId: filterValue.actorId,
-      action: filterValue.action,
-      resourceType: filterValue.resourceType,
-      resourceId: filterValue.resourceId,
-      occurredAfter: dateWindow.occurredAfter,
-      occurredBefore: dateWindow.occurredBefore,
-      q: filterValue.q,
-    }),
+  // Wire object: the keys here go straight onto GET /audit/events, and the
+  // handler reads snake_case (actor_id/resource_type/…). The camelCase UI
+  // filterValue is mapped to those wire keys here. `satisfies` (not a `:`
+  // annotation) excess-checks the literal, so any future camel-key drift is a
+  // tsc error rather than a silently-ignored param (the bug this rename fixed).
+  const queryParams = useMemo(
+    () =>
+      ({
+        limit: PAGE_SIZE,
+        actor_id: filterValue.actorId,
+        action: filterValue.action,
+        resource_type: filterValue.resourceType,
+        resource_id: filterValue.resourceId,
+        occurred_after: dateWindow.occurredAfter,
+        occurred_before: dateWindow.occurredBefore,
+        q: filterValue.q,
+      }) satisfies AuditEventsQueryParams,
     [
       filterValue.actorId,
       filterValue.action,
@@ -162,16 +169,20 @@ export default function AuditTab() {
     }
   }, [eventsQuery]);
 
+  // Export POST body filter — serialized into the request, so it must carry the
+  // snake_case keys the handler decodes (filter.actor_id/resource_type/…). Same
+  // camel→snake mapping + `satisfies` guard as queryParams above.
   const exportFilter = useMemo(
-    () => ({
-      actorId: filterValue.actorId,
-      action: filterValue.action,
-      resourceType: filterValue.resourceType,
-      resourceId: filterValue.resourceId,
-      occurredAfter: dateWindow.occurredAfter,
-      occurredBefore: dateWindow.occurredBefore,
-      q: filterValue.q,
-    }),
+    () =>
+      ({
+        actor_id: filterValue.actorId,
+        action: filterValue.action,
+        resource_type: filterValue.resourceType,
+        resource_id: filterValue.resourceId,
+        occurred_after: dateWindow.occurredAfter,
+        occurred_before: dateWindow.occurredBefore,
+        q: filterValue.q,
+      }) satisfies AuditExportFilter,
     [filterValue, dateWindow.occurredAfter, dateWindow.occurredBefore],
   );
 

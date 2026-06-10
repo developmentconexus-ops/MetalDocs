@@ -49,7 +49,7 @@ type setDefaultTemplateRequest struct {
 func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
 	includeArchived, err := parseIncludeArchived(r)
 	if err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "includeArchived must be true or false")
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "include_archived must be true or false")
 		return
 	}
 

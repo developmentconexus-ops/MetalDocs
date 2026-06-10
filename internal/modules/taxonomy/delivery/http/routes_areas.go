@@ -23,7 +23,7 @@ type areaUpsertRequest struct {
 func (h *Handler) listAreas(w http.ResponseWriter, r *http.Request) {
 	includeArchived, err := parseIncludeArchived(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "includeArchived must be true or false")
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "include_archived must be true or false")
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)

@@ -1,20 +1,15 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { resolveQueryError } from "../../../lib/api/resolveQueryError";
-import { useExportAuditMutation } from "../mutations/useExportAuditMutation";
+import {
+  useExportAuditMutation,
+  type AuditExportFilter,
+} from "../mutations/useExportAuditMutation";
 import styles from "./AuditExportButton.module.css";
 
 type ExportFormat = "csv" | "jsonl";
 
-export interface AuditExportFilter {
-  actorId?: string;
-  action?: string;
-  resourceType?: string;
-  resourceId?: string;
-  occurredAfter?: string;
-  occurredBefore?: string;
-  q?: string;
-}
+export type { AuditExportFilter };
 
 interface AuditExportButtonProps {
   filter: AuditExportFilter;

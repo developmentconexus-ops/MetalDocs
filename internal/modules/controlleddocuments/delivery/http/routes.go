@@ -173,7 +173,7 @@ func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.R
 	profileCode := strings.TrimSpace(params.ProfileCode)
 	areaCode := strings.TrimSpace(params.AreaCode)
 	if profileCode == "" || areaCode == "" {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "profileCode and areaCode query parameters are required")
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "profile_code and area_code query parameters are required")
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)

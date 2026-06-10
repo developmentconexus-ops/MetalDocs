@@ -191,7 +191,7 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id required"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
@@ -241,7 +241,7 @@ func (h *PeopleHandler) handleResetPassword(w http.ResponseWriter, r *http.Reque
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id required"))
 		return
 	}
 	var body iamapi.ResetManagedUserPasswordRequest
@@ -273,7 +273,7 @@ func (h *PeopleHandler) handleUnlock(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id required"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
@@ -305,7 +305,7 @@ func (h *PeopleHandler) handleBulk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(body.UserIds) == 0 {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userIds required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_ids required"))
 		return
 	}
 	action := string(body.Action)
@@ -365,7 +365,7 @@ func (h *PeopleHandler) handleListMemberships(w http.ResponseWriter, r *http.Req
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id required"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
