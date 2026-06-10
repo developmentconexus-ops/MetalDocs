@@ -1,154 +1,79 @@
 # Current Agent Handoff
 
-> **Last verified:** 2026-05-27
-> **Scope:** Recovery context for a fresh or reinstalled Codex session.
-> **Out of scope:** Full implementation details for each screen. Follow the linked plan/spec/backlog files for that.
+> **Last verified:** 2026-06-10
+> **Scope:** Recovery context for a fresh agent session after the user reinstalls Claude/Codex. Captures workspace state, in-flight programs, the new architecture reference stack, and the agent-memory contents that do not survive a tool reinstall.
+> **Out of scope:** Implementation details — follow the linked ADRs, backlog programs, and architecture docs.
 
-## Why this exists
+## Why this exists (2026-06-10 rewrite)
 
-Codex Desktop became unstable and the user planned to reinstall it. This page is the durable landing document for the next session so the agent does not lose the current roadmap state, the Plan 12 screen-finalization intent, or the recovered information from an inaccessible templates review thread.
+The user is uninstalling Claude Code / Codex. The agent's persistent memory directory (`~/.claude/projects/.../memory/`) will be wiped, and session history will be gone. This file is the durable landing document. The previous version of this file (Plan 12 screen-finalization era, 2026-05-27) is superseded; Plan 12 context lives in git history if ever needed.
 
-Start a fresh session by reading this file after `AGENTS.md`, `CLAUDE.md`, `wiki/README.md`, `wiki/quality/qa-operating-system.md`, and `wiki/references/ai-operating-system.md`.
+Start a fresh session by reading: `CLAUDE.md` → `wiki/README.md` → this file → the three-doc architecture stack (below).
 
 ## Workspace state at handoff
 
-- Repository: `C:\Users\leandro.theodoro.MN-NTB-LEANDROT\Documents\MetalDocs`
-- Current branch observed: `codex/release-v2-name-polish`
-- Latest observed commit: `7b79f48b docs: design template wizard stabilization`
-- Unrelated untracked file observed: `repair-codex-chat-render.ps1`
-- Do not delete, stage, or commit `repair-codex-chat-render.ps1` unless the user explicitly asks.
+- Repository: `C:\Users\leandro.theodoro\Documents\MetalDocs`
+- Branch: `qa/iam-area-membership` (main branch for PRs: `main`)
+- Latest commit: `791cc0850 docs(wiki): sync route templates + query params to snake_case (Family 5)`
+- **Uncommitted work in the tree (this session's deliverable — commit it):**
+  - `wiki/standards/backend-canon.md` (new)
+  - `wiki/architecture/backend-blueprint.md` (new)
+  - `wiki/architecture/backend-target-architecture.md` (new)
+  - `wiki/architecture/index.md`, `wiki/standards/index.md` (index entries)
+  - `wiki/references/current-agent-handoff.md` (this rewrite)
+  - Suggested commit: `docs(wiki): backend architecture reference stack (canon → blueprint → target) + handoff`
 
-## Current roadmap position
+## The architecture reference stack (created 2026-06-10)
 
-Plan 12 is the screen finalization plan. It converts the mock-era designed screens into real product screens backed by runtime capability, OpenAPI/generated types, TanStack Query, and documented backend behavior.
+The user's directive: before further "industry-grade" refactoring, define everything — what a backend is composed of, how ours maps, and how it must behave. Three documents now form the canonical chain. **This is the reference for the whole refactoring effort:**
 
-The user-reported Plan 12 status is:
+1. **[`wiki/standards/backend-canon.md`](../standards/backend-canon.md)** — implementation-independent definition of what a backend is composed of. Planes (data/control/management), layers, full concern catalog (edge, API, middleware, identity, domain/DDD, data, async, reliability, observability, security, config, integrations), exact identity vocabulary (authn vs authz, permission vs capability vs role vs scope, PEP/PDP, RBAC/ABAC/ReBAC), canonical sources, 10 litmus tests.
+2. **[`wiki/architecture/backend-blueprint.md`](../architecture/backend-blueprint.md)** — current MetalDocs mapped onto the canon. Composition diagram, real middleware chain (`main.go:595-602`), async write path, per-concern maturity grades (✅/🟡/🔴), standards register, scoreboard with owning programs.
+3. **[`wiki/architecture/backend-target-architecture.md`](../architecture/backend-target-architecture.md)** — **normative target spec.** ~60 REQ-* requirements (RFC 2119), target diagrams/workflows (topology, middleware chain, login, two-tier authz sequence, contract-first workflow, outbox/retry/DLQ), **Refactoring register RF-1..RF-10** with sequencing, litmus tests bound to REQ IDs as release gates, governance rules (PRs cite REQ IDs; MUST deviations need an ADR).
 
-| Screen plan | Screen | User-reported status |
-|---|---|---|
-| Plan 12.1 | `templates` list | done |
-| Plan 12.2 | `caixa-aprovacao` | done |
-| Plan 12.3 | `novo-documento` | done |
-| Plan 12.4 | `novo-template-wizard` | closed in current workspace; see 2026-05-17 closure checkpoint below |
-| Plan 12.5 | `template-editor` | next target |
-| Plan 12.6 | `documento-publicado` | remaining |
-| Plan 12.7 | `library` / biblioteca | remaining |
+Flow: **canon defines target → blueprint locates gap → target specifies behavior → ADR records decision → program executes.**
 
-Important: the next agent must not treat "visual done" as "product done." The original mock screens intentionally used mock data for desired future behavior. Plan 12 is the real-integration pass: keep the visual direction, but wire only behavior that exists or is explicitly implemented.
+## In-flight programs (status at handoff)
 
-## Plan 12 operating rule
+### 1. ADR 0022 — Authz capability coherence
+`wiki/decisions/0022-authz-capability-coherence.md`. Phases 1-5 and 7-13 COMPLETE (registry SSOT, typed scope, membership area-scoping, directory SQL-scoping, CI binding guards, runtime scope binding, raw-string dialect closed, CI coherence-net revived). **Phase 6 (wiki sync via `wiki-curator`) still pending — deliberately sequenced LAST.** Residual: `authz-call-present` call-graph lint rewrite (deferred), authz-cache invalidation contract (RF-3). The original `area_admin` membership 403 is closed at root. **Never symptom-patch authz — this ADR is the boundary.**
 
-Before implementing any screen:
+### 2. API contract hardening
+`wiki/backlog/api-contract-hardening.md`. 6 phases from the 2026-06-05 audit: A base-path ✅, B authz security gaps ✅, C dead-path prune ✅ (2026-06-07), D envelope / E hygiene / F cleanup — F partially done (FD-1 landed 2026-06-08). ~397 reported-only (non-blocking) api-lint spec-drift hits remain; blocking guards are at 0. Maps to RF-4 (fence/converge `spec2.yaml` + `internal/api/v2`) and RF-5.
 
-1. Use `metaldocs-frontend`.
-2. Use `metaldocs-screen-integration-audit` when the screen/backlog may contain mock-era widgets, legacy wrappers, missing backend capability, or deferred behavior.
-3. Use `metaldocs-screen-implementation` before writing TSX/CSS for a designed screen.
-4. Use `metaldocs-tanstack-query` when touching frontend API wrappers, generated API types, query hooks, query keys, cache invalidation, or server state.
-5. Use `runtime-contract-prereq` if startup, auth/session, target route, OpenAPI/generated types, or frontend wrapper truth is not trustworthy.
-6. Use the canonical QA loop before claiming fixed, done, green, or passing: static/targeted verification, code review, product QA, root-cause classification, fix by family, targeted regression, broader regression when boundary-crossing, close only with evidence.
+### 3. Backend standardization (final polish)
+6 families: auth hardening / pagination / error-vocab / casing / CI / dead-code. Executed as batched workflows on `qa/std-execution`, **merged into `qa/iam-area-membership`** (last session). Recent commits on this branch are its output: RFC 9457 error vocabulary (`ef696a177`), constant-time login paths (`f792d64de`), snake_case params spec-first (`16b72f81f`, `2369a02bf`), api-lint CI cleanup (`8e3b99727`), wiki sync (`791cc0850`). Batch A review findings addressed (`7faa7fb3d`). Status: Batches A+B landed; verify whether any family has open tail work before claiming the program closed.
 
-Classify every mismatch before touching code:
+## Next steps (agreed sequencing, from the target doc §10)
 
-| Classification | Meaning |
-|---|---|
-| `runtime prerequisite` | Startup/auth/route does not run reliably enough for screen work. |
-| `shared contract prerequisite` | OpenAPI/runtime/generated/frontend wrappers disagree. |
-| `module-local implementation` | Backend/API/module fix belongs to the owning module and is needed now. |
-| `screen-local implementation` | UI/state/query fix belongs to the screen PR. |
-| `wiki-memory drift` | Code truth changed and wiki/backlog/module docs need sync. |
-| `workflow/tooling gap` | A skill, script, or guide failed to prevent confusion. |
-| `architecture contradiction` | The required fix is redesign-grade and must stop the current implementation lane. |
-| `defer` | Desired product behavior lacks backend/runtime support and must not be faked. |
+1. Commit the doc stack (above).
+2. **Close ADR 0022 Phase 6** (wiki sync — runs last, now unblocked).
+3. Finish api-contract-hardening tail (RF-5) + decide RF-4 (fence or converge the v2 spec surface).
+4. **RF-1 + RF-2 as one program** — the biggest unowned gap: observability audit (OTel exporter wiring, trace propagation api→worker→docx-renderer through outbox rows, readiness-probe depth) + middleware chain realignment (panic recovery + trace context outermost, metrics outside auth so 401s/panics are visible, pre-auth IP-keyed rate limit on login). Current chain: `cors → origin → authn → iam → presence → obs → ratelimit → mux` (`apps/api/cmd/metaldocs-api/main.go:595-602`).
+5. RF-3 (authz cache contract), RF-9 (graceful shutdown/timeout audit), RF-10 (idempotency coverage audit).
+6. RF-7 (delete or implement empty `platform/cache`, `platform/storage`; document-or-fence `platform/messaging` servicebus), RF-8 (feature-flag lifecycle doc).
 
-Default mismatch rule: continue only if the mismatch is local to the current task boundary. Otherwise stop and surface the prerequisite first.
-Hard-stop rule: if the fix requires redesign-grade work outside the assigned boundary, stop and report the architecture contradiction and minimum prerequisite plan instead of patching local symptoms.
+## Recovered agent memory (wiped by the reinstall — re-create if a memory system returns)
 
-## Recovered inaccessible thread
+These facts lived in the agent's persistent memory and are NOT derivable from the repo:
 
-The user could not open this thread:
+- **Machine:** C: SSD (XPG S50 Lite) has degraded writes (~7-16 MB/s; reads fine). Hardware/firmware issue. Prefer `D:` for heavy-write work (builds, caches) when possible.
+- **Impeccable adoption plan:** adopt the "impeccable" design skill only AFTER IAM PR-2, as a guidance layer over MetalDocs design tokens (not a replacement); needs a bridge doc first.
+- **Authz program intent:** the user explicitly chose root-cause coherence (ADR 0022) over symptom-patching the membership 403 — keep honoring that.
+- **Backend standardization parameters:** approved as a 6-family batched-workflow program; H2 finding downgraded to LOW; NEW-1 was the real HIGH; idle timeout policy 30m sliding.
+- **User working style:** wants industry-grade/professional standards, definitions-before-implementation, evidence-based closure; caveman (terse) chat mode was active in Claude sessions — irrelevant for docs/code, which stay normal.
 
-- Thread id: `019e3160-26da-78e1-b81c-19017a5f2b5d`
-- URI: `codex://threads/019e3160-26da-78e1-b81c-19017a5f2b5d`
-- Local backup found: `C:\Users\leandro.theodoro.MN-NTB-LEANDROT\.codex\repair-backups\single-session-render-20260516-132734\rollout-2026-05-16T12-20-45-019e3160-26da-78e1-b81c-19017a5f2b5d.jsonl`
+## Operating rules that remain binding (pointers, not copies)
 
-Recovered summary:
-
-- The vanished thread started because a templates-v2/templates review session disappeared.
-- It identified the active branch as `codex/release-v2-name-polish`.
-- It reconstructed a review from the branch diff because no saved review artifact existed.
-- It found the branch was not ready to merge.
-- The branch mixed wizard completion, release-facing V2 naming cleanup, OpenAPI/generated truth, DB migration correctness, frontend wrappers, screenshots, and wiki drift.
-- A subagent review also found critical contract drift around `POST /api/v1/templates`.
-- The user chose a split sequence: finish the template wizard professionally first, then handle broader release cleanup separately.
-- The session wrote and committed `docs/superpowers/specs/2026-05-16-template-wizard-stabilization-design.md`.
-
-Recovered review blockers that were verified/resolved before declaring Plan 12.4 closed:
-
-| Finding | Action from recovered design |
-|---|---|
-| `POST /api/v1/templates` OpenAPI partial, bundled OpenAPI, runtime, and frontend wrapper disagree | Fix contract truth, regenerate backend/frontend types, align wrapper |
-| Wizard slug/stepper can bypass required slug validation | Fix as screen-local wizard behavior |
-| Active template wizard/catalog paths still used raw `fetch` | Move touched active paths to canonical API client behavior |
-| Upgrade migration can leave template DB tripwire disabled after table rename | Fix migration/runtime DB truth |
-| Templates wiki still referenced old placeholder catalog path | Sync wiki memory |
-| Screenshot/artifact files appeared under nested `frontend/apps/web/frontend/apps/web/...` | Clean artifact placement |
-| Global V2 inventory still had many hits | Defer to release cleanup unless blocking the wizard |
-
-The committed design spec is the authoritative recovery artifact:
-
-- `docs/superpowers/specs/2026-05-16-template-wizard-stabilization-design.md`
-
-2026-05-17 closure checkpoint:
-
-- `/templates/new` is a four-step wizard: Perfil, Identidade, Estrutura, Confirmação.
-- The old template-use permissions/disponibilidade step was removed by product decision. Template governance stays IAM capability-based (`template.*`); template selection for document creation is driven by document type/profile and lifecycle/publication state, not creator-scoped template visibility.
-- Template create/list runtime behavior and OpenAPI/generated DTOs no longer expose or filter by `visibility`, `areas`, or `specific_areas`. Existing database columns remain inert compatibility fields pending a coordinated baseline/migration cleanup.
-- DOCX wizard import is implemented: the selected `.docx` is held until submit, template/version is created, bytes are uploaded via autosave presign, SHA-256 is committed through autosave commit, then Eigenpal opens `/templates/{id}/versions/{n}` with the imported document rendered.
-- Browser validation created both blank and imported-DOCX templates. Blank opened Eigenpal with a blank draft; imported DOCX rendered fixture text `Hello {doc_code}` and did not show `No document loaded`.
-- Fresh gates after closure: frontend template typecheck passed; targeted template Vitest passed (2 files / 5 tests); backend templates `go test ./internal/modules/templates/... -count=1` passed with workspace-local Go cache; backend `go generate ./internal/modules/templates/api/...` passed; editor-ui typecheck passed; editor-ui Vitest passed (5 files / 13 tests); `git diff --check` passed with only CRLF warnings; templates wiki tally passed with severity count 4/6/4.
-- Known caveats: Redocly lint remains blocked by npm `ECOMPROMISED Lock compromised`; the broad frontend suite still has unrelated existing failures; final browser reconnect failed because the browser runtime could not write kernel assets, but prior runtime validation evidence exists in `.codex-run/template-e2e-result.json`.
-
-## Plan 12.5 next target
-
-Plan 12.5 is the `template-editor` screen. Do not start broad implementation until the previous section is resolved or consciously accepted by the user as a separate follow-up.
-
-Recommended first reads for Plan 12.5:
-
-- `docs/superpowers/specs/2026-05-13-plan-12-screens.md`
-- `wiki/backlog/template-editor.md`
-- `wiki/modules/templates.md`
-- `wiki/modules/templates-tech-debt.md`
-- `wiki/modules/editor-chrome.md`
-- `wiki/modules/editor-ui-eigenpal.md`
-- `wiki/architecture/frontend-structure.md`
-- `wiki/architecture/api-contract.md`
-- `wiki/concepts/design-workflow-audit.md`
-- `frontend/apps/web/design-source/template-editor/NOTES.md` if present
-
-Recommended gates before screen work:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/templates
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-module-contract-sync.ps1 -Module templates
-```
-
-Template-editor specific focus:
-
-- Preserve the current visual direction unless the user asks for redesign.
-- Do not add mocked comments, fake version history, fake status workflows, or fake backend metrics.
-- Use real generated contract types and canonical API wrappers.
-- Verify editor-chrome and editor-ui-eigenpal behavior before changing editor integration.
-- If a backlog item requires a backend endpoint that does not exist, mark it `defer` in the screen notes/backlog instead of mocking it.
-
-## Documents naming context
-
-The user stated they are changing references from `documents_v2` to `documents` and that functionality is working as intended. Treat this as naming consistency unless direct verification shows runtime or contract drift. Do not launch a broad rename sweep from Plan 12.5 unless the user explicitly asks.
+- `CLAUDE.md` — skill routing table, mandatory gates, hard-stop rule, evidence rule, close-out loop. Read first, always.
+- `wiki/quality/qa-operating-system.md` — canonical QA/close-out policy.
+- Startup: `.\scripts\start-api.ps1` only (script-truth policy). Dev login: `POST /api/v1/auth/login` `{"identifier":"admin","password":"AdminMetalDocs123!"}`.
+- Wiki drift policy: code change touching a documented surface bumps `Last verified` same change; dispatch `wiki-curator` after refactors.
+- **New since 2026-06-10:** backend work is reviewed against `backend-target-architecture.md` REQ IDs; deviating from a MUST requires an ADR.
 
 ## How to proceed in a fresh session
 
-1. Read `AGENTS.md`, `CLAUDE.md`, `wiki/README.md`, `wiki/quality/qa-operating-system.md`, `wiki/references/ai-operating-system.md`, and this file.
-2. Run `git status --short` and identify current branch.
-3. Treat Plan 12.4 as closed unless fresh verification contradicts the 2026-05-17 closure checkpoint.
-4. If proceeding to Plan 12.5, create or read the Plan 12.5 execution plan and start with `metaldocs-screen-integration-audit`.
-5. Use implementation subagents only after the screen integration audit classifies the work into independent, non-overlapping implementation slices.
-6. After implementation changes, run the relevant verification gates and sync wiki memory with `metaldocs-module-doc-sync` for touched documented modules.
+1. Read `CLAUDE.md` → `wiki/README.md` → this file → the three-doc stack.
+2. `git status --short`; confirm branch; commit the doc stack if still uncommitted.
+3. Pick up at "Next steps" item 2 (ADR 0022 Phase 6) unless the user redirects.
+4. Do not re-execute anything from prior session summaries without verifying against the working tree — most of it is already done.

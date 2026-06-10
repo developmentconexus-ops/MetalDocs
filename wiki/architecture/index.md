@@ -3,6 +3,8 @@
 > **Last verified:** 2026-05-27
 > **Scope:** Durable architecture truth for system structure, contracts, and platform boundaries.
 
+- [backend-target-architecture.md](backend-target-architecture.md) - normative target spec (REQ-* requirements, diagrams, refactoring register) — the reference for the industry-grade refactoring program
+- [backend-blueprint.md](backend-blueprint.md) - backend composition model: every concern, its industry standard, and maturity grade
 - [backend-api-structure.md](backend-api-structure.md) - canonical backend route and OpenAPI structure
 - [api-contract.md](api-contract.md) - contract-first API policy and generated-surface rules
 - [api-design-system.md](api-design-system.md) - API behavior standards and cross-module contract rules
