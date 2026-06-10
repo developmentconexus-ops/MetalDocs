@@ -1,5 +1,7 @@
 # Documents Module Surface
 
+> _Param-casing sync 2026-06-09: path templates reconciled to the std-execution Family 5 rename (`{libraryID}` → `{library_id}`)._
+
 ## 1) File tree
 - internal/modules/documents/
   - internal/modules/documents/module.go - (undocumented)
@@ -359,8 +361,8 @@ OperationIDs from internal/modules/documents/api/api.gen.go:
 | HANDLEFUNC | GET /api/v1/documents/{id}/revisions/{rid}/url | h.signedRevisionURL | internal/modules/documents/delivery/http/handler.go:103 |
 | HANDLEFUNC | GET /api/v1/documents/{id}/comments | h.listComments | internal/modules/documents/delivery/http/handler.go:104 |
 | HANDLEFUNC | POST /api/v1/documents/{id}/comments | h.createComment | internal/modules/documents/delivery/http/handler.go:105 |
-| HANDLEFUNC | PATCH /api/v1/documents/{id}/comments/{libraryID} | h.updateComment | internal/modules/documents/delivery/http/handler.go:106 |
-| HANDLEFUNC | DELETE /api/v1/documents/{id}/comments/{libraryID} | h.deleteComment | internal/modules/documents/delivery/http/handler.go:107 |
+| HANDLEFUNC | PATCH /api/v1/documents/{id}/comments/{library_id} | h.updateComment | internal/modules/documents/delivery/http/handler.go:106 |
+| HANDLEFUNC | DELETE /api/v1/documents/{id}/comments/{library_id} | h.deleteComment | internal/modules/documents/delivery/http/handler.go:107 |
 | HANDLEFUNC | GET /api/v1/documents | h.listDocuments | internal/modules/documents/delivery/http/handler.go:111 |
 | HANDLEFUNC | GET /api/v1/documents/stats | h.documentStats | internal/modules/documents/delivery/http/handler.go:112 |
 | HANDLEFUNC | GET /api/v1/documents/{id} | h.getDocument | internal/modules/documents/delivery/http/handler.go:114 |
@@ -378,8 +380,8 @@ OperationIDs from internal/modules/documents/api/api.gen.go:
 | HANDLEFUNC | GET /api/v1/documents/{id}/revisions/{rid}/url | h.signedRevisionURL | internal/modules/documents/delivery/http/handler.go:138 |
 | HANDLEFUNC | GET /api/v1/documents/{id}/comments | h.listComments | internal/modules/documents/delivery/http/handler.go:139 |
 | HANDLEFUNC | POST /api/v1/documents/{id}/comments | h.createComment | internal/modules/documents/delivery/http/handler.go:140 |
-| HANDLEFUNC | PATCH /api/v1/documents/{id}/comments/{libraryID} | h.updateComment | internal/modules/documents/delivery/http/handler.go:141 |
-| HANDLEFUNC | DELETE /api/v1/documents/{id}/comments/{libraryID} | h.deleteComment | internal/modules/documents/delivery/http/handler.go:142 |
+| HANDLEFUNC | PATCH /api/v1/documents/{id}/comments/{library_id} | h.updateComment | internal/modules/documents/delivery/http/handler.go:141 |
+| HANDLEFUNC | DELETE /api/v1/documents/{id}/comments/{library_id} | h.deleteComment | internal/modules/documents/delivery/http/handler.go:142 |
 | HANDLEFUNC | GET /api/v1/documents | h.listDocuments | internal/modules/documents/delivery/http/handler.go:82 |
 | HANDLEFUNC | GET /api/v1/documents/stats | h.documentStats | internal/modules/documents/delivery/http/handler.go:83 |
 | HANDLEFUNC | GET /api/v1/documents/{id} | h.getDocument | internal/modules/documents/delivery/http/handler.go:85 |

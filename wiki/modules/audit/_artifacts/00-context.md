@@ -4,6 +4,8 @@
 > **Composer:** main agent
 > **Skill version:** metaldocs-module-doc 1.2
 
+> _Param-casing sync 2026-06-09: query params reconciled to the std-execution Family 5 rename (`?resourceType=&resourceId=` → `?resource_type=&resource_id=`)._
+
 ## What this module is (one paragraph)
 
 `internal/modules/audit/` is a **write-only sink + read-only query surface** for regulated mutation events. Consumer modules call `auditdomain.Writer.Record(ctx, Event)` after performing a regulated state change; an admin/IAM console reads recent rows via `auditdomain.Reader.ListEvents`. Storage is a single Postgres table `metaldocs.audit_events` (migration 0004), append-only by design — no UPDATE/DELETE privilege granted (`migrations/0005_grant_workflow_audit_privileges.sql:2` grants INSERT only). Module exposes one HTTP route (`GET /api/v1/audit/events`) wired in `internal/modules/audit/delivery/http/handler.go:35`.
@@ -49,7 +51,7 @@ Test file: `tests/unit/audit_http_handler_test.go`.
 Phase 2 should trace 3 operations to cover full surface:
 
 1. **Writer.Record** (write path) — pick a representative caller: `iam.AdminHandler.recordAudit` at `internal/modules/iam/delivery/http/admin_handler.go:449-466` → `auditpg.Writer.Record` → INSERT.
-2. **handleEvents** (query path, HTTP) — `GET /api/v1/audit/events?resourceType=&resourceId=&limit=` → `application.Service.ListEvents` → `auditpg.Writer.ListEvents` (table SELECT).
+2. **handleEvents** (query path, HTTP) — `GET /api/v1/audit/events?resource_type=&resource_id=&limit=` → `application.Service.ListEvents` → `auditpg.Writer.ListEvents` (table SELECT).
 3. **IAM admin recent-events read** (internal Reader consumer) — `iam.AdminHandler` `WithAuditReader` path at `internal/modules/iam/delivery/http/admin_handler.go:77-135` (recent 25 events for admin console).
 
 No state-transition operation — module is append-only. **§6 (Runtime View) state-machine table row: "n/a — append-only sink, no aggregate lifecycle."**

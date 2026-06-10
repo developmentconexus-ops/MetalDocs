@@ -1,6 +1,6 @@
 # Concept: Controlled Documents
 
-> **Last verified:** 2026-06-08 (Phase E1: request body and response fields updated to snake_case; prior: 2026-05-21)
+> **Last verified:** 2026-06-09 (std-execution Family 5 query-param snake_case: preview-code `?profile_code=<code>&area_code=<code>`; prior: 2026-06-08 Phase E1: request body and response fields updated to snake_case; prior: 2026-05-21)
 > **Scope:** What a Controlled Document (CD) is, code generation, profile + area binding, sequence counters, atomic create endpoint, preview endpoint.
 > **Key files:**
 > - `internal/modules/controlleddocuments/` — controlled-documents module; hosts the atomic create handler
@@ -68,7 +68,7 @@ The CD itself doesn't have an approval state — its document revisions do. The 
 
 ## Preview Endpoint
 
-`GET /api/v2/controlled-documents/preview-code?profileCode=<code>&areaCode=<code>`
+`GET /api/v2/controlled-documents/preview-code?profile_code=<code>&area_code=<code>`
 
 Returns the **next** code that would be assigned for the given (profile, area) pair if a document were created now — read-only, no sequence reservation. The actual code is assigned at create time and may differ if another document is created concurrently.
 

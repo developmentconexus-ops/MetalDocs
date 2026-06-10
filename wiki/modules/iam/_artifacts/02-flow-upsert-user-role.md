@@ -1,8 +1,10 @@
 # Data-flow trace � upsertUserRole
 
 Operation: `upsertUserRole`  
-HTTP: `POST /api/v1/iam/users/{userId}/roles`  
+HTTP: `POST /api/v1/iam/users/{user_id}/roles`  
 Module: `internal/modules/iam`
+
+> _Param-casing sync 2026-06-09: path template reconciled to the std-execution Family 5 rename (`{userId}` → `{user_id}`)._
 
 ## 1. Entry point
 
@@ -14,7 +16,7 @@ Module: `internal/modules/iam`
 
 ## 2. Call chain
 
-1. `internal/modules/iam/delivery/http/admin_handler.go:189` `(*AdminHandler).handleUserRoute` � parses `/api/v1/iam/users/{userId}/...` and dispatches POST `roles` to upsert handler.  
+1. `internal/modules/iam/delivery/http/admin_handler.go:189` `(*AdminHandler).handleUserRoute` � parses `/api/v1/iam/users/{user_id}/...` and dispatches POST `roles` to upsert handler.  
    ? calls: `internal/modules/iam/delivery/http/admin_handler.go:196` `(*AdminHandler).handleUserRoleUpsert`
 2. `internal/modules/iam/delivery/http/admin_handler.go:316` `(*AdminHandler).handleUserRoleUpsert` � validates method/body/role, resolves `assignedBy` and tenant, invokes admin service.  
    ? calls: `internal/modules/iam/delivery/http/admin_handler.go:350` `(*AdminHandler).service.UpsertUserAndAssignRole`
@@ -43,7 +45,7 @@ Idempotency interaction:
 
 | Entity | From | To | Trigger | Capability required |
 |---|---|---|---|---|
-| `metaldocs.iam_user_roles` row for `(tenant_id,user_id)` | existing row or none | replaced with one inserted row for requested role | `POST /api/v1/iam/users/{userId}/roles` | `user.manage` (`iamdomain.CapUserManage`) |
+| `metaldocs.iam_user_roles` row for `(tenant_id,user_id)` | existing row or none | replaced with one inserted row for requested role | `POST /api/v1/iam/users/{user_id}/roles` | `user.manage` (`iamdomain.CapUserManage`) |
 
 Anchors: delete `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:51`; insert `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:57`; capability mapping `apps/api/cmd/metaldocs-api/permissions.go:112`.
 

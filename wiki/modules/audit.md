@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-08 (Phase F audit-cursor re-audit: handleEvents now emits nested `{items, page:{next_cursor,has_more}}`; prior: Phase E1 casing big-bang) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-09 (std-execution Family 5 query-param snake_case: `/audit/events?resource_type=&resource_id=`; prior: 2026-06-08 Phase F audit-cursor re-audit: handleEvents now emits nested `{items, page:{next_cursor,has_more}}`; prior: Phase E1 casing big-bang) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/audit/domain/port.go:8-31` â€” `Event`, `ListEventsQuery`, `Writer`, `Reader`
@@ -94,7 +94,7 @@ Inbound interfaces (Go):
 - `auditdomain.Reader.ListEvents(ctx, query) ([]Event, error)` â€” called by iam `AdminHandler.handleAdminOverview` (`internal/modules/iam/delivery/http/admin_handler.go:128`) for the recent-25 panel.
 
 Inbound interfaces (HTTP):
-- `GET /api/v1/audit/events?resourceType=&resourceId=&limit=` â€” public list (T-001: no authz).
+- `GET /api/v1/audit/events?resource_type=&resource_id=&limit=` â€” public list (T-001: no authz).
 
 Outbound interfaces:
 - DB: `metaldocs.audit_events` only â€” single owned table, no FKs, no triggers.
@@ -210,7 +210,7 @@ sequenceDiagram
     participant S as Service.ListEvents
     participant PG as postgres.Writer.ListEvents
     participant DB as metaldocs.audit_events
-    C->>H: GET /api/v1/audit/events?resourceType&resourceId&limit
+    C->>H: GET /api/v1/audit/events?resource_type&resource_id&limit
     H->>H: parse limit (400 on parse fail)
     H->>S: ListEvents(ctx, query)
     S->>S: clamp Limit to [1..200] (default 50)

@@ -1,5 +1,7 @@
 # IAM Surface Scan
 
+> _Param-casing sync 2026-06-09: path templates reconciled to the std-execution Family 5 rename (`{userId}` → `{user_id}`). Go identifiers (`userID`, `areaCode`) are unchanged._
+
 ## 1. File tree
 
 ### domain/
@@ -190,11 +192,11 @@
 | `GET` | `/api/v1/iam/users` | `(*AdminHandler).handleListUsers` | `internal/modules/iam/delivery/http/admin_handler.go:88` |
 | `POST` | `/api/v1/iam/users` | `(*AdminHandler).handleCreateUser` | `internal/modules/iam/delivery/http/admin_handler.go:90` |
 | `GET` | `/api/v1/iam/admin/overview` | `(*AdminHandler).handleAdminOverview` | `internal/modules/iam/delivery/http/admin_handler.go:85` |
-| `POST` | `/api/v1/iam/users/{userId}/roles` | `(*AdminHandler).handleUserRoleUpsert` | `internal/modules/iam/delivery/http/admin_handler.go:196` |
-| `PUT` | `/api/v1/iam/users/{userId}/roles` | `(*AdminHandler).handleReplaceUserRoles` | `internal/modules/iam/delivery/http/admin_handler.go:198` |
-| `POST` | `/api/v1/iam/users/{userId}/reset-password` | `(*AdminHandler).handleResetPassword` | `internal/modules/iam/delivery/http/admin_handler.go:206` |
-| `POST` | `/api/v1/iam/users/{userId}/unlock` | `(*AdminHandler).handleUnlockUser` | `internal/modules/iam/delivery/http/admin_handler.go:210` |
-| `PATCH` | `/api/v1/iam/users/{userId}` | `(*AdminHandler).handlePatchUser` | `internal/modules/iam/delivery/http/admin_handler.go:214` |
+| `POST` | `/api/v1/iam/users/{user_id}/roles` | `(*AdminHandler).handleUserRoleUpsert` | `internal/modules/iam/delivery/http/admin_handler.go:196` |
+| `PUT` | `/api/v1/iam/users/{user_id}/roles` | `(*AdminHandler).handleReplaceUserRoles` | `internal/modules/iam/delivery/http/admin_handler.go:198` |
+| `POST` | `/api/v1/iam/users/{user_id}/reset-password` | `(*AdminHandler).handleResetPassword` | `internal/modules/iam/delivery/http/admin_handler.go:206` |
+| `POST` | `/api/v1/iam/users/{user_id}/unlock` | `(*AdminHandler).handleUnlockUser` | `internal/modules/iam/delivery/http/admin_handler.go:210` |
+| `PATCH` | `/api/v1/iam/users/{user_id}` | `(*AdminHandler).handlePatchUser` | `internal/modules/iam/delivery/http/admin_handler.go:214` |
 
 ## 4. Migration list
 
