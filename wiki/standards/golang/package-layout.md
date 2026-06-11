@@ -58,4 +58,4 @@ If two packages need each other, extract shared types to a third package, usuall
 
 ## Generated Code
 
-`internal/api/v2/types_gen.go` and `api.gen.go` are excluded from lint. Never edit generated files by hand.
+`api.gen.go` files are excluded from lint. Never edit generated files by hand. (Note: `internal/api/v2/types_gen.go` was deleted in Wave 1, F-03.)

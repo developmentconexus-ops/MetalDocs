@@ -191,7 +191,7 @@ The only production `WithTenantID` caller is `internal/modules/auth/delivery/htt
 
 ### 3.3 Global rate-limit check (`security.RateLimiter`)
 
-Runs inside `httpObs.Wrap(rateLimiter.Wrap(mux))` at `main.go:598`, after CORS, origin-protection, and both auth middlewares.
+Runs as layer 9 of 10 in the chain composed by `apps/api/cmd/metaldocs-api/chain.go` (Wave 1, F-01), after CORS, origin-protection, both auth middlewares, and presence bump.
 
 1. `RateLimiter.Wrap` checks `shouldSkipRateLimit(path)` — `ratelimit.go:177`; skips `/api/v1/health/live` and `/api/v1/health/ready`.
 2. `requestIdentity(req)` — `ratelimit.go:181` — resolves identity in preference order:
@@ -298,14 +298,14 @@ Two identical implementations of a CSV-split function exist: `internal/platform/
 **RL-5 — `authn.DevRoleMap` uses `sync.Once` with package-level vars; not test-resettable**
 `devRoleMapOnce` and `devRoleMapCached` are package-level singletons (`authn/config.go:160-163`). Once set, `t.Setenv` in tests will not invalidate the cache. Tests calling this function with different `METALDOCS_DEV_USER_ROLES` values will see the first-call result. Minor testing-in-production leak.
 
-**RL-6 — `httpObs` sits inside auth in the middleware chain; 401/CORS rejections are not counted in RED metrics**
-Chain order: `cors → originProtection → authMiddleware → iamMiddleware → httpObs → rateLimiter → mux` (`main.go:598, 602`). Requests rejected by CORS, origin-protection, or auth middleware bypass `httpObs`. This means 401 responses are not counted in the observability layer, violating REQ-MW-4. Flagged as RF-2.
+~~**RL-6 — `httpObs` sits inside auth in the middleware chain; 401/CORS rejections are not counted in RED metrics**~~
+CLOSED Wave 1 (F-01, RF-2): `httpObs` moved to layer 2 (outside authn/iam/cors) in the reordered chain (`chain.go`). 401 responses are now counted in RED metrics. REQ-MW-4 satisfied.
 
 **RL-7 — Wiki drift: `wiki/architecture/tenant-context.md §5` describes a removed `LegacyHeaderEnabled` X-Tenant-ID fallback**
 The doc (line 126-138) describes a fallback in `iam/delivery/http/middleware.go` that reads `X-Tenant-ID` when `tenant.FromContext` fails. The actual code (`internal/modules/iam/delivery/http/middleware.go:92-98`) responds 401 immediately on `ErrTenantMissing` with no fallback. The `LegacyHeaderEnabled` field does not exist.
 
 **RL-8 — Wiki drift: `wiki/architecture/rate-limiting.md §2.1` line-number anchors are stale**
-That external doc cites `main.go:209` for `security.NewRateLimiter` and `main.go:471` for the handler chain. Verified actual line numbers: `main.go:276` (`security.NewRateLimiter`) and `main.go:598` (handler chain `httpObs.Wrap(rateLimiter.Wrap(mux))`). This document's own anchors (§3.3) use the correct line numbers; the stale references exist only in `wiki/architecture/rate-limiting.md` and require a separate correction to that file.
+That external doc cites `main.go:209` for `security.NewRateLimiter` and `main.go:471` for the handler chain. As of Wave 1, chain composition moved to `chain.go`; `security.NewRateLimiter` line number may have shifted in `main.go`. Stale references exist only in `wiki/architecture/rate-limiting.md` and require a separate correction to that file.
 
 **Open questions:**
 

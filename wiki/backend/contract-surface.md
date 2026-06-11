@@ -1,13 +1,11 @@
 # Contract Surface — OpenAPI v1, spec2/v2, Codegen Pipeline, api-lint
 
-> **Last verified:** 2026-06-10
+> **Last verified:** 2026-06-11 (Wave 1)
 > **Scope:** API contract surface for MetalDocs: the canonical OpenAPI v1 spec, the parallel spec2/v2 surface (RF-4), the oapi-codegen backend pipeline, the openapi-typescript frontend type pipeline, and the api-lint guard system. Runtime topology and per-module handler detail are in [../architecture/backend-api-structure.md](../architecture/backend-api-structure.md). Strategic stack and current maturity grades are in [../architecture/backend-blueprint.md](../architecture/backend-blueprint.md). Normative requirements referenced here originate from [../architecture/backend-target-architecture.md](../architecture/backend-target-architecture.md).
 > **Key files:**
 > - `api/openapi/v1/openapi.yaml` — canonical v1 contract (5 333 lines)
-> - `api/openapi/spec2.yaml` — parallel approval-only spec (RF-4; 1 061 lines)
 > - `api/openapi/v1/partials/` — three legacy partial files (not consumed by any codegen config)
 > - `internal/modules/*/api/cfg.yaml` + `api.gen.go` — per-module oapi-codegen config and generated stubs
-> - `internal/api/v2/types_gen.go` — hand-maintained legacy type package (misnomer; not generated)
 > - `frontend/apps/web/src/lib/api-types/index.d.ts` — generated TypeScript types
 > - `scripts/api-lint/` — bespoke contract-guard binary
 > - `.github/workflows/api-contract.yml` — CI enforcement jobs
@@ -43,11 +41,9 @@ The canonical pipeline generates per-module Go server stubs with `oapi-codegen v
 | `api/openapi/v1/partials/documents.yaml` | 247 | Dead from pipeline perspective — PascalCase response fields (`DocumentID`, `InitialRevisionID`, `SessionID`), no `operationId` on most ops |
 | `api/openapi/v1/partials/templates.yaml` | 108 | Dead from pipeline perspective — `/api/v1/` path prefix |
 
-### Parallel surface (RF-4)
+### Parallel surface (RF-4) — CLOSED Wave 1
 
-| File | Lines | Status |
-|---|---|---|
-| `api/openapi/spec2.yaml` | 1 061 | Parallel approval-only spec; 13 approval routes; non-Problem error schema; no `//go:generate` consumes it; not linted by api-lint; no global or per-operation `security:` declarations |
+`api/openapi/spec2.yaml` (1 061 lines) and `internal/api/v2/` were deleted in Wave 1 (F-03, 2026-06-11) to eliminate the duplicate contract surface per REQ-API-2. Three contract tests were updated to use `problem.Problem` directly. The `capability-catalog-hash` CI job was also removed (it was a no-op stub). RF-4 is closed.
 
 ---
 
@@ -90,12 +86,9 @@ Each `api.gen.go` exports:
 | `frontend/apps/web/src/lib/api-types/index.d.ts` | Generated TypeScript types; consumed by FE via `openapi-fetch` |
 | `frontend/apps/web/package.json` script `gen:api` | Invokes `openapi-typescript ../../../api/openapi/v1/openapi.yaml -o src/lib/api-types/index.d.ts` |
 
-### Pre-codegen legacy package
+### Pre-codegen legacy package — DELETED Wave 1
 
-| File | Lines | Role |
-|---|---|---|
-| `internal/api/v2/types_gen.go` | 60 | Hand-maintained response types: `ProfileResponse`, `AreaResponse`, `ControlledDocumentResponse`, `MembershipResponse`, `APIError`; predates v1 pipeline (first commit `53060b957`) |
-| `internal/api/v2/contract_test.go` | 65 | JSON round-trip tests for `apiv2.APIError` and `apiv2.ProfileResponse` |
+`internal/api/v2/types_gen.go` and `internal/api/v2/contract_test.go` were deleted in Wave 1 (F-03). Contract tests using `apiv2.APIError` were updated to assert `problem.Problem` directly.
 
 ---
 
@@ -148,6 +141,7 @@ Violations format: `<file>:<line>: <RULE>: <message>` on stdout; exit code 1 on 
 | `frontend-codegen-drift` | `.github/workflows/api-contract.yml:47-48` | `npm run gen:api` + `git diff --exit-code -- src/lib/api-types/`; stale TS types fail the build |
 | `openapi-lint` | `.github/workflows/api-contract.yml` | Redocly lint against v1 spec |
 | `spec-base-path-gate` | `.github/workflows/api-contract.yml` | PATH-BASE-PREFIX check only (fast gate) |
+| ~~`capability-catalog-hash`~~ | ~~`.github/workflows/invariants.yml`~~ | **DELETED Wave 1 (F-03):** Was a no-op stub (placeholder SHA, missing seed file). Removed. Real REQ-AUTHZ-5 guard = api-lint registry rules. |
 | `api-design-system-lint` | `.github/workflows/api-contract.yml:95` | Full `go run ./scripts/api-lint/ -strict api/openapi/v1/openapi.yaml .` |
 
 ---
@@ -398,7 +392,7 @@ Steps:
 | `internal/modules/iam/delivery/http/` | `iamapi` |
 | `internal/modules/taxonomy/delivery/http/` | `taxonomyapi` |
 | `internal/modules/templates/delivery/http/` (presumed) | `templatesapi` |
-| Contract test files (`routes_contract_test.go`, `routes_memberships_contract_test.go`, `routes_profiles_contract_test.go`) | `apiv2 "metaldocs/internal/api/v2"` — `APIError` assertion only |
+| Contract test files (previously imported `apiv2`) | Deleted package; tests now assert `problem.Problem` directly (Wave 1, F-03) |
 
 `apps/api/cmd/metaldocs-api/` does NOT directly import generated api packages; it wires handlers, not the generated interfaces themselves.
 
@@ -434,9 +428,9 @@ The following flags relate to this area. Each one is catalogued in [legacy-regis
 | **CASING-DRIFT: partials camelCase** | `api/openapi/v1/partials/controlled-documents.yaml:207-305` | All property names camelCase (`tenantId`, `profileCode`, `ownerUserId`, etc.); contradicts snake_case in canonical spec at `api/openapi/v1/openapi.yaml:5000-5031`. CASING-DRIFT rule does not run against partials. |
 | **CASING-DRIFT: partials PascalCase fields** | `api/openapi/v1/partials/documents.yaml:47-51` | `DocumentID`, `InitialRevisionID`, `SessionID` response fields. |
 | **PATH-BASE-PREFIX: all three partials** | `api/openapi/v1/partials/controlled-documents.yaml:2`, equivalents in documents.yaml and templates.yaml | All use `/api/v1/...` path keys; PATH-BASE-PREFIX check does not run against partials. |
-| **RF-4: parallel spec2.yaml surface** | `api/openapi/spec2.yaml:1-30`; `wiki/architecture/backend-target-architecture.md:200` | 13 approval routes in spec2.yaml overlap in HTTP path with v1 `approval` tag ops; non-Problem error schema; no global security declarations; not linted. No ADR and no sunset date as of this audit. Requires "converge or formally fence" per REQ-API-2. |
-| **`types_gen.go` filename misnomer** | `internal/api/v2/types_gen.go:1` | File is hand-maintained but named with `_gen.go` suffix, which by Go convention implies machine generation. Tools and linters (including the api-lint pagination-codec check at `scripts/api-lint/code_rules.go:97`) skip `*.gen.go` files, silently exempting this hand-maintained file from those checks. |
-| **`apiv2.APIError` parallel error type** | `internal/api/v2/types_gen.go:55-60`; `internal/modules/iam/delivery/http/routes_memberships_contract_test.go:109-114` | Flat `{Code, Message, Details, TraceID}` shape differs from `Problem {title, status, code, detail, instance, errors}`. Contract tests pass because `json.Unmarshal` tolerates missing fields, but the type does not faithfully represent the `application/problem+json` contract. |
+| ~~**RF-4: parallel spec2.yaml surface**~~ | ~~`api/openapi/spec2.yaml`~~ | **CLOSED Wave 1 (F-03, 2026-06-11):** `spec2.yaml`, `internal/api/v2/`, and the `capability-catalog-hash` CI job all deleted. REQ-API-2 satisfied. |
+| ~~**`types_gen.go` filename misnomer**~~ | ~~`internal/api/v2/types_gen.go`~~ | **CLOSED Wave 1 (F-03):** Package deleted. |
+| ~~**`apiv2.APIError` parallel error type**~~ | ~~`internal/api/v2/types_gen.go`~~ | **CLOSED Wave 1 (F-03):** Package deleted; contract tests use `problem.Problem`. |
 | **`iamapi` cfg.yaml bundles three tags** | `internal/modules/iam/api/cfg.yaml:9-11` | Tags `[iam, audit, security]` generate a single 5 691-line `api.gen.go`. Three distinct domains share one generated package; couples their regeneration. |
 | **`POST /iam/users` undeclared deprecation** | `api/openapi/v1/openapi.yaml:213` | Description marks `createManagedUser` as "legacy; prefer inviteUser" but no OpenAPI `deprecated: true` marker exists; machine-readable consumers have no signal. |
 | **spec2.yaml missing security declarations** | `api/openapi/spec2.yaml:1-30` | No global or per-operation `security:` block; AUTHZ-DRIFT rule does not run against spec2.yaml. |
@@ -451,7 +445,7 @@ The following flags relate to this area. Each one is catalogued in [legacy-regis
 
 2. **[runtime-unverified]** Whether parameter binding errors in generated `ServerInterfaceWrapper` methods produce `application/problem+json` or bare `http.Error` text responses.
 
-3. **RF-4 resolution** — `api/openapi/spec2.yaml` and `internal/api/v2/types_gen.go` are explicitly flagged in the target architecture under REQ-API-2. As of this audit there is no ADR and no sunset date. The practical question — whether approval handlers implement the spec2.yaml shape, the v1 shape, or a mix — cannot be answered by static analysis alone.
+3. ~~**RF-4 resolution**~~ — **CLOSED Wave 1 (F-03).** `spec2.yaml` and `internal/api/v2/` deleted; approval handlers use the v1 `Problem` contract only.
 
 4. **Partial file consumers** — Whether the three partial files feed any non-codegen tooling (documentation portal, external consumer) cannot be confirmed by static analysis. If genuinely dead they should be deleted; if live they must be converged with the canonical spec.
 

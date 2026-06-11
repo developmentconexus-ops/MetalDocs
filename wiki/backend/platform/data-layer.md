@@ -1,18 +1,17 @@
 # Platform Data Layer
 
-> **Last verified:** undefined
-> **Scope:** Packages `internal/platform/db`, `internal/platform/migrate`, `internal/platform/bootstrap`, `internal/platform/objectstore`, `internal/platform/storage`, and `internal/platform/cache`. Covers Postgres connectivity, schema migration, DI bootstrap factories, MinIO presigning, raw blob storage, and the empty `cache` placeholder.
+> **Last verified:** 2026-06-11 (Wave 1: `platform/cache` deleted F-08; River migration single-owner F-19)
+> **Scope:** Packages `internal/platform/db`, `internal/platform/migrate`, `internal/platform/bootstrap`, `internal/platform/objectstore`, `internal/platform/storage`. Covers Postgres connectivity, schema migration, DI bootstrap factories, MinIO presigning, and raw blob storage. `platform/cache` was deleted in Wave 1 (F-08/REQ-TOP-3 — was a `.gitkeep`-only empty scaffold).
 > **Key files:**
 > - `internal/platform/db/postgres/connect.go` — sole Postgres connection factory
 > - `internal/platform/migrate/migrate.go` — forward-only SQL migration runner
 > - `internal/platform/bootstrap/api.go` — API dependency bundle + MinIO client wiring
-> - `internal/platform/bootstrap/jobs.go` — River schema migration + jobs dependency bundle
+> - `internal/platform/bootstrap/jobs.go` — River schema migration (`MigrateRiverSchema`); API binary is the sole owner (Wave 1, F-19)
 > - `internal/platform/bootstrap/worker.go` — outbox + PDF converter dependency bundle
 > - `internal/platform/objectstore/document_presigner.go` — document presign / adopt / hash
 > - `internal/platform/objectstore/templates_presigner.go` — template presign / head
 > - `internal/platform/objectstore/template_keys.go` — canonical MinIO key helpers
 > - `internal/platform/storage/minio/store.go` — raw blob store for PDF byte I/O
-> - `internal/platform/cache/.gitkeep` — empty placeholder (no Go code)
 
 ---
 
@@ -28,7 +27,7 @@ The layer owns five distinct concerns:
 4. Two MinIO presigner value objects for tenant-namespaced presigned PUT/GET URLs, plus helper functions for canonical object-key construction (`objectstore`).
 5. A raw MinIO blob-store adapter that satisfies the `pdfObjectStore` interface consumed by `platform/servicebus.GotenbergPDFClient` (`storage/minio`).
 
-`platform/cache` is an empty placeholder — a `.gitkeep` only, no Go code — and therefore has no behavior. See the Legacy flags section.
+~~`platform/cache`~~ — **DELETED Wave 1 (F-08/REQ-TOP-3).** Was a `.gitkeep`-only empty scaffold with no Go code.
 
 ---
 
@@ -54,7 +53,7 @@ The layer owns five distinct concerns:
 | File | Role |
 |---|---|
 | `internal/platform/bootstrap/api.go` | `APIDependencies` struct bundles all module repos, audit, messaging publisher, Gotenberg, MinIO clients, and cleanup. `BuildAPIDependencies` switches on `repoMode` (postgres vs memory) to wire concrete adapters or in-memory stubs. `buildMinioClients` creates two separate MinIO client instances: one for internal signed ops, one for browser-reachable presigning. |
-| `internal/platform/bootstrap/jobs.go` | `JobsDependencies` struct + `BuildJobsDependencies`: opens its own Postgres connection, runs `MigrateRiverSchema`, builds a River client bundle. `MigrateRiverSchema` is exported for reuse in `main.go`. |
+| `internal/platform/bootstrap/jobs.go` | `JobsDependencies` struct + `BuildJobsDependencies`: opens its own Postgres connection, builds a River client bundle. **Wave 1 (F-19):** `BuildJobsDependencies` no longer calls `MigrateRiverSchema`; the API binary is the sole owner. `MigrateRiverSchema` is still exported and called only from `main.go`. |
 | `internal/platform/bootstrap/worker.go` | `WorkerDependencies` struct + `BuildWorkerDependencies`: opens Postgres, wires the outbox consumer, optionally wires the Gotenberg PDF converter, reads `METALDOCS_FANOUT_URL` and `METALDOCS_DOCX_RENDERER_SERVICE_TOKEN` from env directly. |
 | `internal/platform/bootstrap/api_test.go` | Tests for Gotenberg health-check status (up/skipped/down), MinIO invalid public endpoint error. |
 | `internal/platform/bootstrap/worker_test.go` | Tests for `workerClaimLease` floor enforcement. |
@@ -78,11 +77,9 @@ The layer owns five distinct concerns:
 |---|---|
 | `internal/platform/storage/minio/store.go` | Package `minio`. `Store` struct backed by a single MinIO client. Methods: `EnsureBucket`, `Save`, `Open`, `Delete`. Satisfies the `pdfObjectStore` interface in `platform/servicebus/gotenberg_pdf.go:49-52`. |
 
-### `internal/platform/cache`
+### `internal/platform/cache` — DELETED (Wave 1, F-08)
 
-| File | Role |
-|---|---|
-| `internal/platform/cache/.gitkeep` | Empty directory marker only. No Go source files exist. Package has zero behavior. Present since initial commit (2026-03-16). |
+Directory and its `.gitkeep` file removed. Was an empty placeholder with no Go source since the initial commit. Deleted to satisfy REQ-TOP-3 (no speculative empty platform scaffolds).
 
 ---
 
@@ -117,7 +114,7 @@ func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig)
 func MigrateRiverSchema(ctx context.Context, db *sql.DB, schema string) error
 ```
 
-`MigrateRiverSchema` is called from both `bootstrap/jobs.go:36` and directly from `apps/api/cmd/metaldocs-api/main.go:439`.
+**Wave 1 (F-19):** `MigrateRiverSchema` is now called only from `apps/api/cmd/metaldocs-api/main.go` (the API binary is the sole River schema migration owner). `BuildJobsDependencies` no longer calls it — the jobs compose service declares `depends_on: api(healthy)` so the schema exists before `metaldocs-jobs` starts.
 
 ### `internal/platform/objectstore`
 
@@ -194,8 +191,8 @@ Key references: `apps/api/cmd/metaldocs-api/main.go:180-194`, `internal/platform
 ### Flow 2: Jobs binary startup — River schema migration
 
 1. `apps/jobs/cmd/metaldocs-jobs/main.go` calls `bootstrap.BuildJobsDependencies(ctx, cfg, workerFactory)`.
-2. `bootstrap/jobs.go:25-66`: opens a dedicated `pgdb.Open` pool; calls `MigrateRiverSchema(ctx, db, cfg.RiverSchema)`, which delegates to `rivermigrate.New(...).Migrate(ctx, DirectionUp, nil)`; invokes the injected `workerFactory(db)`.
-3. `MigrateRiverSchema` is also exposed publicly and called from `apps/api/cmd/metaldocs-api/main.go:439` when the API binary needs River enqueuer access. Both callers invoke it independently; `rivermigrate` is idempotent but the dual-call path is fragile (see Legacy flags).
+2. `bootstrap/jobs.go:25-66`: opens a dedicated `pgdb.Open` pool; invokes the injected `workerFactory(db)`. **Wave 1 (F-19):** no longer calls `MigrateRiverSchema` — the API binary ran that before the jobs binary started.
+3. `MigrateRiverSchema` is called from `apps/api/cmd/metaldocs-api/main.go` only. The dual-caller fragility noted in the legacy register is resolved.
 
 ### Flow 3: Document presign flow (browser upload path)
 
@@ -292,7 +289,7 @@ References: `internal/platform/servicebus/gotenberg_pdf.go:70-108`, `internal/pl
 | `platform/bootstrap` | `apps/api/cmd/metaldocs-api/main.go`, `apps/worker/cmd/metaldocs-worker/main.go`, `apps/jobs/cmd/metaldocs-jobs/main.go` |
 | `platform/objectstore` | `apps/api/cmd/metaldocs-api/main.go`, `internal/platform/objectstore/template_keys_test.go` |
 | `platform/storage/minio` | `bootstrap/api.go`, `bootstrap/worker.go` |
-| `platform/cache` | No imports (empty package — no files) |
+| ~~`platform/cache`~~ | **DELETED Wave 1 (F-08)** |
 
 ---
 
@@ -421,7 +418,7 @@ No goroutines, channels, outbox writes, or timers are present in any file in thi
 
 | Flag | Location | RF / REQ |
 |---|---|---|
-| `platform/cache` is an empty placeholder | `internal/platform/cache/.gitkeep` — present since 2026-03-16 initial commit (`912879cba`); zero Go files; zero behavior | RF-7, REQ-TOP-3 |
+| ~~`platform/cache` empty placeholder~~ | **CLOSED Wave 1 (F-08):** directory + `.gitkeep` deleted. | RF-7 partial (closed), REQ-TOP-3 |
 | `internal/platform/db` declares no Go package; real package is `internal/platform/db/postgres` | `internal/platform/db/.gitkeep` + `internal/platform/db/postgres/connect.go:1` — one driver, one file; extra nesting adds path depth without namespace value | RF-7, REQ-TOP-3 |
 | `document_presigner_export.go` splits `DocumentPresigner` methods across two files | `internal/platform/objectstore/document_presigner_export.go:1-38` — `_export` suffix conventionally signals test-helper export files in Go (`export_test.go`); the split is maintenance friction | — |
 | `log.Printf` instead of `slog` in `objectstore` | `internal/platform/objectstore/document_presigner.go:10, 80` — inconsistent with the canonical observability pattern; loses request context | — |
@@ -429,7 +426,7 @@ No goroutines, channels, outbox writes, or timers are present in any file in thi
 | `bootstrap/api.go` imports module infrastructure directly | `internal/platform/bootstrap/api.go` — 216 lines; largest file in area; transitive dep of 3+ bounded contexts; recompiles on any module infrastructure change | — |
 | `METALDOCS_FANOUT_URL` and `METALDOCS_DOCX_RENDERER_SERVICE_TOKEN` read via `os.Getenv`, not config struct | `internal/platform/bootstrap/worker.go:47-48` — breaks the 12-Factor typed-config-at-startup contract for these two values | — |
 | Three separate MinIO client instances created under full Gotenberg + MinIO mode | `internal/platform/bootstrap/api.go:85-103` — `buildMinioClients` (two clients for presigning) + `miniostore.NewStore` (one more for PDF byte I/O) | — |
-| `MigrateRiverSchema` called from two callers with no guard | `bootstrap/jobs.go:36` and `apps/api/cmd/metaldocs-api/main.go:439` — `rivermigrate` is idempotent, so correctness is preserved; the duplication is fragile | — |
+| ~~`MigrateRiverSchema` called from two callers~~| **CLOSED Wave 1 (F-19):** `BuildJobsDependencies` no longer calls it; API binary is sole owner. | — |
 | `internal/platform/objectstore/.gitkeep` is superfluous | directory already has Go files | — |
 | Stale TODO comment in `migrate.go:30` | the described behavior (`requireExplicitTransactionGuard`) is already implemented | — |
 | Blueprint claims "pgx pool (`platform/db/postgres`)" | `wiki/architecture/backend-blueprint.md:175` — the code uses `database/sql` with the pgx stdlib driver, not `pgxpool.Pool`; `pgxpool` is not imported anywhere in `db/postgres` (`internal/platform/db/postgres/connect.go:6, 13`) | — |
@@ -442,7 +439,7 @@ For the registry of all open flags, see [../legacy-register.md](../legacy-regist
 
 - **[runtime-unverified]** Whether Postgres pool settings (25/25 max conns, `connect.go:17-21`) remain appropriate under production load. The values are hard-coded and cannot be tuned without a code change. No documented rationale exists for the specific numbers.
 - **[runtime-unverified]** Whether `METALDOCS_MINIO_AUTO_CREATE_BUCKET` is safe to enable in production. `EnsureBucket` in `storage/minio/store.go:37-52` creates the bucket when the flag is true and the bucket is missing. The flag default is `false`, which is the safe default.
-- **[runtime-unverified]** Whether `MigrateRiverSchema` called from two callers simultaneously (API binary and jobs binary starting in parallel) causes a race condition. `rivermigrate` should use its own locking; not confirmed against the vendored River version.
+- ~~**`MigrateRiverSchema` dual-caller race**~~ — **RESOLVED Wave 1 (F-19):** single caller now; not applicable.
 - **[runtime-unverified]** Edge case in `HashObject`/`HeadContentHash`: the `io.LimitReader(obj, limit+1)` reads up to `limit+1` bytes; at exactly `limit` bytes the `n > limit` check passes, at `limit+1` it fails. Correct but untested at the boundary.
 - Whether `internal/platform/db/.gitkeep` is permanent drift or intended to eventually hold a package-level file distinct from `db/postgres`.
 

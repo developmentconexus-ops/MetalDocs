@@ -80,6 +80,8 @@ The same structural gap is flagged independently by http-kernel, platform-identi
 
 **Stage-2 question:** Which chain positions must move and what is the blast radius of rewiring?
 
+**Resolution (Wave 1.1, 2026-06-11, `58d7009d9` + `2d8728c6b` + `c76fd6cfc`):** chain reordered to the §2.1 canon via declarative `apiChain`/`buildChain` (`apps/api/cmd/metaldocs-api/chain.go`); new `platform/middleware.Recovery` outermost (trace ID + panic → 500 problem+json); httpObs outside authn with panicked-request 500 metrics and principal-slot attribution (`observability.SetPrincipal` called by authn); pre-auth IP-keyed login limit (`platform/ratelimit`, `auth_login` 10/min, path constant `authdelivery.PathLogin`); REQ-MW-7 chain-order test in `chain_test.go`. Runtime-verified: login 200, panic survives as 500 problem+json, 401s/panics in RED metrics, 429 after burst.
+
 ---
 
 ## F-02 — Unstructured Logging (log.Printf vs slog)
@@ -133,6 +135,8 @@ An additional defect is confirmed: the invariants.yml capability-catalog CI gate
 | Capability catalog CI gate non-functional (placeholder hash, missing seed file) | `ops/CAPABILITY_CATALOG.sha256`; `.github/workflows/invariants.yml:89-118` |
 
 **Stage-2 question:** Converge spec2/api/v2 into v1 or formal ADR fence with sunset plan?
+
+**Resolution (Wave 1.3, 2026-06-11, `880f33c4a`):** parallel surface deleted — `api/openapi/spec2.yaml` (1061 lines) and `internal/api/v2/` removed; the 3 contract tests decode `platform/problem.Problem`; `.golangci.yml` exclusion dropped. The non-functional `capability-catalog-hash` CI gate was deleted (it hashed `sql/seeds/capabilities_v2.sql`, which never existed — always exit 0); REQ-AUTHZ-5 binding is enforced by api-lint registry rules (ADR 0022). Placeholder `ops/CAPABILITY_CATALOG.sha256` removed.
 
 ---
 
@@ -256,6 +260,8 @@ Two additional structural problems compound this:
 
 **Stage-2 question:** Which mutating flows have a silent audit-drop window and what is the outbox migration scope?
 
+**Resolution (sub-split only — Wave 1.8, 2026-06-11, `3a257a9cf`):** templates `ListAudit` now reads `metaldocs.audit_events` (`resource_type='template'`); `version_id` carried in the payload on write and lifted on read; historical `templates_audit_log` rows are an accepted seam. The atomicity gap itself (post-commit audit writes) and the deprecated govLogger fallback remain open → Wave 2.2 / 2.11.
+
 ---
 
 ## F-08 — Empty / Vestigial Platform Scaffolds and Dead Binaries
@@ -281,6 +287,8 @@ Several directories and files constitute empty scaffolding or dead artifacts tha
 | `RepositoryMemory` mode in platform config | Dead production path — main.go:677-680 fatal-exits for any non-postgres mode; only reachable from tests | `internal/platform/config/repository.go:9`; `internal/platform/bootstrap/api.go:127-153` |
 
 **Stage-2 question:** Which directories and binaries can be deleted vs need implementation?
+
+**Resolution (partial — Wave 0.1 + Wave 1.9, 2026-06-11, `9ff2c0d6c`):** `cmd/seed-test-document/` + `bin/metaldocs-api.exe` handled in Wave 0.1; the 4 `.gitkeep` files removed in Wave 1.9 (`platform/cache` directory deleted entirely). Still open: `RepositoryMemory` dead production path (F-14-adjacent), `apps/api/.gocache-build/` (local artifact).
 
 ---
 
@@ -309,6 +317,8 @@ Additional defects: idempotency TTL is hard-coded as a duplicate SQL string lite
 | idempotency_keys table missing tenant_id FK | `internal/platform/idempotency/postgres_store.go:54,87` |
 
 **Stage-2 question:** Migrate finalize handler to use `idempotency.Require` middleware; audit remaining raw calls?
+
+**Resolution (raw-codes half — Wave 1.4, 2026-06-11, `ed7890597`):** middleware raw string codes closed — `writeErrJSON` takes `problem.Code`; new catalog consts `IDEMPOTENCY_KEY_INVALID` / `REQUEST_BODY_TOO_LARGE`; conflict emits `IDEMPOTENCY_KEY_REUSED` (aligns FE); `INTERNAL`→`INTERNAL_ERROR`; catalog guard now covers `platform/idempotency`. Still open: finalize-handler inline idempotency (RF-10), TTL literal duplication, tenant_id FK (F-09d → F-12 trigger).
 
 ---
 
@@ -414,6 +424,8 @@ The OpenAPI spec surface has several confirmed gaps between what the code emits,
 
 **Stage-2 question:** Which response schemas emit fields absent from the spec, and which deprecated routes lack machine-readable markers?
 
+**Resolution (F-13a/b — Wave 1.5, 2026-06-11, `2e977845b`):** `SearchDocumentResponse` aligned to the spec's `SearchDocumentItem` (subject/business_unit/classification/tags dropped from the wire); camelCase `businessUnit` param removed. Still open: F-13c/d (partials casing, `deprecated: true` marker — Wave 3 next-regen trigger), F-13e (iamapi bundle — merge-conflict trigger).
+
 ---
 
 ## F-14 — Dead / Superseded Application Code Retained in Source
@@ -483,6 +495,8 @@ Two related gaps: the readiness probe runs dependency checks sequentially under 
 | METALDOCS_ATTACHMENTS_SIGNING_SECRET required unconditionally regardless of storage provider | `internal/platform/config/attachments.go:63-68` |
 
 **Stage-2 question:** Which timeout fields are absent; does SIGTERM drain correctly?
+
+**Resolution (timeouts half — Wave 1.2, 2026-06-11, `1b3f0d11d`):** `ReadTimeout 30s / WriteTimeout 60s / IdleTimeout 90s` added to the API `http.Server`. Still open: readiness sequential checks (F-16C — Wave 3 trigger: second dependency), unconditional signing-secret requirement, WS drain (F-16B — deferred per D-1).
 
 ---
 
@@ -561,6 +575,8 @@ A tertiary defect: the `lease_reaper` subquery matches job names against `public
 
 **Stage-2 question:** Define metaldocs-jobs deployment path; River rows accumulate silently without it.
 
+**Resolution (COMPLETE, 2026-06-11):** deployment half — Wave 0.5 (`baf6e1b78`); dual migration — Wave 1.6 (`38d7cc8ce`): `MigrateRiverSchema` removed from `BuildJobsDependencies`, API binary is the sole owner, ordering via compose `depends_on: api (healthy)`; lease_reaper JOIN bug — Wave 1.7 (`2512f502f`): `public.documents` subquery removed, reaps logged as structured slog warnings (system-scoped; `governance_events.tenant_id` is NOT NULL with no system-tenant convention), integration probe updated and verified against live DB (`c76fd6cfc`). All three F-19 defects closed.
+
 ---
 
 ## F-20 — Correlated / Sequential SQL Performance Patterns
@@ -604,6 +620,8 @@ Each of `buildMinioClients:158-178` (internal + public presigning clients) and `
 ### D-03: 405 Method Not Allowed returned as bare status with no RFC 9457 body in two modules
 
 Both the search module (`internal/modules/search/delivery/http/handler.go:55-57`) and the security module (`internal/modules/security/delivery/http/handler.go:37-39, 58-60, 98-100`) return a bare `405` status with no `problem+json` body. Every other error path in both modules uses `problem.Write` / `httpresponse.WriteError`. This is a cross-module consistency defect affecting the same response type (REQ-H-2).
+
+**Resolution (Wave 1.5, 2026-06-11, `2e977845b` + `c76fd6cfc`):** all four bare 405s now emit RFC 9457 `METHOD_NOT_ALLOWED` problem+json with an `Allow` header via the shared `httpresponse.WriteMethodNotAllowed` helper (new catalog constant; FE message added). Runtime-verified.
 
 ### D-04: `platform/security` vs `platform/ratelimit` — same concern, different packages
 

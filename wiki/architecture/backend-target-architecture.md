@@ -1,6 +1,6 @@
 # Backend Target Architecture — How MetalDocs MUST Behave
 
-> **Last verified:** 2026-06-10
+> **Last verified:** 2026-06-11 (Wave 1)
 > **Scope:** Normative specification. Maps the universal model in [../standards/backend-canon.md](../standards/backend-canon.md) onto MetalDocs and states how each concern **must behave** in the end state. This is the reference for the industry-grade refactoring program: every refactor PR cites the requirement IDs it advances; every review defends them.
 > **Relation to siblings:** [backend-canon.md](../standards/backend-canon.md) defines the universal model · [backend-blueprint.md](backend-blueprint.md) grades the current state · **this doc defines the target** · ADRs record decisions · backlog programs execute.
 > **Language:** RFC 2119 — **MUST** (non-negotiable, review-blocking), **SHOULD** (deviate only with written reason), **MAY** (optional).
@@ -20,7 +20,7 @@ MetalDocs is and remains a **modular monolith** with plane separation expressed 
 
 - **REQ-TOP-1** Modules under `internal/modules/` are bounded contexts. Cross-module access goes through a module's application service or published Go interface — never another module's repository, SQL, or domain internals. (MUST)
 - **REQ-TOP-2** `internal/platform/` packages are domain-free. A platform package importing a module is a layering violation. (MUST)
-- **REQ-TOP-3** Every platform package either has production consumers or does not exist. Empty scaffolds (`platform/cache`, `platform/storage`) are deleted or implemented — speculative directories are banned. (MUST)
+- **REQ-TOP-3** Every platform package either has production consumers or does not exist. Empty scaffolds (`platform/cache`, `platform/storage`) are deleted or implemented — speculative directories are banned. (MUST — `platform/cache` deleted Wave 1 (F-08); `platform/storage` still open.)
 - **REQ-TOP-4** Module extraction to a separate service is a non-goal. Boundaries are kept extraction-clean (REQ-TOP-1) but no network split happens without an ADR. (SHOULD)
 
 ```mermaid
@@ -82,10 +82,10 @@ flowchart LR
 - **REQ-MW-1** Panic recovery and trace-context middleware are outermost. A panicked request still produces a request-ID-tagged log line, a 500 `problem+json`, and a metric. (MUST)
 - **REQ-MW-2** Every request gets a request ID; it propagates into every log line, error response (`trace_id` extension member), and outbound internal call. (MUST)
 - **REQ-MW-3** AuthN strictly precedes any authz, presence, or principal-keyed limiting. (MUST)
-- **REQ-MW-4** Unauthenticated traffic is observable: metrics/logging sit outside authn so 401s and CORS rejects appear in RED metrics. (MUST — this inverts the current wiring where `httpObs` sits inside auth; refactor item RF-2.)
+- **REQ-MW-4** Unauthenticated traffic is observable: metrics/logging sit outside authn so 401s and CORS rejects appear in RED metrics. (MUST — **satisfied Wave 1 (F-01):** `httpObs` and panic recovery are now outermost. RF-2 closed.)
 - **REQ-MW-5** Login and credential endpoints carry the strictest pre-auth IP-keyed rate limit. (MUST)
 - **REQ-MW-6** Fine-grained (resource/area-level) authorization never lives in middleware — it lives at tier-2 inside the owning transaction (§3.3). Middleware does route-level tier-1 only. (MUST)
-- **REQ-MW-7** The chain order is asserted by a test against the composed handler; reordering breaks the build, not production. (SHOULD)
+- **REQ-MW-7** The chain order is asserted by a test against the composed handler; reordering breaks the build, not production. (SHOULD — **satisfied Wave 1 (F-01):** `chain_test.go` asserts composed execution order.)
 
 ### 2.2 Handler discipline
 
@@ -197,7 +197,7 @@ flowchart LR
 ```
 
 - **REQ-API-1** The OpenAPI spec is the only source of route truth. A route reachable at runtime but absent from the spec (or vice versa) is a defect; CI parity checks make it a red build. Undocumented "raw" routes are eliminated or documented (e.g. `POST /documents`). (MUST)
-- **REQ-API-2** One API surface. The `spec2.yaml` / `internal/api/v2` parallel surface is converged into v1 or formally fenced with an ADR and a sunset plan. No third option. (MUST — refactor item RF-4.)
+- **REQ-API-2** One API surface. The `spec2.yaml` / `internal/api/v2` parallel surface is converged into v1 or formally fenced with an ADR and a sunset plan. No third option. (MUST — **satisfied Wave 1 (F-03):** both deleted. RF-4 closed.)
 - **REQ-API-3** Breaking changes require a version bump per the versioning policy in [api-contract.md](api-contract.md); additive evolution is the default. (MUST)
 - **REQ-API-4** Conventions are uniform: snake_case params, cursor pagination on unbounded collections (every list endpoint has a `limit` ceiling — unbounded lists are banned), ETag/`If-Match` on read-modify-write resources, RFC 9457 errors with the closed vocabulary. (MUST)
 - **REQ-API-5** Mutating endpoints that clients may retry accept an idempotency key and replay the original result. Approval/freeze-class operations are in scope by default. (MUST)
@@ -293,12 +293,12 @@ The actionable bridge. Every item is a bounded program; no symptom-patching acro
 | ID | Gap (from blueprint scoreboard) | Target requirements | Owner / program | Status |
 |---|---|---|---|---|
 | **RF-1** | Observability depth unverified: exporter wiring, cross-binary trace propagation, readiness probe depth | REQ-OBS-1..4, REQ-MW-1/2 | **unowned — first candidate program** | open |
-| **RF-2** | Middleware chain vs canon: no panic-recovery/trace outermost; metrics inside auth; no pre-auth IP rate limit tier | REQ-MW-1, REQ-MW-2, REQ-MW-4, REQ-MW-5, REQ-MW-7 | fold into RF-1 or standalone | open |
+| **RF-2** | Middleware chain vs canon: no panic-recovery/trace outermost; metrics inside auth; no pre-auth IP rate limit tier | REQ-MW-1, REQ-MW-2, REQ-MW-4, REQ-MW-5, REQ-MW-7 | fold into RF-1 or standalone | **CLOSED Wave 1 (F-01)** |
 | **RF-3** | Authz cache invalidation contract unwritten | REQ-AUTHZ-8, REQ-CACHE-1/2 | ADR 0022 residual | open |
-| **RF-4** | Parallel contract surface (`spec2.yaml`, `internal/api/v2`) unfenced | REQ-API-2 | api-contract-hardening | open |
+| **RF-4** | Parallel contract surface (`spec2.yaml`, `internal/api/v2`) unfenced | REQ-API-2 | api-contract-hardening | **CLOSED Wave 1 (F-03)** |
 | **RF-5** | Contract drift residue (~397 reported-only lint hits; undocumented raw routes) | REQ-API-1 | api-contract-hardening C–F | in flight |
 | **RF-6** | Authz coherence final close (Phase 6 wiki sync; `authz-call-present` call-graph rewrite) | REQ-AUTHZ-3/5 | ADR 0022 | in flight |
-| **RF-7** | Empty platform scaffolds (`cache`, `storage`); messaging/servicebus undocumented | REQ-TOP-3 | backend-standardization | open |
+| **RF-7** | Empty platform scaffolds (`cache`, `storage`); messaging/servicebus undocumented | REQ-TOP-3 | backend-standardization | open (`cache` deleted Wave 1; `storage` remains) |
 | **RF-8** | Feature-flag lifecycle discipline undefined | canon §2.11 | small standalone doc | open |
 | **RF-9** | Graceful shutdown / timeout / degradation audit (verify REQ-REL-1/2/4 hold everywhere) | REQ-REL-* | unowned | open |
 | **RF-10** | Idempotency coverage audit: which mutating routes accept keys vs should | REQ-API-5 | backend-standardization | open |

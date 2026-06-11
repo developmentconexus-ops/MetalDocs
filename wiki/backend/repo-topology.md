@@ -1,6 +1,6 @@
 # Repository Topology
 
-> **Last verified:** 2026-06-10
+> **Last verified:** 2026-06-11 (Wave 1)
 > **Scope:** Top-level directory layout, all binaries built and run, Go module configuration, CI pipeline shape, script entry points, and orphan/legacy classification for every top-level directory. Does not descend into `frontend/`, `node_modules/`, `vendor/`, `.worktrees/`, `.clone/`, or `non_git/` beyond identification.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (binary 1)
@@ -114,7 +114,9 @@ graph TD
 
 | File | Role |
 |---|---|
-| `main.go` (943 lines) | Composition root: config load, bootstrap, all module wiring, middleware chain assembly, HTTP server |
+| `main.go` | Composition root: config load, bootstrap, all module wiring, HTTP server lifecycle |
+| `chain.go` | Declarative middleware chain: `apiChain`, `buildChain`, `loginRateLimit` (Wave 1, F-01) |
+| `chain_test.go` | Chain-order assertion test (REQ-MW-7; Wave 1) |
 | `permissions.go` (286 lines) | `newPermissionResolver()` and `newPublicPathChecker()` — route-to-capability mapping table |
 | `reauth.go` (52 lines) | Re-authentication helper adapter wiring for sensitive approval sign-off |
 | `main_test.go` | Startup smoke test |
@@ -193,7 +195,7 @@ graph TD
 |---|---|
 | `authn/` | JWT/session config, validation, context helpers |
 | `bootstrap/` | `BuildAPIDependencies`, `BuildWorkerDependencies`, `BuildJobsDependencies`, `MigrateRiverSchema` |
-| `cache/` | **Empty placeholder** — contains only `.gitkeep`; no Go source. See §10. |
+| `cache/` | **Deleted (Wave 1, F-08/REQ-TOP-3).** Was an empty `.gitkeep`-only scaffold; removed to eliminate speculative-generality drift. |
 | `config/` | Typed env-var config loaders for CORS, rate-limit, attachments, feature-flags, jobs, worker |
 | `db/postgres/` | pgx pool factory, connection helpers |
 | `docgenv2/` | Template/snapshot readers for the fanout pipeline |
@@ -204,6 +206,7 @@ graph TD
 | `idempotency/` | Idempotency-key middleware and two-phase store |
 | `jobs/river/` | River queue client bundle factory (`NewClientBundle`) |
 | `messaging/` | `Publisher` interface + `noop/` and `outbox/` implementations; no servicebus adapter wiring in Go |
+| `middleware/` | `Recovery` — outermost panic-recovery middleware; emits 500 `problem+json` and survives panics in inner layers (Wave 1, REQ-MW-1) |
 | `migrate/` | `migrate.Apply()` — forward-only migration runner reading `db/migrations/*.sql` |
 | `objectstore/` | MinIO client factory, `DocumentPresigner` (presigned PUT/GET) |
 | `observability/` | Metrics, tracing, structured logging, `NewHealthHandler`, `NewHTTPObservability` |
@@ -235,14 +238,9 @@ graph TD
 |---|---|
 | `pgtest.go` | `NewTestDB()` — spins up an isolated Postgres database for integration tests via `METALDOCS_DATABASE_URL` |
 
-#### internal/api/v2/ — orphan spec2 surface (flag: no active route coverage)
+#### internal/api/v2/ — DELETED (Wave 1, F-03)
 
-| File | Role |
-|---|---|
-| `types_gen.go` | Handwritten response types for the spec2 surface (`ProfileResponse`, `AreaResponse`, `ControlledDocumentResponse`, etc.) |
-| `contract_test.go` | Contract assertion tests for the above types |
-
-Consumed by contract tests in three module delivery-layer test files only (`controlleddocuments`, `iam`, `taxonomy` delivery-http test files). No active route coverage. See §10.
+The entire `internal/api/v2/` package (`types_gen.go` + `contract_test.go`) was deleted; three contract test files updated to use `problem.Problem` directly. The orphan spec2 surface (RF-4) is now fully removed.
 
 ### api/ — OpenAPI contract source
 
@@ -250,7 +248,7 @@ Consumed by contract tests in three module delivery-layer test files only (`cont
 |---|---|
 | `api/openapi/v1/openapi.yaml` | Primary contract source of truth; assembled by oapi-codegen |
 | `api/openapi/v1/partials/` | Partial YAML fragments included by the main spec |
-| `api/openapi/spec2.yaml` | Secondary/legacy spec; last touched 2026-05-06 (commit `e1944bc4a` purged v2 routes). No active route coverage. See §10. |
+| `api/openapi/spec2.yaml` | **DELETED (Wave 1, F-03).** Was the parallel approval-only spec (1 061 lines, RF-4). Removed to eliminate the duplicate contract surface per REQ-API-2. |
 
 ### db/ — database lifecycle artifacts
 
@@ -363,8 +361,8 @@ Consumed by contract tests in three module delivery-layer test files only (`cont
 
 | Path | Role |
 |---|---|
-| `tools/cilint/main.go` | Custom Go linter binary; runs `analyzers.go`, `legacyvocab.go`, `outboxpair.go`, `txownership.go` on `./...`; outputs SARIF; used by `invariants.yml` |
-| `tools/cilint/internal/analyzers/` | Five custom AST analyzers enforcing architecture invariants |
+| `tools/cilint/main.go` | Custom Go linter binary; runs `analyzers.go`, `legacyvocab.go`, `outboxpair.go`, `txownership.go`, `platformboundary.go` on `./...`; outputs SARIF; used by `invariants.yml` |
+| `tools/cilint/internal/analyzers/` | Six custom AST analyzers enforcing architecture invariants (Wave 1 added `platformboundary` — REQ-TOP-2 guard; Wave 1, F-06a) |
 | `tools/perfbench/` | k6 performance benchmark scripts: `submit.js`, `signoff.js`, `publish.js`, `scheduler_tick.js`, `thresholds.json` |
 
 ### tests/ — test suites
@@ -384,7 +382,7 @@ Consumed by contract tests in three module delivery-layer test files only (`cont
 
 | Path | Role |
 |---|---|
-| `ops/CAPABILITY_CATALOG.sha256` | SHA-256 pin of `sql/seeds/capabilities_v2.sql` — **currently a placeholder string; integrity check is a no-op; see §10** |
+| `ops/CAPABILITY_CATALOG.sha256` | **DELETED (Wave 1, F-03).** Was a placeholder SHA-256 file whose CI gate (`capability-catalog-hash` job) silently exited 0 because the referenced seed file never existed. Job removed from `invariants.yml`. Real REQ-AUTHZ-5 guard is the api-lint registry rules. |
 | `ops/DEPLOY.md` | Deployment runbook |
 | `ops/smoke/healthz.sh`, `ops/smoke/approval_roundtrip.sh` | Synthetic smoke probes used by `smoke.yml` |
 | `ops/chaos/SCENARIOS.md`, `ops/chaos/kill_scheduler.sh` | Chaos engineering scenarios |
@@ -462,12 +460,8 @@ sequenceDiagram
    - Orphan pending sweeper (`main.go:569`) — hourly
    - Presence hub Run + RunHeartbeat (`main.go:306-307`) — 30-second heartbeat
    - Audit retention purge (`main.go:578-593`) — 24-hour ticker; only if `AUDIT_RETENTION_DAYS > 0`
-7. Middleware chain assembled at `main.go:598-602` (outermost first):
-   ```
-   CORS → origin protection → AuthN middleware → IAM middleware →
-   presence bump → HTTP observability → rate limiter → router mux
-   ```
-8. HTTP server starts on `:8081`; graceful shutdown on SIGTERM drains via `workerWG` and `schedulerWG` (`main.go:627`).
+7. Middleware chain assembled via `buildChain(mux, apiChain(...))` (`chain.go` + `main.go:633`, outermost first): `panicRecovery → httpObs → CORS → origin protection → preAuthLoginLimit → AuthN → IAM → presenceBump → rateLimiter → mux`. Order asserted by `chain_test.go` (REQ-MW-7, Wave 1 F-01).
+8. HTTP server starts on `:8081`; `ReadTimeout 30s / WriteTimeout 60s / IdleTimeout 90s` (Wave 1 F-16); graceful shutdown on SIGTERM drains via `workerWG` and `schedulerWG` (`main.go:674`).
 
 ### Flow 3: Docker image build (CI/production)
 
@@ -586,10 +580,10 @@ These flags are tracked in [./legacy-register.md](./legacy-register.md).
 | **DEAD-BINARY** | `cmd/seed-test-document/main.go` | Dead binary | Hardcoded DSN and MinIO credentials; no CI reference; no canonical script; `seed-test-document.exe` in `.gitignore`. Last git touch: commit `c4a7d9a93` (2026-04). RF candidate for deletion. |
 | **DEAD-SCRIPT-1** | `scripts/start-spec1-api.ps1` | Dead script | Contains hardcoded absolute path to a different machine username (`C:\Users\leandro.theodoro.MN-NTB-LEANDROT\...`). Cannot function on current machine. Last git touch: commit `9c62bd3a2` (early 2026). |
 | **LEGACY-SCRIPT** | `scripts/start-api-planc.ps1` | Legacy script | Plan-C variant targeting port 8083 for a specific worktree. Last git touch: `403ad2eef` (2026-04). Not referenced by CI. Retain for context or delete. |
-| **EMPTY-PKG** | `internal/platform/cache/` | Empty placeholder | Contains only `.gitkeep` (added initial commit `912879cba`). No Go source. Drift bait: its presence implies caching infrastructure that does not exist. `backend-blueprint.md` §C4 explicitly flags this: "either implement or delete". Relates to RF-C4 (caching story). |
-| **ORPHAN-SURFACE** | `api/openapi/spec2.yaml` + `internal/api/v2/` | Orphan contract surface | `spec2.yaml` last touched commit `e1944bc4a` (purge v2 routes). `internal/api/v2/types_gen.go` is handwritten; consumed only by three contract test files. The former `openapi-drift` CI job was removed. No active route coverage. `backend-blueprint.md` §A3: "must converge or be explicitly fenced." |
-| **BROKEN-GATE** | `ops/CAPABILITY_CATALOG.sha256` | Broken integrity gate | Contains literal string `placeholder-hash-update-after-catalog-created`. `invariants.yml` compares actual SHA against this value; referenced file `sql/seeds/capabilities_v2.sql` does not exist. CI gate exits 0 with "Catalog file not found". **The capability catalog integrity check is currently a no-op.** |
-| **STALE-BIN** | `bin/metaldocs-api.exe` | Stale committed binary | Compiled binary in git; last touched initial commit `912879cba`. `.gitignore` excludes `metaldocs-api.exe` at root but not `bin/metaldocs-api.exe`. Recommend `git rm bin/metaldocs-api.exe` and adding `bin/*.exe` to `.gitignore`. [runtime-unverified: provenance commit] |
+| ~~**EMPTY-PKG**~~ | ~~`internal/platform/cache/`~~ | **CLOSED Wave 1 (F-08)** | Deleted; `.gitkeep` + directory removed (REQ-TOP-3). |
+| ~~**ORPHAN-SURFACE**~~ | ~~`api/openapi/spec2.yaml` + `internal/api/v2/`~~ | **CLOSED Wave 1 (F-03)** | Both deleted; contract tests migrated to `problem.Problem`; `capability-catalog-hash` CI job removed (REQ-API-2). |
+| ~~**BROKEN-GATE**~~ | ~~`ops/CAPABILITY_CATALOG.sha256`~~ | **CLOSED Wave 1 (F-03)** | File deleted; its CI job removed; real REQ-AUTHZ-5 guard = api-lint registry rules. |
+| ~~**STALE-BIN**~~ | ~~`bin/metaldocs-api.exe`~~ | **CLOSED Wave 0 (F-18)** | Deleted (was never git-tracked per `git ls-files`; on-disk delete in Wave 0.1). |
 | **ARCHIVE-PROXIMITY** | `archive/migrations/` | Archive adjacent to active tree | 189 SQL files (pre-baseline, 0001–0211); archived by commit `266bd4132` (2026-05). Not applied by `platform/migrate`. Adjacent to `db/migrations/` — potential confusion about which migrations are active for newcomers. |
 | **MISSING-DOCKERFILE** | `deploy/docker/` | Missing jobs container | `metaldocs-jobs.exe` has no `jobs.Dockerfile` and no `jobs` service in `docker-compose.yml`. Whether jobs is co-started in the API container, runs as a sidecar, or is simply not in production yet is [runtime-unverified]. |
 | **NON-CANONICAL-SCRIPTS** | `scripts/dev-api.ps1` et al. | Alternate startup scripts | Multiple alternate dev startup scripts alongside canonical `start-api.ps1`, without its freshness checks. Non-authoritative per CLAUDE.md §1. |

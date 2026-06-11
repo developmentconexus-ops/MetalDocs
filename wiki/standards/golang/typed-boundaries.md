@@ -15,7 +15,7 @@ enforced_by:
 
 `string` is banned for IDs, roles, problem codes, and idempotency keys at hand-written package boundaries. Use distinct named types so invalid values cannot drift between auth, tenant, service, store, and HTTP layers unnoticed.
 
-Generated OpenAPI types are exempt because `internal/api/v2/types_gen.go` and `api.gen.go` are generated and excluded from lint. Hand-written domain, service, and store APIs are not exempt.
+Generated OpenAPI types are exempt because `api.gen.go` files are machine-generated and excluded from lint. Hand-written domain, service, and store APIs are not exempt. (Note: `internal/api/v2/types_gen.go` was deleted in Wave 1, F-03.)
 
 ## Proven Types
 

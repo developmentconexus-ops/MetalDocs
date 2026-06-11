@@ -1,6 +1,6 @@
 # Module: search
 
-> **Last verified:** 2026-06-11 (Stage-1 backend audit drift patch: corrected visibility-predicate anchor from repository.go:128 to :133-164; removed unsubstantiated handler.go anchor claim from prior changelog entry)
+> **Last verified:** 2026-06-11 (Wave 1)
 > **Status:** active (limited surface)
 > **Maturity:** L2
 > **Scope:** Cross-module search across templates, controlled documents, document versions.
@@ -49,7 +49,7 @@ Only columns present on `public.documents` and `public.controlled_documents` are
 | EffectiveAt / ExpiryAt | `d.effective_from` / `d.effective_to` |
 | CreatedAt | `d.created_at` |
 
-Fields present on the `Document` struct (`Subject`, `BusinessUnit`, `Classification`, `Tags`) are always zero values in v2 search results. The reader does not select these columns (the legacy governance columns live on the decommissioned `metaldocs.documents` schema) and no other surface currently populates them via a different path.
+**Wave 1 (F-13a/b):** `Subject`, `BusinessUnit`, `Classification`, and `Tags` fields were removed from `SearchDocumentResponse`; the undocumented camelCase `businessUnit` query parameter was also removed. The legacy governance columns (`subject_code`, `business_unit`, `classification`, `tags`) live on the decommissioned `metaldocs.documents` schema and are not part of v2 search.
 
 ## Indexed entities
 
@@ -86,6 +86,6 @@ Open tech-debt items by severity (source: [search-tech-debt.md](search-tech-debt
 
 - Critical: 0
 - Major: 0
-- Minor: 2 (T-001: missing 405 RFC 9457 body; T-002: template search path deferred)
+- Minor: 1 (T-001: ✅ CLOSED Wave 1 — 405 bare responses → `httpresponse.WriteMethodNotAllowed`; T-002: template search path deferred)
 
 Refactor backlog: [../backlog/search-refactor.md](../backlog/search-refactor.md)

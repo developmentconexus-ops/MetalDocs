@@ -1,6 +1,6 @@
 # Module: jobs
 
-> **Last verified:** 2026-06-10
+> **Last verified:** 2026-06-11 (Wave 1)
 > **Status:** active
 > **Maturity:** L0 — Stage-1 audit draft — not yet promoted via metaldocs-module-doc
 > **Scope:** The `internal/modules/jobs` module — the in-API Scheduler, its four maintenance jobs (stuck-instance watchdog, idempotency janitor, audit-integrity validator, lease reaper), and the lightweight document sweepers under `internal/modules/documents/jobs`. The River-based `ScheduledPublishWorker` under `internal/modules/documents/approval/jobs` is included because it is the sole job consumed by the `apps/jobs` binary.
@@ -93,7 +93,7 @@ Lease TTL: 5 minutes. `leaderID` is `hostname:pid`. Container restarts with the 
 `internal/modules/jobs/scheduler/lease_reaper.go`
 
 - Interval: 10 min.
-- `RunLeaseReaper(db)` returns a `JobFunc` that: queries expired `job_leases` rows, deletes each, inserts a `governance_events` row per reclaim.
+- `RunLeaseReaper(db)` returns a `JobFunc` that: queries expired `job_leases` rows, deletes each, writes a structured `slog.WarnContext` log line per reclaim (Wave 1, F-07/1.7 — replaces the broken `governance_events` INSERT that had a cross-schema JOIN bug; `governance_events.tenant_id` is NOT NULL with no system-tenant convention).
 - **High-severity flag:** `lease_reaper.go:38` uses `SELECT doc.tenant_id FROM public.documents doc WHERE doc.id::text = d.job_name LIMIT 1`. The `job_leases.job_name` values for the four registered scheduler jobs are strings like `"stuck-instance-watchdog"`, not document UUIDs. This subquery always returns NULL, causing every reaped lease to be skipped (`rowErrs` appended). The `reclaimed` counter is always 0. Governance rows for scheduler-level lease reaps are never written. [runtime-unverified in a live system, but confirmed as a code-reading finding.]
 
 ---
@@ -154,7 +154,7 @@ HTTP routes: none. The jobs module exposes no HTTP surface.
 | Table | Written by | Read by | Notes |
 |-------|-----------|---------|-------|
 | `metaldocs.job_leases` | `acquire_lease`, `heartbeat_lease`, `release_lease` (Postgres functions) | `lease_reaper.go` (DELETE on expiry), scheduler goroutines | Schema in `db/baseline/0001_current_schema.sql` |
-| `governance_events` | `lease_reaper.go` (INSERT per reclaim), `stuck_instance_watchdog` (INSERT alert) | — | Lease reaper writes are currently a no-op due to the JOIN bug |
+| `governance_events` | `stuck_instance_watchdog` (INSERT alert) | — | `lease_reaper` no longer writes here (Wave 1 fix): reclaim is now logged via `slog.WarnContext` |
 | `metaldocs.idempotency_keys` | API handlers (outside this module) | `idempotency_janitor` (DELETE expired rows) | — |
 | `metaldocs.audit_events` | (outside this module) | `audit_integrity_validator` (read-only) | — |
 | `approval_instances` | Approval module | `stuck_instance_watchdog` (read + cancel) | — |
@@ -170,8 +170,8 @@ HTTP routes: none. The jobs module exposes no HTTP surface.
 | Postgres advisory lease not acquired (another replica holds it) | Job silently skipped for that tick — expected behavior | Normal under multi-replica deployment |
 | `stuck_instance_watchdog` partial failure | Partial errors joined; epoch still released; stuck instances may remain | Check `slog` error output; per-instance failure does not abort run |
 | `idempotency_janitor` slow (large expired batch) | Runs up to 50,000 deletions per execution cycle | Monitor batch loop duration; table may lag under high idempotency-key volume |
-| `lease_reaper` governance writes silent no-op | `governance_events` rows never written for scheduler job leaps | Known code bug — fix requires removing the `documents` JOIN |
-| `apps/jobs` binary not running | `scheduled_publish_cutover` River rows accumulate; documents never become `published` | High-severity deployment gap — see [../backend/binaries/jobs.md](../backend/binaries/jobs.md) |
+| ~~`lease_reaper` governance writes silent no-op~~ | **FIXED Wave 1 (1.7):** JOIN bug removed; reclaim now emits `slog.WarnContext` instead of broken `governance_events` INSERT | — |
+| ~~`apps/jobs` binary not running~~| **FIXED Wave 0 (F-19):** `jobs.Dockerfile` and compose service added; runtime-verified. River schema migration sole owner = API binary (Wave 1, F-19). | — |
 | `sweeper` goroutine exits (context cancel) | Goroutine stops without restart | Context cancel is graceful shutdown; no restart needed |
 
 ---

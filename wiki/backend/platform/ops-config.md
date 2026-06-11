@@ -96,7 +96,7 @@ These three packages form the startup spine and runtime observability surface of
 | Symbol | Consumed by |
 |---|---|
 | `NewHTTPObservability(...RuntimeStatusProvider) *HTTPObservability` | `apps/api/cmd/metaldocs-api/main.go:275` |
-| `HTTPObservability.Wrap(next http.Handler) http.Handler` | `apps/api/cmd/metaldocs-api/main.go:598` (wraps `rateLimiter.Wrap(mux)`) |
+| `HTTPObservability.Wrap(next http.Handler) http.Handler` | `apps/api/cmd/metaldocs-api/chain.go` (layer 2 — outermost after panic recovery; Wave 1 F-01) |
 | `HTTPObservability.MetricsHandler() http.Handler` | `apps/api/cmd/metaldocs-api/main.go:572` (registered at `/api/v1/metrics`) |
 | `NewHealthHandler(RuntimeStatusProvider) *HealthHandler` | via `bootstrap/api.go:118` |
 | `HealthHandler.RegisterRoutes(mux)` | via `apps/api/cmd/metaldocs-api/main.go` |
@@ -174,21 +174,23 @@ sequenceDiagram
     OBS->>LOG: slog.Info("http_request", traceID, method, route, status, elapsedMs, userID, ...)
 ```
 
-**Middleware chain order in production** (outermost → innermost, `main.go:598-602`):
+**Middleware chain order in production** (outermost → innermost, Wave 1 F-01 — composed via `apps/api/cmd/metaldocs-api/chain.go`):
 
 ```
-cors.Wrap(
-  originProtection.Wrap(
-    authMiddleware.Wrap(
-      iamMiddleware.Wrap(
-        presenceBump.Wrap(
-          httpObs.Wrap(
-            rateLimiter.Wrap(mux)))))))
+panicRecovery.Wrap(
+  httpObs.Wrap(
+    cors.Wrap(
+      originProtection.Wrap(
+        preAuthLoginLimit.Wrap(
+          authMiddleware.Wrap(
+            iamMiddleware.Wrap(
+              presenceBump.Wrap(
+                rateLimiter.Wrap(mux)))))))))
 ```
 
-`httpObs.Wrap` sits **inside** authN. Consequence: unauthenticated 401 responses do not appear in the RED metrics ring-buffers. This is a confirmed RF-2 deviation against REQ-MW-4 (`backend-target-architecture.md:85`).
+`httpObs.Wrap` is now **outermost after panic recovery** (layer 2). REQ-MW-4 satisfied (Wave 1, RF-2 CLOSED): 401 responses from authn/iam are counted in RED metrics. Chain order is asserted by `chain_test.go` (REQ-MW-7).
 
-References: `internal/platform/observability/http.go:53-106, 156-176`, `apps/api/cmd/metaldocs-api/main.go:598-602`.
+References: `internal/platform/observability/http.go:53-106, 156-176`, `apps/api/cmd/metaldocs-api/chain.go`.
 
 ### Flow 3: Readiness probe with Gotenberg dependency check
 
@@ -440,7 +442,7 @@ The `wiki/architecture/backend-blueprint.md` line 207–208 mentions "tracing" a
 | Flag | Location | RF / REQ |
 |---|---|---|
 | **No OpenTelemetry anywhere in the platform** | Zero OTel imports in `internal/platform/` or `apps/`; custom `X-Trace-Id`, in-process JSON counters, `slog` to stdout | RF-1, REQ-OBS-3 |
-| **`httpObs.Wrap` sits inside authN** | `apps/api/cmd/metaldocs-api/main.go:598-602` — unauthenticated 401 responses do not appear in RED metrics; inverts the target chain order | RF-2, REQ-MW-4 |
+| ~~**`httpObs.Wrap` sits inside authN**~~ | CLOSED Wave 1 (F-01, RF-2): `httpObs` moved to layer 2, outside authn/iam. Chain reordered in `chain.go`; REQ-MW-4 satisfied. | RF-2 CLOSED |
 | **`observability` imports `auth/domain`** | `internal/platform/observability/http.go:15` — platform package importing a module domain to call `authdomain.CurrentUserFromContext`; solvable via context-key interface | REQ-TOP-2 |
 | **`parseBoolEnv` duplicated** | `internal/platform/config/attachments.go:108` and `internal/platform/authn/config.go:213` — identical function in two packages; `splitCSV` duplicated similarly (`cors.go:63` vs `authn/config.go:222`) | — |
 | **`normalizeRoute` hardcodes partial route set** | `internal/platform/observability/http.go:178-208` — 6 `if` branches covering 4 route families (`/documents`, `/document-profiles`, `/workflow/documents`, `/iam/users`); the `/documents` branch contains a nested sub-condition for the `/versions` sub-path, yielding 7 distinct normalized output patterns total. All other parameterized routes (templates, taxonomy, approval, etc.) log raw IDs, inflating metric cardinality and leaking IDs into structured logs | — |

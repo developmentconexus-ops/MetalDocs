@@ -1,6 +1,6 @@
 # Backend Blueprint — Composition, Standards, Maturity
 
-> **Last verified:** 2026-06-10
+> **Last verified:** 2026-06-11 (Wave 1)
 > **Scope:** The canonical answer to "what is the MetalDocs backend composed of". Defines every backend concern, maps it to our implementation, names the industry standard it must satisfy, and grades maturity. This is the reference for the industry-grade refactoring program.
 > **Out of scope:** Runtime topology ([system-overview.md](system-overview.md)), route truth ([backend-api-structure.md](backend-api-structure.md)), per-module deep dives (`wiki/modules/*`).
 > **Definition layer:** The implementation-independent canon this blueprint maps against is [../standards/backend-canon.md](../standards/backend-canon.md) — read it first if you want the universal model before our specifics.
@@ -75,16 +75,20 @@ flowchart TB
 
 ## 3. Request lifecycle (synchronous path)
 
-The exact middleware chain as wired in `apps/api/cmd/metaldocs-api/main.go:595-602` (outermost first):
+> **Wave 1 (2026-06-11, F-01):** Chain reordered and extracted to `apps/api/cmd/metaldocs-api/chain.go` (declarative `apiChain`/`buildChain`). Recovery and observability are now outermost; pre-auth login rate limit added. Order asserted by `chain_test.go` (REQ-MW-7).
+
+The middleware chain as wired in `apps/api/cmd/metaldocs-api/chain.go` via `apiChain(...)` (outermost first):
 
 ```mermaid
 flowchart LR
-    REQ([Request]) --> M1[CORS]
-    M1 --> M2[Origin protection<br/>CSRF-class defense]
-    M2 --> M3[AuthN middleware<br/>session/JWT → identity in ctx]
-    M3 --> M4[IAM middleware<br/>capabilities → authz ctx]
-    M4 --> M5[Presence bump<br/>needs UserID from M4]
-    M5 --> M6[HTTP observability<br/>metrics + request trace]
+    REQ([Request]) --> M0[Panic recovery<br/>platform/middleware.Recovery]
+    M0 --> M1[HTTP observability<br/>metrics + request trace]
+    M1 --> M2[CORS]
+    M2 --> M3[Origin protection<br/>CSRF-class defense]
+    M3 --> M35[Pre-auth login rate limit<br/>IP-keyed, login path only]
+    M35 --> M4[AuthN middleware<br/>session/JWT → identity in ctx]
+    M4 --> M5[IAM middleware<br/>capabilities → authz ctx]
+    M5 --> M6[Presence bump<br/>needs UserID from M5]
     M6 --> M7[Rate limiter<br/>identity-keyed]
     M7 --> MUX[Router mux]
     MUX --> H[Module handler<br/>delivery/http]
@@ -95,12 +99,13 @@ flowchart LR
     H -. error .-> P[problem+json<br/>RFC 9457 envelope]
 ```
 
-Ordering invariants worth defending in review:
+Ordering invariants:
 
-1. **AuthN before AuthZ before anything identity-keyed.** Presence bump and rate limiting both depend on identity in context.
-2. **CORS and origin protection outermost** — reject cross-origin garbage before spending auth work on it.
-3. **Per-route idempotency** (`platform/idempotency`) applies on mutating routes, inside the chain, after identity.
-4. Known trade-off: observability and rate limiting sit *inside* auth, so unauthenticated rejects are cheaper but less instrumented. Acceptable; documented here so nobody "fixes" it casually.
+1. **Recovery and observability outermost** — panics produce measured 500s; 401s and CORS rejects appear in RED metrics (REQ-MW-1/4).
+2. **AuthN before AuthZ before anything identity-keyed.** Presence bump and rate limiting both depend on identity in context.
+3. **CORS and origin protection before authn** — reject cross-origin requests before spending auth work on them.
+4. **Pre-auth IP rate limit on login** — runs before authn so brute-force is bounded even before session validation (REQ-MW-5).
+5. **Per-route idempotency** (`platform/idempotency`) applies on mutating routes, inside the chain, after identity.
 
 ## 4. Write path (asynchronous)
 
@@ -136,7 +141,7 @@ flowchart LR
 - **Definition:** Machine-readable source of truth for every route, parameter, schema, and error.
 - **Industry standard:** OpenAPI 3.x, contract-first, generated server stubs, CI lint gate, no undocumented routes.
 - **We have:** `api/openapi/v1/openapi.yaml` + partials → oapi-codegen; policy in [api-contract.md](api-contract.md); `scripts/api-lint` CI gate; snake_case params/templates done (2026-06).
-- **Gap:** residual spec/router/permission drift tracked in `wiki/backlog/api-contract-hardening.md` (phases C–F open). `api/openapi/spec2.yaml` + `internal/api/v2/` exist as a parallel surface — must converge or be explicitly fenced.
+- **Gap:** residual spec/router/permission drift tracked in `wiki/backlog/api-contract-hardening.md` (phases C–F open). `api/openapi/spec2.yaml` + `internal/api/v2/` **deleted Wave 1 (F-03)** — parallel surface closed, RF-4 resolved.
 
 #### A4. API behavior conventions — ✅
 - **Definition:** Pagination, filtering, casing, envelope, versioning, ETag/concurrency rules — uniform across modules.
@@ -183,7 +188,7 @@ flowchart LR
 - **Definition:** Derived state with explicit invalidation and TTL story.
 - **Industry standard:** Cache-aside with bounded TTL; cache failure degrades to source of truth, never to wrong answers.
 - **We have:** Redis for authz capability cache + rate-limit state.
-- **Gap:** `platform/cache` directory exists but is empty — either implement or delete; an empty platform package is drift bait. No documented invalidation contract for the authz cache (covered partially by ADR 0022 work).
+- **Gap (partial):** `platform/cache` **deleted Wave 1 (F-08/REQ-TOP-3)** — empty scaffold removed. No documented invalidation contract for the authz cache (covered partially by ADR 0022 work, RF-3 still open).
 
 #### C5. Search — ✅
 - **Definition:** Full-text/cross-module query surface, decoupled from transactional reads.
@@ -234,7 +239,7 @@ flowchart LR
 
 #### D9. Quality gates & testing — ✅
 - **Definition:** CI enforces the contract: unit + integration + race detector + API lint.
-- **We have:** `go test -race`, `scripts/api-lint` exit-code gated, module-level `*_test.go` throughout, `internal/test` + `internal/testsupport` fixtures. QA operating system in [../quality/qa-operating-system.md](../quality/qa-operating-system.md).
+- **We have:** `go test -race`, `scripts/api-lint` exit-code gated, module-level `*_test.go` throughout, `internal/test` + `internal/testsupport` fixtures. `tools/cilint` custom analyzers (6 analyzers; Wave 1 added `platformboundary` enforcing REQ-TOP-2). QA operating system in [../quality/qa-operating-system.md](../quality/qa-operating-system.md).
 
 ---
 
@@ -266,7 +271,7 @@ The named external standards this backend is held to. Cite these in reviews inst
 | B1 authn, B3 tenancy | ✅ | — |
 | B2 authz | 🟡 | ADR 0022 authz-coherence (6 phases) |
 | C1 modules, C2 persistence, C3 blobs, C5 search, C6 async | ✅ | — |
-| C4 caching | 🟡 | empty `platform/cache` + authz-cache invalidation contract |
+| C4 caching | 🟡 | empty `platform/cache` deleted (Wave 1); authz-cache invalidation contract still open (RF-3) |
 | D1 errors, D3 security, D4 config, D5 audit, D6 internal HTTP, D9 quality | ✅ | backend-standardization (final polish in flight) |
 | D2 observability | 🟡 | **unowned — needs audit** (exporters, cross-service trace, readiness depth) |
 | D7 feature flags, D8 messaging | 🟡 | document-or-fence decision pending |

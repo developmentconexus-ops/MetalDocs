@@ -1,6 +1,6 @@
 # MetalDocs Backend Atlas
 
-> **Last verified:** undefined
+> **Last verified:** 2026-06-11 (Wave 1)
 > **Scope:** Atlas entrypoint for the MetalDocs backend Stage-1 truth map. Covers every binary, domain module, platform package, contract surface, and cross-cutting concern. Every behavioral claim carries a `file:line` anchor derived from Stage-1 audit artifacts. Runtime-only behavior tagged `[runtime-unverified]`.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (all wiring)
@@ -68,7 +68,7 @@ Three Go binaries and one Node.js sidecar constitute the MetalDocs backend runti
 |---|---|---|---|
 | `metaldocs-api` | `apps/api/cmd/metaldocs-api/` | :8081 (dev) | `api.Dockerfile`; compose service `api` |
 | `metaldocs-worker` | `apps/worker/cmd/metaldocs-worker/` | none | `worker.Dockerfile`; compose service `worker` |
-| `metaldocs-jobs` | `apps/jobs/cmd/metaldocs-jobs/` | none | **No Dockerfile; no compose service** — deploy gap (F-19) |
+| `metaldocs-jobs` | `apps/jobs/cmd/metaldocs-jobs/` | none | `jobs.Dockerfile` + compose service added in Wave 0 (F-19). Depends on `api` service healthy. |
 | `docx-renderer` | `apps/docx-renderer/` (Node.js/Fastify) | :3100 | separate container |
 
 Sources: `repo-topology.md §3`; `async-runtime.md §10`
@@ -104,7 +104,8 @@ Twenty-eight cross-cutting platform packages live under `internal/platform/`. Do
 | Observability & config | `config`, `observability`, `featureflags` | Env config, structured HTTP logging, feature flags |
 | Async | `worker`, `servicebus`, `jobs/river` | Outbox worker, Azure Service Bus (wired but `[runtime-unverified]`), River job host |
 | Rendering | `docgenv2`, `render/gotenberg` | DOCX template reader, Gotenberg HTTP client |
-| Cache | `cache/` | **Empty scaffold** — `.gitkeep` only; zero Go source (F-08) |
+| Middleware | `middleware/` | `Recovery` — outermost panic-recovery middleware (Wave 1, REQ-MW-1) |
+| ~~Cache~~ | ~~`cache/`~~ | **DELETED Wave 1 (F-08/REQ-TOP-3)** — empty scaffold removed |
 
 ---
 
@@ -220,7 +221,7 @@ platform/authn ──imports──► auth/application (assembles authapp.Config
 platform/authn ──imports──► iam/domain (Role, UserIDFromContext)
 platform/security ──imports──► auth/domain (CurrentUserFromContext for rate limit)
 platform/security ──imports──► iam/domain  (UserIDFromContext fallback)
-platform/observability ──imports──► auth/domain (CurrentUserFromContext for access log)
+~~platform/observability ──imports──► auth/domain~~ (CLOSED Wave 0 F-06a: import removed, user injected via constructor)
 ```
 
 Sources: `synthesis-composition.md §2.1`
@@ -232,7 +233,7 @@ Sources: `synthesis-composition.md §2.1`
 | V-01 | `iam/delivery/http/sessions_handler.go` imports `auth/infrastructure/postgres` directly — delivery layer of one module crossing into infrastructure layer of another | `module-iam.md §5 FLAG-08`; `internal/modules/iam/delivery/http/sessions_handler.go:19` | HIGH |
 | V-02 | `auth` imports `iam/domain`; `iam` imports `auth/application` — bidirectional coupling between the two lowest-level modules | `module-auth.md §5`; `module-iam.md §5` | HIGH |
 | V-03 | `platform/security` imports `auth/domain` and `iam/domain` — platform package imports module domain | `internal/platform/security/ratelimit.go:12-13`; `platform-identity-tenancy.md §10` | MEDIUM |
-| V-04 | `platform/observability` imports `auth/domain` — platform package imports module domain | `internal/platform/observability/http.go:15`; `platform-ops-config.md §10` | MEDIUM |
+| ~~V-04~~ | ~~`platform/observability` imports `auth/domain`~~ | **CLOSED Wave 0 (F-06a):** import removed; user attribution now injected via constructor param. | ~~MEDIUM~~ |
 | V-05 | `platform/authn` imports `auth/application` — platform package imports module application layer | `platform-identity-tenancy.md §5` | MEDIUM |
 | V-06 | `platform/objectstore` imports `documents/domain` and `templates/domain` for error types | `platform-data-layer.md §5` | LOW |
 | V-07 | `platform/docgenv2` imports `documents/application` and `documents/domain` | `render-pipeline.md §5` | MEDIUM |
@@ -260,7 +261,7 @@ graph TB
 
     subgraph Kernel["HTTP Kernel (apps/api/cmd/metaldocs-api)"]
         PERM["permissions.go\ntier-1 route→capability table"]
-        CHAIN["Middleware chain\ncors→origin→authn→iam→presence→httpObs→ratelimit→mux"]
+        CHAIN["Middleware chain\nrecovery→httpObs→cors→origin→preAuthLogin→authn→iam→presence→ratelimit→mux\n(chain.go — Wave 1)"]
     end
 
     subgraph DomainModules["Domain Modules (internal/modules)"]
@@ -435,7 +436,7 @@ graph LR
 
 | Package | Evidence | Severity |
 |---|---|---|
-| `internal/platform/cache/` | Contains only `.gitkeep`; zero Go source files; zero imports confirmed by grep (`platform-data-layer.md §1`) | HIGH — dead placeholder, REQ-TOP-3 violation |
+| ~~`internal/platform/cache/`~~ | **DELETED Wave 1 (F-08).** Was a `.gitkeep`-only scaffold. | CLOSED |
 | `internal/platform/ratelimit/` (production activation) | Package has production-quality code and tests but `apps/api/cmd/metaldocs-api/main.go:501` calls `RegisterRoutes(mux)` not `RegisterRoutesWithRateLimit`; the `New(ctx, cfg)` constructor is never called outside tests (`platform-identity-tenancy.md §10`) | HIGH — implemented but never instantiated |
 
 ### 6.2 Dead binaries and artifacts
@@ -443,10 +444,10 @@ graph LR
 | Artifact | Evidence | Severity |
 |---|---|---|
 | `cmd/seed-test-document/` | Hardcoded DSN with plaintext password (`cmd/seed-test-document/main.go:25-30`); no CI reference; binary convention mismatch (root `cmd/` vs canonical `apps/*/cmd/`) | CRITICAL (F-18) |
-| `api/openapi/spec2.yaml` + `internal/api/v2/` | `spec2.yaml` not consumed by any `//go:generate` invocation; `internal/api/v2/types_gen.go` is test-only; no runtime handler implements spec2 as a primary surface (`contract-surface.md §10`) | HIGH (F-03) |
+| ~~`api/openapi/spec2.yaml` + `internal/api/v2/`~~ | **DELETED Wave 1 (F-03).** Parallel spec surface and orphan type package removed. | CLOSED |
 | `api/openapi/v1/partials/` (3 files) | None of the three partial files referenced by any `cfg.yaml` or `go:generate` invocation; dead from pipeline perspective (`contract-surface.md §10`) | MEDIUM |
-| `bin/metaldocs-api.exe` | Stale binary from initial commit; not excluded by `.gitignore` at `bin/` path (`repo-topology.md §10`) | MEDIUM (F-18) |
-| `ops/CAPABILITY_CATALOG.sha256` | Contains placeholder string; referenced `sql/seeds/capabilities_v2.sql` does not exist; CI gate silently exits 0 (`repo-topology.md §10`) | HIGH |
+| ~~`bin/metaldocs-api.exe`~~ | **DELETED Wave 0 (F-18).** Was never git-tracked; on-disk deleted. | CLOSED |
+| ~~`ops/CAPABILITY_CATALOG.sha256`~~ | **DELETED Wave 1 (F-03).** Placeholder SHA; CI gate was a no-op. Removed with its CI job. | CLOSED |
 
 ### 6.3 Dead application code
 
@@ -476,11 +477,11 @@ Two paths write governance events:
 1. **DBGovernanceLogger** → legacy `public.governance_events` table (active when `AuditGovernanceAdapter` is nil)
 2. **AuditGovernanceAdapter** → canonical `metaldocs.audit_events` table
 
-Both exist simultaneously. `taxonomy` writes governance events AFTER `tx.Commit` (no outbox), making them losable on crash (`module-taxonomy.md §10 F-03`). `iam.MembershipGovernanceLogger` is wired as `nil` in `main.go:325` — IAM membership governance events are never written (`module-iam.md §10 FLAG-03`). `templates` has an explicit read/write split: writes go to `audit_events`, reads go to legacy `templates_audit_log` (`module-templates.md §10 SMELL-05`). Full classification: F-07 in [legacy-register.md](legacy-register.md).
+Both exist simultaneously. `taxonomy` writes governance events AFTER `tx.Commit` (no outbox), making them losable on crash (`module-taxonomy.md §10 F-03`). `iam.MembershipGovernanceLogger` is wired as `nil` in `main.go:325` — IAM membership governance events are never written (`module-iam.md §10 FLAG-03`). `templates` read/write split: `ListAudit` now reads `metaldocs.audit_events` (resource_type='template') — the legacy `templates_audit_log` read path was fixed in Wave 1 (F-07-sub-split). Historical rows in `templates_audit_log` are accepted as a seam. Full classification: F-07 in [legacy-register.md](legacy-register.md).
 
-### 7.3 `metaldocs-jobs` binary has no container image
+### 7.3 `metaldocs-jobs` binary container image — CLOSED (Wave 0, F-19)
 
-`deploy/docker/` has `api.Dockerfile` and `worker.Dockerfile` but no `jobs.Dockerfile`. `deploy/compose/docker-compose.yml` has `api` and `worker` services but no `jobs` service. The scheduled-publish cutover feature depends on River jobs being consumed by this binary. Without it running, River rows accumulate and documents scheduled for future publication never become published (`async-runtime.md §10`; `repo-topology.md §10`). `[runtime-unverified]`
+`jobs.Dockerfile` and the `jobs` compose service were added in Wave 0. River schema migration ownership was moved exclusively to the API binary (Wave 1, F-19/F-19-River-single-owner): `BuildJobsDependencies` no longer calls `MigrateRiverSchema`; the jobs compose service has `depends_on: api(healthy)`. Runtime-verified: container stays Up, logs "MetalDocs Jobs running".
 
 ### 7.4 Auth/IAM circular coupling is a structural constraint
 
@@ -514,9 +515,9 @@ Summary of severity distribution:
 
 | Severity | Count | Families |
 |---|---|---|
-| Critical | 1 | F-18 (hard-coded credentials in VCS) |
-| High | 7 | F-01, F-03, F-07, F-11, F-17, F-19, + nil MembershipGovernanceLogger (F-07 sub-item) |
-| Medium | 10 | F-04, F-05, F-06, F-08, F-09, F-10, F-12, F-13, F-14, F-16 |
+| Critical | 1 | F-18 (Wave 0 remediation complete; history residual resolved-by-plan at re-baseline) |
+| High | 7 | F-01 ✅ Wave 1, F-03 ✅ Wave 1, F-07 🟡 sub-split ✅ Wave 1, F-11, F-17, F-19 ✅ Wave 0/1, + nil MembershipGovernanceLogger (F-07 sub-item) |
+| Medium | 10 | F-04, F-05, F-06, F-08 ✅ Wave 1, F-09 🟡 Wave 1 half, F-10, F-12, F-13 ✅ Wave 1, F-14, F-16 ✅ Wave 1 |
 | Low | 2 | F-02, F-15 |
 | Info | 1 | F-20 (correlated SQL performance patterns) |
 

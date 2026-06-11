@@ -1,6 +1,6 @@
 # Binary: metaldocs-api
 
-> **Last verified:** 2026-06-10 [runtime-unverified: live server not started; all claims verified by static source read]
+> **Last verified:** 2026-06-11 (Wave 1: chain reorder F-01, timeouts F-16)
 > **Scope:** The `metaldocs-api` server binary: entrypoint, responsibilities, config consumed, lifecycle, and runtime constraints. Sister binary `metaldocs-e2e-seed` is covered at the end. For the full middleware chain detail see [../http-kernel.md](../http-kernel.md); for the request flow see [../flows/request-lifecycle.md](../flows/request-lifecycle.md).
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — entrypoint and composition root (943 lines)
@@ -138,8 +138,8 @@ script: scripts/start-api.ps1 [-Build]
        ├─ 7. authz spine (CapabilityService + cache + middlewares)  main.go:224-246
        ├─ 8. module DI + RegisterRoutes  main.go:279-521
        ├─ 9. background goroutines  main.go:523-593
-       ├─ 10. middleware chain  main.go:595-602
-       └─ 11. http.Server.ListenAndServe → block in shutdownServer  main.go:613-627
+       ├─ 10. middleware chain  chain.go + main.go:623-643 (Wave 1: chain.go new)
+       └─ 11. http.Server.ListenAndServe → block in shutdownServer  main.go:654-674
 ```
 
 ### Shutdown
@@ -158,13 +158,13 @@ Non-zero exit explicitly calls `deps.Cleanup()` before `os.Exit` because `os.Exi
 
 | Parameter | Value | Source |
 |---|---|---|
-| `ReadHeaderTimeout` | 5s | `main.go:613-617` |
-| `ReadTimeout` | **not set** | `main.go:613-617` |
-| `WriteTimeout` | **not set** | `main.go:613-617` |
-| `IdleTimeout` | **not set** | `main.go:613-617` |
-| Handler | `http.ServeMux` wrapped in middleware chain | `main.go:595-617` |
+| `ReadHeaderTimeout` | 5s | `main.go:657` |
+| `ReadTimeout` | 30s | `main.go:661` (Wave 1, F-16) |
+| `WriteTimeout` | 60s | `main.go:662` (Wave 1, F-16) |
+| `IdleTimeout` | 90s | `main.go:663` (Wave 1, F-16) |
+| Handler | `http.ServeMux` wrapped in middleware chain | `chain.go` + `main.go:633-643` |
 
-The absence of `ReadTimeout`, `WriteTimeout`, and `IdleTimeout` means slow-body or slow-read clients hold connections indefinitely. This is a registered flag (RF-9, `wiki/architecture/backend-target-architecture.md:303`).
+`ReadTimeout/WriteTimeout/IdleTimeout` added in Wave 1 (F-16, REQ-REL-1) — slow-body connection exhaustion closed.
 
 ---
 

@@ -1,6 +1,6 @@
 # Flow — Login & Session Resolution
 
-> **Last verified:** 2026-06-11
+> **Last verified:** 2026-06-11 (Wave 1: chain reordered F-01)
 > **Scope:** End-to-end walkthrough of two flows: (1) credential submission at `POST /api/v1/auth/login` — from HTTP request through credential verification, advisory-lock critical section, session token creation, and cookie response; (2) per-request session resolution — from cookie extraction through token verification, DB lookup, expiry/idle checks, context injection, and downstream handler receipt. Covers every platform package and module involved: `platform/authn`, `platform/tenant`, `platform/security`, `modules/auth/delivery/http`, `modules/auth/application`, `modules/auth/infrastructure/postgres`.
 > **Key files:**
 > - `internal/modules/auth/delivery/http/handler.go` — login, logout, me, change-password handlers
@@ -16,22 +16,24 @@
 
 ## 1. Middleware pipeline context
 
-Both flows operate inside the `metaldocs-api` binary's middleware chain. The full chain, from outermost to innermost, as wired in `apps/api/cmd/metaldocs-api/main.go:598-602`:
+Both flows operate inside the `metaldocs-api` binary's middleware chain. The full chain, from outermost to innermost, as composed in `apps/api/cmd/metaldocs-api/chain.go` (Wave 1, F-01 — reordered from the original `main.go:598-602` wiring):
 
 ```
-cors.Wrap
-  → originProtection.Wrap
-    → authMiddleware.Wrap           ← session enforcement (this document)
-      → iamMiddleware.Wrap          ← authz (IAM module)
-        → presenceBump.Wrap         ← iam_users.last_seen_at bump (optional; omitted when nil)
-          → httpObs.Wrap            ← observability (REQ-MW-4 gap: auth rejections not counted here)
-            → rateLimiter.Wrap      ← global fixed-window rate limit
-              → mux                ← routed handlers
+panicRecovery.Wrap           ← outermost: panics → 500 problem+json + metrics (REQ-MW-1)
+  → httpObs.Wrap             ← observability outside auth: 401s counted in RED metrics (REQ-MW-4)
+    → cors.Wrap
+      → originProtection.Wrap
+        → preAuthLoginLimit  ← IP-keyed, login path only, 10/min (REQ-MW-5)
+          → authMiddleware.Wrap     ← session enforcement (this document)
+            → iamMiddleware.Wrap   ← authz (IAM module)
+              → presenceBump.Wrap  ← iam_users.last_seen_at bump (optional; omitted when nil)
+                → rateLimiter.Wrap ← identity-keyed rate limit
+                  → mux            ← routed handlers
 ```
 
-`presenceBump` is conditionally applied: `main.go:598` builds `presenceWrapped = httpObs.Wrap(rateLimiter.Wrap(mux))`; `main.go:599-601` wraps that with `presenceBump.Wrap(presenceWrapped)` only when `presenceBump != nil`. `httpObs` is therefore always inside (downstream of) `presenceBump`, never between `iamMiddleware` and `presenceBump`.
+`presenceBump` is conditionally applied via a nil-guard in `main.go`. Chain order is asserted by `chain_test.go` (REQ-MW-7).
 
-The login handler (`POST /api/v1/auth/login`) and logout handler (`POST /api/v1/auth/logout`) are in `defaultPublicPaths` (`middleware.go:94-105`). The auth middleware fast-paths these through the `isPublic` check without requiring a session cookie.
+The login handler (`POST /api/v1/auth/login`) is public (fast-path through authn); it is also covered by the pre-auth IP rate limit layer before reaching authn.
 
 ---
 
@@ -240,7 +242,7 @@ The login and session-resolution flows touch three tables.
 | Audit events emitted | `auth.login` (success, `handler.go:94`), `auth.login.failed` (failure, `handler.go:83`), `auth.logout` (success, `handler.go:112`), `auth.password.changed` (`handler.go:162`) |
 | PII protection in logs | Identifier is hashed (SHA-256) before logging at `handler.go:80` |
 | Metrics / traces | None. No OpenTelemetry spans emitted by the auth module. |
-| 401/CORS rejection visibility | REQ-MW-4 gap: `httpObs` sits inside auth in the chain (`main.go:598-602`); 401 responses from session check bypass the observability layer |
+| 401/CORS rejection visibility | CLOSED Wave 1 (F-01): `httpObs` moved outermost (layer 2, outside authn); 401 responses from session check are now counted in RED metrics |
 | TraceID | `requesttrace.Resolve(r.Context())` at `handler.go:195`; server-generated UUID, does not echo `X-Trace-Id` |
 
 ---
