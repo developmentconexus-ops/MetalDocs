@@ -70,6 +70,16 @@ Stage 2 (evaluation against professional SaaS and industry standards) is complet
 
 **Next step: execute the roadmap starting with Wave 0 — F-18 credential prerequisite** (rotate Postgres password, delete `cmd/seed-test-document/`, rewrite git history, fix `.gitignore`, replace `api-lint.exe`). No other work is meaningful for the security program until this lands.
 
+### Design spec — APPROVED (2026-06-11): execution contract for Waves 0-3
+
+Brainstorm with the user is complete; all judgment calls are decided and recorded in:
+
+- **[`docs/superpowers/specs/2026-06-11-backend-professionalization-design.md`](../../docs/superpowers/specs/2026-06-11-backend-professionalization-design.md)** — binding decisions (D-1..D-5), execution protocol, and per-wave cards.
+
+Key decisions: single-server Docker Compose deployment (D-1); audit-facing compliance, no ceremony (D-2); multi-tenant design kept, RLS as defense-in-depth on 2 tables (D-3); FULL F-18 remedy incl. history rewrite gated on user rotation (D-4); secrets never quoted in docs (D-4a); **wave-by-wave execution, each wave in a FRESH session, review gate between waves (D-5)**.
+
+**A fresh wave session reads:** `CLAUDE.md` → `wiki/README.md` → this file → the design spec → its wave card. Wave closes only with the evidence block recorded here.
+
 ## Recovered agent memory (wiped by the reinstall — re-create if a memory system returns)
 
 These facts lived in the agent's persistent memory and are NOT derivable from the repo:
