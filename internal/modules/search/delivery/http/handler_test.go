@@ -84,7 +84,7 @@ func TestHandleSearchDocumentsPassesTenantContext(t *testing.T) {
 func TestHandleSearchDocumentsMapsAdvertisedFilters(t *testing.T) {
 	reader := &handlerStubReader{}
 	h := NewHandler(searchapp.NewService(reader))
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/search/documents?q=manual&document_type=po&document_profile=qa-doc&document_family=sop&process_area=quality&owner_id=user-42&department=qa&status=ARCHIVED&expiry_before=2026-12-01T00:00:00Z&expiry_after=2026-01-01T00:00:00Z&limit=7&subject=deviation&businessUnit=ops&classification=INTERNAL&tag=tag-a", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/search/documents?q=manual&document_type=po&document_profile=qa-doc&document_family=sop&process_area=quality&owner_id=user-42&department=qa&status=ARCHIVED&expiry_before=2026-12-01T00:00:00Z&expiry_after=2026-01-01T00:00:00Z&limit=7&subject=deviation&classification=INTERNAL&tag=tag-a", nil)
 	ctx := iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{iamdomain.RoleViewer})
 	ctx = tenant.WithTenantID(ctx, "tenant-1")
 	req = req.WithContext(ctx)
@@ -131,14 +131,43 @@ func TestHandleSearchDocumentsMapsAdvertisedFilters(t *testing.T) {
 	if reader.lastQuery.Subject != "deviation" {
 		t.Fatalf("query.Subject = %q, want deviation", reader.lastQuery.Subject)
 	}
-	if reader.lastQuery.BusinessUnit != "ops" {
-		t.Fatalf("query.BusinessUnit = %q, want ops", reader.lastQuery.BusinessUnit)
+	// businessUnit (camelCase, undocumented) was removed in Wave 1.5 (F-13b).
+	if reader.lastQuery.BusinessUnit != "" {
+		t.Fatalf("query.BusinessUnit = %q, want empty (parameter removed)", reader.lastQuery.BusinessUnit)
 	}
 	if reader.lastQuery.Classification != searchdomain.ClassificationInternal {
 		t.Fatalf("query.Classification = %q, want INTERNAL", reader.lastQuery.Classification)
 	}
 	if reader.lastQuery.Tag != "tag-a" {
 		t.Fatalf("query.Tag = %q, want tag-a", reader.lastQuery.Tag)
+	}
+}
+
+func TestHandleSearchDocumentsMethodNotAllowedIsProblemJSON(t *testing.T) {
+	reader := &handlerStubReader{}
+	h := NewHandler(searchapp.NewService(reader))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/search/documents", nil)
+	rec := httptest.NewRecorder()
+
+	h.handleSearchDocuments(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Fatalf("Content-Type = %q, want application/problem+json", ct)
+	}
+	if allow := rec.Header().Get("Allow"); allow != http.MethodGet {
+		t.Fatalf("Allow = %q, want GET", allow)
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body not JSON: %v", err)
+	}
+	if body.Code != "METHOD_NOT_ALLOWED" {
+		t.Fatalf("code = %q, want METHOD_NOT_ALLOWED", body.Code)
 	}
 }
 
@@ -187,20 +216,21 @@ func TestHandleSearchDocumentsResponseIncludesAdvertisedFields(t *testing.T) {
 		t.Fatalf("len(items) = %d, want 1", len(items))
 	}
 	item := items[0]
-	if got := item["subject"]; got != "legacy-subject" {
-		t.Fatalf("subject = %#v, want legacy-subject", got)
+	// F-13a (Wave 1.5): the legacy fields are gone from the wire format even
+	// when the domain model carries values — the spec never declared them and
+	// the SQL reader never populates them in production.
+	for _, removed := range []string{"subject", "business_unit", "classification", "tags"} {
+		if _, present := item[removed]; present {
+			t.Fatalf("removed legacy field %q still present in response: %#v", removed, item)
+		}
 	}
-	if got := item["business_unit"]; got != "legacy-bu" {
-		t.Fatalf("business_unit = %#v, want legacy-bu", got)
+	if got := item["document_code"]; got != "PO-QA-012" {
+		t.Fatalf("document_code = %#v, want PO-QA-012", got)
 	}
-	if got := item["classification"]; got != "INTERNAL" {
-		t.Fatalf("classification = %#v, want INTERNAL", got)
+	if got := item["process_area"]; got != "quality" {
+		t.Fatalf("process_area = %#v, want quality", got)
 	}
-	tags, ok := item["tags"].([]any)
-	if !ok {
-		t.Fatalf("tags type = %T, want []any", item["tags"])
-	}
-	if len(tags) != 1 || tags[0] != "legacy-tag" {
-		t.Fatalf("tags = %#v, want [legacy-tag]", tags)
+	if got := item["status"]; got != "ARCHIVED" {
+		t.Fatalf("status = %#v, want ARCHIVED", got)
 	}
 }

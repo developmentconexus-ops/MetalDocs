@@ -10,6 +10,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	searchdomain "metaldocs/internal/modules/search/domain"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -21,25 +22,26 @@ type Searcher interface {
 	SearchDocuments(ctx context.Context, q searchdomain.Query) ([]searchdomain.Document, error)
 }
 
+// SearchDocumentResponse mirrors the SearchDocumentItem schema in
+// api/openapi/v1/openapi.yaml. The legacy subject/business_unit/
+// classification/tags fields were removed in Wave 1.5 (F-13a): the SQL
+// reader never populated them, so they were always zero-valued on the wire
+// and absent from the spec.
 type SearchDocumentResponse struct {
-	DocumentID       string   `json:"document_id"`
-	Title            string   `json:"title"`
-	DocumentType     string   `json:"document_type"`
-	DocumentProfile  string   `json:"document_profile"`
-	DocumentFamily   string   `json:"document_family"`
-	DocumentSequence int      `json:"document_sequence"`
-	DocumentCode     string   `json:"document_code"`
-	ProcessArea      string   `json:"process_area,omitempty"`
-	Subject          string   `json:"subject,omitempty"`
-	OwnerID          string   `json:"owner_id"`
-	BusinessUnit     string   `json:"business_unit,omitempty"`
-	Department       string   `json:"department,omitempty"`
-	Classification   string   `json:"classification,omitempty"`
-	Status           string   `json:"status"`
-	Tags             []string `json:"tags,omitempty"`
-	EffectiveAt      string   `json:"effective_at,omitempty"`
-	ExpiryAt         string   `json:"expiry_at,omitempty"`
-	CreatedAt        string   `json:"created_at"`
+	DocumentID       string `json:"document_id"`
+	Title            string `json:"title"`
+	DocumentType     string `json:"document_type"`
+	DocumentProfile  string `json:"document_profile"`
+	DocumentFamily   string `json:"document_family"`
+	DocumentSequence int    `json:"document_sequence"`
+	DocumentCode     string `json:"document_code"`
+	ProcessArea      string `json:"process_area,omitempty"`
+	OwnerID          string `json:"owner_id"`
+	Department       string `json:"department,omitempty"`
+	Status           string `json:"status"`
+	EffectiveAt      string `json:"effective_at,omitempty"`
+	ExpiryAt         string `json:"expiry_at,omitempty"`
+	CreatedAt        string `json:"created_at"`
 }
 
 func NewHandler(service Searcher) *Handler {
@@ -52,7 +54,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", http.MethodGet)
+		httpresponse.WriteError(w, http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed")
 		return
 	}
 
@@ -96,7 +99,6 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 		ProcessArea:     r.URL.Query().Get("process_area"),
 		Subject:         r.URL.Query().Get("subject"),
 		OwnerID:         r.URL.Query().Get("owner_id"),
-		BusinessUnit:    r.URL.Query().Get("businessUnit"),
 		Department:      r.URL.Query().Get("department"),
 		Classification:  searchdomain.Classification(r.URL.Query().Get("classification")),
 		Status:          searchdomain.Status(r.URL.Query().Get("status")),
@@ -121,13 +123,9 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 			DocumentSequence: item.DocumentSequence,
 			DocumentCode:     item.DocumentCode,
 			ProcessArea:      item.ProcessArea,
-			Subject:          item.Subject,
 			OwnerID:          item.OwnerID,
-			BusinessUnit:     item.BusinessUnit,
 			Department:       item.Department,
-			Classification:   string(item.Classification),
 			Status:           string(item.Status),
-			Tags:             append([]string(nil), item.Tags...),
 			EffectiveAt:      formatOptionalTime(item.EffectiveAt),
 			ExpiryAt:         formatOptionalTime(item.ExpiryAt),
 			CreatedAt:        item.CreatedAt.Format(time.RFC3339),

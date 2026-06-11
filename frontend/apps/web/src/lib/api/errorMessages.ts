@@ -73,6 +73,7 @@ export const errorMessages: Record<string, string> = {
 
   // ─── Platform: not-found / already-exists / state ─────────────────────────
   NOT_FOUND: 'O recurso solicitado não foi encontrado.',
+  METHOD_NOT_ALLOWED: 'Operação não suportada para este recurso.',
   'not_found.revision': 'Revisão do documento não encontrada.',
   ALREADY_EXISTS: 'O recurso informado já existe.',
   STATE_TRANSITION_INVALID: 'A transição de estado solicitada não é permitida.',

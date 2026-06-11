@@ -34,7 +34,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *Handler) handleMfaCoverage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		h.methodNotAllowed(w)
 		return
 	}
 	tenantID, ok := h.requireTenant(w, r)
@@ -56,7 +56,7 @@ func (h *Handler) handleMfaCoverage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleLockouts(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		h.methodNotAllowed(w)
 		return
 	}
 	tenantID, ok := h.requireTenant(w, r)
@@ -96,7 +96,7 @@ func (h *Handler) handleLockouts(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		h.methodNotAllowed(w)
 		return
 	}
 	tenantID, ok := h.requireTenant(w, r)
@@ -137,6 +137,13 @@ func (h *Handler) requireTenant(w http.ResponseWriter, r *http.Request) (string,
 		return "", false
 	}
 	return tenantID, true
+}
+
+// methodNotAllowed writes the RFC 9457 405 response (D-03: every error path
+// in this module emits problem+json — bare statuses were the one exception).
+func (h *Handler) methodNotAllowed(w http.ResponseWriter) {
+	w.Header().Set("Allow", http.MethodGet)
+	h.writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed"))
 }
 
 func (h *Handler) writeProblem(w http.ResponseWriter, p *problem.Problem) {

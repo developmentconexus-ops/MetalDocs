@@ -19,6 +19,7 @@ const (
 	CodeForbiddenArea          Code = "FORBIDDEN_AREA"
 	CodeForbiddenOrigin        Code = "FORBIDDEN_ORIGIN"
 	CodeNotFound               Code = "NOT_FOUND"
+	CodeMethodNotAllowed       Code = "METHOD_NOT_ALLOWED"
 	CodeAlreadyExists          Code = "ALREADY_EXISTS"
 	CodeStateTransitionInvalid Code = "STATE_TRANSITION_INVALID"
 	CodeConcurrentModification Code = "CONCURRENT_MODIFICATION"
