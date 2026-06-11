@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	apiv2 "metaldocs/internal/api/v2"
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -60,7 +60,7 @@ func TestProfilesHandler_ErrorEnvelopeContract(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 
-	var apiErr apiv2.APIError
+	var apiErr problem.Problem
 	if err := json.Unmarshal(rec.Body.Bytes(), &apiErr); err != nil {
 		t.Fatalf("unmarshal api error: %v body=%s", err, rec.Body.String())
 	}

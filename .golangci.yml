@@ -65,23 +65,6 @@ linters:
           - bodyclose
           - exhaustive
           - contextcheck
-      - path: internal/api/v2/types_gen\.go
-        linters:
-          - errcheck
-          - govet
-          - staticcheck
-          - nilerr
-          - errorlint
-          - gosec
-          - gocritic
-          - revive
-          - gocyclo
-          - gocognit
-          - sqlclosecheck
-          - rowserrcheck
-          - bodyclose
-          - exhaustive
-          - contextcheck
 
 run:
   timeout: 5m

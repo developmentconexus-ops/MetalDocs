@@ -33,13 +33,17 @@ jobs:
         run: go run ./tools/cilint ./...
 
   # NOTE: the former `openapi-drift` job was removed — it regenerated approval
-  # frontend types from api/openapi/spec2.yaml into
-  # frontend/apps/web/src/features/approval/api/__generated__/, a path that no
-  # longer exists and that nothing imports (spec2.yaml is referenced only by this
-  # workflow). Frontend type drift is covered by api-contract.yml's
-  # `frontend-codegen-drift` job (npm run gen:api -> src/lib/api-types). The job
-  # had been broken anyway (`openapiTS` is not a real binary; openapi-typescript
-  # v7 also rejects spec2.yaml as a multi-schema doc).
+  # frontend types from api/openapi/spec2.yaml (deleted with the rest of the
+  # parallel v2 contract surface in Wave 1 item 1.3, F-03/REQ-API-2). Frontend
+  # type drift is covered by api-contract.yml's `frontend-codegen-drift` job
+  # (npm run gen:api -> src/lib/api-types).
+  #
+  # NOTE: the former `capability-catalog-hash` job was removed in the same
+  # change — it pinned the SHA-256 of sql/seeds/capabilities_v2.sql, a file
+  # that never existed, so the gate always exited 0 ("Catalog file not found")
+  # and enforced nothing. The real REQ-AUTHZ-5 code↔registry binding guard is
+  # api-lint's capability registry rules (scripts/api-lint/registry_rules.go,
+  # ADR 0022).
 
   migration-gapless:
     name: Migration monotonicity check
@@ -85,37 +89,6 @@ jobs:
             exit 1
           fi
           echo "✅ No historical migration edits"
-
-  capability-catalog-hash:
-    name: Capability catalog integrity
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Verify SHA256 matches pinned hash
-        run: |
-          CATALOG="sql/seeds/capabilities_v2.sql"
-          PIN_FILE="ops/CAPABILITY_CATALOG.sha256"
-
-          if [ ! -f "$CATALOG" ]; then
-            echo "Catalog file not found: $CATALOG — skip"
-            exit 0
-          fi
-          if [ ! -f "$PIN_FILE" ]; then
-            echo "Pin file not found: $PIN_FILE — creating initial pin"
-            sha256sum "$CATALOG" | awk '{print $1}' > "$PIN_FILE"
-            exit 0
-          fi
-
-          ACTUAL=$(sha256sum "$CATALOG" | awk '{print $1}')
-          EXPECTED=$(cat "$PIN_FILE" | tr -d '[:space:]')
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "❌ Capability catalog changed without bump PR"
-            echo "Expected: $EXPECTED"
-            echo "Actual:   $ACTUAL"
-            echo "Update ops/CAPABILITY_CATALOG.sha256 in a dedicated PR."
-            exit 1
-          fi
-          echo "✅ Capability catalog hash matches"
 
   staticcheck:
     name: staticcheck + go vet

@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	apiv2 "metaldocs/internal/api/v2"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -106,7 +106,7 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 		t.Fatalf("Content-Type = %q, want application/problem+json", ct)
 	}
 
-	var apiErr apiv2.APIError
+	var apiErr problem.Problem
 	if err := json.Unmarshal(rec.Body.Bytes(), &apiErr); err != nil {
 		t.Fatalf("unmarshal api error: %v body=%s", err, rec.Body.String())
 	}
