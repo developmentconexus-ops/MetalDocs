@@ -60,7 +60,15 @@ Stage 1 (backend audit and mapping) is complete. The full atlas is at:
 - **[`wiki/backend/index.md`](../backend/index.md)** — atlas root: binary map, repo topology, HTTP kernel, domain modules, platform packages, contract surface, flows, and navigation to all detail pages
 - **[`wiki/backend/legacy-register.md`](../backend/legacy-register.md)** — complete legacy/duplication/smell register with RF-* cross-references and prioritized remediation sequencing
 
-**Next step after the items above: Stage 2** — evaluate the as-mapped backend against professional SaaS and industry standards (Go conventions, PostgreSQL practice, ISO/RFC-grade API standards) using the atlas as the factual base.
+### Stage-2 backend evaluation — COMPLETE (2026-06-11)
+
+Stage 2 (evaluation against professional SaaS and industry standards) is complete. The canonical evaluation artifact is at:
+
+- **[`wiki/backend/stage2-evaluation.md`](../backend/stage2-evaluation.md)** — master verdict table (all findings), executive posture, P0 prerequisites, 4-wave prioritized roadmap, and ADR backlog
+
+**Summary:** 3 P0 prerequisites (F-18 credentials, F-19 jobs deployment, F-06a platform layering inversion), 4 roadmap waves, 2 ADRs proposed (ADR 0027: RLS adoption sequencing; ADR 0028: upsertApprovalConfig capability, conditional).
+
+**Next step: execute the roadmap starting with Wave 0 — F-18 credential prerequisite** (rotate Postgres password, delete `cmd/seed-test-document/`, rewrite git history, fix `.gitignore`, replace `api-lint.exe`). No other work is meaningful for the security program until this lands.
 
 ## Recovered agent memory (wiped by the reinstall — re-create if a memory system returns)
 
