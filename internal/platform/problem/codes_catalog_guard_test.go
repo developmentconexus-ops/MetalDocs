@@ -22,6 +22,7 @@ var errorWriterCodeArg = map[string]int{
 	"httpErrDetail":      2, // httpErrDetail(w, status, code, detail)
 	"writeErr":           2, // writeErr(w, status, code, message)
 	"writePDFWebhookErr": 2, // writePDFWebhookErr(w, status, code, detail)
+	"writeErrJSON":       2, // idempotency: writeErrJSON(w, status, code, msg)
 }
 
 // guardedPackages are the HTTP packages whose error vocabulary Family 4
@@ -31,6 +32,7 @@ var errorWriterCodeArg = map[string]int{
 var guardedPackages = []string{
 	filepath.Join("internal", "modules", "documents", "delivery", "http"),
 	filepath.Join("internal", "modules", "templates", "delivery", "http"),
+	filepath.Join("internal", "platform", "idempotency"), // F-09: middleware raw codes closed Wave 1.4
 	"pdf_webhook", // documents/http: only the pdf-complete webhook handler
 }
 

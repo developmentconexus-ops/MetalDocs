@@ -90,11 +90,11 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string), 
 			}
 			key := r.Header.Get("Idempotency-Key")
 			if key == "" {
-				writeErrJSON(w, 400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key header required")
+				writeErrJSON(w, 400, problem.CodeIdempotencyKeyRequired, "Idempotency-Key header required")
 				return
 			}
 			if !IsValidKey(key) {
-				writeErrJSON(w, 400, "IDEMPOTENCY_KEY_INVALID", "Idempotency-Key must be a UUID")
+				writeErrJSON(w, 400, problem.CodeIdempotencyKeyInvalid, "Idempotency-Key must be a UUID")
 				return
 			}
 
@@ -105,22 +105,22 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string), 
 			if err != nil {
 				var maxBytesErr *http.MaxBytesError
 				if errors.As(err, &maxBytesErr) {
-					writeErrJSON(w, http.StatusRequestEntityTooLarge, "REQUEST_BODY_TOO_LARGE", "request body exceeds 1 MiB limit")
+					writeErrJSON(w, http.StatusRequestEntityTooLarge, problem.CodeRequestBodyTooLarge, "request body exceeds 1 MiB limit")
 					return
 				}
-				writeErrJSON(w, 400, "BAD_REQUEST", "cannot read body")
+				writeErrJSON(w, 400, problem.CodeValidationError, "cannot read body")
 				return
 			}
 
 			handle, replay, err := store.BeginReplay(r.Context(), tenantID, actorID, key, hash)
 			if errors.Is(err, ErrConflict) {
-				writeErrJSON(w, 422, "IDEMPOTENCY_KEY_CONFLICT", "key reused with different payload")
+				writeErrJSON(w, 422, problem.CodeIdempotencyKeyReused, "key reused with different payload")
 				return
 			}
 			if err != nil {
 				slog.ErrorContext(r.Context(), "idempotency: begin failed",
 					"key", key, "tenant", tenantID, "err", err)
-				writeErrJSON(w, 500, "INTERNAL", "idempotency check failed")
+				writeErrJSON(w, 500, problem.CodeInternalError, "idempotency check failed")
 				return
 			}
 			if replay != nil {
@@ -210,11 +210,11 @@ func (r *responseRecorder) Flush() {
 }
 
 // writeErrJSON emits an RFC 9457 Problem (application/problem+json) — the single
-// API error envelope (AD-2). The name is retained for the call sites; the body
-// is no longer a bespoke {code,message} JSON object (which Phase D's emitter
-// sweep missed at this middleware layer).
-func writeErrJSON(w http.ResponseWriter, status int, code, msg string) {
-	if err := problem.Write(w, problem.New(status, problem.Code(code), msg)); err != nil {
+// API error envelope (AD-2). The code parameter is typed problem.Code so call
+// sites must use catalog constants; the codes_catalog_guard_test enforces that
+// no raw string literal appears in the code position (F-09, REQ-API-5).
+func writeErrJSON(w http.ResponseWriter, status int, code problem.Code, msg string) {
+	if err := problem.Write(w, problem.New(status, code, msg)); err != nil {
 		slog.Warn("idempotency: problem write failed", "err", err, "status", status, "code", code)
 	}
 }
