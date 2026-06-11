@@ -16,6 +16,8 @@ $meRoute = '/api/v1/auth/me'
 $loginIdentifier = 'admin'
 $loginPassword = 'AdminMetalDocs123!'
 $blankTemplateSeedScript = Join-Path $PSScriptRoot 'seed-system-blank-template.ps1'
+# Shell-agnostic: under PowerShell 7+ $PSHOME contains pwsh.exe, not powershell.exe.
+$psShellExe = if ($PSVersionTable.PSEdition -eq 'Core') { Join-Path $PSHOME 'pwsh.exe' } else { Join-Path $PSHOME 'powershell.exe' }
 
 function Resolve-TargetRoute {
     param(
@@ -53,7 +55,7 @@ function Assert-SystemBlankTemplateObject {
         Fail-Checkpoint -Name 'blank-template-object' -Message "seed script missing at $blankTemplateSeedScript"
     }
 
-    & (Join-Path $PSHOME 'powershell.exe') `
+    & $psShellExe `
         -NoProfile `
         -ExecutionPolicy Bypass `
         -File $blankTemplateSeedScript `
@@ -179,7 +181,7 @@ try {
         if (-not $reuseRunningApi) {
             Write-Host "Starting API via scripts/dev-api.ps1"
             Normalize-ProcessPathEnvironment
-            & (Join-Path $PSHOME "powershell.exe") `
+            & $psShellExe `
                 -NoProfile `
                 -ExecutionPolicy Bypass `
                 -File (Join-Path $PSScriptRoot 'dev-api.ps1') | Out-Host
