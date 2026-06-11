@@ -539,6 +539,13 @@ func main() {
 	approvalHandler.RegisterRoutes(mux)
 	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {
 		e2etest.RegisterE2EHandlers(m, deps.SQLDB, nil)
+		// Runtime probe for REQ-MW-1: a deliberate handler panic that the
+		// platform recovery middleware must convert into a 500 problem+json
+		// without killing the process. Mounted only when METALDOCS_E2E=1;
+		// touches no data.
+		m.HandleFunc("GET /internal/test/panic", func(http.ResponseWriter, *http.Request) {
+			panic("e2e panic probe: must be recovered by platform/middleware.Recovery (REQ-MW-1)")
+		})
 	})
 
 	leaderID := schedulerLeaderID()
