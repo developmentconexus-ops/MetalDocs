@@ -125,6 +125,77 @@ func (r *Repository) ok(db *sql.DB) {
 	}
 }
 
+// ─── PlatformBoundary (REQ-TOP-2 import direction) ───────────────────────────
+
+func platformBoundaryFixture(t *testing.T, pkgSegments []string, src string) string {
+	t.Helper()
+	dir := t.TempDir()
+	pkgDir := filepath.Join(append([]string{dir, "internal", "platform"}, pkgSegments...)...)
+	_ = os.MkdirAll(pkgDir, 0o755)
+	path := filepath.Join(pkgDir, "code.go")
+	_ = os.WriteFile(path, []byte(src), 0o644)
+	return path
+}
+
+func TestPlatformBoundary_Positive_ModuleImport(t *testing.T) {
+	src := `package cache
+import (
+	"context"
+	authdomain "metaldocs/internal/modules/auth/domain"
+)
+func Bad(ctx context.Context) { _ = authdomain.CurrentUserFromContext; _ = ctx }
+`
+	path := platformBoundaryFixture(t, []string{"cache"}, src)
+	findings := analyzers.PlatformBoundary([]string{path})
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding for module import from platform package, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestPlatformBoundary_Negative_PlatformOnlyImports(t *testing.T) {
+	src := `package observability
+import (
+	"net/http"
+	"metaldocs/internal/platform/problem"
+)
+func OK(w http.ResponseWriter) { _ = problem.Write }
+`
+	path := platformBoundaryFixture(t, []string{"observability"}, src)
+	findings := analyzers.PlatformBoundary([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings for platform-only imports, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestPlatformBoundary_Negative_FrozenBaselinePackage(t *testing.T) {
+	src := `package bootstrap
+import documents "metaldocs/internal/modules/documents"
+var _ = documents.Module{}
+`
+	path := platformBoundaryFixture(t, []string{"bootstrap"}, src)
+	findings := analyzers.PlatformBoundary([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings for frozen-baseline package, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestPlatformBoundary_Negative_ModuleFilesNotInScope(t *testing.T) {
+	src := `package application
+import other "metaldocs/internal/modules/iam/domain"
+var _ = other.Role("")
+`
+	dir := t.TempDir()
+	pkgDir := filepath.Join(dir, "internal", "modules", "documents", "application")
+	_ = os.MkdirAll(pkgDir, 0o755)
+	path := filepath.Join(pkgDir, "svc.go")
+	_ = os.WriteFile(path, []byte(src), 0o644)
+
+	findings := analyzers.PlatformBoundary([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("module-to-module imports are out of scope, got %d findings", len(findings))
+	}
+}
+
 // ─── OutboxPair (struct-field emitter detection) ─────────────────────────────
 
 func TestOutboxPair_Negative_StructFieldEmitter(t *testing.T) {

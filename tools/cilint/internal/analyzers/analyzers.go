@@ -44,6 +44,7 @@ func RunAll(targets []string) []Finding {
 	out = append(out, TxOwnership(files)...)
 	out = append(out, LegacyVocab(files)...)
 	out = append(out, OutboxPair(files)...)
+	out = append(out, PlatformBoundary(files)...)
 	return out
 }
 
