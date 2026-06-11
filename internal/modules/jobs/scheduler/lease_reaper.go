@@ -3,14 +3,21 @@ package scheduler
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"log/slog"
-
-	"github.com/lib/pq"
 )
 
+// RunLeaseReaper deletes scheduler job leases whose expiry is more than 10
+// minutes past and emits a structured log line per reclaimed lease.
+//
+// Job leases are system-scoped maintenance artifacts: job_name is a scheduler
+// job identifier, not a tenant resource. The previous implementation tried to
+// attribute each reap to a tenant by joining job_name against
+// public.documents.id — a cross-schema comparison that never matched, so
+// tenant resolution failed for every reaped lease, the governance insert was
+// skipped, and every tick with a reap returned an error (F-19, REQ-ASYNC-4).
+// governance_events.tenant_id is NOT NULL with no system-tenant convention,
+// so the durable record for these infrastructure events is the structured
+// log stream, per the Wave 1.7 card.
 func RunLeaseReaper(db *sql.DB) JobFunc {
 	return func(ctx context.Context, epoch int64) error {
 		tx, err := db.BeginTx(ctx, nil)
@@ -31,11 +38,7 @@ deleted AS (
 	WHERE jl.job_name IN (SELECT job_name FROM locked)
 	RETURNING jl.job_name, jl.leader_id, jl.lease_epoch
 )
-SELECT
-	d.job_name,
-	d.leader_id,
-	d.lease_epoch,
-	(SELECT doc.tenant_id::text FROM public.documents doc WHERE doc.id::text = d.job_name LIMIT 1) AS tenant_id
+SELECT d.job_name, d.leader_id, d.lease_epoch
 FROM deleted d
 `)
 		if err != nil {
@@ -44,72 +47,25 @@ FROM deleted d
 		defer rows.Close()
 
 		reclaimed := 0
-		jobNames := make([]string, 0)
-		payloads := make([]string, 0)
-		tenantIDs := make([]string, 0)
-		var rowErrs []error
 		for rows.Next() {
 			var jobName string
 			var leaderID string
 			var leaseEpoch int64
-			var tenantID sql.NullString
-			if err := rows.Scan(&jobName, &leaderID, &leaseEpoch, &tenantID); err != nil {
-				slog.ErrorContext(ctx, "lease_reaper: scan reclaimed lease failed", "error", err)
-				rowErrs = append(rowErrs, err)
-				continue
+			if err := rows.Scan(&jobName, &leaderID, &leaseEpoch); err != nil {
+				return err
 			}
-
-			payloadJSON, err := json.Marshal(map[string]any{
-				"job_name":    jobName,
-				"leader_id":   leaderID,
-				"lease_epoch": leaseEpoch,
-			})
-			if err != nil {
-				slog.ErrorContext(ctx, "lease_reaper: marshal governance payload failed",
-					"job_name", jobName,
-					"leader_id", leaderID,
-					"lease_epoch", leaseEpoch,
-					"error", err)
-				rowErrs = append(rowErrs, err)
-				continue
-			}
-
-			if !tenantID.Valid || tenantID.String == "" {
-				err := fmt.Errorf("lease_reaper: tenant attribution unavailable for job %q", jobName)
-				slog.ErrorContext(ctx, "lease_reaper: resolve tenant failed",
-					"job_name", jobName,
-					"leader_id", leaderID,
-					"lease_epoch", leaseEpoch,
-					"error", err)
-				rowErrs = append(rowErrs, err)
-				continue
-			}
-
-			jobNames = append(jobNames, jobName)
-			payloads = append(payloads, string(payloadJSON))
-			tenantIDs = append(tenantIDs, tenantID.String)
+			// Warn: an expired lease means a leader stopped renewing
+			// (crash, partition, or shutdown without release).
+			slog.WarnContext(ctx, "lease_reaper: expired lease reclaimed",
+				"job", "lease_reaper",
+				"job_name", jobName,
+				"leader_id", leaderID,
+				"lease_epoch", leaseEpoch,
+				"epoch", epoch)
 			reclaimed++
 		}
 		if err := rows.Err(); err != nil {
 			return err
-		}
-		if len(jobNames) > 0 {
-			if _, err := tx.ExecContext(ctx, `
-INSERT INTO governance_events
-	(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, created_at)
-SELECT
-	u.tenant_id::uuid,
-	'lease.reaped',
-	'system:reaper',
-	'job_lease',
-	u.job_name,
-	'expired_lease_reclaimed',
-	u.payload_json::jsonb,
-	now()
-FROM unnest($1::text[], $2::text[], $3::text[]) AS u(job_name, payload_json, tenant_id)
-`, pq.Array(jobNames), pq.Array(payloads), pq.Array(tenantIDs)); err != nil {
-				return err
-			}
 		}
 		if err := tx.Commit(); err != nil {
 			return err
@@ -119,6 +75,6 @@ FROM unnest($1::text[], $2::text[], $3::text[]) AS u(job_name, payload_json, ten
 			"job", "lease_reaper",
 			"epoch", epoch,
 			"reclaimed", reclaimed)
-		return errors.Join(rowErrs...)
+		return nil
 	}
 }
