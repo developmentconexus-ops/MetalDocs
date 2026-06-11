@@ -34,8 +34,7 @@ var allowedTxPackages = []string{
 	"/platform/messaging/",
 	"/platform/worker/",
 	"jobs/",
-	"internal/test/",         // integration seed harness (build-tagged, non-prod)
-	"cmd/seed-test-document", // standalone dev seed CLI (owns its own tx)
+	"internal/test/", // integration seed harness (build-tagged, non-prod)
 }
 
 // RunAll runs every analyzer over the given patterns and aggregates findings.

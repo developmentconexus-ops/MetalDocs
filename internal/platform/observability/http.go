@@ -59,7 +59,9 @@ func NewHTTPObservability(runtimeProvider ...RuntimeStatusProvider) *HTTPObserva
 // WithUserIDResolver injects the callback that resolves the authenticated
 // user id for request logging. The composition root supplies it so this
 // platform package stays free of module imports (REQ-TOP-2); when nil or
-// when the callback returns empty, requests log as "anonymous".
+// when the callback returns empty, requests log as "anonymous". Must be
+// called before the middleware sees traffic (same contract as
+// ratelimit.WithClock) — the field is not synchronized.
 func (o *HTTPObservability) WithUserIDResolver(resolve func(*http.Request) string) *HTTPObservability {
 	o.userIDResolver = resolve
 	return o

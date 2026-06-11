@@ -10,9 +10,9 @@ useDefault = true
 description = "Assessed non-secrets (Wave 0 item 0.2)"
 paths = [
     # Go test fixtures (named test* constants, fake S3 keys)
-    '''.*_test\.go''',
+    '''.*_test\.go$''',
     # oapi-codegen output: embedded base64 spec chunks trip entropy rules
-    '''.*\.gen\.go''',
+    '''.*\.gen\.go$''',
     # Ephemeral AI plan docs — dir is gitignored for new content; tracked
     # leftovers contain stale example tokens (verified ≠ current .env values)
     '''docs/superpowers/plans/.*''',

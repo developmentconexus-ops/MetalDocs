@@ -51,3 +51,14 @@ logs/**
 
 # Worktrees
 .worktrees
+
+# Agent/session dirs — can grow to hundreds of MB; never build inputs
+.claude
+.claude/**
+.codex*
+.clone
+.clone/**
+.gomodcache
+.gomodcache/**
+backups
+backups/**
