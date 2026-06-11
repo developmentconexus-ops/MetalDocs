@@ -44,7 +44,7 @@
 
 | # | Item | Findings | Status | Commit | Evidence / notes |
 |---|------|----------|--------|--------|------------------|
-| 1.1 | Middleware chain reorder + panic recovery + pre-auth login rate limit + REQ-MW-7 chain-order test | F-01 | ⏸ on 0.6 | | |
+| 1.1 | Middleware chain reorder + panic recovery + pre-auth login rate limit + REQ-MW-7 chain-order test | F-01 | 🔁 | (this commit) | Chain now `panicRecovery → httpObs → cors → origin → preAuthLoginLimit → authn → iam → presenceBump → rateLimiter → mux` via declarative `apiChain`/`buildChain` (`apps/api/cmd/metaldocs-api/chain.go`) + REQ-MW-7 order test (`chain_test.go`). New `platform/middleware.Recovery` (trace-ID + panic → 500 problem+json; re-panics ErrAbortHandler). httpObs: records panicked requests as 500 in RED metrics (defer; panic NOT swallowed); user attribution preserved across the authn boundary via `observability.SetPrincipal` slot (authn reports outward — REQ-MW-4 without losing audit attribution). Pre-auth login limit: `platform/ratelimit` instance, `auth_login` 10/min IP-keyed, login path only. build+vet+tests green (`apps/api/cmd`, `platform/{middleware,observability,ratelimit}`, `modules/auth`, `tests/unit`). Runtime proof (login, panic survival, 401 metric) pending wave-close Docker check |
 | 1.2 | http.Server Read/Write/Idle timeouts | F-16 | ☐ | | |
 | 1.3 | Delete `spec2.yaml` + `internal/api/v2`; migrate 3 contract tests; fix capability-catalog CI gate | F-03 | ☐ | | −~1100 lines |
 | 1.4 | Idempotency middleware codes → problem catalog; expand guard test | F-09 | ☐ | | |

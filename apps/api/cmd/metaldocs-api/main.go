@@ -74,8 +74,10 @@ import (
 	"metaldocs/internal/platform/httpclient"
 	riverjobs "metaldocs/internal/platform/jobs/river"
 	"metaldocs/internal/platform/migrate"
+	platformmw "metaldocs/internal/platform/middleware"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
+	"metaldocs/internal/platform/ratelimit"
 	"metaldocs/internal/platform/requesttrace"
 	"metaldocs/internal/platform/security"
 	e2etest "metaldocs/internal/test"
@@ -284,6 +286,16 @@ func main() {
 	)
 	rateLimiter := security.NewRateLimiter(rateCfg)
 	cors := security.NewCORS(corsCfg)
+
+	// Pre-auth IP-keyed rate limit for the login endpoint (REQ-MW-5). Runs
+	// before authn in the chain; always keys by client IP. 10 attempts/min
+	// per IP — brute force is additionally bounded by account lockout.
+	loginRateCfg, err := ratelimit.NewConfig(map[ratelimit.RouteKey]int{ratelimit.RouteAuthLogin: 10})
+	if err != nil {
+		log.Fatalf("login rate limit config: %v", err)
+	}
+	loginRateCfg.TrustedProxyCIDRs = authCfg.TrustedProxyCIDRs
+	preAuthLimiter := ratelimit.New(ctx, loginRateCfg)
 
 	mux := http.NewServeMux()
 	authHandler.RegisterRoutes(mux)
@@ -601,14 +613,27 @@ func main() {
 		}()
 	}
 
-	// PR-9: presenceBump sits AFTER iamMiddleware (so iamdomain.UserID
-	// is in ctx) and wraps the inner stack so authenticated requests
-	// bump iam_users.last_seen_at (debounced 60s per user).
-	var presenceWrapped http.Handler = httpObs.Wrap(rateLimiter.Wrap(mux))
+	// Canonical chain per backend-target-architecture.md §2.1 (F-01 fix,
+	// REQ-MW-1/2/4/5): panic recovery + trace context outermost, access
+	// log/metrics OUTSIDE authn so 401s and panics are observable,
+	// pre-auth IP-keyed login limit before authn. presenceBump stays
+	// after iamMiddleware (needs iamdomain.UserID in ctx, PR-9). Order is
+	// asserted by chain_test.go (REQ-MW-7).
+	var presenceWrap func(http.Handler) http.Handler
 	if presenceBump != nil {
-		presenceWrapped = presenceBump.Wrap(presenceWrapped)
+		presenceWrap = presenceBump.Wrap
 	}
-	handler := cors.Wrap(originProtection.Wrap(authMiddleware.Wrap(iamMiddleware.Wrap(presenceWrapped))))
+	handler := buildChain(mux, apiChain(
+		platformmw.Recovery,
+		httpObs.Wrap,
+		cors.Wrap,
+		originProtection.Wrap,
+		loginRateLimit(preAuthLimiter),
+		authMiddleware.Wrap,
+		iamMiddleware.Wrap,
+		presenceWrap,
+		rateLimiter.Wrap,
+	))
 
 	addr := ":8080"
 	if appPort := os.Getenv("APP_PORT"); appPort != "" {

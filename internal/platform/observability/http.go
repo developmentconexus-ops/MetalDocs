@@ -70,49 +70,65 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 		if !ok {
 			traceID = requesttrace.Resolve(r.Context())
 		}
-		r = r.WithContext(requesttrace.WithTraceID(r.Context(), traceID))
+		r = r.WithContext(withPrincipalSlot(requesttrace.WithTraceID(r.Context(), traceID)))
 
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(sw, r)
-
-		path := strings.ReplaceAll(r.URL.Path, "\n", "")
-		route := normalizeRoute(path)
-		method := r.Method
-		elapsedMs := time.Since(start).Milliseconds()
-		if elapsedMs < 0 {
-			elapsedMs = 0
-		}
-		durationMs := uint64(elapsedMs)
-		isError := sw.status >= 400
-
-		m := o.getMetric(route, method)
-		atomic.AddUint64(&m.requests, 1)
-		if isError {
-			atomic.AddUint64(&m.errors, 1)
-		}
-		atomic.AddUint64(&m.durationMs, durationMs)
-		m.record(durationMs)
-
-		userID := "anonymous"
-		if o.userIDResolver != nil {
-			if id := strings.TrimSpace(o.userIDResolver(r)); id != "" {
-				userID = id
+		panicked := true
+		defer func() {
+			if panicked {
+				// A downstream panic is unwinding through us. The outer
+				// recovery middleware writes the 500 problem+json; record
+				// the request here so panics stay visible in RED metrics
+				// (REQ-MW-1). The panic itself is NOT swallowed.
+				sw.status = http.StatusInternalServerError
 			}
-		}
-		documentID, profileCode := extractRouteContext(path)
 
-		o.logger.Info("http_request",
-			"trace_id", traceID,
-			"user_id", userID,
-			"method", method,
-			"path", path,
-			"route", route,
-			"status", sw.status,
-			"duration_ms", durationMs,
-			"document_id", documentID,
-			"profile_code", profileCode,
-		)
+			path := strings.ReplaceAll(r.URL.Path, "\n", "")
+			route := normalizeRoute(path)
+			method := r.Method
+			elapsedMs := time.Since(start).Milliseconds()
+			if elapsedMs < 0 {
+				elapsedMs = 0
+			}
+			durationMs := uint64(elapsedMs)
+			isError := sw.status >= 400
+
+			m := o.getMetric(route, method)
+			atomic.AddUint64(&m.requests, 1)
+			if isError {
+				atomic.AddUint64(&m.errors, 1)
+			}
+			atomic.AddUint64(&m.durationMs, durationMs)
+			m.record(durationMs)
+
+			// Attribution order: principal slot (set outward by authn when
+			// this middleware runs outside auth, REQ-MW-4) → injected
+			// resolver (works when wrapped inside auth, e.g. tests).
+			userID := "anonymous"
+			if id := principalFromContext(r.Context()); id != "" {
+				userID = id
+			} else if o.userIDResolver != nil {
+				if id := strings.TrimSpace(o.userIDResolver(r)); id != "" {
+					userID = id
+				}
+			}
+			documentID, profileCode := extractRouteContext(path)
+
+			o.logger.Info("http_request",
+				"trace_id", traceID,
+				"user_id", userID,
+				"method", method,
+				"path", path,
+				"route", route,
+				"status", sw.status,
+				"duration_ms", durationMs,
+				"document_id", documentID,
+				"profile_code", profileCode,
+			)
+		}()
+		next.ServeHTTP(sw, r)
+		panicked = false
 	})
 }
 

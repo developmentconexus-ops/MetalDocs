@@ -13,6 +13,11 @@ import (
 type RouteKey string
 
 const (
+	// RouteAuthLogin is the pre-auth IP-keyed login limit (REQ-MW-5); it is
+	// enforced before authentication, so its limiter instance always keys by
+	// client IP (the user extractor returns "").
+	RouteAuthLogin RouteKey = "auth_login"
+
 	RouteUploadsPresign  RouteKey = "uploads_presign"
 	RouteAutosavePresign RouteKey = "autosave_presign"
 	RouteAutosaveCommit  RouteKey = "autosave_commit"

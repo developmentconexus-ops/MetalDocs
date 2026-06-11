@@ -9,6 +9,7 @@ import (
 	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/problem"
 	platformtenant "metaldocs/internal/platform/tenant"
 )
@@ -77,6 +78,11 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_PASSWORD_CHANGE_REQUIRED", "Password change is required before accessing the application"))
 			return
 		}
+
+		// Report the principal outward to the observability middleware,
+		// which runs outside authn (REQ-MW-4) and cannot see this
+		// context enrichment from its layer.
+		observability.SetPrincipal(r.Context(), currentUser.UserID)
 
 		ctx := authdomain.WithCurrentUser(r.Context(), currentUser)
 		ctx = iamdomain.WithAuthContext(ctx, currentUser.UserID, currentUser.Roles)
