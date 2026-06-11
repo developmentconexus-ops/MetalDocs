@@ -78,7 +78,7 @@ Brainstorm with the user is complete; all judgment calls are decided and recorde
 
 Key decisions: single-server Docker Compose deployment (D-1); audit-facing compliance, no ceremony (D-2); multi-tenant design kept, RLS as defense-in-depth on 2 tables (D-3); FULL F-18 remedy incl. history rewrite gated on user rotation (D-4); secrets never quoted in docs (D-4a); **wave-by-wave execution, each wave in a FRESH session, review gate between waves (D-5)**.
 
-**A fresh wave session reads:** `CLAUDE.md` → `wiki/README.md` → this file → the design spec → its wave card. Wave closes only with the evidence block recorded here.
+**A fresh wave session reads:** `CLAUDE.md` → `wiki/README.md` → this file → the design spec → **the living roadmap tracker** [`wiki/backend/roadmap.md`](../backend/roadmap.md) → its wave card. Wave closes only with the evidence block recorded here AND the tracker rows updated in the same commit. The program ends with the Wave F final full review (all CI guards green, runtime QA, legacy-register sweep, blueprint re-score, full-program code review).
 
 ## Recovered agent memory (wiped by the reinstall — re-create if a memory system returns)
 
