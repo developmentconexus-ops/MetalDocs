@@ -164,6 +164,9 @@ services:
       METALDOCS_GOTENBERG_URL: ${METALDOCS_GOTENBERG_URL}
       METALDOCS_FANOUT_URL: http://docx-renderer:3100
       METALDOCS_DOCX_RENDERER_SERVICE_TOKEN: ${DOCX_RENDERER_SERVICE_TOKEN}
+      # River schema must match the jobs service exactly — both default to ""
+      # (public) when unset; set explicitly so they cannot diverge.
+      METALDOCS_JOBS_RIVER_SCHEMA: ${METALDOCS_JOBS_RIVER_SCHEMA:-}
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}
@@ -227,6 +230,8 @@ services:
     environment:
       METALDOCS_JOBS_ENABLED: ${METALDOCS_JOBS_ENABLED:-true}
       METALDOCS_JOBS_TEMPORAL_MAX_WORKERS: ${METALDOCS_JOBS_TEMPORAL_MAX_WORKERS:-10}
+      # Must match the api service's value (both default to "" / public schema).
+      METALDOCS_JOBS_RIVER_SCHEMA: ${METALDOCS_JOBS_RIVER_SCHEMA:-}
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}

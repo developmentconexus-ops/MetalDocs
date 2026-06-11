@@ -1,6 +1,8 @@
 # gitleaks config — extends the default ruleset with project allowlists.
-# Disposition recorded in Wave 0 item 0.2 (F-18): every allowlisted class below
-# was individually assessed on 2026-06-11 and contains no live credential.
+# Disposition recorded in Wave 0 item 0.2 (F-18); allowlist rationale revisited
+# in the round-2 review. NOTE: gitleaks v8.24.3 honors the SINGULAR [allowlist]
+# table only — the plural [[allowlists]] (with per-block `condition = "AND"`)
+# form is silently ignored on this version, so path+regex scoping is OR-only.
 title = "MetalDocs secret-scan config"
 
 [extend]
@@ -9,18 +11,22 @@ useDefault = true
 [allowlist]
 description = "Assessed non-secrets (Wave 0 item 0.2)"
 paths = [
-    # Go test fixtures (named test* constants, fake S3 keys)
+    # Go test fixtures (named test* constants, fake S3 keys) — entropy noise.
     '''.*_test\.go$''',
-    # oapi-codegen output: embedded base64 spec chunks trip entropy rules
+    # oapi-codegen output: embedded base64 spec chunks trip entropy rules.
     '''.*\.gen\.go$''',
-    # Ephemeral AI plan docs — dir is gitignored for new content; tracked
-    # leftovers contain stale example tokens (verified ≠ current .env values)
+    # Ephemeral AI plan docs. The directory is gitignored for NEW content
+    # (.gitignore: docs/superpowers/plans/), so this only ever covers the
+    # already-tracked historical leftovers (stale example tokens, verified ≠
+    # current .env). A new secret here cannot be committed without a force-add.
     '''docs/superpowers/plans/.*''',
-    # Screen-QA artifacts: idempotency-key UUIDs, captured payloads
+    # Screen-QA artifacts: idempotency-key UUIDs, captured payloads.
     '''frontend/apps/web/design-source/.*/artifacts/.*''',
 ]
 regexes = [
-    # Documented sample password in dev runbook user-creation payload
-    # (same class as the documented dev admin login — not a credential)
+    # Documented throwaway sample password used in the manual-setup runbook's
+    # user-creation curl example. This exempts only this exact dummy literal
+    # everywhere — a DIFFERENT secret (incl. in the same runbook) still trips.
+    # Per-file scoping needs the [[allowlists]] AND-form, unsupported here.
     '''StrongPass123''',
 ]

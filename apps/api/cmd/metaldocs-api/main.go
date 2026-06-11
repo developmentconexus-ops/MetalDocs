@@ -273,13 +273,15 @@ func main() {
 		iamAdminHandler = iamAdminHandler.WithObservabilityService(observabilityService)
 	}
 	featureFlagsHandler := featureflags.NewHandler(featureFlagsCfg)
-	httpObs := observability.NewHTTPObservability(deps.StatusProvider).
-		WithUserIDResolver(func(r *http.Request) string {
+	httpObs := observability.NewHTTPObservability(
+		func(r *http.Request) string {
 			if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
 				return currentUser.UserID
 			}
 			return ""
-		})
+		},
+		deps.StatusProvider,
+	)
 	rateLimiter := security.NewRateLimiter(rateCfg)
 	cors := security.NewCORS(corsCfg)
 

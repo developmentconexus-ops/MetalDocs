@@ -44,7 +44,14 @@ type metricItem struct {
 	P99DurationMs   uint64 `json:"p99_duration_ms"`
 }
 
-func NewHTTPObservability(runtimeProvider ...RuntimeStatusProvider) *HTTPObservability {
+// NewHTTPObservability builds the metrics/logging middleware. userIDResolver
+// is REQUIRED (not an optional setter) so the composition root cannot silently
+// omit it and degrade every request to "anonymous" in the access log — an
+// audit-attribution loss. The callback is how this platform package stays free
+// of module imports (REQ-TOP-2); a nil resolver, or one returning empty, logs
+// "anonymous". It is invoked per request and must not be swapped after the
+// middleware sees traffic (the field is not synchronized).
+func NewHTTPObservability(userIDResolver func(*http.Request) string, runtimeProvider ...RuntimeStatusProvider) *HTTPObservability {
 	var provider RuntimeStatusProvider
 	if len(runtimeProvider) > 0 {
 		provider = runtimeProvider[0]
@@ -52,19 +59,9 @@ func NewHTTPObservability(runtimeProvider ...RuntimeStatusProvider) *HTTPObserva
 	return &HTTPObservability{
 		logger:          slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})),
 		runtimeProvider: provider,
+		userIDResolver:  userIDResolver,
 		byKey:           make(map[string]*routeMetrics),
 	}
-}
-
-// WithUserIDResolver injects the callback that resolves the authenticated
-// user id for request logging. The composition root supplies it so this
-// platform package stays free of module imports (REQ-TOP-2); when nil or
-// when the callback returns empty, requests log as "anonymous". Must be
-// called before the middleware sees traffic (same contract as
-// ratelimit.WithClock) — the field is not synchronized.
-func (o *HTTPObservability) WithUserIDResolver(resolve func(*http.Request) string) *HTTPObservability {
-	o.userIDResolver = resolve
-	return o
 }
 
 func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
