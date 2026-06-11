@@ -1,7 +1,7 @@
 # Backend Professionalization — Execution Roadmap (LIVING TRACKER)
 
-> **Status:** ACTIVE · Wave 0 not started
-> **Last updated:** 2026-06-11 (created)
+> **Status:** ACTIVE · Wave 0 executed (0.4 history rewrite in flight — see row)
+> **Last updated:** 2026-06-11 (Wave 0 session)
 > **Contract:** [`docs/superpowers/specs/2026-06-11-backend-professionalization-design.md`](../../docs/superpowers/specs/2026-06-11-backend-professionalization-design.md) (decisions D-1..D-5, protocol)
 > **Verdicts:** [`stage2-evaluation.md`](stage2-evaluation.md) · **Evidence:** [`legacy-register.md`](legacy-register.md)
 >
@@ -18,7 +18,7 @@
 | Stage 1 — map the backend | ✅ `d7489d5a2` | `wiki/backend/` atlas, legacy register (212 flags) |
 | Stage 2 — evaluate vs standards | ✅ `e5a162867` | 34 verdicts, 4-wave plan, 2-ADR backlog |
 | Brainstorm — decisions D-1..D-5 | ✅ `432e24405` | Design spec (the contract) |
-| **Wave 0 — P0 prerequisites** | ☐ | security unblocked, deployment complete, layering legal |
+| **Wave 0 — P0 prerequisites** | ▶ evidence in handoff | security unblocked, deployment complete, layering legal |
 | **Wave 1 — high-value / low-blast** | ☐ | correctness + compliance defects < ~100 lines each |
 | **Wave 2 — structural refactors** | ☐ | atomicity, RLS, boundaries, ADR 0027 |
 | Wave 3 — trigger-gated | ➖ by design | executed only when triggers fire |
@@ -30,12 +30,12 @@
 
 | # | Item | Findings | Status | Commit | Evidence / notes |
 |---|------|----------|--------|--------|------------------|
-| 0.1 | Delete seed binary; redact secret from 7 docs; rm committed .exe; .gitignore fix; delete dead script; pin api-lint.exe | F-18, D-4a | ✅ | (this commit) | Secret grep clean over tracked files AND full working tree (incl. `.env` — already holds a new value). Redacted 9 tracked files (2 more than planned: `scripts/start-api-no-build.ps1`, `scripts/start-worker.ps1` comments + `_artifacts/stage1/repo-topology.md`); `bin/metaldocs-api.exe` + `scripts/api-lint/api-lint.exe` were on-disk only, never git-tracked → file deleted / rebuilt from source (SHA-256 `5660…2C8D`); `bin/*.exe` added to `.gitignore`; stale gitignored agent-worktree copies redacted in place |
-| 0.2 | gitleaks secret-scan in CI + D-4a rule in documentation-governance.md | F-18 | ✅ | (this commit) | `.github/workflows/secret-scan.yml` (gitleaks v8.24.3, working-tree mode until 0.4 rewrites history) + `.gitleaks.toml` allowlist (10 findings assessed: test fixtures, `.gen.go` spec chunks, stale plan-doc token ≠ current `.env`, runbook sample password). Verified: gitleaks over `git archive HEAD` + config = no leaks (exit 0); YAML parses |
-| 0.3 | **USER:** rotate dev DB password in `.env` at Docker re-creation (+ anywhere reused) | F-18 | ⏸ user | — | unlocks 0.4 |
-| 0.4 | History rewrite: `git filter-repo --replace-text` + force-push; user re-clones | F-18 | ⏸ on 0.3 | | `git log --all -S '<secret>'` empty |
-| 0.5 | `jobs.Dockerfile` + `jobs` service in compose | F-19-deployment | ✅ | (this commit) | RUNTIME-VERIFIED (Docker up on this machine): `docker compose config` parses; `compose-jobs` image built; `docker compose up -d --no-deps jobs` → log "MetalDocs Jobs running (queues=temporal)", container stays Up. Service envs: `METALDOCS_JOBS_ENABLED`/`METALDOCS_JOBS_TEMPORAL_MAX_WORKERS` + PG* (mirrors worker); `depends_on: postgres(healthy), api(healthy)` |
-| 0.6 | platform/observability → callback injection (drop auth/domain import) | F-06a | ✅ | (this commit) | `WithUserIDResolver(func(*http.Request) string)` setter (pattern: `platform/ratelimit`); wired at composition root `main.go`. Build + vet + `go test ./internal/platform/observability/...` OK; grep: observability clean. **Discovered for 1.10 scoping:** `platform/{authn,bootstrap,docgenv2,objectstore,security}` still import `internal/modules/**` — the 1.10 CI guard needs explicit per-package disposition (bootstrap/authn are composition-adjacent; `security/ratelimit.go` dies in 2.8) |
+| 0.1 | Delete seed binary; redact secret from 7 docs; rm committed .exe; .gitignore fix; delete dead script; pin api-lint.exe | F-18, D-4a | ✅ | `8902a8dfe` | Secret grep clean over tracked files AND full working tree (incl. `.env` — already holds a new value). Redacted 9 tracked files (2 more than planned: `scripts/start-api-no-build.ps1`, `scripts/start-worker.ps1` comments + `_artifacts/stage1/repo-topology.md`); `bin/metaldocs-api.exe` + `scripts/api-lint/api-lint.exe` were on-disk only, never git-tracked → file deleted / rebuilt from source (SHA-256 `5660…2C8D`); `bin/*.exe` added to `.gitignore`; stale gitignored agent-worktree copies redacted in place |
+| 0.2 | gitleaks secret-scan in CI + D-4a rule in documentation-governance.md | F-18 | ✅ | `1473fa348` + `1905da3bc` | `.github/workflows/secret-scan.yml` (gitleaks v8.24.3, working-tree mode until 0.4 rewrites history) + `.gitleaks.toml` allowlist (10 findings assessed: test fixtures, `.gen.go` spec chunks, stale plan-doc token ≠ current `.env`, runbook sample password). Verified: gitleaks over `git archive HEAD` + config = no leaks (exit 0); YAML parses |
+| 0.3 | **USER:** rotate dev DB password in `.env` at Docker re-creation (+ anywhere reused) | F-18 | ➖ owner-waived | — | User declined rotation in the Wave 0 session ("keep this work professional, no secret") and explicitly accepted the residual risk of the historical value; `.env` working value verified ≠ the leaked string. 0.4 unlocked by this directive |
+| 0.4 | History rewrite: `git filter-repo --replace-text` + force-push; user re-clones | F-18 | ▶ this session | | Executed after the wave-evidence push (rewrite must be the last push). Verification (`git log --all -S '<secret>'` empty on fresh mirror) recorded in the handoff evidence block + final tracker stamp |
+| 0.5 | `jobs.Dockerfile` + `jobs` service in compose | F-19-deployment | ✅ | `5c957c171` | RUNTIME-VERIFIED (Docker up on this machine): `docker compose config` parses; `compose-jobs` image built; `docker compose up -d --no-deps jobs` → log "MetalDocs Jobs running (queues=temporal)", container stays Up. Service envs: `METALDOCS_JOBS_ENABLED`/`METALDOCS_JOBS_TEMPORAL_MAX_WORKERS` + PG* (mirrors worker); `depends_on: postgres(healthy), api(healthy)` |
+| 0.6 | platform/observability → callback injection (drop auth/domain import) | F-06a | ✅ | `75ab92458` + `1905da3bc` | `WithUserIDResolver(func(*http.Request) string)` setter (pattern: `platform/ratelimit`); wired at composition root `main.go`. Build + vet + `go test ./internal/platform/observability/...` OK; grep: observability clean. **Discovered for 1.10 scoping:** `platform/{authn,bootstrap,docgenv2,objectstore,security}` still import `internal/modules/**` — the 1.10 CI guard needs explicit per-package disposition (bootstrap/authn are composition-adjacent; `security/ratelimit.go` dies in 2.8) |
 
 **Wave close:** evidence block in handoff · this file updated · user review → Wave 1.
 

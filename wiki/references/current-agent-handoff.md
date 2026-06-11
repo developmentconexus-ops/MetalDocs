@@ -80,6 +80,22 @@ Key decisions: single-server Docker Compose deployment (D-1); audit-facing compl
 
 **A fresh wave session reads:** `CLAUDE.md` → `wiki/README.md` → this file → the design spec → **the living roadmap tracker** [`wiki/backend/roadmap.md`](../backend/roadmap.md) → its wave card. Wave closes only with the evidence block recorded here AND the tracker rows updated in the same commit. The program ends with the Wave F final full review (all CI guards green, runtime QA, legacy-register sweep, blueprint re-score, full-program code review).
 
+### Wave 0 evidence block (2026-06-11, fresh session #1)
+
+**Branch:** `qa/iam-area-membership`. One commit per item per spec §4. Pre-existing uncommitted `scripts/check-system-runnable.ps1` modification left untouched (not mine).
+
+| Item | Commit | Verification commands → outcome |
+|---|---|---|
+| 0.1 secret removal + redaction (F-18, D-4a) | `8902a8dfe` | `go build ./...` OK · secret grep: `git grep -F <secret>` = 0 hits AND full working-tree scan (incl. hidden, `.env`) = 0 hits. Beyond-card finds redacted: `scripts/start-api-no-build.ps1:5`, `scripts/start-worker.ps1:5`, `_artifacts/stage1/repo-topology.md`. Card deviations (verified): `bin/metaldocs-api.exe` and `scripts/api-lint/api-lint.exe` were never git-tracked (`git ls-files`/`git log` empty) → on-disk delete + source rebuild (SHA-256 `5660295764021D0DA9783EC27CE44EC40511AA0AA9A0BC5535351EAB43952C8D`) instead of `git rm` |
+| 0.2 gitleaks CI + D-4a rule (F-18) | `1473fa348` | Workflow YAML parses (yq) · gitleaks v8.24.3 over `git archive HEAD` + `.gitleaks.toml`: **no leaks, exit 0**. 10 raw findings dispositioned: test fixtures, `.gen.go` spec chunks, stale plan-doc token (verified ≠ current `.env` value), runbook sample password — allowlisted with rationale in `.gitleaks.toml` |
+| 0.5 jobs deployment (F-19-deployment, REQ-ASYNC-4) | `5c957c171` | **Runtime-verified** (Docker up): `docker compose config` parses (11 services) · `compose-jobs` image built · `up -d --no-deps jobs` → log `MetalDocs Jobs running (queues=temporal)`, container stays Up. Left running |
+| 0.6 observability layering (F-06a, REQ-TOP-2) | `75ab92458` | `go build ./...` · `go vet` · `go test ./internal/platform/observability/...` OK · grep: zero `modules/` imports in `platform/observability`. **Discovered:** `platform/{authn,bootstrap,docgenv2,objectstore,security}` still import modules → recorded for Wave 1 item 1.10 guard scoping |
+| review disposition | `1905da3bc` | `/code-review` (7 finder angles) over wave diff. Fixed: dead cilint tx-allowlist entry; unanchored gitleaks path regexes; WithUserIDResolver set-before-traffic contract doc; `.dockerignore` agent dirs. Refuted with evidence: gitleaks config auto-detection (empirical), Dockerfile flags/base mirror worker.Dockerfile per card, exes never tracked, `depends_on api(healthy)` spec-mandated. Deferred (recorded in tracker/register): compose PG-env YAML anchors (style-consistent with existing), jobs healthcheck (worker has none either), `METALDOCS_JOBS_RIVER_SCHEMA` plumbing → Wave 1.6, tracked `docs/superpowers/plans/` leftovers (stale tokens, verified non-live) |
+| 0.3 rotation (USER) | — | Owner **declined rotation** and explicitly accepted residual risk ("keep this work professional, no secret"); `.env` working value verified ≠ leaked string. Recorded as ➖ owner-waived |
+| 0.4 history rewrite | this session | `git filter-repo --replace-text` on fresh mirror clone → verify `git log --all -S '<secret>'` empty → force-push origin. Executed AFTER the evidence push (a later push from a stale clone would resurrect old history). GitHub server-side cached/PR refs may retain old objects — full purge needs GitHub support; accepted (single-user repo, D-4) |
+
+**Wave close:** full `go vet ./...` clean · touched-package tests green (`observability`, `scripts/api-lint`, `tools/cilint`) · api-lint not run (no contract surface touched) · tracker rows updated same-commit per item · legacy-register F-06/F-18/F-19 resolution notes added. **After the 0.4 force-push every other clone must be re-cloned; this working repo was reset onto the rewritten origin.**
+
 ## Recovered agent memory (wiped by the reinstall — re-create if a memory system returns)
 
 These facts lived in the agent's persistent memory and are NOT derivable from the repo:
