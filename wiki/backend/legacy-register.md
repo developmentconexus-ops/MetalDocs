@@ -219,7 +219,7 @@ The most severe instance is a REQ-TOP-2 breach: `internal/platform/observability
 | Second standalone PostgresControlledDocumentRepository constructed in main.go outside module boundary | `apps/api/cmd/metaldocs-api/main.go:357` | main → infra package |
 | TemplateVersionChecker queries templates table with no tx and no authz GUC, from within taxonomy module | `internal/modules/taxonomy/infrastructure/template_version_checker.go:30-48` | taxonomy → templates table |
 | sessions_handler.go (IAM delivery) directly imports auth/infrastructure/postgres types | `internal/modules/iam/delivery/http/sessions_handler.go:19` | IAM delivery → auth infra |
-| `platform/observability` imports `modules/auth/domain` — **RESOLVED** (Wave 0 item 0.6, commit `75ab92458`: injected `WithUserIDResolver` callback, wired at composition root) | `internal/platform/observability/http.go` | platform → module domain (REQ-TOP-2) |
+| `platform/observability` imports `modules/auth/domain` — **RESOLVED** (Wave 0 item 0.6, commit `8e0aa9eb4`: injected `WithUserIDResolver` callback, wired at composition root) | `internal/platform/observability/http.go` | platform → module domain (REQ-TOP-2) |
 
 **Stage-2 question:** Where must repository / service boundaries be introduced to isolate cross-module SQL writes and reads?
 
@@ -531,7 +531,7 @@ Additionally, pre-built Windows binaries of indeterminate provenance are committ
 
 **Stage-2 action (pre-prerequisite, not a deferral):** Assess whether the credential in `cmd/seed-test-document/main.go:25-30` has been rotated since commit c4a7d9a93. Scrub DSN and binary artifacts. Confirm .gitignore coverage end-to-end.
 
-**Resolution (Wave 0, 2026-06-11):** items 0.1 (`8902a8dfe` — deletion + redaction + gitignore + api-lint rebuild), 0.2 (`1473fa348` — gitleaks CI + D-4a rule), 0.4 (history rewrite — see roadmap tracker for status). Rotation (0.3): owner declined to change the `.env` value; risk explicitly accepted by owner in the Wave 0 session.
+**Resolution (Wave 0, 2026-06-11):** items 0.1 (`58cbf9943` — deletion + redaction + gitignore + api-lint rebuild), 0.2 (`3402a8bbd` — gitleaks CI + D-4a rule), 0.4 (history rewrite — see roadmap tracker for status). Rotation (0.3): owner declined to change the `.env` value; risk explicitly accepted by owner in the Wave 0 session.
 
 ---
 
@@ -545,7 +545,7 @@ Additionally, pre-built Windows binaries of indeterminate provenance are committ
 
 A secondary defect: the API binary and the jobs binary both call `MigrateRiverSchema` independently at startup, meaning River schema lifecycle has no single declared owner.
 
-**Resolution (deployment half — Wave 0, 2026-06-11):** `deploy/docker/jobs.Dockerfile` + `jobs` compose service landed and runtime-verified (commit `5c957c171`). The dual-migration defect remains open → Wave 1 item 1.6 (note for 1.6: no compose service passes `METALDOCS_JOBS_RIVER_SCHEMA`; decide the schema owner and env plumbing there).
+**Resolution (deployment half — Wave 0, 2026-06-11):** `deploy/docker/jobs.Dockerfile` + `jobs` compose service landed and runtime-verified (commit `baf6e1b78`). The dual-migration defect remains open → Wave 1 item 1.6 (note for 1.6: no compose service passes `METALDOCS_JOBS_RIVER_SCHEMA`; decide the schema owner and env plumbing there).
 
 A tertiary defect: the `lease_reaper` subquery matches job names against `public.documents.id` — a cross-schema join that always returns NULL for scheduler job names, silently disabling lease reaping for all scheduled jobs.
 
