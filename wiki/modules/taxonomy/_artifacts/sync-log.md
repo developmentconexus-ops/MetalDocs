@@ -1,6 +1,28 @@
 # Sync log — taxonomy
 
+**Last verified:** 2026-06-11 (Stage-1 backend audit drift patch)
+
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
+
+## 2026-06-10 — Stage-1 backend audit drift patch
+
+- **Context:** Stage-1 mapper found 8 mismatches between wiki text and current code.
+- **Mode:** lite patch (surgical corrections only; no restructuring).
+- **Affected files:** `wiki/modules/taxonomy.md`; `wiki/modules/taxonomy-tech-debt.md`; `wiki/modules/taxonomy/_artifacts/sync-log.md`.
+- **Corrections applied:**
+  1. Key files line: `FamilyService` — updated struct anchor `:13-19`; corrected description to reflect `govLogger` field + `NewFamilyService(families, govLogger)` (T-004 closed).
+  2. Key files line: `ProfileService` — corrected Create `:70` and Update `:96` both call `s.govLogger.Log` (T-005 closed).
+  3. Key files line: `AreaService` — corrected Create `:59` and Update `:98` both call `s.govLogger.Log` (T-005 closed).
+  4. Key files line + §8.2 + T-007: `HasActiveProfiles` — replaced with `HasActiveProfilesTx` which takes `tenantID`; `WHERE tenant_id=$1 AND family_code=$2` present; T-007 TOCTOU resolved (single tx + FOR UPDATE). Anchor corrected to `infrastructure/family_repository.go:218-240` (method definition line 218; query lines 230-233). Prior stale anchor `153-178` pointed to the non-transactional `HasActiveProfiles` variant (lines 156-178), not to `HasActiveProfilesTx`.
+  5. §6.3 sequence diagram + §8.7 + T-007: `deactivateFamily` — redrawn to show `BeginTx`/`GetByCodeForUpdate`/`HasActiveProfilesTx`/`UpdateTx`/Commit; removed "NO tx · NO row lock" annotations.
+  6. §2 + §4 + §5.2 + §9 + T-009: removed "No OpenAPI spec / raw ServeMux" claims; added `internal/modules/taxonomy/api/` (api.gen.go, cfg.yaml, gen.go), `handler.go:42-51` HandlerWithOptions call, `routes_generated.go:10` ServerInterface assertion; T-009 marked closed.
+  7. §3.2 + §5.2 + failure-modes: `registry/module.go:31` corrected to `internal/modules/controlleddocuments/module.go:37`.
+  8. Key files + §8.9: `main.go:197-201,225,508-524` corrected to `main.go:314-315,358,412,908-924`.
+  9. §1.2 + §4 + §8.8 + §10: migration `0122` trigger anchor corrected from `0122:33-39` to `0122:35-49`. Actual `reject_code_update()` function definition starts at line 35; `DROP TRIGGER / CREATE TRIGGER trg_document_profiles_code_immutable` block is lines 46-49. Prior anchor `33-39` fell inside the unique-index comment and start of a different block.
+  10. §1.2 + §4 + §8.8: migration `0123` trigger anchor corrected from `0123:33-37` to `0123:61-75`. Actual `reject_code_update()` function definition starts at line 61; `DROP TRIGGER / CREATE TRIGGER trg_process_areas_code_immutable` block is lines 72-75. Prior anchor `33-37` fell inside the FK-constraint `DO $$` block.
+- **T-NNN status changes:** T-004 confirmed closed; T-005 confirmed closed; T-007 marked resolved; T-009 marked closed.
+- **§11 severity counts:** no count change (all items were already closed in the register text; only Key Files and behavioral prose were stale).
+- **Tally gate:** drift patch only — no implementation change; preflight not applicable.
 
 ## 2026-05-17 - active v2 reference memory sync
 

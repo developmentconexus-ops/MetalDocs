@@ -53,6 +53,15 @@ Flow: **canon defines target → blueprint locates gap → target specifies beha
 5. RF-3 (authz cache contract), RF-9 (graceful shutdown/timeout audit), RF-10 (idempotency coverage audit).
 6. RF-7 (delete or implement empty `platform/cache`, `platform/storage`; document-or-fence `platform/messaging` servicebus), RF-8 (feature-flag lifecycle doc).
 
+### Stage-1 backend audit — COMPLETE (2026-06-11)
+
+Stage 1 (backend audit and mapping) is complete. The full atlas is at:
+
+- **[`wiki/backend/index.md`](../backend/index.md)** — atlas root: binary map, repo topology, HTTP kernel, domain modules, platform packages, contract surface, flows, and navigation to all detail pages
+- **[`wiki/backend/legacy-register.md`](../backend/legacy-register.md)** — complete legacy/duplication/smell register with RF-* cross-references and prioritized remediation sequencing
+
+**Next step after the items above: Stage 2** — evaluate the as-mapped backend against professional SaaS and industry standards (Go conventions, PostgreSQL practice, ISO/RFC-grade API standards) using the atlas as the factual base.
+
 ## Recovered agent memory (wiped by the reinstall — re-create if a memory system returns)
 
 These facts lived in the agent's persistent memory and are NOT derivable from the repo:

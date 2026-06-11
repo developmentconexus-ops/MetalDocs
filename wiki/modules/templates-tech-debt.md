@@ -2,15 +2,16 @@
 
 > Companion to `wiki/modules/templates.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates-refactor.md`.
 
-**Last verified:** 2026-05-31 (fix/templates-publish-role-binding — T-004 fully closed; `PublishTemplateVersion` now enforces `pending_approver_role` binding parity with `Service.Approve`, denied attempts audited via `publish_forbidden_role`)
+**Last verified:** 2026-06-11 (adversarial verification pass — corrected T-001 tripwire anchor to baseline DDL, added rename note for `templates_v2_*` → `templates_template*` history, fixed T-008 `ValidatePlaceholders` anchor to `schema.go:114`, fixed T-010 test file reference to `routes_contract_test.go:122`, fixed T-014 `schema.go:84` → `schema.go:114`, flagged stale line numbers in `_artifacts/02-flow-publish.md` in T-004 and T-007 evidence; prior: T-007 closed — transaction wrapping confirmed in code; 2026-06-10 Stage-1 backend audit drift patch; 2026-05-31 — fix/templates-publish-role-binding — T-004 fully closed; `PublishTemplateVersion` now enforces `pending_approver_role` binding parity with `Service.Approve`, denied attempts audited via `publish_forbidden_role`)
 
 ## Items
 
 ### T-001 · Authz wired `nil` — every mutation bypasses capability assertion — CLOSED 2026-05-11 (Plan 5)
 - **Severity:** critical (closed)
-- **Surface (resolved):** `internal/modules/templates/application/service.go:22` — `WithDB(db *sql.DB) *Service` builder added; `apps/api/cmd/metaldocs-api/main.go` wires `tv2Svc.WithDB(deps.SQLDB)` + real `capabilityService` `AuthzFunc`. `application/create.go`, `application/lifecycle.go`, and `application/autosave.go` now call `authz.Require` with the appropriate capability when `s.db != nil`; the 2026-05-17 repair added `template.edit` assertions around `SaveTemplateDraft` and `CommitAutosave` so DOCX import/autosave commits satisfy the templates table tripwire. Migration `0188_tripwire_extend.sql:226-233` attaches `trg_require_cap_asserted` to `public.templates_template` and `public.templates_template_version`.
+- **Surface (resolved):** `internal/modules/templates/application/service.go:22` — `WithDB(db *sql.DB) *Service` builder added; `apps/api/cmd/metaldocs-api/main.go` wires `tv2Svc.WithDB(deps.SQLDB)` + real `capabilityService` `AuthzFunc`. `application/create.go`, `application/lifecycle.go`, and `application/autosave.go` now call `authz.Require` with the appropriate capability when `s.db != nil`; the 2026-05-17 repair added `template.edit` assertions around `SaveTemplateDraft` and `CommitAutosave` so DOCX import/autosave commits satisfy the templates table tripwire. The live schema (see **Rename note** below) attaches `trg_require_cap_asserted` to `public.templates_template` and `public.templates_template_version` (`db/baseline/0001_current_schema.sql:3797-3807`).
 - **Observation (original):** `New(svc, authz)` accepted an `AuthzFunc` argument, then if `authz == nil` substituted a no-op callback. The composition root passed `nil`. None of the seven repo mutations was wrapped in `internal/platform/authz.Require`. No `metaldocs.asserted_caps` GUC tripwire was installed on `templates_*` tables.
 - **Evidence:** `_artifacts/02-flow-update-schema.md`, `_artifacts/02-flow-publish.md`, `_artifacts/04-persistence.md` §5 (7 tripwire violations), `_artifacts/03-deps.md` §3.
+- **Rename note:** Archive migrations `0120_templates_init.sql`, `0157_drop_editable_zones.sql`, and `0188_tripwire_extend.sql` all reference `templates_v2_template` and `templates_v2_template_version` — these are the pre-rename table names used during a v2 redesign phase. At some point the tables were renamed to `templates_template` and `templates_template_version`; the rename is reflected in the curated baseline (`db/baseline/0001_current_schema.sql:2188-2214`) and in the live `enforce_capability_asserted` CASE branches (`db/baseline/0001_current_schema.sql:477-486`). Migration 0188 attached the tripwire to the v2 names (`archive/migrations/0188_tripwire_extend.sql:226-234`); the authoritative production trigger bindings are the baseline DDL — readers should treat archive migration DDL for these tables as history, not as the live schema shape. For T-002 through T-013, all table name references to `templates_template` and `templates_template_version` refer to the current production names as defined in the baseline.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-001`
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md` (decision exists; module deviation is the debt)
 
@@ -36,7 +37,7 @@
 - **Surface (resolved 2026-05-11 Plan 5):** `internal/modules/templates/application/lifecycle.go` — `content_hash != ""` guard, `domain.CheckSegregation("approver", ...)` SoD gate, `authz.Require(CapTemplatePublish)` capability assertion inside the same tx.
 - **Surface (resolved 2026-05-31):** `lifecycle.go` `PublishTemplateVersion` now calls `version.RoleBindingFor(VersionStatusPublished)` (new helper on `domain/version.go`) and returns `domain.ErrForbiddenRole` → RFC 9457 `code: "forbidden_role"` 403 when the actor's roles do not satisfy `pending_approver_role`. Denied attempts emit `AuditPublishForbiddenRole` to the canonical audit sink. `Service.Approve` was refactored to consume the same helper — single source of truth for role-binding semantics.
 - **Observation (original):** Parallel publish path to `Service.Approve`. Transitioned a version directly `draft → published` without SoD, role check, or `content_hash` gate.
-- **Evidence:** `_artifacts/02-flow-publish.md`, `_artifacts/05-industry.md` IP-004; `go test ./internal/modules/templates/...` PASS (race build unavailable on this host — no gcc); `internal/modules/templates/application/lifecycle_publish_role_test.go` (3-case table-driven service test); `internal/modules/templates/delivery/http/routes_lifecycle_test.go::TestPublishTemplateVersion_ForbiddenRoleRFC9457`.
+- **Evidence:** `_artifacts/02-flow-publish.md` (**note:** line numbers in this artifact are stale — the artifact references `lifecycle.go:265` as the `PublishTemplateVersion` entry point, but the function is declared at `internal/modules/templates/application/lifecycle.go:373`; artifact requires a separate refresh), `_artifacts/05-industry.md` IP-004; `go test ./internal/modules/templates/...` PASS (race build unavailable on this host — no gcc); `internal/modules/templates/application/lifecycle_publish_role_test.go` (3-case table-driven service test); `internal/modules/templates/delivery/http/routes_lifecycle_test.go::TestPublishTemplateVersion_ForbiddenRoleRFC9457`.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-004` (closed)
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md`
 
@@ -56,17 +57,21 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-006` (closed for route/spec/generated coverage; strict-server cleanup can be tracked separately if desired)
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md`
 
-### T-007 · Multi-step publish + obsolete + audit not transactional
-- **Severity:** major
-- **Surface:** `internal/modules/templates/application/lifecycle.go:265` (`PublishTemplateVersion`); also `Service.Approve` (lifecycle.go:159), `Service.CreateTemplate` (`application/create.go:30`).
-- **Observation:** Publish emits 3–5 independent `*sql.DB.ExecContext` calls (`ObsoletePreviousPublished` → `UpdateTemplate` → `UpdateVersion` → `AppendAudit` → `CreateNextVersion`). No `pgx.Tx` wraps the sequence. Repo methods take `context.Context` only — there is no `WithTx(tx)` variant on `Repository`. Partial failure between any two statements leaves DB inconsistent: e.g. previous version marked obsolete but new version not flipped to published, or published flip lands without an audit row. Concurrent publish on the same template has a race window where two versions can briefly co-exist as `published` before `obsolete`-on-next-write resolves it. `AuditObsoleted` constant exists in `domain/audit.go:7` but is never written for the obsolete side-effect.
-- **Evidence:** `_artifacts/02-flow-publish.md`.
-- **Linked backlog row:** `backlog/templates-refactor.md#R-007`
+### T-007 · Multi-step publish + obsolete + audit not transactional — CLOSED (date unknown; confirmed resolved 2026-06-11)
+- **Severity:** major (closed)
+- **Surface (resolved):**
+  - `internal/modules/templates/application/lifecycle.go:442-480` (`PublishTemplateVersion`) — `BeginTx` at line 442, all mutations via `*Tx` repo variants (`ObsoletePreviousPublishedTx`, `UpdateTemplateTx` ×2, `UpdateVersionTx`, `CreateVersionTx`, `AppendAuditTx`), `Commit` at line 478. No `db != nil` guard — `PublishTemplateVersion` requires a live DB and unconditionally uses the transaction path.
+  - `internal/modules/templates/application/lifecycle.go:265-319` (`Approve` accept branch) — `BeginTx` at line 266, `Commit` at line 296, same `*Tx` repo variants. Falls back to non-Tx variants only when `s.db == nil` (unit-test mode with no real DB).
+  - `internal/modules/templates/application/create.go:62-126` (`CreateTemplate`) — `BeginTx` at line 63, `Commit` at line 98, same pattern.
+- **Observation (original):** Publish and Approve emitted 3–5 independent `*sql.DB.ExecContext` calls with no wrapping transaction. Repo methods accepted only `context.Context` — no `WithTx` variant existed. Partial failures left DB inconsistent.
+- **Resolution:** `*Tx` variants added to `Repository`; all three multi-step mutation paths (`PublishTemplateVersion`, `Approve` accept, `CreateTemplate`) now wrap their statements in a single `*sql.Tx`. The `AuditObsoleted` emission gap (original observation) is not separately tracked here — see `_artifacts/02-flow-publish.md` for current audit coverage.
+- **Evidence:** `internal/modules/templates/application/lifecycle.go:442-480` (`PublishTemplateVersion` tx — `BeginTx` at 442, `Commit` at 478), `lifecycle.go:265-296` (`Approve` accept branch — `BeginTx` at 266, `Commit` at 296), `internal/modules/templates/application/create.go:62-98` (create tx). Note: `_artifacts/02-flow-publish.md` cites `lifecycle.go:265` as the `PublishTemplateVersion` entry — this is incorrect; that line is inside the `Approve` accept branch. The artifact's line numbers are stale and require a separate refresh.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-007` (can be closed)
 - **Linked ADR:** missing-ADR
 
 ### T-008 · `ResolverRegistryReader` wired `nil` — `PHComputed.resolver_key` validation skipped
 - **Severity:** major
-- **Surface:** `internal/modules/templates/application/service.go:11` (`New` constructor accepts variadic `resolvers ResolverRegistryReader`); `apps/api/cmd/metaldocs-api/main.go:328` (does not pass the variadic). Validation site: `internal/modules/templates/application/schema.go:84` (`ValidatePlaceholders`).
+- **Surface:** `internal/modules/templates/application/service.go:11` (`New` constructor accepts variadic `resolvers ResolverRegistryReader`); `apps/api/cmd/metaldocs-api/main.go:328` (does not pass the variadic). Validation site: `internal/modules/templates/application/schema.go:114` (`ValidatePlaceholders`).
 - **Observation:** The placeholder catalog gate enforces the 7-token `PHType` enum unconditionally. For `PHType == PHComputed`, the resolver_key string is intended to be checked against `ResolverRegistryReader.HasResolver(key)`. Composition root omits the variadic, leaving the registry reader nil. `ValidatePlaceholders` short-circuits the resolver check when reader is nil. A template author can save a schema with arbitrary `resolver_key` strings; the value propagates into every document instantiated from the published version (per `wiki/modules/documents.md §8.7` snapshot path). Template-injection blast radius is module-wide.
 - **Evidence:** `_artifacts/02-flow-update-schema.md`, `_artifacts/03-deps.md` §3.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-008`
@@ -91,14 +96,14 @@
   - `frontend/apps/web/src/features/templates/hooks/useTemplateSchemas.ts` holds lockVersion, sends `expected_lock_version`, raises `staleConflict` on 412 instead of silent overwrite; `refetch` clears it.
 - **Surface (residual):** legacy `/autosave/commit` carries only `expected_content_hash`, not `expected_lock_version`; it is hash-gated and tripwire-protected, but not multi-tab lock-version protected. Tracked separately (not under T-010 — the original unverified-field gap is closed for every route that takes a `lock_version` field).
 - **Observation:** Schema PUT was hard-coding `expected_content_hash: ''` from the FE; the server treated empty as "skip CAS", so two tabs editing placeholders concurrently last-write-wins with no audit signal. Switching that path to lock_version CAS closes the silent overwrite class for the schema editor. Eigenpal's DOCX import path still uses `/autosave/commit` and is content-hash gated — separate cleanup outside this branch.
-- **Evidence:** `_artifacts/02-flow-update-schema.md`; `TestUpdateSchemas_StaleLockVersion`; `TestUpdateTemplateSchema_StaleLockVersion_412`; `useTemplateSchemas` vitest stale-conflict spec; preview drive (two-tab editor) — second tab surfaces stale-lock alert, first save survives until explicit refetch.
+- **Evidence:** `_artifacts/02-flow-update-schema.md`; `TestUpdateSchemas_StaleLockVersion`; `internal/modules/templates/delivery/http/routes_contract_test.go:122` (`TestUpdateTemplateSchema_StaleLockVersion_412`); `useTemplateSchemas` vitest stale-conflict spec; preview drive (two-tab editor) — second tab surfaces stale-lock alert, first save survives until explicit refetch.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-010` (close)
 - **Linked ADR:** missing-ADR
 
 ### T-011 · `ListTemplates` is unbounded — no LIMIT / OFFSET / cursor
 - **Severity:** minor
-- **Surface:** `internal/modules/templates/repository/postgres.go:88` (`ListTemplates`).
-- **Observation:** Query selects every row from `templates_template` matching the filter without LIMIT or cursor. Single-tenant deployments with low template counts (current production) hide the gap. Latent at multi-tenant scale or a tenant with high template churn. Plan 2 cursor primitive (`feat(pagination): cursor primitive with sort + filter_hash validation`, commit 7effa430) exists but is not consumed here.
+- **Surface:** `internal/modules/templates/repository/postgres.go:114-127` (`ListTemplates`).
+- **Observation:** Query applies `LIMIT $3 OFFSET $4` populated from `ListFilter.Limit` / `ListFilter.Offset`. LIMIT/OFFSET pagination is present; keyset/cursor pagination is not. Plan 2 cursor primitive (`feat(pagination): cursor primitive with sort + filter_hash validation`, commit 7effa430) exists but is not consumed here. At large offset values performance degrades (full scan to skip rows). Severity remains minor.
 - **Evidence:** `_artifacts/02-flow-list.md`, `_artifacts/05-industry.md` IP-003.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-011`
 - **Linked ADR:** missing-ADR
@@ -111,18 +116,18 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-012`
 - **Linked ADR:** `wiki/decisions/0002-zone-purge.md` (decision exists; column persistence is the residual debt) — missing-ADR for the deferral itself.
 
-### T-013 · Module-local `templates_audit_log` parallel to canonical `metaldocs.audit_events` — CLOSED 2026-05-11 (Plan 6a)
-- **Severity:** minor (closed)
-- **Surface:** `migrations/0120_templates_init.sql` (CREATE `templates_audit_log`); `internal/modules/templates/repository/postgres.go:318` (`AppendAudit` writes only to the local sink).
-- **Observation:** MetalDocs has a canonical audit sink at `metaldocs.audit_events` (per `wiki/modules/audit.md`). templates writes to a module-local `templates_audit_log` table instead. Two sinks of record means downstream queries (compliance export, forensic timeline) must union both — and a future canonical-sink consumer that does not know about the local sink will silently miss every templates event. Decision to fork was undocumented.
-- **Evidence:** `_artifacts/04-persistence.md` §1, §6.
+### T-013 · Module-local `templates_audit_log` parallel to canonical `metaldocs.audit_events` — WRITE path CLOSED 2026-05-11 (Plan 6a); READ path divergence unacknowledged
+- **Severity:** minor (write path closed; read/write sink divergence is a residual gap)
+- **Surface:** `migrations/0120_templates_init.sql` (CREATE `templates_audit_log`); `internal/modules/templates/repository/postgres.go:631-639` (`AppendAudit` now delegates to `r.audit.Record` — canonical `metaldocs.audit_events` via `auditdomain.Writer`); `internal/modules/templates/repository/postgres.go:676` (`ListAudit` still reads from `templates_audit_log`).
+- **Observation:** Plan 6a closed the write side: `AppendAudit` delegates to the canonical `auditdomain.Writer` (injected via `WithAudit`). However, `ListAudit` (`repository/postgres.go:676`) still reads from `templates_audit_log`. New audit events written after Plan 6a land in `metaldocs.audit_events`; historical events and the `GET /api/v1/templates/{id}/audit` read path still serve from the old local table. The two sinks are now diverged in direction (writes: canonical; reads: local) rather than being unified. Compliance queries consuming `ListAudit` see only the pre-Plan-6a history. Decision to leave the read path on the legacy sink was not documented.
+- **Evidence:** `_artifacts/04-persistence.md` §1, §6; `repository/postgres.go:631-639` (write path); `repository/postgres.go:676-683` (read path).
 - **Linked backlog row:** `backlog/templates-refactor.md#R-013`
 - **Linked ADR:** missing-ADR
 
 ### T-014 · Exported symbols lack Go doc comments
 - **Severity:** minor
 - **Surface:** all files under `internal/modules/templates/{domain,application,delivery,repository}/`.
-- **Observation:** Per `_artifacts/01-surface.md` §3, every exported type, function, method, and constant in the module is undocumented (no leading `// SymbolName ...` doc comment). `golint` / `revive` exported-rule would flag the module wholesale. Reader of `Service.PublishTemplateVersion` must read the body to learn it skips SoD; reader of `ResolverRegistryReader` must read `schema.go:84` to learn it gates resolver_key. Hexagonal layout itself also lacks an ADR (`domain/application/delivery/repository` split is convention-only, same as `documents` and `auth`).
+- **Observation:** Per `_artifacts/01-surface.md` §3, every exported type, function, method, and constant in the module is undocumented (no leading `// SymbolName ...` doc comment). `golint` / `revive` exported-rule would flag the module wholesale. Reader of `Service.PublishTemplateVersion` must read the body to learn it skips SoD; reader of `ResolverRegistryReader` must read `schema.go:114` (`ValidatePlaceholders`) to learn it gates resolver_key. Hexagonal layout itself also lacks an ADR (`domain/application/delivery/repository` split is convention-only, same as `documents` and `auth`).
 - **Evidence:** `_artifacts/01-surface.md` §3.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-014`
 - **Linked ADR:** missing-ADR
@@ -132,7 +137,7 @@
 ## Coverage stats (computed at compose time)
 
 - Public symbols undocumented: 100% (per T-014)
-- Operations missing C4 placement: 0 / 20
+- Operations missing C4 placement: 0 / 22
 - Cross-deps missing in §5/§8: 0 / 17
 - State transitions missing in §6: 0 / 9
 - Decisions without ADR link: 8 / 8

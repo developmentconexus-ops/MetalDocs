@@ -2,6 +2,28 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-06-10 — Stage-1 backend audit drift patch
+
+- **Context:** Stage-1 backend proficiency mapper found mismatches between wiki docs and code; patch applies only verified code facts, no redesign.
+- **Mode:** lite patch — surgical corrections to stale anchors, closed-item flags, and removed fields only.
+- **Affected surface scan:** `internal/modules/auth/delivery/http/middleware.go`, `internal/modules/auth/application/service.go`, `internal/modules/auth/domain/port.go`, `internal/platform/authn/config.go`.
+- **Facts updated:**
+  - T-001 closed in `auth-tech-debt.md`: `LegacyHeaderEnabled` field and X-User-Id branch confirmed absent from `middleware.go` and `authapp.Config`; commit 554c4007d identified as removal.
+  - All T-001 references removed from `auth.md`: §2 constraint bullet, §6.2 sequence diagram bypass branch, §8.1 bypass line, §8.7 config table `LegacyHeaderEnabled` row, §9 ADR table row, §12 glossary `LegacyHeaderEnabled` entry, Key files `middleware.go:58` anchor.
+  - §6.4 RFC 9457 note corrected from "not used (T-003)" to "used" — T-003 closed 2026-05-12 Plan 7; `problem.Write` confirmed in `handler.go` and `middleware.go`.
+  - §11 summary counts updated: Critical 2→0 (T-001 and T-002 both closed); Top 3 list updated to reflect open items only.
+  - §1.1 bcrypt reference corrected: `service.go:431 (bcrypt.DefaultCost)` → `service.go:29 (bcryptCost = 12)`.
+  - §1.2 Quality Goals table row 2 corrected: `service.go:431` → `service.go:29`; `bcrypt.DefaultCost` → `bcryptCost = 12`.
+  - §9 ADR table corrected: `bcrypt.DefaultCost (= 10)` → `bcryptCost = 12`.
+  - Key files `ResolveSession` anchor corrected: `service.go:255` → `service.go:340`.
+  - Key files `GetUserTenants` anchor corrected: `port.go:23` → `port.go:68`.
+  - Key files middleware anchors refreshed: `Wrap` from `:47` → `:49`; context-inject block from `:83-88` → `:81-87`; `defaultPublicPaths` from `:96` → `:94`; stale `LegacyHeaderEnabled` line at `:58` removed.
+  - §5.2 `domain/port.go` surface updated: 15 methods → 17 methods; `WithinLoginLock`, `RecordLastLoginContext`, `GetTenantByID`, `LoginState`, `LoginTx`, `CapabilityProvider` added.
+  - §1.3, §3.1, Failure modes, Cross-links: T-002 open-gap language replaced with closed status.
+- **T/R rows touched:** T-001 closed; T-002 language updated (already closed in prior run).
+- **Preflight/tally:** code verified by direct file reads; no live runtime checks (Docker down).
+- **Patched files:** `wiki/modules/auth.md`, `wiki/modules/auth-tech-debt.md`, `wiki/modules/auth/_artifacts/sync-log.md`.
+
 ## 2026-05-25 - Phase 11 auth medium sweep
 
 - **Context:** uncommitted diff for Batch F auth mediums in `internal/modules/auth/*` plus shared migration-runner comment.

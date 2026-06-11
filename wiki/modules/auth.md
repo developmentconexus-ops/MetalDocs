@@ -2,37 +2,36 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-06-08 (Phase E1 casing big-bang: create-user response `{userId}` → `{user_id}`; prior: 2026-06-01) | **Owner:** unassigned | **Status:** active (RFC 9457 envelope; auth event audit emission wired) | **Maturity:** L2
+**Last verified:** 2026-06-11 (adversarial-verification anchor corrections pass 2: handler line numbers + route registration lines corrected; prior: 2026-06-11 pass 1 — Key files section anchors) | **Owner:** unassigned | **Status:** active (RFC 9457 envelope; auth event audit emission wired) | **Maturity:** L2
 
 > **Key files:**
-> - Current Phase 11 anchors: `internal/modules/auth/delivery/http/handler.go:181` (`recordAudit`), `internal/modules/auth/application/service.go:255` (`ResolveSession`), `service.go:381` (`CreateUserWithInput` shared-tx path), `internal/modules/auth/domain/model.go:145`/`:149` (`AuthenticatedSession` redactors), `internal/modules/auth/infrastructure/postgres/repository.go:98` (`GetUserTenants` ordering), `repository.go:121` (`TouchSession` grace window).
-> - `internal/modules/auth/application/service.go:75` â€” `NewService` (rejects `SessionSecret` shorter than 32 bytes)
-> - `internal/modules/auth/application/service.go:126` â€” `Authenticate` (login; calls `resolveLoginTenant` to bind tenant at login)
-> - `internal/modules/auth/application/service.go:172` â€” `resolveLoginTenant` (binds tenant from session; uses `AllowDevTenantFallback`)
-> - `internal/modules/auth/application/service.go:196` â€” `ResolveSession` (no longer takes `tenantID`; reads from stored session)
-> - `internal/modules/auth/application/service.go:470` â€” `newSessionToken` (HMAC-SHA256 + SHA-256 hash)
-> - `internal/modules/auth/application/service.go:481` â€” `tokenHashFromCookieValue` (constant-time `hmac.Equal`)
-> - `internal/modules/auth/delivery/http/handler.go:34` â€” `RegisterRoutes` (4 stdlib mux registrations)
-> - `internal/modules/auth/delivery/http/handler.go:165` â€” `writeAPIError` (legacy envelope writer)
-> - `internal/modules/auth/delivery/http/middleware.go:47` â€” `Wrap` (session enforcement)
-> - `internal/modules/auth/delivery/http/middleware.go:58` â€” `LegacyHeaderEnabled` X-User-Id bypass
-> - `internal/modules/auth/delivery/http/middleware.go:83-88` â€” injects `WithCurrentUser` + `WithAuthContext` + `WithTenantID`; strips `X-Tenant-ID` header
-> - `internal/modules/auth/delivery/http/middleware.go:96` â€” `defaultPublicPaths` (health + login + logout)
-> - `internal/modules/auth/domain/model.go:26` â€” `Session` (now carries `TenantID` field)
-> - `internal/modules/auth/domain/model.go:93` â€” `CurrentUser` (now carries `TenantID` field)
+> - Current Phase 11 anchors: `internal/modules/auth/delivery/http/handler.go:186` (`recordAudit`), `internal/modules/auth/application/service.go:340` (`ResolveSession`), `service.go:470` (`CreateUserWithInput` shared-tx path), `internal/modules/auth/domain/model.go:149`/`:159` (`AuthenticatedSession` redactors), `internal/modules/auth/infrastructure/postgres/repository.go:98` (`GetUserTenants` ordering), `repository.go:140` (`TouchSession` grace window).
+> - `internal/modules/auth/application/service.go:126` â€” `NewService` (rejects `SessionSecret` shorter than 32 bytes)
+> - `internal/modules/auth/application/service.go:204` â€” `Authenticate` (login; calls `resolveLoginTenant` to bind tenant at login)
+> - `internal/modules/auth/application/service.go:316` â€” `resolveLoginTenant` (binds tenant from session; uses `AllowDevTenantFallback`)
+> - `internal/modules/auth/application/service.go:340` â€” `ResolveSession` (no longer takes `tenantID`; reads from stored session)
+> - `internal/modules/auth/application/service.go:725` â€” `newSessionToken` (HMAC-SHA256 + SHA-256 hash)
+> - `internal/modules/auth/application/service.go:736` â€” `tokenHashFromCookieValue` (constant-time `hmac.Equal`)
+> - `internal/modules/auth/delivery/http/handler.go:57` â€” `RegisterRoutes` (4 stdlib mux registrations)
+> - `internal/modules/auth/delivery/http/handler.go:165` â€” `writeAuthError` (RFC 9457 error dispatcher)
+> - `internal/modules/auth/delivery/http/middleware.go:49` â€” `Wrap` (session enforcement)
+> - `internal/modules/auth/delivery/http/middleware.go:81-86` â€” injects `WithCurrentUser` + `WithAuthContext` + `WithTenantID`; strips `X-Tenant-ID` header
+> - `internal/modules/auth/delivery/http/middleware.go:94` â€” `defaultPublicPaths` (health + login + logout)
+> - `internal/modules/auth/domain/model.go:54` â€” `Session` (now carries `TenantID` field)
+> - `internal/modules/auth/domain/model.go:133` â€” `CurrentUser` (now carries `TenantID` field)
 > - `internal/modules/auth/domain/errors.go:18` â€” `ErrTenantNotPermitted` (login rejects unclaimed tenant)
 > - `internal/modules/auth/domain/errors.go:21` â€” `ErrTenantClaimRequired` (multi-tenant user must supply X-Tenant-ID at login)
-> - `internal/modules/auth/domain/port.go:23` â€” `GetUserTenants` (new Repository method â€” list tenant IDs from iam_user_roles)
-> - `internal/modules/auth/infrastructure/postgres/repository.go:174` â€” `CreateUser` (own tx, INSERT auth_identities)
-> - `internal/modules/auth/infrastructure/postgres/repository.go:103` â€” `TouchSession` (UPDATE per request)
+> - `internal/modules/auth/domain/port.go:68` â€” `GetUserTenants` (Repository method — list tenant IDs from iam_user_roles)
+> - `internal/modules/auth/infrastructure/postgres/repository.go:379` â€” `CreateUser` (own tx, INSERT auth_identities)
+> - `internal/modules/auth/infrastructure/postgres/repository.go:140` â€” `TouchSession` (UPDATE per request)
 > - `internal/modules/auth/infrastructure/memory/repository.go:403` â€” `SeedUserTenants` (test helper)
 > - `internal/platform/authn/config.go:101-116` â€” `Config` env-var load sites
 > - `internal/platform/tenant/context.go:1` â€” `WithTenantID` / `FromContext` / `ErrTenantMissing` (see `wiki/architecture/tenant-context.md`)
 > - `internal/platform/tenant/const.go:4` â€” `DevTenantID` sentinel
-> - `migrations/0021_init_auth_identities_and_sessions.sql:1-30` â€” table DDL
-> - `migrations/0036_decouple_auth_identity_from_iam_user_tables.sql:1-88` â€” FK rewire to `auth_identities(user_id)`
-> - `migrations/0184_auth_sessions_tenant_id.sql` â€” adds `tenant_id` column to `auth_sessions`
-> - `migrations/0185_revoke_ambiguous_sessions.sql` â€” revokes existing sessions lacking a tenant binding
+> - `archive/migrations/0021_init_auth_identities_and_sessions.sql:1-30` â€” table DDL (applied; archived after baseline)
+> - `archive/migrations/0036_decouple_auth_identity_from_iam_user_tables.sql:1-88` â€” FK rewire to `auth_identities(user_id)` (applied; archived)
+> - `archive/migrations/0184_auth_sessions_tenant_id.sql` â€” adds `tenant_id` column to `auth_sessions` (applied; archived)
+> - `archive/migrations/0185_revoke_ambiguous_sessions.sql` â€” revokes existing sessions lacking a tenant binding (applied; archived)
 
 ---
 
@@ -44,7 +43,7 @@
 
 - **Cookie-based session authn** â€” driver: web client uses HttpOnly session cookie; source: `internal/modules/auth/delivery/http/handler.go:61`.
 - **Per-account brute-force lockout** â€” driver: regulated-app baseline; source: `application/service.go:117-126` + `Config.LoginMaxFailedAttempts/LoginLockDuration`.
-- **Bcrypt password storage** â€” driver: industry baseline for new deployments; source: `application/service.go:431` (`bcrypt.DefaultCost`).
+- **Bcrypt password storage** â€” driver: industry baseline for new deployments; source: `application/service.go:29` (`bcryptCost = 12`).
 - **Session secret length guard** â€” driver: avoid forgeable HMACs from empty/short keys; source: `application/service.go:75` (`NewService` rejects `SessionSecret` shorter than 32 bytes).
 - **Single source of truth for "current user"** â€” driver: downstream consumers (documents, templates, observability) read `authdomain.CurrentUserFromContext`; source: artifact 03 Â§2 (10 importers).
 - **First-boot admin bootstrap** â€” driver: empty-DB onboarding; source: `application/service.go:56` `BootstrapLocalAdmin`, gated by `BootstrapAdminEnabled`.
@@ -54,7 +53,7 @@
 | Rank | Goal | How verified |
 |---|---|---|
 | 1 | Correctness â€” no path serves a request without a valid session (when `authn.Enabled()`) | `delivery/http/middleware_test.go`; `tests/unit/auth_password_change_flow_test.go`; `defaultPublicPaths` whitelist (`middleware.go:96-107`) |
-| 2 | Credential safety â€” passwords stored as bcrypt; session token signed + hashed before storage | `application/service.go:431` (bcrypt cost), `:439-447` (HMAC + SHA-256), `:455` (`hmac.Equal` constant-time) |
+| 2 | Credential safety â€” passwords stored as bcrypt; session token signed + hashed before storage | `application/service.go:29` (`bcryptCost = 12`), `:652-654` (hash helper using `bcryptCost`), `:470-481` (HMAC + SHA-256 token mint + verify) |
 | 3 | Lockout policy enforcement | `tests/unit/auth_login_policy_test.go`; `Config.LoginMaxFailedAttempts` consumed at `service.go:120` |
 
 ### 1.3 Stakeholders
@@ -64,7 +63,7 @@
 | End user | Login with username/email + password; session persists across requests; password change required after admin reset or first login |
 | Operator (admin) | Bootstrap a first admin via env; reset another user's password and force change; unlock locked accounts |
 | Developer (other modules) | One way to read current user (`authdomain.CurrentUserFromContext`); one way to read tenant from context (`tenant.FromContext`); fallback sentinel `tenant.DevTenantID` in dev mode |
-| Auditor (ISO) | Login / logout / password-change / admin-reset / role-replace events captured in audit sink â€” **gap, see Â§11 T-002** |
+| Auditor (ISO) | Login / logout / password-change / admin-reset / role-replace events captured in audit sink (T-002 closed 2026-05-11) |
 
 ---
 
@@ -78,7 +77,6 @@
 - Auth is NOT under `oapi-codegen` â€” routes are registered via `mux.HandleFunc` (`delivery/http/handler.go:35-39`); no entry in `api/openapi/v1/openapi.yaml` for `/api/v1/auth/*`. Consistent with ADR 0012's partial-rollout scope.
 - Error envelope uses RFC 9457 Problem Details via `problem.Write(...)`. Auth audit trace IDs are server-generated UUIDs and do not trust caller-supplied headers.
 - Auth tables (`auth_identities`, `auth_sessions`) are explicitly **outside** the `enforce_capability_asserted` tripwire scope. Plan 5 migration 0188 expanded the trigger to 10 additional tables (IAM, documents, controlled-documents, taxonomy, templates) but auth tables remain unguarded â€” per ADR 0007 amendment.
-- `LegacyHeaderEnabled` â€” when true, requests with `X-User-Id` header bypass session enforcement entirely (`middleware.go:58-61`); single-flag compromise vector (T-001).
 
 ---
 
@@ -107,7 +105,7 @@ C4Context
 
 ### 3.1 Business Context
 
-Quality-managed app. Every controlled-document mutation must trace to a known actor; the actor identity is what `auth` produces. Login failures must lock; session must expire; admin-set passwords must force a change on next login. ISO 9001 expects authentication events themselves in the audit trail â€” currently a gap (T-002).
+Quality-managed app. Every controlled-document mutation must trace to a known actor; the actor identity is what `auth` produces. Login failures must lock; session must expire; admin-set passwords must force a change on next login. ISO 9001 expects authentication events in the audit trail — auth events are now wired (T-002 closed 2026-05-11 Plan 6a).
 
 ### 3.2 Technical Context
 
@@ -178,7 +176,7 @@ Full table in `_artifacts/01-surface.md` (98 exported symbols). Grouping:
 | `delivery/http/handler.go` | `Handler`, `NewHandler`, `RegisterRoutes` |
 | `delivery/http/middleware.go` | `PublicPathChecker`, `Middleware`, `NewMiddleware`, `WithPublicPathChecker`, `Wrap` |
 | `domain/model.go` | `Identity`, `Session`, `OnlineUser`, `ManagedUser`, `CreateUserParams`, `UpdateUserParams`, `BootstrapAdminParams`, `CurrentUser`, `AuthenticatedSession` |
-| `domain/port.go` | `Repository` (15 methods) |
+| `domain/port.go` | `Repository` (17 methods: FindIdentityBy*, WithinLoginLock, CreateSession, FindSession, TouchSession, RevokeSession*, RecordSuccessfulLogin, RecordLastLoginContext, CreateUser, ListUsers, UpdateUser, ListOnlineUsers, BootstrapAdmin, GetUserTenants, GetTenantByID); `CapabilityProvider`; `LoginState`; `LoginTx` |
 | `domain/context.go` | `WithCurrentUser`, `CurrentUserFromContext` |
 | `domain/errors.go` | `ErrInvalidCredentials`, `ErrSessionNotFound`, `ErrSessionExpired`, `ErrSessionRevoked`, `ErrPasswordPolicy`, `ErrPasswordChangeRequired`, `ErrIdentityLocked`, `ErrIdentityInactive`, `ErrIdentityNotFound`, `ErrUserAlreadyExists`, `ErrTenantNotPermitted`, `ErrTenantClaimRequired` |
 | `infrastructure/postgres/repository.go` | `Repository`, `NewRepository`, 13 methods (FindIdentityBy*, CreateSession, FindSession, TouchSession, RevokeSession*, RecordSuccessful/FailedLogin, CreateUser, ListUsers, ListOnlineUsers, UpdateUser, BootstrapAdmin) |
@@ -190,19 +188,19 @@ All exported symbols are `(undocumented)` in the surface scan â€” captured 
 
 | Method | Path | Handler | Auth requirement |
 |---|---|---|---|
-| POST | `/api/v1/auth/login` | `Handler.handleLogin` (`handler.go:42`) | public (in `defaultPublicPaths`) |
-| POST | `/api/v1/auth/logout` | `Handler.handleLogout` (`handler.go:68`) | public (in `defaultPublicPaths`) |
-| GET | `/api/v1/auth/me` | `Handler.handleMe` (`handler.go:80`) | session cookie required |
-| POST | `/api/v1/auth/change-password` | `Handler.handleChangePassword` (`handler.go:94`) | session cookie required; allowed during `MustChangePassword` lock |
+| POST | `/api/v1/auth/login` | `Handler.handleLogin` (`handler.go:64`) | public (in `defaultPublicPaths`) |
+| POST | `/api/v1/auth/logout` | `Handler.handleLogout` (`handler.go:99`) | public (in `defaultPublicPaths`) |
+| GET | `/api/v1/auth/me` | `Handler.handleMe` (`handler.go:119`) | session cookie required |
+| POST | `/api/v1/auth/change-password` | `Handler.handleChangePassword` (`handler.go:132`) | session cookie required; allowed during `MustChangePassword` lock |
 
 ## API Route Truth Table (Plan 8 Baseline)
 
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| POST | `/api/v1/auth/login` | `internal/modules/auth/delivery/http/handler.go:45` | `handleLogin` | `/auth/login` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
-| POST | `/api/v1/auth/logout` | `internal/modules/auth/delivery/http/handler.go:46` | `handleLogout` | `/auth/logout` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
-| GET | `/api/v1/auth/me` | `internal/modules/auth/delivery/http/handler.go:47` | `handleMe` | `/auth/me` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
-| POST | `/api/v1/auth/change-password` | `internal/modules/auth/delivery/http/handler.go:48` | `handleChangePassword` | `/auth/change-password` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| POST | `/api/v1/auth/login` | `internal/modules/auth/delivery/http/handler.go:58` | `handleLogin` | `/auth/login` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| POST | `/api/v1/auth/logout` | `internal/modules/auth/delivery/http/handler.go:59` | `handleLogout` | `/auth/logout` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| GET | `/api/v1/auth/me` | `internal/modules/auth/delivery/http/handler.go:60` | `handleMe` | `/auth/me` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| POST | `/api/v1/auth/change-password` | `internal/modules/auth/delivery/http/handler.go:61` | `handleChangePassword` | `/auth/change-password` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
 
 - Module contract status: Contracted
 - Owner: leandro
@@ -259,7 +257,7 @@ State transitions:
 | `metaldocs.auth_identities.locked_until` | nullable | `now + LoginLockDuration` on threshold; cleared on success | `RecordFailedLogin` / `RecordSuccessfulLogin` | n/a |
 
 Tripwire pairing: **N/A** â€” auth tables out-of-scope (artifact 04 Â§3,5).
-Audit log emission: **NO** â€” only `log.Printf` on failure (`handler.go:56`). T-002.
+Audit log emission: **YES** â€” `h.recordAudit()` is called for both success (`handler.go:94-96`, emits `auth.login`) and failure (`handler.go:83-85`, emits `auth.login.failed`). T-002 closed 2026-05-11 Plan 6a.
 
 ### 6.2 Resolve session â€” middleware on every non-public request
 
@@ -273,9 +271,6 @@ sequenceDiagram
     participant IAM as iam.RoleProvider
     C->>MW: any non-public request with cookie
     MW->>MW: isPublic(method, path)?
-    alt LegacyHeaderEnabled && X-User-Id present
-        MW-->>C: pass-through (BYPASS â€” T-001)
-    end
     MW->>S: ResolveSession(rawToken)
     S->>S: tokenHashFromCookieValue (split + hmac.Equal)
     S->>R: FindSession(sessionID)
@@ -319,7 +314,7 @@ sequenceDiagram
     participant RA as iam.RoleAdminRepository
     participant DB as Postgres
     H->>S: CreateUser(userID, ..., roles, createdBy)
-    S->>S: validatePassword + hashPassword (bcrypt.DefaultCost)
+    S->>S: validatePassword + hashPassword (bcryptCost=12)
     S->>R: BeginTx + CreateUserTx(params)
     R->>DB: BEGIN; INSERT auth_identities
     S->>RA: ReplaceUserRolesTx(userID, displayName, tenantID, roles, createdBy)
@@ -342,9 +337,9 @@ Postgres now uses a shared transaction when both auth and IAM adapters expose tx
 
 ### 6.4 Failure modes (current envelope)
 
-| Condition | HTTP | Body |
+| Condition | HTTP | RFC 9457 `code` field |
 |---|---|---|
-| Invalid credentials / identity not found | 401 | `{error:{code:"AUTH_INVALID_CREDENTIALS",...,trace_id}}` |
+| Invalid credentials / identity not found | 401 | `AUTH_INVALID_CREDENTIALS` |
 | Account locked | 403 | `AUTH_ACCOUNT_LOCKED` |
 | Account inactive | 403 | `AUTH_ACCOUNT_INACTIVE` |
 | Password policy violation | 400 | `VALIDATION_ERROR` |
@@ -355,7 +350,7 @@ Postgres now uses a shared transaction when both auth and IAM adapters expose tx
 | `MustChangePassword` set, path not allowed | 403 | `AUTH_PASSWORD_CHANGE_REQUIRED` |
 | Internal error (DB, hashing) | 500 | `INTERNAL_ERROR` |
 
-RFC 9457 Problem envelope: **not used** (T-003).
+RFC 9457 Problem envelope: **used** — all non-2xx responses go through `problem.Write(w, problem.New(...))` in `handler.go` and `middleware.go` (T-003 closed 2026-05-12, Plan 7).
 
 ---
 
@@ -376,7 +371,6 @@ RFC 9457 Problem envelope: **not used** (T-003).
 - Authentication: this module. Session cookie + bcrypt + lockout + HMAC-signed opaque token; SHA-256 hash persisted server-side.
 - Authorization: NOT here. Tier-1 (`CapabilityService.CanDo`) and tier-2 (`authz.Require`) live in `iam` per ADR 0007. Auth's contribution is `iamdomain.WithAuthContext(ctx, userID, roles)` injected by middleware (`middleware.go:88`) so downstream tier checks have an actor.
 - `system_admin` bypass: NOT applied here â€” login still requires correct password for the system_admin account (no per-role login bypass).
-- `LegacyHeaderEnabled` X-User-Id bypass at `middleware.go:58-61` â€” disabled by default (`internal/platform/authn/config.go:107`); when true, no session check runs. T-001.
 
 ### 8.2 Error envelope
 
@@ -413,7 +407,6 @@ From artifact 03 Â§4. Loaded in `internal/platform/authn/config.go:101-116`.
 | `PasswordMinLength` | no | `8` | enforced in `validatePassword` |
 | `LoginMaxFailedAttempts` | no | `5` | lockout threshold |
 | `LoginLockDuration` | no | `15m` | lockout window |
-| `LegacyHeaderEnabled` | no | `false` | enables X-User-Id bypass â€” see T-001 |
 | `AllowDevTenantFallback` | no | `false` | when true, login succeeds for users with no IAM roles by returning `DevTenantID`; dev/test only |
 | `OriginProtection` | no | `authn.Enabled()` | flag declared; **enforcement site not located in repo** (T-012) |
 | `TrustedOrigins` | no | empty | companion to `OriginProtection`; same gap |
@@ -436,11 +429,10 @@ From artifact 03 Â§4. Loaded in `internal/platform/authn/config.go:101-116`.
 |---|---|
 | Two-tier authz boundary; auth owns authn only | [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) |
 | Cookie + HMAC-signed opaque session token over JWT | No ADR. **missing-ADR** â†’ T-010 |
-| Bcrypt at `bcrypt.DefaultCost` (= 10) for password hashing | No ADR. **missing-ADR** â†’ T-010 |
+| Bcrypt at cost 12 (`bcryptCost = 12`, `application/service.go:29`) for password hashing | No ADR. **missing-ADR** â†’ T-010 |
 | Per-account lockout; no IP-rate-limit | No ADR. **missing-ADR** â†’ T-010 |
 | Identity tenant-global (`auth_identities` has no `tenant_id`); roles tenant-scoped | No ADR. **missing-ADR** â†’ T-008 |
 | `CreateUser` relies on tx-aware auth/IAM adapters for atomicity; fallback adapters still execute sequentially | No ADR. **missing-ADR** â†’ T-004 |
-| `LegacyHeaderEnabled` X-User-Id bypass retained as opt-in | No ADR. **missing-ADR** â†’ T-001 |
 | Auth NOT under oapi-codegen (consistent with ADR 0012 partial rollout) | [`wiki/decisions/0012-contract-first-api.md`](../decisions/0012-contract-first-api.md) |
 | Legacy `{error:{code,...}}` envelope retained pending RFC 9457 migration | No ADR. **missing-ADR** â†’ T-003 |
 | Session cookie attributes: HttpOnly, SameSite=Strict, Secure conditional on env | No ADR. **missing-ADR** â†’ T-010 |
@@ -465,14 +457,14 @@ From artifact 03 Â§4. Loaded in `internal/platform/authn/config.go:101-116`.
 Pointer-only. Body in [`wiki/modules/auth-tech-debt.md`](auth-tech-debt.md). Severity rubric (concrete triggers) lives in the register, not here.
 
 Summary counts:
-- Critical: 2
-- Major: 3
-- Minor: 7
+- Critical: 0 (T-001 closed commit 554c4007d; T-002 closed 2026-05-11 Plan 6a)
+- Major: 3 (T-004, T-005, T-014)
+- Minor: 7 (T-007, T-008, T-009, T-010, T-011, T-012, T-013)
 
 Top 3 (by severity, then by blast-radius):
-1. T-001 â€” `LegacyHeaderEnabled` X-User-Id bypass: misconfiguration in prod env = full authn bypass, attacker sets header. Critical.
-2. T-002 â€” Audit-trail gap on login / logout / password-change / admin-reset / create-user: ISO 9001 QMS evidence missing for authentication events. Critical.
-3. T-005 â€” Login endpoint missing IP-based rate limit: per-account lockout permits distributed brute-force across identifiers. Major.
+1. T-004 â€” `CreateUser` two-transaction non-atomicity: orphaned `auth_identities` row when IAM role TX fails. Major.
+2. T-005 â€” Login endpoint missing IP-based rate limit: per-account lockout permits distributed brute-force across identifiers. Major.
+3. T-014 â€” FE 401 interceptor conflated session-expiry with domain-401 (closed 2026-05-28). Major (closed).
 
 Coverage stats (computed at compose):
 - Public symbols undocumented: 98 / 98
@@ -495,7 +487,6 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 | CurrentUser | DTO carried in `context.Context` after middleware (`authdomain.CurrentUser`) â€” userId, username, displayName, mustChangePassword, roles. |
 | ManagedUser | Admin-listing view of an identity (`authdomain.ManagedUser`) â€” same identity fields plus role list. |
 | BootstrapAdmin | One-shot first-boot admin seed; gated by `BootstrapAdminEnabled` (defaults `APP_ENV==local`). |
-| LegacyHeaderEnabled | Config flag that, when true, lets `X-User-Id` header bypass session enforcement. Off by default. |
 | MustChangePassword | Identity flag forcing the user to call `POST /api/v1/auth/change-password` before any other route returns 200. |
 | `tenant.DevTenantID` | Sentinel UUID `ffffffff-...` used when `AllowDevTenantFallback=true` and the user has no IAM roles. Production sessions always carry a real tenant from `resolveLoginTenant`. |
 | Session-bound tenant | `auth_sessions.tenant_id` (migration 0184) stores the tenant selected at login. Middleware reads it via `tenant.FromContext`; downstream handlers never touch `X-Tenant-ID`. |
@@ -517,7 +508,7 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 | `MustChangePassword` lock active | All non-change-password routes 403 with `auth.password_change_required` | Middleware short-circuits | User completes `POST /api/v1/auth/change-password` |
 | `X-Tenant-ID` claim names a tenant user has no role in | 403 `ErrTenantNotPermitted` on login | `resolveLoginTenant` returns error | User selects a tenant they belong to |
 | Multi-tenant user omits `X-Tenant-ID` | 400 `ErrTenantClaimRequired` | `resolveLoginTenant` rejects ambiguous login | Frontend prompts for tenant selection |
-| Auth events not emitted to audit (T-002 in auth-tech-debt) | Audit trail missing login/logout/password-change rows | Compliance review | Implement `Writer.Record` calls from `Service` per T-002 |
+| Auth audit events missing (was T-002, closed 2026-05-11) | n/a — resolved: `recordAudit` wired in handler for login/logout/password-change | — | — |
 | Identity tenant-global (T-008) | No RLS isolation on `auth_identities`/`auth_sessions` | Multi-tenant separation review | T-008: model identity as tenant-scoped or add view-level filtering |
 
 ## Cross-links
@@ -526,7 +517,7 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 - Concepts: [`concepts/authz-tiers.md`](../concepts/authz-tiers.md), [`concepts/iso-segregation.md`](../concepts/iso-segregation.md), [`concepts/error-ux.md`](../concepts/error-ux.md)
 - Architecture: [`architecture/api-design-system.md`](../architecture/api-design-system.md), [`architecture/api-contract.md`](../architecture/api-contract.md), [`architecture/tenant-context.md`](../architecture/tenant-context.md)
 - Modules: [`modules/iam.md`](iam.md) (consumer + producer), [`modules/documents.md`](documents.md) (CurrentUser consumer)
-- See also: [`modules/audit.md`](audit.md) â€” auth is a consumer-side gap (T-002 in auth-tech-debt: login / logout / password-change events not yet emitted to the audit sink)
+- See also: [`modules/audit.md`](audit.md) â€” auth wires audit events for login/logout/password-change (T-002 closed 2026-05-11 Plan 6a)
 - Backlog: [`backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 - Tech debt: [`auth-tech-debt.md`](auth-tech-debt.md)
 - Source artifacts: [`auth/_artifacts/00-context.md`](auth/_artifacts/00-context.md) through [`05-industry.md`](auth/_artifacts/05-industry.md)
@@ -534,6 +525,9 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 
 ## Changelog
 
+- 2026-06-11 — Adversarial-verification anchor corrections pass 2: corrected handler function line numbers in §5.3 (handleLogin 42→64, handleLogout 68→99, handleMe 80→119, handleChangePassword 94→132) and route registration line numbers in API Route Truth Table (handler.go:45/46/47/48 → 58/59/60/61); all four mux.HandleFunc calls confirmed at lines 58-61 in handler.go.
+- 2026-06-11 — Adversarial-verification anchor corrections pass 1: fixed 11 stale file:line anchors in Key files section (recordAudit 181→186, NewService 75→126, Authenticate 126→204, resolveLoginTenant 172→316, newSessionToken 470→725, tokenHashFromCookieValue 481→736, RegisterRoutes 34→57, Session struct 26→54, CurrentUser struct 93→133, CreateUser 174→379, TouchSession 103→140); corrected middleware context-injection range from 81-87 to 81-86; corrected migration paths from `migrations/` to `archive/migrations/` (all four files are archived post-application); corrected §6.1 audit emission from "NO — only log.Printf" to "YES — recordAudit() wired for both success and failure" (T-002 was already closed); corrected §6.4 failure-modes table body column from legacy envelope format to RFC 9457 code field (consistent with §8.2 and line 353); renamed `writeAPIError` anchor label to `writeAuthError` to match actual function name.
+- 2026-06-10 — Stage-1 backend audit drift patch: closed T-001 (LegacyHeaderEnabled bypass removed in commit 554c4007d — field and branch gone from middleware and Config); removed all stale T-001 references (§2 constraint, §6.2 sequence diagram branch, §8.1, §8.7 config table row, §9 ADR row, §12 glossary entry); fixed §6.4 RFC 9457 note from "not used" to "used" (T-003 closed 2026-05-12); adjusted §11 summary counts from Critical:2 to Critical:0 and updated Top 3 list; fixed bcrypt cost in §1.1, §1.2, §9 from `bcrypt.DefaultCost`/`service.go:431` to `bcryptCost = 12`/`service.go:29`; fixed ResolveSession anchor from `service.go:255` to `service.go:340`; fixed GetUserTenants anchor from `port.go:23` to `port.go:68`; updated port.go surface to reflect WithinLoginLock, RecordLastLoginContext, GetTenantByID, LoginState, LoginTx, CapabilityProvider; closed T-002 language in §1.3, §3.1, Failure modes, Cross-links.
 - 2026-05-25 - Phase 11 auth medium sweep: `CreateUserWithInput` now routes through shared tx-aware helpers when available, bootstrap admin password bytes are zeroed after hashing, `problem.Write` failures are logged through a helper, audit writes skip marshal-failed payloads, audit trace IDs are always server-generated UUIDs, and `ListUsers`/lockout/session-touch hot spots are documented with TODOs.
 - 2026-05-25 - Phase 8 auth mediums: failed-login audit now records `auth.login.failed` with SHA-256 identifier hash; audit trace IDs are allowlisted with server UUID fallback; audit payload marshal failures emit a sentinel payload; session cookies use `SameSite=Strict`; `TouchSession` has a 30-second grace window; `AuthenticatedSession` redacts raw tokens in string/JSON output; tenant selection query is ordered.
 

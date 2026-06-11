@@ -1,3 +1,21 @@
+# Sync log — documents
+
+> Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
+
+## 2026-06-11 — Stage-1 backend audit drift patch
+
+- **Context:** Stage-1 backend audit (`wiki/backend/_artifacts/stage1/module-documents-core.md`) found three stale claims in the documents wiki. No code was changed; doc-only corrections.
+- **Mode:** lite patch
+- **Affected-surface scan:** `wiki/modules/documents.md` §6.2 (renameDocument response), §8.4 (pagination model); `wiki/modules/documents-tech-debt.md` T-010 (generated wrapper mount status).
+- **Routes/API:** no contract change.
+- **Runtime flows:** §6.2 sequence diagram corrected: `PATCH /api/v1/documents/{id}` returns `200 OK + document body` (via `GetDocument` + `httpresponse.WriteJSON`) not `204 No Content` — evidence `delivery/http/handler.go:426–432`.
+- **Persistence:** §8.4 corrected: `ListDocumentsPaginated` uses keyset cursor `(updated_at, id) < (...)` at `repository.go:465`, not LIMIT/OFFSET; `limit` param default 20 cap 100; response shape `{items, page:{next_cursor, has_more}, total}`.
+- **T-NNN touched:** T-010 — stale "not mounted" observation replaced with accurate FLAG-03 description: routes ARE mounted via `documentsapi.HandlerWithOptions` at `module.go:120` and `module.go:134`; issue is that typed params are discarded by `NewGeneratedServerAdapter`.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4 (unchanged — T-010 severity unchanged; description only corrected).
+- **Tally gate:** N/A (doc-only patch; no code tally required).
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents-tech-debt.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
 ## 2026-05-26 - Wave 2 authz tx seeding sync
 
 - **Context:** uncommitted diff for Wave 2 shared authz transaction seeding across `internal/modules/documents/{application,repository}` and `internal/modules/iam/{authz,application,infrastructure/postgres}`.
@@ -62,7 +80,7 @@
 
 - **Context:** uncommitted diff on `fix/docs-5a-rows-affected-c1-c2` for 5a-C1/C2.
 - **Mode:** lite patch
-- **Anchors moved:** `MarkArchived` -> `repository.go:1368`; `Unarchive` -> `repository.go:1399`; snapshot writer anchor -> `snapshot_repository.go:55`.
+- **Anchors moved:** `MarkArchived` -> `repository.go:1504`; `Unarchive` -> `repository.go:1542`; snapshot writer anchor -> `snapshot_repository.go:55`.
 - **Public surface:** no API/handler surface changed; repository method behavior now fails zero-row archive/unarchive and snapshot/freeze/final artifact writes.
 - **Routes/API:** none.
 - **Runtime flows:** no route flow changed; repository write flows now stop on zero-row `RowsAffected`.
@@ -150,8 +168,6 @@
 - **Tally gate:** PASS (severity count drift repaired; warnings remain for backlog rows T-007/T-010/T-011/T-012)
 - **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`
 
-## 2026-05-15 - D4 hard-cutover wiki/docs sync
-
 ## 2026-05-17 - active v2 reference memory sync
 
 - **Context:** post-merge scan after documents/templates v2 name polish and template wizard completion; active wiki/backlog surfaces still referenced removed `documentsV2.ts`, `/api/v2/documents`, and historical route names.
@@ -180,6 +196,8 @@
 - **Tally gate:** PASS preflight
 - **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`
 
+## 2026-05-15 - D4 hard-cutover wiki/docs sync
+
 - **Context:** Worker E wiki/docs lane cutover refresh for current route/API truth and approval linkage rename evidence.
 - **Mode:** lite patch
 - **Anchors moved:** route/API wording only
@@ -191,9 +209,6 @@
 - **Counts after:** Critical=1 Major=5 Minor=4; missing-ADR=6
 - **Tally gate:** pending
 - **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/04-persistence.md`; `wiki/modules/documents/_artifacts/sync-log.md`
-# Sync log — documents
-
-> Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
 ## 2026-05-19 - Document revision artifact metadata runtime sync
 

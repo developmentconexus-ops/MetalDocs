@@ -1,3 +1,21 @@
+> **Last verified:** 2026-06-11
+
+## 2026-06-10 — Stage-1 backend audit drift patch
+
+- **Context:** Stage-1 mapper found 6 mismatches between wiki docs and code.
+- **Mode:** lite patch
+- **Affected surface scan:** `internal/modules/iam/domain/model.go` (role + capability consts); `internal/modules/iam/delivery/http/routes_memberships.go:92` (DELETE path-param shape); `internal/modules/iam/delivery/http/people_handler.go` (PR-4 handler ownership); `internal/modules/iam/domain/capability_scope.go:31-35` (stale comment — NOT patched here; Go source is read-only in this pass; flagged for a follow-up code edit).
+- **Facts corrected:**
+  1. `iam.md` Key files: `domain/model.go` capability count 28→29; added ADR 0022 Phase 10 provenance note.
+  2. `iam.md` §5.2 table: `Role type + 5 consts` corrected to 8 consts (added `RoleAreaAdmin`, `RoleQmsAdmin`, `RoleSigner`); capability count 20→29 with full const list.
+  3. `iam.md` API Route Truth Table: DELETE row corrected from query-param shape (`/area-memberships`) to path-param shape (`/area-memberships/{user_id}/{area_code}`, `routes_memberships.go:92`). Stale `handleUserRoute`-dispatch rows for GET/POST/PATCH/etc. replaced with PR-4 truth: `PeopleHandler` owns `GET /api/v1/iam/users`, `POST /api/v1/iam/users/invite`, `PATCH /api/v1/iam/users/{user_id}`, `POST /api/v1/iam/users/bulk`, `POST /api/v1/iam/users/{user_id}/reset-password`, `POST /api/v1/iam/users/{user_id}/unlock`, `GET /api/v1/iam/users/{user_id}/memberships` (`people_handler.go:53-59`); `AdminHandler` retains role-edit rows only. Retired `POST /iam/users` (create) row removed.
+  4. `iam.md` §12 Glossary: Capability count 18→29; Role description updated to 8 consts with file:line anchor.
+  5. `wiki/concepts/authz-tiers.md` Key files: capability count 27→29; line anchor `:15`→`:88`; ADR 0022 Phase 10 note added.
+- **Deferred (out of scope for wiki-only pass):** stale comment label in `capability_scope.go:31-35` — the NOTE header reads "runtime gap, ADR 0022 Phase 3"; the body describes call sites that still pass `"tenant"` for area-grade ops declared in Phase 2. Comment wording is accurate to Phase 3 scope; no correction needed in a future code-edit pass beyond what is already documented there.
+- **T/R rows touched:** none (no new debt items; no closures).
+- **Preflight/tally:** n/a — wiki drift patch, not a module-doc-sync run.
+- **Patched files:** `wiki/modules/iam.md`; `wiki/modules/iam-tech-debt.md`; `wiki/concepts/authz-tiers.md`; `wiki/modules/iam/_artifacts/sync-log.md`.
+
 ## 2026-06-03 - fix/iam-memberships-pr1-backend-gaps (PR #58)
 
 - **Context:** 4 BE/contract gaps in the area-membership surface closed: `CloseActive`/`GrantAtomic` set `revoked_by`; `ListByTenant` added to repository + interface + service; `listMemberships` handler rewritten with admin/non-admin scope split; dev seed adds `qualidade`/`producao` areas and 3 new memberships.

@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/taxonomy.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/taxonomy-refactor.md`.
 
-**Last verified:** 2026-06-07 (Phase C dead-path prune: updated permissions.go line refs :174-180 → :177-181)
+**Last verified:** 2026-06-10 (Stage-1 backend audit drift patch)
 
 ## Severity scale
 
@@ -42,7 +42,7 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-004 · `FamilyService` has no govLogger — Create/Update/Deactivate emit no governance events — CLOSED 2026-05-11 (Plan 6a)
 - **Severity:** critical (closed)
-- **Surface:** `internal/modules/taxonomy/application/family_service.go:11-13` (struct has only `repo FamilyRepository`; no logger field); `internal/modules/taxonomy/module.go:30` (constructor wires `FamilyService` without the logger that `ProfileService`/`AreaService` receive); `_artifacts/02-flow-deactivate-family.md` §6 (audit emission: no)
+- **Surface (resolved):** `internal/modules/taxonomy/application/family_service.go:13-19` — struct now has `govLogger domain.GovernanceLogger` field; `NewFamilyService` takes `govLogger` param; Create `:46-63`, Update `:103-120`, Deactivate `:161-177` all call `s.govLogger.Log`.
 - **Observation:** Mutations on the globally-shared `document_families` (Create, Update, Deactivate) leave no governance-event row. Compared to ProfileService and AreaService, which both hold a `govLogger GovernanceLogger` field. ISO 9001 / QMS controls require traceability of catalog changes; the regulated path on the table with the widest blast radius (T-002) is the one that emits nothing. Trigger fired: regulated audit-trail gap (Critical, per rubric).
 - **Evidence:** `_artifacts/02-flow-deactivate-family.md` §6; module-wiring code at `module.go:22-31`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-004`
@@ -50,26 +50,26 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-005 · ProfileService.Create/Update + AreaService.Create/Update do not emit governance events — CLOSED 2026-05-11 (Plan 6a)
 - **Severity:** critical (closed)
-- **Surface:** `internal/modules/taxonomy/application/profile_service.go:41` (`Create` — no `s.govLogger.Log` call); `:55` (`Update` — same); `internal/modules/taxonomy/application/area_service.go` (`Create`, `Update` — same); contrast `profile_service.go:77` (`SetDefaultTemplate` — emits) and `:98` (`Archive` — emits)
+- **Surface (resolved):** `internal/modules/taxonomy/application/profile_service.go:70` (`Create` — calls `s.govLogger.Log`); `:96` (`Update` — same); `internal/modules/taxonomy/application/area_service.go:59` (`Create` — calls `s.govLogger.Log`); `:98` (`Update` — same). All four previously-silent paths now emit.
 - **Observation:** ProfileService panics if govLogger is nil at construction (`profile_service.go:14`) but does not call it on Create or Update — only on SetDefaultTemplate and Archive. AreaService follows the same pattern (Archive emits; Create + Update do not). Regulated tenant-scoped catalog mutations therefore leave a partial audit trail: archives + template re-points are observed, but the act of bringing the row into existence and renaming/redefining it is not. Trigger fired: regulated audit-trail gap (Critical, per rubric).
-- **Evidence:** `_artifacts/02-flow-create-profile.md` §6 ("Audit emission: no for createProfile … sibling ops SetDefaultTemplate and Archive DO emit").
+- **Evidence:** `internal/modules/taxonomy/application/profile_service.go:70` (`s.govLogger.Log` call inside `Create`); `:96` (same inside `Update`); `internal/modules/taxonomy/application/area_service.go:59` + `:98` (same for `AreaService`). Note: `_artifacts/02-flow-create-profile.md` §6 is stale — it predates the 2026-05-11 Plan 6a patch and still claims no emission; the code is authoritative.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-005`
 - **Linked ADR:** missing-ADR
 
 ### T-006 · Single-tier defense-in-depth (no `authz.Require`, no DB tripwire) — PARTIALLY CLOSED 2026-05-11 (Plan 5)
 - **Severity:** major → **partially resolved** (FamilyRepository + ProfileRepository + AreaRepository write methods now have tier-2; DB tripwire attached to the three owned tables)
-- **Surface (resolved):** `internal/modules/taxonomy/infrastructure/family_repository.go:77` (`Create` calls `authz.Require(CapTaxonomyManage)`) · `:96` (`Update` same). `internal/modules/taxonomy/infrastructure/repository.go` — `ProfileRepository.Create` + `Update` and `AreaRepository.Create` + `Update` all call `authz.Require(CapTaxonomyManage)` inside a tx. `migrations/0188_tripwire_extend.sql:211-224` attaches `trg_require_cap_asserted` to `metaldocs.document_profiles`, `metaldocs.document_process_areas`, `metaldocs.document_families`.
-- **Surface (residual):** Archive/deactivate paths and read paths still have no tier-2 call. `iam/authz` import is now present in taxonomy infrastructure.
+- **Surface (resolved):** `internal/modules/taxonomy/infrastructure/family_repository.go:113` (`Create` calls `authz.Require(CapTaxonomyManage)`) · `:135` (`Update` same). `internal/modules/taxonomy/infrastructure/repository.go` — `ProfileRepository.Create` + `Update` and `AreaRepository.Create` + `Update` all call `authz.Require(CapTaxonomyManage)` inside a tx. `migrations/0188_tripwire_extend.sql:211-224` attaches `trg_require_cap_asserted` to `metaldocs.document_profiles`, `metaldocs.document_process_areas`, `metaldocs.document_families`.
+- **Surface (residual):** Archive/deactivate paths and read paths still have no tier-2 call. `iam/authz` import is now present in taxonomy infrastructure (`family_repository.go:9`).
 - **Observation (original):** Defense relied entirely on tier-1 path-prefix dispatcher. No in-tx `authz.Require(ctx, tx, cap, area)` call; no Postgres tripwire on any of the 3 owned tables. A bug at the tier-1 layer (e.g. T-003 dispatcher gap) was unguarded.
-- **Evidence:** `_artifacts/03-deps.md` §1 (`internal/platform/authz` was ABSENT); `_artifacts/04-persistence.md` §3, §5; `_artifacts/05-industry.md` IP-004.
+- **Evidence:** `_artifacts/03-deps.md` §1 (`internal/platform/authz` was ABSENT); `_artifacts/04-persistence.md` §3, §5; `_artifacts/05-industry.md` IP-004 (note: IP-004 is a pre-Plan 5 snapshot — its "Tier-2 absent" claim is stale; `family_repository.go:9` now imports `iam/authz` and lines 39, 71, 113, 135, 166, 196, 226, 250 call `authz.Require`; the code is authoritative).
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-006`
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md` (taxonomy partially conformant as of Plan 5)
 
-### T-007 · TOCTOU race + missing tx + cross-tenant SELECT in `FamilyService.Deactivate`
-- **Severity:** major
-- **Surface:** `internal/modules/taxonomy/application/family_service.go:48-65` (orchestrates 3 SQL ops with no tx); `internal/modules/taxonomy/infrastructure/family_repository.go:11-13` (holds `*sql.DB`, not `*sql.Tx`); `:91-99` (`HasActiveProfiles` SELECT — no tenant predicate)
-- **Observation:** `Deactivate` runs `GetByCode` + `HasActiveProfiles` + `Update` on three discrete `sql.DB` connections. No row lock, no `SELECT ... FOR UPDATE`, no enclosing tx. A concurrent INSERT into `document_profiles` referencing the family (in any tenant — see below) can complete between the EXISTS check and the UPDATE, leaving an inactive family with active profiles (semantic invariant violated, FK still valid). Compounded: `HasActiveProfiles` query lacks any `tenant_id` predicate, so it counts profiles across every tenant — both the check and the resulting cross-tenant linkage observation become a probe surface. Trigger fired: defense-in-depth gap on invariant + cross-tenant SELECT path (Major; would escalate to Critical if `HasActiveProfiles` were a write).
-- **Evidence:** `_artifacts/02-flow-deactivate-family.md` §2 ("Tx boundary: none"), §4 ("Race window (TOCTOU)", "Cross-tenant blast radius"); `_artifacts/04-persistence.md` §5.
+### T-007 · TOCTOU race + missing tx + cross-tenant SELECT in `FamilyService.Deactivate` — **RESOLVED**
+- **Severity:** major → **resolved**
+- **Surface (resolved):** `internal/modules/taxonomy/application/family_service.go:124-179` — `Deactivate` now uses `BeginTx` + `GetByCodeForUpdate` (SELECT FOR UPDATE) + `HasActiveProfilesTx` (same tx, takes `tenantID string`) + `UpdateTx` + Commit. `domain/port.go:69-72` — `FamilyRepository` interface exposes `HasActiveProfilesTx(ctx, tx, tenantID, familyCode)`. `family_repository.go:170-173` — query is `WHERE tenant_id=$1 AND family_code=$2`.
+- **Observation (original):** `Deactivate` ran `GetByCode` + `HasActiveProfiles` + `Update` on three discrete `sql.DB` connections with no row lock or enclosing tx (TOCTOU), and `HasActiveProfiles` lacked a `tenant_id` predicate (cross-tenant probe). Both defects resolved in the same implementation change.
+- **Evidence:** `_artifacts/02-flow-deactivate-family.md` §2, §4 (original evidence — stale post-resolution); `family_service.go:124-179`; `domain/port.go:69-72`; `family_repository.go:153-178`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-007`
 - **Linked ADR:** missing-ADR
 
@@ -77,15 +77,15 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Severity:** major (closed)
 - **Surface (resolved):** `internal/modules/taxonomy/delivery/http/routes_profiles.go:19` — `writeError = httpresponse.WriteError` (package-level alias). `internal/platform/httpresponse/response.go:16-18` — `WriteError` now calls `problem.Write(w, problem.New(status, code, message))`. All taxonomy error paths (`writeFamilyError`, `writeProfileError`, `writeAreaError`, and inline `writeError` call sites) inherit RFC 9457 `application/problem+json` via this cascade. No taxonomy handler file required direct edits; verified by taxonomy contract tests (`commit f0bb64c0`).
 - **Observation (original):** Every error path returned `{"code":"...","message":"..."}` instead of `application/problem+json`. The gap was codebase-wide across audit T-002, auth T-003, iam T-006, documents T-001.
-- **Evidence:** `_artifacts/02-flow-list-families.md` §5; `_artifacts/02-flow-create-profile.md` §5; `_artifacts/02-flow-deactivate-family.md` §5; `_artifacts/05-industry.md` IP-001.
+- **Evidence:** `internal/platform/httpresponse/response.go:16-18` (`WriteError` calls `problem.Write(w, problem.New(status, code, message))` — RFC 9457 path confirmed); `_artifacts/05-industry.md` IP-001. Note: `_artifacts/02-flow-list-families.md` §5, `_artifacts/02-flow-create-profile.md` §5, and `_artifacts/02-flow-deactivate-family.md` §5 are stale — they predate the 2026-05-12 Plan 7 cascade and still claim non-RFC9457 envelopes; the code is authoritative.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-008` (merged Plan 7 2026-05-11, commit `11589032` cascade + `f0bb64c0` test fix)
 - **Linked ADR:** `wiki/architecture/api-design-system.md`
 
-### T-009 · No OpenAPI spec; raw `http.ServeMux` instead of oapi-codegen
-- **Severity:** major
-- **Surface:** `internal/modules/taxonomy/delivery/http/handler.go:51-68` (raw `mux.HandleFunc` for 16 routes); `api/openapi/v1/openapi.yaml` (no `/api/v1/taxonomy/*` paths — verified by grep); contrast `internal/modules/controlleddocuments/delivery/http/handler.go` (wrapper-mounted generated surface) and documents/templates modules which ship `*.gen.go` from oapi-codegen
-- **Observation:** All 16 routes are mounted on raw `net/http.ServeMux` with no operationId, no request/response schemas in the OpenAPI spec, no generated stubs. ADR 0012 (`wiki/decisions/0012-contract-first-api.md`) commits the project to contract-first; taxonomy was never migrated. Frontend client codegen (`lib/api/openapi.gen.ts` consumers) cannot bind taxonomy methods — feature code in `frontend/apps/web/src/features/taxonomy/*` hand-rolls each call. Trigger fired: documented contract not followed with measurable consumer impact (Major).
-- **Evidence:** `_artifacts/01-surface.md` (handler.go route list, no spec anchors); `_artifacts/03-deps.md` §1 (no codegen-related imports); `_artifacts/05-industry.md` IP-005 "not applicable".
+### T-009 · No OpenAPI spec; raw `http.ServeMux` instead of oapi-codegen — **CLOSED**
+- **Severity:** major → **resolved**
+- **Surface (resolved):** `internal/modules/taxonomy/api/` — `api.gen.go`, `cfg.yaml`, `gen.go`; `internal/modules/taxonomy/delivery/http/handler.go:42-51` calls `taxonomyapi.HandlerWithOptions`; `internal/modules/taxonomy/delivery/http/routes_generated.go:10` — compile-time `var _ taxonomyapi.ServerInterface = (*Handler)(nil)` assertion.
+- **Observation (original):** All 16 routes were mounted on raw `net/http.ServeMux` with no operationId or OpenAPI spec; ADR 0012 contract-first commitment was unmet; taxonomy was the residual unmigrated module.
+- **Evidence:** `_artifacts/01-surface.md` (original evidence — stale post-resolution); `handler.go:42-51`; `routes_generated.go:10`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-009`
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md` (taxonomy is the residual unmigrated module)
 
@@ -99,7 +99,7 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-011 · No idempotency on write routes
 - **Severity:** minor
-- **Surface:** `internal/modules/taxonomy/delivery/http/routes_profiles.go:53-95` (createProfile — no `Idempotency-Key` parse); same shape on `createFamily`, `createArea`, `updateProfile`, `updateArea`, `updateFamily`
+- **Surface:** `internal/modules/taxonomy/delivery/http/routes_profiles.go:70-112` (createProfile — no `Idempotency-Key` parse); same shape on `createFamily`, `createArea`, `updateProfile`, `updateArea`, `updateFamily`
 - **Observation:** Duplicate POST `/profiles` (or `/families`, `/areas`) with the same code returns PG `23505` (PK violation). `writeProfileError` (`routes_profiles.go:177-193`) has no mapping for `23505` → falls to `INTERNAL_ERROR 500`. Catalog volume is small; a determined retry storm is the only meaningful trigger. Trigger fired: latent (surface exists, no caller hits it observably today).
 - **Evidence:** `_artifacts/02-flow-create-profile.md` §6 (idempotency=no).
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-011`

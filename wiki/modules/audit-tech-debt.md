@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/audit.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/audit-refactor.md`.
 
-**Last verified:** 2026-06-08 (Phase F audit-cursor re-audit: handler.go line anchors updated; T-002/T-003 envelope notes revised)
+**Last verified:** 2026-06-11 (adversarial verification pass 2: T-005 anchor corrected to admin_handler.go:403 + main.go:816; T-006 anchor corrected to admin_handler.go:404, claim updated from timestamp-based to uuid.NewString(); T-003/T-010 migration paths corrected to archive/migrations/; T-010 payload anchor corrected to admin_handler.go:403-414 + main.go:816-828; T-007 wording corrected — tenant_id filter is unconditional; prior: T-001/T-005/T-007 closed-item observations labeled (original); T-008 anchor corrected to openapi.yaml:741-745; 2026-06-10 Stage-1 drift patch T-009)
 
 ## Severity scale
 
@@ -20,8 +20,8 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-001 · Unauthenticated `GET /api/v1/audit/events` — CLOSED 2026-05-11 (Plan 6a)
 - **Severity:** critical (closed)
-- **Surface:** `internal/modules/audit/delivery/http/handler.go:67-68` (route registration); `apps/api/cmd/metaldocs-api/permissions.go:229-231` (audit routeRules — T-001 CLOSED; explicit `CapAuditRead` rows added)
-- **Observation:** The route is mounted via `mux.HandleFunc("/api/v1/audit/events", h.handleEvents)` with zero auth middleware. The capability resolver has no rule for the path; the public-path checker therefore admits the request as public. Verified by grep — no `audit/events` rule in `permissions.go`. Any network-reachable client can read up to 200 audit rows per call, filtered by `resource_type`/`resource_id`. Confidentiality breach + tampering reconnaissance vector. Trigger fired: authn/authz bypass.
+- **Surface (resolved):** `internal/modules/audit/delivery/http/handler.go:67-68` (route registration); `apps/api/cmd/metaldocs-api/permissions.go:232` (audit routeRules — `CapAuditRead` binding added at line 232 for `GET /api/v1/audit/events`).
+- **Observation (original):** The route was mounted via `mux.HandleFunc("/api/v1/audit/events", h.handleEvents)` with zero auth middleware. The capability resolver had no rule for the path; the public-path checker therefore admitted the request as public. Any network-reachable client could read up to 200 audit rows per call, filtered by `resource_type`/`resource_id`. Confidentiality breach + tampering reconnaissance vector. Trigger fired: authn/authz bypass.
 - **Evidence:** `_artifacts/02-flow-list.md` §1, §6; `_artifacts/05-industry.md` IP-004.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-001`
 - **Linked ADR:** missing-ADR
@@ -36,7 +36,7 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-003 · No retention or purge policy — CLOSED 2026-05-11 (Plan 6a, app-level goroutine)
 - **Severity:** major (closed)
-- **Surface:** `migrations/0004_init_audit_events.sql`; `migrations/0005_grant_workflow_audit_privileges.sql` (no follow-up retention migration); module code (no purge job, no partition, no TTL)
+- **Surface:** `archive/migrations/0004_init_audit_events.sql`; `archive/migrations/0005_grant_workflow_audit_privileges.sql` (no follow-up retention migration); module code (no purge job, no partition, no TTL)
 - **Observation:** `metaldocs.audit_events` grows monotonically. No partitioning, no `pg_cron` job, no soft-delete, no archive offload. Regulated data has both retention-floor (ISO 9001 §7.5.3 record retention) and retention-ceiling (LGPD/GDPR right-to-erasure for personal data inside `payload`) obligations. Without a retention strategy, both ends fail: old records cannot be selectively purged when erasure is requested; storage growth is unbounded. Trigger fired: governance/compliance gap on a regulated path with measurable consumer impact (legal).
 - **Evidence:** `_artifacts/04-persistence.md` §6 ("none — table grows monotonically"); `_artifacts/05-industry.md` "Patterns deliberately NOT cited" — retention.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-003`
@@ -52,47 +52,47 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-005 · Fire-and-forget Record discards emission errors — CLOSED 2026-05-11 (Plan 6a)
 - **Severity:** major (closed)
-- **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:457` (`_ = h.audit.Record(...)`); `apps/api/cmd/metaldocs-api/main.go:467` (adapter — logs error but emits no metric and does not propagate)
-- **Observation:** All consumer call sites discard or only log the Record error. There is no failure metric, no dead-letter queue, no alarm, no retry. On Postgres unavailability or PK collision (see T-006), the regulated action persists but the audit row is silently lost. Operator cannot detect dropped trail entries. Per user-supplied rubric, this is rated **Major** here because the drop happens *consumer-side* (audit module's port contract correctly returns the error — callers ignore it); the Critical-rated mirror lives in the consumer registers. Trigger fired: defense-in-depth + observability sink gap on regulated path.
+- **Surface (resolved):** `internal/modules/iam/delivery/http/admin_handler.go:403` (audit.Record call); `apps/api/cmd/metaldocs-api/main.go:816` (documentsAuditAdapter.Record call) — error surfacing work merged per `backlog/audit-refactor.md#R-005`.
+- **Observation (original):** All consumer call sites discarded or only logged the Record error (`_ = h.audit.Record(...)`). There was no failure metric, no dead-letter queue, no alarm, no retry. On Postgres unavailability or PK collision (see T-006), the regulated action persisted but the audit row was silently lost. Operator could not detect dropped trail entries. Per user-supplied rubric, rated **Major** here because the drop happened *consumer-side* (audit module's port contract correctly returned the error — callers ignored it); the Critical-rated mirror lives in the consumer registers. Trigger fired: defense-in-depth + observability sink gap on regulated path.
 - **Evidence:** `_artifacts/02-flow-record.md` §6(c); `_artifacts/03-deps.md` §2b, §2c.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-005`
 - **Linked ADR:** missing-ADR
 
 ### T-006 · App-side timestamp-based event ID is collision-prone
 - **Severity:** minor
-- **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:458` — `"evt_" + strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", "")`; same shape in `apps/api/cmd/metaldocs-api/main.go:467` (adapter)
-- **Observation:** Event ID derives from a single-process `time.Now()` timestamp at nanosecond resolution with a string-replace to drop the dot. On the same process, two emitters at the same wall-clock nanosecond collide on PK `id`. On distributed deploys (none today), collisions broaden. Resulting `unique_violation` is silently lost due to T-005. Latent today (single-process API, low audit-volume). Trigger fired: latent (surface exists; no caller hits it today at observable rate).
+- **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:404` — `"evt_" + uuid.NewString()`; `apps/api/cmd/metaldocs-api/main.go:761` (`bypassAuditAdapter`, same `"evt_" + uuid.NewString()` pattern); `apps/api/cmd/metaldocs-api/main.go:817` (`documentsAuditAdapter`, bare `uuid.NewString()` without `"evt_"` prefix)
+- **Observation:** Event ID generation is not uniform across call sites. The IAM handler and bypass adapter prefix the UUID with `"evt_"` (`admin_handler.go:404`, `main.go:761`), while the documents adapter emits a bare UUID with no prefix (`main.go:817`). This inconsistency means the `id` column holds heterogeneous formats and consumers cannot reliably parse the prefix as a stable type marker. A prior version of this item documented a timestamp-based ID scheme (`"evt_" + strings.ReplaceAll(time.Now()...)`); that scheme no longer exists — all sites now use `uuid.NewString()`. The residual debt is the prefix inconsistency, not collision risk. Trigger fired: latent (surface exists; no caller relies on the prefix today, but it is part of the implicit event-ID contract).
 - **Evidence:** `_artifacts/04-persistence.md` §1 (event id generation fact).
 - **Linked backlog row:** `backlog/audit-refactor.md#R-006`
 - **Linked ADR:** missing-ADR
 
 ### T-007 · No `tenant_id` column or tenant-scoped query path — CLOSED 2026-05-11 (Plan 6a)
 - **Severity:** major (closed)
-- **Surface:** `migrations/0004_init_audit_events.sql:1-14` (schema); `internal/modules/audit/infrastructure/postgres/writer.go:50-57` (SELECT has no tenant filter)
-- **Observation:** `metaldocs.audit_events` has no `tenant_id` column. `ListEvents` filters by `resource_type` and `resource_id` only. When multi-tenant lands (auth T-008 plans `tenant_id` on identity tables), a tenant-A admin reading `/api/v1/audit/events` would see Tenant-B events. Latent today (single-tenant deploy); load-bearing on multi-tenant cutover. Trigger fired: multi-tenant data leak path (latent — single-tenant today, but the leak path is in code today).
+- **Surface (resolved):** `archive/migrations/0190_audit_events_tenant_id.sql:4-8` adds `tenant_id TEXT NOT NULL DEFAULT ''` column and index; `archive/migrations/0193_audit_events_hash_chain.sql:60` includes `tenant_id` in hash-chain CTE; `internal/modules/audit/infrastructure/postgres/writer.go:232` (`buildWhere` unconditionally adds `tenant_id = $N` as the first filter clause).
+- **Observation (original):** `metaldocs.audit_events` had no `tenant_id` column. `ListEvents` filtered by `resource_type` and `resource_id` only. When multi-tenant lands (auth T-008 plans `tenant_id` on identity tables), a tenant-A admin reading `/api/v1/audit/events` would see Tenant-B events. Latent at time of writing (single-tenant deploy); load-bearing on multi-tenant cutover. Trigger fired: multi-tenant data leak path (latent — single-tenant today, but the leak path was in code). Note: the resolved `buildWhere` at `writer.go:232` applies the `tenant_id` filter unconditionally (not guarded by a non-empty check), consistent with `TenantID` being mandatory at the application layer per `internal/modules/audit/domain/port.go:69-70`.
 - **Evidence:** `_artifacts/04-persistence.md` §1; `_artifacts/05-industry.md` IP-008.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-007`
 - **Linked ADR:** missing-ADR
 
-### T-008 · Missing OpenAPI `operationId` for `/audit/events`
+### T-008 · Audit route served outside oapi-codegen (manual `HandleFunc`, not generated handler)
 - **Severity:** minor
-- **Surface:** `api/openapi/v1/openapi.yaml:819` (path `/audit/events`; `operationId` absent — verified via Phase 2 grep); `internal/modules/audit/delivery/http/handler.go:67-68` (route mounted via `http.ServeMux.HandleFunc` directly, not via oapi-codegen)
-- **Observation:** The route exists in the spec but has no `operationId`, and is NOT served via generated handlers. Drift: spec promises a contract the code does not honour through codegen. Client-codegen tools (frontend `lib/api/openapi.gen.ts`) cannot bind a method name. Trigger fired: contract surface gap with measurable consumer impact (client codegen).
+- **Surface:** `api/openapi/v1/openapi.yaml:741-745` (path `/audit/events`, `operationId: listAuditEvents` — present); `internal/modules/audit/delivery/http/handler.go:67-68` (route mounted via `http.ServeMux.HandleFunc` directly, not via oapi-codegen generated handler)
+- **Observation:** The `operationId` `listAuditEvents` exists in the spec at `openapi.yaml:745`. The drift is not a missing `operationId` but a wiring gap: the handler is registered manually via `HandleFunc` rather than through the oapi-codegen `StrictServerInterface` path used by other modules. Client codegen can bind a method name from the spec, but the server-side implementation is not generated/validated by oapi-codegen. This means request/response type checking at the codegen boundary is absent for this route. Trigger fired: contract surface gap — spec and implementation diverge in binding mechanism.
 - **Evidence:** `_artifacts/02-flow-list.md` §1.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-008`
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md` (audit was never migrated; flagged here as the residual)
 
-### T-009 · No explicit `SELECT` grant on `metaldocs.audit_events`
-- **Severity:** minor
-- **Surface:** `migrations/0005_grant_workflow_audit_privileges.sql:2` grants only `INSERT` to `metaldocs_app`; no other migration grants `SELECT`
-- **Observation:** Audit reads succeed in dev today — implies `SELECT` is being granted through schema-owner pathways or `PUBLIC` defaults outside the migration set, or that `metaldocs_app` is identical to the schema owner in this deployment. The intent (read for query/export, write append-only) is not explicitly encoded in migrations. On Postgres permissions hardening (revoke PUBLIC, separate roles), reads will break silently. Trigger fired: latent (works today; breaks on a routine ops change).
-- **Evidence:** `_artifacts/04-persistence.md` §6 ("No explicit GRANT SELECT … found in migrations").
+### T-009 · No explicit `SELECT` grant on `metaldocs.audit_events` — CLOSED 2026-06-10 (Stage-1 drift patch)
+- **Severity:** minor (closed)
+- **Surface (resolved):** `migrations/0193_audit_events_hash_chain.sql:110` — `GRANT INSERT, SELECT ON TABLE metaldocs.audit_events TO metaldocs_app`. The SELECT grant exists in the archived migration ledger; it was added together with the hash-chain extension in archived migration 0193.
+- **Observation (original):** Written before migration 0193 was applied. At that point only `migrations/0005_grant_workflow_audit_privileges.sql:2` (INSERT only) existed. 0193 upgraded the grant to `INSERT, SELECT`. The item was not closed when 0193 landed. Stage-1 backend audit confirmed the grant at `archive/migrations/0193_audit_events_hash_chain.sql:110`. Note: `migrations/0224_audit_export_jobs_pr6.sql` creates `metaldocs.audit_export_jobs` without an explicit GRANT (tracked as flag F-07 in the Stage-1 artifact).
+- **Evidence:** `wiki/backend/_artifacts/stage1/module-audit.md` §6 ("Grants: GRANT INSERT, SELECT…added in archived 0193").
 - **Linked backlog row:** `backlog/audit-refactor.md#R-009`
 - **Linked ADR:** missing-ADR
 
 ### T-010 · No payload size constraint
 - **Severity:** minor
-- **Surface:** `migrations/0004_init_audit_events.sql:8` (`payload JSONB NOT NULL DEFAULT '{}'::jsonb`); `internal/modules/iam/delivery/http/admin_handler.go:453` and `apps/api/cmd/metaldocs-api/main.go:467` (payload marshalled with no size check)
+- **Surface:** `archive/migrations/0004_init_audit_events.sql:8` (`payload JSONB NOT NULL DEFAULT '{}'::jsonb`); `internal/modules/iam/delivery/http/admin_handler.go:403-414` and `apps/api/cmd/metaldocs-api/main.go:816-828` (payload marshalled with no size check before passing to `audit.Record`)
 - **Observation:** `payload JSONB` has no `CHECK (octet_length(payload::text) < N)` constraint and no application-side size cap. A misbehaving consumer can emit unbounded payloads (e.g. dumping a full document body). Today consumer payloads are small (`map[string]any{}`-shaped), but the surface is open. Trigger fired: latent (surface exists; no caller hits it today).
 - **Evidence:** `_artifacts/04-persistence.md` §1 ("Payload size constraint fact").
 - **Linked backlog row:** `backlog/audit-refactor.md#R-010`

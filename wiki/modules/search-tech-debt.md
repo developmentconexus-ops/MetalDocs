@@ -2,15 +2,15 @@
 
 > Companion to `wiki/modules/search.md`. Debt only; no fix prescriptions.
 
-**Last verified:** 2026-06-05 (T-003 closed: AccessPolicy ABAC path removed in Phase B API contract hardening)
+**Last verified:** 2026-06-10 (Stage-1 backend audit drift patch: T-001 evidence corrected)
 
 ## Items
 
-### T-001 · Route still emits legacy `{error:{code,message}}` envelope
-- **Severity:** major
-- **Surface:** `internal/modules/search/delivery/http/handler.go:141`
-- **Observation:** search handler writes custom API error envelope instead of RFC 9457 Problem+JSON.
-- **Evidence:** `writeAPIError` helper in handler.
+### T-001 · 405 response body is empty (no RFC 9457 Problem+JSON envelope)
+- **Severity:** minor
+- **Surface:** `internal/modules/search/delivery/http/handler.go:54-56`
+- **Observation:** The method guard calls `w.WriteHeader(http.StatusMethodNotAllowed)` and returns without a body. All other error paths in the handler were migrated to `httpresponse.WriteError` (RFC 9457 compliant) in commit c4c4d95d2 (Phase D error-envelope unification). The 405 path was not migrated and emits no body.
+- **Evidence:** `handler.go:54-56` — `w.WriteHeader(http.StatusMethodNotAllowed); return` with no `httpresponse.WriteError` call. `writeAPIError` no longer exists in the handler; previous evidence anchor was stale.
 - **Linked backlog row:** `R-001`
 - **Linked ADR:** missing-ADR
 

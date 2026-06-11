@@ -24,6 +24,7 @@
 
 ## Supporting modules
 
+- [jobs.md](jobs.md) — background-job / async worker module (Stage-1 draft)
 - [render-fanout.md](render-fanout.md), [render-fanout-tech-debt.md](render-fanout-tech-debt.md)
 - [search.md](search.md), [search-tech-debt.md](search-tech-debt.md)
 

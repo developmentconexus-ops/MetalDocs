@@ -1,6 +1,6 @@
 # Module: search
 
-> **Last verified:** 2026-06-05 (Phase B API contract hardening: dead AccessPolicy ABAC path removed; visibility now enforced at data layer via unified model AD-3; phantom columns subject/business_unit/classification/tags removed from SQL)
+> **Last verified:** 2026-06-11 (Stage-1 backend audit drift patch: corrected visibility-predicate anchor from repository.go:128 to :133-164; removed unsubstantiated handler.go anchor claim from prior changelog entry)
 > **Status:** active (limited surface)
 > **Maturity:** L2
 > **Scope:** Cross-module search across templates, controlled documents, document versions.
@@ -30,7 +30,7 @@ A row in `public.documents` is included in results only when at least one condit
 | Controlled document — restricted + area grant | active `controlled_document_area_grants` row joined to active `user_process_areas` row for caller |
 | Controlled document — restricted + user grant | `controlled_document_user_grants` row for caller |
 
-This is a verbatim port of the predicate at `internal/modules/controlleddocuments/infrastructure/repository.go:128`. There is no `system_admin` bypass — matches the controlled-documents list semantics.
+This is a verbatim port of the predicate at `internal/modules/controlleddocuments/infrastructure/repository.go:133-164`. There is no `system_admin` bypass — matches the controlled-documents list semantics.
 
 ### Columns returned by the reader
 
@@ -49,7 +49,7 @@ Only columns present on `public.documents` and `public.controlled_documents` are
 | EffectiveAt / ExpiryAt | `d.effective_from` / `d.effective_to` |
 | CreatedAt | `d.created_at` |
 
-Fields present on the `Document` struct (`Subject`, `BusinessUnit`, `Classification`, `Tags`) are populated as zero values by the reader; the struct is shared with other surfaces that may populate them via different paths.
+Fields present on the `Document` struct (`Subject`, `BusinessUnit`, `Classification`, `Tags`) are always zero values in v2 search results. The reader does not select these columns (the legacy governance columns live on the decommissioned `metaldocs.documents` schema) and no other surface currently populates them via a different path.
 
 ## Indexed entities
 
@@ -82,8 +82,10 @@ Fields present on the `Document` struct (`Subject`, `BusinessUnit`, `Classificat
 
 ## Risks & Technical Debt
 
+Open tech-debt items by severity (source: [search-tech-debt.md](search-tech-debt.md)):
+
 - Critical: 0
-- Major: 1
-- Minor: 1
+- Major: 0
+- Minor: 2 (T-001: missing 405 RFC 9457 body; T-002: template search path deferred)
 
 Refactor backlog: [../backlog/search-refactor.md](../backlog/search-refactor.md)

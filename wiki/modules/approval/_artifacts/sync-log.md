@@ -1,5 +1,20 @@
+Last verified: 2026-06-11
+
 # Sync log - approval
 
+## 2026-06-11 — Stage-1 backend audit drift patch
+
+- **Context:** Stage-1 backend mapping audit (wiki/backend/_artifacts/stage1/module-approval.md) found four stale claims in wiki/modules/approval.md and wiki/modules/approval-tech-debt.md.
+- **Mode:** lite patch
+- **Anchors moved:** none.
+- **Public surface:** corrected sentinel name ErrSoDSubmitterCannotSign → ErrAuthorCannotSign (domain/sod.go:6). Note: wiki/modules/approval/_artifacts/01-surface.md line 38 still carries the old name `ErrSoDSubmitterCannotSign` — that file was not patched in this run; it remains stale on this point.
+- **Routes/API:** deactivate route corrected from DELETE /api/v1/approval/routes/{id} to POST /api/v1/approval/routes/{id}/deactivate (router.go:27) in §5.3 simple table and Plan 8 Baseline table (router.go line anchor updated from :24 to :27).
+- **Filesystem paths:** infra/signature/ corrected to infrastructure/signature/ in §5.1 container diagram, §5.2 public surface table, and T-007 surface entry. Note: wiki/modules/approval/_artifacts/01-surface.md line 55 still shows `infra/signature/` — that file was not patched in this run; the actual on-disk directory is `internal/modules/documents/approval/infrastructure/signature/`.
+- **T-NNN touched:** T-007 surface path corrected (infra/signature/ → infrastructure/signature/).
+- **R-NNN touched:** none.
+- **Counts after:** unchanged (Critical=1 open; Major=2 open; Minor=4 open; 1 deferred T-014; High composite T-015 closed).
+- **Tally gate:** read-only audit patch — no code change; no preflight required.
+- **Patched files:** wiki/modules/approval.md; wiki/modules/approval-tech-debt.md; wiki/modules/approval/_artifacts/sync-log.md.
 ## 2026-05-25 - approval 5c + 5d medium sweep sync
 
 - **Context:** current uncommitted Phase 11 medium-sweep diff scoped to `internal/modules/documents/approval/**`.
@@ -8,7 +23,7 @@
 - **Public surface:** `ReadService.LoadInstance` no longer accepts `actorID`; `application.SignoffRequest.Decision` is now typed as `domain.Decision`; approval contract DTOs now use typed quorum/drift/status/decision/signature aliases and `RouteResponse.NewVersion` is a pointer field.
 - **Routes/API:** no route or OpenAPI ownership change; HTTP contract validation is stricter and now wraps a typed `contracts.ErrValidation` sentinel.
 - **Runtime flows:** signoff seeds `authz.WithCapCache` before authz GUC setup; publish/cancel set authz context before repository reads; scheduler logs all three nil-return skip reasons; doc-signoff handlers parse boundary decisions into `domain.Decision`.
-- **Persistence:** governance events now persist `occurred_at`; active-instance lookup orders by `submitted_at DESC, id DESC`; repository scan failures now include approval-instance context; cancel area snapshot scan now tolerates SQL NULL with `sql.NullString`.
+- **Persistence:** `GovernanceEvent.OccurredAt` (Go struct field) is now passed through and persisted to the `created_at` column of `governance_events` via `COALESCE($8::timestamptz, now())` (events.go:46-47; the DB column is `created_at`, not `occurred_at`); active-instance lookup orders by `submitted_at DESC, id DESC`; repository scan failures now include approval-instance context; cancel area snapshot scan now tolerates SQL NULL with `sql.NullString`.
 - **Dependencies:** none beyond existing approval/http/authz/repository surfaces.
 - **T-NNN touched:** none.
 - **R-NNN touched:** none.
@@ -99,7 +114,7 @@
 
 ## 2026-05-16 - controlled-document review route polish
 
-- **Context:** uncommitted diff: approval inbox navigation target changed from `/controlled-documents/{controlled_document_id}` to `/controlled-documents/{controlled_document_id}`.
+- **Context:** uncommitted diff: approval inbox navigation target changed from `/registry-v2/{controlled_document_id}` to `/controlled-documents/{controlled_document_id}` (commit 9f7ff693a, chore: clean active documents v2 names).
 - **Mode:** lite patch
 - **Anchors moved:** none
 - **Public surface:** none

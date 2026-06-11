@@ -1,14 +1,14 @@
 # Authz Tiers
 
-> **Last verified:** 2026-06-08 (Phase F FD-1: authz-call-present lint deleted from code_rules.go; no anchor change needed here — code_rules.go anchor was already removed)
+> **Last verified:** 2026-06-11 (adversarial-fix: tripwire anchor corrected to db/migrations/0231; View-cap enumeration corrected 4→6, added CapDocumentView + CapTemplateView) | **Prior:** 2026-06-10 (Stage-1 backend audit drift patch: capability count 27→29, line anchor :15→:88)
 > **Scope:** Two authorization tiers in MetalDocs — HTTP middleware (tier 1) vs in-transaction area check (tier 2).
 > **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam.md`.
 > **Key files:**
 > - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo`
 > - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require`
 > - `internal/modules/iam/authz/context.go:13` — `ErrActorContextMissing` / `ErrTenantContextMissing` typed errors; `MustActorID` at :21, `MustTenantID` at :34
-> - `migrations/0188_tripwire_extend.sql:18` — extended `enforce_capability_asserted()` function covering 12 tables (Plan 5); trigger attachment at lines :186–233
-> - `internal/modules/iam/domain/model.go:15` — `Capability` typed consts (27 total; ADR 0016 added `CapMetricsView`, `CapMembershipView`, `CapUserView`, `CapTaxonomyView`; Plan 5 follow-up added `CapControlledDocumentObsolete`/`CapControlledDocumentSupersede`)
+> - `db/migrations/0231_db_hardening_tripwire_and_dead_schema.sql:36` — `enforce_capability_asserted()` function covering 12 tables (Plan 5 + hardening); trigger attachment follows inline in the same migration
+> - `internal/modules/iam/domain/model.go:88` — `Capability` typed consts (29 total; ADR 0016 added `CapMetricsView`, `CapMembershipView`, `CapUserView`, `CapTaxonomyView`; Plan 5 follow-up added `CapControlledDocumentObsolete`/`CapControlledDocumentSupersede`; ADR 0022 Phase 10 minimized 33→29)
 > See ADR `wiki/decisions/0007-two-tier-authz.md` for the decision rationale.
 
 MetalDocs has **two authorization tiers**.
@@ -62,7 +62,7 @@ Source: F-001 audit (`wiki/references/qa-runs/plans-f001-f002.md`). The Tier-1 d
 1. **Never declare a write-grade cap on GET.** GET rows must point at a View-grade cap (`*.view`, `audit.read`). Write-grade caps (`*.manage`, `*.submit`, `*.create`, `*.edit`, `*.approve`, `*.publish`, `*.signoff`, `*.obsolete`, `*.supersede`, `*.review`) must NEVER appear on a GET row.
 2. **Never omit `method` on a prefix that has any write verbs.** A methodless row matches every HTTP method (rules scan top-down, first match wins) and silently shadows any per-verb intent declared elsewhere for the same prefix. Always declare per-verb rows on writable prefixes.
 3. **Every writable resource declares at least one read row and at least one write row.** The IAM users block at `permissions.go:101-116` is the canonical pattern: one `{method: GET, ..., cap: <readCap>}` plus one row per write verb with the Manage/Submit cap.
-4. **Read caps live in the registry.** Do NOT invent caps inline. If a needed View-grade cap is missing from `internal/modules/iam/domain/model.go`, STOP and file an ADR (precedent: ADR 0016). The four current View caps are `CapMetricsView`, `CapMembershipView`, `CapUserView`, `CapTaxonomyView`. A fifth — `CapRouteView` — is proposed for the approval route catalogue read path in [ADR 0018](../decisions/0018-approval-route-lifecycle.md) §6 and deferred to the F-001 follow-up.
+4. **Read caps live in the registry.** Do NOT invent caps inline. If a needed View-grade cap is missing from `internal/modules/iam/domain/model.go`, STOP and file an ADR (precedent: ADR 0016). The six current View caps are `CapDocumentView`, `CapTemplateView`, `CapTaxonomyView`, `CapMembershipView`, `CapUserView`, and `CapMetricsView` (all defined at `internal/modules/iam/domain/model.go:88–119`). A fifth — `CapRouteView` — is proposed for the approval route catalogue read path in [ADR 0018](../decisions/0018-approval-route-lifecycle.md) §6 and deferred to the F-001 follow-up.
 5. **Tier-2 read calls match Tier-1 caps.** When a repository read calls `authz.Require(ctx, tx, <cap>, "tenant")`, the cap MUST match the Tier-1 GET row's cap for the same resource. Mismatch causes a 403 inside the handler after a 200 from the middleware — silent partial denial.
 
 ## Common pitfalls

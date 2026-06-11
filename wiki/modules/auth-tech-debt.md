@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/auth.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/auth-refactor.md`.
 
-**Last verified:** 2026-05-25 (Phase 8 auth mediums)
+**Last verified:** 2026-06-11 (Stage-1 adversarial verification pass — T-004 false-open corrected; T-009 behavior + anchor corrected; T-014 line anchors corrected)
 
 ## Severity scale
 
@@ -10,11 +10,12 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 
 ## Items
 
-### T-001 · LegacyHeaderEnabled X-User-Id authn bypass
-- **Severity:** critical
-- **Surface:** `internal/modules/auth/delivery/http/middleware.go:58-61`
-- **Observation:** When `LegacyHeaderEnabled=true`, middleware accepts unauthenticated `X-User-Id` header and synthesises a current-user context with no proof of identity. Single-flag compromise grants tier-0 bypass on every protected route. Fact, not hypothetical: code path is live; only the env-var gate prevents abuse. Trigger fired: authn bypass.
-- **Evidence:** `_artifacts/02-flow-resolve-session.md` §middleware chain; `_artifacts/05-industry.md` IP-004.
+### T-001 · LegacyHeaderEnabled X-User-Id authn bypass — CLOSED 2026-06-10 (Stage-1 backend audit)
+- **Severity:** critical (closed)
+- **Surface (resolved):** `internal/modules/auth/delivery/http/middleware.go` — no `LegacyHeaderEnabled` field or `X-User-Id` branch exists; `authapp.Config` (`internal/modules/auth/application/service.go:38-50`) has no `LegacyHeaderEnabled` field. `internal/platform/authn/config.go` does not load or set this field.
+- **Observation (original):** When `LegacyHeaderEnabled=true`, middleware accepted an unauthenticated `X-User-Id` header and synthesised a current-user context with no proof of identity. Single-flag compromise granted tier-0 bypass on every protected route.
+- **Resolution:** Bypass code and config field removed in commit 554c4007d. `Middleware.Wrap` (`middleware.go:49-88`) now handles exactly two code paths: public route pass-through and cookie-based session resolution — no header bypass branch.
+- **Evidence:** `internal/modules/auth/delivery/http/middleware.go:49-88`; `internal/modules/auth/application/service.go:38-50`; `internal/platform/authn/config.go` (no `LegacyHeaderEnabled` load site).
 - **Linked backlog row:** `backlog/auth-refactor.md#R-001`
 - **Linked ADR:** missing-ADR
 
@@ -28,17 +29,18 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 
 ### T-003 · Legacy error envelope (RFC 9457 drift) — CLOSED 2026-05-12 (Plan 7)
 - **Severity:** major (closed)
-- **Surface (resolved):** `internal/modules/auth/delivery/http/handler.go:141-158` (`writeAuthError`) — every branch calls `problem.Write(w, problem.New(...))`. `handler.go:58,102,115,121,126,131` — inline error paths use `problem.Write` directly. `internal/modules/auth/delivery/http/middleware.go:66,73,76,80` — all error branches use `problem.Write`. `writeAuthError` signature also drops the `traceID` parameter (was a noop; removed in Plan 7).
+- **Surface (resolved):** `internal/modules/auth/delivery/http/handler.go:141-158` (`writeAuthError`) — every branch calls `problem.Write(w, problem.New(...))`. `handler.go:58,102,115,121,126,131` — inline error paths use `problem.Write` directly. `internal/modules/auth/delivery/http/middleware.go:66,73,76,80` — all error branches use `problem.Write`. `writeAuthError` takes no `traceID` parameter (`handler.go:165`); the parameter was removed in Plan 7 (was a noop).
 - **Observation (original):** Auth emitted `{error:{code,message,details,trace_id}}` instead of `application/problem+json`.
 - **Evidence:** `_artifacts/05-industry.md` IP-001.
 - **Linked backlog row:** `backlog/auth-refactor.md#R-003` (merged Plan 7 2026-05-11, commit `95ebedfc`)
 - **Linked ADR:** `wiki/architecture/api-design-system.md`
 
-### T-004 · CreateUser two-transaction non-atomicity
-- **Severity:** major
-- **Surface:** `internal/modules/auth/application/service.go:305,325`; `internal/modules/auth/infrastructure/postgres/repository.go:174-211`; `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:73-112`
-- **Observation:** `Service.CreateUser` calls `repo.CreateUser` (own `BeginTx` → INSERT `auth_identities` → COMMIT) then `roleAdmin.ReplaceUserRoles` (own `BeginTx` → UPSERT `iam_users`, DELETE+INSERT `iam_user_roles` → COMMIT). No outer transaction. If TX-B fails after TX-A commits, `auth_identities` row is orphaned with no role binding. Recovery is manual. Trigger fired: data-loss-adjacent path (orphan rows on partial failure).
-- **Evidence:** `_artifacts/02-flow-create-user.md` §2 transaction-boundary fact.
+### T-004 · CreateUser two-transaction non-atomicity — CLOSED 2026-05-13 (Plan 9r)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/auth/application/service.go:485-508` (shared-tx path); `internal/modules/auth/application/service.go:114-124` (interface definitions `createUserTxRepository`, `replaceUserRolesTxRepository`, `beginTxRepository`); `internal/modules/auth/infrastructure/postgres/repository.go:396` (`CreateUserTx` implementation); `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:20-21,94` (`BeginTx` + `ReplaceUserRolesTx` implementations).
+- **Observation (original):** `Service.CreateUser` called `repo.CreateUser` (own `BeginTx` → INSERT `auth_identities` → COMMIT) then `roleAdmin.ReplaceUserRoles` (own `BeginTx` → UPSERT `iam_users`, DELETE+INSERT `iam_user_roles` → COMMIT). No outer transaction. If TX-B failed after TX-A committed, `auth_identities` row was orphaned with no role binding. Recovery was manual. Trigger fired: data-loss-adjacent path (orphan rows on partial failure).
+- **Resolution:** `Service.CreateUserWithInput` (`service.go:470`) now asserts three interfaces at runtime. When all three are satisfied — `createUserTxRepository` (auth postgres repo), `replaceUserRolesTxRepository` (IAM postgres repo), and `beginTxRepository` (auth postgres repo) — a single `*sql.Tx` is opened, both `CreateUserTx` and `ReplaceUserRolesTx` execute inside it, and a single `Commit` closes it (`service.go:488-508`). Both postgres repositories implement the required interfaces, making this the canonical production path. The two-tx fallback at `service.go:511-514` is retained for test/in-memory implementations that do not satisfy the Tx interfaces.
+- **Evidence:** `internal/modules/auth/application/service.go:114-124` (interface defs); `internal/modules/auth/application/service.go:485-508` (shared-tx path); `internal/modules/auth/infrastructure/postgres/repository.go:396` (`CreateUserTx`); `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:20-21,94` (`BeginTx`, `ReplaceUserRolesTx`). Fix merged commit `58a71b5aa` 2026-05-13.
 - **Linked backlog row:** `backlog/auth-refactor.md#R-004`
 - **Linked ADR:** missing-ADR
 
@@ -75,10 +77,10 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - **Linked backlog row:** `backlog/auth-refactor.md#R-008`
 - **Linked ADR:** `wiki/architecture/tenant-context.md` (sessions portion), missing-ADR (identities portion)
 
-### T-009 · Logout swallows malformed-cookie error silently
+### T-009 · Logout cannot distinguish "no session" from "tampered cookie"
 - **Severity:** minor
-- **Surface:** `internal/modules/auth/application/service.go:198-201`
-- **Observation:** `Service.Logout` discards the error from `parseAndVerifyToken` when the cookie is malformed and returns nil. Caller cannot distinguish "no session existed" from "cookie was tampered". No log emission. Trigger fired: latent (no current caller relies on the distinction).
+- **Surface:** `internal/modules/auth/application/service.go:374-384`; `internal/modules/auth/application/service.go:736-744`
+- **Observation:** `Service.Logout` (`service.go:374-384`) calls `tokenHashFromCookieValue` (`service.go:736-744`) and propagates its error via `return err` (`service.go:381`). However, `tokenHashFromCookieValue` returns `authdomain.ErrSessionNotFound` for both a structurally malformed cookie (wrong number of parts, empty part — line 739) and an HMAC-mismatched (tampered) cookie (line 742). The error is not discarded — it is returned — but both failure modes surface as the same `ErrSessionNotFound` sentinel. The caller cannot distinguish "session never existed" from "cookie was tampered". No log emission on the tampered-cookie path. Trigger fired: latent (no current caller relies on the distinction).
 - **Evidence:** `_artifacts/02-flow-resolve-session.md` §logout sub-flow.
 - **Linked backlog row:** `backlog/auth-refactor.md#R-009`
 - **Linked ADR:** n/a
@@ -86,7 +88,7 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 ### T-010 · Missing standalone ADR for session-cookie + bcrypt + lockout policy
 - **Severity:** minor
 - **Surface:** `internal/modules/auth/application/service.go:117-126,431-432`; `internal/platform/authn/config.go:101-116`
-- **Observation:** Session-cookie format (`<base64url(rand32)>.<base64url(HMAC-SHA256(secret,token))>` with `SHA-256(token)` stored as `session_id`), `bcrypt.DefaultCost`, and per-account lockout policy are enforced by code + tests but no standalone ADR captures the choice. ADR 0007 covers tier split, not credential mechanics. Trigger fired: missing standalone ADR for an enforced rule.
+- **Observation:** Session-cookie format (`<base64url(rand32)>.<base64url(HMAC-SHA256(secret,token))>` with `SHA-256(token)` stored as `session_id`), bcrypt cost 12 (`bcryptCost = 12` at `service.go:29`), and per-account lockout policy are enforced by code + tests but no standalone ADR captures the choice. ADR 0007 covers tier split, not credential mechanics. Trigger fired: missing standalone ADR for an enforced rule.
 - **Evidence:** `_artifacts/02-flow-login.md` §token mint + verify; `_artifacts/03-deps.md` §4 config surface.
 - **Linked backlog row:** `backlog/auth-refactor.md#R-010`
 - **Linked ADR:** missing-ADR
@@ -110,9 +112,9 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 ### T-014 · FE 401 interceptor conflated session-expiry with domain-401 — CLOSED 2026-05-28 (qa/fe-401-interceptor)
 - **Severity:** major (closed)
 - **Surface:** `frontend/apps/web/src/lib/api/client.ts` (`assertApiResponse`); consumer `frontend/apps/web/src/features/auth/useAuthSession.ts`
-- **Observation (original):** `assertApiResponse` treated **every** 401 as session-expiry — it called `dispatchAuthExpired(...)` and threw `ApiError.fromLegacy("authn.expired", 401, "Sessão expirada")` **before** parsing the `application/problem+json` body, discarding the RFC 9457 `code`. Backend already discriminates: wrong current password → `AUTH_INVALID_CREDENTIALS` (`handler.go:164-165` via `writeAuthError`), genuine unauthenticated/expired session → `AUTH_UNAUTHORIZED` (`middleware.go:62,69`, `handler.go:123,136`). The FE collapse meant a wrong-current-password during forced change surfaced "Sessão expirada" instead of a credential error (found in qa/auth-password-change as F-A; the consumer-level patch there mapped bare status 401 and masked the real interceptor root). Trigger fired: contract violation with measurable consumer impact.
+- **Observation (original):** `assertApiResponse` treated **every** 401 as session-expiry — it called `dispatchAuthExpired(...)` and threw `ApiError.fromLegacy("authn.expired", 401, "Sessão expirada")` **before** parsing the `application/problem+json` body, discarding the RFC 9457 `code`. Backend already discriminates: wrong current password → `AUTH_INVALID_CREDENTIALS` (`handler.go:165` via `writeAuthError`), genuine unauthenticated/expired session → `AUTH_UNAUTHORIZED` (`middleware.go:62,69`, `handler.go:126,139`). The FE collapse meant a wrong-current-password during forced change surfaced "Sessão expirada" instead of a credential error (found in qa/auth-password-change as F-A; the consumer-level patch there mapped bare status 401 and masked the real interceptor root). Trigger fired: contract violation with measurable consumer impact.
 - **Fix:** interceptor now parses the problem first and only dispatches `authExpired` + throws `authn.expired` when `res.status === 401 && (!problem || problem.code === "AUTH_UNAUTHORIZED")`. Domain 401s keep their problem `code`. Consumers (`handleLogin`, `handleChangePassword`) map by `codeOf(err) === 'AUTH_INVALID_CREDENTIALS'` instead of bare status. Regression: `src/lib/api/client.test.ts` (3 cases), `src/features/auth/useAuthSession.test.tsx` (code-based + session-expiry fall-through). Live Preview proof: forced change w/ wrong current pw → `[role=alert]` "Senha atual incorreta.", stays on form, no logout.
-- **Evidence:** backend `internal/modules/auth/delivery/http/{handler.go:164-165,123,136, middleware.go:62,69}`; FE `src/lib/api/client.ts:33-46`.
+- **Evidence:** backend `internal/modules/auth/delivery/http/{handler.go:165` (`writeAuthError` definition), `handler.go:126,139` (`AUTH_UNAUTHORIZED` write sites in `handleMe` and `handleChangePassword`), `handler.go:168,170` (`AUTH_INVALID_CREDENTIALS` write sites inside `writeAuthError`), `middleware.go:62,69}`; FE `src/lib/api/client.ts:51-65` (`assertApiResponse` — problem parsed at line 53, session-expiry branch at lines 58-61, domain error at 63-65).
 - **Linked ADR:** `wiki/architecture/api-design-system.md` (RFC 9457); `wiki/concepts/error-ux.md`
 
 ### T-013 · Login form `noValidate` makes `required` inert (FE)

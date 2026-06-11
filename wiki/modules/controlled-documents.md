@@ -2,21 +2,21 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-06-08 (Phase F F4/FD-1: repository.go line anchors updated for cursor migration; idempotency diagram updated CheckReplay→BeginReplay/RecordReplay→CompleteReplay) | **Owner:** leandro | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-06-11 | **Owner:** leandro | **Status:** active | **Maturity:** L2
 
 > **Key files:**
-> - `internal/modules/controlleddocuments/module.go:25` - module wiring (`New`, dependencies)
-> - `internal/modules/controlleddocuments/application/service.go:104` - service `Create` (legacy literal struct identifier noted in Historical Literal Key Notes)
-> - `internal/modules/controlleddocuments/application/service.go:293` - `Obsolete` / `Supersede` via `changeStatus`
+> - `internal/modules/controlleddocuments/module.go:27` - module wiring (`New`, dependencies)
+> - `internal/modules/controlleddocuments/application/service.go:146` - service `Create` (legacy literal struct identifier noted in Historical Literal Key Notes)
+> - `internal/modules/controlleddocuments/application/service.go:451` - `Obsolete` / `Supersede` via `changeStatus`
 > - `internal/modules/controlleddocuments/delivery/http/handler.go:49` - `injectTenant` middleware (reads tenant via `tenant.FromContext`)
 > - `internal/modules/controlleddocuments/delivery/http/handler.go:61` - `tenantIDFromContext` (local context accessor)
-> - `internal/modules/controlleddocuments/delivery/http/routes.go:43` - `AtomicCreateControlledDocument` handler
-> - `internal/modules/controlleddocuments/delivery/http/routes.go:232` - `GetActiveDocument` handler (FULL OUTER JOIN)
-> - `internal/modules/controlleddocuments/delivery/http/routes.go:488` - `tenantIDFromRequest` -> `tenant.FromContext`
-> - `internal/modules/controlleddocuments/domain/document_initializer.go:30` - `DocumentInitializer` port (consumed by documents)
+> - `internal/modules/controlleddocuments/delivery/http/routes.go:70` - `AtomicCreateControlledDocument` handler
+> - `internal/modules/controlleddocuments/delivery/http/routes.go:266` - `GetActiveDocument` handler (FULL OUTER JOIN)
+> - `internal/modules/controlleddocuments/delivery/http/routes.go:595` - `tenantIDFromRequest` -> `tenant.FromContext`
+> - `internal/modules/controlleddocuments/domain/document_initializer.go:61` - `DocumentInitializer` port (consumed by documents)
 > - `internal/modules/controlleddocuments/infrastructure/repository.go:432` - `UpdateStatus` (lifecycle mutation)
-> - `migrations/0124_registry_controlled_documents.sql` - initial table (legacy literal migration filename)
-> - `migrations/0182_cd_sequence_per_area.sql` - per-area sequence (ADR 0011)
+> - `db/baseline/0001_current_schema.sql` - consolidated schema baseline (includes initial controlled-documents and per-area sequence tables; replaces legacy `migrations/0124…0183` series)
+> - `db/migrations/0210_controlled_documents_capability_namespace.sql` - capability namespace rename (post-baseline)
 
 ---
 
@@ -102,7 +102,7 @@ Controlled-documents owns the **identity** of every controlled document under QM
 ## 4. Solution Strategy
 
 - **Atomic multi-row create in a single `*sql.Tx`**          driver: ADR 0011 (eliminate orphan slot risk). Controlled-documents opens the tx, allocates the sequence, inserts the CD, calls `DocumentInitializer.CloneTemplate` (documents materializes the first revision inside the same tx), commits, then emits governance events.
-- **Controlled-documents-owned port for the cross-module call**          driver: avoid circular imports. `domain/document_initializer.go:30` defines the interface; `documents/application/cd_initializer.go` implements it; main.go injects via `WithDocumentInitializer` post-construction.
+- **Controlled-documents-owned port for the cross-module call**          driver: avoid circular imports. `domain/document_initializer.go:61` defines the interface; `documents/application/cd_initializer.go` implements it; main.go injects via `WithDocumentInitializer` post-construction.
 - **Per-(tenant, profile, area) sequence counter table**          driver: ADR 0011 (replaces single `profile_sequence_counters` keyed only on profile; no cross-area counter bleed).
 - **Shared idempotency platform on POST create + revisions**          driver: ADR 0011 (Stripe-style key replay; body-hash conflict detection).
 - **FULL OUTER JOIN for active-document lookup** - driver: E10 fix; published-only CDs must return 200 with `published_document_id` so frontend renders download link.
@@ -143,23 +143,23 @@ C4Container
 
 ### 5.2 Public surface (selected)
 
-Full list in `_artifacts/01-surface.md` (89 exported symbols). Anchors below:
+Full list in `_artifacts/01-surface.md` (92 exported symbols). Anchors below:
 
 | File | Symbol | Kind | Purpose |
 |---|---|---|---|
 | `module.go:15` | `Module`, `New` | type + ctor | DI entry; builds repo, allocator, readers, service, handler |
-| `application/service.go:31` | service struct | type | Use-case orchestrator (legacy literal struct identifier noted in Historical Literal Key Notes) |
-| `application/service.go:104` | `Create` | method | Atomic CD + first-revision create |
-| `application/service.go:279` | `PreviewCode` | method | Read-only next-code peek |
-| `application/service.go:293` | `Obsolete` / `Supersede` | method | Lifecycle transitions via `changeStatus` |
-| `application/service.go:330` | `CreateRevision` | method | New revision on existing CD |
-| `application/migration.go:13` | `BackfillLegacyDocuments` | func | Recovery-only legacy data maintenance hook |
+| `application/service.go:38` | service struct | type | Use-case orchestrator (legacy literal struct identifier noted in Historical Literal Key Notes) |
+| `application/service.go:146` | `Create` | method | Atomic CD + first-revision create |
+| `application/service.go:389` | `PreviewCode` | method | Read-only next-code peek |
+| `application/service.go:451` | `Obsolete` | method | Lifecycle transition via `changeStatus` |
+| `application/service.go:455` | `Supersede` | method | Lifecycle transition via `changeStatus` |
+| `application/service.go:584` | `CreateRevision` | method | New revision on existing CD |
 | `domain/controlled_document.go:18` | `ControlledDocument` | struct | Domain entity |
 | `domain/controlled_document.go:13-15` | `CDStatusActive/Obsolete/Superseded` | const | Status enum |
 | `domain/controlled_document.go:48` | `AutoCode` | func | Format `{profile}-{area}-{NNN}` |
-| `domain/document_initializer.go:30` | `DocumentInitializer` | iface | Cross-module port (documents implements) |
-| `domain/document_initializer.go:20` | `NewCloneTemplateRequest` | func | Validates clone-template requests before crossing the documents port |
-| `domain/document_initializer.go:38` | `NewDocumentRef` | func | Validates document handles returned by the documents port |
+| `domain/document_initializer.go:61` | `DocumentInitializer` | iface | Cross-module port (documents implements) |
+| `domain/document_initializer.go:27` | `NewCloneTemplateRequest` | func | Validates clone-template requests before crossing the documents port |
+| `domain/document_initializer.go:51` | `DocumentRef` | struct | Handle returned by the documents port after a successful atomic create |
 | `domain/sequence.go:13` | `SequenceAllocator` | iface | Counter port |
 | `domain/resolution.go:30` | `Resolve` | func | Template-version resolution (default vs override) |
 | `infrastructure/repository.go:353` | `CreateTx` | method | Insert in caller-owned tx |
@@ -172,14 +172,14 @@ All routes registered via `Handler.RegisterRoutes` (`delivery/http/handler.go:67
 
 | Method | Path | OperationID | Handler | Authz |
 |---|---|---|---|---|
-| POST | `/api/v1/controlled-documents` | `atomicCreateControlledDocument` | `routes.go:43` | create capability (tier-1 + in-tx `authz.Require`; sets `metaldocs.tenant_id`/`actor_id` before sequence/CD writes) |
-| POST | `/api/v1/controlled-documents/{id}/revisions` | `createControlledDocumentRevision` | `routes.go:148` | create capability (tier-1) |
-| GET | `/api/v1/controlled-documents/preview-code` | `previewControlledDocumentCode` | `routes.go:127` | (read; resolver mapping outside module) |
+| POST | `/api/v1/controlled-documents` | `atomicCreateControlledDocument` | `routes.go:70` | create capability (tier-1 + in-tx `authz.Require`; sets `metaldocs.tenant_id`/`actor_id` before sequence/CD writes) |
+| POST | `/api/v1/controlled-documents/{id}/revisions` | `createControlledDocumentRevision` | `routes.go:197` | create capability (tier-1) |
+| GET | `/api/v1/controlled-documents/preview-code` | `previewControlledDocumentCode` | `routes.go:172` | (read; resolver mapping outside module) |
 | GET | `/api/v1/controlled-documents` | `listControlledDocuments` | `routes.go:23` | (read) |
 | GET | `/api/v1/controlled-documents/{id}` | `getControlledDocument` | `routes.go:190` | (read) |
-| GET | `/api/v1/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:232` | (read; tenant from `tenant.FromContext` via `injectTenant` middleware) |
-| PUT | `/api/v1/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:328` | obsolete capability (legacy literal constant; see Historical Literal Key Notes)          T-001 closed Plan 5 |
-| PUT | `/api/v1/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:337` | supersede capability (legacy literal constant; see Historical Literal Key Notes)          T-001 closed Plan 5 |
+| GET | `/api/v1/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:266` | (read; tenant from `tenant.FromContext` via `injectTenant` middleware) |
+| PUT | `/api/v1/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:441` | obsolete capability (legacy literal constant; see Historical Literal Key Notes)          T-001 closed Plan 5 |
+| PUT | `/api/v1/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:455` | supersede capability (legacy literal constant; see Historical Literal Key Notes)          T-001 closed Plan 5 |
 
 ## API Route Truth Table (Plan 8 Baseline)
 
@@ -256,7 +256,7 @@ Failure modes:
 | Profile/area archived | 409 | `PROFILE_ARCHIVED` / `AREA_ARCHIVED` |
 | Override template mismatch | 409 | `TEMPLATE_PROFILE_MISMATCH` |
 | Code uniqueness violation | 409 | `CONTROLLED_DOCUMENT_CODE_TAKEN` |
-| Template/profile mismatch | 422 | `template_invalid` (`routes.go:470-471`          T-007 closed Plan 7) |
+| Template/profile mismatch | 422 | `template_invalid` (`routes.go:560-561`          T-007 closed Plan 7) |
 
 Detail: `_artifacts/02-flow-atomic-create.md`.
 
@@ -324,7 +324,7 @@ State transitions:
 | `controlled_documents` | `active` | `obsolete` | `Obsolete` op | `ErrCDNotActive` if not active | **YES          T-002 closed Plan 6a** |
 | `controlled_documents` | `active` | `superseded` | `Supersede` op | `ErrCDNotActive` if not active | **YES          T-002 closed Plan 6a** |
 
-Tripwire pairing: active          `authz.Require(<obsolete-or-supersede capability>, ...)` called inside `changeStatus` tx (`service.go:327`); `trg_require_cap_asserted` on `controlled_documents` (UPDATE, OR-logic accepts either lifecycle capability, migration 0188 line 201). T-001/T-004 closed Plan 5.
+Tripwire pairing: active          `authz.Require(<obsolete-or-supersede capability>, ...)` called inside `changeStatus` tx (`service.go:534`); `trg_require_cap_asserted` on `controlled_documents` (UPDATE, OR-logic accepts either lifecycle capability, `db/baseline/0001_current_schema.sql:3783-3786`). T-001/T-004 closed Plan 5.
 
 Detail: `_artifacts/02-flow-obsolete.md`.
 
@@ -334,8 +334,8 @@ Detail: `_artifacts/02-flow-obsolete.md`.
 
 - Binary: single Go server (`apps/api/cmd/metaldocs-api`)
 - Process: `:8081` (see [wiki/references/local-dev-startup.md](references/local-dev-startup.md))
-- Migrations: applied at startup; files at repo-root `migrations/` (7 affect controlled-documents: 0124, 0126, 0127, 0128, 0167, 0182, 0183 - see `_artifacts/04-persistence.md` section 6)
-- Legacy controlled-documents maintenance is not part of normal API startup. Use `Module.RunLegacyMaintenance` only for intentional recovery on older databases.
+- Migrations: applied at startup; historical controlled-documents schema is consolidated into `db/baseline/0001_current_schema.sql`; incremental migrations in `db/migrations/` (select post-baseline entries: `0210_controlled_documents_capability_namespace.sql`, `0225_authz_p2_document_lifecycle_grants.sql`, `0229_authz_p12_rename_document_lifecycle_caps.sql` — see `_artifacts/04-persistence.md` section 6)
+- Legacy controlled-documents maintenance (`application/migration.go`, `BackfillLegacyDocuments`) has been removed from the codebase. No legacy maintenance hook exists in the current module.
 - Environment: module reads no env vars directly (`_artifacts/03-deps.md` section 4)
 
 ---
@@ -346,12 +346,12 @@ Detail: `_artifacts/02-flow-obsolete.md`.
 
 - Tier 1 (HTTP edge): IAM `CapabilityService` resolves create capability (legacy literal constant; see Historical Literal Key Notes) for POST routes (`apps/api/cmd/metaldocs-api/permissions.go:185-186`; reseeded in `migrations/0165_role_capabilities_reseed.sql` for `editor`, `author`, `system_admin`).
 - Tier 2 (in-tx `authz.Require`): applied in `Create`/`CreateTx` (create capability) and `changeStatus` (obsolete/supersede capabilities). Plan 5 (T-001/T-004 closed).
-- Tier 3 (Postgres `enforce_capability_asserted` tripwire): `migrations/0188_tripwire_extend.sql:201-208` attaches `trg_require_cap_asserted` to `controlled_documents` (INSERT + UPDATE with OR-logic) and `cd_sequence_counters`.
+- Tier 3 (Postgres `enforce_capability_asserted` tripwire): `db/baseline/0001_current_schema.sql:3783-3786` (consolidated; migration 0188 no longer exists as a standalone file) attaches `trg_require_cap_asserted` to `controlled_documents` (INSERT + UPDATE with OR-logic) and `cd_sequence_counters` (`0001_current_schema.sql:3776-3779`).
 - See [wiki/concepts/authz-tiers.md](concepts/authz-tiers.md) and [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md).
 
 ### 8.2 Error envelope
 
-RFC 9457 `application/problem+json`. `httpresponse.WriteError` at `internal/platform/httpresponse/response.go:16-18` calls `problem.Write(w, problem.New(status, code, message))`. `ErrTemplateProfileMismatch` uses a direct `problem.Write` call at `routes.go:470-471` (422 `template_invalid`). T-003 and T-007 both closed Plan 7.
+RFC 9457 `application/problem+json`. `httpresponse.WriteError` at `internal/platform/httpresponse/response.go:16-18` calls `problem.Write(w, problem.New(status, code, message))`. `ErrTemplateProfileMismatch` uses a direct `problem.Write` call at `routes.go:560-561` (422 `template_invalid`). T-003 and T-007 both closed Plan 7.
 
 ### 8.3 Idempotency
 
@@ -379,7 +379,7 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 
 - `cd_sequence_counters.next_seq` is monotonic per (tenant, profile_code, process_area_code).
 - Code format `{PROFILE}-{AREA}-{NNN}` zero-padded to 3 digits (`domain/sequence.go` -> `AutoCode`).
-- `controlled_documents.code` immutability is enforced by the `trg_controlled_documents_code_immutable` trigger calling `reject_code_update()` (`migrations/0124_registry_controlled_documents.sql:47-59`, legacy literal migration filename).
+- `controlled_documents.code` immutability is enforced by the `trg_controlled_documents_code_immutable` trigger calling `reject_code_update()` (`db/baseline/0001_current_schema.sql:3755-3758`; historical origin in `archive/migrations/0124_registry_controlled_documents.sql`).
 
 ---
 
@@ -434,7 +434,7 @@ Top 3 (by severity, then blast-radius):
 
 ### Coverage stats
 
-- Public symbols undocumented: 79 / 90 (computed from `_artifacts/01-surface.md`; deferred to T-012)
+- Public symbols undocumented: 79 / 94 (computed from `_artifacts/01-surface.md`; deferred to T-012; `application/migration.go` and `BackfillLegacyDocuments` removed — file no longer exists)
 - Operations missing C4 placement: 0 / 8
 - Cross-deps missing in section 5/section 8: 0 / 13 (IN-edges) + 0 / 6 (OUT-edges)
 - State transitions missing in section 6: 0 / 2 (Obsolete, Supersede both in section 6.3; Create in section 6.1)
@@ -459,7 +459,7 @@ Top 3 (by severity, then blast-radius):
 
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
-| Postgres unavailable mid atomic-create | Tx aborts; no CD row, no first revision — caller sees 500 | `application/service.go:104` `Create` rolls back the whole tx | Per ADR 0011: atomic guarantee — no orphan slots possible by design |
+| Postgres unavailable mid atomic-create | Tx aborts; no CD row, no first revision — caller sees 500 | `application/service.go:146` `Create` rolls back the whole tx | Per ADR 0011: atomic guarantee — no orphan slots possible by design |
 | Sequence counter collision (concurrent create on same `(tenant, profile, area)`) | One side wins via `NextAndIncrement`; loser retries | `infrastructure/repository.go:559` uses `SELECT … FOR UPDATE` or `UPDATE … RETURNING` | Caller retries with fresh `Idempotency-Key`; race is bounded |
 | Idempotency replay (`Idempotency-Key` header reused) | 201 with stored response; no duplicate CD/document | `platform/idempotency.Require` middleware | Expected; safe network-retry path |
 | Body-hash mismatch on replay | 409 from idempotency middleware | Idempotency store detects payload change | Caller must use a fresh key for a different payload |
@@ -468,7 +468,7 @@ Top 3 (by severity, then blast-radius):
 | `DocumentInitializer.CloneTemplate` fails inside tx | Whole atomic create rolls back; no CD; caller sees 500 | Cross-module port returns err; tx rollback | Investigate documents-module clone error; replay with same idempotency key |
 | Obsolete/Supersede emit no audit event | Audit trail missing lifecycle entry | T-002 (registry-legacy critical) — known gap | Wire `auditdomain.Writer.Record` on `changeStatus` |
 | Active-document lookup returns nothing for published-only CD | Frontend cannot render download link | Before E10 fix: missing row; now mitigated by FULL OUTER JOIN in `getActiveDocument` | Regression test on published-only CDs |
-| Sequence counter not initialized for new `(profile, area)` | First create on a pair must call `EnsureCounter` | `service.go:104` ensures counter before `NextAndIncrement` | Self-healing — counter row created lazily |
+| Sequence counter not initialized for new `(profile, area)` | First create on a pair must call `EnsureCounter` | `service.go:146` ensures counter before `NextAndIncrement` | Self-healing — counter row created lazily |
 | Cross-module governance log lag | Governance event for create lands after CD row | Logger writes post-commit (taxonomy `DBGovernanceLogger`) | Replay outbox if event missing; T-008 tracks dual-sink coupling |
 
 ## Cross-links

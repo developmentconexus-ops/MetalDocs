@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/approval.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/approval-refactor.md`.
 
-**Last verified:** 2026-06-02 (Approval route admin PR-5 — pure wiki/backlog sync: composite tech-debt row T-015 registered closing FE-1..FE-20 + C-2 + BE-3..BE-12 across PR-1..PR-4; BE-1 marked resolved under T-002 (route-admin OpenAPI coverage shipped PR-1, signoff/cancel doc-scoped routes still pending); BE-9 explicitly carried over to F-001 follow-up (Tier-1 `route.view` split / `CapRouteView`); backlog row `R-RouteAdmin-Rewrite` added; bugs-audit K2 flipped `wont-fix` → `fixed`; approval module summary risks tally recomputed. Prior PR-4 verification preserved below.
+**Last verified:** 2026-06-11 (anchor-correction pass at HEAD `d3f5dc62b` — T-001 `MapErrorToResponse` corrected to `:83`, T-005 `ListInboxItems`/`CountPendingForActor` corrected to `:237`/`:326`, T-006 cancel GUC `set_config` call corrected to `:124-126`; no logic changes). Prior: 2026-06-02 (Approval route admin PR-5 — pure wiki/backlog sync: composite tech-debt row T-015 registered closing FE-1..FE-20 + C-2 + BE-3..BE-12 across PR-1..PR-4; BE-1 marked resolved under T-002 (route-admin OpenAPI coverage shipped PR-1, signoff/cancel doc-scoped routes still pending); BE-9 explicitly carried over to F-001 follow-up (Tier-1 `route.view` split / `CapRouteView`); backlog row `R-RouteAdmin-Rewrite` added; bugs-audit K2 flipped `wont-fix` → `fixed`; approval module summary risks tally recomputed. Prior PR-4 verification preserved below.
 
 **Prior verification — 2026-06-02 (PR-4):** Approval route admin PR-4 — FE rewrite of `RouteAdminPage` on canonical patterns closes the legacy FE scan items FE-1..FE-20 + C-2: TanStack Query for reads, optimistic+rollback mutations on writes; thin `routeAdminApi.ts` consumes `components['schemas']` codegen; native `<dialog>` primitive at `components/ui/Dialog.tsx` (no `@radix-ui` dep); stage rows keyed by stable uuid; `useAreasQuery` replaces silent `fetchAreas().catch(()=>{})`; 412/409/422/403 mapped to distinct PT-BR copy via `messageForRouteError`; status badge visually distinct; cause-based edit-disabled tooltip; role select fed by `useIamRolesQuery` (ADR 0018 Option B fallback); legacy `getJSON` + 4 route fns + 9 route-admin DTOs deleted; `ControlledDocumentDetailPanel.tsx` migrated to `routeAdminApi.listRoutes` + `RouteSummary`. FE-side debt rows to be authored in PR-5 will reference this PR. Prior PR-2 verification preserved below.
 
@@ -16,17 +16,17 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 
 ### T-001 · RFC 9457 envelope absent across approval HTTP surface — CLOSED 2026-05-12 (Plan 7)
 - **Severity:** critical (closed)
-- **Surface (resolved):** `internal/modules/documents/approval/http/errors.go:23` (`MapErrorToResponse`) returns `*problem.Problem`; `:136-141` (`WriteError`) calls `problem.Write(w, prob)`. `internal/modules/documents/approval/http/contracts/errors.go` — emptied to `package contracts` (error sentinels remain in `errors.go`). Frontend `frontend/apps/web/src/features/approval/api/mutationClient.ts:55-66` — `parseProblem(res.clone())` is now tried first in all non-2xx branches; legacy `{error:{code,message}}` fallback retained for incremental rollout.
+- **Surface (resolved):** `internal/modules/documents/approval/http/errors.go:83` (`MapErrorToResponse`) returns `*problem.Problem`; `:257-271` (`WriteError`) calls `problem.Write(w, prob)` at line 268. `internal/modules/documents/approval/http/contracts/errors.go` — emptied to `package contracts` (error sentinels remain in `errors.go`). Frontend `frontend/apps/web/src/features/approval/api/mutationClient.ts:55-66` — `parseProblem(res.clone())` is now tried first in all non-2xx branches; legacy `{error:{code,message}}` fallback retained for incremental rollout.
 - **Observation (original):** All non-2xx responses returned legacy `{error:{code,message,details,trace_id}}` envelope. Frontend `ApprovalError` parsed the legacy shape; switching server-side required a coordinated frontend update.
-- **Evidence:** `_artifacts/02-flow-inbox.md` §5; `_artifacts/02-flow-signoff.md` §5; `_artifacts/05-industry.md` IP-001 row.
+- **Evidence:** `wiki/modules/approval/_artifacts/02-flow-inbox.md` §5; `wiki/modules/approval/_artifacts/02-flow-signoff.md` §5; `wiki/modules/approval/_artifacts/05-industry.md` IP-001 row.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-001` (merged Plan 7 2026-05-11, commit `b8747d6a` + `c4f5535f`)
 - **Linked ADR:** `wiki/architecture/api-design-system.md`
 
-### T-002 · Signoff & cancel document-scoped routes absent from OpenAPI
-- **Severity:** critical
-- **Surface:** `api/openapi/spec2.yaml` (no entry for `POST /api/v1/documents/{id}/signoff`, `/signoffs`, `/cancel`); routes wired manually in `internal/modules/documents/approval/http/router.go:6-30`
-- **Observation:** Per Phase 2 trace, `SignoffByDocumentHandler`, `CancelByDocumentHandler`, and several v2 doc-action POSTs have no OpenAPI operationId or response schema. Frontend cannot codegen types; `ApprovalError` and `signoffOutcome` shapes are hand-maintained. Contract drift downstream consumers rely on.
-- **Evidence:** `_artifacts/02-flow-signoff.md` §1+§5; `_artifacts/02-flow-submit.md` §5; surface scan §3.
+### T-002 · Signoff & cancel document-scoped routes absent from OpenAPI — PARTIALLY RESOLVED
+- **Severity:** critical (partially resolved — see sub-item progress)
+- **Surface:** `api/openapi/v1/openapi.yaml` (routes wired manually in `internal/modules/documents/approval/http/router.go:6-30`); `POST /api/v1/documents/{id}/signoff` and `POST /api/v1/documents/{id}/cancel` are now present in the spec (verified in `api/openapi/v1/openapi.yaml:3428-3470`).
+- **Observation:** Original finding was that `SignoffByDocumentHandler`, `CancelByDocumentHandler`, and several v2 doc-action POSTs had no OpenAPI operationId or response schema. The document-scoped signoff and cancel routes (`/documents/{id}/signoff`, `/documents/{id}/cancel`) have since been added to `api/openapi/v1/openapi.yaml`. The `/documents/{id}/signoffs` list route and remaining v2 doc-action endpoints may still lack full schema coverage; FE codegen types should be verified after any further additions.
+- **Evidence:** `wiki/modules/approval/_artifacts/02-flow-signoff.md` §1+§5; `wiki/modules/approval/_artifacts/02-flow-submit.md` §5; surface scan §3.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-002`
 - **Linked ADR:** missing-ADR
 - **Sub-item progress 2026-06-02:** BE-1 (route-admin `/api/v1/approval/routes` × 4 absent from OpenAPI) — **resolved** by PR-1 (commit `f57d5525e`). Component schemas `CreateRouteRequest`, `UpdateRouteRequest`, `DeactivateRouteRequest`, `RouteResponse`, `ListRoutesResponse`, `RouteSummary`, `StageRequest`, `StageSummary`, `QuorumKind`, `DriftPolicy` shipped; `api.gen.go` + FE `lib/api-types/index.d.ts` regenerated. T-002 stays open for the remaining signoff/cancel/v2 doc-action POSTs called out above.
@@ -35,38 +35,38 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Severity:** major (closed)
 - **Surface (resolved):** `internal/modules/documents/approval/http/errors.go:82-84` — `domain.ErrNoActiveStage` now has an explicit `errors.Is` branch: 409 `state.instance_completed`. The substring fallback (`looksLikeValidationError` at `:127`) is retained for genuine validation strings but is no longer the path for `ErrNoActiveStage`.
 - **Observation (original):** `domain.ErrNoActiveStage` ("no active stage in this approval instance") did not match the substring classifier → 500 `internal.unknown` instead of the correct 409. E4 finding from prior stub.
-- **Evidence:** prior stub `wiki/modules/approval.md` §E4; `_artifacts/02-flow-inbox.md` §5.
+- **Evidence:** prior stub `wiki/modules/approval.md` §E4; `wiki/modules/approval/_artifacts/02-flow-inbox.md` §5.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-003` (merged Plan 7 2026-05-11, commit `b8747d6a`)
 - **Linked ADR:** missing-ADR
 
 ### T-004 · Deprecated post-commit PDF dispatcher path still compiled
 - **Severity:** major
 - **Surface:** `internal/modules/documents/approval/application/decision_service.go:43,60` (`NewDecisionService` accepts `PDFDispatchInvoker`; `WithPDFOutbox` overlays optional outbox); `internal/modules/render/fanout/pdf_dispatcher.go:27`
-- **Observation:** When a caller constructs `DecisionService` without `WithPDFOutbox`, the legacy post-commit `PDFDispatchInvoker.Dispatch` path runs. That path emits `messaging.Event` with empty `IdempotencyKey`; if the messaging bus dedupes by `IdempotencyKey`, dispatches after the first one are silently dropped. Composition root `apps/api/cmd/metaldocs-api/main.go:313` does wire `WithPDFOutbox(pdfOutboxRepo)`, so live binary uses the outbox path — but the deprecated surface remains constructible (test fixtures, future callers).
-- **Evidence:** prior stub "Outbox idempotency_key bug"; cross-deps artifact §3 main.go:313.
+- **Observation:** When a caller constructs `DecisionService` without `WithPDFOutbox`, the legacy post-commit `PDFDispatchInvoker.Dispatch` path runs. That path emits `messaging.Event` with empty `IdempotencyKey`; if the messaging bus dedupes by `IdempotencyKey`, dispatches after the first one are silently dropped. Composition root `apps/api/cmd/metaldocs-api/main.go:494-497` does wire `WithPDFOutbox(pdfOutboxRepo)`, so live binary uses the outbox path — but the deprecated surface remains constructible (test fixtures, future callers).
+- **Evidence:** prior stub "Outbox idempotency_key bug"; cross-deps artifact §3 `apps/api/cmd/metaldocs-api/main.go:494-497`.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-004`
 - **Linked ADR:** missing-ADR
 
 ### T-005 · Inbox uses two-query `LIMIT/OFFSET + COUNT` with snapshot drift
 - **Severity:** major
-- **Surface:** `internal/modules/documents/approval/application/read_service.go:153` (`ListInboxItems`) + `:224` (`CountPendingForActor`)
+- **Surface:** `internal/modules/documents/approval/application/read_service.go:237` (`ListInboxItems`) + `:326` (`CountPendingForActor`)
 - **Observation:** Both SELECTs use raw `db.QueryContext`, no enclosing tx. A signoff committed between the two queries can produce `Total < len(Items) + 1` or vice versa. Pagination via `LIMIT/OFFSET` only — no cursor (IP-003 drift). Same shape as documents list per `wiki/architecture/data-model.md` "two-query LIMIT/OFFSET+COUNT pattern".
-- **Evidence:** `_artifacts/02-flow-inbox.md` §2 + §6; `_artifacts/05-industry.md` IP-003 not-applicable row.
+- **Evidence:** `wiki/modules/approval/_artifacts/02-flow-inbox.md` §2 + §6; `wiki/modules/approval/_artifacts/05-industry.md` IP-003 not-applicable row.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-005`
 - **Linked ADR:** missing-ADR
 
 ### T-006 · Tripwire pairing audit not extended to cancel & cutover service paths
 - **Severity:** major
-- **Surface:** `internal/modules/documents/approval/application/cancel_service.go:47` (`CancelInstance` writes `metaldocs.cancel_in_progress` but pairing with `authz.Require` on the cancel call site not verified by Phase 4 audit); `internal/modules/documents/approval/application/cutover_service.go:39`
-- **Observation:** Phase 4 statement-local audit (`_artifacts/04-persistence.md` §6) flagged 3 FAIL rows on `InsertInstance` / `InsertSignoff` / `UpdateInstanceStatus` — these are repository methods called from `submit_service`/`decision_service`/`obsolete_service` where `authz.Require` does precede in the calling function (service-call-graph pairing OK). Not audited: cancel and cutover service call sites. Defense-in-depth gap if either path skips `authz.Require`.
-- **Evidence:** `_artifacts/04-persistence.md` §6 (statement-local FAILs); cross-deps §1 (cancel_service.go:12 imports `authz`).
+- **Surface:** `internal/modules/documents/approval/application/cancel_service.go:124-126` (`cancelInstance` writes `metaldocs.cancel_in_progress` via `set_config` but pairing with `authz.Require` on the cancel call site not verified by Phase 4 audit); `internal/modules/documents/approval/application/cutover_service.go:39`
+- **Observation:** Phase 4 statement-local audit (`wiki/modules/approval/_artifacts/04-persistence.md` §6) flagged 3 FAIL rows on `InsertInstance` / `InsertSignoff` / `UpdateInstanceStatus` — these are repository methods called from `submit_service`/`decision_service`/`obsolete_service` where `authz.Require` does precede in the calling function (service-call-graph pairing OK). Not audited: cancel and cutover service call sites. Defense-in-depth gap if either path skips `authz.Require`.
+- **Evidence:** `wiki/modules/approval/_artifacts/04-persistence.md` §6 (statement-local FAILs); cross-deps §1 (cancel_service.go:12 imports `authz`).
 - **Linked backlog row:** `backlog/approval-refactor.md#R-006`
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md` (covers tier-2 model)
 - **Resolution sync 2026-05-25:** CLOSED by 5c High hardening. `cancel_service.go` now sets authz/RLS context before instance load, requires `workflow.instance.cancel` for user cancels, keeps system bypass behind `SystemCancelInstance`, tenant-scopes stage cancellation through `approval_instances`, and checks cancel event `json.Marshal` errors. `cutover_service.go` now counts legacy statuses inside a transaction with `authz.BypassSystem`, so RLS cannot hide rows during preflight. Verified with `go test ./internal/modules/documents/approval/application ./internal/modules/documents/approval/repository -count=1`.
 
-### T-007 · `infra/signature/` vs `infrastructure/` package naming inconsistency
+### T-007 · `infrastructure/signature/` vs `infrastructure/` package naming inconsistency
 - **Severity:** minor
-- **Surface:** `internal/modules/documents/approval/infra/signature/` (signature providers) vs `internal/modules/documents/approval/infrastructure/` (signoff idempotency store)
+- **Surface:** `internal/modules/documents/approval/infrastructure/signature/` (signature providers) vs `internal/modules/documents/approval/infrastructure/` (signoff idempotency store)
 - **Observation:** Two adjacent package directories with near-identical purpose (infrastructure adapters) but different names. Forces consumers to memorise which adapter lives where.
 - **Evidence:** surface scan §1 (file tree).
 - **Linked backlog row:** `backlog/approval-refactor.md#R-007`
@@ -100,7 +100,7 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Severity:** minor
 - **Surface:** `internal/modules/documents/approval/application/membership_tx.go:22` and `internal/modules/documents/approval/application/authz_guc.go:11`
 - **Observation:** Two helpers set `metaldocs.tenant_id` + `metaldocs.actor_id` on the tx. `setAuthzGUC` is the call used by both `submit_service` and `decision_service`; `WithMembershipContext` predates it and is now only referenced internally. Risk: future caller picks the wrong helper.
-- **Evidence:** surface scan §2; `_artifacts/02-flow-signoff.md` step 9.
+- **Evidence:** surface scan §2; `wiki/modules/approval/_artifacts/02-flow-signoff.md` step 9.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-011`
 - **Linked ADR:** missing-ADR
 
@@ -114,7 +114,7 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 
 ### T-013 · Signoff content-pin canonicalization drift — CLOSED 2026-06-01
 - **Severity:** critical (closed)
-- **Surface (resolved):** `internal/modules/documents/approval/application/decision_service.go:162-176` — signoff now loads the content hash via the same COALESCE used by `/api/v1/controlled-documents/{cd}/active-document` (`internal/modules/controlleddocuments/delivery/http/routes.go:320-343`): `documents.content_hash_at_submit` with fallback to the latest `document_revisions.content_hash`. Compared against the FE-echoed `content_hash` body field; persisted as `approval_signoffs.content_hash`.
+- **Surface (resolved):** `internal/modules/documents/approval/application/decision_service.go:223-246` (`RecordSignoff` — content-pin block) — signoff now loads the content hash via the same COALESCE used by `/api/v1/controlled-documents/{cd}/active-document` (`internal/modules/controlleddocuments/delivery/http/routes.go:320-343`): `documents.content_hash_at_submit` with fallback to the latest `document_revisions.content_hash`. Helper function `loadActiveDocumentContentHash` defined at `:733-758`. Compared against the FE-echoed `content_hash` body field; persisted as `approval_signoffs.content_hash`.
 - **Observation (original):** `RecordSignoff` recomputed a content hash with three diverging knobs vs the value the FE received from the active-document endpoint: `DocumentID=req.InstanceID` (was instance id, not document id), `RevisionNumber=0` (vs submit's actual revision), and `FormData=loadCurrentDocumentFormData(...)` (vs the revision-time form snapshot the FE saw). Every `POST /api/v1/documents/{id}/signoff` returned 412 `precondition.content_hash_mismatch` — approvals fully blocked past the submit stage. The two stale comments at `decision_service.go:168-170` ("keyed on instance for signoff hashing" / "signoff hash does not embed revision") were drift, not a documented requirement (no ADR; original commit `911e61f344` adds them without rationale).
 - **Resolution:** Replaced the recompute with a direct lookup of the same value `active-document` exposes; deleted the now-unused `loadCurrentDocumentFormData` helper. Persisted `approval_signoffs.content_hash` now equals the revision hash the FE pinned to, which is the semantically correct value for the regulated audit trail. Hardened per ultrareview: `loadActiveDocumentContentHash` now returns `ErrContentHashMismatch` when the row is missing (`sql.ErrNoRows`) or the COALESCE resolves NULL (no `content_hash_at_submit` and no revisions), and `RecordSignoff` rejects a request that omits `_content_hash` entirely — closing the defense-in-depth bypass for programmatic callers that skip the HTTP boundary's 64-hex validation.
 - **Evidence:** Live chain `create → submit → signoff (approver) → approved` verified `2026-06-01`; instance `8ec1c370-bcfc-4f7f-b5e8-8d697dd2150c` reached `approved` (first iteration), then `a296dd2f-840c-4f7e-9c9e-58409c4cf503` reached `approved` (post-hardening) with `outcome=approved` HTTP 200. Signoff persisted with hash `ba20ff68…` matching `document_revisions.content_hash`. Unit suite `go test ./internal/modules/documents/approval/... -count=1` green after hardening.
@@ -126,7 +126,7 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Surface:** `internal/modules/iam/application/authorization.go` (DELETED Plan 4 — iam T-003 closed; approval never imported it)
 - **Observation:** iam `AuthorizationService` was deleted in Plan 4 (2026-05-11). Approval module enforces SoD via its own pure-domain `domain/sod.go:15` `CheckSoD` and never consumed the iam service. No adoption path needed; cross-module pointer moot. T-012 closed.
 - **Resolution:** Deletion confirmed via Plan 4 commit b17a09e8. No approval-side change required.
-- **Evidence:** `_artifacts/00-context.md` Decision A.
+- **Evidence:** `wiki/modules/approval/_artifacts/00-context.md` Decision A.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-012` (merged)
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md`
 

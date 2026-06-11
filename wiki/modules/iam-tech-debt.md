@@ -2,7 +2,7 @@
 
 > Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
-**Last verified:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: T-004 resolved-surface line numbers updated to reflect new file layout after `ListByTenant` insertion)
+**Last verified:** 2026-06-11 (adversarial re-verification: T-001 surface corrected to past-tense history of deleted file; T-004 iam_users INSERT line numbers corrected to :51/:57; T-005 observation corrected to past tense matching closed status; artifact 01-surface.md stale-row warning added) | **Prior:** 2026-06-11 (adversarial anchor correction: T-004/T-005/T-007/T-008 line numbers corrected to match actual source — that pass missed the T-001 deleted-file citation and T-005 present-tense false claim) | **Prior:** 2026-06-10 (Stage-1 backend audit drift patch — no debt row changes; capability/role counts corrected in iam.md §5.2 + §12) | **Prior:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: T-004 resolved-surface line numbers updated to reflect new file layout after `ListByTenant` insertion)
 
 ### T-PR7B-1 · CRITICAL — cross-tenant ATO via `handleResetPassword` — CLOSED 2026-06-02
 - **Severity:** critical (closed)
@@ -80,9 +80,9 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 
 ### T-001 · Dual capability namespaces — CLOSED 2026-05-11 (Plan 4)
 - **Severity:** critical (closed)
-- **Surface:** `internal/modules/iam/domain/capabilities.go:4-19` (16 string consts `CapDocView`, `CapDocCreate`, …) and `internal/modules/iam/domain/model.go:16-20` (5 typed `Capability` consts `CapDocumentView`, `CapDocumentCreate`, `CapDocumentEdit`, `CapWorkflowReview`, `CapWorkflowApprove`)
-- **Observation:** Two parallel capability namespaces exist with overlapping semantics. `domain/capabilities.go` defines `doc.view` / `doc.create` / `doc.edit`; `domain/model.go` defines `document.view` / `document.create` / `document.edit` plus `workflow.review` / `workflow.approve`. The `role_capabilities` DB table (migration 0165) seeds the `doc.*` / `template.*` / `registry.*` (legacy literal capability namespace for controlled-documents) / `taxonomy.*` / `membership.*` / `route.*` / `user.*` namespace from `capabilities.go`. The typed `Capability` constants from `model.go` are imported by `internal/modules/documents/application/fillin_authz.go:9` and `apps/api/internal/wiring/documents.go:7`.
-- **Evidence:** `_artifacts/01-surface.md` rows 120-152; `_artifacts/03-deps.md` §2 (documents importers).
+- **Surface (at time of closure):** `internal/modules/iam/domain/capabilities.go:4-19` (16 untyped string consts `CapDocView`, `CapDocCreate`, … — **file deleted by commit 3a227642e**) and `internal/modules/iam/domain/model.go:88-122` (typed `Capability` consts `CapDocumentView`, `CapDocumentCreate`, `CapDocumentEdit`, `CapWorkflowReview`, `CapWorkflowApprove` and 24 more — file retained, consts consolidated here by closure commit)
+- **Observation (historical):** Two parallel capability namespaces existed with overlapping semantics. `domain/capabilities.go` defined `doc.view` / `doc.create` / `doc.edit` as bare `string` consts; `domain/model.go` defined `document.view` / `document.create` / `document.edit` plus `workflow.review` / `workflow.approve` as typed `Capability` consts. The `role_capabilities` DB table (migration 0165) seeded the `doc.*` / `template.*` / `registry.*` / `taxonomy.*` / `membership.*` / `route.*` / `user.*` namespace from `capabilities.go`. The typed `Capability` constants from `model.go` were imported by `internal/modules/documents/application/fillin_authz.go:9` and `apps/api/internal/wiring/documents.go:7`. Plan 4 (commit 3a227642e) deleted `capabilities.go` and consolidated all capability consts into the typed namespace in `model.go`.
+- **Evidence:** `_artifacts/03-deps.md` §2 (documents importers). Note: `_artifacts/01-surface.md` rows 124-139 still list `capabilities.go` consts from before closure — those rows are stale and should be removed in the next artifact refresh; the file no longer exists.
 - **Linked backlog row:** `backlog/iam-refactor.md#R-001`
 - **Linked ADR:** missing-ADR (no decision recording why two namespaces coexist)
 - **Consumer cross-ref:** `wiki/modules/documents-tech-debt.md#t-008` — documents module straddles both namespaces; closure here unblocks documents R-008
@@ -105,8 +105,8 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 
 ### T-004 · IAM mutations have neither tier-2 nor tripwire enforcement — PARTIALLY CLOSED 2026-05-11 (Plan 5)
 - **Severity:** major → **partially resolved** (residual: `iam_users` INSERT still tier-1 only)
-- **Surface (resolved):** `infrastructure/postgres/role_admin_repository.go:34,76` (`UpsertUserAndAssignRole` at `:40`, `ReplaceUserRoles` at `:82` now call `authz.Require(CapUserManage)`); `infrastructure/postgres/user_area_repository.go:89,141,185` (`Insert` at `:100`, `CloseActive` at `:152`, `GrantAtomic` at `:196` now call `authz.Require(CapMembershipManage)`). `migrations/0188_tripwire_extend.sql` attaches `trg_require_cap_asserted` to `metaldocs.iam_user_roles` (line 187) and `metaldocs.user_process_areas` (line 192).
-- **Surface (residual):** `iam_users` INSERT inside `UpsertUserAndAssignRole` (`role_admin_repository.go:50`) and `ReplaceUserRoles` (`:92`) is still not explicitly guarded at tier-2 on the `iam_users` table itself (no separate tripwire trigger on `metaldocs.iam_users`). The capability check on the enclosing tx covers it functionally, but DB-layer enforcement is absent.
+- **Surface (resolved):** `infrastructure/postgres/role_admin_repository.go:37,82` (`UpsertUserAndAssignRole` at `:47`, `ReplaceUserRoles` at `:99` now call `authz.Require(CapUserManage)`); `infrastructure/postgres/user_area_repository.go:177,232,277` (`Insert` at `:191`, `CloseActive` at `:244`, `GrantAtomic` at `:299` now call `authz.Require(CapMembershipManage)`). `migrations/0188_tripwire_extend.sql` attaches `trg_require_cap_asserted` to `metaldocs.iam_user_roles` (line 187) and `metaldocs.user_process_areas` (line 192).
+- **Surface (residual):** `iam_users` INSERT inside `UpsertUserAndAssignRole` (`role_admin_repository.go:51`, `ExecContext` at `:57`) and `ReplaceUserRoles` (`:94`) is still not explicitly guarded at tier-2 on the `iam_users` table itself (no separate tripwire trigger on `metaldocs.iam_users`). The capability check on the enclosing tx covers it functionally, but DB-layer enforcement is absent.
 - **Observation (original):** All IAM-owned mutating tables (`iam_user_roles`, `user_process_areas`, `iam_users`) were guarded by tier-1 middleware only. `authz.Require(...)` was called by none of these repository methods. The Postgres tripwire `enforce_capability_asserted` was attached to `public.approval_instances` and `public.approval_signoffs` only (`migrations/0142b_role_capabilities_v2_enforce.sql:200-209`), not to any IAM-owned table. The defense-in-depth pattern (IP-004 in `references/industry-patterns-index.md`) was therefore single-layer for IAM admin writes.
 - **Evidence:** `_artifacts/04-persistence.md` §3, §5; `_artifacts/05-industry.md` §IP-004.
 - **Linked backlog row:** `backlog/iam-refactor.md#R-004`
@@ -115,8 +115,8 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 ### T-005 · Admin role upsert does not emit audit events — CLOSED 2026-05-11 (Plan 6a)
 - **Severity:** critical (closed)
 - **Severity rationale:** triggers Critical rubric — "regulated audit-trail gap: a mutation on an ISO 9001 / QMS / regulated path is not written to the audit sink." Role assignment is the privileged op an external auditor inspects first; absence from the trail is a compliance break, not a service degradation.
-- **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:319` (`handleUserRoleUpsert`) and `:454` (`recordAudit`)
-- **Observation:** `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) does not call `recordAudit` between request validation and response (artifact 02-flow-upsert-user-role §6). The audit sink is wired (`auditdomain.Writer` passed into `NewAdminHandler` at `main.go:182`; sink impl at `internal/modules/audit/infrastructure/postgres/writer.go:20`). Other admin ops do call `recordAudit`; this one does not.
+- **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:298` (`handleUserRoleUpsert`) and `:390` (`recordAudit`)
+- **Observation (historical):** `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) did not call `recordAudit` after a successful role upsert. The audit sink was wired (`auditdomain.Writer` passed into `NewAdminHandler`; sink impl at `internal/modules/audit/infrastructure/postgres/writer.go:20`). Other admin ops called `recordAudit`; this one did not. Plan 6a (commit f27529e8) fixed this: `admin_handler.go:340` now calls `h.recordAudit(r, userID, "iam.user.role.upserted", ...)` after `writeJSON` returns.
 - **Evidence:** `_artifacts/02-flow-upsert-user-role.md` §6; `_artifacts/03-deps.md` §1 (audit OUT edge).
 - **Linked backlog row:** `backlog/iam-refactor.md#R-005`
 - **Linked ADR:** missing-ADR (audit-emission policy not formalised)
@@ -131,7 +131,7 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 
 ### T-007 · `MembershipGovernanceLogger` wired with `nil` in production
 - **Severity:** major
-- **Surface:** `apps/api/cmd/metaldocs-api/main.go:217` (`NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), nil)`); consumer at `internal/modules/iam/application/area_membership_service.go:79,101`
+- **Surface:** `apps/api/cmd/metaldocs-api/main.go:325` (`NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), nil)`); consumer at `internal/modules/iam/application/area_membership_service.go:79,101`
 - **Observation:** The second argument to `NewAreaMembershipService` is the `MembershipGovernanceLogger`. In production wiring it is `nil`. The service nil-checks before calling (`area_membership_service.go:79`), so grant/revoke produce no governance log. For the SECURITY DEFINER path (`area_membership/area_membership.go`), governance events ARE written by the SQL function itself (artifact 04 §5 note). The two write paths therefore emit different governance trails.
 - **Evidence:** main.go:217 (verified by main agent read); artifact 02-flow-grant-membership §6.
 - **Linked backlog row:** `backlog/iam-refactor.md#R-007`
@@ -139,7 +139,7 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 
 ### T-008 · `CachedRoleProvider` not invalidated on group membership writes
 - **Severity:** minor
-- **Surface:** `internal/modules/iam/application/cached_role_provider.go:65` (`InvalidateUser`); admin write site `application/admin_service.go:42`
+- **Surface:** `internal/modules/iam/application/cached_role_provider.go:90` (`InvalidateUserTenant`); admin write site `application/admin_service.go:49`
 - **Observation:** `CachedRoleProvider.RolesByUserID` is invalidated after `AdminService.UpsertUserAndAssignRole` and `ReplaceUserRoles`. There is no admin route or service method that mutates `iam_group_members` / `iam_group_roles` in the IAM module today, so no live invalidation gap exists. If such routes are added, group changes will not invalidate the role cache. Recorded as latent debt.
 - **Evidence:** `_artifacts/01-surface.md` rows for `CachedRoleProvider`; `_artifacts/03-deps.md` (no group-write site).
 - **Linked backlog row:** `backlog/iam-refactor.md#R-008`

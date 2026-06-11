@@ -1,6 +1,6 @@
 # Security Signals (rule-based, v1)
 
-**Last verified:** 2026-06-02 (PR-7 backend implementation).
+**Last verified:** 2026-06-08 — snake_case casing big-bang Phase E1 (commit aa7ef0416); touched `service.go` and `handler.go` (field renames only, no logic change).
 **Owner:** Admin Center Sessions & Security tab.
 **Source of truth:**
 - Service: [`internal/modules/security/application/service.go`](../../internal/modules/security/application/service.go)
@@ -65,9 +65,21 @@ Severity vocabulary matches the OpenAPI `SecuritySignalSeverity` enum:
 ## Tenant isolation invariants
 
 - Every SQL query takes `tenantID` as the FIRST positional parameter.
-- Joins between `auth_sessions` / `iam_user_roles` and `iam_users` are bound
-  on **both** `(user_id, tenant_id)` — a `user_id` collision across tenants
-  cannot leak.
+- Two distinct join patterns are in use:
+  - **`(user_id, tenant_id)` dual-column join** — used by `auth_sessions`,
+    `iam_user_roles`, and `audit_events`. Both columns appear in the `ON`
+    clause so a `user_id` collision across tenants cannot leak
+    (`repository.go:195-197`, `repository.go:253-254`).
+  - **Single-column `user_id` join via `iam_users`** — used by
+    `auth_identities`, which has no `tenant_id` column. The three queries that
+    touch it (`ListLockouts`, `CountRecentFailedLoginsByUser`,
+    `CountRecentLockouts`) join on `u.user_id = i.user_id` and then scope with
+    `WHERE u.tenant_id = $1::uuid` on the `iam_users` side
+    (`repository.go:84-97`, `repository.go:141-145`, `repository.go:171-175`).
+    The inline comment at `repository.go:83-86` documents this pattern
+    explicitly. The isolation guarantee is equivalent — cross-tenant leak
+    requires a collision of both `user_id` AND the `iam_users.tenant_id` filter
+    — but the mechanism differs from the dual-column join tables.
 - Unit tests in
   [`internal/modules/security/application/service_test.go`](../../internal/modules/security/application/service_test.go)
   verify "tenant A's signals are invisible to tenant B".

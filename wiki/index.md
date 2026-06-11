@@ -18,6 +18,7 @@
 ## Canonical domains
 
 - [architecture/index.md](architecture/index.md) - system architecture, API contract rules, platform boundaries
+- [backend/index.md](backend/index.md) - backend detail layer: binary map, repo topology, HTTP kernel, domain modules, platform packages, contract surface, flows, and legacy register (Stage-1 audit)
 - [modules/index.md](modules/index.md) - per-module living docs, tech-debt registers, maturity state
 - [database/index.md](database/index.md) - schema ownership, dictionary, migration policy, reference data
 - [standards/index.md](standards/index.md) - engineering and documentation standards

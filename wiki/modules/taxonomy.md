@@ -1,24 +1,27 @@
-# Module: taxonomy
+﻿# Module: taxonomy
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-07 (Phase C dead-path prune: `permissions.go` taxonomy block shifted from :158-180 to :165-181 after 8 phantom rows removed; prior: 2026-06-01) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-07 (commit `108439f42` — Phase C surface-prune stamp refresh) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/taxonomy/domain/family.go:8` â€” `DocumentFamily` aggregate
 > - `internal/modules/taxonomy/domain/profile.go:8` â€” `DocumentProfile` aggregate
 > - `internal/modules/taxonomy/domain/area.go:8` â€” `ProcessArea` aggregate
 > - `internal/modules/taxonomy/domain/port.go:1` â€” repository ports + `GovernanceEvent`
-> - `internal/modules/taxonomy/application/family_service.go:11` â€” `FamilyService` (constructor takes no govLogger)
-> - `internal/modules/taxonomy/application/profile_service.go:14` â€” `ProfileService` (panics if govLogger nil; Create/Update do not call it)
-> - `internal/modules/taxonomy/application/area_service.go:14` â€” `AreaService` (Archive logs; Create/Update do not)
-> - `internal/modules/taxonomy/delivery/http/handler.go:51-68` â€” 16 routes mounted on raw `net/http.ServeMux`
-> - `internal/modules/taxonomy/delivery/http/routes_profiles.go:230-231` â€” `tenantIDFromRequest` (delegates to `tenant.FromContext`; Plan 3 removed header trust)
-> - `internal/modules/taxonomy/infrastructure/repository.go:102` â€” `ProfileRepository.Create` (now in tx + `authz.Require(CapTaxonomyManage)` â€” Plan 5 wired)
-> - `internal/modules/taxonomy/infrastructure/family_repository.go:91-99` â€” `HasActiveProfiles` (no tenant predicate; TOCTOU race with `Update`)
+> - `internal/modules/taxonomy/application/family_service.go:13-19` â€” `FamilyService` (struct has `govLogger domain.GovernanceLogger`; `NewFamilyService` takes `govLogger` param; Create/Update/Deactivate all call `s.govLogger.Log` â€” T-004 closed)
+> - `internal/modules/taxonomy/application/profile_service.go:16-20` â€” `ProfileService` (panics if govLogger nil; Create `:70` and Update `:96` both call `s.govLogger.Log` â€” T-005 closed)
+> - `internal/modules/taxonomy/application/area_service.go:13-17` â€” `AreaService` (Create `:59` and Update `:98` both call `s.govLogger.Log`; Archive also emits â€” T-005 closed)
+> - `internal/modules/taxonomy/delivery/http/handler.go:42-51` â€” `RegisterRoutes` calls `taxonomyapi.HandlerWithOptions`; routes mounted via oapi-codegen generated router (T-009 closed)
+> - `internal/modules/taxonomy/delivery/http/routes_profiles.go:255-257` â€” `tenantIDFromRequest` (delegates to `tenant.FromContext`; Plan 3 removed header trust)
+> - `internal/modules/taxonomy/infrastructure/repository.go:152` â€” `ProfileRepository.Create` (now in tx + `authz.Require(CapTaxonomyManage)` at `:162` â€” Plan 5 wired)
+> - `internal/modules/taxonomy/infrastructure/family_repository.go:218-240` â€” `HasActiveProfilesTx` (takes `tenantID string`; WHERE `tenant_id=$1 AND family_code=$2` â€” tenant predicate present; T-007 TOCTOU resolved: `Deactivate` now uses `GetByCodeForUpdate` + `HasActiveProfilesTx` inside a single tx)
 > - `apps/api/cmd/metaldocs-api/permissions.go:165-181` — path-prefix capability dispatcher (taxonomy profiles/areas/families; F-001 split applied)
-> - `apps/api/cmd/metaldocs-api/main.go:197-201,225,508-524` â€” module wiring + standalone `ProfileRepository` + `profileDefaultsAdapter` for documents
-> - `migrations/0023_init_document_family_and_profile_registry.sql` Â· `0025_init_document_taxonomy.sql` Â· `0122_taxonomy_extend_document_profiles.sql` Â· `0123_taxonomy_extend_process_areas.sql` Â· `0161_grant_families_write_privileges.sql` Â· `0175_documents_area_name_snapshot.sql`
+> - `apps/api/cmd/metaldocs-api/main.go:314-315,358,412,908-924` â€” module wiring (`buildTaxonomyModule` call `:314-315`) + standalone `ProfileRepository` (`:358`) + `profileDefaultsAdapter` use (`:412`) + type definition (`:908-924`)
+> - `db/baseline/0001_current_schema.sql:1028-1034` — `document_families` table definition
+> - `db/baseline/0001_current_schema.sql:1056-1069` — `document_process_areas` table definition
+> - `db/baseline/0001_current_schema.sql:1121-1138` — `document_profiles` table definition
+> - `db/baseline/0001_current_schema.sql:3678-3716` — code-immutability triggers + `trg_require_cap_asserted` on all 3 taxonomy tables
 
 ---
 
@@ -29,9 +32,9 @@
 ### 1.1 Requirements overview
 
 - **Catalog CRUD** with code immutability post-create (CHECK + trigger on profile/area; handler-overwrite on family).
-- **Per-tenant scoping for profiles + areas** â€” `tenant_id UUID NOT NULL DEFAULT DevTenantID` (`0122:4-6`, `0123:3-5`).
-- **Global family catalog** â€” `document_families` has no `tenant_id` (`0023:1-7`); shared across tenants (no ADR; see T-002).
-- **Soft-archive** for profiles + areas via `archived_at TIMESTAMPTZ NULL` (`0122:13`, `0123:8`).
+- **Per-tenant scoping for profiles + areas** â€” `tenant_id UUID NOT NULL DEFAULT DevTenantID` (`db/baseline/0001_current_schema.sql:1062`, `:1130` â€” added in the curated baseline, no discrete forward migration).
+- **Global family catalog** â€” `document_families` has no `tenant_id` (`db/baseline/0001_current_schema.sql:1028-1034`); shared across tenants (no ADR; see T-002).
+- **Soft-archive** for profiles + areas via `archived_at TIMESTAMPTZ NULL` (`db/baseline/0001_current_schema.sql:1066`, `:1134` â€” part of the curated baseline).
 - **Area hierarchy** â€” self-FK `(tenant_id, parent_code) â†’ (tenant_id, code)` with application-layer cycle detection (`area_service.go:SetParent` â†’ `ListAncestors`).
 - **Capability gate** — tier-1 only: `taxonomy.manage` for writes, `taxonomy.view` for reads (`permissions.go:165-181`; F-001 split applied).
 
@@ -40,8 +43,8 @@
 | Rank | Goal | How verified |
 |---|---|---|
 | 1 | **Multi-tenant isolation** of profiles + areas | per-tenant unique `(tenant_id, code)` indexes; **FAILS** â€” tenant_id sourced from client header without verification (T-001); families have no tenant scoping at all (T-002) |
-| 2 | **Regulated-mutation traceability** | govLogger emits to `governance_events` on selected ops â€” **PARTIAL**: `FamilyService` has no govLogger field; `ProfileService.Create/Update` and `AreaService.Create/Update` do not emit (T-004, T-005) |
-| 3 | **Code immutability post-create** | DB trigger `trg_document_profiles_code_immutable` (`0122:33-39`) + `trg_process_areas_code_immutable` (`0123:33-37`) + `trg_reject_families_code_update` (migration 0188, Plan 5 â€” T-013 closed) â€” PASSES for all 3 entities |
+| 2 | **Regulated-mutation traceability** | govLogger emits to `governance_events` / `audit_events` on all regulated ops â€” **PASSES** for Create/Update/Deactivate on all three services (T-004 closed commit `115cb635`; T-005 closed commit `20bf2067`); archive paths also emit |
+| 3 | **Code immutability post-create** | DB trigger `trg_document_profiles_code_immutable` (`db/baseline/0001_current_schema.sql:3681`) + `trg_process_areas_code_immutable` (`:3688`) + `trg_reject_families_code_update` (`:3695`) â€” all three in the curated baseline; T-013 closed â€” PASSES for all 3 entities |
 
 ### 1.3 Stakeholders
 
@@ -57,10 +60,10 @@
 ## 2. Architecture Constraints
 
 - Language / runtime: Go 1.25
-- Persistence: Postgres; 3 owned tables in schema `metaldocs` (forward-only migrations, `0023`/`0025` base + `0122`/`0123` tenant-extension)
-- HTTP routing: raw `net/http.ServeMux` (`handler.go:51-68`). **No OpenAPI spec**, no oapi-codegen â€” divergence from ADR 0012 (T-009)
+- Persistence: Postgres; 3 owned tables in schema `metaldocs` (all 3 tables delivered in the curated baseline `db/baseline/0001_current_schema.sql`; no discrete forward migrations for the core taxonomy schema; forward migrations start at 0203)
+- HTTP routing: oapi-codegen generated router; `handler.go:42-51` calls `taxonomyapi.HandlerWithOptions`; spec lives at `internal/modules/taxonomy/api/` (`api.gen.go`, `cfg.yaml`, `gen.go`); `routes_generated.go:10` has compile-time `ServerInterface` assertion (T-009 closed)
 - Error envelope: **RFC 9457** `application/problem+json` via `writeError = httpresponse.WriteError` alias (`routes_profiles.go:19`) which cascades to `problem.Write` â€” T-008 closed Plan 7
-- Authz: tier-1 path-prefix dispatcher (T-003 PATCH bypass closed Plan 5); **Plan 5 wired `authz.Require(CapTaxonomyManage)` in `FamilyRepository.Create/Update`, `ProfileRepository.Create/Update`, `AreaRepository.Create/Update`; tripwire on all 3 tables via migration 0188 (T-006 partially closed)**; archive/deactivate paths still tier-1 only
+- Authz: tier-1 path-prefix dispatcher (T-003 PATCH bypass closed Plan 5); **Plan 5 wired `authz.Require(CapTaxonomyManage)` in `FamilyRepository.Create/Update`, `ProfileRepository.Create/Update`, `AreaRepository.Create/Update`; tripwire on all 3 taxonomy tables via `trg_require_cap_asserted` (`db/baseline/0001_current_schema.sql:3699-3716`; T-006 partially closed)**; archive/deactivate paths still tier-1 only
 - Tenant scoping: application-layer only via `tenant.FromContext` (Plan 3 replaced `X-Tenant-ID` header reads; no `set_local_tenant_id` GUC anywhere in `internal/`)
 
 ---
@@ -95,7 +98,7 @@ A QMS admin needs a stable catalog so every controlled document carries a profil
 ### 3.2 Technical Context
 
 Inbound interfaces (Go):
-- `taxonomyapp.NewDBGovernanceLogger(db)` â€” reused by `registry/module.go:31` (legacy literal code path) to write to `governance_events` from outside the module.
+- `taxonomyapp.NewDBGovernanceLogger(db)` â€” reused by `internal/modules/controlleddocuments/module.go:12,37` (controlled-documents module) as a fallback when no `AuditWriter` is injected; primary path uses `NewAuditGovernanceAdapter`.
 - `taxonomydomain.{DocumentProfile, ProcessArea, GovernanceEvent, GovernanceLogger, sentinel errors}` â€” consumed by legacy literal code paths `registry/application/service.go:13`, `registry/delivery/http/routes.go:17`, `registry/infrastructure/repository.go:15`.
 - `taxonomyinfra.NewProfileRepository(db)` â€” constructed standalone in `main.go:225` for `profileDefaultsAdapter`.
 - `taxonomyinfra.NewTemplateVersionChecker(db)` â€” joins to `templates_template{_version}` for `IsPublished` (`template_version_checker.go:14-17`).
@@ -111,11 +114,11 @@ Outbound interfaces:
 ## 4. Solution Strategy
 
 - **Per-aggregate repository + service split.** Each of the 3 entities has its own service + repository pair. Driver: simplicity; cost: govLogger wired inconsistently (FamilyService omits it â€” T-004).
-- **DB-level code immutability for profile + area + family.** Triggers `trg_document_profiles_code_immutable` (`0122:33-39`) and `trg_process_areas_code_immutable` (`0123:33-37`) raise on `NEW.code <> OLD.code`. Family immutability added by migration 0188 via `trg_reject_families_code_update` (Plan 5, T-013 closed). Handler still overwrites body `code` with path param as an additional guard.
-- **Tenant scoping on profile + area only; families are global.** `0122:4-6` and `0123:3-5` add `tenant_id`. `document_families` has no `tenant_id` (`0023:1-7`). No ADR justifies the asymmetry (T-002).
+- **DB-level code immutability for profile + area + family.** Triggers `trg_document_profiles_code_immutable` (`db/baseline/0001_current_schema.sql:3681`) and `trg_process_areas_code_immutable` (`:3688`) raise on `NEW.code <> OLD.code` via `public.reject_code_update()` (`:805-816`). Family immutability enforced by `trg_reject_families_code_update` (`:3695`) via `public.reject_families_code_update()` (`:823-834`); all triggers are in the curated baseline (Plan 5, T-013 closed). Handler still overwrites body `code` with path param as an additional guard.
+- **Tenant scoping on profile + area only; families are global.** `tenant_id` is present on `document_process_areas` (`db/baseline/0001_current_schema.sql:1062`) and `document_profiles` (`:1130`) but absent from `document_families` (`:1028-1034`); the asymmetry is baked into the curated baseline with no discrete migration history. No ADR justifies it (T-002).
 - **Application-layer cycle prevention for area parents.** `AreaService.SetParent` walks `ListAncestors` to reject cycles. Self-FK is structural; acyclicity is application-only.
-- **Two-tier authz now wired for Create/Update paths (Plan 5).** `authz.Require(CapTaxonomyManage)` in FamilyRepository + ProfileRepository + AreaRepository write methods; tripwire on all 3 taxonomy tables (migration 0188). PATCH dispatcher bypass fixed (T-003). Archive/deactivate + FamilyService govLogger gap remain (T-004, T-005, T-006 partial).
-- **Raw `net/http.ServeMux` routes.** No OpenAPI spec, no codegen. Driver: pre-dates contract-first migration (ADR 0012). Cost: client codegen cannot bind taxonomy methods (T-009).
+- **Two-tier authz now wired for Create/Update paths (Plan 5).** `authz.Require(CapTaxonomyManage)` in FamilyRepository + ProfileRepository + AreaRepository write methods; `trg_require_cap_asserted` on all 3 taxonomy tables (`db/baseline/0001_current_schema.sql:3699-3716`). PATCH dispatcher bypass fixed (T-003). Archive/deactivate + FamilyService govLogger gap remain (T-004, T-005, T-006 partial).
+- **oapi-codegen generated router.** `internal/modules/taxonomy/api/` ships `api.gen.go` + `cfg.yaml`; `handler.go:42-51` mounts via `taxonomyapi.HandlerWithOptions`; compile-time `ServerInterface` assertion at `routes_generated.go:10`. T-009 closed.
 
 ---
 
@@ -154,15 +157,15 @@ C4Container
 | `domain/area.go` | `ErrAreaNotFound Â· ErrAreaArchived Â· ErrAreaCodeImmutable Â· ErrAreaParentCycle` | sentinels | |
 | `domain/port.go` | `FamilyRepository Â· ProfileRepository Â· AreaRepository Â· TemplateVersionChecker Â· GovernanceLogger` | ifaces | repository ports |
 | `domain/port.go` | `GovernanceEvent` | struct | governance log row (`ActorID, EntityType, EntityCode, Action, BeforeJSON, AfterJSON, OccurredAt`) |
-| `application/family_service.go:11` | `FamilyService` | struct | List Â· Get Â· Create Â· Update Â· Deactivate (no govLogger) |
-| `application/profile_service.go:14` | `ProfileService` | struct | List Â· Get Â· Create Â· Update Â· Archive Â· SetDefaultTemplate (Archive + SetDefaultTemplate emit) |
-| `application/area_service.go:14` | `AreaService` | struct | List Â· Get Â· Create Â· Update Â· Archive Â· SetParent (Archive emits; cycle check via `ListAncestors`) |
-| `application/governance.go` | `NewDBGovernanceLogger` | func | re-exported by controlled-documents (legacy literal code path: `registry/module.go:31`) |
-| `infrastructure/family_repository.go:11` | `FamilyRepository` | struct | `*sql.DB`-backed; no tx; `HasActiveProfiles` cross-tenant SELECT |
+| `application/family_service.go:13-19` | `FamilyService` | struct | List Â· Get Â· Create Â· Update Â· Deactivate; all mutating methods call `s.govLogger.Log` (T-004 closed) |
+| `application/profile_service.go:16-20` | `ProfileService` | struct | List Â· Get Â· Create Â· Update Â· Archive Â· SetDefaultTemplate; Create `:70`, Update `:96`, Archive, SetDefaultTemplate all emit govLogger events (T-005 closed) |
+| `application/area_service.go:13-17` | `AreaService` | struct | List Â· Get Â· Create Â· Update Â· Archive Â· SetParent; Create `:59`, Update `:98`, Archive, SetParent all emit govLogger events (T-005 closed); cycle check via `ListAncestors` |
+| `application/governance.go` | `NewDBGovernanceLogger` | func | reused by `internal/modules/controlleddocuments/module.go:37` as fallback when no `AuditWriter` injected |
+| `infrastructure/family_repository.go:11` | `FamilyRepository` | struct | `*sql.DB`-backed; `HasActiveProfilesTx` takes `tenantID` + wraps in tx (T-007 resolved) |
 | `infrastructure/repository.go:14,180` | `ProfileRepository Â· AreaRepository` | structs | `*sql.DB`-backed; no tx |
 | `infrastructure/template_version_checker.go:11` | `TemplateVersionChecker` | struct | READ join: `_template + _template_version` |
-| `delivery/http/handler.go:15` | `Handler` | struct | HTTP wrapper |
-| `delivery/http/handler.go:51-68` | `Handler.RegisterRoutes` | method | mounts 16 routes |
+| `delivery/http/handler.go:36-40` | `Handler` | struct | HTTP wrapper |
+| `delivery/http/handler.go:42-51` | `Handler.RegisterRoutes` | method | mounts 16 routes via `taxonomyapi.HandlerWithOptions` |
 | `module.go:11` | `Module Â· Dependencies` | struct | composition root |
 
 (Phase 1 surface scan: 80 exported symbols total â€” all without Go doc comments; tracked as T-014.)
@@ -261,7 +264,7 @@ sequenceDiagram
     H-->>C: 201 {DocumentProfile} | 4xx legacy envelope
 ```
 
-Trust chain: client header â†’ SQL `tenant_id` value. No verification that the authenticated user belongs to the named tenant (T-001). No govLogger emission on Create (T-005). See `_artifacts/02-flow-create-profile.md`.
+Trust chain: client header â†’ SQL `tenant_id` value. No verification that the authenticated user belongs to the named tenant (T-001). `ProfileService.Create` emits a govLogger event at `profile_service.go:70` (T-005 closed). See `_artifacts/02-flow-create-profile.md`.
 
 ### 6.3 deactivateFamily â€” state transition
 
@@ -275,20 +278,21 @@ sequenceDiagram
     participant DB as Postgres
     C->>H: DELETE /api/v1/taxonomy/families/{code}
     H->>S: Deactivate(ctx, code)
-    S->>R: GetByCode(ctx, code)
-    R->>DB: SELECT FROM document_families
-    DB-->>R: family
+    S->>R: BeginTx(ctx)
+    R-->>S: tx
+    S->>R: GetByCodeForUpdate(ctx, tx, code)
+    R->>DB: SELECT ... FOR UPDATE FROM document_families WHERE code=$1
+    DB-->>R: family (row locked)
     R-->>S: DocumentFamily
-    S->>R: HasActiveProfiles(ctx, code)
-    R->>DB: SELECT EXISTS FROM document_profiles WHERE family_code=$1 AND archived_at IS NULL
-    Note over R,DB: NO tenant predicate â€” scans every tenant's profiles
+    S->>R: HasActiveProfilesTx(ctx, tx, tenantID, code)
+    R->>DB: SELECT EXISTS FROM document_profiles WHERE tenant_id=$1 AND family_code=$2 AND archived_at IS NULL
     DB-->>R: bool
     R-->>S: bool
     S->>S: (*DocumentFamily).Deactivate
-    S->>R: Update(ctx, family)
+    S->>R: UpdateTx(ctx, tx, family)
     R->>DB: UPDATE document_families SET is_active=FALSE WHERE code=$4
-    Note over S,DB: NO tx Â· NO row lock Â· TOCTOU race window (T-007)
     DB-->>R: ok
+    S->>R: tx.Commit()
     R-->>S: nil
     S-->>H: nil
     H-->>C: 204
@@ -298,7 +302,7 @@ sequenceDiagram
 |---|---|---|---|
 | `is_active=TRUE` | `is_active=FALSE` | `DELETE /families/{code}` + no active profiles | `taxonomy.manage` |
 
-`FamilyService` has no govLogger field â€” no governance event emitted on this regulated mutation (T-004). See `_artifacts/02-flow-deactivate-family.md`.
+`FamilyService.Deactivate` uses `BeginTx` + `GetByCodeForUpdate` (FOR UPDATE) + `HasActiveProfilesTx` (same tx, tenant-scoped) + `UpdateTx` + Commit (T-007 resolved). `govLogger.Log` called post-commit (T-004 closed). See `_artifacts/02-flow-deactivate-family.md`.
 
 Failure modes â€” reference `wiki/concepts/error-ux.md`:
 
@@ -317,7 +321,7 @@ Failure modes â€” reference `wiki/concepts/error-ux.md`:
 
 - Binary: single Go server (`apps/api/cmd/metaldocs-api`)
 - Process: one container, port `:8081`
-- Migrations: forward-only; 19 migrations touch taxonomy tables (see `_artifacts/04-persistence.md` Â§6)
+- Schema: all 3 taxonomy tables are defined in the curated baseline (`db/baseline/0001_current_schema.sql`); there are no discrete forward migrations for the core taxonomy schema. Forward migrations start at 0203 and currently do not extend taxonomy tables (see `_artifacts/04-persistence.md` Â§6)
 - Environment: **no taxonomy-specific env vars or config keys** (Phase 3 Â§4); tenant scoping is header-driven, not config-driven; `DevTenantID` is a compile-time constant (`internal/platform/tenant/const.go:1-4`)
 
 ---
@@ -327,13 +331,13 @@ Failure modes â€” reference `wiki/concepts/error-ux.md`:
 ### 8.1 Authentication & Authorization
 - **Tier 1 (HTTP edge):** path-prefix dispatcher (`apps/api/cmd/metaldocs-api/permissions.go:165-181`). Profiles branch matches GET + POST/PATCH/PUT/DELETE. Areas branch matches GET + POST/PUT/DELETE. Families branch matches GET + POST/PATCH/PUT/DELETE (T-003 closed Plan 5 — PATCH added; F-001 split: GET→CapTaxonomyView, writes→CapTaxonomyManage).
 - **Tier 2 (in-tx):** `authz.Require(CapTaxonomyManage)` wired in `FamilyRepository.Create` (`:77`) / `Update` (`:96`); `ProfileRepository.Create` / `Update`; `AreaRepository.Create` / `Update`. Archive/deactivate paths still tier-1 only (T-006 partial). `internal/modules/iam/authz` import now present in taxonomy infrastructure.
-- **Postgres tripwire:** `migrations/0188_tripwire_extend.sql:211-224` attaches `trg_require_cap_asserted` to `document_profiles`, `document_process_areas`, `document_families`.
+- **Postgres tripwire:** `trg_require_cap_asserted` is attached to `document_families` (`db/baseline/0001_current_schema.sql:3699-3702`), `document_process_areas` (`:3706-3709`), and `document_profiles` (`:3713-3716`). The trigger body is `public.enforce_capability_asserted()` (`:36-163` in migration `0231_db_hardening_tripwire_and_dead_schema.sql`, mirrored in the baseline). The file `migrations/0188_tripwire_extend.sql` does not exist; this anchor was false.
 - See `wiki/decisions/0007-two-tier-authz.md` â€” taxonomy partially conformant as of Plan 5 (T-006 partially closed).
 
 ### 8.2 Tenant scoping
-- Tenant now sourced from `tenant.FromContext` (`routes_profiles.go:230-231`). Plan 3 replaced the `X-Tenant-ID` header reads; `tenant.DevTenantID` is no longer a fallback at this layer â€” if context lacks a tenant, `ErrTenantMissing` returns 500. T-001 (header trust) is resolved; see `taxonomy-tech-debt.md` T-001.
+- Tenant now sourced from `tenant.FromContext` (`routes_profiles.go:255-257`). Plan 3 replaced the `X-Tenant-ID` header reads; `tenant.DevTenantID` is no longer a fallback at this layer â€” if context lacks a tenant, `ErrTenantMissing` returns 500. T-001 (header trust) is resolved; see `taxonomy-tech-debt.md` T-001.
 - `document_families` has no `tenant_id` â€” globally shared across tenants. Mutation blast radius extends to every tenant's UI/controlled-documents surface (legacy literal module id: `registry`) (T-002).
-- No DB-level tenant predicate guard: `HasActiveProfiles` scans across all tenants (T-007 cross-tenant probe surface).
+- `HasActiveProfilesTx` (called from `FamilyService.Deactivate`) includes `WHERE tenant_id=$1` predicate; cross-tenant scan concern from T-007 resolved.
 
 ### 8.3 Error envelope
 - RFC 9457 `application/problem+json` via `writeError` package alias at `routes_profiles.go:19` (`var writeError = httpresponse.WriteError`). `httpresponse.WriteError` at `internal/platform/httpresponse/response.go:16-18` delegates to `problem.Write`. No direct taxonomy handler changes were required â€” T-008 closed via cascade (Plan 7, commit `11589032` + test fix `f0bb64c0`).
@@ -349,16 +353,18 @@ Failure modes â€” reference `wiki/concepts/error-ux.md`:
 - No trace-id propagation; no metrics.
 
 ### 8.7 Concurrency / Transactions
-- Repositories hold `*sql.DB`, not `*sql.Tx`. No service-layer tx boundary. `FamilyService.Deactivate` runs `GetByCode` + `HasActiveProfiles` + `Update` as three discrete connections â€” TOCTOU race window (T-007).
-- `ProfileService.Create` similarly: pre-INSERT lookup + INSERT on separate connections. `ProfileRepository.Create` also calls `TemplateVersionChecker` outside any tx.
+- `FamilyService.Deactivate` uses a single tx: `BeginTx` â†' `GetByCodeForUpdate` (SELECT FOR UPDATE) â†' `HasActiveProfilesTx` (tenant-scoped, same tx) â†' `UpdateTx` â†' Commit (`family_service.go:124-179`). T-007 resolved.
+- `FamilyService.Update` likewise uses `BeginTx` + `GetByCodeForUpdate` + `UpdateTx` (`family_service.go:67-122`).
+- `ProfileService.Create` / `Update` operate outside a tx; `ProfileRepository.Create` / `Update` each wrap authz GUC + their own single-statement tx. `TemplateVersionChecker` in `SetDefaultTemplate` is checked inside a tx (`profile_service.go:110-165`).
+- `AreaService.Update` operates outside an enclosing service-layer tx; no `FOR UPDATE` on the Get preceding the Update.
 
 ### 8.8 Code immutability
-- Profile + area: DB-enforced via `reject_code_update()` function + BEFORE-UPDATE trigger (`0122:25-39`, `0123:23-37`).
-- Family: DB-enforced by `trg_reject_families_code_update` trigger (migration 0188, Plan 5 â€” T-013 closed). Handler also overwrites body `code` with path-param `code` as a defense-in-depth layer.
+- Profile + area: DB-enforced via `public.reject_code_update()` (`db/baseline/0001_current_schema.sql:805-816`) + BEFORE-UPDATE trigger `trg_document_profiles_code_immutable` (`:3681`) and `trg_process_areas_code_immutable` (`:3688`) — all in the curated baseline.
+- Family: DB-enforced by `trg_reject_families_code_update` (`db/baseline/0001_current_schema.sql:3695`) via `public.reject_families_code_update()` (`:823-834`) â€” both in the curated baseline (Plan 5, T-013 closed). Handler also overwrites body `code` with path-param `code` as a defense-in-depth layer.
 
 ### 8.9 Cross-module data contracts
 - `document_profiles.code` + `process_areas.code` â†’ CD code prefix (`{profile}-{area}-{seq}`) in legacy literal code path `registry/domain/controlled_document.go:48`.
-- `document_profiles.default_template_version_id` â†’ documents wizard via `profileDefaultsAdapter` (`main.go:508-524`).
+- `document_profiles.default_template_version_id` â†’ documents wizard via `profileDefaultsAdapter` (`main.go:908-924` type definition; use at `main.go:412`).
 - `process_areas.name` â†’ snapshotted live by documents (`internal/modules/documents/repository/repository.go:94-101`) into `documents.area_name_snapshot`.
 - `document_profiles.family_code` â†’ FK to `document_families.code`.
 
@@ -375,7 +381,7 @@ Failure modes â€” reference `wiki/concepts/error-ux.md`:
 | Application-layer cycle prevention on area parents | `tech-debt: missing-ADR` (T-016) |
 | Same `*sql.DB` (no tx) across three repositories | `tech-debt: missing-ADR` (T-007 sub-bullet) |
 | `DBGovernanceLogger` as a module-local audit sink parallel to `audit.Writer` | `tech-debt: missing-ADR` (T-004 sub-bullet) |
-| Raw `http.ServeMux` instead of oapi-codegen | `tech-debt: missing-ADR` (T-009) |
+| oapi-codegen generated router (migrated from raw ServeMux) | `tech-debt: T-009 closed` |
 
 ---
 
@@ -385,11 +391,11 @@ Failure modes â€” reference `wiki/concepts/error-ux.md`:
 |---|---|---|---|
 | Multi-tenant isolation | Authn'd user in tenant A POSTs `/profiles` with forged `X-Tenant-ID` header | 403; no insert | **PASSES** after Plan 3 â€” header stripped by auth middleware; tenant from session (`tenant.FromContext`) |
 | Authz on regulated mutations | Authn'd user without `taxonomy.manage` PATCHes `/families/{code}` | 403 | **PASSES** â€” PATCH added to dispatcher Plan 5 (T-003 closed) |
-| Regulated-mutation traceability | `Create`/`Update`/`Deactivate` on family/profile/area emits a governance event | grep shows â‰¥1 govLogger call per mutating service method | **FAILS** â€” FamilyService has no govLogger; Profile/Area Create + Update do not emit (T-004, T-005) |
-| Code immutability | Direct UPDATE to `document_profiles.code` raises | trigger fires | PASSES (`0122:33-39`) |
-| Family code immutability | Direct UPDATE to `document_families.code` raises | trigger fires | **PASSES** â€” `trg_reject_families_code_update` added migration 0188 Plan 5 (T-013 closed) |
-| Concurrency on Deactivate | Concurrent INSERT into `_profiles` during Deactivate cannot bypass `HasActiveProfiles` | row lock or single tx | **FAILS** â€” no tx, no lock (T-007) |
-| Migration discipline | Schema changes appended forward-only | grep migrations | PASSES (19 sequential migrations; IP-006 conformant) |
+| Regulated-mutation traceability | `Create`/`Update`/`Deactivate` on family/profile/area emits a governance event | grep shows â‰¥1 govLogger call per mutating service method | **PASSES** â€” all three services emit on every mutating path (T-004 closed commit `115cb635`; T-005 closed commit `20bf2067`) |
+| Code immutability | Direct UPDATE to `document_profiles.code` raises | trigger fires | PASSES (`db/baseline/0001_current_schema.sql:3681` — `trg_document_profiles_code_immutable`) |
+| Family code immutability | Direct UPDATE to `document_families.code` raises | trigger fires | **PASSES** â€” `trg_reject_families_code_update` (`db/baseline/0001_current_schema.sql:3695`) in curated baseline, Plan 5 (T-013 closed) |
+| Concurrency on Deactivate | Concurrent INSERT into `_profiles` during Deactivate cannot bypass `HasActiveProfiles` | row lock or single tx | **PASSES** â€” `BeginTx` + `GetByCodeForUpdate` (FOR UPDATE) + `HasActiveProfilesTx` (same tx) + `UpdateTx` + Commit (`family_service.go:124-179`); T-007 resolved |
+| Migration discipline | Schema changes appended forward-only | grep migrations | PASSES (core taxonomy schema is in the curated baseline; forward migrations 0203+ append non-taxonomy changes; IP-006 conformant) |
 | `(tenant_id, code)` uniqueness | Two profiles with same code in same tenant rejected | unique index | PASSES (`ux_document_profiles_tenant_code`) |
 
 ---
@@ -406,7 +412,7 @@ Top 3 (by severity, then by blast-radius):
 
 1. **Tenant header trust removed (Plan 3)** â€” `tenantIDFromRequest` now calls `tenant.FromContext`; `X-Tenant-ID` header is stripped by auth middleware before reaching taxonomy handlers. T-001 resolved. Residual: no GUC-based row-level isolation (T-006 partial).
 2. **`document_families` is globally shared with no ADR** â€” any caller with `taxonomy.manage` (held by `qms_admin` + `system_admin` in any tenant) mutates a row visible to every tenant. Cross-tenant blast on a regulated catalog. See tech-debt T-002. Still open.
-3. **Plan 5 closures** â€” T-003 (PATCH dispatcher bypass fixed in `permissions.go`); T-006 partially closed (Create/Update paths now have `authz.Require` + DB tripwire on all 3 taxonomy tables); T-013 (families code immutability trigger added, migration 0188).
+3. **Plan 5/6a closures** â€” T-003 (PATCH dispatcher bypass fixed); T-004 (FamilyService govLogger wired, commit `115cb635`); T-005 (Profile/Area Create+Update emit, commit `20bf2067`); T-006 partially closed (Create/Update paths have `authz.Require` + DB tripwire on all 3 taxonomy tables); T-007 (Deactivate tx + FOR UPDATE + tenant-scoped HasActiveProfilesTx); T-009 (oapi-codegen generated router wired); T-013 (families code immutability trigger).
 
 ---
 
@@ -417,7 +423,7 @@ Top 3 (by severity, then by blast-radius):
 | `document_family` | Top-level catalog grouping ("Procedimento", "InstruÃ§Ã£o"). Global across tenants; no `tenant_id`. |
 | `document_profile` | Per-tenant document type bound to a family. Has `default_template_version_id` for the documents wizard. |
 | `process_area` | Per-tenant operational area with optional `parent_code` self-FK. Cycle prevention is application-layer. |
-| `taxonomy.manage` | IAM capability gating writes on all 16 taxonomy routes; held by `system_admin` (migration 0165) + `qms_admin` (migration 0169). |
+| `taxonomy.manage` | IAM capability gating writes on all 16 taxonomy routes; granted to `system_admin` (`db/reference-data/0001_product_reference_data.sql:75`) and `qms_admin` (`:57`) via reference data, not a forward migration. |
 | `governance_events` | Module-local audit sink written via `DBGovernanceLogger`. Parallel to `audit.Writer`; not unified. |
 | `DevTenantID` | Compile-time UUID constant (`ffffffff-...`). After Plan 3, this is no longer the fallback in taxonomy handlers â€” `tenant.FromContext` errors out if no session tenant is present. Still used in auth's `AllowDevTenantFallback` mode for dev-only login. |
 | `archived_at` | Soft-archive timestamp on profile + area (per ADR 0010). Families use `is_active` boolean (predates ADR 0010). |
@@ -430,15 +436,15 @@ Top 3 (by severity, then by blast-radius):
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
 | Postgres unavailable | 500 on all taxonomy routes | Handler logs; `/healthz` | Restore Postgres; module uses `*sql.DB` per repo, no tx, so no rollback complexity |
-| Code-immutability trigger fires on PATCH | UPDATE rejected by `trg_document_profiles_code_immutable` / `trg_process_areas_code_immutable` / `trg_reject_families_code_update` (migration 0188) | Postgres `RAISE` from trigger | Caller must not include `code` in PATCH body; handler also overwrites body `code` with path param as guard |
+| Code-immutability trigger fires on PATCH | UPDATE rejected by `trg_document_profiles_code_immutable` / `trg_process_areas_code_immutable` / `trg_reject_families_code_update` (all in `db/baseline/0001_current_schema.sql:3681-3695`) | Postgres `RAISE` from trigger | Caller must not include `code` in PATCH body; handler also overwrites body `code` with path param as guard |
 | Profile/area archive blocked by FK | DELETE returns 409 because dependent rows exist (e.g. active CDs reference profile) | Service-layer pre-check on `HasActiveProfiles` etc. | Operator removes/migrates dependents before archive |
 | Area parent cycle (admin sets area as child of its descendant) | 409 `ErrAreaParentCycle` | `AreaService.SetParent` walks `ListAncestors` | Operator picks a non-descendant parent |
 | Default template version not published | 409 `ErrTemplateNotPublished` on `SetDefaultTemplate` | `TemplateVersionChecker.IsPublished` returns false | Publish template version first; never bind a draft as default |
 | Default template profile mismatch | 409 `ErrTemplateProfileMismatch` | Cross-check vs `templates_template.profile_code` | Pick a template version whose template belongs to this profile |
-| Tier-3 tripwire abort on taxonomy write | Mutation 500; INSERT/UPDATE rejected | Postgres `RAISE` from migration 0188 trigger on taxonomy tables | Code bypassed `authz.Require(CapTaxonomyManage)` — fix-forward |
-| FamilyService omits govLogger (T-004) | Family create/update/deactivate not logged to `governance_events` | Audit review finds gap | T-004: wire `GovernanceLogger` into `FamilyService`; profile + area already wired |
+| Tier-3 tripwire abort on taxonomy write | Mutation 500; INSERT/UPDATE rejected | Postgres `RAISE` from `trg_require_cap_asserted` on taxonomy tables (`db/baseline/0001_current_schema.sql:3699-3716`) | Code bypassed `authz.Require(CapTaxonomyManage)` — fix-forward |
+| FamilyService omits govLogger (T-004 — CLOSED) | (historical) family mutations would not log to `governance_events` | â€" | T-004 closed commit `115cb635`: `govLogger` field wired; Create/Update/Deactivate all emit |
 | Archive/deactivate event coverage incomplete (T-005/T-006) | Some archive paths emit event, some do not | Compliance review | Audit each service path; wire missing emits |
-| Cross-module `DBGovernanceLogger` reuse by controlled-documents | Coupling: controlled-documents writes its events through taxonomy's logger (`registry/module.go:31`) | Architecture review | T-008 (in controlled-documents tech-debt) tracks the dual-sink coupling |
+| Cross-module `DBGovernanceLogger` reuse by controlled-documents | Coupling: controlled-documents imports `taxonomyapp.NewDBGovernanceLogger` (`internal/modules/controlleddocuments/module.go:37`) as fallback; primary path now uses `NewAuditGovernanceAdapter` | Architecture review | T-010 closed; residual fallback path remains |
 | Dev tenant fallback used in prod read | `tenant.DevTenantID` returns generic catalog | Bootstrap config check | Production must disable dev tenant fallback |
 
 ## Cross-links

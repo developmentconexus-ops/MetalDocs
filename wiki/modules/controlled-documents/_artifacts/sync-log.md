@@ -2,6 +2,26 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-06-10 — Stage-1 backend audit drift patch
+
+- **Context:** Stage-1 mapper artifact `wiki/backend/_artifacts/stage1/module-controlled-documents.md` (written 2026-06-10) identified 5 drift categories between existing wiki docs and the current codebase on branch `qa/iam-area-membership`.
+- **Mode:** lite patch (surgical corrections only; no restructure)
+- **Affected modules:** controlled-documents only
+- **Affected-surface scan:** file:line anchors, removed symbols, closed tech-debt statuses, visibility grant tables, tripwire trigger migration reference, RFC 9457 gap status
+- **Changes applied:**
+  1. `wiki/modules/controlled-documents.md`: fixed `service.go:293` anchor for `Obsolete`/`Supersede` → `service.go:451`/`service.go:455`; added `service.go:389` for `PreviewCode` and `service.go:584` for `CreateRevision`; removed stale `application/migration.go:13 BackfillLegacyDocuments` row from section 5.2; updated coverage stats from 90 → 94; updated section 7 deployment note; updated `Last verified` stamp to `2026-06-11` — adversarial verification confirmed stamp present and correct on 2026-06-11 (line 5).
+  2. `wiki/modules/controlled-documents/_artifacts/01-surface.md`: replaced all `internal/modules/registry/` path prefixes with `internal/modules/controlleddocuments/`; removed `application/migration.go` file-tree entry, `application/migration_integration_test.go` file-tree entry, and `BackfillLegacyDocuments` public-surface table row; updated stale line-number anchors for `Obsolete` (now line 57, `service.go:451`) and `Supersede` (now line 58, `service.go:455`) — adversarial verification confirmed correct anchors present on 2026-06-11.
+  3. `wiki/modules/controlled-documents/_artifacts/03-deps.md`: replaced all `internal/modules/registry/` path prefixes with `internal/modules/controlleddocuments/`; updated header title and note comment. **Residual drift (not applied):** auto-generated header metadata (`<!-- date: 2026-05-10 -->` on line 3) was not updated to reflect the 2026-06-10 edit date declared in the patch note on line 4 — generator metadata and patch note are now inconsistent.
+  4. `wiki/modules/controlled-documents/_artifacts/04-persistence.md`: updated module name and path; added `controlled_document_area_grants` and `controlled_document_user_grants` to section 1; updated section 3 triggers to reference migration 0231 (not 0142b) and documented GUC writes; updated section 5 tripwire pairing audit to reflect T-004 closure (`Create` at `repository.go:341`, `CreateTx` at `repository.go:362`); appended 6 missing migrations (0188, 0198, 0203, 0210, 0225, 0231) to section 6; bumped Last verified.
+  5. `wiki/modules/controlled-documents/_artifacts/05-industry.md`: updated title; marked IP-001 APPLIED (Plan 7 / T-003 + T-007 closed); updated IP-004 to reflect T-001 + T-004 closed with remaining T-006/T-005 gaps; updated IP-005 path references; updated IP-006 migration count; updated IP-008 GUC note; replaced all stale "Registry state" labels with "Module state"; updated summary table.
+  6. `wiki/modules/controlled-documents-tech-debt.md`: bumped Last verified to `2026-06-11` (applied successfully; adversarial verification confirmed correct value on 2026-06-11).
+- **T-NNN touched:** T-003 (confirmed closed in artifacts); T-004 (confirmed closed in artifacts); T-007 (confirmed closed in artifacts)
+- **R-NNN touched:** none
+- **Counts after:** Critical=2 Major=6 Minor=4; public symbols undocumented=79/94
+- **Tally gate:** READ-ONLY — no source changes; drift patch only
+- **Patched files:** `wiki/modules/controlled-documents.md`; `wiki/modules/controlled-documents-tech-debt.md`; `wiki/modules/controlled-documents/_artifacts/01-surface.md`; `wiki/modules/controlled-documents/_artifacts/03-deps.md`; `wiki/modules/controlled-documents/_artifacts/04-persistence.md`; `wiki/modules/controlled-documents/_artifacts/05-industry.md`; `wiki/modules/controlled-documents/_artifacts/sync-log.md`
+- **Known residual drift after this run:** (1) `wiki/modules/controlled-documents/_artifacts/03-deps.md` generator-metadata comment (`<!-- date: 2026-05-10 -->` on line 3) was not updated to reflect the 2026-06-10 edit date declared in the patch note on line 4 — generator metadata and patch note are inconsistent.
+
 ## 2026-05-25 - backend medium quality-bar sync
 
 - **Context:** uncommitted diff on `fix/phase10-controlleddocs` for Worker 10A, scoped to `internal/modules/controlleddocuments/`

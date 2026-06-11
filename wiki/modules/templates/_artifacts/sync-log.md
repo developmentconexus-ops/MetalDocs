@@ -1,6 +1,20 @@
-# Sync log â€” templates
+# Sync log — templates
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
+
+Last verified: 2026-06-11 (adversarial QA pass — missing header, untagged runtime claims, tally gap corrected)
+
+## 2026-06-10 - Stage-1 backend audit drift patch
+
+- **Context:** Stage-1 backend mapper found four mismatches between wiki docs and code; targeted surgical corrections only. No restructuring.
+- **Mode:** lite patch.
+- **Affected modules:** templates only.
+- **Affected-surface scan:** `handler.go:34-65` (route count), `repository/postgres.go:114-127` (ListTemplates LIMIT/OFFSET), `routes_generated.go:203` (publish Tier 1 authz string), `repository/postgres.go:631-639` + `676-683` (audit write vs read sinks).
+- **Routes/API:** §3.2, §5.1 C4Container label, §5.2 Handler.Register note, and §5.3 HTTP operations table corrected from 20 to 22 routes; `GET /api/v1/templates/system/blank` row added to §5.3 table; publish row authz notes corrected — Tier 1 check is `template.approve` (`routes_generated.go:203`), not `template.publish`.
+- **Runtime flows:** §6.1 ListTemplates sequence diagram corrected — query applies `LIMIT $3 OFFSET $4` (`repository/postgres.go:114-127`); `no LIMIT` annotation removed. §8.4 pagination note updated accordingly.
+- **Debt/backlog:** T-011 surface anchor updated (`postgres.go:114-127`); observation corrected — LIMIT/OFFSET is present, keyset cursor is not. T-013 closure note expanded: write path is closed (Plan 6a); `ListAudit` (`postgres.go:676`) still reads from `templates_audit_log` — read/write sink divergence documented as residual gap. Coverage stats row updated from 0/20 to 0/22.
+- **Tally gate:** not run (read-only audit pass; no structural change).
+- **Patched files:** wiki/modules/templates.md; wiki/modules/templates-tech-debt.md; wiki/modules/templates/_artifacts/sync-log.md.
 
 ## 2026-05-17 - active v2 reference memory sync
 
@@ -11,7 +25,7 @@
 - **Runtime flows:** none.
 - **Persistence:** none.
 - **Debt/backlog:** template editor and novo-template-wizard backlog route text aligned with production v1; roadmap Plan 9/10 examples aligned to v1.
-- **Tally gate:** preflight PASS before edits; final tally recorded in session output.
+- **Tally gate:** preflight PASS before edits; final counts carry-forward from preceding entry: Critical=4 Major=6 Minor=4; missing-ADR=11 (no debt rows changed).
 - **Patched files:** `wiki/backlog/template-editor.md`; `wiki/backlog/novo-template-wizard.md`; `wiki/backlog/roadmap.md`; `wiki/modules/templates/_artifacts/sync-log.md`.
 
 ## 2026-05-17 - Template wizard DOCX import + permission simplification sync
@@ -24,8 +38,8 @@
 - **Runtime flows:** `/templates/new` is four steps; DOCX start stores the selected file until submit, creates the template/version, uploads through `/autosave/presign`, commits through `/autosave/commit`, then opens Eigenpal on `/templates/{id}/versions/{n}`. Blank start opens Eigenpal with a blank draft.
 - **Persistence:** existing `templates_template.areas`, `visibility`, and `specific_areas` columns remain inert compatibility fields; repository inserts fixed empty/public values while runtime/API selection ignores them.
 - **Debt/backlog:** no new T/R debt rows opened. Wizard backlog marked DOCX upload and editor handoff resolved, and former permissions/visibility API rows removed by product decision.
-- **Verification:** targeted frontend template tests, frontend build typecheck, editor-ui tests/typecheck, backend `go generate`, backend templates tests, and browser runtime validation completed. Redocly lint was blocked by npm `ECOMPROMISED`; broad frontend suite still has unrelated pre-existing failures.
-- **Tally gate:** PASS with Git Bash `PATH="/usr/bin:/bin:$PATH"`; severity count 4/6/4 matched, missing-ADR register count 11 (script could not parse a stated doc count and still exited 0).
+- **Verification:** targeted frontend template tests, frontend build typecheck, editor-ui tests/typecheck, backend `go generate`, backend templates tests, and browser runtime validation completed. Redocly lint was blocked by npm `ECOMPROMISED` [runtime-unverified]; broad frontend suite still has unrelated pre-existing failures [runtime-unverified].
+- **Tally gate:** PASS (Git Bash unix PATH); severity count 4/6/4 matched, missing-ADR register count 11 (script could not parse a stated doc count and still exited 0).
 - **Patched files:** wiki/modules/templates.md; wiki/modules/templates-tech-debt.md; wiki/backlog/templates-refactor.md; wiki/backlog/novo-template-wizard.md; wiki/modules/templates/_artifacts/01-surface.md; wiki/modules/templates/_artifacts/02-flow-list.md; wiki/modules/templates/_artifacts/04-persistence.md; wiki/modules/templates/_artifacts/sync-log.md
 
 ## 2026-05-17 - DOCX import runtime repair sync
@@ -37,7 +51,7 @@
 - **Authz/tripwire:** `SaveTemplateDraft` and `CommitAutosave` now run version writes and audit rows inside `template.edit` authz transactions when `s.db != nil`, including transaction-local tenant/actor GUC setup.
 - **T-NNN touched:** T-001 evidence extended for autosave/import; T-010 partially closed for generated `SaveTemplateDraft` CAS enforcement while legacy `/autosave/commit` remains hash-gated.
 - **R-NNN touched:** R-001 note extended; R-010 marked merged (partial).
-- **Verification:** `go test ./internal/modules/templates/application -count=1 -timeout=60s`; `go test ./internal/modules/templates/delivery/http -count=1 -timeout=60s`; Docker API rebuilt/restarted healthy; runtime smoke showed MinIO PUT 200 and `/autosave/commit` 200.
+- **Verification:** `go test ./internal/modules/templates/application -count=1 -timeout=60s`; `go test ./internal/modules/templates/delivery/http -count=1 -timeout=60s`; Docker API rebuilt/restarted healthy [runtime-unverified]; runtime smoke showed MinIO PUT 200 and `/autosave/commit` 200 [runtime-unverified].
 - **Patched files:** wiki/modules/templates.md; wiki/modules/templates-tech-debt.md; wiki/backlog/templates-refactor.md; wiki/modules/templates/_artifacts/sync-log.md
 
 ## 2026-05-16 - Plan 12.4 template wizard stabilization sync
@@ -47,7 +61,7 @@
 - **Anchors moved:** generated API shape for `POST /api/v1/templates`; placeholder catalog canonical route documented
 - **Public surface:** `POST /api/v1/templates` response documented as `data.template` + `data.version`; frontend wrapper types derive from generated OpenAPI types
 - **Routes/API:** bundled and partial OpenAPI include the mounted template route set; `api.gen.go` and frontend API types regenerated; placeholder catalog now has generated `PlaceholderCatalogResponse`
-- **Runtime flows:** runtime smoke verified authenticated `POST /api/v1/templates` with `Idempotency-Key` and `doc_type_code: "POP"` returns HTTP 201 and editor redirect path
+- **Runtime flows:** runtime smoke verified authenticated `POST /api/v1/templates` with `Idempotency-Key` and `doc_type_code: "POP"` returns HTTP 201 and editor redirect path [runtime-unverified]
 - **Persistence:** migration 0203 refreshes the authz tripwire function for renamed template tables
 - **Dependencies:** `scripts/start-api.ps1` now falls back to `go run` when Windows denies execution of the repo-local built `.exe`
 - **T-NNN touched:** T-006 closed for route/spec/generated coverage and catalog response typing; T-009 narrowed to replay-audit debt after create-path header coverage

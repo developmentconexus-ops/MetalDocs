@@ -22,6 +22,7 @@
 ## Durable section boundaries inside `wiki/`
 
 - `architecture/` - durable system structure, contracts, and boundary rules
+- `backend/` - backend detail layer; produced by Stage-1 backend audit; owned by backend audit / professionalization program
 - `modules/` - module-local living docs, debt registers, maturity evidence
 - `database/` - schema ownership, dictionary, migration policy, reference data
 - `standards/` - cross-cutting standards, including documentation governance

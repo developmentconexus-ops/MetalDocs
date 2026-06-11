@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-09 (std-execution Family 5 path-param snake_case: document-comment routes `{libraryID}`→`{library_id}`; prior: 2026-06-08 Phase F F4/F8: handler.go + repository.go line anchors updated for keyset cursor migration and dead-code removal; prior: Phase E1 casing big-bang: `form_data_json`, `revision_number`, `current_revision_*` wire keys updated to snake_case; prior: 2026-06-01) (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section) | prior: 2026-05-29 (QA `qa/documents-distribution`: `DocumentDistributionPage` wires real document identity via `useDocumentDetailQuery` (Code, RevisionNumber, Name) at honest surfaces (hero breadcrumb, hero badges, props-driven `DocRefCard`, em-breve banner). Mock distribution UI (KPIStrip / DonutCard / DistributionFacts / CoverageByArea / TimelineCard / RecipientsCard / `lib/distributionMeta.ts`) preserved as design scaffolding for unbuilt fanout/read-tracking feature — every illustrative section wrapped in `IllustrativeBlock` with `aria-hidden="true"` + `Dados ilustrativos · Em breve` watermark + `pointer-events:none` + saturate filter + diagonal-stripe overlay. `role="note"` banner above scaffolding names the real document and states numbers are illustrative. 4 hero CTAs `aria-disabled="true" title="Em breve"`. Preview proof on `PO-RH-002` / `REV00` / `DC_Template_Descricao_Cargo`: identity correct on every honest surface, 5 watermarks aria-hidden, only `GET /api/v1/documents/:id` called — zero phantom endpoints. Fanout + read-tracking Go module remains hard-stop / out of scope — see `backlog/distribuicao.md`. Previous: 2026-05-29 QA `qa/documents-detail` follow-up wired `ProcessAreaCodeSnapshot` + `ProfileCodeSnapshot` into `DocumentPublishedPage` via `useAreasQuery` + `useProfilesQuery` (5 hardcoded "—" sites replaced); removed mock `PLACEHOLDER_RELATED` + `PLACEHOLDER_COMMENTS` from §04/§05 → honest em-breve; fixed misleading status badge + wrong Iniciar-revisão title; tsc clean, 19/19 vitest. Previous: 2026-05-29 `qa/documents-editor` ambiguous-content_hash JOIN fix.) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-06-11 (Stage-1 backend audit drift patch: §6.2 renameDocument response corrected 204→200+body; §8.4 pagination corrected to keyset cursor, limit param default 20 cap 100, response {items,page:{next_cursor,has_more},total}; T-010 stale "not mounted" claim corrected to FLAG-03 adapter-discards-params; prior: 2026-06-09 (std-execution Family 5 path-param snake_case: document-comment routes `{libraryID}`→`{library_id}`; prior: 2026-06-08 Phase F F4/F8: handler.go + repository.go line anchors updated for keyset cursor migration and dead-code removal; prior: Phase E1 casing big-bang: `form_data_json`, `revision_number`, `current_revision_*` wire keys updated to snake_case; prior: 2026-06-01) (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section) | prior: 2026-05-29 (QA `qa/documents-distribution`: `DocumentDistributionPage` wires real document identity via `useDocumentDetailQuery` (Code, RevisionNumber, Name) at honest surfaces (hero breadcrumb, hero badges, props-driven `DocRefCard`, em-breve banner). Mock distribution UI (KPIStrip / DonutCard / DistributionFacts / CoverageByArea / TimelineCard / RecipientsCard / `lib/distributionMeta.ts`) preserved as design scaffolding for unbuilt fanout/read-tracking feature — every illustrative section wrapped in `IllustrativeBlock` with `aria-hidden="true"` + `Dados ilustrativos · Em breve` watermark + `pointer-events:none` + saturate filter + diagonal-stripe overlay. `role="note"` banner above scaffolding names the real document and states numbers are illustrative. 4 hero CTAs `aria-disabled="true" title="Em breve"`. Preview proof on `PO-RH-002` / `REV00` / `DC_Template_Descricao_Cargo`: identity correct on every honest surface, 5 watermarks aria-hidden, only `GET /api/v1/documents/:id` called — zero phantom endpoints. Fanout + read-tracking Go module remains hard-stop / out of scope — see `backlog/distribuicao.md`. Previous: 2026-05-29 QA `qa/documents-detail` follow-up wired `ProcessAreaCodeSnapshot` + `ProfileCodeSnapshot` into `DocumentPublishedPage` via `useAreasQuery` + `useProfilesQuery` (5 hardcoded "—" sites replaced); removed mock `PLACEHOLDER_RELATED` + `PLACEHOLDER_COMMENTS` from §04/§05 → honest em-breve; fixed misleading status badge + wrong Iniciar-revisão title; tsc clean, 19/19 vitest. Previous: 2026-05-29 `qa/documents-editor` ambiguous-content_hash JOIN fix.) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -25,7 +25,7 @@
 
 | Rank | Goal | How verified |
 |---|---|---|
-| 1 | Authz isolation on regulated mutations | Tier-1 role gate + tier-2 `authz.Require` + Postgres tripwire; **T-003 closed Plan 5** â€” all 5 `documents` table mutations now call `authz.Require` + tripwire attached (migration 0188) |
+| 1 | Authz isolation on regulated mutations | Tier-1 role gate + tier-2 `authz.Require` + Postgres tripwire; **T-003 closed Plan 5** â€” all 5 `documents` table mutations now call `authz.Require` + tripwire present in curated baseline (`db/baseline/0001_current_schema.sql:3793`) |
 | 2 | Atomic CD+draft create | `CreateDocumentTx` port; one transaction across `controlled_documents`, `documents`, `cd_sequence_counters` (ADR 0011) |
 | 3 | Forward-only schema evolution | All `documents`-owned migrations are append-only (`migrations/0001..0183`); rename from `documents_v2` shipped as paired migrations 0167/0168 |
 
@@ -181,7 +181,7 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 | `internal/modules/documents/approval/application/decision_service.go` | `DecisionService` | type | Signoff approve/reject/publish/supersede/obsolete |
 | `internal/modules/documents/delivery/http/handler.go:100` | `NewHandlerWithSubmit` | func | Wires db + submitSvc for atomic finalize |
 | `internal/modules/documents/delivery/http/handler.go:178` | `listDocuments` | func | `GET /api/v1/documents` |
-| `internal/modules/documents/delivery/http/handler.go:400` | `renameDocument` | func | `PATCH /api/v1/documents/{id}` (T-002 spec gap, T-004 dup route, T-005 audit-tx gap) |
+| `internal/modules/documents/delivery/http/handler.go:400` | `renameDocument` | func | `PATCH /api/v1/documents/{id}` (T-002 spec gap, T-005 audit-tx gap); response is raw `*domain.Document` — see FLAG-04 |
 | `internal/modules/documents/delivery/http/handler.go:435` | `finalizeDocument` | func | `POST /api/v1/documents/{id}/finalize` with HTTP idempotency header + replay support |
 | `internal/modules/documents/delivery/http/handler.go:1107` | `authorizeDocumentScope` | func | Role + ownership gate (tier-1) |
 | `internal/modules/documents/delivery/http/handler.go:1158` | `mapErr` | func | Legacy envelope mapping (T-001) |
@@ -204,12 +204,12 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 
 | Method | Path | OperationID | Handler | Authz |
 |---|---|---|---|---|
-| GET | `/api/v1/documents` | `listDocuments` | `Handler.listDocuments` (`handler.go:145`) | role: admin\|filler; filler scoped to `created_by` |
-| GET | `/api/v1/documents/stats` | â€” | `Handler.documentStats` (`handler.go:174`) | role |
-| GET | `/api/v1/documents/{id}` | `getDocument` | `Handler.getDocument` (`handler.go:114`) | role + ownership |
-| PATCH | `/api/v1/documents/{id}` | â€” | `Handler.renameDocument` (`handler.go:285`) | role + ownership; **dup registration at `:86`+`:115`** (T-004) |
-| POST | `/api/v1/documents/{id}/finalize` | `finalizeDocument` | `Handler.finalizeDocument` (`handler.go:403`) | role + ownership + tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` |
-| GET | `/api/v1/documents/{id}/revision-history` | `getDocumentRevisionHistory` | `Handler.listRevisionHistory` (`handler.go:694`) | role + ownership |
+| GET | `/api/v1/documents` | `listDocuments` | `Handler.listDocuments` (`handler.go:178`) | role: admin\|filler; filler scoped to `created_by` |
+| GET | `/api/v1/documents/stats` | â€” | `Handler.documentStats` (`handler.go:224`) | role |
+| GET | `/api/v1/documents/{id}` | `getDocument` | `Handler.getDocument` (`handler.go:316`) | role + ownership |
+| PATCH | `/api/v1/documents/{id}` | â€” | `Handler.renameDocument` (`handler.go:400`) | role + ownership |
+| POST | `/api/v1/documents/{id}/finalize` | `finalizeDocument` | `Handler.finalizeDocument` (`handler.go:435`) | role + ownership + tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` |
+| GET | `/api/v1/documents/{id}/revision-history` | `getDocumentRevisionHistory` | `Handler.listRevisionHistory` (`handler.go:852`) | role + ownership |
 | POST | `/api/v1/documents/{id}/archive` | â€” | `Handler.archiveDocument` | role |
 | POST | `/api/v1/documents/{id}/duplicate` | â€” | `Handler.duplicateDocument` | role |
 | GET/POST/PATCH/DELETE | `/api/v1/documents/{id}/comments[/{commentId}]` | â€” | comments CRUD | role + ownership |
@@ -233,36 +233,39 @@ Spec gaps (missing `operationId`s on regulated paths) are enumerated in T-002 an
 
 ## API Route Truth Table (Plan 8 Baseline)
 
+Routes are registered once per mux via `Handler.RegisterRoutes` (`handler.go:112-140`) or the rate-limit variant (`handler.go:142-176`). Both delegate through `module.go:buildLegacyMux` to `documentsapi.HandlerWithOptions` + `NewGeneratedServerAdapter` (`module.go:118-130`). There is no duplicate registration at runtime — the T-004 concern is resolved by this adapter architecture (single `legacyMux` per request path). The `Runtime owner (file:line)` column gives the `mux.HandleFunc` registration line in `RegisterRoutes`, followed by the handler func definition line in parentheses.
+
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/documents` | `internal/modules/documents/delivery/http/handler.go:83` | `h.listDocuments` | `/api/v1/documents` | `listDocuments` | `ListDocuments` | Aligned | Also re-registered at `handler.go:112` |
-| GET | `/api/v1/documents/stats` | `internal/modules/documents/delivery/http/handler.go:84` | `h.documentStats` | `/api/v1/documents/stats` | `documentStats` | `DocumentStats` | Aligned | Also re-registered at `handler.go:113` |
-| GET | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:86` | `h.getDocument` | `/api/v1/documents/{id}` | `getDocument` | `GetDocument` | Aligned | 200 response is now schema-backed by `DocumentDetailResponse`, including embedded JSON `form_data_json` |
-| PATCH | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:87` | `h.renameDocument` | `/api/v1/documents/{id}` | `renameDocument` | `RenameDocument` | Aligned | Also re-registered at `handler.go:116`; legacy wrapper sits beneath the generated boundary |
-| POST | `/api/v1/documents/{id}/finalize` | `internal/modules/documents/delivery/http/handler.go:88` | `h.finalizeDocument` | `/api/v1/documents/{id}/finalize` | â€” | `PostApiV2DocumentsIdFinalize` | Aligned | Also re-registered at `handler.go:117` |
-| POST | `/api/v1/documents/{id}/archive` | `internal/modules/documents/delivery/http/handler.go:89` | `h.archiveDocument` | `/api/v1/documents/{id}/archive` | â€” | `PostApiV2DocumentsIdArchive` | Aligned | Also re-registered at `handler.go:118` |
-| POST | `/api/v1/documents/{id}/duplicate` | `internal/modules/documents/delivery/http/handler.go:90` | `h.duplicateDocument` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:119` |
-| POST | `/api/v1/documents/{id}/session/acquire` | `internal/modules/documents/delivery/http/handler.go:92` | `h.acquireSession` | `/api/v1/documents/{id}/session/acquire` | â€” | `PostApiV2DocumentsIdSessionAcquire` | Aligned | Also re-registered at `handler.go:121` |
-| POST | `/api/v1/documents/{id}/session/heartbeat` | `internal/modules/documents/delivery/http/handler.go:93` | `h.heartbeatSession` | `/api/v1/documents/{id}/session/heartbeat` | â€” | `PostApiV2DocumentsIdSessionHeartbeat` | Aligned | Also re-registered at `handler.go:122` |
-| POST | `/api/v1/documents/{id}/session/release` | `internal/modules/documents/delivery/http/handler.go:94` | `h.releaseSession` | `/api/v1/documents/{id}/session/release` | â€” | `PostApiV2DocumentsIdSessionRelease` | Aligned | Also re-registered at `handler.go:123` |
-| POST | `/api/v1/documents/{id}/session/force-release` | `internal/modules/documents/delivery/http/handler.go:95` | `h.forceReleaseSession` | `/api/v1/documents/{id}/session/force-release` | â€” | `PostApiV2DocumentsIdSessionForceRelease` | Aligned | Also re-registered at `handler.go:124` |
-| POST | `/api/v1/documents/{id}/autosave/presign` | `internal/modules/documents/delivery/http/handler.go:97` | `h.presignAutosave` | `/api/v1/documents/{id}/autosave/presign` | â€” | `PostApiV2DocumentsIdAutosavePresign` | Aligned | Also re-registered (wrapped) at `handler.go:126` |
-| POST | `/api/v1/documents/{id}/autosave/commit` | `internal/modules/documents/delivery/http/handler.go:98` | `h.commitAutosave` | `/api/v1/documents/{id}/autosave/commit` | â€” | `PostApiV2DocumentsIdAutosaveCommit` | Aligned | Also re-registered (wrapped) at `handler.go:130` |
-| GET | `/api/v1/documents/{id}/checkpoints` | `internal/modules/documents/delivery/http/handler.go:100` | `h.listCheckpoints` | `/api/v1/documents/{id}/checkpoints` | â€” | `GetApiV2DocumentsIdCheckpoints` | Aligned | Also re-registered at `handler.go:135` |
-| POST | `/api/v1/documents/{id}/checkpoints` | `internal/modules/documents/delivery/http/handler.go:101` | `h.createCheckpoint` | `/api/v1/documents/{id}/checkpoints` | â€” | `PostApiV2DocumentsIdCheckpoints` | Aligned | Also re-registered at `handler.go:136` |
-| POST | `/api/v1/documents/{id}/checkpoints/{version}/restore` | `internal/modules/documents/delivery/http/handler.go:102` | `h.restoreCheckpoint` | `/api/v1/documents/{id}/checkpoints/{versionNum}/restore` | â€” | `PostApiV2DocumentsIdCheckpointsVersionNumRestore` | Signature mismatch | Runtime param `{version}` differs from spec/codegen `{versionNum}` |
-| GET | `/api/v1/documents/{id}/revisions/{rid}/url` | `internal/modules/documents/delivery/http/handler.go:104` | `h.signedRevisionURL` | `/api/v1/documents/{id}/revisions/{rid}/url` | â€” | `GetApiV2DocumentsIdRevisionsRidUrl` | Aligned | Also re-registered at `handler.go:139` |
-| GET | `/api/v1/documents/{id}/comments` | `internal/modules/documents/delivery/http/handler.go:105` | `h.listComments` | `/api/v1/documents/{id}/comments` | `listDocumentComments` | `ListDocumentComments` | Aligned | Response is now schema-backed by `DocumentCommentResponse[]` |
-| POST | `/api/v1/documents/{id}/comments` | `internal/modules/documents/delivery/http/handler.go:106` | `h.createComment` | `/api/v1/documents/{id}/comments` | `createDocumentComment` | `CreateDocumentComment` | Aligned | Request/response now use named comment schemas |
-| PATCH | `/api/v1/documents/{id}/comments/{library_id}` | `internal/modules/documents/delivery/http/handler.go:107` | `h.updateComment` | `/api/v1/documents/{id}/comments/{library_id}` | `updateDocumentComment` | `UpdateDocumentComment` | Aligned | Request/response now use named comment schemas |
-| DELETE | `/api/v1/documents/{id}/comments/{library_id}` | `internal/modules/documents/delivery/http/handler.go:108` | `h.deleteComment` | `/api/v1/documents/{id}/comments/{library_id}` | `deleteDocumentComment` | `DeleteDocumentComment` | Aligned | 204 no-content delete |
-| POST | `/api/v1/documents/{id}/export/pdf` | `internal/modules/documents/delivery/http/export_handler.go:40` | `h.exportPDF` | `/api/v1/documents/{id}/export/pdf` | `exportDocumentPDF` | `ExportDocumentPDF` | Aligned | Also registered via rate-limit wrapper at `export_handler.go:45` |
-| GET | `/api/v1/documents/{id}/export/docx-url` | `internal/modules/documents/delivery/http/export_handler.go:41` | `h.exportDocxURL` | `/api/v1/documents/{id}/export/docx-url` | `getDocumentDocxURL` | `GetDocumentDocxURL` | Aligned | Also re-registered at `export_handler.go:49` |
-| GET | `/api/v1/documents/{id}/fill-in-schema` | `internal/modules/documents/http/fillin_handler.go:36` | `h.GetFillInSchema` | â€” | â€” | â€” | Spec missing |  |
-| GET | `/api/v1/documents/{id}/placeholders` | `internal/modules/documents/http/fillin_handler.go:37` | `h.ListPlaceholderValues` | â€” | â€” | â€” | Spec missing |  |
-| PUT | `/api/v1/documents/{id}/placeholders/{pid}` | `internal/modules/documents/http/fillin_handler.go:38` | `h.PutPlaceholderValue` | â€” | â€” | â€” | Spec missing |  |
-| GET | `/api/v1/documents/{id}/view` | `internal/modules/documents/http/view_handler.go:30` | `h.HandleView` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v1/documents/{id}/reconstruct` | `internal/modules/documents/http/reconstruct_handler.go:27` | `h.HandleReconstruct` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v1/documents` | `handler.go:113` (func `:178`) | `h.listDocuments` | `/api/v1/documents` | `listDocuments` | `ListDocuments` | Aligned | Rate-limit variant at `handler.go:143` |
+| GET | `/api/v1/documents/stats` | `handler.go:114` (func `:224`) | `h.documentStats` | `/api/v1/documents/stats` | `documentStats` | `DocumentStats` | Aligned | Rate-limit variant at `handler.go:144` |
+| GET | `/api/v1/documents/{id}` | `handler.go:116` (func `:316`) | `h.getDocument` | `/api/v1/documents/{id}` | `getDocument` | `GetDocument` | Aligned | 200 via `toDocumentDetailResponse`; `form_data_json` as `json.RawMessage`, validated, defaults to `{}` |
+| PATCH | `/api/v1/documents/{id}` | `handler.go:117` (func `:400`) | `h.renameDocument` | `/api/v1/documents/{id}` | `renameDocument` | `RenameDocument` | Aligned | Returns raw `*domain.Document` — `form_data_json` as `[]byte` (not `json.RawMessage`); asymmetry vs `getDocument` — see FLAG-04 |
+| POST | `/api/v1/documents/{id}/finalize` | `handler.go:118` (func `:435`) | `h.finalizeDocument` | `/api/v1/documents/{id}/finalize` | — | `PostApiV2DocumentsIdFinalize` | Aligned | Requires `Idempotency-Key` header; rate-limit variant at `handler.go:148` |
+| POST | `/api/v1/documents/{id}/archive` | `handler.go:119` (func `:605`) | `h.archiveDocument` | `/api/v1/documents/{id}/archive` | — | `PostApiV2DocumentsIdArchive` | Aligned | Rate-limit variant at `handler.go:149` |
+| POST | `/api/v1/documents/{id}/duplicate` | `handler.go:120` (func `:621`) | `h.duplicateDocument` | — | — | — | Spec missing | Rate-limit variant at `handler.go:150` |
+| POST | `/api/v1/documents/{id}/session/acquire` | `handler.go:122` (func `:647`) | `h.acquireSession` | `/api/v1/documents/{id}/session/acquire` | — | `PostApiV2DocumentsIdSessionAcquire` | Aligned | Rate-limit variant at `handler.go:152` |
+| POST | `/api/v1/documents/{id}/session/heartbeat` | `handler.go:123` (func `:678`) | `h.heartbeatSession` | `/api/v1/documents/{id}/session/heartbeat` | — | `PostApiV2DocumentsIdSessionHeartbeat` | Aligned | Rate-limit variant at `handler.go:153` |
+| POST | `/api/v1/documents/{id}/session/release` | `handler.go:124` (func `:702`) | `h.releaseSession` | `/api/v1/documents/{id}/session/release` | — | `PostApiV2DocumentsIdSessionRelease` | Aligned | Rate-limit variant at `handler.go:154` |
+| POST | `/api/v1/documents/{id}/session/force-release` | `handler.go:125` (func `:726`) | `h.forceReleaseSession` | `/api/v1/documents/{id}/session/force-release` | — | `PostApiV2DocumentsIdSessionForceRelease` | Aligned | Rate-limit variant at `handler.go:155` |
+| POST | `/api/v1/documents/{id}/autosave/presign` | `handler.go:127` (func `:752`) | `h.presignAutosave` | `/api/v1/documents/{id}/autosave/presign` | — | `PostApiV2DocumentsIdAutosavePresign` | Aligned | Rate-limit wrapped at `handler.go:157-160` |
+| POST | `/api/v1/documents/{id}/autosave/commit` | `handler.go:128` (func `:790`) | `h.commitAutosave` | `/api/v1/documents/{id}/autosave/commit` | — | `PostApiV2DocumentsIdAutosaveCommit` | Aligned | Rate-limit wrapped at `handler.go:161-164` |
+| GET | `/api/v1/documents/{id}/checkpoints` | `handler.go:130` (func `:835`) | `h.listCheckpoints` | `/api/v1/documents/{id}/checkpoints` | — | `GetApiV2DocumentsIdCheckpoints` | Aligned | Rate-limit variant at `handler.go:166` |
+| POST | `/api/v1/documents/{id}/checkpoints` | `handler.go:131` (func `:896`) | `h.createCheckpoint` | `/api/v1/documents/{id}/checkpoints` | — | `PostApiV2DocumentsIdCheckpoints` | Aligned | Rate-limit variant at `handler.go:167` |
+| POST | `/api/v1/documents/{id}/checkpoints/{version}/restore` | `handler.go:132` (func `:925`) | `h.restoreCheckpoint` | `/api/v1/documents/{id}/checkpoints/{versionNum}/restore` | — | `PostApiV2DocumentsIdCheckpointsVersionNumRestore` | Signature mismatch | Runtime param `{version}` differs from spec/codegen `{versionNum}` |
+| GET | `/api/v1/documents/{id}/revision-history` | `handler.go:133` (func `:852`) | `h.listRevisionHistory` | `/api/v1/documents/{id}/revision-history` | — | — | Spec missing | Rate-limit variant at `handler.go:169` |
+| GET | `/api/v1/documents/{id}/revisions/{rid}/url` | `handler.go:135` (func `:953`) | `h.signedRevisionURL` | `/api/v1/documents/{id}/revisions/{rid}/url` | — | `GetApiV2DocumentsIdRevisionsRidUrl` | Aligned | Rate-limit variant at `handler.go:171` |
+| GET | `/api/v1/documents/{id}/comments` | `handler.go:136` (func `:970`) | `h.listComments` | `/api/v1/documents/{id}/comments` | `listDocumentComments` | `ListDocumentComments` | Aligned | Rate-limit variant at `handler.go:172` |
+| POST | `/api/v1/documents/{id}/comments` | `handler.go:137` (func `:991`) | `h.createComment` | `/api/v1/documents/{id}/comments` | `createDocumentComment` | `CreateDocumentComment` | Aligned | Rate-limit variant at `handler.go:173` |
+| PATCH | `/api/v1/documents/{id}/comments/{library_id}` | `handler.go:138` (func `:1024`) | `h.updateComment` | `/api/v1/documents/{id}/comments/{library_id}` | `updateDocumentComment` | `UpdateDocumentComment` | Aligned | Rate-limit variant at `handler.go:174` |
+| DELETE | `/api/v1/documents/{id}/comments/{library_id}` | `handler.go:139` (func `:1058`) | `h.deleteComment` | `/api/v1/documents/{id}/comments/{library_id}` | `deleteDocumentComment` | `DeleteDocumentComment` | Aligned | 204 no-content; rate-limit variant at `handler.go:175` |
+| POST | `/api/v1/documents/{id}/export/pdf` | `export_handler.go:41` (func `:53`) | `h.exportPDF` | `/api/v1/documents/{id}/export/pdf` | `exportDocumentPDF` | `ExportDocumentPDF` | Aligned | Rate-limit wrapped variant at `export_handler.go:46-49` |
+| GET | `/api/v1/documents/{id}/export/docx-url` | `export_handler.go:42` (func: see handler) | `h.exportDocxURL` | `/api/v1/documents/{id}/export/docx-url` | `getDocumentDocxURL` | `GetDocumentDocxURL` | Aligned | Rate-limit variant at `export_handler.go:50` |
+| GET | `/api/v1/documents/{id}/fill-in-schema` | `fillin_handler.go:38` (func `:43`) | `h.GetFillInSchema` | — | — | — | Spec missing | Legacy `documentshttp` package |
+| GET | `/api/v1/documents/{id}/placeholders` | `fillin_handler.go:39` (func: see handler) | `h.ListPlaceholderValues` | — | — | — | Spec missing | Legacy `documentshttp` package |
+| PUT | `/api/v1/documents/{id}/placeholders/{pid}` | `fillin_handler.go:40` (func: see handler) | `h.PutPlaceholderValue` | — | — | — | Spec missing | Legacy `documentshttp` package |
+| GET | `/api/v1/documents/{id}/view` | `view_handler.go:31` (func `:34`) | `h.HandleView` | — | — | — | Spec missing | Legacy `documentshttp` package |
+| POST | `/api/v1/documents/{id}/reconstruct` | `reconstruct_handler.go:28` (func `:31`) | `h.HandleReconstruct` | — | — | — | Spec missing | Legacy `documentshttp` package |
 
 Module contract status: Contracted
 Owner: leandro
@@ -319,11 +322,14 @@ sequenceDiagram
     S->>S: guard doc.Status==Draft else 409
     S->>R: UpdateDocumentName  (ExecContext â€” no tx)
     R->>DB: UPDATE documents SET name=$2, updated_at=now() WHERE id=$1 AND tenant_id=$3
-    S->>A: audit.Write("document.renamed", ...)  (OUTSIDE tx â€” T-005)
-    H-->>C: 204 No Content
+    S->>A: audit.Write(“document.renamed”, ...)  (OUTSIDE tx â€” T-005)
+    S-->>H: (no error)
+    H->>S: GetDocument(tenantID, docID)
+    S-->>H: doc
+    H-->>C: 200 OK + document body (JSON)
 ```
 
-Source: `_artifacts/02-flow-renameDocument.md` (corrected against `handler.go:285..308` during Phase 6.75 â€” response is `204 No Content`, not a re-fetched JSON body). Spec drift (T-002) â€” route absent from openapi.yaml. Duplicate registration (T-004). No tier-2 authz, no tripwire on `documents` table (T-003). Latent: error path at `handler.go:303-304` calls `httpErr(w, status, msg)` **twice** for a single `RenameDocument` error â€” second call writes a header after a status is already written; visible as a "superfluous WriteHeader" log only.
+Source: `_artifacts/02-flow-renameDocument.md`. Actual response is `200 OK` with the re-fetched document body via `httpresponse.WriteJSON(w, http.StatusOK, doc)` (`handler.go:426–432`), not `204 No Content`. Spec drift (T-002) â€” route absent from openapi.yaml. No tier-2 authz, no tripwire on `documents` table (T-003). **FLAG-04**: `renameDocument` (handler.go:400-433) returns raw `*domain.Document` serialising `FormDataJSON` as `[]byte`, while `getDocument` (handler.go:316) returns `documentDetailResponse` with `FormDataJSON` as validated `json.RawMessage`; the two handlers produce different JSON shapes for the same field on the same resource, and this asymmetry is absent from the spec (T-002). The double-`httpErr` pattern previously noted at `:303-304` is not present in current code: each error branch in `renameDocument` has an explicit `return`.
 
 ### 6.3 finalizeDocument (state transition) â€” `POST /api/v1/documents/{id}/finalize`
 
@@ -390,7 +396,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 
 - Binaries: `apps/api/cmd/metaldocs-api` for HTTP ownership, `apps/jobs/cmd/metaldocs-jobs` for scheduled publish temporal work, and `apps/worker/cmd/metaldocs-worker` for PDF/outbox work.
 - Process: local startup now runs API on `:8081` and starts the dedicated jobs host by default (per `scripts/start-api.ps1`).
-- Migrations: applied at startup; documents-owned files live in `migrations/` chronological set (0001..0183 to date) â€” full enumeration in `_artifacts/04-persistence.md`. Forward-only (IP-006).
+- Migrations: applied at startup via `db/migrations/` (`apps/api/cmd/metaldocs-api/main.go:187-192`). Schema is bootstrapped from a curated baseline (`db/baseline/0001_current_schema.sql`, 4463 lines) plus 31 forward-only delta migrations (`db/migrations/0203_rename_templates_v2_objects.sql` through `db/migrations/0233_templates_template_version_revision_number.sql`). Documents-owned tables are defined in the baseline and refined by the delta set; full enumeration in `_artifacts/04-persistence.md`. Forward-only (IP-006).
 - Environment: documents reads no env/config vars directly (verified in `_artifacts/03-deps.md`). All knobs come through DI from `apps/api/cmd/metaldocs-api/main.go`.
 - Background jobs:
   - `metaldocs-jobs` River temporal worker â€” promotes scheduled â†’ published at effective time from the dedicated jobs runtime; the API now owns only transactional enqueue
@@ -406,7 +412,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 - Tier-2 (in-tx): `authz.Require(ctx, tx, string(iamdomain.CapDocumentSubmit), areaCode)` (`submit_service.go:85`). Capability value `"document.submit"` (Plan 4: previously `"doc.submit"`, closed T-008 / iam T-001).
 - Typed capabilities: `internal/modules/documents/application/fillin_authz.go:9` consumes `iamdomain.Capability` consts. Module now uses typed namespace exclusively (T-008 closed).
 - Capability adapter: `internal/modules/documents/application/ports.go` declares `CapabilityChecker`; impl `capabilityServiceAdapter` at `apps/api/internal/wiring/documents.go:14`; `NewCapabilityChecker` factory at `:24` (ADR 0007 J2 amendment).
-- Postgres tripwire: `enforce_capability_asserted` function (`migrations/0142b_role_capabilities_v2_enforce.sql:67`), triggers on `approval_instances` (`:201`) and `approval_signoffs` (`:207`). Plan 5 migration `0188_tripwire_extend.sql:196-199` additionally attaches `trg_require_cap_asserted` to `public.documents` (INSERT `CapDocumentCreate`; UPDATE `CapDocumentEdit`). Documents-owned tx paths now seed `metaldocs.tenant_id` + `metaldocs.actor_id` through `iam/authz.SeedTxIdentity(...)` before `authz.Require(...)` appends `metaldocs.asserted_caps`. **T-003 closed.**
+- Postgres tripwire: `enforce_capability_asserted` function (`migrations/0142b_role_capabilities_v2_enforce.sql:67`), triggers on `approval_instances` (`:201`) and `approval_signoffs` (`:207`). Plan 5 tripwire extension attaches `trg_require_cap_asserted` to `public.documents` (INSERT `CapDocumentCreate`; UPDATE `CapDocumentEdit`) — present in curated baseline (`db/baseline/0001_current_schema.sql:3793`); the originating migration (`archive/migrations/0188_tripwire_extend.sql`) is archived and not replayed at startup. Documents-owned tx paths now seed `metaldocs.tenant_id` + `metaldocs.actor_id` through `iam/authz.SeedTxIdentity(...)` before `authz.Require(...)` appends `metaldocs.asserted_caps`. **T-003 closed.**
 - Sentinel: `iamapp.ErrCapabilityDenied` imported at `handler.go:17`; `authz.ErrCapDenied` (struct) also imported (iam T-009 closed by Plan 4 â€” renamed from `authz.ErrCapabilityDenied`).
 
 ### 8.2 Error envelope
@@ -420,9 +426,9 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 - Used on finalize: handler requires `Idempotency-Key`, hashes the request payload, checks/records replay entries through `internal/platform/idempotency`, and returns `Idempotent-Replay: true` on replay. The submit path still computes its internal deterministic key (`approval/application/idempotency.go:20`) for approval-side consistency.
 
 ### 8.4 Pagination
-- Offset only: `page` + `pageSize` (default 1 / 20, cap 50). Repo `LIMIT/OFFSET` at `repository.go:343`.
-- Response body: `{items, page, pageSize, total}` at `handler.go:167`; generated counterpart `DocumentListResponse` at `api.gen.go:266`.
-- Cursor pagination not adopted (IP-003 not-applicable today).
+- Keyset cursor: `limit` parameter (default 20, cap 100) + opaque `cursor` query param. Repo uses `(updated_at, id) < (...)` cursor predicate at `repository.go:465–474` (FD-2); no LIMIT/OFFSET path.
+- Response body: `{items, page: {next_cursor, has_more}, total}` — `next_cursor` is the opaque cursor built from the last item's `(UpdatedAt, ID)`; `total` is the sibling COUNT at `repository.go:517`.
+- `parseListOptions` (`handler.go:253`) reads the `limit` query parameter; `page`/`pageSize` parameters are not used by this handler.
 
 ### 8.5 Logging & Observability
 - No structured trace correlation wired in this module (IP-007 system-wide gap â€” not documents-specific debt).
@@ -432,7 +438,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 ### 8.6 Concurrency / Transactions
 - Repository methods accept `context.Context` and accept tx where the SubmitService composes one (`approval/application/submit_service.go:68`).
 - `Service.RenameDocument` does **not** wrap UPDATE + audit in a tx (T-005).
-- Atomic CD+draft create uses an explicit tx via `CreateDocumentTx` port (ADR 0011). Because migration 0188 tripwires `documents` INSERT as `document.create` and UPDATE as `document.edit`, `CreateDocumentTx` asserts both capabilities in-order inside the caller-owned tx.
+- Atomic CD+draft create uses an explicit tx via `CreateDocumentTx` port (ADR 0011). Because the Plan 5 tripwire extension (present in curated baseline `db/baseline/0001_current_schema.sql:3793`) attaches `trg_require_cap_asserted` to `documents` for INSERT (`document.create`) and UPDATE (`document.edit`), `CreateDocumentTx` asserts both capabilities in-order inside the caller-owned tx.
 - One-active-instance constraint enforced by partial unique index `ux_approval_instances_active` on `approval_instances(document_id) WHERE status='in_progress'` (`migrations/0135_*.sql:33`, renamed by 0194).
 
 ### 8.7 Snapshot & freeze (placeholder lifecycle)
@@ -460,7 +466,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 | Atomic CD+draft create via `CreateDocumentTx` port | `wiki/decisions/0011-cd-atomic-create.md` |
 | Contract-first OpenAPI via oapi-codegen | `wiki/decisions/0012-contract-first-api.md` (spec-mounted via generated boundary; non-spec routes wired beneath via legacy adapter) |
 | `{name}` single-brace token syntax | `wiki/concepts/token-syntax.md` (ADR 0003) |
-| Duplicate route registration (`handler.go:86/:115`) | `tech-debt: missing-ADR` (T-004) |
+| Route registration via adapter (`module.go:118-130`) — single ``legacyMux`` per handler; no duplicate registration at runtime | T-004 closed by adapter architecture (``NewGeneratedServerAdapter``) |
 | `audit.Write` outside SQL UPDATE tx in rename | `tech-debt: missing-ADR` (T-005) |
 | Audit emission via consumer-port interface (no audit/domain import) | `tech-debt: missing-ADR` (T-007) |
 | Capability namespace unified to typed `iamdomain.Capability` (`document.*`); `doc.submit` literal replaced with `string(iamdomain.CapDocumentSubmit)` | Plan 4 (2026-05-11) â€” closed T-008 |

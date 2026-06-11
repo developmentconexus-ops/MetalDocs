@@ -1,6 +1,6 @@
 # Sessions & Security — Tech Debt Register
 
-**Last verified:** 2026-06-02 (PR-7).
+**Last verified:** 2026-06-10 — Stage-1 backend audit drift patch.
 **Scope:** features deliberately deferred from the v1 rebuild of the Admin
 Center Sessions & Security tab.
 
@@ -17,11 +17,11 @@ promote it to active work. New items appended in chronological order.
 | 6 | Geographic IP intelligence | Requires a third-party IP-geo provider (MaxMind etc.) and the legal review that comes with it. | A control-tower partner requires it, or a sec-eng program funds the provider. |
 | 7 | Cursor pagination for `/auth/sessions` | OpenAPI exposes the `cursor` param but the v1 handler returns `has_more=false` and a hard `LIMIT 200`. Sufficient until any tenant has >200 concurrent sessions. | A tenant routinely exceeds the limit, OR the UI grows a server-paginated table. |
 | 8 | `bulk-permission-change` signal kind | Listed in the PR-7 spec but not present in the PR-3 OpenAPI `SecuritySignalKind` enum. Adding it would force a codegen regen. | Contract change is scheduled with PR-12 (FE consumer). |
-| 9 | Real-time signal push | FE polls `/security/signals` on tab focus (60s). A websocket / SSE push would shave the perceived latency. | Operators complain about lag, or push infra (mercure / SSE) lands generically. |
-| 10 | Memory-mode parity for Sessions & Security | The handler returns `501 Not Implemented` when `deps.SQLDB == nil`. Memory mode is dev-only; the SQL JOINs that drive the tab don't translate cleanly to the in-memory maps. | Memory mode becomes the test path for E2E coverage, or someone wires an integration test that needs it. |
+| 9 | Real-time signal push | FE refetches `/security/signals` when the cache is stale (staleTime = 5 min, `useSecuritySignalsQuery.ts:5,17`); no polling interval is set. A websocket / SSE push would shave perceived latency. | Operators complain about lag, or push infra (mercure / SSE) lands generically. |
+| 10 | Memory-mode parity for Sessions & Security | When `deps.SQLDB == nil` (memory mode / no SQL DB), every handler returns `200 OK` with zero/empty data: MFA-coverage returns `{"total_users":0,"mfa_enabled":0,...}` (`handler.go:44–47, 166–173`) and lockouts/signals return `{"items":[]}` (`handler.go:66–68, 106–109`). No 501 is emitted. Memory mode is dev-only; the SQL JOINs that drive the tab don't translate cleanly to the in-memory maps. | Memory mode becomes the test path for E2E coverage, or someone wires an integration test that needs it. |
 
 ## Source pointers
 
 - Service contract: [`internal/modules/security/application/service.go`](../../internal/modules/security/application/service.go)
 - Signal rules: [`security-signals.md`](security-signals.md)
-- Migration that added stub MFA columns: [`migrations/0210_iam_mfa_and_failed_login_metadata.sql`](../../migrations/0210_iam_mfa_and_failed_login_metadata.sql)
+- Migration that added stub MFA columns: [`db/migrations/0222_iam_mfa_and_failed_login_metadata.sql`](../../db/migrations/0222_iam_mfa_and_failed_login_metadata.sql) (the `archive/migrations/0210_*` path is not replayed at runtime)
