@@ -651,7 +651,18 @@ func (r *Repository) AppendAuditTx(ctx context.Context, tx *sql.Tx, entry *domai
 }
 
 func (r *Repository) auditEvent(ctx context.Context, entry *domain.AuditEvent) (auditdomain.Event, error) {
-	payload, err := json.Marshal(entry.Details)
+	// audit_events has no version_id column; carry it inside the payload so
+	// ListAudit (which reads audit_events since Wave 1.8, F-07-sub-split)
+	// can surface it. Copy before mutating — Details belongs to the caller.
+	details := entry.Details
+	if entry.VersionID != nil && *entry.VersionID != "" {
+		details = make(map[string]any, len(entry.Details)+1)
+		for k, v := range entry.Details {
+			details[k] = v
+		}
+		details["version_id"] = *entry.VersionID
+	}
+	payload, err := json.Marshal(details)
 	if err != nil {
 		return auditdomain.Event{}, fmt.Errorf("templates audit marshal details: %w", err)
 	}
@@ -673,11 +684,16 @@ func (r *Repository) auditEvent(ctx context.Context, entry *domain.AuditEvent) (
 	}, nil
 }
 
+// ListAudit reads template audit history from the canonical audit_events
+// sink, where AppendAudit[Tx] writes (F-07-sub-split, Wave 1.8). Events
+// recorded in the legacy templates_audit_log before the write-sink migration
+// are an accepted historical seam — they are not surfaced here.
 func (r *Repository) ListAudit(ctx context.Context, tenantID, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
 	const q = `
-SELECT tenant_id::text, template_id::text, version_id::text, actor_id, action, details, occurred_at
-FROM templates_audit_log
-WHERE template_id = $1
+SELECT tenant_id::text, resource_id, actor_id, action, payload, occurred_at
+FROM metaldocs.audit_events
+WHERE resource_type = 'template'
+  AND resource_id = $1
   AND tenant_id = $2::uuid
 ORDER BY occurred_at DESC
 LIMIT $3 OFFSET $4`
@@ -693,21 +709,23 @@ LIMIT $3 OFFSET $4`
 	out := make([]*domain.AuditEvent, 0)
 	for rows.Next() {
 		var (
-			event     domain.AuditEvent
-			versionID sql.NullString
-			details   []byte
+			event   domain.AuditEvent
+			details []byte
 		)
-		if err := rows.Scan(&event.TenantID, &event.TemplateID, &versionID, &event.ActorID, &event.Action, &details, &event.OccurredAt); err != nil {
+		if err := rows.Scan(&event.TenantID, &event.TemplateID, &event.ActorID, &event.Action, &details, &event.OccurredAt); err != nil {
 			return nil, err
-		}
-		if versionID.Valid {
-			event.VersionID = &versionID.String
 		}
 		event.Details = map[string]any{}
 		if len(details) > 0 {
 			if err := unmarshalAuditDetails(details, &event.Details); err != nil {
 				return nil, err
 			}
+		}
+		// version_id travels inside the payload (audit_events has no
+		// dedicated column); lift it back onto the domain field.
+		if v, ok := event.Details["version_id"].(string); ok && v != "" {
+			event.VersionID = &v
+			delete(event.Details, "version_id")
 		}
 		out = append(out, &event)
 	}
