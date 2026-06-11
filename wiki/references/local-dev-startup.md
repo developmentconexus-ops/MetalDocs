@@ -1,6 +1,6 @@
 # Local Dev Startup
 
-**Last verified:** 2026-06-08 (Phase E1: PATCH reset-password body fields updated to snake_case; prior: 2026-06-01)
+**Last verified:** 2026-06-11 (Wave 0 item 0.1 / D-4a: secret value redacted — referenced by location only; prior: 2026-06-08)
 
 ## TL;DR
 
@@ -19,7 +19,7 @@ cd frontend/apps/web && pnpm dev
 
 ## Why PowerShell, not bash
 
-`.env` contains `PGPASSWORD=***REDACTED***`. The `<>` characters are I/O redirect operators in bash. Running `source .env` or `set -o allexport; source .env` silently corrupts the value — Postgres connection fails with auth error that looks unrelated.
+`.env` contains `PGPASSWORD=<redacted — see .env>` whose value includes `<>` characters — I/O redirect operators in bash. Running `source .env` or `set -o allexport; source .env` silently corrupts the value — Postgres connection fails with auth error that looks unrelated.
 
 PowerShell string assignment is literal — `<>` is safe.
 

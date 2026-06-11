@@ -524,7 +524,7 @@ Additionally, pre-built Windows binaries of indeterminate provenance are committ
 
 | Claim | Location |
 |---|---|
-| Plaintext database password (`***REDACTED***`) and hardcoded MinIO credentials in source | `cmd/seed-test-document/main.go:25-30` |
+| Plaintext database password (`<redacted — see .env>`) and hardcoded MinIO credentials in source | `cmd/seed-test-document/main.go:25-30` |
 | Stale compiled binary committed from initial commit 912879cba; .gitignore covers root .exe but not `bin/` | `bin/metaldocs-api.exe` |
 | Pre-built Windows binary of unverifiable provenance | `scripts/api-lint/api-lint.exe` |
 | Absolute path to a different developer's machine username hard-coded | `scripts/start-spec1-api.ps1:2` |

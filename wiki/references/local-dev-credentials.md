@@ -1,6 +1,6 @@
 # Local Dev Credentials
 
-**Last verified:** 2026-06-03 (ADR 0022 Phase 5: marked `cap:membership.manage` for the `wiki-capability-parity` CI binding; prior: 2026-06-01)
+**Last verified:** 2026-06-11 (Wave 0 item 0.1 / D-4a: secret value redacted — referenced by location only; prior: 2026-06-03)
 
 ## API login
 
@@ -29,7 +29,7 @@ PGHOST=127.0.0.1
 PGPORT=5433
 PGDATABASE=metaldocs
 PGUSER=metaldocs_app
-PGPASSWORD=***REDACTED***   ← set via $env:PGPASSWORD in PowerShell, never via bash source .env
+PGPASSWORD=<redacted — see .env>   ← value contains <> chars; set via $env:PGPASSWORD in PowerShell, never via bash source .env
 ```
 
 See `.env` for full var list. Use `scripts/start-api-ps.ps1` if it exists, otherwise set manually.

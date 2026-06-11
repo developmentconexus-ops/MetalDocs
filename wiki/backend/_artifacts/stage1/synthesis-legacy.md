@@ -468,7 +468,7 @@ A committed source file contains plaintext credentials. This is the highest-seve
 
 | Claim | Location |
 |---|---|
-| `cmd/seed-test-document/main.go` contains hardcoded DSN with plaintext password (`***REDACTED***`) and hardcoded MinIO credentials | `cmd/seed-test-document/main.go:25-30` |
+| `cmd/seed-test-document/main.go` contains hardcoded DSN with plaintext password (`<redacted — see .env>`) and hardcoded MinIO credentials | `cmd/seed-test-document/main.go:25-30` |
 | `bin/metaldocs-api.exe` is a stale compiled binary committed from the initial commit; .gitignore covers root .exe but not `bin/` | `bin/metaldocs-api.exe` |
 | `scripts/api-lint/api-lint.exe` — pre-built Windows binary committed; provenance cannot be verified | `scripts/api-lint/api-lint.exe` |
 | `scripts/start-spec1-api.ps1` hardcodes an absolute path to a different machine's username | `scripts/start-spec1-api.ps1:2` |

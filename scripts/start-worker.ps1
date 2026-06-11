@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-# Load .env — split on first '=' only so PGPASSWORD=***REDACTED*** is preserved intact
+# Load .env — split on first '=' only so the PGPASSWORD value (contains '<>' chars) is preserved intact
 Get-Content ".env" | ForEach-Object {
   if ($_ -match '^\s*#' -or $_ -match '^\s*$') { return }
   $name, $value = $_ -split '=', 2

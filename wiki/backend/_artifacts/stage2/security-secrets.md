@@ -22,7 +22,7 @@ Confirmed by direct file read. Four distinct hardcoded secrets/artifacts exist:
 
 | Artifact | Location | Content |
 |---|---|---|
-| Plaintext Postgres DSN with password | `cmd/seed-test-document/main.go:25` | `password='***REDACTED***'` |
+| Plaintext Postgres DSN with password | `cmd/seed-test-document/main.go:25` | `password='<redacted — see .env>'` |
 | Plaintext MinIO access key + secret key | `cmd/seed-test-document/main.go:27-28` | `minioadmin` / `minioadmin` |
 | Compiled Windows binary of unknown provenance | `scripts/api-lint/api-lint.exe` | No build provenance |
 | Stale compiled binary committed from initial commit | `bin/metaldocs-api.exe` | Commit `912879cba`; `.gitignore` covers root `.exe` but NOT `bin/` |
@@ -46,13 +46,13 @@ The credential-bearing file was last touched commit `c4a7d9a93` (2026-04). Git h
 
 ### Verdict: REFACTOR — P0-prerequisite
 
-**Rationale:** This is not a "fix before production" finding — it is a "fix before any further security analysis is meaningful" finding. A credential in VCS must be treated as compromised from the moment of the first clone. The MinIO credentials (`minioadmin`/`minioadmin`) are default values that are also likely present in the compose stack; the Postgres password `***REDACTED***` is non-default and specific, suggesting it may be a real credential used in a shared environment.
+**Rationale:** This is not a "fix before production" finding — it is a "fix before any further security analysis is meaningful" finding. A credential in VCS must be treated as compromised from the moment of the first clone. The MinIO credentials (`minioadmin`/`minioadmin`) are default values that are also likely present in the compose stack; the Postgres password (`<redacted — see .env>`) is non-default and specific, suggesting it may be a real credential used in a shared environment.
 
 **Over-engineering check:** The fix is the minimum possible action. No abstraction or framework is required. This is a delete + rotate + gitignore + history-scrub operation.
 
 **Smallest correct fix (ordered by urgency):**
 
-1. **Rotate the Postgres password** (`***REDACTED***`) immediately if it matches any non-dev environment. Assess which environments use this password. Document the rotation outcome.
+1. **Rotate the Postgres password** (`<redacted — see .env>`) immediately if it matches any non-dev environment. Assess which environments use this password. Document the rotation outcome.
 2. **Delete `cmd/seed-test-document/main.go`** — confirmed dead binary (no canonical script, no CI reference, `D-06` topology flag). The seed function is covered by `apps/api/cmd/metaldocs-e2e-seed/` which reads credentials from env. Delete the whole `cmd/` directory; it has no other inhabitants.
 3. **Rewrite git history** using `git filter-repo --invert-paths --path cmd/seed-test-document/main.go` (or BFG) to remove the secret from all commits, then force-push. Add `cmd/` to `.gitignore` or confirm it is gone.
 4. **Remove `bin/metaldocs-api.exe`** with `git rm bin/metaldocs-api.exe` and add `bin/*.exe` to `.gitignore`. The file is a stale build artifact from the initial commit.

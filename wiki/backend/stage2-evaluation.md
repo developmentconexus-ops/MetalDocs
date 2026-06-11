@@ -25,7 +25,7 @@ These block the roadmap. No Wave 1 security work is meaningful until F-18 is res
 
 ### P0-1: F-18 — Plaintext credentials committed to VCS
 
-`cmd/seed-test-document/main.go:25-28` contains a plaintext Postgres password (`***REDACTED***`) and MinIO credentials. This is CWE-798 / OWASP ASVS V2.10.4 / OWASP Top 10 A07. Git history permanently retains the secret unless rewritten. The MinIO credentials are default values; the Postgres password is non-default and specific.
+`cmd/seed-test-document/main.go:25-28` contains a plaintext Postgres password (`<redacted — see .env>`) and MinIO credentials. This is CWE-798 / OWASP ASVS V2.10.4 / OWASP Top 10 A07. Git history permanently retains the secret unless rewritten. The MinIO credentials are default values; the Postgres password is non-default and specific.
 
 **Blocked-by:** nothing. Execute immediately.
 

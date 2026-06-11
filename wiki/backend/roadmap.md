@@ -30,7 +30,7 @@
 
 | # | Item | Findings | Status | Commit | Evidence / notes |
 |---|------|----------|--------|--------|------------------|
-| 0.1 | Delete seed binary; redact secret from 7 docs; rm committed .exe; .gitignore fix; delete dead script; pin api-lint.exe | F-18, D-4a | ☐ | | grep of secret over working tree must be empty |
+| 0.1 | Delete seed binary; redact secret from 7 docs; rm committed .exe; .gitignore fix; delete dead script; pin api-lint.exe | F-18, D-4a | ✅ | (this commit) | Secret grep clean over tracked files AND full working tree (incl. `.env` — already holds a new value). Redacted 9 tracked files (2 more than planned: `scripts/start-api-no-build.ps1`, `scripts/start-worker.ps1` comments + `_artifacts/stage1/repo-topology.md`); `bin/metaldocs-api.exe` + `scripts/api-lint/api-lint.exe` were on-disk only, never git-tracked → file deleted / rebuilt from source (SHA-256 `5660…2C8D`); `bin/*.exe` added to `.gitignore`; stale gitignored agent-worktree copies redacted in place |
 | 0.2 | gitleaks secret-scan in CI + D-4a rule in documentation-governance.md | F-18 | ☐ | | |
 | 0.3 | **USER:** rotate dev DB password in `.env` at Docker re-creation (+ anywhere reused) | F-18 | ⏸ user | — | unlocks 0.4 |
 | 0.4 | History rewrite: `git filter-repo --replace-text` + force-push; user re-clones | F-18 | ⏸ on 0.3 | | `git log --all -S '<secret>'` empty |

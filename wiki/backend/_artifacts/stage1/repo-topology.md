@@ -549,7 +549,7 @@ The `workerWG` and `schedulerWG` sync.WaitGroups are used during graceful shutdo
 
 ## 10. Legacy / duplication / smell flags
 
-- **DEAD BINARY: `cmd/seed-test-document/`** — `cmd/seed-test-document/main.go` has hardcoded DSN (`host=127.0.0.1 port=5433 ... password='***REDACTED***'`), hardcoded MinIO credentials, and no reference in any CI workflow, canonical script, or README. Last git touch: commit `c4a7d9a93` (2026-04, extracted `DevTenantID` constant). Binary `seed-test-document.exe` appears in `.gitignore`. No active consumer found. RF candidate for deletion.
+- **DEAD BINARY: `cmd/seed-test-document/`** — `cmd/seed-test-document/main.go` has hardcoded DSN (`host=127.0.0.1 port=5433 ... password='<redacted — see .env>'`), hardcoded MinIO credentials, and no reference in any CI workflow, canonical script, or README. Last git touch: commit `c4a7d9a93` (2026-04, extracted `DevTenantID` constant). Binary `seed-test-document.exe` appears in `.gitignore`. No active consumer found. RF candidate for deletion.
 
 - **LEGACY STARTUP SCRIPT: `scripts/start-spec1-api.ps1`** — Contains hardcoded absolute path to a different machine's username (`C:\Users\leandro.theodoro.MN-NTB-LEANDROT\Documents\MetalDocs\...`). This script cannot function on the current machine. Last git touch: commit `9c62bd3a2` (early 2026). Dead in its current form; confusing to future developers.
 
