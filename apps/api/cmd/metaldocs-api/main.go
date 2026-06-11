@@ -42,6 +42,7 @@ import (
 	auditdelivery "metaldocs/internal/modules/audit/delivery/http"
 	authapp "metaldocs/internal/modules/auth/application"
 	authdelivery "metaldocs/internal/modules/auth/delivery/http"
+	authdomain "metaldocs/internal/modules/auth/domain"
 	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	controlleddocuments "metaldocs/internal/modules/controlleddocuments"
 	controlleddocumentsapp "metaldocs/internal/modules/controlleddocuments/application"
@@ -272,7 +273,13 @@ func main() {
 		iamAdminHandler = iamAdminHandler.WithObservabilityService(observabilityService)
 	}
 	featureFlagsHandler := featureflags.NewHandler(featureFlagsCfg)
-	httpObs := observability.NewHTTPObservability(deps.StatusProvider)
+	httpObs := observability.NewHTTPObservability(deps.StatusProvider).
+		WithUserIDResolver(func(r *http.Request) string {
+			if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
+				return currentUser.UserID
+			}
+			return ""
+		})
 	rateLimiter := security.NewRateLimiter(rateCfg)
 	cors := security.NewCORS(corsCfg)
 

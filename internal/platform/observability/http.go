@@ -12,7 +12,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	authdomain "metaldocs/internal/modules/auth/domain"
 	"metaldocs/internal/platform/requesttrace"
 )
 
@@ -28,6 +27,7 @@ type routeMetrics struct {
 type HTTPObservability struct {
 	logger          *slog.Logger
 	runtimeProvider RuntimeStatusProvider
+	userIDResolver  func(*http.Request) string
 	mu              sync.RWMutex
 	byKey           map[string]*routeMetrics
 }
@@ -54,6 +54,15 @@ func NewHTTPObservability(runtimeProvider ...RuntimeStatusProvider) *HTTPObserva
 		runtimeProvider: provider,
 		byKey:           make(map[string]*routeMetrics),
 	}
+}
+
+// WithUserIDResolver injects the callback that resolves the authenticated
+// user id for request logging. The composition root supplies it so this
+// platform package stays free of module imports (REQ-TOP-2); when nil or
+// when the callback returns empty, requests log as "anonymous".
+func (o *HTTPObservability) WithUserIDResolver(resolve func(*http.Request) string) *HTTPObservability {
+	o.userIDResolver = resolve
+	return o
 }
 
 func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
@@ -87,8 +96,10 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 		m.record(durationMs)
 
 		userID := "anonymous"
-		if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok && strings.TrimSpace(currentUser.UserID) != "" {
-			userID = currentUser.UserID
+		if o.userIDResolver != nil {
+			if id := strings.TrimSpace(o.userIDResolver(r)); id != "" {
+				userID = id
+			}
 		}
 		documentID, profileCode := extractRouteContext(path)
 

@@ -35,7 +35,7 @@
 | 0.3 | **USER:** rotate dev DB password in `.env` at Docker re-creation (+ anywhere reused) | F-18 | ⏸ user | — | unlocks 0.4 |
 | 0.4 | History rewrite: `git filter-repo --replace-text` + force-push; user re-clones | F-18 | ⏸ on 0.3 | | `git log --all -S '<secret>'` empty |
 | 0.5 | `jobs.Dockerfile` + `jobs` service in compose | F-19-deployment | ☐ | | `docker compose config` parses; 🔁 runtime |
-| 0.6 | platform/observability → callback injection (drop auth/domain import) | F-06a | ☐ | | build + pkg tests; no `modules/` import under `platform/` |
+| 0.6 | platform/observability → callback injection (drop auth/domain import) | F-06a | ✅ | (this commit) | `WithUserIDResolver(func(*http.Request) string)` setter (pattern: `platform/ratelimit`); wired at composition root `main.go`. Build + vet + `go test ./internal/platform/observability/...` OK; grep: observability clean. **Discovered for 1.10 scoping:** `platform/{authn,bootstrap,docgenv2,objectstore,security}` still import `internal/modules/**` — the 1.10 CI guard needs explicit per-package disposition (bootstrap/authn are composition-adjacent; `security/ratelimit.go` dies in 2.8) |
 
 **Wave close:** evidence block in handoff · this file updated · user review → Wave 1.
 
