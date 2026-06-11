@@ -1,8 +1,14 @@
 # Documentation Governance
 
-> **Last verified:** 2026-05-27
-> **Scope:** Ownership model for durable project knowledge, section boundaries, and safe promotion rules.
+> **Last verified:** 2026-06-11 (added "Secrets in documentation" rule per design decision D-4a)
+> **Scope:** Ownership model for durable project knowledge, section boundaries, safe promotion rules, and the secrets-in-documentation rule.
 > **Out of scope:** Rewriting every legacy document or mass-moving existing trees in one session.
+
+## Secrets in documentation (D-4a — permanent rule)
+
+Secrets are **referenced by location, never quoted** — in any doc, report, commit message, audit artifact, or chat-derived summary. Write `<redacted — see .env>` (or the owning store, e.g. "see the CI secret `X`") instead of the value. This applies to *audit and security findings as well*: a report about a leaked credential must not itself reproduce the credential (the Stage-1/2 backend audit made exactly this mistake across 5 committed files — that is the incident this rule comes from, decision D-4a in `docs/superpowers/specs/2026-06-11-backend-professionalization-design.md`).
+
+Enforcement: the `secret-scan` CI workflow (gitleaks) blocks checked-in secret values; this rule covers what scanners cannot reliably catch — deliberate quotation in prose.
 
 ## Ownership rule
 

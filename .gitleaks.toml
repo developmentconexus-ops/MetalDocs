@@ -1,0 +1,26 @@
+# gitleaks config — extends the default ruleset with project allowlists.
+# Disposition recorded in Wave 0 item 0.2 (F-18): every allowlisted class below
+# was individually assessed on 2026-06-11 and contains no live credential.
+title = "MetalDocs secret-scan config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Assessed non-secrets (Wave 0 item 0.2)"
+paths = [
+    # Go test fixtures (named test* constants, fake S3 keys)
+    '''.*_test\.go''',
+    # oapi-codegen output: embedded base64 spec chunks trip entropy rules
+    '''.*\.gen\.go''',
+    # Ephemeral AI plan docs — dir is gitignored for new content; tracked
+    # leftovers contain stale example tokens (verified ≠ current .env values)
+    '''docs/superpowers/plans/.*''',
+    # Screen-QA artifacts: idempotency-key UUIDs, captured payloads
+    '''frontend/apps/web/design-source/.*/artifacts/.*''',
+]
+regexes = [
+    # Documented sample password in dev runbook user-creation payload
+    # (same class as the documented dev admin login — not a credential)
+    '''StrongPass123''',
+]
