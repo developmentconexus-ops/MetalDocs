@@ -33,10 +33,11 @@ func BuildJobsDependencies(ctx context.Context, cfg config.JobsConfig, workerFac
 		return JobsDependencies{}, fmt.Errorf("open postgres: %w", err)
 	}
 
-	if err := MigrateRiverSchema(ctx, db, cfg.RiverSchema); err != nil {
-		_ = closeDB(db)
-		return JobsDependencies{}, err
-	}
+	// River schema migration is owned by the API binary alone (F-19,
+	// REQ-ASYNC-4): metaldocs-api runs MigrateRiverSchema at startup, and
+	// the jobs compose service has depends_on: api (healthy), so the schema
+	// exists before this binary starts. Running it here too gave the schema
+	// two owners with no declared order.
 
 	var workers *river.Workers
 	if workerFactory != nil {
