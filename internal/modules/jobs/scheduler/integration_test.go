@@ -424,6 +424,11 @@ VALUES ($1, $2, $3, now() - interval '15 minutes', now() - interval '15 minutes'
 		t.Fatalf("expected stale lease deleted, got count=%d", leaseCount)
 	}
 
+	// Wave 1.7 (F-19): leases are system-scoped; reaps are recorded as
+	// structured log lines, NOT tenant-scoped governance events. The old
+	// 'lease.reaped' governance INSERT never fired anyway (the tenant
+	// lookup against public.documents always failed) — assert the new
+	// contract: no governance row is written.
 	var eventCount int
 	if err := db.QueryRowContext(ctx, `
 SELECT count(*)
@@ -434,8 +439,8 @@ WHERE event_type = 'lease.reaped'
 `, job).Scan(&eventCount); err != nil {
 		t.Fatalf("count governance events: %v", err)
 	}
-	if eventCount == 0 {
-		t.Fatal("expected at least one governance_events row for lease.reaped")
+	if eventCount != 0 {
+		t.Fatalf("expected no governance_events rows for system-scoped lease reaps, got %d", eventCount)
 	}
 }
 

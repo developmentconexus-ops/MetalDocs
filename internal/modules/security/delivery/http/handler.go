@@ -142,8 +142,7 @@ func (h *Handler) requireTenant(w http.ResponseWriter, r *http.Request) (string,
 // methodNotAllowed writes the RFC 9457 405 response (D-03: every error path
 // in this module emits problem+json — bare statuses were the one exception).
 func (h *Handler) methodNotAllowed(w http.ResponseWriter) {
-	w.Header().Set("Allow", http.MethodGet)
-	h.writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed"))
+	httpresponse.WriteMethodNotAllowed(w, http.MethodGet)
 }
 
 func (h *Handler) writeProblem(w http.ResponseWriter, p *problem.Problem) {

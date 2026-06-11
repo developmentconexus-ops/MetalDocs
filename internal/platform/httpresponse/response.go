@@ -17,6 +17,13 @@ func WriteError(w http.ResponseWriter, status int, code problem.Code, message st
 	_ = problem.Write(w, problem.New(status, code, message))
 }
 
+// WriteMethodNotAllowed writes the canonical RFC 9457 405 response with the
+// RFC 9110 Allow header (D-03: no bare-status error responses).
+func WriteMethodNotAllowed(w http.ResponseWriter, allow string) {
+	w.Header().Set("Allow", allow)
+	WriteError(w, http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed")
+}
+
 func ReadJSON(r *http.Request, v any) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }

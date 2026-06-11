@@ -14,6 +14,12 @@ import (
 	platformtenant "metaldocs/internal/platform/tenant"
 )
 
+// PathLogin is the login endpoint path. Exported so the composition root's
+// pre-auth rate limiter (REQ-MW-5) and this middleware's public-path fallback
+// reference one constant — renaming the route cannot silently detach the
+// rate-limit gate from the real endpoint.
+const PathLogin = "/api/v1/auth/login"
+
 // PublicPathChecker returns true if the given method+path requires no session
 // cookie (i.e. it is fully unauthenticated). Injecting this function into the
 // middleware lets the composition root own the single authoritative list of
@@ -101,7 +107,7 @@ func defaultPublicPaths(method, path string) bool {
 	switch {
 	case path == "/api/v1/health/live", path == "/api/v1/health/ready":
 		return true
-	case method == http.MethodPost && path == "/api/v1/auth/login":
+	case method == http.MethodPost && path == PathLogin:
 		return true
 	case method == http.MethodPost && path == "/api/v1/auth/logout":
 		return true

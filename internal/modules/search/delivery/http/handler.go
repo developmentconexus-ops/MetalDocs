@@ -10,7 +10,6 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	searchdomain "metaldocs/internal/modules/search/domain"
 	"metaldocs/internal/platform/httpresponse"
-	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -54,8 +53,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", http.MethodGet)
-		httpresponse.WriteError(w, http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed")
+		httpresponse.WriteMethodNotAllowed(w, http.MethodGet)
 		return
 	}
 

@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	authdelivery "metaldocs/internal/modules/auth/delivery/http"
 	"metaldocs/internal/platform/ratelimit"
 )
 
@@ -53,7 +54,7 @@ func loginRateLimit(limiter *ratelimit.Middleware) func(http.Handler) http.Handl
 	return func(next http.Handler) http.Handler {
 		limited := limiter.Limit(ratelimit.RouteAuthLogin, func(*http.Request) string { return "" }, next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost && r.URL.Path == "/api/v1/auth/login" {
+			if r.Method == http.MethodPost && r.URL.Path == authdelivery.PathLogin {
 				limited.ServeHTTP(w, r)
 				return
 			}
