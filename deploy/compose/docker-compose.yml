@@ -213,6 +213,27 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGSSLMODE: disable
 
+  jobs:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/jobs.Dockerfile
+    container_name: metaldocs-jobs
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      METALDOCS_JOBS_ENABLED: ${METALDOCS_JOBS_ENABLED:-true}
+      METALDOCS_JOBS_TEMPORAL_MAX_WORKERS: ${METALDOCS_JOBS_TEMPORAL_MAX_WORKERS:-10}
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGSSLMODE: disable
+
   web:
     build:
       context: ../..
