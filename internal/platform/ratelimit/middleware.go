@@ -255,6 +255,31 @@ func (m *Middleware) loadOrInsert(lk string, interval time.Duration, quota int, 
 	return fresh, true
 }
 
+// GlobalEnvelopeWrap returns an http.Handler wrapper that enforces the
+// RouteGlobalEnvelope quota on every request except health probes
+// (/api/v1/health/live, /api/v1/health/ready). It replaces the legacy
+// security.RateLimiter (F-05/D-04, Wave 2.8).
+//
+// userExtractor must return the authenticated user id from the request context,
+// or "" when the request is unauthenticated (e.g. a session-less path that
+// slipped through authn). When "" is returned the limiter falls back to the
+// trusted-proxy-resolved client IP — same identity precedence as the old
+// security.RateLimiter.
+//
+// The method returns next unchanged when no quota is configured for
+// RouteGlobalEnvelope (e.g. quota map was built without it).
+func (m *Middleware) GlobalEnvelopeWrap(userExtractor func(*http.Request) string, next http.Handler) http.Handler {
+	limited := m.Limit(RouteGlobalEnvelope, userExtractor, next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/health/live", "/api/v1/health/ready":
+			next.ServeHTTP(w, r)
+			return
+		}
+		limited.ServeHTTP(w, r)
+	})
+}
+
 func writeRateLimitError(w http.ResponseWriter, quota, retryAfterSec int) {
 	// RFC 9457 (AD-2): one error shape across the API. The quota/retry detail
 	// the legacy body carried is preserved via the standard Retry-After header

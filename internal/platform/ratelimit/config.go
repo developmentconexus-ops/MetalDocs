@@ -18,6 +18,12 @@ const (
 	// client IP (the user extractor returns "").
 	RouteAuthLogin RouteKey = "auth_login"
 
+	// RouteGlobalEnvelope is the post-authn blanket limiter that replaces the
+	// legacy security.RateLimiter (F-05/D-04, Wave 2.8). It applies to every
+	// non-health request and keys on authenticated user → trusted-proxy-resolved
+	// IP, matching the old limiter's identity precedence. Default: 120 req/min.
+	RouteGlobalEnvelope RouteKey = "global_envelope"
+
 	RouteUploadsPresign  RouteKey = "uploads_presign"
 	RouteAutosavePresign RouteKey = "autosave_presign"
 	RouteAutosaveCommit  RouteKey = "autosave_commit"
@@ -71,6 +77,7 @@ func (c Config) QuotaFor(k RouteKey) (int, bool) {
 // Panics only if the built-in defaults are invalid (static; cannot happen at runtime).
 func DefaultConfig() Config {
 	cfg, err := NewConfig(map[RouteKey]int{
+		RouteGlobalEnvelope:  120,
 		RouteUploadsPresign:  60,
 		RouteAutosavePresign: 60,
 		RouteAutosaveCommit:  30,

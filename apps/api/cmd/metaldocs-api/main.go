@@ -159,10 +159,6 @@ func main() {
 	if err := requirePostgresRepositoryMode(repoMode); err != nil {
 		log.Fatal(err)
 	}
-	rateCfg, err := config.LoadRateLimitConfig()
-	if err != nil {
-		log.Fatalf("invalid rate limit config: %v", err)
-	}
 	corsCfg, err := config.LoadCORSConfig()
 	if err != nil {
 		log.Fatalf("invalid cors config: %v", err)
@@ -287,7 +283,6 @@ func main() {
 		},
 		deps.StatusProvider,
 	)
-	rateLimiter := security.NewRateLimiter(rateCfg)
 	cors := security.NewCORS(corsCfg)
 
 	// Pre-auth IP-keyed rate limit for the login endpoint (REQ-MW-5). Runs
@@ -299,6 +294,29 @@ func main() {
 	}
 	loginRateCfg.TrustedProxyCIDRs = authCfg.TrustedProxyCIDRs
 	preAuthLimiter := ratelimit.New(ctx, loginRateCfg)
+
+	// Post-authn global envelope limiter (F-05/D-04, Wave 2.8): replaces the
+	// legacy security.RateLimiter. Same identity precedence: authenticated user
+	// → trusted-proxy-resolved client IP → fail-closed. Default: 120 req/min
+	// per identity (matches old fixed-window default of 120 req / 60s window).
+	// Env vars METALDOCS_RATE_LIMIT_ENABLED / _WINDOW_SECONDS / _MAX_REQUESTS
+	// are now dead — see commit body for mapping.
+	globalRateCfg := ratelimit.DefaultConfig()
+	globalRateCfg.TrustedProxyCIDRs = authCfg.TrustedProxyCIDRs
+	globalLimiter := ratelimit.New(ctx, globalRateCfg)
+	// userIDExtractor resolves the authenticated principal from context. Runs
+	// after authn + iamMiddleware in the chain, so both auth and IAM user IDs
+	// are available. Mirrors security.RateLimiter.requestIdentity without
+	// importing domain packages (dependency injected via closure).
+	userIDExtractor := func(r *http.Request) string {
+		if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok && strings.TrimSpace(currentUser.UserID) != "" {
+			return strings.TrimSpace(currentUser.UserID)
+		}
+		if userID := strings.TrimSpace(iamdomain.UserIDFromContext(r.Context())); userID != "" {
+			return userID
+		}
+		return ""
+	}
 
 	mux := http.NewServeMux()
 	authHandler.RegisterRoutes(mux)
@@ -522,7 +540,7 @@ func main() {
 	docDeps.SubmitSvc = approvalServices.Submit
 
 	docMod := documents.New(docDeps)
-	docMod.RegisterRoutes(mux)
+	docMod.RegisterRoutesWithRateLimit(mux, globalLimiter, userIDExtractor)
 
 	// Wire the documents-side adapter back into the controlled-documents service so atomic
 	// CD-create can clone the initial document inside the same tx as the CD
@@ -642,7 +660,7 @@ func main() {
 		authMiddleware.Wrap,
 		iamMiddleware.Wrap,
 		presenceWrap,
-		rateLimiter.Wrap,
+		func(next http.Handler) http.Handler { return globalLimiter.GlobalEnvelopeWrap(userIDExtractor, next) },
 	))
 
 	addr := ":8080"
@@ -666,8 +684,8 @@ func main() {
 		IdleTimeout:  90 * time.Second,
 	}
 
-	log.Printf("MetalDocs API listening on %s (repository=%s auth_enabled=%t auth_cache_ttl=%s rate_limit_enabled=%t rate_limit_window_s=%d rate_limit_max_requests=%d cors_enabled=%t cors_allowed_origins=%d)",
-		addr, repoMode, authn.Enabled(), authn.CacheTTL(), rateCfg.Enabled, rateCfg.WindowSeconds, rateCfg.MaxRequests, corsCfg.Enabled, len(corsCfg.AllowedOrigins))
+	log.Printf("MetalDocs API listening on %s (repository=%s auth_enabled=%t auth_cache_ttl=%s cors_enabled=%t cors_allowed_origins=%d)",
+		addr, repoMode, authn.Enabled(), authn.CacheTTL(), corsCfg.Enabled, len(corsCfg.AllowedOrigins))
 
 	serverErr := make(chan error, 1)
 	go func() {

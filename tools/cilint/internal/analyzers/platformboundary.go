@@ -28,9 +28,6 @@ var platformBoundaryAllowed = map[string]string{
 	"internal/platform/docgenv2": "pending Wave 2 boundary extraction",
 	// Presigner reads module domain types. Disposition: Wave 2 F-06 family.
 	"internal/platform/objectstore": "pending Wave 2 boundary extraction",
-	// Legacy rate limiter imports domain packages; the whole file dies in
-	// Wave 2.8 (F-05/D-04) when platform/ratelimit replaces it.
-	"internal/platform/security": "deleted in Wave 2.8 (F-05)",
 }
 
 // PlatformBoundary flags imports of internal/modules from internal/platform
