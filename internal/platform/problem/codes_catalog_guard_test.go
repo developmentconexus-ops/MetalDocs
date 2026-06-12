@@ -23,6 +23,7 @@ var errorWriterCodeArg = map[string]int{
 	"writeErr":           2, // writeErr(w, status, code, message)
 	"writePDFWebhookErr": 2, // writePDFWebhookErr(w, status, code, detail)
 	"writeErrJSON":       2, // idempotency: writeErrJSON(w, status, code, msg)
+	"WriteError":         2, // httpresponse.WriteError(w, status, code, message)
 }
 
 // guardedPackages are the HTTP packages whose error vocabulary Family 4
@@ -34,6 +35,11 @@ var guardedPackages = []string{
 	filepath.Join("internal", "modules", "templates", "delivery", "http"),
 	filepath.Join("internal", "platform", "idempotency"), // F-09: middleware raw codes closed Wave 1.4
 	"pdf_webhook", // documents/http: only the pdf-complete webhook handler
+	// F-09 Wave 2.4: only handler.go is on the canonical catalog. The sibling
+	// routes.go (writeDomainError) owns a separate CD/template domain taxonomy
+	// — including dotted codes (template.artifact_missing) — that is intentionally
+	// excluded, mirroring the documents/approval/http exclusion above.
+	"controlleddocuments_handler",
 }
 
 func repoRoot(t *testing.T) string {
@@ -84,6 +90,9 @@ func resolvePkgFiles(t *testing.T, root, entry string) []string {
 	if entry == "pdf_webhook" {
 		return []string{filepath.Join(root, "internal", "modules", "documents", "http", "pdf_webhook_handler.go")}
 	}
+	if entry == "controlleddocuments_handler" {
+		return []string{filepath.Join(root, "internal", "modules", "controlleddocuments", "delivery", "http", "handler.go")}
+	}
 	dir := filepath.Join(root, entry)
 	dirEntries, err := os.ReadDir(dir)
 	if err != nil {
@@ -128,8 +137,9 @@ func codeArgIndex(call *ast.CallExpr) (int, bool) {
 		idx, ok := errorWriterCodeArg[fn.Name]
 		return idx, ok
 	case *ast.SelectorExpr:
-		// Only problem.New(status, code, title); ignore other pkg.New (e.g. idempotency.New).
-		if pkg, ok := fn.X.(*ast.Ident); ok && pkg.Name == "problem" {
+		// problem.New(status, code, title) and httpresponse.WriteError(w, status,
+		// code, message) carry a code arg; ignore other pkg.New (e.g. idempotency.New).
+		if pkg, ok := fn.X.(*ast.Ident); ok && (pkg.Name == "problem" || pkg.Name == "httpresponse") {
 			idx, ok := errorWriterCodeArg[fn.Sel.Name]
 			return idx, ok
 		}

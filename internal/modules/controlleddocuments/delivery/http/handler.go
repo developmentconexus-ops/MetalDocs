@@ -12,6 +12,7 @@ import (
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/idempotency"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -51,7 +52,7 @@ func injectTenant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tid, err := tenant.FromContext(r.Context())
 		if err != nil {
-			httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 			return
 		}
 		ctx := context.WithValue(r.Context(), tenantContextKey{}, tid)
@@ -103,10 +104,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			if requiresIdempotencyKey(r) && strings.Contains(err.Error(), "Idempotency-Key is required") {
-				httpresponse.WriteError(w, http.StatusBadRequest, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key header is required")
+				httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeIdempotencyKeyRequired, "Idempotency-Key header is required")
 				return
 			}
-			httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+			httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, err.Error())
 		},
 	})
 }
