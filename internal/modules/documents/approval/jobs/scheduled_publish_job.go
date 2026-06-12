@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/riverqueue/river"
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/db"
 )
 
 var (
@@ -53,8 +55,12 @@ type RiverScheduledPublishEnqueuer struct {
 	Client *river.Client[*sql.Tx]
 }
 
-func (e *RiverScheduledPublishEnqueuer) EnqueueScheduledPublishTx(ctx context.Context, tx *sql.Tx, input application.ScheduledPublishJobInput) error {
-	_, err := e.Client.InsertTx(ctx, tx, ScheduledPublishArgs{
+func (e *RiverScheduledPublishEnqueuer) EnqueueScheduledPublishTx(ctx context.Context, tx db.Tx, input application.ScheduledPublishJobInput) error {
+	sqlTx, ok := tx.(*sql.Tx)
+	if !ok {
+		return fmt.Errorf("scheduled_publish: river requires *sql.Tx, got %T", tx)
+	}
+	_, err := e.Client.InsertTx(ctx, sqlTx, ScheduledPublishArgs{
 		TenantID:                input.TenantID,
 		DocumentID:              input.DocumentID,
 		ExpectedRevisionVersion: input.ExpectedRevisionVersion,

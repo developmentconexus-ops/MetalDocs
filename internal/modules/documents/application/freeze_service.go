@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/resolvers"
 	tmpldom "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/db"
 )
 
 type FreezeFinalizer interface {
@@ -33,7 +33,7 @@ type FanoutClient interface {
 
 // MaterializeOutboxEnqueuer enqueues an async materialize job inside the Pin transaction.
 type MaterializeOutboxEnqueuer interface {
-	Enqueue(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, contentHash []byte) error
+	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
 }
 
 // MaterializeResult is returned by Materialize after a successful fanout call.
@@ -95,7 +95,7 @@ func (s *FreezeService) WithMaterializeOutbox(enqueuer MaterializeOutboxEnqueuer
 // validates required placeholders, resolves computed ones, computes values_hash,
 // and writes the freeze marker inside tx. Returns the resolved valMap and schema.
 func (s *FreezeService) pinValidateAndHash(
-	ctx context.Context, tx *sql.Tx, tenantID, revisionID string, approver ApproverContext,
+	ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext,
 ) (map[string]any, []tmpldom.Placeholder, error) {
 	schema, err := s.schemas.LoadPlaceholderSchema(ctx, tenantID, revisionID)
 	if err != nil {
@@ -188,7 +188,7 @@ func (s *FreezeService) pinValidateAndHash(
 // It validates, resolves computed placeholders, writes values_hash + frozen_at,
 // and enqueues a materialize_dispatch_outbox row — all inside tx.
 // No network calls to docx-renderer. Fast and cheap.
-func (s *FreezeService) Pin(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, approver ApproverContext) error {
+func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext) error {
 	snap, valuesFrozenAt, err := s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, revisionID, tx)
 	if err != nil {
 		return fmt.Errorf("pin: read snapshot: %w", err)
@@ -299,7 +299,7 @@ func (s *FreezeService) Materialize(ctx context.Context, tenantID, revisionID st
 
 // Freeze is the original synchronous implementation kept for backward compatibility.
 // New code should use Pin (in-tx) + Materialize (async worker) instead.
-func (s *FreezeService) Freeze(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, approver ApproverContext) error {
+func (s *FreezeService) Freeze(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext) error {
 	var (
 		snap           v2dom.TemplateSnapshot
 		valuesFrozenAt *time.Time

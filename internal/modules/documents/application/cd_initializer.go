@@ -2,11 +2,11 @@ package application
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	"metaldocs/internal/platform/db"
 )
 
 // CDDocumentInitializer adapts the documents Service to the controlled-document
@@ -37,7 +37,7 @@ func (i *CDDocumentInitializer) Exists(ctx context.Context, storageKey string) (
 // CloneTemplate threads the caller's tx into Service.cloneIntoTx so the
 // document, initial revision, editor session, snapshot columns and required
 // placeholder rows commit atomically with the CD row.
-func (i *CDDocumentInitializer) CloneTemplate(ctx context.Context, tx *sql.Tx, cd *controlleddocumentsdomain.ControlledDocument, req controlleddocumentsdomain.CloneTemplateRequest) (*controlleddocumentsdomain.DocumentRef, error) {
+func (i *CDDocumentInitializer) CloneTemplate(ctx context.Context, tx db.Tx, cd *controlleddocumentsdomain.ControlledDocument, req controlleddocumentsdomain.CloneTemplateRequest) (*controlleddocumentsdomain.DocumentRef, error) {
 	var formData json.RawMessage
 	if req.FormData() != nil {
 		raw, err := json.Marshal(req.FormData())

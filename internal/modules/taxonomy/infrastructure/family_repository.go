@@ -22,9 +22,16 @@ type familyTx struct {
 func (f familyTx) Commit() error   { return f.tx.Commit() }
 func (f familyTx) Rollback() error { return f.tx.Rollback() }
 
-// Unwrap exposes the underlying *sql.Tx so AuditGovernanceAdapter.LogTx can
-// call audit.Writer.RecordTx inside the same transaction (F-07).
-func (f familyTx) Unwrap() *sql.Tx { return f.tx }
+// db.Tx forwarding — satisfies domain.FamilyTx which embeds db.Tx (F-07).
+func (f familyTx) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return f.tx.ExecContext(ctx, query, args...)
+}
+func (f familyTx) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return f.tx.QueryContext(ctx, query, args...)
+}
+func (f familyTx) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return f.tx.QueryRowContext(ctx, query, args...)
+}
 
 func NewFamilyRepository(db *sql.DB) *FamilyRepository {
 	return &FamilyRepository{db: db}

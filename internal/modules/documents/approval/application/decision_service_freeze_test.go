@@ -13,6 +13,7 @@ import (
 
 	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -21,7 +22,7 @@ type fakeFreezeInvoker struct {
 	err   error
 }
 
-func (f *fakeFreezeInvoker) Freeze(_ context.Context, _ *sql.Tx, _, _ string, _ docapp.ApproverContext) error {
+func (f *fakeFreezeInvoker) Freeze(_ context.Context, _ db.Tx, _, _ string, _ docapp.ApproverContext) error {
 	f.calls++
 	return f.err
 }
@@ -31,7 +32,7 @@ type fakePinInvoker struct {
 	err   error
 }
 
-func (f *fakePinInvoker) Pin(_ context.Context, _ *sql.Tx, _, _ string, _ docapp.ApproverContext) error {
+func (f *fakePinInvoker) Pin(_ context.Context, _ db.Tx, _, _ string, _ docapp.ApproverContext) error {
 	f.calls++
 	return f.err
 }
@@ -43,7 +44,7 @@ type fakePDFOutboxEnqueuer struct {
 	revisionIDs []string
 }
 
-func (f *fakePDFOutboxEnqueuer) Enqueue(_ context.Context, _ *sql.Tx, tenantID, revisionID string, _ []byte) error {
+func (f *fakePDFOutboxEnqueuer) Enqueue(_ context.Context, _ db.Tx, tenantID, revisionID string, _ []byte) error {
 	f.calls++
 	f.tenantIDs = append(f.tenantIDs, tenantID)
 	f.revisionIDs = append(f.revisionIDs, revisionID)

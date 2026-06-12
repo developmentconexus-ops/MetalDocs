@@ -18,6 +18,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 )
 
 var ErrApprovalBlockedByUnresolvedComments = errors.New("approval: unresolved comments block approval")
@@ -33,7 +34,7 @@ var ErrReauthNotConfigured = errors.New("approval: signature verifier not config
 const signatureMethodPasswordReauth = "password_reauth"
 
 type FreezeInvoker interface {
-	Freeze(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
+	Freeze(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
 }
 
 // PinInvoker is the async-freeze replacement for FreezeInvoker (ADR 0015).
@@ -41,12 +42,12 @@ type FreezeInvoker interface {
 // frozen_at, and enqueues a materialize_dispatch_outbox row — all inside tx.
 // No network calls to docx-renderer.
 type PinInvoker interface {
-	Pin(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
+	Pin(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
 }
 
 // PDFOutboxEnqueuer enqueues a PDF dispatch inside the approval transaction.
 type PDFOutboxEnqueuer interface {
-	Enqueue(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, contentHash []byte) error
+	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
 }
 
 // DecisionService handles approver approve/reject decisions.

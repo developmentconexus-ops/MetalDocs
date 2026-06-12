@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"metaldocs/internal/platform/db"
 )
 
 type MaterializeOutboxRow struct {
@@ -22,7 +24,7 @@ func NewMaterializeOutboxRepository(db *sql.DB) *MaterializeOutboxRepository {
 	return &MaterializeOutboxRepository{db: db}
 }
 
-func (r *MaterializeOutboxRepository) Enqueue(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, contentHash []byte) error {
+func (r *MaterializeOutboxRepository) Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error {
 	var exec interface {
 		ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	} = r.db

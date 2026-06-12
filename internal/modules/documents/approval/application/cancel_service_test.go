@@ -14,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -28,11 +29,11 @@ type cancelFakeRepo struct {
 	updateInstErr error
 }
 
-func (r *cancelFakeRepo) LoadInstance(_ context.Context, _ *sql.Tx, _, _ string) (*domain.Instance, error) {
+func (r *cancelFakeRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
 	return r.instance, r.loadErr
 }
 
-func (r *cancelFakeRepo) UpdateInstanceStatus(_ context.Context, _ *sql.Tx, _, _ string, _, _ domain.InstanceStatus, _ *time.Time) error {
+func (r *cancelFakeRepo) UpdateInstanceStatus(_ context.Context, _ db.Tx, _, _ string, _, _ domain.InstanceStatus, _ *time.Time) error {
 	return r.updateInstErr
 }
 

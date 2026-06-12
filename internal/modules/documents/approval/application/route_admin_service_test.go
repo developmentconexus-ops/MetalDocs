@@ -19,6 +19,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/tenant"
 )
@@ -814,10 +815,10 @@ type stubRouteListRepo struct {
 	called   bool
 	tenant   string
 	routes   []repository.Route
-	returnTx *sql.Tx
+	returnTx db.Tx
 }
 
-func (s *stubRouteListRepo) ListRoutesTx(_ context.Context, tx *sql.Tx, tenantID string) ([]repository.Route, error) {
+func (s *stubRouteListRepo) ListRoutesTx(_ context.Context, tx db.Tx, tenantID string) ([]repository.Route, error) {
 	s.called = true
 	s.tenant = tenantID
 	s.returnTx = tx

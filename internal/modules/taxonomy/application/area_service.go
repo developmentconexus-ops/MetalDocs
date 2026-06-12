@@ -64,7 +64,7 @@ func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
 		return fmt.Errorf("taxonomy: marshal area create governance payload: %w", err)
 	}
 	actorUserID, _ := authn.UserIDFromContext(ctx)
-	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     newArea.TenantID,
 		EventType:    domain.GovernanceEventTypeAreaCreated,
 		ActorUserID:  actorUserID,
@@ -116,7 +116,7 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 		return fmt.Errorf("taxonomy: marshal area update governance payload: %w", err)
 	}
 	actorUserID, _ := authn.UserIDFromContext(ctx)
-	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     existing.TenantID,
 		EventType:    domain.GovernanceEventTypeAreaUpdated,
 		ActorUserID:  actorUserID,
@@ -155,7 +155,7 @@ func (s *AreaService) Archive(ctx context.Context, tenantID string, areaCode dom
 	if err := s.areas.UpdateTx(ctx, tx, area); err != nil {
 		return fmt.Errorf("taxonomy: update archived area %q: %w", areaCode, err)
 	}
-	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeAreaArchived,
 		ActorUserID:  actorID,

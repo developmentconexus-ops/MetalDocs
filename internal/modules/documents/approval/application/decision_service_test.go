@@ -14,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -36,20 +37,20 @@ type fakeDecisionRepo struct {
 	instanceStatusFrom domain.InstanceStatus
 }
 
-func (r *fakeDecisionRepo) LoadInstance(_ context.Context, _ *sql.Tx, _, _ string) (*domain.Instance, error) {
+func (r *fakeDecisionRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
 	return r.instance, r.loadInstanceErr
 }
 
-func (r *fakeDecisionRepo) InsertSignoff(_ context.Context, _ *sql.Tx, s domain.Signoff) (repository.SignoffInsertResult, error) {
+func (r *fakeDecisionRepo) InsertSignoff(_ context.Context, _ db.Tx, s domain.Signoff) (repository.SignoffInsertResult, error) {
 	r.insertedSignoff = &s
 	return r.insertSignoffRes, r.insertSignoffErr
 }
 
-func (r *fakeDecisionRepo) UpdateStageStatus(_ context.Context, _ *sql.Tx, _, _ string, _, _ domain.StageStatus) error {
+func (r *fakeDecisionRepo) UpdateStageStatus(_ context.Context, _ db.Tx, _, _ string, _, _ domain.StageStatus) error {
 	return r.updateStageErr
 }
 
-func (r *fakeDecisionRepo) UpdateInstanceStatus(_ context.Context, _ *sql.Tx, _, _ string, to domain.InstanceStatus, from domain.InstanceStatus, _ *time.Time) error {
+func (r *fakeDecisionRepo) UpdateInstanceStatus(_ context.Context, _ db.Tx, _, _ string, to domain.InstanceStatus, from domain.InstanceStatus, _ *time.Time) error {
 	r.instanceStatusTo = to
 	r.instanceStatusFrom = from
 	return r.updateInstanceErr

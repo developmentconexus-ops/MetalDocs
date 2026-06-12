@@ -12,6 +12,7 @@ import (
 	"github.com/lib/pq"
 
 	"metaldocs/internal/modules/documents/approval/domain"
+	"metaldocs/internal/platform/db"
 )
 
 type postgresApprovalRepository struct {
@@ -26,7 +27,7 @@ func NewPostgresApprovalRepository(db *sql.DB) ApprovalRepository {
 }
 
 // InsertInstance writes a new approval_instances row within the caller's transaction.
-func (r *postgresApprovalRepository) InsertInstance(ctx context.Context, tx *sql.Tx, inst domain.Instance) error {
+func (r *postgresApprovalRepository) InsertInstance(ctx context.Context, tx db.Tx, inst domain.Instance) error {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO approval_instances
 		  (id, tenant_id, document_id, route_id, route_version_snapshot,
@@ -50,7 +51,7 @@ func (r *postgresApprovalRepository) InsertInstance(ctx context.Context, tx *sql
 }
 
 // InsertStageInstances bulk-inserts all stage instances for an approval in one round-trip.
-func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, tx *sql.Tx, stages []domain.StageInstance) error {
+func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, tx db.Tx, stages []domain.StageInstance) error {
 	if len(stages) == 0 {
 		return nil
 	}
@@ -108,7 +109,7 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 // InsertSignoff inserts a signoff with ON CONFLICT DO NOTHING.
 // If the row already exists it calls LoadSignoffByActor to compare fields.
 // Matching fields → WasReplay=true. Mismatching fields → ErrActorAlreadySigned.
-func (r *postgresApprovalRepository) InsertSignoff(ctx context.Context, tx *sql.Tx, s domain.Signoff) (SignoffInsertResult, error) {
+func (r *postgresApprovalRepository) InsertSignoff(ctx context.Context, tx db.Tx, s domain.Signoff) (SignoffInsertResult, error) {
 	payload := s.SignaturePayload()
 	if payload == nil {
 		payload = json.RawMessage("{}")
@@ -171,7 +172,7 @@ func (r *postgresApprovalRepository) InsertSignoff(ctx context.Context, tx *sql.
 
 // LoadSignoffByActor loads a signoff by (tenantID, instanceID, actorUserID).
 // Returns nil, ErrActorAlreadySigned if not found (caller decides on semantics).
-func (r *postgresApprovalRepository) LoadSignoffByActor(ctx context.Context, tx *sql.Tx, tenantID, instanceID, actorUserID string) (*domain.Signoff, error) {
+func (r *postgresApprovalRepository) LoadSignoffByActor(ctx context.Context, tx db.Tx, tenantID, instanceID, actorUserID string) (*domain.Signoff, error) {
 	row := tx.QueryRowContext(ctx, `
 		SELECT s.id, s.approval_instance_id, s.stage_instance_id, s.actor_user_id,
 		       s.actor_tenant_id, s.decision, coalesce(s.comment,''), s.signed_at,
@@ -186,7 +187,7 @@ func (r *postgresApprovalRepository) LoadSignoffByActor(ctx context.Context, tx 
 	return scanSignoff(row)
 }
 
-func (r *postgresApprovalRepository) loadSignoffByStageActor(ctx context.Context, tx *sql.Tx, tenantID, stageInstanceID, actorUserID string) (*domain.Signoff, error) {
+func (r *postgresApprovalRepository) loadSignoffByStageActor(ctx context.Context, tx db.Tx, tenantID, stageInstanceID, actorUserID string) (*domain.Signoff, error) {
 	row := tx.QueryRowContext(ctx, `
 		SELECT s.id, s.approval_instance_id, s.stage_instance_id, s.actor_user_id,
 		       s.actor_tenant_id, s.decision, coalesce(s.comment,''), s.signed_at,
@@ -238,7 +239,7 @@ func scanSignoff(row rowScanner) (*domain.Signoff, error) {
 
 // LoadInstance loads an approval instance and its stage instances by ID.
 // Returns ErrNoActiveInstance if not found or tenant mismatch.
-func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx *sql.Tx, tenantID, id string) (*domain.Instance, error) {
+func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx db.Tx, tenantID, id string) (*domain.Instance, error) {
 	var inst domain.Instance
 	var completedAt sql.NullTime
 
@@ -279,7 +280,7 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx *sql.T
 
 // LoadActiveInstanceByDocument loads the single in_progress instance for a document.
 // Returns ErrNoActiveInstance when none exists or tenant doesn't match.
-func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Context, tx *sql.Tx, tenantID, docID string) (*domain.Instance, error) {
+func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Context, tx db.Tx, tenantID, docID string) (*domain.Instance, error) {
 	var inst domain.Instance
 	var completedAt sql.NullTime
 
@@ -322,7 +323,7 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 	return &inst, nil
 }
 
-func (r *postgresApprovalRepository) ValidateScheduledSupersedeTarget(ctx context.Context, tx *sql.Tx, tenantID, documentID, supersededDocumentID string) error {
+func (r *postgresApprovalRepository) ValidateScheduledSupersedeTarget(ctx context.Context, tx db.Tx, tenantID, documentID, supersededDocumentID string) error {
 	var valid bool
 	err := tx.QueryRowContext(ctx, `
 		SELECT EXISTS (
@@ -347,7 +348,7 @@ func (r *postgresApprovalRepository) ValidateScheduledSupersedeTarget(ctx contex
 	return nil
 }
 
-func (r *postgresApprovalRepository) LoadCurrentPublishedHeadForDocument(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error) {
+func (r *postgresApprovalRepository) LoadCurrentPublishedHeadForDocument(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
 	var publishedDocumentID string
 	err := tx.QueryRowContext(ctx, `
 		SELECT current_head.id
@@ -372,7 +373,7 @@ func (r *postgresApprovalRepository) LoadCurrentPublishedHeadForDocument(ctx con
 	return publishedDocumentID, nil
 }
 
-func (r *postgresApprovalRepository) LoadCurrentPublishedHead(ctx context.Context, tx *sql.Tx, tenantID, controlledDocumentID string) (string, error) {
+func (r *postgresApprovalRepository) LoadCurrentPublishedHead(ctx context.Context, tx db.Tx, tenantID, controlledDocumentID string) (string, error) {
 	var documentID string
 	err := tx.QueryRowContext(ctx, `
 		SELECT id
@@ -394,7 +395,7 @@ func (r *postgresApprovalRepository) LoadCurrentPublishedHead(ctx context.Contex
 	return documentID, nil
 }
 
-func (r *postgresApprovalRepository) GetDocumentRevisionVersion(ctx context.Context, tx *sql.Tx, documentID, tenantID string) (int, error) {
+func (r *postgresApprovalRepository) GetDocumentRevisionVersion(ctx context.Context, tx db.Tx, documentID, tenantID string) (int, error) {
 	var revisionVersion int
 	err := tx.QueryRowContext(ctx, `
 		SELECT revision_version
@@ -426,7 +427,7 @@ func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID st
 // ListRoutesTx is the transaction-scoped variant used by the route admin
 // service so the tenant GUC set on the transaction governs row visibility
 // (single-tx authz + read; no TOCTOU).
-func (r *postgresApprovalRepository) ListRoutesTx(ctx context.Context, tx *sql.Tx, tenantID string) ([]Route, error) {
+func (r *postgresApprovalRepository) ListRoutesTx(ctx context.Context, tx db.Tx, tenantID string) ([]Route, error) {
 	rows, err := tx.QueryContext(ctx, listRoutesQuery, tenantID)
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
@@ -522,7 +523,7 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 	return routes, nil
 }
 
-func (r *postgresApprovalRepository) MarkSuperseded(ctx context.Context, tx *sql.Tx, tenantID, documentID string) error {
+func (r *postgresApprovalRepository) MarkSuperseded(ctx context.Context, tx db.Tx, tenantID, documentID string) error {
 	res, err := tx.ExecContext(ctx, `
 		UPDATE documents
 		   SET status           = 'superseded',
@@ -546,7 +547,7 @@ func (r *postgresApprovalRepository) MarkSuperseded(ctx context.Context, tx *sql
 }
 
 // loadStageInstances loads all stage instances for a given approval instance, ordered by stage_order.
-func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx *sql.Tx, tenantID, instanceID string) ([]domain.StageInstance, error) {
+func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx db.Tx, tenantID, instanceID string) ([]domain.StageInstance, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id, approval_instance_id, stage_order, name_snapshot,
 		       required_role_snapshot, required_capability_snapshot, area_code_snapshot,
@@ -638,7 +639,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 
 // loadSignoffsForInstance fetches all signoffs for an approval instance,
 // keyed by stage_instance_id.
-func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context, tx *sql.Tx, tenantID, instanceID string) (map[string][]*domain.Signoff, error) {
+func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context, tx db.Tx, tenantID, instanceID string) (map[string][]*domain.Signoff, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id, approval_instance_id, stage_instance_id, actor_user_id,
 		       actor_tenant_id, decision, coalesce(comment,''), signed_at,
@@ -703,7 +704,7 @@ func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context
 // Uses a single query for headers, one for all stage instances, and one for all
 // signoffs — 3 round trips instead of 3N. Order matches ids; missing IDs are
 // silently omitted (tenant mismatch or not found).
-func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx *sql.Tx, tenantID string, ids []string) ([]domain.Instance, error) {
+func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx db.Tx, tenantID string, ids []string) ([]domain.Instance, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -921,7 +922,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 
 // UpdateStageStatus applies an OCC (optimistic concurrency control) UPDATE.
 // Checks RowsAffected == 0 — which means expectedOldStatus was not the current value — and returns ErrStageNotActive.
-func (r *postgresApprovalRepository) UpdateStageStatus(ctx context.Context, tx *sql.Tx, tenantID, stageID string, newStatus, expectedOldStatus domain.StageStatus) error {
+func (r *postgresApprovalRepository) UpdateStageStatus(ctx context.Context, tx db.Tx, tenantID, stageID string, newStatus, expectedOldStatus domain.StageStatus) error {
 	res, err := tx.ExecContext(ctx, `
 		UPDATE approval_stage_instances asi
 		SET status = $1,
@@ -949,7 +950,7 @@ func (r *postgresApprovalRepository) UpdateStageStatus(ctx context.Context, tx *
 
 // UpdateInstanceStatus applies an OCC UPDATE on approval_instances.
 // Checks RowsAffected == 0 → ErrInstanceCompleted (stale read or already terminal).
-func (r *postgresApprovalRepository) UpdateInstanceStatus(ctx context.Context, tx *sql.Tx, tenantID, instID string, newStatus domain.InstanceStatus, expectedStatus domain.InstanceStatus, completedAt *time.Time) error {
+func (r *postgresApprovalRepository) UpdateInstanceStatus(ctx context.Context, tx db.Tx, tenantID, instID string, newStatus domain.InstanceStatus, expectedStatus domain.InstanceStatus, completedAt *time.Time) error {
 	res, err := tx.ExecContext(ctx, `
 		UPDATE approval_instances
 		SET status = $1, completed_at = $2

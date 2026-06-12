@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"metaldocs/internal/platform/db"
 )
 
 type OutboxRow struct {
@@ -22,7 +24,7 @@ func NewPDFOutboxRepository(db *sql.DB) *PDFOutboxRepository {
 	return &PDFOutboxRepository{db: db}
 }
 
-func (r *PDFOutboxRepository) Enqueue(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, contentHash []byte) error {
+func (r *PDFOutboxRepository) Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error {
 	var exec interface {
 		ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	} = r.db

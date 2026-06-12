@@ -2,13 +2,13 @@ package memory
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"sort"
 	"strings"
 	"sync"
 
 	"metaldocs/internal/modules/audit/domain"
+	"metaldocs/internal/platform/db"
 )
 
 type Writer struct {
@@ -27,7 +27,7 @@ func (w *Writer) Record(_ context.Context, event domain.Event) error {
 	return nil
 }
 
-func (w *Writer) RecordTx(ctx context.Context, tx *sql.Tx, event domain.Event) error {
+func (w *Writer) RecordTx(ctx context.Context, tx db.Tx, event domain.Event) error {
 	return w.Record(ctx, event)
 }
 

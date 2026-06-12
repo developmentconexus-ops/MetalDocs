@@ -2,7 +2,6 @@ package httpdelivery
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/requesttrace"
 )
@@ -47,7 +47,7 @@ func (f failingAuditWriter) Record(context.Context, auditdomain.Event) error {
 	return errors.New("boom")
 }
 
-func (f failingAuditWriter) RecordTx(context.Context, *sql.Tx, auditdomain.Event) error {
+func (f failingAuditWriter) RecordTx(context.Context, db.Tx, auditdomain.Event) error {
 	return errors.New("boom")
 }
 
@@ -60,7 +60,7 @@ func (c *captureAuditWriter) Record(_ context.Context, event auditdomain.Event) 
 	return nil
 }
 
-func (c *captureAuditWriter) RecordTx(context.Context, *sql.Tx, auditdomain.Event) error {
+func (c *captureAuditWriter) RecordTx(context.Context, db.Tx, auditdomain.Event) error {
 	return nil
 }
 

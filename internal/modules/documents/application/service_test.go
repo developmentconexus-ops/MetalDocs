@@ -2,7 +2,6 @@ package application_test
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -12,6 +11,7 @@ import (
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/db"
 )
 
 type fakeRepo struct {
@@ -80,7 +80,7 @@ func (f *fakeRepo) CreateDocument(_ context.Context, _ *domain.Document, _ strin
 	return f.createDocIDs[0], f.createDocIDs[1], f.createDocIDs[2], nil
 }
 
-func (f *fakeRepo) CreateDocumentTx(_ context.Context, _ *sql.Tx, _ *domain.Document, _, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
+func (f *fakeRepo) CreateDocumentTx(_ context.Context, _ db.Tx, _ *domain.Document, _, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
 	if f.createDocErr != nil {
 		return "", "", "", f.createDocErr
 	}
@@ -107,7 +107,7 @@ func (f *fakeRepo) UpdateDocumentName(_ context.Context, tenantID, actorID, docI
 	return f.renameErr
 }
 
-func (f *fakeRepo) UpdateDocumentNameTx(_ context.Context, _ *sql.Tx, tenantID, actorID, docID, name string) error {
+func (f *fakeRepo) UpdateDocumentNameTx(_ context.Context, _ db.Tx, tenantID, actorID, docID, name string) error {
 	f.renameTenantID = tenantID
 	f.renameDocID = docID
 	f.renameName = name
@@ -172,7 +172,7 @@ func (f *fakeRepo) ReleaseSession(_ context.Context, _, _, _ string) error { ret
 
 func (f *fakeRepo) ForceReleaseSession(_ context.Context, _, _, _ string) error { return nil }
 
-func (f *fakeRepo) ForceReleaseSessionTx(_ context.Context, _ *sql.Tx, _, _, _ string) error {
+func (f *fakeRepo) ForceReleaseSessionTx(_ context.Context, _ db.Tx, _, _, _ string) error {
 	return nil
 }
 
@@ -280,7 +280,7 @@ func (f *fakeRepo) GetFinalizePrereqs(_ context.Context, _, _ string) (*domain.F
 
 func (f *fakeRepo) MarkArchived(_ context.Context, _, _, _ string) error { return nil }
 
-func (f *fakeRepo) MarkArchivedTx(_ context.Context, _ *sql.Tx, _, _, _ string) error { return nil }
+func (f *fakeRepo) MarkArchivedTx(_ context.Context, _ db.Tx, _, _, _ string) error { return nil }
 
 type fakePresigner struct {
 	hashReturn  string
@@ -369,7 +369,7 @@ func (n *noopAudit) Write(_ context.Context, _, _, action, _ string, _ any) {
 	n.lastAction = action
 }
 
-func (n *noopAudit) WriteTx(_ context.Context, _ *sql.Tx, _, _, action, _ string, _ any) error {
+func (n *noopAudit) WriteTx(_ context.Context, _ db.Tx, _, _, action, _ string, _ any) error {
 	n.calls++
 	n.lastAction = action
 	return nil

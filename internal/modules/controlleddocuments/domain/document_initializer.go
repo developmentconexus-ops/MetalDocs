@@ -2,9 +2,10 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
+
+	"metaldocs/internal/platform/db"
 )
 
 var (
@@ -59,7 +60,7 @@ type DocumentRef struct {
 // part of this contract: storage_key starts empty and the editor renders on
 // demand.
 type DocumentInitializer interface {
-	CloneTemplate(ctx context.Context, tx *sql.Tx, cd *ControlledDocument, req CloneTemplateRequest) (*DocumentRef, error)
+	CloneTemplate(ctx context.Context, tx db.Tx, cd *ControlledDocument, req CloneTemplateRequest) (*DocumentRef, error)
 	ResolveTemplateStorageKey(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error)
 	Exists(ctx context.Context, storageKey string) (bool, error)
 }

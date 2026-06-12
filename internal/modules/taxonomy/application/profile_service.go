@@ -76,7 +76,7 @@ func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) 
 		return fmt.Errorf("taxonomy: marshal profile create governance payload: %w", err)
 	}
 	actorUserID, _ := authn.UserIDFromContext(ctx)
-	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     newProfile.TenantID,
 		EventType:    domain.GovernanceEventTypeProfileCreated,
 		ActorUserID:  actorUserID,
@@ -115,7 +115,7 @@ func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) 
 		return fmt.Errorf("taxonomy: marshal profile update governance payload: %w", err)
 	}
 	actorUserID, _ := authn.UserIDFromContext(ctx)
-	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     p.TenantID,
 		EventType:    domain.GovernanceEventTypeProfileUpdated,
 		ActorUserID:  actorUserID,
@@ -173,7 +173,7 @@ func (s *ProfileService) SetDefaultTemplate(ctx context.Context, tenantID string
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal default template governance payload: %w", err)
 	}
-	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeProfileDefaultTemplateChange,
 		ActorUserID:  actorID,
@@ -212,7 +212,7 @@ func (s *ProfileService) Archive(ctx context.Context, tenantID string, profileCo
 	if err := s.profiles.UpdateTx(ctx, tx, profile); err != nil {
 		return fmt.Errorf("taxonomy: update archived profile %q: %w", profileCode, err)
 	}
-	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeProfileArchived,
 		ActorUserID:  actorID,

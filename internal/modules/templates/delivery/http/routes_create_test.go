@@ -3,7 +3,6 @@ package http_test
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"metaldocs/internal/modules/templates/application"
 	tmplhttp "metaldocs/internal/modules/templates/delivery/http"
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -84,7 +84,7 @@ func (r *fakeRepo) CreateVersion(_ context.Context, v *domain.TemplateVersion) e
 	return nil
 }
 
-func (r *fakeRepo) CreateVersionTx(_ context.Context, _ *sql.Tx, v *domain.TemplateVersion) error {
+func (r *fakeRepo) CreateVersionTx(_ context.Context, _ db.Tx, v *domain.TemplateVersion) error {
 	return r.CreateVersion(context.Background(), v)
 }
 
@@ -113,15 +113,15 @@ func (r *fakeRepo) GetVersionByID(_ context.Context, tenantID, id string) (*doma
 	return v, nil
 }
 
-func (r *fakeRepo) CreateTemplateTx(_ context.Context, _ *sql.Tx, t *domain.Template) error {
+func (r *fakeRepo) CreateTemplateTx(_ context.Context, _ db.Tx, t *domain.Template) error {
 	return r.CreateTemplate(context.Background(), t)
 }
 
-func (r *fakeRepo) UpdateTemplateTx(_ context.Context, _ *sql.Tx, t *domain.Template) error {
+func (r *fakeRepo) UpdateTemplateTx(_ context.Context, _ db.Tx, t *domain.Template) error {
 	return r.UpdateTemplate(context.Background(), t)
 }
 
-func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ *sql.Tx, tenantID string, v *domain.TemplateVersion) error {
+func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ db.Tx, tenantID string, v *domain.TemplateVersion) error {
 	return r.UpdateVersion(context.Background(), tenantID, v)
 }
 
@@ -148,7 +148,7 @@ func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, _ string, versionID 
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ *sql.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ db.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
 	return r.UpdateVersionDraftCAS(context.Background(), tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 }
 
@@ -172,7 +172,7 @@ func (r *fakeRepo) UpdateVersionSchemaCAS(_ context.Context, tenantID string, v 
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionSchemaCASTx(_ context.Context, _ *sql.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
+func (r *fakeRepo) UpdateVersionSchemaCASTx(_ context.Context, _ db.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
 	return r.UpdateVersionSchemaCAS(context.Background(), tenantID, v, expectedLockVersion)
 }
 
@@ -187,7 +187,7 @@ func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keep
 	return nil
 }
 
-func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ *sql.Tx, templateID, keepVersionID string) error {
+func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ db.Tx, templateID, keepVersionID string) error {
 	return r.ObsoletePreviousPublished(context.Background(), templateID, keepVersionID)
 }
 
@@ -208,7 +208,7 @@ func (r *fakeRepo) UpsertApprovalConfig(_ context.Context, c *domain.ApprovalCon
 	return nil
 }
 
-func (r *fakeRepo) UpsertApprovalConfigTx(_ context.Context, _ *sql.Tx, c *domain.ApprovalConfig) error {
+func (r *fakeRepo) UpsertApprovalConfigTx(_ context.Context, _ db.Tx, c *domain.ApprovalConfig) error {
 	return r.UpsertApprovalConfig(context.Background(), c)
 }
 
@@ -217,7 +217,7 @@ func (r *fakeRepo) AppendAudit(_ context.Context, e *domain.AuditEvent) error {
 	return nil
 }
 
-func (r *fakeRepo) AppendAuditTx(_ context.Context, _ *sql.Tx, e *domain.AuditEvent) error {
+func (r *fakeRepo) AppendAuditTx(_ context.Context, _ db.Tx, e *domain.AuditEvent) error {
 	return r.AppendAudit(context.Background(), e)
 }
 

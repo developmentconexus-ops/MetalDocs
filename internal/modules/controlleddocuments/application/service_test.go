@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
@@ -15,6 +14,7 @@ import (
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/db"
 )
 
 func TestNewControlledDocumentService_PanicsOnNilRequiredDependencies(t *testing.T) {
@@ -408,7 +408,7 @@ func (f *fakeGovernanceLogger) Log(_ context.Context, e taxonomydomain.Governanc
 	return nil
 }
 
-func (f *fakeGovernanceLogger) LogTx(_ context.Context, _ *sql.Tx, e taxonomydomain.GovernanceEvent) error {
+func (f *fakeGovernanceLogger) LogTx(_ context.Context, _ db.Tx, e taxonomydomain.GovernanceEvent) error {
 	f.events = append(f.events, e)
 	return nil
 }
@@ -434,7 +434,7 @@ type fakeDocumentInitializer struct {
 	gotExistsStorageKey               string
 }
 
-func (f *fakeDocumentInitializer) CloneTemplate(_ context.Context, _ *sql.Tx, cd *controlleddocumentsdomain.ControlledDocument, req controlleddocumentsdomain.CloneTemplateRequest) (*controlleddocumentsdomain.DocumentRef, error) {
+func (f *fakeDocumentInitializer) CloneTemplate(_ context.Context, _ db.Tx, cd *controlleddocumentsdomain.ControlledDocument, req controlleddocumentsdomain.CloneTemplateRequest) (*controlleddocumentsdomain.DocumentRef, error) {
 	f.called = true
 	f.gotReq = req
 	f.gotCD = cd

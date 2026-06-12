@@ -68,6 +68,7 @@ import (
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
+	"metaldocs/internal/platform/db"
 	docgenv2 "metaldocs/internal/platform/docgenv2"
 	"metaldocs/internal/platform/featureflags"
 	"metaldocs/internal/platform/formval"
@@ -856,7 +857,7 @@ func newDocumentsAuditAdapter(writer auditdomain.Writer) *documentsAuditAdapter 
 	return &documentsAuditAdapter{writer: writer}
 }
 
-func (a *documentsAuditAdapter) WriteTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, action, docID string, meta any) error {
+func (a *documentsAuditAdapter) WriteTx(ctx context.Context, tx db.Tx, tenantID, actorID, action, docID string, meta any) error {
 	payload := map[string]any{"tenant_id": tenantID}
 	if meta != nil {
 		payload["meta"] = meta

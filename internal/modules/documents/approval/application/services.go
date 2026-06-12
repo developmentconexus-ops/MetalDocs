@@ -2,11 +2,11 @@ package application
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/platform/db"
 )
 
 // Clock abstracts time so services can be tested deterministically.
@@ -44,7 +44,7 @@ type ScheduledPublishJobInput struct {
 }
 
 type ScheduledPublishEnqueuer interface {
-	EnqueueScheduledPublishTx(ctx context.Context, tx *sql.Tx, input ScheduledPublishJobInput) error
+	EnqueueScheduledPublishTx(ctx context.Context, tx db.Tx, input ScheduledPublishJobInput) error
 }
 
 var ErrContentHashMismatch = errors.New("approval: content hash mismatch")

@@ -17,6 +17,7 @@ import (
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/pagination"
 )
 
@@ -35,13 +36,23 @@ type Repository struct {
 
 func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
+// mustSQLTx asserts a db.Tx to *sql.Tx. All callers of this repository pass
+// *sql.Tx at runtime; the assertion fails only if a test double is misused.
+func mustSQLTx(tx db.Tx) *sql.Tx {
+	sqltx, ok := tx.(*sql.Tx)
+	if !ok {
+		panic(fmt.Sprintf("documents/repository: expected *sql.Tx, got %T", tx))
+	}
+	return sqltx
+}
+
 // loadDocumentArea returns the document's process_area_code_snapshot within tx.
 // document.create/edit are area-grade (ADR 0022 Phase 7): the area is passed to
 // tier-2 authz.Require so an actor is authorized only within the document's
 // process area. Empty string when the snapshot is NULL/empty — fails closed for
 // non-system actors (system_admin still bypasses tier-2). A missing row yields
 // ("", nil) so the authz check, not a row-existence probe, decides the outcome.
-func loadDocumentArea(ctx context.Context, tx *sql.Tx, tenantID, docID string) (string, error) {
+func loadDocumentArea(ctx context.Context, tx db.Tx, tenantID, docID string) (string, error) {
 	var area sql.NullString
 	err := tx.QueryRowContext(ctx,
 		`SELECT process_area_code_snapshot FROM documents WHERE tenant_id=$1 AND id=$2`,
@@ -57,7 +68,7 @@ func loadDocumentArea(ctx context.Context, tx *sql.Tx, tenantID, docID string) (
 
 // loadDocumentAreaBySession resolves the document area from an editor session id,
 // for session-keyed edit ops that carry no docID. Same fail-closed semantics.
-func loadDocumentAreaBySession(ctx context.Context, tx *sql.Tx, tenantID, sessionID string) (string, error) {
+func loadDocumentAreaBySession(ctx context.Context, tx db.Tx, tenantID, sessionID string) (string, error) {
 	var area sql.NullString
 	err := tx.QueryRowContext(ctx,
 		`SELECT d.process_area_code_snapshot
@@ -121,9 +132,9 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 // It does NOT touch S3. Callers that need S3 finalization (overwriting
 // storage_key with a rendered key) must do so after tx.Commit() via
 // SetRevisionStorageKey.
-func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
+func (r *Repository) CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
 	ctx = authz.WithCapCache(ctx)
-	if err := authz.SeedTxIdentity(ctx, tx, d.TenantID, d.CreatedBy); err != nil {
+	if err := authz.SeedTxIdentity(ctx, mustSQLTx(tx), d.TenantID, d.CreatedBy); err != nil {
 		return "", "", "", err
 	}
 
@@ -141,7 +152,7 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 	// ADR 0022 Phase 7: a document is created INTO a process area — authorize
 	// against that area (area-grade). system_admin bypasses tier-2.
 	docArea := docAreaSnapshot(d.ProcessAreaCodeSnapshot)
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentCreate), docArea); err != nil {
+	if err := authz.Require(ctx, mustSQLTx(tx), string(iamdomain.CapDocumentCreate), docArea); err != nil {
 		return "", "", "", fmt.Errorf("create document: authz check: %w", err)
 	}
 
@@ -187,7 +198,7 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 		return "", "", "", fmt.Errorf("insert revision: %w", err)
 	}
 
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
+	if err := authz.Require(ctx, mustSQLTx(tx), string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return "", "", "", fmt.Errorf("initialize document pointers: authz check: %w", err)
 	}
 
@@ -334,15 +345,15 @@ func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, actorID, 
 	return tx.Commit()
 }
 
-func (r *Repository) UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, docID, name string) error {
-	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+func (r *Repository) UpdateDocumentNameTx(ctx context.Context, tx db.Tx, tenantID, actorID, docID, name string) error {
+	if err := authz.SeedTxIdentity(ctx, mustSQLTx(tx), tenantID, actorID); err != nil {
 		return err
 	}
 	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
 	if err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
+	if err := authz.Require(ctx, mustSQLTx(tx), string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return fmt.Errorf("update document name: authz check: %w", err)
 	}
 	res, err := tx.ExecContext(ctx,
@@ -769,16 +780,16 @@ func (r *Repository) ForceReleaseSession(ctx context.Context, tenantID, adminID,
 
 // ForceReleaseSessionTx performs the force-release using the caller-owned tx.
 // The caller is responsible for authz GUC setup, commit, and rollback.
-func (r *Repository) ForceReleaseSessionTx(ctx context.Context, tx *sql.Tx, tenantID, adminID, sessionID string) error {
+func (r *Repository) ForceReleaseSessionTx(ctx context.Context, tx db.Tx, tenantID, adminID, sessionID string) error {
 	ctx = authz.WithCapCache(ctx)
-	if err := authz.SeedTxIdentity(ctx, tx, tenantID, adminID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, mustSQLTx(tx), tenantID, adminID); err != nil {
 		return err
 	}
 	docArea, err := loadDocumentAreaBySession(ctx, tx, tenantID, sessionID)
 	if err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), docArea); err != nil {
+	if err := authz.Require(ctx, mustSQLTx(tx), string(iamdomain.CapMembershipManage), docArea); err != nil {
 		return fmt.Errorf("force release session: authz check: %w", err)
 	}
 	res, err := tx.ExecContext(ctx,
@@ -797,16 +808,16 @@ func (r *Repository) ForceReleaseSessionTx(ctx context.Context, tx *sql.Tx, tena
 
 // MarkArchivedTx sets archived_at using the caller-owned tx.
 // The caller is responsible for authz GUC setup, commit, and rollback.
-func (r *Repository) MarkArchivedTx(ctx context.Context, tx *sql.Tx, tenantID, docID, actorID string) error {
+func (r *Repository) MarkArchivedTx(ctx context.Context, tx db.Tx, tenantID, docID, actorID string) error {
 	ctx = authz.WithCapCache(ctx)
-	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, mustSQLTx(tx), tenantID, actorID); err != nil {
 		return err
 	}
 	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
 	if err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
+	if err := authz.Require(ctx, mustSQLTx(tx), string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return fmt.Errorf("mark archived: authz check: %w", err)
 	}
 	res, err := tx.ExecContext(ctx, `

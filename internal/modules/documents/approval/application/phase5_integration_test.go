@@ -24,6 +24,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -51,27 +52,27 @@ type phase5Repo struct {
 	updateInstanceErr error
 }
 
-func (r *phase5Repo) InsertInstance(_ context.Context, _ *sql.Tx, _ domain.Instance) error {
+func (r *phase5Repo) InsertInstance(_ context.Context, _ db.Tx, _ domain.Instance) error {
 	return r.insertInstanceErr
 }
 
-func (r *phase5Repo) InsertStageInstances(_ context.Context, _ *sql.Tx, _ []domain.StageInstance) error {
+func (r *phase5Repo) InsertStageInstances(_ context.Context, _ db.Tx, _ []domain.StageInstance) error {
 	return r.insertStageInstancesErr
 }
 
-func (r *phase5Repo) LoadInstance(_ context.Context, _ *sql.Tx, _, _ string) (*domain.Instance, error) {
+func (r *phase5Repo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
 	return r.instance, r.loadInstanceErr
 }
 
-func (r *phase5Repo) InsertSignoff(_ context.Context, _ *sql.Tx, _ domain.Signoff) (repository.SignoffInsertResult, error) {
+func (r *phase5Repo) InsertSignoff(_ context.Context, _ db.Tx, _ domain.Signoff) (repository.SignoffInsertResult, error) {
 	return r.insertSignoffRes, r.insertSignoffErr
 }
 
-func (r *phase5Repo) UpdateStageStatus(_ context.Context, _ *sql.Tx, _, _ string, _, _ domain.StageStatus) error {
+func (r *phase5Repo) UpdateStageStatus(_ context.Context, _ db.Tx, _, _ string, _, _ domain.StageStatus) error {
 	return r.updateStageErr
 }
 
-func (r *phase5Repo) UpdateInstanceStatus(_ context.Context, _ *sql.Tx, _, _ string, _ domain.InstanceStatus, _ domain.InstanceStatus, _ *time.Time) error {
+func (r *phase5Repo) UpdateInstanceStatus(_ context.Context, _ db.Tx, _, _ string, _ domain.InstanceStatus, _ domain.InstanceStatus, _ *time.Time) error {
 	return r.updateInstanceErr
 }
 

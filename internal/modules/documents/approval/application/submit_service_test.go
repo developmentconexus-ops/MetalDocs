@@ -15,6 +15,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -30,12 +31,12 @@ type fakeSubmitRepo struct {
 	repository.ApprovalRepository
 }
 
-func (r *fakeSubmitRepo) InsertInstance(_ context.Context, _ *sql.Tx, inst domain.Instance) error {
+func (r *fakeSubmitRepo) InsertInstance(_ context.Context, _ db.Tx, inst domain.Instance) error {
 	r.lastInstance = inst
 	return r.insertInstanceErr
 }
 
-func (r *fakeSubmitRepo) InsertStageInstances(_ context.Context, _ *sql.Tx, _ []domain.StageInstance) error {
+func (r *fakeSubmitRepo) InsertStageInstances(_ context.Context, _ db.Tx, _ []domain.StageInstance) error {
 	return r.insertStageInstancesErr
 }
 

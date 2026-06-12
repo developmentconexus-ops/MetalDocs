@@ -2,7 +2,8 @@ package domain
 
 import (
 	"context"
-	"database/sql"
+
+	"metaldocs/internal/platform/db"
 )
 
 type ProfileRepository interface {
@@ -34,7 +35,7 @@ type GovernanceLogger interface {
 	// LogTx writes the governance event inside an open transaction so the
 	// audit record is atomically committed with the mutation that caused it
 	// (REQ-ASYNC-1, F-07).
-	LogTx(ctx context.Context, tx *sql.Tx, e GovernanceEvent) error
+	LogTx(ctx context.Context, tx db.Tx, e GovernanceEvent) error
 }
 
 type GovernanceEventType string
@@ -63,13 +64,15 @@ type GovernanceEvent struct {
 	PayloadJSON  []byte
 }
 
+// FamilyTx is the minimal transaction handle services receive from repositories.
+// It embeds db.Tx so the governance logger can write audit rows inside the same
+// database transaction without an Unwrap shim.
 type FamilyTx interface {
+	db.Tx
 	Commit() error
 	Rollback() error
 }
 
-// FamilyTx intentionally stays minimal so services do not depend on *sql.Tx
-// directly; repository adapters perform the concrete type assertion internally.
 type FamilyRepository interface {
 	GetByCode(ctx context.Context, code FamilyCode) (*DocumentFamily, error)
 	List(ctx context.Context, includeInactive bool) ([]DocumentFamily, error)

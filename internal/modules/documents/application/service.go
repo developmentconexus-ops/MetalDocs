@@ -15,6 +15,7 @@ import (
 	"metaldocs/internal/modules/documents/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -26,11 +27,11 @@ type RevisionHistoryItem = domain.RevisionHistoryItem
 
 type Repository interface {
 	CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
-	CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
+	CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
 	SetRevisionStorageKey(ctx context.Context, revID, storageKey string) error
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
 	UpdateDocumentName(ctx context.Context, tenantID, actorID, docID, name string) error
-	UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, docID, name string) error
+	UpdateDocumentNameTx(ctx context.Context, tx db.Tx, tenantID, actorID, docID, name string) error
 	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
 	ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, bool, error)
@@ -39,13 +40,13 @@ type Repository interface {
 	StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
 	UpdateDocumentStatus(ctx context.Context, tenantID, actorID, id string, cur, next domain.DocumentStatus, stampTime bool) error
 	MarkArchived(ctx context.Context, tenantID, docID, actorID string) error
-	MarkArchivedTx(ctx context.Context, tx *sql.Tx, tenantID, docID, actorID string) error
+	MarkArchivedTx(ctx context.Context, tx db.Tx, tenantID, docID, actorID string) error
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
 	AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, error)
 	HeartbeatSession(ctx context.Context, tenantID, sessionID, userID string) error
 	ReleaseSession(ctx context.Context, tenantID, sessionID, userID string) error
 	ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID string) error
-	ForceReleaseSessionTx(ctx context.Context, tx *sql.Tx, tenantID, adminID, sessionID string) error
+	ForceReleaseSessionTx(ctx context.Context, tx db.Tx, tenantID, adminID, sessionID string) error
 	ExpireStaleSessions(ctx context.Context, now time.Time) (int, error)
 	PresignReserve(ctx context.Context, tenantID, sessionID, userID, docID, baseRev, contentHash, storageKey string, expiresAt time.Time) (string, error)
 	GetPendingForCommit(ctx context.Context, tenantID, pendingID string) (*PendingCommitMeta, error)
@@ -86,7 +87,7 @@ type FormValidator interface {
 
 type Audit interface {
 	Write(ctx context.Context, tenantID, actorID, action, docID string, meta any)
-	WriteTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, action, docID string, meta any) error
+	WriteTx(ctx context.Context, tx db.Tx, tenantID, actorID, action, docID string, meta any) error
 }
 
 // ControlledDocumentReader loads a ControlledDocument for validation at create time.
@@ -364,7 +365,7 @@ type cloneIntoTxInput struct {
 //     after tx.Commit().
 //
 // All repo calls thread the tx via CreateDocumentTx.
-func (s *Service) cloneIntoTx(ctx context.Context, tx *sql.Tx, in cloneIntoTxInput) (docID string, contentHash string, err error) {
+func (s *Service) cloneIntoTx(ctx context.Context, tx db.Tx, in cloneIntoTxInput) (docID string, contentHash string, err error) {
 	resolvedTemplateVersionID, err := s.resolveTemplateVersionID(ctx, in.TenantID, in.ProfileCode, in.OverrideTemplateVersionID)
 	if err != nil {
 		return "", "", err

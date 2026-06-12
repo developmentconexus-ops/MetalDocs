@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/resolvers"
 	tmpldom "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/db"
 )
 
 type fakeMaterializeOutboxEnqueuer struct {
@@ -22,7 +22,7 @@ type fakeMaterializeOutboxEnqueuer struct {
 	err        error
 }
 
-func (f *fakeMaterializeOutboxEnqueuer) Enqueue(_ context.Context, _ *sql.Tx, tenantID, revisionID string, contentHash []byte) error {
+func (f *fakeMaterializeOutboxEnqueuer) Enqueue(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte) error {
 	if f.err != nil {
 		return f.err
 	}

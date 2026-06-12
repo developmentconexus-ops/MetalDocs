@@ -13,7 +13,6 @@ package iampeopletest
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -30,6 +29,7 @@ import (
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iammemory "metaldocs/internal/modules/iam/infrastructure/memory"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -191,7 +191,7 @@ func (f *fakeAuditWriter) Record(_ context.Context, ev auditdomain.Event) error 
 	return nil
 }
 
-func (f *fakeAuditWriter) RecordTx(_ context.Context, _ *sql.Tx, ev auditdomain.Event) error {
+func (f *fakeAuditWriter) RecordTx(_ context.Context, _ db.Tx, ev auditdomain.Event) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.events = append(f.events, ev)

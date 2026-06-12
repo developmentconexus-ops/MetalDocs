@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"metaldocs/internal/modules/audit/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/sqlescape"
 )
@@ -41,7 +42,7 @@ func (w *Writer) Record(ctx context.Context, event domain.Event) error {
 	return nil
 }
 
-func (w *Writer) RecordTx(ctx context.Context, tx *sql.Tx, event domain.Event) error {
+func (w *Writer) RecordTx(ctx context.Context, tx db.Tx, event domain.Event) error {
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, auditHashChainLockID); err != nil {
 		return fmt.Errorf("lock audit hash chain: %w", err)
 	}

@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"metaldocs/internal/platform/db"
 )
 
 type Event struct {
@@ -97,7 +98,7 @@ func (c Cursor) IsZero() bool { return c.ID == "" && c.OccurredAt.IsZero() }
 // once write flows stop passing raw audit events across module boundaries.
 type Writer interface {
 	Record(ctx context.Context, event Event) error
-	RecordTx(ctx context.Context, tx *sql.Tx, event Event) error
+	RecordTx(ctx context.Context, tx db.Tx, event Event) error
 }
 
 // ListEvents intentionally lives on Reader rather than Writer so write-only

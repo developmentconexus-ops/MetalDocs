@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/db"
 )
 
 func TestProfileServiceCreate_UsesDomainConstructorNormalizationAndValidation(t *testing.T) {
@@ -138,8 +139,11 @@ type fakeProfileRepository struct {
 
 type fakeTx struct{}
 
-func (fakeTx) Commit() error   { return nil }
-func (fakeTx) Rollback() error { return nil }
+func (fakeTx) Commit() error                                                                { return nil }
+func (fakeTx) Rollback() error                                                              { return nil }
+func (fakeTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error)       { return nil, nil }
+func (fakeTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error)       { return nil, nil }
+func (fakeTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row              { return nil }
 
 func newFakeProfileRepository() *fakeProfileRepository {
 	return &fakeProfileRepository{byKey: map[string]*domain.DocumentProfile{}}
@@ -214,7 +218,7 @@ func (f *fakeGovernanceLogger) Log(_ context.Context, e domain.GovernanceEvent) 
 	return nil
 }
 
-func (f *fakeGovernanceLogger) LogTx(_ context.Context, _ *sql.Tx, e domain.GovernanceEvent) error {
+func (f *fakeGovernanceLogger) LogTx(_ context.Context, _ db.Tx, e domain.GovernanceEvent) error {
 	f.events = append(f.events, e)
 	return nil
 }

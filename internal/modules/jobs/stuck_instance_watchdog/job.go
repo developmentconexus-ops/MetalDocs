@@ -12,6 +12,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/modules/jobs/scheduler"
+	"metaldocs/internal/platform/db"
 )
 
 const (
@@ -35,7 +36,7 @@ type cancelSvcInterface interface {
 }
 
 type governanceEmitter interface {
-	Emit(ctx context.Context, tx *sql.Tx, e application.GovernanceEvent) error
+	Emit(ctx context.Context, tx db.Tx, e application.GovernanceEvent) error
 }
 
 func New(db *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) scheduler.JobFunc {

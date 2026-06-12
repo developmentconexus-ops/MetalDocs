@@ -15,6 +15,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -37,18 +38,18 @@ type fakePublishRepo struct {
 	repository.ApprovalRepository // no-op embed for unused methods
 }
 
-func (r *fakePublishRepo) LoadInstance(_ context.Context, _ *sql.Tx, _, _ string) (*domain.Instance, error) {
+func (r *fakePublishRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
 	return r.instance, r.loadErr
 }
 
-func (r *fakePublishRepo) LoadCurrentPublishedHeadForDocument(_ context.Context, _ *sql.Tx, tenantID, documentID string) (string, error) {
+func (r *fakePublishRepo) LoadCurrentPublishedHeadForDocument(_ context.Context, _ db.Tx, tenantID, documentID string) (string, error) {
 	r.loadCurrentPublishedHeadCalls++
 	r.validateSupersedeTenantID = tenantID
 	r.loadCurrentPublishedHeadDocID = documentID
 	return r.currentPublishedHeadForDoc, r.loadCurrentPublishedHeadErr
 }
 
-func (r *fakePublishRepo) ValidateScheduledSupersedeTarget(_ context.Context, _ *sql.Tx, tenantID, documentID, supersededDocumentID string) error {
+func (r *fakePublishRepo) ValidateScheduledSupersedeTarget(_ context.Context, _ db.Tx, tenantID, documentID, supersededDocumentID string) error {
 	r.validateSupersedeCalls++
 	r.validateSupersedeTenantID = tenantID
 	r.validateSupersedeDocumentID = documentID
@@ -288,7 +289,7 @@ type fakeScheduledPublishEnqueuer struct {
 	err    error
 }
 
-func (f *fakeScheduledPublishEnqueuer) EnqueueScheduledPublishTx(_ context.Context, _ *sql.Tx, input ScheduledPublishJobInput) error {
+func (f *fakeScheduledPublishEnqueuer) EnqueueScheduledPublishTx(_ context.Context, _ db.Tx, input ScheduledPublishJobInput) error {
 	f.inputs = append(f.inputs, input)
 	return f.err
 }

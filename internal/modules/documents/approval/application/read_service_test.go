@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"os"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -24,11 +24,11 @@ type readServiceRepoSpy struct {
 	inst   *domain.Instance
 }
 
-func (s *readServiceRepoSpy) LoadInstance(context.Context, *sql.Tx, string, string) (*domain.Instance, error) {
+func (s *readServiceRepoSpy) LoadInstance(context.Context, db.Tx, string, string) (*domain.Instance, error) {
 	return nil, nil
 }
 
-func (s *readServiceRepoSpy) LoadActiveInstanceByDocument(_ context.Context, _ *sql.Tx, _, _ string) (*domain.Instance, error) {
+func (s *readServiceRepoSpy) LoadActiveInstanceByDocument(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
 	s.called = true
 	return s.inst, nil
 }

@@ -2,9 +2,10 @@ package application
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"time"
+
+	"metaldocs/internal/platform/db"
 )
 
 type EventType string
@@ -36,7 +37,7 @@ type GovernanceEvent struct {
 // EventEmitter writes governance events within the caller's transaction.
 // The tx must be the same transaction as the state-change write (outbox pattern).
 type EventEmitter interface {
-	Emit(ctx context.Context, tx *sql.Tx, event GovernanceEvent) error
+	Emit(ctx context.Context, tx db.Tx, event GovernanceEvent) error
 }
 
 // sqlEmitter is the default production implementation.
@@ -50,7 +51,7 @@ INSERT INTO governance_events
   (tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, now()))`
 
-func (e *sqlEmitter) Emit(ctx context.Context, tx *sql.Tx, ev GovernanceEvent) error {
+func (e *sqlEmitter) Emit(ctx context.Context, tx db.Tx, ev GovernanceEvent) error {
 	payload := ev.PayloadJSON
 	if payload == nil {
 		payload = json.RawMessage("{}")
@@ -71,7 +72,7 @@ type MemoryEmitter struct {
 	Events []GovernanceEvent
 }
 
-func (m *MemoryEmitter) Emit(_ context.Context, _ *sql.Tx, ev GovernanceEvent) error {
+func (m *MemoryEmitter) Emit(_ context.Context, _ db.Tx, ev GovernanceEvent) error {
 	m.Events = append(m.Events, ev)
 	return nil
 }

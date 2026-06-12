@@ -19,6 +19,7 @@ import (
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
@@ -102,7 +103,7 @@ func (f fakeGovernanceLogger) Log(ctx context.Context, e taxonomydomain.Governan
 	return nil
 }
 
-func (f fakeGovernanceLogger) LogTx(_ context.Context, _ *sql.Tx, _ taxonomydomain.GovernanceEvent) error {
+func (f fakeGovernanceLogger) LogTx(_ context.Context, _ db.Tx, _ taxonomydomain.GovernanceEvent) error {
 	return nil
 }
 

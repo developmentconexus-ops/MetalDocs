@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"testing"
 
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/messaging"
 )
 
@@ -30,7 +31,7 @@ type fakeFinalDocxPersister struct {
 	err   error
 }
 
-func (f *fakeFinalDocxPersister) WriteFinalDocxInTx(_ context.Context, _ *sql.Tx, _, _, _ string, _ []byte) error {
+func (f *fakeFinalDocxPersister) WriteFinalDocxInTx(_ context.Context, _ db.Tx, _, _, _ string, _ []byte) error {
 	if f.err != nil {
 		return f.err
 	}
@@ -43,7 +44,7 @@ type fakePDFEnqueuer struct {
 	err   error
 }
 
-func (f *fakePDFEnqueuer) Enqueue(_ context.Context, _ *sql.Tx, _, _ string, _ []byte) error {
+func (f *fakePDFEnqueuer) Enqueue(_ context.Context, _ db.Tx, _, _ string, _ []byte) error {
 	if f.err != nil {
 		return f.err
 	}

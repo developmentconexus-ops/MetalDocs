@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/db"
 )
 
 type DBGovernanceLogger struct {
@@ -44,9 +45,9 @@ func (l *DBGovernanceLogger) Log(ctx context.Context, e domain.GovernanceEvent) 
 }
 
 // LogTx writes the governance event inside an open transaction (REQ-ASYNC-1, F-07).
-func (l *DBGovernanceLogger) LogTx(ctx context.Context, tx *sql.Tx, e domain.GovernanceEvent) error {
+func (l *DBGovernanceLogger) LogTx(ctx context.Context, tx db.Tx, e domain.GovernanceEvent) error {
 	if tx == nil {
-		return fmt.Errorf("taxonomy: DBGovernanceLogger.LogTx called with nil tx; a real *sql.Tx is required")
+		return fmt.Errorf("taxonomy: DBGovernanceLogger.LogTx called with nil tx; a real db.Tx is required")
 	}
 	payload := e.PayloadJSON
 	if len(payload) == 0 {

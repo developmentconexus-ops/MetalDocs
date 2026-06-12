@@ -36,6 +36,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -494,7 +495,7 @@ func TestSubmitRevisionForReview_StageInsertError(t *testing.T) {
 // errorEmitter always returns an error from Emit.
 type errorEmitter struct{}
 
-func (e *errorEmitter) Emit(_ context.Context, _ *sql.Tx, _ GovernanceEvent) error {
+func (e *errorEmitter) Emit(_ context.Context, _ db.Tx, _ GovernanceEvent) error {
 	return errors.New("emit failed")
 }
 
@@ -2825,15 +2826,15 @@ type fakeDecisionRepoWithCounter struct {
 	updateInstanceErr error
 }
 
-func (r *fakeDecisionRepoWithCounter) LoadInstance(_ context.Context, _ *sql.Tx, _, _ string) (*domain.Instance, error) {
+func (r *fakeDecisionRepoWithCounter) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
 	return r.instance, r.loadInstanceErr
 }
 
-func (r *fakeDecisionRepoWithCounter) InsertSignoff(_ context.Context, _ *sql.Tx, _ domain.Signoff) (repository.SignoffInsertResult, error) {
+func (r *fakeDecisionRepoWithCounter) InsertSignoff(_ context.Context, _ db.Tx, _ domain.Signoff) (repository.SignoffInsertResult, error) {
 	return r.insertSignoffRes, r.insertSignoffErr
 }
 
-func (r *fakeDecisionRepoWithCounter) UpdateStageStatus(_ context.Context, _ *sql.Tx, _, _ string, _, _ domain.StageStatus) error {
+func (r *fakeDecisionRepoWithCounter) UpdateStageStatus(_ context.Context, _ db.Tx, _, _ string, _, _ domain.StageStatus) error {
 	if r.stageUpdateIdx < len(r.stageUpdateErrors) {
 		err := r.stageUpdateErrors[r.stageUpdateIdx]
 		r.stageUpdateIdx++
@@ -2842,7 +2843,7 @@ func (r *fakeDecisionRepoWithCounter) UpdateStageStatus(_ context.Context, _ *sq
 	return nil
 }
 
-func (r *fakeDecisionRepoWithCounter) UpdateInstanceStatus(_ context.Context, _ *sql.Tx, _, _ string, _ domain.InstanceStatus, _ domain.InstanceStatus, _ *time.Time) error {
+func (r *fakeDecisionRepoWithCounter) UpdateInstanceStatus(_ context.Context, _ db.Tx, _, _ string, _ domain.InstanceStatus, _ domain.InstanceStatus, _ *time.Time) error {
 	return r.updateInstanceErr
 }
 

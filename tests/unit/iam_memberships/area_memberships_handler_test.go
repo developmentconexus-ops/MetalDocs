@@ -15,7 +15,6 @@ package iammembershipstest
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -30,6 +29,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -202,7 +202,7 @@ func (a *recordingAudit) Record(_ context.Context, ev auditdomain.Event) error {
 	return nil
 }
 
-func (a *recordingAudit) RecordTx(_ context.Context, _ *sql.Tx, ev auditdomain.Event) error {
+func (a *recordingAudit) RecordTx(_ context.Context, _ db.Tx, ev auditdomain.Event) error {
 	return a.Record(context.Background(), ev)
 }
 

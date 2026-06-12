@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"metaldocs/internal/modules/documents/approval/application"
+	"metaldocs/internal/platform/db"
 )
 
 type mockCancelService struct {
@@ -50,7 +51,7 @@ type recordingEmitter struct {
 	events []application.GovernanceEvent
 }
 
-func (r *recordingEmitter) Emit(_ context.Context, _ *sql.Tx, e application.GovernanceEvent) error {
+func (r *recordingEmitter) Emit(_ context.Context, _ db.Tx, e application.GovernanceEvent) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.events = append(r.events, e)

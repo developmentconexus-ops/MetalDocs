@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/domain"
+	"metaldocs/internal/platform/db"
 )
 
 // SignoffInsertResult returned by InsertSignoff.
@@ -56,25 +57,25 @@ type RouteStage struct {
 }
 
 // ApprovalRepository defines all persistence operations for the approval subsystem.
-// All mutating methods take *sql.Tx — callers own tx lifecycle (Phase 5 services).
+// All mutating methods take db.Tx — callers own tx lifecycle (Phase 5 services).
 type ApprovalRepository interface {
-	InsertInstance(ctx context.Context, tx *sql.Tx, inst domain.Instance) error
-	InsertStageInstances(ctx context.Context, tx *sql.Tx, stages []domain.StageInstance) error
-	InsertSignoff(ctx context.Context, tx *sql.Tx, s domain.Signoff) (SignoffInsertResult, error)
-	LoadSignoffByActor(ctx context.Context, tx *sql.Tx, tenantID, instanceID, actorUserID string) (*domain.Signoff, error)
-	LoadInstance(ctx context.Context, tx *sql.Tx, tenantID, id string) (*domain.Instance, error)
+	InsertInstance(ctx context.Context, tx db.Tx, inst domain.Instance) error
+	InsertStageInstances(ctx context.Context, tx db.Tx, stages []domain.StageInstance) error
+	InsertSignoff(ctx context.Context, tx db.Tx, s domain.Signoff) (SignoffInsertResult, error)
+	LoadSignoffByActor(ctx context.Context, tx db.Tx, tenantID, instanceID, actorUserID string) (*domain.Signoff, error)
+	LoadInstance(ctx context.Context, tx db.Tx, tenantID, id string) (*domain.Instance, error)
 	// LoadInstancesByIDs batch-loads multiple approval instances in a single
 	// query set. Order of the returned slice matches ids. Missing IDs (tenant
 	// mismatch or not found) are silently omitted.
-	LoadInstancesByIDs(ctx context.Context, tx *sql.Tx, tenantID string, ids []string) ([]domain.Instance, error)
-	LoadActiveInstanceByDocument(ctx context.Context, tx *sql.Tx, tenantID, docID string) (*domain.Instance, error)
-	ValidateScheduledSupersedeTarget(ctx context.Context, tx *sql.Tx, tenantID, documentID, supersededDocumentID string) error
-	LoadCurrentPublishedHeadForDocument(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error)
-	LoadCurrentPublishedHead(ctx context.Context, tx *sql.Tx, tenantID, controlledDocumentID string) (string, error)
-	GetDocumentRevisionVersion(ctx context.Context, tx *sql.Tx, documentID, tenantID string) (int, error)
+	LoadInstancesByIDs(ctx context.Context, tx db.Tx, tenantID string, ids []string) ([]domain.Instance, error)
+	LoadActiveInstanceByDocument(ctx context.Context, tx db.Tx, tenantID, docID string) (*domain.Instance, error)
+	ValidateScheduledSupersedeTarget(ctx context.Context, tx db.Tx, tenantID, documentID, supersededDocumentID string) error
+	LoadCurrentPublishedHeadForDocument(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error)
+	LoadCurrentPublishedHead(ctx context.Context, tx db.Tx, tenantID, controlledDocumentID string) (string, error)
+	GetDocumentRevisionVersion(ctx context.Context, tx db.Tx, documentID, tenantID string) (int, error)
 	ListRoutes(ctx context.Context, tenantID string) ([]Route, error)
-	ListRoutesTx(ctx context.Context, tx *sql.Tx, tenantID string) ([]Route, error)
-	MarkSuperseded(ctx context.Context, tx *sql.Tx, tenantID, documentID string) error
-	UpdateStageStatus(ctx context.Context, tx *sql.Tx, tenantID, stageID string, newStatus, expectedOldStatus domain.StageStatus) error
-	UpdateInstanceStatus(ctx context.Context, tx *sql.Tx, tenantID, instID string, newStatus domain.InstanceStatus, expectedStatus domain.InstanceStatus, completedAt *time.Time) error
+	ListRoutesTx(ctx context.Context, tx db.Tx, tenantID string) ([]Route, error)
+	MarkSuperseded(ctx context.Context, tx db.Tx, tenantID, documentID string) error
+	UpdateStageStatus(ctx context.Context, tx db.Tx, tenantID, stageID string, newStatus, expectedOldStatus domain.StageStatus) error
+	UpdateInstanceStatus(ctx context.Context, tx db.Tx, tenantID, instID string, newStatus domain.InstanceStatus, expectedStatus domain.InstanceStatus, completedAt *time.Time) error
 }

@@ -2,13 +2,13 @@ package application_test
 
 import (
 	"context"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"testing"
 
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/servicebus"
 )
 
@@ -102,7 +102,7 @@ func (f *fakeAudit) Write(_ context.Context, tenantID, actorID, action, docID st
 	})
 }
 
-func (f *fakeAudit) WriteTx(_ context.Context, _ *sql.Tx, tenantID, actorID, action, docID string, meta any) error {
+func (f *fakeAudit) WriteTx(_ context.Context, _ db.Tx, tenantID, actorID, action, docID string, meta any) error {
 	f.events = append(f.events, map[string]any{
 		"tenant_id": tenantID,
 		"actor_id":  actorID,

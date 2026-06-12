@@ -14,6 +14,7 @@ import (
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/db"
 	tenant "metaldocs/internal/platform/tenant"
 )
 
@@ -220,7 +221,7 @@ RETURNING revision_number`
 	return nil
 }
 
-func (r *Repository) CreateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.TemplateVersion) error {
+func (r *Repository) CreateVersionTx(ctx context.Context, tx db.Tx, v *domain.TemplateVersion) error {
 	metadataJSON, placeholderJSON, err := marshalVersionSchemas(v)
 	if err != nil {
 		return err
@@ -301,7 +302,7 @@ func (r *Repository) UpdateVersion(ctx context.Context, tenantID string, v *doma
 	return updateVersion(ctx, r.db, tenantID, v)
 }
 
-func (r *Repository) CreateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error {
+func (r *Repository) CreateTemplateTx(ctx context.Context, tx db.Tx, t *domain.Template) error {
 	const q = `
 INSERT INTO templates_template (
 	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
@@ -395,7 +396,7 @@ SELECT EXISTS (
 	return domain.ErrStaleLockVersion
 }
 
-func (r *Repository) UpdateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error {
+func (r *Repository) UpdateTemplateTx(ctx context.Context, tx db.Tx, t *domain.Template) error {
 	const q = `
 UPDATE templates_template
 SET
@@ -425,7 +426,7 @@ WHERE id = $1 AND tenant_id = $2::uuid`
 	return nil
 }
 
-func (r *Repository) UpdateVersionTx(ctx context.Context, tx *sql.Tx, tenantID string, v *domain.TemplateVersion) error {
+func (r *Repository) UpdateVersionTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion) error {
 	return updateVersion(ctx, tx, tenantID, v)
 }
 
@@ -433,7 +434,7 @@ func (r *Repository) UpdateVersionDraftCAS(ctx context.Context, tenantID, versio
 	return updateVersionDraftCAS(ctx, r.db, tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 }
 
-func (r *Repository) UpdateVersionDraftCASTx(ctx context.Context, tx *sql.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+func (r *Repository) UpdateVersionDraftCASTx(ctx context.Context, tx db.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
 	return updateVersionDraftCAS(ctx, tx, tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 }
 
@@ -489,7 +490,7 @@ func (r *Repository) UpdateVersionSchemaCAS(ctx context.Context, tenantID string
 	return updateVersionSchemaCAS(ctx, r.db, tenantID, v, expectedLockVersion)
 }
 
-func (r *Repository) UpdateVersionSchemaCASTx(ctx context.Context, tx *sql.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
+func (r *Repository) UpdateVersionSchemaCASTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
 	return updateVersionSchemaCAS(ctx, tx, tenantID, v, expectedLockVersion)
 }
 
@@ -556,7 +557,7 @@ WHERE template_id = $1 AND status = 'published' AND id <> $2`
 	return nil
 }
 
-func (r *Repository) ObsoletePreviousPublishedTx(ctx context.Context, tx *sql.Tx, templateID, keepVersionID string) error {
+func (r *Repository) ObsoletePreviousPublishedTx(ctx context.Context, tx db.Tx, templateID, keepVersionID string) error {
 	const q = `
 UPDATE templates_template_version
 SET status = 'obsolete', obsoleted_at = now()
@@ -611,7 +612,7 @@ SET reviewer_role = EXCLUDED.reviewer_role,
 	return nil
 }
 
-func (r *Repository) UpsertApprovalConfigTx(ctx context.Context, tx *sql.Tx, c *domain.ApprovalConfig) error {
+func (r *Repository) UpsertApprovalConfigTx(ctx context.Context, tx db.Tx, c *domain.ApprovalConfig) error {
 	const q = `
 INSERT INTO templates_approval_config (template_id, reviewer_role, approver_role)
 VALUES ($1, $2, $3)
@@ -639,7 +640,7 @@ func (r *Repository) AppendAudit(ctx context.Context, entry *domain.AuditEvent) 
 	return r.audit.Record(ctx, event)
 }
 
-func (r *Repository) AppendAuditTx(ctx context.Context, tx *sql.Tx, entry *domain.AuditEvent) error {
+func (r *Repository) AppendAuditTx(ctx context.Context, tx db.Tx, entry *domain.AuditEvent) error {
 	if r.audit == nil {
 		return nil
 	}

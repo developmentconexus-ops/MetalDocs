@@ -60,7 +60,7 @@ func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) er
 		}
 		tenantID, _ := tenant.FromContext(ctx)
 		actorUserID, _ := authn.UserIDFromContext(ctx)
-		if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
+		if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 			TenantID:     tenantID,
 			EventType:    domain.GovernanceEventTypeFamilyCreated,
 			ActorUserID:  actorUserID,
@@ -117,7 +117,7 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 		}
 		tenantID, _ := tenant.FromContext(ctx)
 		actorUserID, _ := authn.UserIDFromContext(ctx)
-		if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
+		if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 			TenantID:     tenantID,
 			EventType:    domain.GovernanceEventTypeFamilyUpdated,
 			ActorUserID:  actorUserID,
@@ -174,7 +174,7 @@ func (s *FamilyService) Deactivate(ctx context.Context, code domain.FamilyCode) 
 			return fmt.Errorf("taxonomy: marshal family deactivate governance payload: %w", err)
 		}
 		actorUserID, _ := authn.UserIDFromContext(ctx)
-		if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
+		if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 			TenantID:     tenantID,
 			EventType:    domain.GovernanceEventTypeFamilyDeactivated,
 			ActorUserID:  actorUserID,

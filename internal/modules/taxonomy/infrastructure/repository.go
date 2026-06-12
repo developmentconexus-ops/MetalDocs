@@ -28,9 +28,16 @@ type taxonomyTx struct {
 func (t taxonomyTx) Commit() error   { return t.tx.Commit() }
 func (t taxonomyTx) Rollback() error { return t.tx.Rollback() }
 
-// Unwrap exposes the underlying *sql.Tx so AuditGovernanceAdapter.LogTx can
-// call audit.Writer.RecordTx inside the same transaction (F-07).
-func (t taxonomyTx) Unwrap() *sql.Tx { return t.tx }
+// db.Tx forwarding — satisfies domain.FamilyTx which embeds db.Tx (F-07).
+func (t taxonomyTx) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return t.tx.ExecContext(ctx, query, args...)
+}
+func (t taxonomyTx) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return t.tx.QueryContext(ctx, query, args...)
+}
+func (t taxonomyTx) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return t.tx.QueryRowContext(ctx, query, args...)
+}
 
 func NewProfileRepository(db *sql.DB) *ProfileRepository {
 	return &ProfileRepository{db: db}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/messaging"
 )
 
@@ -23,12 +24,12 @@ type MaterializeFanoutResult struct {
 
 // MaterializeFinalDocxPersister writes the final docx key + hash transactionally.
 type MaterializeFinalDocxPersister interface {
-	WriteFinalDocxInTx(ctx context.Context, tx *sql.Tx, tenantID, revisionID, s3Key string, contentHash []byte) error
+	WriteFinalDocxInTx(ctx context.Context, tx db.Tx, tenantID, revisionID, s3Key string, contentHash []byte) error
 }
 
 // MaterializePDFEnqueuer enqueues a pdf_dispatch_outbox row inside a transaction.
 type MaterializePDFEnqueuer interface {
-	Enqueue(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, contentHash []byte) error
+	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
 }
 
 // MaterializeJobRunner handles EventTypeMaterializeFanout events.

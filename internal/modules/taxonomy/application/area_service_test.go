@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/db"
 )
 
 func TestAreaServiceCreate_UsesDomainConstructorNormalizationAndValidation(t *testing.T) {
@@ -142,15 +143,22 @@ func (r *fakeAreaRepository) get(tenantID, code string) *domain.ProcessArea {
 	return r.byKey[tenantID+"|"+code]
 }
 
-// commitTrackingTx records whether Commit was called; does not implement
-// Unwrap so sqlTxFromFamilyTx returns nil (simulating a test double that
-// cannot provide a real *sql.Tx).
+// commitTrackingTx records whether Commit was called.
 type commitTrackingTx struct {
 	committed bool
 }
 
 func (t *commitTrackingTx) Commit() error   { t.committed = true; return nil }
 func (t *commitTrackingTx) Rollback() error { return nil }
+func (t *commitTrackingTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	return nil, nil
+}
+func (t *commitTrackingTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
+	return nil, nil
+}
+func (t *commitTrackingTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row {
+	return nil
+}
 
 // TestAreaServiceCreate_AtomicRollback_WhenLogTxFails asserts that when the
 // governance LogTx call returns an error the mutation is not persisted (the
@@ -188,9 +196,6 @@ func TestAreaServiceCreate_AtomicRollback_WhenLogTxFails(t *testing.T) {
 
 // atomicFakeAreaRepository wraps fakeAreaRepository with a commitTrackingTx
 // and stages writes in a pending map; writes are only promoted on Commit.
-// Since commitTrackingTx does not implement Unwrap, sqlTxFromFamilyTx returns
-// nil and the fakeGovernanceLoggerWithError receives nil tx (acceptable for a
-// fake that does not use the tx at all).
 type atomicFakeAreaRepository struct {
 	fakeAreaRepository
 	tx      *commitTrackingTx
@@ -218,6 +223,6 @@ func (f *fakeGovernanceLoggerWithError) Log(_ context.Context, _ domain.Governan
 	return nil
 }
 
-func (f *fakeGovernanceLoggerWithError) LogTx(_ context.Context, _ *sql.Tx, _ domain.GovernanceEvent) error {
+func (f *fakeGovernanceLoggerWithError) LogTx(_ context.Context, _ db.Tx, _ domain.GovernanceEvent) error {
 	return f.err
 }

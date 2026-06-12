@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"os"
 	"os/signal"
@@ -15,6 +14,7 @@ import (
 	"metaldocs/internal/modules/render/resolvers"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/httpclient"
 	workerapp "metaldocs/internal/platform/worker"
 )
@@ -44,7 +44,7 @@ type snapshotFinalDocxAdapter struct {
 	repo *docrepo.SnapshotRepository
 }
 
-func (a snapshotFinalDocxAdapter) WriteFinalDocxInTx(ctx context.Context, tx *sql.Tx, tenantID, revisionID, s3Key string, contentHash []byte) error {
+func (a snapshotFinalDocxAdapter) WriteFinalDocxInTx(ctx context.Context, tx db.Tx, tenantID, revisionID, s3Key string, contentHash []byte) error {
 	return a.repo.WriteFinalDocx(ctx, tenantID, revisionID, s3Key, contentHash, tx)
 }
 
