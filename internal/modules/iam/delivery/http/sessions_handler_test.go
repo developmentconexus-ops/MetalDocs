@@ -10,7 +10,6 @@ import (
 	"time"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
-	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -19,13 +18,13 @@ type fakeSessionAdmin struct {
 	revoked  []string
 }
 
-func (f *fakeSessionAdmin) ListActiveSessions(_ context.Context, q authpg.SessionAdminQuery) ([]authpg.SessionListItem, error) {
-	out := make([]authpg.SessionListItem, 0)
+func (f *fakeSessionAdmin) ListActiveSessions(_ context.Context, q authdomain.SessionAdminQuery) ([]authdomain.SessionListItem, error) {
+	out := make([]authdomain.SessionListItem, 0)
 	for _, s := range f.sessions {
 		if s.TenantID != q.TenantID {
 			continue
 		}
-		out = append(out, authpg.SessionListItem{SessionID: s.SessionID, UserID: s.UserID, DisplayName: s.UserID})
+		out = append(out, authdomain.SessionListItem{SessionID: s.SessionID, UserID: s.UserID, DisplayName: s.UserID})
 	}
 	return out, nil
 }

@@ -16,7 +16,6 @@ import (
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
-	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 	"metaldocs/internal/platform/useragent"
@@ -27,7 +26,7 @@ import (
 // returns 501 from the handler so dev/test paths don't pay for an in-memory
 // approximation of the JOIN.
 type SessionAdmin interface {
-	ListActiveSessions(ctx context.Context, q authpg.SessionAdminQuery) ([]authpg.SessionListItem, error)
+	ListActiveSessions(ctx context.Context, q authdomain.SessionAdminQuery) ([]authdomain.SessionListItem, error)
 	FindSession(ctx context.Context, sessionID string) (authdomain.Session, error)
 	RevokeSession(ctx context.Context, sessionID string, revokedAt time.Time) error
 	RevokeSessionsByUserID(ctx context.Context, userID string, revokedAt time.Time) error
@@ -67,7 +66,7 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	q := authpg.SessionAdminQuery{
+	q := authdomain.SessionAdminQuery{
 		TenantID: tenantID,
 		UserID:   strings.TrimSpace(r.URL.Query().Get("user_id")),
 	}
