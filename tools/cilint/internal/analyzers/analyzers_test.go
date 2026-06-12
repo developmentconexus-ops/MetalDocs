@@ -368,7 +368,7 @@ func (s *Svc) Submit(ctx interface{}) error {
 	}
 }
 
-func TestPostCommitAudit_Positive_MutationWithoutEmit(t *testing.T) {
+func TestOutboxPair_Positive_MutationWithoutEmit(t *testing.T) {
 	src := `package application
 type Svc struct{}
 func (s *Svc) MutateOnly(tx interface{}) {

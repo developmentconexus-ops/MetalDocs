@@ -17,9 +17,9 @@ func marshalGovernancePayload(v any) ([]byte, error) {
 }
 
 // sqlTxFromFamilyTx extracts the underlying *sql.Tx from a FamilyTx.
-// All taxonomy infrastructure adapters implement Unwrap() *sql.Tx; test
-// doubles that do not are silently skipped (LogTx falls back to Log in the
-// adapter if tx is nil, but that path should not occur in production).
+// All taxonomy infrastructure adapters and test doubles that pass through
+// LogTx must implement Unwrap() *sql.Tx; AuditGovernanceAdapter.LogTx
+// returns an error if a nil *sql.Tx is supplied.
 func sqlTxFromFamilyTx(tx domain.FamilyTx) *sql.Tx {
 	type unwrapper interface{ Unwrap() *sql.Tx }
 	if u, ok := tx.(unwrapper); ok {

@@ -543,29 +543,8 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 	return template, nil
 }
 
-func (s *Service) updateVersionWithAuthz(ctx context.Context, tenantID, actorID string, version *domain.TemplateVersion, cap string) error {
-	if s.db != nil {
-		tx, err := s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("templates update version: begin tx: %w", err)
-		}
-		defer func() { _ = tx.Rollback() }()
-		if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
-			return fmt.Errorf("templates update version: setAuthzGUC: %w", err)
-		}
-		if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
-			return fmt.Errorf("templates update version: authz: %w", err)
-		}
-		if err := s.repo.UpdateVersionTx(ctx, tx, tenantID, version); err != nil {
-			return err
-		}
-		return tx.Commit()
-	}
-	return s.repo.UpdateVersion(ctx, tenantID, version)
-}
-
-// updateVersionWithAuthzAndAudit is like updateVersionWithAuthz but also
-// appends the audit event inside the same transaction (F-07 / REQ-ASYNC-1).
+// updateVersionWithAuthzAndAudit runs the authz check and the version update
+// inside a single transaction, then appends the audit event atomically (F-07 / REQ-ASYNC-1).
 func (s *Service) updateVersionWithAuthzAndAudit(ctx context.Context, tenantID, actorID string, version *domain.TemplateVersion, cap string, audit *domain.AuditEvent) error {
 	if s.db != nil {
 		tx, err := s.db.BeginTx(ctx, nil)

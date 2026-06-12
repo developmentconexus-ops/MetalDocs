@@ -45,9 +45,11 @@ func (a *AuditGovernanceAdapter) Log(ctx context.Context, event domain.Governanc
 
 // LogTx writes the governance event inside tx so the audit record is
 // atomically committed with the mutation that caused it (REQ-ASYNC-1, F-07).
-// If tx is nil (test doubles that do not expose a real *sql.Tx), the call
-// falls back to the non-tx path.
+// tx must not be nil; callers must ensure a real *sql.Tx is provided.
 func (a *AuditGovernanceAdapter) LogTx(ctx context.Context, tx *sql.Tx, event domain.GovernanceEvent) error {
+	if tx == nil {
+		return fmt.Errorf("taxonomy: LogTx called with nil tx; adapter requires a real *sql.Tx (implement Unwrap on the tx type)")
+	}
 	payload := event.PayloadJSON
 	if payload == nil {
 		var err error
@@ -66,8 +68,5 @@ func (a *AuditGovernanceAdapter) LogTx(ctx context.Context, tx *sql.Tx, event do
 		PayloadJSON:  string(payload),
 		TenantID:     event.TenantID,
 	}
-	if tx != nil {
-		return a.writer.RecordTx(ctx, tx, auditEvent)
-	}
-	return a.writer.Record(ctx, auditEvent)
+	return a.writer.RecordTx(ctx, tx, auditEvent)
 }

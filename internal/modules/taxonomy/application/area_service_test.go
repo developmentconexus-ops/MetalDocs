@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -184,4 +185,84 @@ func (r *fakeAreaRepository) get(tenantID, code string) *domain.ProcessArea {
 func areaCodePtr(v string) *domain.AreaCode {
 	code := domain.AreaCode(v)
 	return &code
+}
+
+// commitTrackingTx records whether Commit was called; does not implement
+// Unwrap so sqlTxFromFamilyTx returns nil (simulating a test double that
+// cannot provide a real *sql.Tx).
+type commitTrackingTx struct {
+	committed bool
+}
+
+func (t *commitTrackingTx) Commit() error   { t.committed = true; return nil }
+func (t *commitTrackingTx) Rollback() error { return nil }
+
+// TestAreaServiceCreate_AtomicRollback_WhenLogTxFails asserts that when the
+// governance LogTx call returns an error the mutation is not persisted (the
+// transaction is rolled back and Commit is never called).
+func TestAreaServiceCreate_AtomicRollback_WhenLogTxFails(t *testing.T) {
+	tx := &commitTrackingTx{}
+	repo := &atomicFakeAreaRepository{
+		fakeAreaRepository: *newFakeAreaRepository(),
+		tx:                 tx,
+	}
+
+	govErr := errors.New("governance write failed")
+	logger := &fakeGovernanceLoggerWithError{err: govErr}
+
+	service := NewAreaService(repo, logger)
+	err := service.Create(context.Background(), &domain.ProcessArea{
+		Code:     "AR-ATOMIC",
+		TenantID: "tenant-a",
+		Name:     "Atomic Test",
+	})
+
+	if err == nil {
+		t.Fatal("expected error when LogTx fails, got nil")
+	}
+	if !errors.Is(err, govErr) {
+		t.Fatalf("expected wrapped govErr, got: %v", err)
+	}
+	if tx.committed {
+		t.Fatal("Commit must NOT be called when LogTx fails")
+	}
+	if repo.get("tenant-a", "AR-ATOMIC") != nil {
+		t.Fatal("area must not be persisted when governance write fails and tx is rolled back")
+	}
+}
+
+// atomicFakeAreaRepository wraps fakeAreaRepository with a commitTrackingTx
+// and stages writes in a pending map; writes are only promoted on Commit.
+// Since commitTrackingTx does not implement Unwrap, sqlTxFromFamilyTx returns
+// nil and the fakeGovernanceLoggerWithError receives nil tx (acceptable for a
+// fake that does not use the tx at all).
+type atomicFakeAreaRepository struct {
+	fakeAreaRepository
+	tx      *commitTrackingTx
+	pending map[string]*domain.ProcessArea
+}
+
+func (r *atomicFakeAreaRepository) BeginTx(_ context.Context) (domain.FamilyTx, error) {
+	r.pending = map[string]*domain.ProcessArea{}
+	return r.tx, nil
+}
+
+func (r *atomicFakeAreaRepository) CreateTx(_ context.Context, _ domain.FamilyTx, a *domain.ProcessArea) error {
+	cp := *a
+	r.pending[a.TenantID+"|"+string(a.Code)] = &cp
+	return nil
+}
+
+// fakeGovernanceLoggerWithError returns err from LogTx and nil from Log.
+// It satisfies domain.GovernanceLogger.
+type fakeGovernanceLoggerWithError struct {
+	err error
+}
+
+func (f *fakeGovernanceLoggerWithError) Log(_ context.Context, _ domain.GovernanceEvent) error {
+	return nil
+}
+
+func (f *fakeGovernanceLoggerWithError) LogTx(_ context.Context, _ *sql.Tx, _ domain.GovernanceEvent) error {
+	return f.err
 }
