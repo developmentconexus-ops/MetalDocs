@@ -87,6 +87,53 @@ func (c *CachedRoleProvider) RolesByUserID(ctx context.Context, userID, tenantID
 	return roles, nil
 }
 
+// RolesByUserIDs resolves roles for multiple users with read-through cache.
+// Per-user cache hits are served without a DB round trip; misses are fetched in
+// a single batch query, then each miss result is stored under its TTL.
+func (c *CachedRoleProvider) RolesByUserIDs(ctx context.Context, tenantID string, userIDs []string) (map[string][]domain.Role, error) {
+	if len(userIDs) == 0 {
+		return map[string][]domain.Role{}, nil
+	}
+	now := time.Now().UTC()
+	out := make(map[string][]domain.Role, len(userIDs))
+	var misses []string
+
+	c.mu.RLock()
+	for _, uid := range userIDs {
+		key := roleCacheKey(uid, tenantID)
+		if entry, ok := c.items[key]; ok && now.Before(entry.expiresAt) {
+			out[uid] = cloneRoles(entry.roles)
+		} else {
+			misses = append(misses, uid)
+		}
+	}
+	c.mu.RUnlock()
+
+	if len(misses) == 0 {
+		return out, nil
+	}
+
+	fetched, err := c.base.RolesByUserIDs(ctx, tenantID, misses)
+	if err != nil {
+		return nil, err
+	}
+
+	c.mu.Lock()
+	for _, uid := range misses {
+		roles, active := fetched[uid]
+		if !active {
+			// User not found / inactive — do not cache negative; simply omit.
+			continue
+		}
+		key := roleCacheKey(uid, tenantID)
+		c.items[key] = cacheEntry{roles: cloneRoles(roles), expiresAt: now.Add(c.ttl)}
+		out[uid] = cloneRoles(roles)
+	}
+	c.mu.Unlock()
+
+	return out, nil
+}
+
 func (c *CachedRoleProvider) InvalidateUserTenant(userID, tenantID string) {
 	c.evict(userID, tenantID)
 }

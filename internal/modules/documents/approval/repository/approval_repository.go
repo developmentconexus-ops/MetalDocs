@@ -63,6 +63,10 @@ type ApprovalRepository interface {
 	InsertSignoff(ctx context.Context, tx *sql.Tx, s domain.Signoff) (SignoffInsertResult, error)
 	LoadSignoffByActor(ctx context.Context, tx *sql.Tx, tenantID, instanceID, actorUserID string) (*domain.Signoff, error)
 	LoadInstance(ctx context.Context, tx *sql.Tx, tenantID, id string) (*domain.Instance, error)
+	// LoadInstancesByIDs batch-loads multiple approval instances in a single
+	// query set. Order of the returned slice matches ids. Missing IDs (tenant
+	// mismatch or not found) are silently omitted.
+	LoadInstancesByIDs(ctx context.Context, tx *sql.Tx, tenantID string, ids []string) ([]domain.Instance, error)
 	LoadActiveInstanceByDocument(ctx context.Context, tx *sql.Tx, tenantID, docID string) (*domain.Instance, error)
 	ValidateScheduledSupersedeTarget(ctx context.Context, tx *sql.Tx, tenantID, documentID, supersededDocumentID string) error
 	LoadCurrentPublishedHeadForDocument(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error)

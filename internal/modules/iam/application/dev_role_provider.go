@@ -42,3 +42,27 @@ func (p *DevRoleProvider) RolesByUserID(_ context.Context, userID, tenantID stri
 	copy(out, roles)
 	return out, nil
 }
+
+// RolesByUserIDs resolves roles for multiple users in a single call (dev mode).
+// Mirrors the batch semantics: absent/inactive users are omitted from the map;
+// active users with no roles are present with an empty slice.
+func (p *DevRoleProvider) RolesByUserIDs(_ context.Context, tenantID string, userIDs []string) (map[string][]domain.Role, error) {
+	out := make(map[string][]domain.Role, len(userIDs))
+	if strings.TrimSpace(tenantID) != p.allowedTenantID {
+		return out, nil
+	}
+	for _, uid := range userIDs {
+		id := strings.TrimSpace(uid)
+		if id == "" {
+			continue
+		}
+		roles, ok := p.rolesByUser[id]
+		if !ok {
+			continue
+		}
+		clone := make([]domain.Role, len(roles))
+		copy(clone, roles)
+		out[id] = clone
+	}
+	return out, nil
+}

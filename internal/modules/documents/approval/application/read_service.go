@@ -216,13 +216,10 @@ func (s *ReadService) ListPendingForActor(ctx context.Context, db *sql.DB, tenan
 		return nil, fmt.Errorf("list pending: rows: %w", err)
 	}
 
-	out := make([]domain.Instance, 0, len(ids))
-	for _, id := range ids {
-		inst, err := s.repo.LoadInstance(ctx, tx, tenantID, id)
-		if err != nil {
-			return nil, fmt.Errorf("list pending: load instance %s: %w", id, err)
-		}
-		out = append(out, *inst)
+	// Batch-load all instances in a single query set (REQ-DATA-2 / F-10).
+	out, err := s.repo.LoadInstancesByIDs(ctx, tx, tenantID, ids)
+	if err != nil {
+		return nil, fmt.Errorf("list pending: batch load instances: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
+
 	"metaldocs/internal/modules/documents/approval/domain"
 )
 
@@ -695,6 +697,218 @@ func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context
 		return nil, fmt.Errorf("iterate signoff rows for approval instance %s: %w", instanceID, err)
 	}
 	return out, nil
+}
+
+// LoadInstancesByIDs batch-loads approval instances by their IDs.
+// Uses a single query for headers, one for all stage instances, and one for all
+// signoffs — 3 round trips instead of 3N. Order matches ids; missing IDs are
+// silently omitted (tenant mismatch or not found).
+func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx *sql.Tx, tenantID string, ids []string) ([]domain.Instance, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	// ── 1. Load instance headers ──────────────────────────────────────────────
+	headerRows, err := tx.QueryContext(ctx, `
+		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
+		       d.revision_version,
+		       ai.status, ai.submitted_by, ai.submitted_at, ai.completed_at,
+		       ai.content_hash_at_submit, ai.idempotency_key
+		FROM approval_instances ai
+		JOIN documents d
+		  ON d.id = ai.document_id
+		 AND d.tenant_id = ai.tenant_id
+		WHERE ai.id = ANY($1)
+		  AND ai.tenant_id = $2`,
+		pq.Array(ids), tenantID,
+	)
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	defer headerRows.Close()
+
+	// Maintain insertion order from ids slice.
+	order := make([]string, 0, len(ids))
+	byID := make(map[string]*domain.Instance, len(ids))
+	for headerRows.Next() {
+		var inst domain.Instance
+		var completedAt sql.NullTime
+		if err := headerRows.Scan(
+			&inst.ID, &inst.TenantID, &inst.DocumentID, &inst.RouteID, &inst.RouteVersionSnapshot,
+			&inst.RevisionVersion,
+			&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
+			&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
+		); err != nil {
+			return nil, fmt.Errorf("scan approval instance header: %w", err)
+		}
+		if completedAt.Valid {
+			inst.CompletedAt = &completedAt.Time
+		}
+		if _, seen := byID[inst.ID]; !seen {
+			order = append(order, inst.ID)
+		}
+		cp := inst
+		byID[inst.ID] = &cp
+	}
+	if err := headerRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate approval instance headers: %w", err)
+	}
+	if len(byID) == 0 {
+		return nil, nil
+	}
+
+	// ── 2. Load all stage instances for the found set ─────────────────────────
+	knownIDs := make([]string, 0, len(byID))
+	for id := range byID {
+		knownIDs = append(knownIDs, id)
+	}
+	stageRows, err := tx.QueryContext(ctx, `
+		SELECT id, approval_instance_id, stage_order, name_snapshot,
+		       required_role_snapshot, required_capability_snapshot, area_code_snapshot,
+		       quorum_snapshot, quorum_m_snapshot,
+		       on_eligibility_drift_snapshot,
+		       eligible_actor_ids, effective_denominator,
+		       status, opened_at, completed_at, skip_reason
+		FROM approval_stage_instances
+		WHERE approval_instance_id = ANY($1)
+		  AND EXISTS (
+		      SELECT 1
+		        FROM approval_instances ai
+		       WHERE ai.id = approval_stage_instances.approval_instance_id
+		         AND ai.tenant_id = $2::uuid
+		  )
+		ORDER BY approval_instance_id, stage_order ASC
+		FOR UPDATE`,
+		pq.Array(knownIDs), tenantID,
+	)
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	defer stageRows.Close()
+
+	stagesByInst := make(map[string][]domain.StageInstance, len(byID))
+	for stageRows.Next() {
+		var s domain.StageInstance
+		var quorumMSnapshot sql.NullInt32
+		var effectiveDenominator sql.NullInt32
+		var openedAt, completedAt sql.NullTime
+		var eligibleJSON []byte
+		var skipReason sql.NullString
+		if err := stageRows.Scan(
+			&s.ID, &s.ApprovalInstanceID, &s.StageOrder, &s.NameSnapshot,
+			&s.RequiredRoleSnapshot, &s.RequiredCapabilitySnapshot, &s.AreaCodeSnapshot,
+			&s.QuorumSnapshot, &quorumMSnapshot,
+			&s.OnEligibilityDriftSnapshot,
+			&eligibleJSON, &effectiveDenominator,
+			&s.Status, &openedAt, &completedAt, &skipReason,
+		); err != nil {
+			return nil, fmt.Errorf("scan stage instance in batch load: %w", err)
+		}
+		if quorumMSnapshot.Valid {
+			v := int(quorumMSnapshot.Int32)
+			s.QuorumMSnapshot = &v
+		}
+		if effectiveDenominator.Valid {
+			v := int(effectiveDenominator.Int32)
+			s.EffectiveDenominator = &v
+		}
+		if openedAt.Valid {
+			s.OpenedAt = &openedAt.Time
+		}
+		if completedAt.Valid {
+			s.CompletedAt = &completedAt.Time
+		}
+		if skipReason.Valid {
+			s.SkipReason = skipReason.String
+		}
+		if len(eligibleJSON) > 0 {
+			if err := json.Unmarshal(eligibleJSON, &s.EligibleActorIDs); err != nil {
+				return nil, fmt.Errorf("unmarshal eligible_actor_ids for stage %s: %w", s.ID, err)
+			}
+		}
+		stagesByInst[s.ApprovalInstanceID] = append(stagesByInst[s.ApprovalInstanceID], s)
+	}
+	if err := stageRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate stage instances in batch load: %w", err)
+	}
+
+	// ── 3. Load all signoffs for the found set ────────────────────────────────
+	signoffRows, err := tx.QueryContext(ctx, `
+		SELECT id, approval_instance_id, stage_instance_id, actor_user_id,
+		       actor_tenant_id, decision, coalesce(comment,''), signed_at,
+		       signature_method, signature_payload, content_hash,
+		       coalesce(actor_display_name_snapshot,'')
+		FROM approval_signoffs
+		WHERE approval_instance_id = ANY($1)
+		  AND EXISTS (
+		      SELECT 1
+		        FROM approval_instances ai
+		       WHERE ai.id = approval_signoffs.approval_instance_id
+		         AND ai.tenant_id = $2::uuid
+		  )
+		ORDER BY signed_at ASC`,
+		pq.Array(knownIDs), tenantID,
+	)
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	defer signoffRows.Close()
+
+	// signoffsByStage: stageInstanceID → []*Signoff
+	signoffsByStage := make(map[string][]*domain.Signoff)
+	for signoffRows.Next() {
+		var (
+			id, instID, stageID, actorUserID, actorTenantID string
+			decision, comment, signatureMethod, contentHash  string
+			displayName                                      string
+			signedAt                                         time.Time
+			sigPayload                                        []byte
+		)
+		if err := signoffRows.Scan(&id, &instID, &stageID, &actorUserID, &actorTenantID,
+			&decision, &comment, &signedAt, &signatureMethod, &sigPayload,
+			&contentHash, &displayName); err != nil {
+			return nil, fmt.Errorf("scan signoff row in batch load: %w", err)
+		}
+		sig, err := domain.NewSignoff(domain.SignoffParams{
+			ID:                       id,
+			ApprovalInstanceID:       instID,
+			StageInstanceID:          stageID,
+			ActorUserID:              actorUserID,
+			ActorTenantID:            actorTenantID,
+			Decision:                 domain.Decision(decision),
+			Comment:                  comment,
+			SignedAt:                 signedAt,
+			SignatureMethod:          signatureMethod,
+			SignaturePayload:         sigPayload,
+			ContentHash:              contentHash,
+			ActorDisplayNameSnapshot: displayName,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("scan signoff %s in batch load: %w", id, err)
+		}
+		signoffsByStage[stageID] = append(signoffsByStage[stageID], sig)
+	}
+	if err := signoffRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate signoff rows in batch load: %w", err)
+	}
+
+	// ── 4. Assemble in input order ────────────────────────────────────────────
+	result := make([]domain.Instance, 0, len(order))
+	for _, id := range ids {
+		inst, ok := byID[id]
+		if !ok {
+			continue
+		}
+		stages := stagesByInst[id]
+		for i := range stages {
+			if sigs, ok := signoffsByStage[stages[i].ID]; ok {
+				stages[i].Signoffs = sigs
+			}
+		}
+		inst.Stages = stages
+		result = append(result, *inst)
+	}
+	return result, nil
 }
 
 // UpdateStageStatus applies an OCC (optimistic concurrency control) UPDATE.

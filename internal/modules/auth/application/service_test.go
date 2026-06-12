@@ -43,6 +43,27 @@ func (m *mockRoleProvider) RolesByUserID(_ context.Context, userID, tenantID str
 	return roles, nil
 }
 
+func (m *mockRoleProvider) RolesByUserIDs(_ context.Context, tenantID string, userIDs []string) (map[string][]iamdomain.Role, error) {
+	out := make(map[string][]iamdomain.Role, len(userIDs))
+	for _, uid := range userIDs {
+		key := uid + ":" + tenantID
+		if err, hasErr := m.errs[key]; hasErr {
+			// ErrNoRolesAssigned → user is active but has no roles: include with empty slice.
+			// Other errors (ErrUserNotFound, ErrUserInactive) → exclude.
+			if errors.Is(err, iamdomain.ErrNoRolesAssigned) {
+				out[uid] = []iamdomain.Role{}
+			}
+			continue
+		}
+		if roles, ok := m.roles[key]; ok {
+			clone := make([]iamdomain.Role, len(roles))
+			copy(clone, roles)
+			out[uid] = clone
+		}
+	}
+	return out, nil
+}
+
 func newMockRoleProvider() *mockRoleProvider {
 	return &mockRoleProvider{
 		roles: map[string][]iamdomain.Role{},

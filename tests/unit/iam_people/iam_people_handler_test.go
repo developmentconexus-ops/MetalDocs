@@ -171,6 +171,14 @@ func (fakeRoleProvider) RolesByUserID(_ context.Context, _, _ string) ([]iamdoma
 	return []iamdomain.Role{iamdomain.RoleAuthor}, nil
 }
 
+func (fakeRoleProvider) RolesByUserIDs(_ context.Context, _ string, userIDs []string) (map[string][]iamdomain.Role, error) {
+	out := make(map[string][]iamdomain.Role, len(userIDs))
+	for _, uid := range userIDs {
+		out[uid] = []iamdomain.Role{iamdomain.RoleAuthor}
+	}
+	return out, nil
+}
+
 type fakeAuditWriter struct {
 	mu     sync.Mutex
 	events []auditdomain.Event

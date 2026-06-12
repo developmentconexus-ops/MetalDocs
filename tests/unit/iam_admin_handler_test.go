@@ -51,6 +51,14 @@ func (peopleRoleProviderShim) RolesByUserID(_ context.Context, _, _ string) ([]i
 	return []iamdomain.Role{iamdomain.RoleViewer}, nil
 }
 
+func (peopleRoleProviderShim) RolesByUserIDs(_ context.Context, _ string, userIDs []string) (map[string][]iamdomain.Role, error) {
+	out := make(map[string][]iamdomain.Role, len(userIDs))
+	for _, uid := range userIDs {
+		out[uid] = []iamdomain.Role{iamdomain.RoleViewer}
+	}
+	return out, nil
+}
+
 type fakeInvalidator struct {
 	called bool
 	userID string

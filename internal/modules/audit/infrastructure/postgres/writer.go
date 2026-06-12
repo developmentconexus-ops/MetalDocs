@@ -257,9 +257,16 @@ func buildWhere(q domain.ListEventsQuery) ([]string, []any) {
 		pattern := "%" + sqlescape.LikeEscape(needle) + "%"
 		args = append(args, pattern)
 		idx := len(args)
+		// Restrict free-text search to the indexed/structured columns only.
+		// payload::text ILIKE was dropped (F-10): it forced a full-scan of the
+		// JSONB column with no index support, making every search O(rows).
+		// The OpenAPI description "action / payload summary" is satisfied by
+		// searching action, actor_id, and resource_id — the columns users
+		// realistically filter on. If payload-content search is ever required,
+		// add a GIN index on the payload column and a separate query parameter.
 		where = append(where, fmt.Sprintf(
-			`(action ILIKE $%d ESCAPE '\' OR actor_id ILIKE $%d ESCAPE '\' OR resource_id ILIKE $%d ESCAPE '\' OR payload::text ILIKE $%d ESCAPE '\')`,
-			idx, idx, idx, idx,
+			`(action ILIKE $%d ESCAPE '\' OR actor_id ILIKE $%d ESCAPE '\' OR resource_id ILIKE $%d ESCAPE '\')`,
+			idx, idx, idx,
 		))
 	}
 	return where, args

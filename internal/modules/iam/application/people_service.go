@@ -159,6 +159,14 @@ type peopleRoleProvider interface {
 	RolesByUserID(ctx context.Context, userID, tenantID string) ([]iamdomain.Role, error)
 }
 
+// TenantMemberChecker is the narrow port PeopleService uses to determine
+// whether a user is an active member of the caller's tenant. Satisfied by
+// *postgres.RoleProvider (UserActiveInTenant) in production; the in-memory
+// test path uses a trivial stub or nil (nil = always true for backward compat).
+type TenantMemberChecker interface {
+	UserActiveInTenant(ctx context.Context, tenantID, userID string) (bool, error)
+}
+
 // peopleMembershipService is the subset of AreaMembershipService we need.
 type peopleMembershipService interface {
 	Grant(ctx context.Context, userID, tenantID, areaCode string, role iamdomain.Role, grantedBy string) error
@@ -167,14 +175,15 @@ type peopleMembershipService interface {
 
 // PeopleService is the People-tab orchestrator (PR-4).
 type PeopleService struct {
-	auth         peopleAuthService
-	roles        peopleRoleProvider
-	roleAdmin    iamdomain.RoleAdminRepository
-	memberships  peopleMembershipService
-	areaCatalog  AreaCatalogReader
-	invalidator  RoleCacheInvalidator
-	tempPassword func() (string, error)
-	nowFn        func() time.Time
+	auth           peopleAuthService
+	roles          peopleRoleProvider
+	roleAdmin      iamdomain.RoleAdminRepository
+	memberships    peopleMembershipService
+	areaCatalog    AreaCatalogReader
+	invalidator    RoleCacheInvalidator
+	tenantChecker  TenantMemberChecker
+	tempPassword   func() (string, error)
+	nowFn          func() time.Time
 }
 
 // NewPeopleService wires the People orchestrator. memberships may be nil in
@@ -224,6 +233,14 @@ func (s *PeopleService) WithTempPasswordGenerator(fn func() (string, error)) *Pe
 	if fn != nil {
 		s.tempPassword = fn
 	}
+	return s
+}
+
+// WithTenantMemberChecker wires the EXISTS-based tenant membership check used
+// by VerifyUserInTenant. When nil, VerifyUserInTenant falls back to loading
+// the full user list (backward-compatible; dev/test mode without a SQLDB).
+func (s *PeopleService) WithTenantMemberChecker(c TenantMemberChecker) *PeopleService {
+	s.tenantChecker = c
 	return s
 }
 
@@ -578,16 +595,32 @@ func (s *PeopleService) ListFiltered(ctx context.Context, tenantID string, filte
 	}, nil
 }
 
-// VerifyUserInTenant returns nil if userID is a member of tenantID per the
-// auth ListUsers projection (which joins iam_users tenant_id). Returns
-// ErrUserNotInTenant on miss. Used as a tenant-membership guard before
+// VerifyUserInTenant returns nil if userID is an active member of tenantID.
+// Returns ErrUserNotInTenant on miss. Used as a tenant-membership guard before
 // delegating to tenant-agnostic auth mutations (reset password, unlock).
+//
+// When a TenantMemberChecker is wired (production: postgres.RoleProvider) the
+// check is a single EXISTS query. Without one, it falls back to loading the
+// full user list for backward compatibility (dev/memory mode).
 func (s *PeopleService) VerifyUserInTenant(ctx context.Context, tenantID, userID string) error {
 	tenantID = strings.TrimSpace(tenantID)
 	userID = strings.TrimSpace(userID)
 	if tenantID == "" || userID == "" {
 		return ErrUserNotInTenant
 	}
+
+	if s.tenantChecker != nil {
+		active, err := s.tenantChecker.UserActiveInTenant(ctx, tenantID, userID)
+		if err != nil {
+			return err
+		}
+		if !active {
+			return ErrUserNotInTenant
+		}
+		return nil
+	}
+
+	// Fallback: full list scan (dev/memory mode without a SQLDB).
 	users, err := s.auth.ListUsers(ctx, tenantID)
 	if err != nil {
 		return err

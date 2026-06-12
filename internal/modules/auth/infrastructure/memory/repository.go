@@ -406,6 +406,25 @@ func (r *Repository) RolesByUserID(_ context.Context, userID, _ string) ([]iamdo
 	return append([]iamdomain.Role(nil), identity.Roles...), nil
 }
 
+// RolesByUserIDs resolves roles for multiple users in a single call (in-memory).
+// Mirrors batch semantics: inactive/absent users are omitted; active users with
+// no roles are present with an empty slice.
+func (r *Repository) RolesByUserIDs(_ context.Context, _ string, userIDs []string) (map[string][]iamdomain.Role, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make(map[string][]iamdomain.Role, len(userIDs))
+	for _, uid := range userIDs {
+		identity, ok := r.users[uid]
+		if !ok || !identity.IsActive {
+			continue
+		}
+		clone := make([]iamdomain.Role, len(identity.Roles))
+		copy(clone, identity.Roles)
+		out[uid] = clone
+	}
+	return out, nil
+}
+
 func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, _ string, role iamdomain.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

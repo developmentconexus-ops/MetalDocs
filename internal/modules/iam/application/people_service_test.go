@@ -32,6 +32,14 @@ func (stubRoles) RolesByUserID(_ context.Context, _, _ string) ([]iamdomain.Role
 	return []iamdomain.Role{iamdomain.RoleAuthor}, nil
 }
 
+func (stubRoles) RolesByUserIDs(_ context.Context, _ string, userIDs []string) (map[string][]iamdomain.Role, error) {
+	out := make(map[string][]iamdomain.Role, len(userIDs))
+	for _, uid := range userIDs {
+		out[uid] = []iamdomain.Role{iamdomain.RoleAuthor}
+	}
+	return out, nil
+}
+
 // spyInvalidator records InvalidateUserTenant calls so the create-path guard
 // (A3) can assert Invite flushes the role cache after the user is created.
 type spyInvalidator struct {

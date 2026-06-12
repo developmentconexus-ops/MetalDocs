@@ -445,20 +445,27 @@ func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.
 	if err != nil {
 		return nil, err
 	}
-	// TODO: batch role lookup with IN clause to avoid N+1 role queries.
+	if len(items) == 0 {
+		return nil, nil
+	}
+
+	// Batch-fetch all tenant roles in one round trip (REQ-DATA-2 / F-10).
+	userIDs := make([]string, len(items))
+	for i := range items {
+		userIDs[i] = items[i].UserID
+	}
+	rolesMap, err := s.roleProvider.RolesByUserIDs(ctx, tenantID, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build result: users absent from the map are not in this tenant (skip them).
+	// Users present with an empty slice are active but role-less (include with empty roles).
 	filtered := make([]authdomain.ManagedUser, 0, len(items))
 	for i := range items {
-		roles, roleErr := s.roleProvider.RolesByUserID(ctx, items[i].UserID, tenantID)
-		if roleErr != nil {
-			if errors.Is(roleErr, iamdomain.ErrUserNotFound) {
-				continue
-			}
-			if errors.Is(roleErr, iamdomain.ErrNoRolesAssigned) {
-				items[i].Roles = []iamdomain.Role{}
-				filtered = append(filtered, items[i])
-				continue
-			}
-			return nil, roleErr
+		roles, active := rolesMap[items[i].UserID]
+		if !active {
+			continue
 		}
 		items[i].Roles = roles
 		filtered = append(filtered, items[i])

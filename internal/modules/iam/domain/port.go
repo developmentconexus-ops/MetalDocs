@@ -5,6 +5,11 @@ import "context"
 // RoleProvider resolves effective roles for a given user identity within a tenant.
 type RoleProvider interface {
 	RolesByUserID(ctx context.Context, userID, tenantID string) ([]Role, error)
+	// RolesByUserIDs resolves roles for multiple users in a single query.
+	// Returns a map of userID → []Role. Missing or inactive users are absent
+	// from the map (same semantics as ErrUserNotFound from RolesByUserID).
+	// Users that are active but have no roles are present with an empty slice.
+	RolesByUserIDs(ctx context.Context, tenantID string, userIDs []string) (map[string][]Role, error)
 }
 
 // RoleAdminRepository writes IAM user and role assignments.
