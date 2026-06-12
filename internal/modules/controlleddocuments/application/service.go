@@ -492,7 +492,7 @@ func (s *ControlledDocumentService) Get(ctx context.Context, tenantID, id string
 
 // GetActiveInstance returns the active document instance for the controlled
 // document identified by id, after verifying that the caller can read it.
-// Returns ErrCDNotFound (404) when the caller cannot read the document.
+// Returns ErrNoActiveInstance when the caller cannot read the document (restored contract).
 // Returns nil, nil when the document is readable but has no active/published instance.
 func (s *ControlledDocumentService) GetActiveInstance(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ActiveDocumentInstance, error) {
 	actorUserID, ok := authn.UserIDFromContext(ctx)

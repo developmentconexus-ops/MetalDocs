@@ -58,8 +58,10 @@ None. Rows are transient (created on first failure, deleted on success or window
 
 ## Notes and Debt
 
-- Stale rows are pruned inline by the `RecordFailure` UPSERT CASE expression — no
-  janitor job is needed for this table.
+- Stale rows are reset in place by the `RecordFailure` UPSERT CASE expression
+  (window_start and fail_count are overwritten to start a new window) — rows are
+  never deleted by RecordFailure; deletion happens only in `Reset` on successful
+  authentication. No janitor job is needed for this table.
 - The `actor_id` key is the user UUID only (no IP component), matching the
   in-memory implementation semantics exactly.
 - Threshold `maxFailures = 5`, window `windowDur = 60s` — same constants as the

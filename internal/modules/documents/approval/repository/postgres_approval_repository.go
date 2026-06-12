@@ -708,6 +708,18 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		return nil, nil
 	}
 
+	// Dedupe ids preserving first-occurrence order so duplicate inputs cannot
+	// produce duplicate rows in the result.
+	seen := make(map[string]struct{}, len(ids))
+	deduped := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; !ok {
+			seen[id] = struct{}{}
+			deduped = append(deduped, id)
+		}
+	}
+	ids = deduped
+
 	// ── 1. Load instance headers ──────────────────────────────────────────────
 	headerRows, err := tx.QueryContext(ctx, `
 		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
@@ -727,8 +739,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	}
 	defer headerRows.Close()
 
-	// Maintain insertion order from ids slice.
-	order := make([]string, 0, len(ids))
+	// Maintain insertion order from ids slice (deduped above).
 	byID := make(map[string]*domain.Instance, len(ids))
 	for headerRows.Next() {
 		var inst domain.Instance
@@ -743,9 +754,6 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		}
 		if completedAt.Valid {
 			inst.CompletedAt = &completedAt.Time
-		}
-		if _, seen := byID[inst.ID]; !seen {
-			order = append(order, inst.ID)
 		}
 		cp := inst
 		byID[inst.ID] = &cp
@@ -893,7 +901,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	}
 
 	// ── 4. Assemble in input order ────────────────────────────────────────────
-	result := make([]domain.Instance, 0, len(order))
+	result := make([]domain.Instance, 0, len(ids))
 	for _, id := range ids {
 		inst, ok := byID[id]
 		if !ok {

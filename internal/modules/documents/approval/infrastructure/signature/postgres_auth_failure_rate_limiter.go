@@ -50,6 +50,8 @@ func (l *PostgresAuthFailureRateLimiter) Allow(ctx context.Context, actorID stri
 
 // RecordFailure increments the failure counter. If no row exists, or the existing
 // window has expired, a new window is started at the current time (count = 1).
+// Stale rows are reset in place by the UPSERT CASE expression — the row is never
+// deleted here; deletion happens only in Reset (on successful authentication).
 //
 // Timestamps are precomputed in Go so only timestamptz parameters are passed to
 // Postgres — pgx/v5/stdlib encodes time.Duration as bigint, and

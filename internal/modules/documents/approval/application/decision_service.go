@@ -44,10 +44,6 @@ type PinInvoker interface {
 	Pin(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
 }
 
-type PDFDispatchInvoker interface {
-	Dispatch(ctx context.Context, tenantID, revisionID string) error
-}
-
 // PDFOutboxEnqueuer enqueues a PDF dispatch inside the approval transaction.
 type PDFOutboxEnqueuer interface {
 	Enqueue(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, contentHash []byte) error
@@ -60,8 +56,6 @@ type DecisionService struct {
 	clock         Clock
 	freezeInvoker FreezeInvoker
 	pinInvoker    PinInvoker
-	// deprecated: post-commit best-effort dispatcher; replaced by pdfOutbox.
-	pdfDispatcher PDFDispatchInvoker
 	pdfOutbox     PDFOutboxEnqueuer
 	// sigRegistry verifies the e-signature credential before a sign-off is
 	// recorded. nil only in tests that exercise non-reauth methods.
@@ -73,20 +67,12 @@ func NewDecisionService(
 	emitter EventEmitter,
 	clock Clock,
 	freezeInvoker FreezeInvoker,
-	pdfDispatcher PDFDispatchInvoker,
 ) *DecisionService {
-	// F-14: fail loud if the deprecated post-commit dispatcher is wired without
-	// the transactional outbox replacement. Callers must pass nil for pdfDispatcher
-	// and wire the outbox via WithPDFOutbox instead.
-	if pdfDispatcher != nil {
-		panic("DecisionService: deprecated pdfDispatcher must not be set; use WithPDFOutbox for transactional PDF dispatch")
-	}
 	return &DecisionService{
 		repo:          repo,
 		emitter:       emitter,
 		clock:         clock,
 		freezeInvoker: freezeInvoker,
-		pdfDispatcher: pdfDispatcher,
 	}
 }
 
@@ -566,16 +552,6 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	// Step 14: commit.
 	if err := tx.Commit(); err != nil {
 		return SignoffResult{}, fmt.Errorf("recordSignoff: commit: %w", err)
-	}
-	// deprecated: post-commit best-effort dispatch (replaced by pdfOutbox transactional enqueue above).
-	// Left in place for callers that have not yet wired pdfOutbox.
-	if shouldDispatchPDF && s.pdfOutbox == nil && s.pdfDispatcher != nil && s.pinInvoker == nil {
-		// Client fails fast; retry owned by PDFOutboxWorker (wiki/decisions/0009-pdf-dispatch-outbox.md).
-		dispatchCtx, dispatchCancel := context.WithTimeout(ctx, 45*time.Second)
-		defer dispatchCancel()
-		if err := s.pdfDispatcher.Dispatch(dispatchCtx, pdfTenantID, pdfRevisionID); err != nil {
-			slog.ErrorContext(dispatchCtx, "pdf dispatch failed", "tenantID", pdfTenantID, "revisionID", pdfRevisionID, "err", err)
-		}
 	}
 	return result, nil
 }

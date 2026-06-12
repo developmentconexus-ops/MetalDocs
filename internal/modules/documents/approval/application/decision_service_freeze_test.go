@@ -36,16 +36,6 @@ func (f *fakePinInvoker) Pin(_ context.Context, _ *sql.Tx, _, _ string, _ docapp
 	return f.err
 }
 
-type fakePDFDispatchInvoker struct {
-	calls int
-	err   error
-}
-
-func (f *fakePDFDispatchInvoker) Dispatch(_ context.Context, _, _ string) error {
-	f.calls++
-	return f.err
-}
-
 type fakePDFOutboxEnqueuer struct {
 	calls       int
 	err         error
@@ -232,7 +222,6 @@ func TestRecordSignoff_QuorumApproved_CallsFreezeAndApprovesDocument(t *testing.
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-a", WasReplay: false},
 	}
 	freeze := &fakeFreezeInvoker{}
-	pdf := &fakePDFDispatchInvoker{}
 	conn := &freezeDecisionConn{
 		actorID: actorID,
 		stageSignoffs: []signoffRow{{
@@ -254,7 +243,6 @@ func TestRecordSignoff_QuorumApproved_CallsFreezeAndApprovesDocument(t *testing.
 		emitter:       &MemoryEmitter{},
 		clock:         fixedClock{t: signedAt},
 		freezeInvoker: freeze,
-		pdfDispatcher: pdf,
 	}
 
 	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
@@ -338,64 +326,9 @@ func TestRecordSignoff_FreezeError_RollsBackTransaction(t *testing.T) {
 	}
 }
 
-func TestRecordSignoff_PDFDispatchError_IsBestEffort(t *testing.T) {
-	const (
-		instanceID = "inst-freeze-c"
-		stageID    = "stage-freeze-c"
-		actorID    = "approver-1"
-		authorID   = "author-1"
-	)
-	signedAt := time.Date(2026, 4, 23, 12, 20, 0, 0, time.UTC)
-	repo := &fakeDecisionRepo{
-		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
-		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-c", WasReplay: false},
-	}
-	freeze := &fakeFreezeInvoker{}
-	pdf := &fakePDFDispatchInvoker{err: errors.New("transient queue error")}
-	conn := &freezeDecisionConn{
-		actorID: actorID,
-		stageSignoffs: []signoffRow{{
-			id:                 "sig-c",
-			approvalInstanceID: instanceID,
-			stageInstanceID:    stageID,
-			actorUserID:        actorID,
-			actorTenantID:      "tenant-1",
-			decision:           "approve",
-			signedAt:           signedAt,
-			signatureMethod:    "password",
-			signaturePayload:   []byte(`{}`),
-			contentHash:        validContentHash,
-		}},
-	}
-	db := newFreezeDecisionTestDB(t, conn)
-	svc := &DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: signedAt},
-		freezeInvoker: freeze,
-		pdfDispatcher: pdf,
-	}
-
-	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
-		TenantID:         "tenant-1",
-		InstanceID:       instanceID,
-		StageInstanceID:  stageID,
-		ActorUserID:      actorID,
-		Decision:         "approve",
-		SignatureMethod:  "password",
-		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
-	})
-	if err != nil {
-		t.Fatalf("RecordSignoff() error = %v", err)
-	}
-	if !result.InstanceApproved || conn.documentStatus != "approved" {
-		t.Fatalf("expected approved document despite PDF error, status=%q result=%+v", conn.documentStatus, result)
-	}
-	if pdf.calls != 1 {
-		t.Fatalf("PDF dispatch should be attempted once, got %d", pdf.calls)
-	}
-}
+// TestRecordSignoff_PDFDispatchError_IsBestEffort was deleted: it existed solely
+// to cover the deprecated post-commit pdfDispatcher.Dispatch path, which has been
+// removed. PDF dispatch is now exclusively transactional via pdfOutbox (ADR 0015).
 
 func TestRecordSignoff_OutboxEnqueuedInsideTx(t *testing.T) {
 	const (
@@ -431,7 +364,6 @@ func TestRecordSignoff_OutboxEnqueuedInsideTx(t *testing.T) {
 		emitter:       &MemoryEmitter{},
 		clock:         fixedClock{t: signedAt},
 		freezeInvoker: &fakeFreezeInvoker{},
-		pdfDispatcher: &fakePDFDispatchInvoker{},
 	}).WithPDFOutbox(outbox)
 
 	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
@@ -531,7 +463,6 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 		emitter:       &MemoryEmitter{},
 		clock:         fixedClock{t: signedAt},
 		freezeInvoker: freeze,
-		pdfDispatcher: &fakePDFDispatchInvoker{},
 	}
 
 	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
@@ -711,7 +642,6 @@ func TestRecordSignoff_RejectPath_AssertsDocumentEditBeforeDocumentWrite(t *test
 		emitter:       &MemoryEmitter{},
 		clock:         fixedClock{t: signedAt},
 		freezeInvoker: &fakeFreezeInvoker{},
-		pdfDispatcher: &fakePDFDispatchInvoker{},
 	}
 
 	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{

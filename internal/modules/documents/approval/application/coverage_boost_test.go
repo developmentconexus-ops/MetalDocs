@@ -529,7 +529,7 @@ func TestSubmitRevisionForReview_EmitError(t *testing.T) {
 func TestRecordSignoff_FloatInPayload(t *testing.T) {
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -551,7 +551,7 @@ func TestRecordSignoff_LoadInstanceError(t *testing.T) {
 	loadErr := errors.New("db error")
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{loadInstanceErr: loadErr}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -571,7 +571,7 @@ func TestRecordSignoff_LoadInstanceError(t *testing.T) {
 func TestRecordSignoff_LoadInstanceNotFound(t *testing.T) {
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{loadInstanceErr: sql.ErrNoRows}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -592,7 +592,7 @@ func TestRecordSignoff_NilInstance(t *testing.T) {
 	conn := &decisionTestConn{}
 	// instance == nil, loadInstanceErr == nil
 	repo := &fakeDecisionRepo{instance: nil}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -615,7 +615,7 @@ func TestRecordSignoff_InstanceAlreadyCompleted(t *testing.T) {
 
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -636,7 +636,7 @@ func TestRecordSignoff_StageNotActive(t *testing.T) {
 	inst := buildSingleStageInstance("inst-stale", "stage-1", "author", []string{"actor"})
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -657,7 +657,7 @@ func TestRecordSignoff_RequiresStageInstanceID(t *testing.T) {
 	inst := buildSingleStageInstance("inst-missing-stage", "stage-required", "author", []string{"actor"})
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
@@ -681,7 +681,7 @@ func TestRecordSignoff_InsertSignoffError(t *testing.T) {
 		instance:         inst,
 		insertSignoffErr: signoffErr,
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -706,7 +706,7 @@ func TestRecordSignoff_ActorAlreadySigned(t *testing.T) {
 		instance:         inst,
 		insertSignoffErr: repository.ErrActorAlreadySigned,
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -732,7 +732,7 @@ func TestRecordSignoff_IdempotentReplay(t *testing.T) {
 		instance:         inst,
 		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-replay", WasReplay: true},
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -782,7 +782,7 @@ func TestRecordSignoff_UpdateStageStatusError(t *testing.T) {
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-u1", WasReplay: false},
 		updateStageErr:   stageErr,
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -827,7 +827,7 @@ func TestRecordSignoff_UpdateInstanceStatusError_Approve(t *testing.T) {
 		insertSignoffRes:  repository.SignoffInsertResult{ID: "sig-ui-a", WasReplay: false},
 		updateInstanceErr: instErr,
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -872,7 +872,7 @@ func TestRecordSignoff_UpdateInstanceStatusError_Reject(t *testing.T) {
 		insertSignoffRes:  repository.SignoffInsertResult{ID: "sig-ui-r", WasReplay: false},
 		updateInstanceErr: instErr,
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -918,7 +918,7 @@ func TestRecordSignoff_EmitError(t *testing.T) {
 		instance:         inst,
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-emit-err", WasReplay: false},
 	}
-	svc := &DecisionService{repo: repo, emitter: &errorEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &errorEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -1002,7 +1002,7 @@ func TestRecordSignoff_ActivateNextStage(t *testing.T) {
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-ts-1", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -1704,7 +1704,7 @@ func TestMarkObsolete_BeginTxError(t *testing.T) {
 func TestRecordSignoff_BeginTxError(t *testing.T) {
 	inst := buildSingleStageInstance("inst", "stage", "author", []string{"actor"})
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newBeginFailDB(t)
 
 	req := SignoffRequest{
@@ -2368,7 +2368,7 @@ func TestRecordSignoff_NoActiveStage(t *testing.T) {
 	// Instance status is InProgress but no stage is Active.
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -2464,7 +2464,7 @@ func newDecisionPriorQueryFailDB(t *testing.T) *sql.DB {
 func TestRecordSignoff_LoadPriorSignoffsError(t *testing.T) {
 	inst := buildSingleStageInstance("inst-prior-err", "stage-prior-err", "author", []string{"actor"})
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionPriorQueryFailDB(t)
 
 	req := SignoffRequest{
@@ -2492,7 +2492,7 @@ func TestRecordSignoff_InvalidDecision(t *testing.T) {
 	inst := buildSingleStageInstance("inst-inv-dec", "stage-inv-dec", "author", []string{"actor"})
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{instance: inst}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -2566,7 +2566,7 @@ func TestRecordSignoff_LoadStageSignoffsError(t *testing.T) {
 		instance:         inst,
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-stage-err", WasReplay: false},
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionStageQueryFailDB(t)
 
 	req := SignoffRequest{
@@ -2639,7 +2639,7 @@ func TestRecordSignoff_NoEligibleActors_QuorumPending(t *testing.T) {
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-no-elig", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -2737,7 +2737,7 @@ func TestRecordSignoff_ReplayCommitError(t *testing.T) {
 		instance:         inst,
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-replay-commit", WasReplay: true},
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionReplayCommitFailDB(t)
 
 	req := SignoffRequest{
@@ -2794,7 +2794,7 @@ func TestRecordSignoff_ActivateNextStage_UpdateError(t *testing.T) {
 		insertSignoffRes:  repository.SignoffInsertResult{ID: "sig-nse", WasReplay: false},
 		stageUpdateErrors: []error{nil, nextStageErr},
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -2878,7 +2878,7 @@ func TestRecordSignoff_RejectStageUpdateError(t *testing.T) {
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-rse", WasReplay: false},
 		updateStageErr:   rejectStageErr,
 	}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -2940,7 +2940,7 @@ func TestRecordSignoff_FinalCommitError(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, freezeInvoker: &fakeFreezeInvoker{}}
 
 	req := SignoffRequest{
 		TenantID:        "tenant-1",

@@ -10,7 +10,7 @@ type DocxKeyReader interface {
 	ReadFinalDocxS3Key(ctx context.Context, tenantID, docID string) (string, error)
 }
 
-// PDFDispatchAdapter implements approval/application.PDFDispatchInvoker.
+// PDFDispatchAdapter bridges PDFDispatcher with a DocxKeyReader.
 // It reads the frozen DOCX S3 key from the DB and delegates to PDFDispatcher.
 type PDFDispatchAdapter struct {
 	dispatcher *PDFDispatcher

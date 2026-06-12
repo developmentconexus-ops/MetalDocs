@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -74,7 +75,12 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 	}
 
 	allowed, err := p.limiter.Allow(ctx, req.ActorUserID)
-	if err != nil || !allowed {
+	if err != nil {
+		slog.ErrorContext(ctx, "signature: auth-failure limiter Allow failed; failing closed",
+			"actor_user_id", req.ActorUserID, "err", err)
+		return SignatureResult{}, ErrRateLimited
+	}
+	if !allowed {
 		return SignatureResult{}, ErrRateLimited
 	}
 

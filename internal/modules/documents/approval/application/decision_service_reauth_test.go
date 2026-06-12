@@ -56,7 +56,6 @@ func newReauthDecisionService(reg *signature.Registry, repo repository.ApprovalR
 		emitter:       emitter,
 		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
 		freezeInvoker: &fakeFreezeInvoker{},
-		pdfDispatcher: &fakePDFDispatchInvoker{},
 	}).WithSignatureRegistry(reg)
 }
 

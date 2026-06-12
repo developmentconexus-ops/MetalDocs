@@ -384,6 +384,9 @@ func main() {
 		// mode) which satisfies iamapp.TenantMemberChecker via UserActiveInTenant.
 		if checker, ok := deps.RoleProvider.(iamapp.TenantMemberChecker); ok {
 			peopleService.WithTenantMemberChecker(checker)
+		} else {
+			slog.Warn("TenantMemberChecker type assertion failed: EXISTS fast path inactive; VerifyUserInTenant will fall back to full-scan",
+				"role_provider_type", fmt.Sprintf("%T", deps.RoleProvider))
 		}
 	}
 	iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter).RegisterRoutes(mux)
@@ -538,7 +541,7 @@ func main() {
 	startOutboxWorker("materialize outbox worker", materializeOutboxWorker.Run)
 
 	approvalServices.Decision = approvalapp.NewDecisionService(
-		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService, nil,
+		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService,
 	).WithPDFOutbox(pdfOutboxRepo).WithPinInvoker(fanoutCfg.freezeService).
 		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB))
 	docDeps.SubmitSvc = approvalServices.Submit

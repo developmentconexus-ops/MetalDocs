@@ -324,7 +324,7 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 	}
 	decisionConn := &phase5Conn{stageSignoffs: decisionStageSignoffs}
 	decisionDB := newPhase5DB(t, decisionConn)
-	decisionSvc := &DecisionService{repo: decisionRepo, emitter: emitter, clock: clock, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	decisionSvc := &DecisionService{repo: decisionRepo, emitter: emitter, clock: clock, freezeInvoker: &fakeFreezeInvoker{}}
 
 	signoffReq := SignoffRequest{
 		TenantID:         tenantID,
@@ -497,7 +497,7 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 	connDecision := &phase5Conn{stageSignoffs: rejectSignoffRows}
 	dbDecision := newPhase5DB(t, connDecision)
 
-	decisionSvc := &DecisionService{repo: repo, emitter: emitter, clock: clockAtSignoff, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	decisionSvc := &DecisionService{repo: repo, emitter: emitter, clock: clockAtSignoff, freezeInvoker: &fakeFreezeInvoker{}}
 
 	signoffReq := SignoffRequest{
 		TenantID:         tenantID,
