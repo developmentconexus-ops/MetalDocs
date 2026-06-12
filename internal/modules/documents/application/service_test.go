@@ -172,6 +172,10 @@ func (f *fakeRepo) ReleaseSession(_ context.Context, _, _, _ string) error { ret
 
 func (f *fakeRepo) ForceReleaseSession(_ context.Context, _, _, _ string) error { return nil }
 
+func (f *fakeRepo) ForceReleaseSessionTx(_ context.Context, _ *sql.Tx, _, _, _ string) error {
+	return nil
+}
+
 func (f *fakeRepo) ExpireStaleSessions(_ context.Context, _ time.Time) (int, error) { return 0, nil }
 
 func (f *fakeRepo) PresignReserve(_ context.Context, _, _, _, _, _, _, _ string, _ time.Time) (string, error) {
@@ -271,6 +275,8 @@ func (f *fakeRepo) DeleteComment(_ context.Context, _, _ string, _ int) error {
 }
 
 func (f *fakeRepo) MarkArchived(_ context.Context, _, _, _ string) error { return nil }
+
+func (f *fakeRepo) MarkArchivedTx(_ context.Context, _ *sql.Tx, _, _, _ string) error { return nil }
 
 type fakePresigner struct {
 	hashReturn  string

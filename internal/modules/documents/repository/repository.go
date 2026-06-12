@@ -767,6 +767,66 @@ func (r *Repository) ForceReleaseSession(ctx context.Context, tenantID, adminID,
 	return tx.Commit()
 }
 
+// ForceReleaseSessionTx performs the force-release using the caller-owned tx.
+// The caller is responsible for authz GUC setup, commit, and rollback.
+func (r *Repository) ForceReleaseSessionTx(ctx context.Context, tx *sql.Tx, tenantID, adminID, sessionID string) error {
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, adminID); err != nil {
+		return err
+	}
+	docArea, err := loadDocumentAreaBySession(ctx, tx, tenantID, sessionID)
+	if err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), docArea); err != nil {
+		return fmt.Errorf("force release session: authz check: %w", err)
+	}
+	res, err := tx.ExecContext(ctx,
+		`UPDATE editor_sessions SET status='force_released', released_at=now()
+		 WHERE id=$1 AND tenant_id=$2::uuid AND status='active'`, sessionID, tenantID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return domain.ErrSessionInactive
+	}
+	_, err = tx.ExecContext(ctx, `UPDATE documents SET active_session_id=NULL, updated_at=now() WHERE active_session_id=$1`, sessionID)
+	return err
+}
+
+// MarkArchivedTx sets archived_at using the caller-owned tx.
+// The caller is responsible for authz GUC setup, commit, and rollback.
+func (r *Repository) MarkArchivedTx(ctx context.Context, tx *sql.Tx, tenantID, docID, actorID string) error {
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+		return err
+	}
+	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
+	if err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
+		return fmt.Errorf("mark archived: authz check: %w", err)
+	}
+	res, err := tx.ExecContext(ctx, `
+		UPDATE public.documents
+		   SET archived_at = now(), updated_at = now()
+		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NULL`,
+		tenantID, docID)
+	if err != nil {
+		return fmt.Errorf("mark archived: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("mark archived rows affected: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("mark archived: not found or already in target state")
+	}
+	return nil
+}
+
 func (r *Repository) ExpireStaleSessions(ctx context.Context, now time.Time) (int, error) {
 	// Single atomic CTE: expire sessions and clear document pointers in one tx.
 	tx, err := r.db.BeginTx(ctx, nil)

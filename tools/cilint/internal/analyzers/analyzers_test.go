@@ -218,7 +218,157 @@ func (s *Svc) RecordSignoff(tx interface{}) {
 	}
 }
 
-func TestOutboxPair_Positive_MutationWithoutEmit(t *testing.T) {
+// ─── PostCommitAudit ─────────────────────────────────────────────────────────
+
+// postCommitAuditFixture writes a Go source file inside internal/modules/...
+// so PostCommitAudit picks it up.
+func postCommitAuditFixture(t *testing.T, src string) string {
+	t.Helper()
+	dir := t.TempDir()
+	pkgDir := dir + "/internal/modules/foo/application"
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	path := pkgDir + "/svc.go"
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	return path
+}
+
+func TestPostCommitAudit_Positive_LogAfterCommit(t *testing.T) {
+	src := `package application
+func (s *Svc) Create(ctx interface{}, tx interface{}) error {
+	s.repo.Update(tx)
+	tx.Commit()
+	s.govLogger.Log(ctx, nil) // post-commit — violation
+	return nil
+}
+`
+	path := postCommitAuditFixture(t, src)
+	findings := analyzers.PostCommitAudit([]string{path})
+	if len(findings) == 0 {
+		t.Fatal("expected finding for Log after Commit")
+	}
+}
+
+func TestPostCommitAudit_Positive_WriteAfterCommit(t *testing.T) {
+	src := `package application
+func (s *Svc) Archive(ctx interface{}, tx interface{}) error {
+	s.repo.MarkArchived(ctx)
+	tx.Commit()
+	s.audit.Write(ctx, "t", "a", "doc.archived", "d", nil) // post-commit — violation
+	return nil
+}
+`
+	path := postCommitAuditFixture(t, src)
+	findings := analyzers.PostCommitAudit([]string{path})
+	if len(findings) == 0 {
+		t.Fatal("expected finding for Write after Commit")
+	}
+}
+
+func TestPostCommitAudit_Negative_LogBeforeCommit(t *testing.T) {
+	src := `package application
+func (s *Svc) Create(ctx interface{}, tx interface{}) error {
+	s.repo.Update(tx)
+	s.govLogger.Log(ctx, nil) // before commit — OK
+	tx.Commit()
+	return nil
+}
+`
+	path := postCommitAuditFixture(t, src)
+	findings := analyzers.PostCommitAudit([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings for Log before Commit, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestPostCommitAudit_Negative_LogTxBeforeCommit(t *testing.T) {
+	src := `package application
+func (s *Svc) Create(ctx interface{}, tx interface{}) error {
+	s.repo.Update(tx)
+	s.govLogger.LogTx(ctx, tx, nil) // Tx variant before commit — OK
+	tx.Commit()
+	return nil
+}
+`
+	path := postCommitAuditFixture(t, src)
+	findings := analyzers.PostCommitAudit([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings for LogTx before Commit, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestPostCommitAudit_Negative_NoCommit(t *testing.T) {
+	src := `package application
+func (s *Svc) Create(ctx interface{}) error {
+	s.repo.Update(ctx)
+	s.govLogger.Log(ctx, nil)
+	return nil
+}
+`
+	path := postCommitAuditFixture(t, src)
+	findings := analyzers.PostCommitAudit([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings when there is no Commit, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestPostCommitAudit_Negative_AllowDirective(t *testing.T) {
+	src := `package application
+func (s *Svc) Create(ctx interface{}, tx interface{}) error {
+	s.repo.Update(tx)
+	tx.Commit()
+	s.govLogger.Log(ctx, nil) //cilint:allow-post-commit-audit legacy best-effort path
+	return nil
+}
+`
+	path := postCommitAuditFixture(t, src)
+	findings := analyzers.PostCommitAudit([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings with allow directive, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestPostCommitAudit_Negative_OutsideModulesPath(t *testing.T) {
+	src := `package platform
+func (s *Svc) Create(ctx interface{}, tx interface{}) error {
+	s.repo.Update(tx)
+	tx.Commit()
+	s.govLogger.Log(ctx, nil) // outside modules — not scoped
+	return nil
+}
+`
+	dir := t.TempDir()
+	pkgDir := dir + "/internal/platform/foo"
+	_ = os.MkdirAll(pkgDir, 0o755)
+	path := pkgDir + "/svc.go"
+	_ = os.WriteFile(path, []byte(src), 0o644)
+	findings := analyzers.PostCommitAudit([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings outside internal/modules, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestPostCommitAudit_Positive_AppendAuditAfterCommit(t *testing.T) {
+	src := `package application
+func (s *Svc) Submit(ctx interface{}) error {
+	tx := s.db.BeginTx(ctx, nil)
+	s.repo.UpdateVersionTx(ctx, tx, nil)
+	tx.Commit()
+	s.repo.AppendAudit(ctx, nil) // post-commit — violation
+	return nil
+}
+`
+	path := postCommitAuditFixture(t, src)
+	findings := analyzers.PostCommitAudit([]string{path})
+	if len(findings) == 0 {
+		t.Fatal("expected finding for AppendAudit after Commit")
+	}
+}
+
+func TestPostCommitAudit_Positive_MutationWithoutEmit(t *testing.T) {
 	src := `package application
 type Svc struct{}
 func (s *Svc) MutateOnly(tx interface{}) {

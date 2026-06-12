@@ -28,6 +28,10 @@ type taxonomyTx struct {
 func (t taxonomyTx) Commit() error   { return t.tx.Commit() }
 func (t taxonomyTx) Rollback() error { return t.tx.Rollback() }
 
+// Unwrap exposes the underlying *sql.Tx so AuditGovernanceAdapter.LogTx can
+// call audit.Writer.RecordTx inside the same transaction (F-07).
+func (t taxonomyTx) Unwrap() *sql.Tx { return t.tx }
+
 func NewProfileRepository(db *sql.DB) *ProfileRepository {
 	return &ProfileRepository{db: db}
 }
@@ -186,6 +190,33 @@ VALUES
 		return err
 	}
 	return tx.Commit()
+}
+
+// CreateTx inserts a new DocumentProfile using the caller-owned transaction.
+// The caller is responsible for committing or rolling back the transaction.
+func (r *ProfileRepository) CreateTx(ctx context.Context, tx domain.FamilyTx, p *domain.DocumentProfile) error {
+	sqlTx, ok := tx.(taxonomyTx)
+	if !ok {
+		return fmt.Errorf("taxonomy: ProfileRepository.CreateTx: unsupported tx type %T", tx)
+	}
+	if err := setAuthzGUC(ctx, sqlTx.tx); err != nil {
+		return fmt.Errorf("insert profile %q: %w", p.Code, err)
+	}
+	if err := authz.Require(ctx, sqlTx.tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return fmt.Errorf("taxonomy: authz check CreateTx profile: %w", err)
+	}
+	const q = `
+INSERT INTO metaldocs.document_profiles
+    (code, tenant_id, family_code, name, description, alias, review_interval_days, default_template_version_id, owner_user_id, editable_by_role, archived_at)
+VALUES
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+	_, err := sqlTx.tx.ExecContext(
+		ctx, q,
+		p.Code, p.TenantID, p.FamilyCode, p.Name, p.Description, p.Alias,
+		p.ReviewIntervalDays, stringPtrToNull(p.DefaultTemplateVersionID),
+		stringPtrToNull(p.OwnerUserID), p.EditableByRole, p.ArchivedAt,
+	)
+	return err
 }
 
 func (r *ProfileRepository) Update(ctx context.Context, p *domain.DocumentProfile) error {
@@ -470,6 +501,33 @@ VALUES
 		return err
 	}
 	return tx.Commit()
+}
+
+// CreateTx inserts a new ProcessArea using the caller-owned transaction.
+// The caller is responsible for committing or rolling back the transaction.
+func (r *AreaRepository) CreateTx(ctx context.Context, tx domain.FamilyTx, a *domain.ProcessArea) error {
+	sqlTx, ok := tx.(taxonomyTx)
+	if !ok {
+		return fmt.Errorf("taxonomy: AreaRepository.CreateTx: unsupported tx type %T", tx)
+	}
+	if err := setAuthzGUC(ctx, sqlTx.tx); err != nil {
+		return fmt.Errorf("insert area %q: %w", a.Code, err)
+	}
+	if err := authz.Require(ctx, sqlTx.tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return fmt.Errorf("taxonomy: authz check CreateTx area: %w", err)
+	}
+	const q = `
+INSERT INTO metaldocs.document_process_areas
+    (code, tenant_id, name, description, parent_code, owner_user_id, default_approver_role, archived_at)
+VALUES
+    ($1, $2, $3, $4, $5, $6, $7, $8)`
+	_, err := sqlTx.tx.ExecContext(
+		ctx, q,
+		a.Code, a.TenantID, a.Name, a.Description,
+		areaCodePtrToNull(a.ParentCode), stringPtrToNull(a.OwnerUserID),
+		stringPtrToNull(a.DefaultApproverRole), a.ArchivedAt,
+	)
+	return err
 }
 
 func (r *AreaRepository) Update(ctx context.Context, a *domain.ProcessArea) error {

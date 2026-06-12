@@ -45,10 +45,19 @@ func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
 	if err != nil {
 		return fmt.Errorf("taxonomy: validate area create: %w", err)
 	}
-	if err := s.areas.Create(ctx, newArea); err != nil {
+	tx, err := s.areas.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("taxonomy: begin area create tx: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if err := s.areas.CreateTx(ctx, tx, newArea); err != nil {
 		return fmt.Errorf("taxonomy: create area %q: %w", newArea.Code, err)
 	}
-
 	payload, err := marshalGovernancePayload(map[string]string{
 		"name": newArea.Name,
 	})
@@ -56,7 +65,7 @@ func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
 		return fmt.Errorf("taxonomy: marshal area create governance payload: %w", err)
 	}
 	actorUserID, _ := authn.UserIDFromContext(ctx)
-	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
 		TenantID:     newArea.TenantID,
 		EventType:    domain.GovernanceEventTypeAreaCreated,
 		ActorUserID:  actorUserID,
@@ -66,17 +75,31 @@ func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
 	}); err != nil {
 		return fmt.Errorf("taxonomy: log area create governance event: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("taxonomy: commit area create tx: %w", err)
+	}
+	committed = true
 	return nil
 }
 
 func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
-	existing, err := s.areas.GetByCode(ctx, a.TenantID, a.Code)
-	if err != nil {
-		return fmt.Errorf("taxonomy: get area %q for update: %w", a.Code, err)
-	}
 	normalized, err := domain.NewProcessArea(*a)
 	if err != nil {
 		return fmt.Errorf("taxonomy: validate area update: %w", err)
+	}
+	tx, err := s.areas.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("taxonomy: begin area update tx: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	existing, err := s.areas.GetByCodeForUpdate(ctx, tx, a.TenantID, a.Code)
+	if err != nil {
+		return fmt.Errorf("taxonomy: get area %q for update: %w", a.Code, err)
 	}
 	existing.Name = normalized.Name
 	existing.Description = normalized.Description
@@ -84,10 +107,9 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 	existing.OwnerUserID = normalized.OwnerUserID
 	existing.DefaultApproverRole = normalized.DefaultApproverRole
 	existing.ArchivedAt = normalized.ArchivedAt
-	if err := s.areas.Update(ctx, existing); err != nil {
+	if err := s.areas.UpdateTx(ctx, tx, existing); err != nil {
 		return fmt.Errorf("taxonomy: update area %q: %w", existing.Code, err)
 	}
-
 	payload, err := marshalGovernancePayload(map[string]string{
 		"name": existing.Name,
 	})
@@ -95,7 +117,7 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 		return fmt.Errorf("taxonomy: marshal area update governance payload: %w", err)
 	}
 	actorUserID, _ := authn.UserIDFromContext(ctx)
-	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
 		TenantID:     existing.TenantID,
 		EventType:    domain.GovernanceEventTypeAreaUpdated,
 		ActorUserID:  actorUserID,
@@ -105,6 +127,10 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 	}); err != nil {
 		return fmt.Errorf("taxonomy: log area update governance event: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("taxonomy: commit area update tx: %w", err)
+	}
+	committed = true
 	return nil
 }
 
@@ -153,11 +179,7 @@ func (s *AreaService) SetParent(ctx context.Context, tenantID string, areaCode d
 	if err := s.areas.UpdateTx(ctx, tx, area); err != nil {
 		return fmt.Errorf("taxonomy: update area parent %q: %w", areaCode, err)
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("taxonomy: commit set area parent tx: %w", err)
-	}
-	committed = true
-	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeAreaParentChanged,
 		ActorUserID:  actorID,
@@ -167,6 +189,10 @@ func (s *AreaService) SetParent(ctx context.Context, tenantID string, areaCode d
 	}); err != nil {
 		return fmt.Errorf("taxonomy: log area parent governance event: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("taxonomy: commit set area parent tx: %w", err)
+	}
+	committed = true
 	return nil
 }
 
@@ -192,11 +218,7 @@ func (s *AreaService) Archive(ctx context.Context, tenantID string, areaCode dom
 	if err := s.areas.UpdateTx(ctx, tx, area); err != nil {
 		return fmt.Errorf("taxonomy: update archived area %q: %w", areaCode, err)
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("taxonomy: commit archive area tx: %w", err)
-	}
-	committed = true
-	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeAreaArchived,
 		ActorUserID:  actorID,
@@ -206,5 +228,9 @@ func (s *AreaService) Archive(ctx context.Context, tenantID string, areaCode dom
 	}); err != nil {
 		return fmt.Errorf("taxonomy: log area archive governance event: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("taxonomy: commit archive area tx: %w", err)
+	}
+	committed = true
 	return nil
 }

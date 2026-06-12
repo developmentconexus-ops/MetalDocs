@@ -51,6 +51,11 @@ func (r *fakeFamilyRepo) Create(_ context.Context, f *domain.DocumentFamily) err
 	return nil
 }
 
+func (r *fakeFamilyRepo) CreateTx(_ context.Context, _ domain.FamilyTx, f *domain.DocumentFamily) error {
+	r.families[string(f.Code)] = f
+	return nil
+}
+
 func (r *fakeFamilyRepo) Update(_ context.Context, f *domain.DocumentFamily) error {
 	if _, ok := r.families[string(f.Code)]; !ok {
 		return domain.ErrFamilyNotFound

@@ -92,7 +92,7 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 		if err := s.repo.UpsertApprovalConfig(ctx, &config); err != nil {
 			return nil, wrapAppErr("templates approval config: upsert", err)
 		}
-		if err := s.repo.AppendAudit(ctx, audit); err != nil {
+		if err := s.repo.AppendAudit(ctx, audit); err != nil { //cilint:allow-post-commit-audit
 			return nil, wrapAppErr("templates approval config: append audit", err)
 		}
 	}

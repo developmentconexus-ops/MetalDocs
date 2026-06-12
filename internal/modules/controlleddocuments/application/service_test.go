@@ -404,6 +404,11 @@ func (f *fakeGovernanceLogger) Log(_ context.Context, e taxonomydomain.Governanc
 	return nil
 }
 
+func (f *fakeGovernanceLogger) LogTx(_ context.Context, _ *sql.Tx, e taxonomydomain.GovernanceEvent) error {
+	f.events = append(f.events, e)
+	return nil
+}
+
 func stringPtr(v string) *string { return &v }
 
 func newInvariantReadyDocumentInitializer() *fakeDocumentInitializer {

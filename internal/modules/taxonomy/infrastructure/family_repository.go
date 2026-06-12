@@ -22,6 +22,10 @@ type familyTx struct {
 func (f familyTx) Commit() error   { return f.tx.Commit() }
 func (f familyTx) Rollback() error { return f.tx.Rollback() }
 
+// Unwrap exposes the underlying *sql.Tx so AuditGovernanceAdapter.LogTx can
+// call audit.Writer.RecordTx inside the same transaction (F-07).
+func (f familyTx) Unwrap() *sql.Tx { return f.tx }
+
 func NewFamilyRepository(db *sql.DB) *FamilyRepository {
 	return &FamilyRepository{db: db}
 }
@@ -120,6 +124,26 @@ VALUES ($1, $2, $3, $4)`
 		return err
 	}
 	return tx.Commit()
+}
+
+// CreateTx inserts a new DocumentFamily using the caller-owned transaction.
+// The caller is responsible for committing or rolling back the transaction.
+func (r *FamilyRepository) CreateTx(ctx context.Context, tx domain.FamilyTx, f *domain.DocumentFamily) error {
+	sqlTx, ok := tx.(familyTx)
+	if !ok {
+		return fmt.Errorf("taxonomy: FamilyRepository.CreateTx: unsupported tx type %T", tx)
+	}
+	if err := setAuthzGUC(ctx, sqlTx.tx); err != nil {
+		return fmt.Errorf("insert family %q: %w", f.Code, err)
+	}
+	if err := authz.Require(ctx, sqlTx.tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return fmt.Errorf("taxonomy: authz check CreateTx family: %w", err)
+	}
+	const q = `
+INSERT INTO metaldocs.document_families (code, name, description, is_active)
+VALUES ($1, $2, $3, $4)`
+	_, err := sqlTx.tx.ExecContext(ctx, q, f.Code, f.Name, f.Description, f.IsActive)
+	return err
 }
 
 func (r *FamilyRepository) Update(ctx context.Context, f *domain.DocumentFamily) error {

@@ -112,7 +112,7 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		}); err != nil {
 			return nil, err
 		}
-		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
+		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{ //cilint:allow-post-commit-audit
 			TenantID:   cmd.TenantID,
 			TemplateID: template.ID,
 			VersionID:  &version.ID,
@@ -219,7 +219,7 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 		if err := s.repo.UpdateTemplate(ctx, template); err != nil {
 			return nil, err
 		}
-		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
+		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{ //cilint:allow-post-commit-audit
 			TenantID:   cmd.TenantID,
 			TemplateID: template.ID,
 			VersionID:  &version.ID,

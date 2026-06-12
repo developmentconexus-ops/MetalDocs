@@ -96,7 +96,7 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 		if err := s.repo.UpdateVersionSchemaCAS(ctx, cmd.TenantID, version, cmd.ExpectedLockVersion); err != nil {
 			return nil, wrapAppErr("templates update schemas: update version", err)
 		}
-		if err := s.repo.AppendAudit(ctx, audit); err != nil {
+		if err := s.repo.AppendAudit(ctx, audit); err != nil { //cilint:allow-post-commit-audit
 			return nil, wrapAppErr("templates update schemas: append audit", err)
 		}
 	}

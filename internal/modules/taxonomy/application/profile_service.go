@@ -55,10 +55,19 @@ func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) 
 	if err != nil {
 		return fmt.Errorf("taxonomy: validate profile create: %w", err)
 	}
-	if err := s.profiles.Create(ctx, newProfile); err != nil {
+	tx, err := s.profiles.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("taxonomy: begin profile create tx: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if err := s.profiles.CreateTx(ctx, tx, newProfile); err != nil {
 		return fmt.Errorf("taxonomy: create profile %q: %w", newProfile.Code, err)
 	}
-
 	payload, err := marshalGovernancePayload(map[string]string{
 		"code": string(newProfile.Code),
 		"name": newProfile.Name,
@@ -67,7 +76,7 @@ func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) 
 		return fmt.Errorf("taxonomy: marshal profile create governance payload: %w", err)
 	}
 	actorUserID, _ := authn.UserIDFromContext(ctx)
-	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
 		TenantID:     newProfile.TenantID,
 		EventType:    domain.GovernanceEventTypeProfileCreated,
 		ActorUserID:  actorUserID,
@@ -77,14 +86,27 @@ func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) 
 	}); err != nil {
 		return fmt.Errorf("taxonomy: log profile create governance event: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("taxonomy: commit profile create tx: %w", err)
+	}
+	committed = true
 	return nil
 }
 
 func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) error {
-	if err := s.profiles.Update(ctx, p); err != nil {
+	tx, err := s.profiles.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("taxonomy: begin profile update tx: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if err := s.profiles.UpdateTx(ctx, tx, p); err != nil {
 		return fmt.Errorf("taxonomy: update profile %q: %w", p.Code, err)
 	}
-
 	payload, err := marshalGovernancePayload(map[string]string{
 		"code": string(p.Code),
 		"name": p.Name,
@@ -93,7 +115,7 @@ func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) 
 		return fmt.Errorf("taxonomy: marshal profile update governance payload: %w", err)
 	}
 	actorUserID, _ := authn.UserIDFromContext(ctx)
-	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
 		TenantID:     p.TenantID,
 		EventType:    domain.GovernanceEventTypeProfileUpdated,
 		ActorUserID:  actorUserID,
@@ -103,6 +125,10 @@ func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) 
 	}); err != nil {
 		return fmt.Errorf("taxonomy: log profile update governance event: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("taxonomy: commit profile update tx: %w", err)
+	}
+	committed = true
 	return nil
 }
 
@@ -141,18 +167,13 @@ func (s *ProfileService) SetDefaultTemplate(ctx context.Context, tenantID string
 	if err := s.profiles.UpdateTx(ctx, tx, profile); err != nil {
 		return fmt.Errorf("taxonomy: update profile default template %q: %w", profileCode, err)
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("taxonomy: commit set default template tx: %w", err)
-	}
-	committed = true
-
 	payload, err := marshalGovernancePayload(map[string]string{
 		"template_version_id": templateVersionID,
 	})
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal default template governance payload: %w", err)
 	}
-	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeProfileDefaultTemplateChange,
 		ActorUserID:  actorID,
@@ -162,6 +183,10 @@ func (s *ProfileService) SetDefaultTemplate(ctx context.Context, tenantID string
 	}); err != nil {
 		return fmt.Errorf("taxonomy: log default template governance event: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("taxonomy: commit set default template tx: %w", err)
+	}
+	committed = true
 	return nil
 }
 
@@ -187,11 +212,7 @@ func (s *ProfileService) Archive(ctx context.Context, tenantID string, profileCo
 	if err := s.profiles.UpdateTx(ctx, tx, profile); err != nil {
 		return fmt.Errorf("taxonomy: update archived profile %q: %w", profileCode, err)
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("taxonomy: commit archive profile tx: %w", err)
-	}
-	committed = true
-	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    domain.GovernanceEventTypeProfileArchived,
 		ActorUserID:  actorID,
@@ -201,5 +222,9 @@ func (s *ProfileService) Archive(ctx context.Context, tenantID string, profileCo
 	}); err != nil {
 		return fmt.Errorf("taxonomy: log profile archive governance event: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("taxonomy: commit archive profile tx: %w", err)
+	}
+	committed = true
 	return nil
 }

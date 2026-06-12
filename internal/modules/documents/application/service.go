@@ -39,11 +39,13 @@ type Repository interface {
 	StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
 	UpdateDocumentStatus(ctx context.Context, tenantID, actorID, id string, cur, next domain.DocumentStatus, stampTime bool) error
 	MarkArchived(ctx context.Context, tenantID, docID, actorID string) error
+	MarkArchivedTx(ctx context.Context, tx *sql.Tx, tenantID, docID, actorID string) error
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
 	AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, error)
 	HeartbeatSession(ctx context.Context, tenantID, sessionID, userID string) error
 	ReleaseSession(ctx context.Context, tenantID, sessionID, userID string) error
 	ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID string) error
+	ForceReleaseSessionTx(ctx context.Context, tx *sql.Tx, tenantID, adminID, sessionID string) error
 	ExpireStaleSessions(ctx context.Context, now time.Time) (int, error)
 	PresignReserve(ctx context.Context, tenantID, sessionID, userID, docID, baseRev, contentHash, storageKey string, expiresAt time.Time) (string, error)
 	GetPendingForCommit(ctx context.Context, tenantID, pendingID string) (*PendingCommitMeta, error)
@@ -801,10 +803,24 @@ func (s *Service) ReleaseSession(ctx context.Context, tenantID, sessionID, userI
 }
 
 func (s *Service) ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID, docID string) error {
+	if s.db != nil {
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("documents: begin force-release session tx: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := s.repo.ForceReleaseSessionTx(ctx, tx, tenantID, adminID, sessionID); err != nil {
+			return err
+		}
+		if err := s.audit.WriteTx(ctx, tx, tenantID, adminID, "session.force_released", docID, map[string]any{"session_id": sessionID}); err != nil {
+			return fmt.Errorf("documents: audit force-release session: %w", err)
+		}
+		return tx.Commit()
+	}
 	if err := s.repo.ForceReleaseSession(ctx, tenantID, adminID, sessionID); err != nil {
 		return err
 	}
-	s.audit.Write(ctx, tenantID, adminID, "session.force_released", docID, map[string]any{"session_id": sessionID})
+	s.audit.Write(ctx, tenantID, adminID, "session.force_released", docID, map[string]any{"session_id": sessionID}) //cilint:allow-post-commit-audit no-db fallback: no tx in this branch
 	return nil
 }
 
@@ -841,10 +857,24 @@ func (s *Service) RestoreCheckpoint(ctx context.Context, tenantID, docID, actorI
 }
 
 func (s *Service) Archive(ctx context.Context, tenantID, docID, actorID string) error {
+	if s.db != nil {
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("documents: begin archive tx: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := s.repo.MarkArchivedTx(ctx, tx, tenantID, docID, actorID); err != nil {
+			return err
+		}
+		if err := s.audit.WriteTx(ctx, tx, tenantID, actorID, "document.archived", docID, nil); err != nil {
+			return fmt.Errorf("documents: audit archive: %w", err)
+		}
+		return tx.Commit()
+	}
 	if err := s.repo.MarkArchived(ctx, tenantID, docID, actorID); err != nil {
 		return err
 	}
-	s.audit.Write(ctx, tenantID, actorID, "document.archived", docID, nil)
+	s.audit.Write(ctx, tenantID, actorID, "document.archived", docID, nil) //cilint:allow-post-commit-audit no-db fallback: no tx in this branch
 	return nil
 }
 

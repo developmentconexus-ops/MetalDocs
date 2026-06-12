@@ -1,12 +1,16 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"database/sql"
+)
 
 type ProfileRepository interface {
 	GetByCode(ctx context.Context, tenantID string, code ProfileCode) (*DocumentProfile, error)
 	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID string, code ProfileCode) (*DocumentProfile, error)
 	List(ctx context.Context, tenantID string, includeArchived bool) ([]DocumentProfile, error)
 	Create(ctx context.Context, p *DocumentProfile) error
+	CreateTx(ctx context.Context, tx FamilyTx, p *DocumentProfile) error
 	Update(ctx context.Context, p *DocumentProfile) error
 	UpdateTx(ctx context.Context, tx FamilyTx, p *DocumentProfile) error
 	BeginTx(ctx context.Context) (FamilyTx, error)
@@ -17,6 +21,7 @@ type AreaRepository interface {
 	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID string, code AreaCode) (*ProcessArea, error)
 	List(ctx context.Context, tenantID string, includeArchived bool) ([]ProcessArea, error)
 	Create(ctx context.Context, a *ProcessArea) error
+	CreateTx(ctx context.Context, tx FamilyTx, a *ProcessArea) error
 	Update(ctx context.Context, a *ProcessArea) error
 	ListAncestors(ctx context.Context, tenantID string, code AreaCode) ([]AreaCode, error)
 	ListAncestorsTx(ctx context.Context, tx FamilyTx, tenantID string, code AreaCode) ([]AreaCode, error)
@@ -26,6 +31,10 @@ type AreaRepository interface {
 
 type GovernanceLogger interface {
 	Log(ctx context.Context, e GovernanceEvent) error
+	// LogTx writes the governance event inside an open transaction so the
+	// audit record is atomically committed with the mutation that caused it
+	// (REQ-ASYNC-1, F-07).
+	LogTx(ctx context.Context, tx *sql.Tx, e GovernanceEvent) error
 }
 
 type GovernanceEventType string
@@ -65,6 +74,7 @@ type FamilyRepository interface {
 	GetByCode(ctx context.Context, code FamilyCode) (*DocumentFamily, error)
 	List(ctx context.Context, includeInactive bool) ([]DocumentFamily, error)
 	Create(ctx context.Context, f *DocumentFamily) error
+	CreateTx(ctx context.Context, tx FamilyTx, f *DocumentFamily) error
 	Update(ctx context.Context, f *DocumentFamily) error
 	HasActiveProfiles(ctx context.Context, tenantID string, familyCode FamilyCode) (bool, error)
 	BeginTx(ctx context.Context) (FamilyTx, error)

@@ -141,6 +141,11 @@ func (r *fakeAreaRepository) Create(_ context.Context, a *domain.ProcessArea) er
 	return nil
 }
 
+func (r *fakeAreaRepository) CreateTx(_ context.Context, _ domain.FamilyTx, a *domain.ProcessArea) error {
+	r.put(a)
+	return nil
+}
+
 func (r *fakeAreaRepository) Update(_ context.Context, a *domain.ProcessArea) error {
 	r.put(a)
 	return nil

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -40,4 +41,33 @@ func (a *AuditGovernanceAdapter) Log(ctx context.Context, event domain.Governanc
 		PayloadJSON:  string(payload),
 		TenantID:     event.TenantID,
 	})
+}
+
+// LogTx writes the governance event inside tx so the audit record is
+// atomically committed with the mutation that caused it (REQ-ASYNC-1, F-07).
+// If tx is nil (test doubles that do not expose a real *sql.Tx), the call
+// falls back to the non-tx path.
+func (a *AuditGovernanceAdapter) LogTx(ctx context.Context, tx *sql.Tx, event domain.GovernanceEvent) error {
+	payload := event.PayloadJSON
+	if payload == nil {
+		var err error
+		payload, err = json.Marshal(map[string]string{})
+		if err != nil {
+			return fmt.Errorf("marshal empty governance payload: %w", err)
+		}
+	}
+	auditEvent := auditdomain.Event{
+		ID:           uuid.NewString(),
+		OccurredAt:   time.Now().UTC(),
+		ActorID:      event.ActorUserID,
+		Action:       string(event.EventType),
+		ResourceType: event.ResourceType,
+		ResourceID:   event.ResourceID,
+		PayloadJSON:  string(payload),
+		TenantID:     event.TenantID,
+	}
+	if tx != nil {
+		return a.writer.RecordTx(ctx, tx, auditEvent)
+	}
+	return a.writer.Record(ctx, auditEvent)
 }

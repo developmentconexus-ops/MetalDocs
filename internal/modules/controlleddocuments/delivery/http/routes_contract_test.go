@@ -98,6 +98,10 @@ func (f fakeGovernanceLogger) Log(ctx context.Context, e taxonomydomain.Governan
 	return nil
 }
 
+func (f fakeGovernanceLogger) LogTx(_ context.Context, _ *sql.Tx, _ taxonomydomain.GovernanceEvent) error {
+	return nil
+}
+
 type spyControlledDocumentService struct {
 	gotCreate       application.CreateControlledDocumentCmd
 	gotListFilter   application.CDFilter

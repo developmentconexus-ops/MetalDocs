@@ -45,6 +45,7 @@ func RunAll(targets []string) []Finding {
 	out = append(out, LegacyVocab(files)...)
 	out = append(out, OutboxPair(files)...)
 	out = append(out, PlatformBoundary(files)...)
+	out = append(out, PostCommitAudit(files)...)
 	return out
 }
 

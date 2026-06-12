@@ -61,7 +61,7 @@
 | # | Item | Findings | Status | Commit | Evidence / notes |
 |---|------|----------|--------|--------|------------------|
 | 2.1 | **ADR 0027** — auth_identities tenant-global by design; RLS sequencing (write BEFORE 2.3) | D-3, F-12 | ✅ | pending (wave-close backfill) | `wiki/decisions/0027-rls-adoption-sequencing.md`: T-008 closed by-design; RLS sequencing recorded (Wave 2.3 = controlled_documents+audit_events, RF-6 = iam_users, trigger-gated = remaining tables); GUC `metaldocs.tenant_id` confirmed |
-| 2.2 | In-tx audit/governance writes (`RecordTx`/`LogTx`) across taxonomy/templates/documents-core + **CI guard vs post-commit audit calls** | F-07, D-01, D-2 | ☐ | | approval module is the template |
+| 2.2 | In-tx audit/governance writes (`RecordTx`/`LogTx`) across taxonomy/templates/documents-core + **CI guard vs post-commit audit calls** | F-07, D-01, D-2 | ✅ | `go build ./...` ✓ · `go vet ./...` ✓ · all targeted tests green · cilint exit 0 | `GovernanceLogger.LogTx(*sql.Tx)` added; taxonomy/templates/documents/controlleddocuments violations fixed; `PostCommitAudit` cilint analyzer added + 8 unit tests; `//cilint:allow-post-commit-audit` for legitimate no-tx else-branches |
 | 2.3 | RLS on `controlled_documents` + `audit_events`; `ExportJob.TenantID` → uuid.UUID | F-12 | ⏸ on 2.1 | | rest of tables ➖ trigger: first external tenant |
 | 2.4 | Capability literals: resolve `"template.admin"`; typed EventType consts; tier-1/2 pairing audit (ADR 0028 only if new cap minted) | F-11 | ☐ | | ask user if new capability needed |
 | 2.5 | Extract delivery-layer raw SQL (CD routes.go, documents handler.go) to repositories | F-06b | ☐ | | |

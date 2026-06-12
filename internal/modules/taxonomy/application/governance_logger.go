@@ -43,6 +43,32 @@ func (l *DBGovernanceLogger) Log(ctx context.Context, e domain.GovernanceEvent) 
 	return nil
 }
 
+// LogTx writes the governance event inside an open transaction (REQ-ASYNC-1, F-07).
+func (l *DBGovernanceLogger) LogTx(ctx context.Context, tx *sql.Tx, e domain.GovernanceEvent) error {
+	payload := e.PayloadJSON
+	if len(payload) == 0 {
+		payload = []byte("{}")
+	}
+	_, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO governance_events
+		    (tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json)
+		 VALUES
+		    ($1, $2, $3, $4, $5, $6, $7)`,
+		e.TenantID,
+		string(e.EventType),
+		e.ActorUserID,
+		e.ResourceType,
+		e.ResourceID,
+		nullString(e.Reason),
+		payload,
+	)
+	if err != nil {
+		return fmt.Errorf("taxonomy: insert governance event in tx: %w", err)
+	}
+	return nil
+}
+
 func nullString(v string) sql.NullString {
 	if v == "" {
 		return sql.NullString{}

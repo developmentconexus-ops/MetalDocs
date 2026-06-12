@@ -50,6 +50,22 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 	version.Status = domain.VersionStatusInReview
 	version.SubmittedAt = &now
 
+	audit, err := newAuditEvent(
+		cmd.TenantID,
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		&version.ID,
+		domain.AuditSubmitted,
+		map[string]any{
+			"reviewer_role": config.ReviewerRole,
+			"approver_role": config.ApproverRole,
+		},
+		s.clock.Now(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	if s.db != nil {
 		// Validation reads above still happen before the write transaction; this tx
 		// only serializes the state update itself in the current implementation.
@@ -67,30 +83,19 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
 			return nil, err
 		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return nil, wrapAppErr("templates submit: append audit", err)
+		}
 		if err := tx.Commit(); err != nil {
 			return nil, err
 		}
-	} else if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
-		return nil, err
-	}
-
-	audit, err := newAuditEvent(
-		cmd.TenantID,
-		cmd.TemplateID,
-		cmd.ActorUserID,
-		&version.ID,
-		domain.AuditSubmitted,
-		map[string]any{
-			"reviewer_role": config.ReviewerRole,
-			"approver_role": config.ApproverRole,
-		},
-		s.clock.Now(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.repo.AppendAudit(ctx, audit); err != nil {
-		return nil, wrapAppErr("templates submit: append audit", err)
+	} else {
+		if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAudit(ctx, audit); err != nil { //cilint:allow-post-commit-audit
+			return nil, wrapAppErr("templates submit: append audit", err)
+		}
 	}
 
 	return version, nil
@@ -140,15 +145,12 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 		version.ReviewerID = &cmd.ActorUserID
 		version.ReviewedAt = &now
 
-		if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateReview)); err != nil {
-			return nil, err
-		}
 		audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditReviewed, nil, s.clock.Now())
 		if err != nil {
 			return nil, err
 		}
-		if err := s.repo.AppendAudit(ctx, audit); err != nil {
-			return nil, wrapAppErr("templates review: append audit", err)
+		if err := s.updateVersionWithAuthzAndAudit(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateReview), audit); err != nil {
+			return nil, err
 		}
 		return version, nil
 	}
@@ -159,9 +161,6 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 	version.Status = domain.VersionStatusDraft
 	version.SubmittedAt = nil
 
-	if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateReview)); err != nil {
-		return nil, err
-	}
 	audit, err := newAuditEvent(
 		cmd.TenantID,
 		cmd.TemplateID,
@@ -177,8 +176,8 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 	if err != nil {
 		return nil, err
 	}
-	if err := s.repo.AppendAudit(ctx, audit); err != nil {
-		return nil, wrapAppErr("templates review: append audit", err)
+	if err := s.updateVersionWithAuthzAndAudit(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateReview), audit); err != nil {
+		return nil, err
 	}
 
 	return version, nil
@@ -313,7 +312,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 			if err != nil {
 				return nil, err
 			}
-			if err := s.repo.AppendAudit(ctx, audit); err != nil {
+			if err := s.repo.AppendAudit(ctx, audit); err != nil { //cilint:allow-post-commit-audit
 				return nil, wrapAppErr("templates approve: append audit", err)
 			}
 		}
@@ -328,9 +327,6 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 	version.ReviewedAt = nil
 	version.ApprovedAt = nil
 
-	if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateApprove)); err != nil {
-		return nil, err
-	}
 	audit, err := newAuditEvent(
 		cmd.TenantID,
 		cmd.TemplateID,
@@ -346,8 +342,8 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 	if err != nil {
 		return nil, err
 	}
-	if err := s.repo.AppendAudit(ctx, audit); err != nil {
-		return nil, wrapAppErr("templates approve: append audit", err)
+	if err := s.updateVersionWithAuthzAndAudit(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateApprove), audit); err != nil {
+		return nil, err
 	}
 
 	return &ApproveResult{Version: version}, nil
@@ -509,6 +505,11 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 	now := s.clock.Now()
 	template.ArchivedAt = &now
 
+	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, nil, domain.AuditArchived, nil, s.clock.Now())
+	if err != nil {
+		return nil, err
+	}
+
 	if s.db != nil {
 		tx, err := s.db.BeginTx(ctx, nil)
 		if err != nil {
@@ -524,19 +525,19 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
 			return nil, err
 		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return nil, wrapAppErr("templates archive: append audit", err)
+		}
 		if err := tx.Commit(); err != nil {
 			return nil, err
 		}
-	} else if err := s.repo.UpdateTemplate(ctx, template); err != nil {
-		return nil, err
-	}
-
-	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, nil, domain.AuditArchived, nil, s.clock.Now())
-	if err != nil {
-		return nil, err
-	}
-	if err := s.repo.AppendAudit(ctx, audit); err != nil {
-		return nil, wrapAppErr("templates archive: append audit", err)
+	} else {
+		if err := s.repo.UpdateTemplate(ctx, template); err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAudit(ctx, audit); err != nil { //cilint:allow-post-commit-audit
+			return nil, wrapAppErr("templates archive: append audit", err)
+		}
 	}
 
 	return template, nil
@@ -561,6 +562,35 @@ func (s *Service) updateVersionWithAuthz(ctx context.Context, tenantID, actorID 
 		return tx.Commit()
 	}
 	return s.repo.UpdateVersion(ctx, tenantID, version)
+}
+
+// updateVersionWithAuthzAndAudit is like updateVersionWithAuthz but also
+// appends the audit event inside the same transaction (F-07 / REQ-ASYNC-1).
+func (s *Service) updateVersionWithAuthzAndAudit(ctx context.Context, tenantID, actorID string, version *domain.TemplateVersion, cap string, audit *domain.AuditEvent) error {
+	if s.db != nil {
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("templates update version: begin tx: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+			return fmt.Errorf("templates update version: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
+			return fmt.Errorf("templates update version: authz: %w", err)
+		}
+		if err := s.repo.UpdateVersionTx(ctx, tx, tenantID, version); err != nil {
+			return err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return wrapAppErr("templates update version: append audit", err)
+		}
+		return tx.Commit()
+	}
+	if err := s.repo.UpdateVersion(ctx, tenantID, version); err != nil {
+		return err
+	}
+	return s.repo.AppendAudit(ctx, audit) //cilint:allow-post-commit-audit
 }
 
 func containsRole(roles []string, role string) bool {

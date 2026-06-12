@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -162,6 +163,11 @@ func (r *fakeProfileRepository) Create(_ context.Context, p *domain.DocumentProf
 	return nil
 }
 
+func (r *fakeProfileRepository) CreateTx(_ context.Context, _ domain.FamilyTx, p *domain.DocumentProfile) error {
+	r.put(p)
+	return nil
+}
+
 func (r *fakeProfileRepository) Update(_ context.Context, p *domain.DocumentProfile) error {
 	r.put(p)
 	return nil
@@ -204,6 +210,11 @@ type fakeGovernanceLogger struct {
 }
 
 func (f *fakeGovernanceLogger) Log(_ context.Context, e domain.GovernanceEvent) error {
+	f.events = append(f.events, e)
+	return nil
+}
+
+func (f *fakeGovernanceLogger) LogTx(_ context.Context, _ *sql.Tx, e domain.GovernanceEvent) error {
 	f.events = append(f.events, e)
 	return nil
 }

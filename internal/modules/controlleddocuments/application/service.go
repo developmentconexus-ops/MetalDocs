@@ -344,8 +344,10 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 	}
 
 	// Governance events are best-effort; document creation is already committed.
+	// Multi-leg Create has no single outer tx (no-db path + potential tx branch above),
+	// so post-commit best-effort logging is accepted here by design (item 2.11).
 	for _, event := range events {
-		if err := s.govLogger.Log(ctx, event); err != nil {
+		if err := s.govLogger.Log(ctx, event); err != nil { //cilint:allow-post-commit-audit
 			slog.WarnContext(ctx, "controlled documents governance event logging failed", "tenant_id", event.TenantID, "actor_user_id", event.ActorUserID, "event_type", event.EventType, "resource_id", event.ResourceID, "error", err)
 		}
 	}
@@ -542,9 +544,6 @@ SELECT status, process_area_code
 	if err := s.docs.UpdateStatusTx(ctx, tx, tenantID, controlledDocumentID, next, s.now().UTC()); err != nil {
 		return fmt.Errorf("controlled_documents: update controlled document status: %w", err)
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("controlled_documents: commit status change tx: %w", err)
-	}
 
 	eventType := "controlled_documents.cd.obsoleted"
 	if next == controlleddocumentsdomain.CDStatusSuperseded {
@@ -558,7 +557,7 @@ SELECT status, process_area_code
 	if u, ok := authdomain.CurrentUserFromContext(ctx); ok {
 		actorID = u.UserID
 	}
-	if err := s.govLogger.Log(ctx, taxonomydomain.GovernanceEvent{
+	if err := s.govLogger.LogTx(ctx, tx, taxonomydomain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    taxonomydomain.GovernanceEventType(eventType),
 		ActorUserID:  actorID,
@@ -566,7 +565,10 @@ SELECT status, process_area_code
 		ResourceID:   controlledDocumentID,
 		PayloadJSON:  payload,
 	}); err != nil {
-		slog.WarnContext(ctx, "controlled documents governance event logging failed", "tenant_id", tenantID, "actor_user_id", actorID, "event_type", eventType, "resource_id", controlledDocumentID, "error", err)
+		return fmt.Errorf("controlled_documents: governance event for status change: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("controlled_documents: commit status change tx: %w", err)
 	}
 	return nil
 }

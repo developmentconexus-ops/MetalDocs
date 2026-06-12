@@ -148,7 +148,7 @@ func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCm
 	if err := s.repo.UpdateVersionDraftCAS(ctx, cmd.TenantID, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
 		return wrapAppErr("templates save draft: update draft", err)
 	}
-	if err := s.repo.AppendAudit(ctx, audit); err != nil {
+	if err := s.repo.AppendAudit(ctx, audit); err != nil { //cilint:allow-post-commit-audit
 		return wrapAppErr("templates save draft: append audit", err)
 	}
 	return nil
@@ -212,7 +212,7 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 	if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
 		return nil, wrapAppErr("templates commit autosave: update version", err)
 	}
-	if err := s.repo.AppendAudit(ctx, audit); err != nil {
+	if err := s.repo.AppendAudit(ctx, audit); err != nil { //cilint:allow-post-commit-audit
 		return nil, wrapAppErr("templates commit autosave: append audit", err)
 	}
 
