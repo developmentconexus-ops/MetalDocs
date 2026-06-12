@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-12 (Wave 2 module sync — GovernanceLogger.LogTx/RecordTx in-tx governance writes; CreateTx on repos; Unwrap() *sql.Tx on tx types; AreaService.SetParent DELETED; DBGovernanceLogger nil-tx guard; deferred removal recorded) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-12 (Wave 2.12 sync — DBGovernanceLogger + governance_logger.go DELETED; AuditGovernanceAdapter is the sole GovernanceLogger; FamilyTx embeds db.Tx (Unwrap chain gone); module.go panics fail-loud on nil AuditWriter; domain no longer imports database/sql; two new cilint guards: nosqltxindomain + nodualmode; prior Wave 2 sync: GovernanceLogger.LogTx/RecordTx in-tx governance writes; CreateTx on repos; AreaService.SetParent DELETED) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/taxonomy/domain/family.go:8` â€” `DocumentFamily` aggregate
@@ -15,7 +15,8 @@
 > - `internal/modules/taxonomy/delivery/http/handler.go:42-51` â€” `RegisterRoutes` calls `taxonomyapi.HandlerWithOptions`; routes mounted via oapi-codegen generated router (T-009 closed)
 > - `internal/modules/taxonomy/delivery/http/routes_profiles.go:255-257` â€” `tenantIDFromRequest` (delegates to `tenant.FromContext`; Plan 3 removed header trust)
 > - `internal/modules/taxonomy/infrastructure/repository.go:152` â€” `ProfileRepository.Create` (now in tx + `authz.Require(CapTaxonomyManage)` at `:162` â€” Plan 5 wired)
-> - `internal/modules/taxonomy/domain/port.go` -- `GovernanceLogger.LogTx(ctx, *sql.Tx, event)` (Wave 2: in-tx governance writes; `AuditGovernanceAdapter.RecordTx` routes to audit writer inside caller tx; tx types expose `Unwrap() *sql.Tx`)
+> - `internal/modules/taxonomy/domain/port.go:38` — `GovernanceLogger.LogTx(ctx, db.Tx, event)` (Wave 2.12: takes `db.Tx`, not `*sql.Tx`; `AuditGovernanceAdapter` implements; `FamilyTx` embeds `db.Tx` at port.go:70 — no Unwrap shim needed)
+- `internal/platform/db/tx.go:19,27` — `db.DB` / `db.Tx` driver-agnostic interfaces (Wave 2.12 new package; `*sql.DB` satisfies `DB`; `*sql.Tx` satisfies both)
 > - `internal/modules/taxonomy/infrastructure/repository.go` -- `ProfileRepository.CreateTx` / `AreaRepository.CreateTx` (Wave 2: transactional create variants added to all three repo pairs)
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:218-240` â€” `HasActiveProfilesTx` (takes `tenantID string`; WHERE `tenant_id=$1 AND family_code=$2` â€” tenant predicate present; T-007 TOCTOU resolved: `Deactivate` now uses `GetByCodeForUpdate` + `HasActiveProfilesTx` inside a single tx)
 > - `apps/api/cmd/metaldocs-api/permissions.go:165-181` — path-prefix capability dispatcher (taxonomy profiles/areas/families; F-001 split applied)
@@ -100,7 +101,7 @@ A QMS admin needs a stable catalog so every controlled document carries a profil
 ### 3.2 Technical Context
 
 Inbound interfaces (Go):
-- `taxonomyapp.NewDBGovernanceLogger(db)` â€” reused by `internal/modules/controlleddocuments/module.go:12,37` (controlled-documents module) as a fallback when no `AuditWriter` is injected; primary path uses `NewAuditGovernanceAdapter`.
+- `taxonomyapp.NewAuditGovernanceAdapter(w)` â€” the sole `GovernanceLogger` implementation (Wave 2.12: `DBGovernanceLogger` + `governance_logger.go` deleted); reused by `internal/modules/controlleddocuments/module.go:35` (no fallback — `AuditWriter` is now required; panics on nil).
 - `taxonomydomain.{DocumentProfile, ProcessArea, GovernanceEvent, GovernanceLogger, sentinel errors}` â€” consumed by legacy literal code paths `registry/application/service.go:13`, `registry/delivery/http/routes.go:17`, `registry/infrastructure/repository.go:15`.
 - `taxonomyinfra.NewProfileRepository(db)` â€” constructed standalone in `main.go:225` for `profileDefaultsAdapter`.
 - `taxonomyinfra.NewTemplateVersionChecker(db)` â€” joins to `templates_template{_version}` for `IsPublished` (`template_version_checker.go:14-17`).
@@ -136,8 +137,8 @@ C4Container
     Container(http, "HTTP Handler", "Go (http.ServeMux)", "16 routes: /api/v1/taxonomy/{profiles,areas,families}")
     Container(svc, "Service Layer", "Go", "FamilyService Â· ProfileService Â· AreaService")
     Container(domain, "Domain", "Go", "DocumentFamily Â· DocumentProfile Â· ProcessArea Â· GovernanceEvent Â· sentinel errors")
-    Container(repo, "Repository Layer", "Go + database/sql", "FamilyRepository Â· ProfileRepository Â· AreaRepository Â· TemplateVersionChecker Â· DBGovernanceLogger")
-    ContainerDb(db, "metaldocs.document_*", "Postgres", "document_families Â· document_profiles Â· document_process_areas (+ governance_events)")
+    Container(repo, "Repository Layer", "Go + database/sql", "FamilyRepository Â· ProfileRepository Â· AreaRepository Â· TemplateVersionChecker")
+    ContainerDb(db, "metaldocs.document_*", "Postgres", "document_families Â· document_profiles Â· document_process_areas")
     System_Ext(tplv2, "templates_template_version", "Postgres (templates)", "READ join for IsPublished")
     Rel(http, svc, "calls")
     Rel(svc, domain, "uses")
@@ -162,7 +163,7 @@ C4Container
 | `application/family_service.go:13-19` | `FamilyService` | struct | List Â· Get Â· Create Â· Update Â· Deactivate; all mutating methods call `s.govLogger.Log` (T-004 closed) |
 | `application/profile_service.go:16-20` | `ProfileService` | struct | List Â· Get Â· Create Â· Update Â· Archive Â· SetDefaultTemplate; Create `:70`, Update `:96`, Archive, SetDefaultTemplate all emit govLogger events (T-005 closed) |
 | `application/area_service.go:13-17` | `AreaService` | struct | List Â· Get Â· Create Â· Update Â· Archive; Create `:59`, Update `:98`, Archive all emit govLogger events (T-005 closed); `SetParent` DELETED (Wave 2 — dead code, no HTTP route wired) |
-| `application/governance.go` | `NewDBGovernanceLogger` | func | reused by `internal/modules/controlleddocuments/module.go:37` as fallback when no `AuditWriter` injected |
+| `application/audit_governance_adapter.go` | `NewAuditGovernanceAdapter` | func | sole `GovernanceLogger` implementation; routes events to `audit.Writer` (Wave 2.12: `DBGovernanceLogger` deleted) |
 | `infrastructure/family_repository.go:11` | `FamilyRepository` | struct | `*sql.DB`-backed; `HasActiveProfilesTx` takes `tenantID` + wraps in tx (T-007 resolved) |
 | `infrastructure/repository.go:14,180` | `ProfileRepository Â· AreaRepository` | structs | `*sql.DB`-backed; no tx |
 | `infrastructure/template_version_checker.go:11` | `TemplateVersionChecker` | struct | READ join: `_template + _template_version` |
@@ -351,7 +352,7 @@ Failure modes â€” reference `wiki/concepts/error-ux.md`:
 - No pagination. `listProfiles`, `listAreas`, `listFamilies` return full ordered slices. Catalog cardinality expected to stay small (< 1k rows per tenant). Latent risk; tracked as T-015.
 
 ### 8.6 Logging & Observability
-- No structured logging in module. `DBGovernanceLogger` writes to `metaldocs.governance_events` â€” a module-local parallel sink to `audit.Writer`. Same gap as audit T-007 (two parallel sinks; not unified). **Wave 2:** `DBGovernanceLogger` gained a nil-tx guard (returns error rather than panic when called with a nil `*sql.Tx`). Full removal is deferred; it remains the nil-`AuditWriter` fallback for the taxonomy module only.
+- No structured logging in module. **Wave 2.12:** `DBGovernanceLogger` + `governance_logger.go` DELETED. `AuditGovernanceAdapter` (in `application/audit_governance_adapter.go`) is the sole `GovernanceLogger`; it routes to `metaldocs.audit_events` via `audit.Writer`. The separate `governance_events` sink no longer exists in taxonomy. `module.go` panics fail-loud if `AuditWriter` is nil — no fallback. CI guard `nosqltxindomain` enforces `database/sql` types stay out of `internal/modules/taxonomy/**/domain/`.
 - No trace-id propagation; no metrics.
 
 ### 8.7 Concurrency / Transactions
@@ -382,7 +383,7 @@ Failure modes â€” reference `wiki/concepts/error-ux.md`:
 | `document_families` global (no `tenant_id`) by design | `tech-debt: missing-ADR` (T-002) |
 | Application-layer cycle prevention on area parents | `tech-debt: missing-ADR` (T-016) |
 | Same `*sql.DB` (no tx) across three repositories | `tech-debt: missing-ADR` (T-007 sub-bullet) |
-| `DBGovernanceLogger` as a module-local audit sink parallel to `audit.Writer` | `tech-debt: missing-ADR` (T-004 sub-bullet) |
+| `DBGovernanceLogger` removed; `AuditGovernanceAdapter` is the sole logger (Wave 2.12) | closed (T-010 fully closed) |
 | oapi-codegen generated router (migrated from raw ServeMux) | `tech-debt: T-009 closed` |
 
 ---
@@ -426,7 +427,7 @@ Top 3 (by severity, then by blast-radius):
 | `document_profile` | Per-tenant document type bound to a family. Has `default_template_version_id` for the documents wizard. |
 | `process_area` | Per-tenant operational area with optional `parent_code` self-FK. Cycle prevention is application-layer. |
 | `taxonomy.manage` | IAM capability gating writes on all 16 taxonomy routes; granted to `system_admin` (`db/reference-data/0001_product_reference_data.sql:75`) and `qms_admin` (`:57`) via reference data, not a forward migration. |
-| `governance_events` | Module-local audit sink written via `DBGovernanceLogger`. Parallel to `audit.Writer`; not unified. |
+| `governance_events` | Historical module-local audit table. Removed as taxonomy's write target in Wave 2.12 (`DBGovernanceLogger` deleted); taxonomy now writes exclusively to `metaldocs.audit_events` via `AuditGovernanceAdapter`. |
 | `DevTenantID` | Compile-time UUID constant (`ffffffff-...`). After Plan 3, this is no longer the fallback in taxonomy handlers â€” `tenant.FromContext` errors out if no session tenant is present. Still used in auth's `AllowDevTenantFallback` mode for dev-only login. |
 | `archived_at` | Soft-archive timestamp on profile + area (per ADR 0010). Families use `is_active` boolean (predates ADR 0010). |
 | `code` | Primary key in all three entities; CHECK `^[a-z][a-z0-9_-]{1,63}$` (profile + area only). Immutable via trigger (profile + area only). |
@@ -446,7 +447,7 @@ Top 3 (by severity, then by blast-radius):
 | Tier-3 tripwire abort on taxonomy write | Mutation 500; INSERT/UPDATE rejected | Postgres `RAISE` from `trg_require_cap_asserted` on taxonomy tables (`db/baseline/0001_current_schema.sql:3699-3716`) | Code bypassed `authz.Require(CapTaxonomyManage)` — fix-forward |
 | FamilyService omits govLogger (T-004 — CLOSED) | (historical) family mutations would not log to `governance_events` | â€" | T-004 closed commit `115cb635`: `govLogger` field wired; Create/Update/Deactivate all emit |
 | Archive/deactivate event coverage incomplete (T-005/T-006) | Some archive paths emit event, some do not | Compliance review | Audit each service path; wire missing emits |
-| Cross-module `DBGovernanceLogger` reuse by controlled-documents | Coupling: controlled-documents imports `taxonomyapp.NewDBGovernanceLogger` (`internal/modules/controlleddocuments/module.go:37`) as fallback; primary path now uses `NewAuditGovernanceAdapter` | Architecture review | T-010 closed; residual fallback path remains |
+| Cross-module `DBGovernanceLogger` reuse by controlled-documents | RESOLVED Wave 2.12 — `NewDBGovernanceLogger` deleted; controlled-documents now uses `NewAuditGovernanceAdapter` exclusively (`module.go:35`); `AuditWriter` is required (panics on nil) | â€" | T-010 fully closed |
 | Dev tenant fallback used in prod read | `tenant.DevTenantID` returns generic catalog | Bootstrap config check | Production must disable dev tenant fallback |
 
 ## Cross-links
@@ -460,6 +461,7 @@ Top 3 (by severity, then by blast-radius):
 
 ## Changelog (this doc)
 
+- 2026-06-12 - Wave 2.12 sync: `DBGovernanceLogger` + `governance_logger.go` DELETED — `AuditGovernanceAdapter` is the sole `GovernanceLogger`. `FamilyTx` now embeds `db.Tx` (Unwrap chain deleted). `GovernanceLogger.LogTx` signature changed to accept `db.Tx` (not `*sql.Tx`). `module.go` panics fail-loud on nil `AuditWriter`. Domain no longer imports `database/sql`. CI guards `nosqltxindomain` + `nodualmode` added. New `internal/platform/db` package (`db.Tx` / `db.DB` interfaces) documented. Controlled-documents `module.go` fallback to `DBGovernanceLogger` removed — T-010 fully closed. C4 container diagram updated (removed `DBGovernanceLogger` node; removed `governance_events` ContainerDb). §3.2 inbound interface updated. §8.6 observability updated.
 - 2026-06-12 - Wave 2 structural refresh: `GovernanceLogger.LogTx(ctx, *sql.Tx, event)` + `AuditGovernanceAdapter.RecordTx` in-tx governance write path documented; `CreateTx` variants on all three repository pairs noted; tx types `Unwrap() *sql.Tx` noted; `AreaService.SetParent` removed (dead code — no HTTP route); `DBGovernanceLogger` nil-tx guard noted; deferred removal of `DBGovernanceLogger` fallback recorded.
 
 - 2026-05-17 - Lite memory sync: active taxonomy docs now name the downstream consumer as `documents` instead of historical `documents_v2`; route and persistence behavior unchanged.

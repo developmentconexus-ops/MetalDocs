@@ -2,7 +2,7 @@
 
 > Companion to [wiki/modules/controlled-documents.md](controlled-documents.md). Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in [wiki/backlog/controlled-documents-refactor.md](../backlog/controlled-documents-refactor.md).
 
-**Last verified:** 2026-06-12 (Wave 2 module sync — no debt rows opened or closed; T-005 partially addressed by RLS migration 0234 on controlled_documents; stamp bumped) | **Prior:** 2026-06-11
+**Last verified:** 2026-06-12 (Wave 2.12 sync — db==nil authz-bypass class-B branch in Create deleted (authz now unconditional); DBTX replaced by db.Tx; sequence.go no longer imports database/sql; orphan document_subjects column+index noted as deferred; no existing debt rows opened or closed) | **Prior:** 2026-06-12 (Wave 2 sync — T-005 partially addressed by RLS migration 0234) | **Prior:** 2026-06-11
 
 ## Severity scale
 
@@ -89,12 +89,19 @@ The category names are useful only when paired with concrete triggers. Use the t
 - **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-007`](../backlog/controlled-documents-refactor.md) (merged Plan 7 2026-05-11, commit `395b0b24`)
 - **Linked ADR:** [wiki/decisions/0012-contract-first-api.md](../decisions/0012-contract-first-api.md)
 
-### T-008    Cross-module audit sink     taxonomy logger reused     CLOSED 2026-05-11 (Plan 6a)
-- **Severity:** major (closed)
-- **Surface:** `internal/modules/controlleddocuments/module.go:31`; `internal/modules/taxonomy/application/governance_logger.go:18`
-- **Observation:** Controlled-documents wires its governance logger from `taxonomyapp.NewDBGovernanceLogger(deps.DB)`. Controlled-documents audit emissions land in `governance_events` via taxonomy's adapter. Two coupled concerns: (a) the audit sink semantics belong to a platform-owned `internal/audit` per the audit module's port/adapter contract (see `wiki/modules/audit.md`), not to a sibling business module; (b) controlled-documents debt items + retention policies become coupled to taxonomy refactors. Cross-module dependency that blocks audit's clean port adoption.
-- **Evidence:** `controlled-documents/_artifacts/03-deps.md`   1 (OUT-edges)
+### T-008    Cross-module audit sink — taxonomy logger reused — FULLY CLOSED 2026-06-12 (Wave 2.12)
+- **Severity:** major (fully closed)
+- **Surface (resolved):** `internal/modules/controlleddocuments/module.go:35` — `govLogger := taxonomyapp.NewAuditGovernanceAdapter(deps.AuditWriter)`. The `NewDBGovernanceLogger(deps.DB)` call and `governance_logger.go` are deleted. `AuditWriter` is required (`module.go:27-29` panics on nil). Controlled-documents audit emissions now go to `metaldocs.audit_events` via the canonical `auditdomain.Writer` — no more dual-sink split.
+- **Observation (original):** Controlled-documents used `taxonomyapp.NewDBGovernanceLogger(deps.DB)` as its governance adapter, causing emissions to land in `governance_events` instead of the canonical audit sink.
+- **Evidence:** `internal/modules/controlleddocuments/module.go:27-35`.
 - **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-008`](../backlog/controlled-documents-refactor.md)
+- **Linked ADR:** missing-ADR
+
+### T-010    Orphan `documents.subject_code` column + index (Wave 2.12 deferred)
+- **Severity:** minor
+- **Surface:** `db/migrations/0236` (migration that dropped `document_subjects` table with CASCADE, which dropped the FK from `controlled_documents`). The `documents.subject_code` column and its index remain as orphans.
+- **Observation:** Migration 0236 dropped `document_subjects` and its FK CASCADE deleted the `document_subjects_document_subject_code_fkey` constraint on `controlled_documents`. However the `subject_code` column itself and its index remain. They reference a non-existent FK target (table gone), making them dead schema. Next-touch trigger: any migration that touches the `controlled_documents` table or schema.
+- **Linked backlog row:** none yet
 - **Linked ADR:** missing-ADR
 
 ### T-009    Documents DI cycle resolved via post-construction setter

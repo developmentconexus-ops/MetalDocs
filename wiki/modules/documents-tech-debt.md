@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/documents.md`. Debt only — fixes belong in `wiki/backlog/documents-refactor.md`.
 
-**Last verified:** 2026-06-12 (Wave 2 module sync — ForceReleaseSession+Archive audit in-tx WriteTx; GetFinalizePrereqs extracted; rate-limited routes. Prior: Stage-1 adversarial-verification pass round 2: T-001 httpErr anchor corrected :1027-1029 → :1202-1204; T-002 OpenAPI line refs corrected :1952/:2050 → :2292/:2405; T-003 migration reference corrected to live path 0231:64-69; T-009 non-actionable status updated — FK bug already resolved in curated baseline db/baseline/0001_current_schema.sql:4333; T-010 evidence ranges tightened to exact call-site lines; prior: T-004 anchor corrected :86/:115 → :117/:147; T-005 surface anchors and observation corrected to match post-fix code; T-006 backlog sync discrepancy noted; prior: T-010 stale "not mounted" claim corrected — routes ARE mounted via documentsapi.HandlerWithOptions at module.go:120/134; prior: 2026-06-08 Phase F F8: handler.go finalizeDocument anchor :316 → :435)
+**Last verified:** 2026-06-12 (Wave 2.12 sync — db==nil branches removed from documents service (single-mode); NewFillInServiceNoAuthz deleted; requireDocEditDraft unconditional; freeze_service //cilint:allow-dualmode at :178/:314/:379 (deferred, ADR-0015); approval reauth Postgres limiter unconditional; new deferred item: freeze_service in-tx-only collapse. Prior Wave 2 sync: ForceReleaseSession+Archive audit in-tx WriteTx; GetFinalizePrereqs extracted; rate-limited routes. Prior: Stage-1 adversarial-verification pass round 2: T-001 httpErr anchor corrected :1027-1029 → :1202-1204; T-002 OpenAPI line refs corrected :1952/:2050 → :2292/:2405; T-003 migration reference corrected to live path 0231:64-69; T-009 non-actionable status updated — FK bug already resolved in curated baseline db/baseline/0001_current_schema.sql:4333; T-010 evidence ranges tightened to exact call-site lines; prior: T-004 anchor corrected :86/:115 → :117/:147; T-005 surface anchors and observation corrected to match post-fix code; T-006 backlog sync discrepancy noted; prior: T-010 stale "not mounted" claim corrected — routes ARE mounted via documentsapi.HandlerWithOptions at module.go:120/134; prior: 2026-06-08 Phase F F8: handler.go finalizeDocument anchor :316 → :435)
 
 ## Severity scale
 
@@ -109,6 +109,14 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked ADR:** missing-ADR
 
 2026-05-19 follow-up: sidebar revision rows were tightened to code/title/date and `REV00` now defaults to `Criacao do documento`; no new debt opened. Rich history search/filtering remains deferred until governed lineages are long enough to need more than collapse/expand.
+
+### T-013 · `freeze_service.go` optional-tx-enlistment pattern (ADR-0015 deferred) — OPEN
+- **Severity:** major (open — deferred by ADR-0015 annotation)
+- **Surface:** `internal/modules/documents/application/freeze_service.go:178`, `:314`, `:379` — three `if tx != nil { //cilint:allow-dualmode }` branches retained; `freeze_service` can enlist in a caller-provided tx or run without one.
+- **Observation:** Wave 2.12 removed all other `db==nil` dual-mode branches in the documents service, but `freeze_service` retains the optional-tx pattern annotated `//cilint:allow-dualmode`. This is explicitly deferred: the path where no tx is provided is the ADR-0015 "optional enlistment" design. Collapse to in-tx-only requires rethinking callers that invoke freeze without an outer tx. CI guard `nodualmode` treats the annotation as an allow-list escape hatch.
+- **Resolution path:** Collapse `freeze_service` to require a non-nil `tx` argument; refactor callers. Next-touch trigger: any change to the freeze execution path.
+- **Linked backlog row:** none yet
+- **Linked ADR:** ADR-0015 (referenced in annotation; no standalone file verified)
 
 ## Coverage stats (computed at compose time)
 

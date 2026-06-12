@@ -2,7 +2,7 @@
 
 > Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
-**Last verified:** 2026-06-12 (Wave 2 module sync — no debt rows opened or closed; stamp bumped) | **Prior:** 2026-06-11 (adversarial re-verification: T-001 surface corrected to past-tense history of deleted file; T-004 iam_users INSERT line numbers corrected to :51/:57; T-005 observation corrected to past tense matching closed status; artifact 01-surface.md stale-row warning added) | **Prior:** 2026-06-11 (adversarial anchor correction: T-004/T-005/T-007/T-008 line numbers corrected to match actual source — that pass missed the T-001 deleted-file citation and T-005 present-tense false claim) | **Prior:** 2026-06-10 (Stage-1 backend audit drift patch — no debt row changes; capability/role counts corrected in iam.md §5.2 + §12) | **Prior:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: T-004 resolved-surface line numbers updated to reflect new file layout after `ListByTenant` insertion)
+**Last verified:** 2026-06-12 (Wave 2.12 sync — T-007 CLOSED: MembershipGovernanceLogger now required ctor dep, wired in main.go:363, best-effort emission; TenantMemberChecker port + WithTenantMemberChecker/tenantChecker/ListUsers-fallback DELETED; RoleProvider.UserActiveInTenant replaces it; RolesByUserIDs M-6 fix (tenantID filter added); prior Wave 2 sync: no debt rows opened or closed) | **Prior:** 2026-06-11 (adversarial re-verification: T-001 surface corrected to past-tense history of deleted file; T-004 iam_users INSERT line numbers corrected to :51/:57; T-005 observation corrected to past tense matching closed status; artifact 01-surface.md stale-row warning added) | **Prior:** 2026-06-11 (adversarial anchor correction: T-004/T-005/T-007/T-008 line numbers corrected to match actual source — that pass missed the T-001 deleted-file citation and T-005 present-tense false claim) | **Prior:** 2026-06-10 (Stage-1 backend audit drift patch — no debt row changes; capability/role counts corrected in iam.md §5.2 + §12) | **Prior:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: T-004 resolved-surface line numbers updated to reflect new file layout after `ListByTenant` insertion)
 
 ### T-PR7B-1 · CRITICAL — cross-tenant ATO via `handleResetPassword` — CLOSED 2026-06-02
 - **Severity:** critical (closed)
@@ -129,11 +129,12 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Linked backlog row:** `backlog/iam-refactor.md#R-006` (merged Plan 7 2026-05-11, commit `1ecfe674`)
 - **Linked ADR:** `wiki/architecture/api-design-system.md`
 
-### T-007 · `MembershipGovernanceLogger` wired with `nil` in production
-- **Severity:** major
-- **Surface:** `apps/api/cmd/metaldocs-api/main.go:325` (`NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), nil)`); consumer at `internal/modules/iam/application/area_membership_service.go:79,101`
-- **Observation:** The second argument to `NewAreaMembershipService` is the `MembershipGovernanceLogger`. In production wiring it is `nil`. The service nil-checks before calling (`area_membership_service.go:79`), so grant/revoke produce no governance log. For the SECURITY DEFINER path (`area_membership/area_membership.go`), governance events ARE written by the SQL function itself (artifact 04 §5 note). The two write paths therefore emit different governance trails.
-- **Evidence:** main.go:217 (verified by main agent read); artifact 02-flow-grant-membership §6.
+### T-007 · `MembershipGovernanceLogger` wired with `nil` in production — CLOSED 2026-06-12 (Wave 2.12)
+- **Severity:** major (closed)
+- **Surface (resolved):** `apps/api/cmd/metaldocs-api/main.go:363` — `NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), newMembershipGovernanceLogger(deps.AuditWriter))`. The `membershipGovernanceLogger` adapter (`main.go:968-983`) wraps `auditdomain.Writer`; it panics if nil. Governance logging is best-effort: sink failures are `slog.Warn`-logged and never fail the mutation. `area_membership_service.go` no longer nil-guards the logger — it is required.
+- **Observation (original):** `NewAreaMembershipService` second argument was `nil` in production. Grant/revoke produced no governance log on the application-service path.
+- **Evidence:** `apps/api/cmd/metaldocs-api/main.go:363,968-983`.
+- **Deferred:** In-tx atomic governance log via `RecordTx` (T-007 next-touch item, currently best-effort post-commit).
 - **Linked backlog row:** `backlog/iam-refactor.md#R-007`
 - **Linked ADR:** missing-ADR
 

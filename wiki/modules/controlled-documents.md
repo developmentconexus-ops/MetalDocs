@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-06-12 (Wave 2 module sync — GetActiveInstance service+repo extraction, ActiveDocumentInstance domain type, ErrNoActiveInstance, govLogger.LogTx in changeStatus, AuditWriter nil-panic guard in module.go, RLS migration 0234; see sync-log) | **Owner:** leandro | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-06-12 (Wave 2.12 sync — db==nil authz-bypass class-B branch in Create DELETED (authz now unconditional); DBTX local interface replaced with db.Tx; sequence.go no longer imports database/sql; nosqltxindomain CI guard. Prior Wave 2 sync: GetActiveInstance service+repo extraction, ActiveDocumentInstance domain type, ErrNoActiveInstance, govLogger.LogTx in changeStatus, AuditWriter nil-panic guard in module.go, RLS migration 0234) | **Owner:** leandro | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/controlleddocuments/module.go:27` - module wiring (`New`, dependencies)
@@ -132,7 +132,7 @@ C4Container
     ContainerDb(db1, "controlled_documents", "Postgres", "tenant_id, code, status, owner")
     ContainerDb(db2, "cd_sequence_counters", "Postgres", "next_seq per (tenant, profile, area)")
     Container_Ext(idemp, "platform/idempotency", "Go", "POST replay store")
-    Container_Ext(govLog, "taxonomy DBGovernanceLogger", "Go", "governance_events sink (shared from taxonomy)")
+    Container_Ext(govLog, "taxonomy AuditGovernanceAdapter", "Go", "audit_events sink via auditdomain.Writer (Wave 2.12: DBGovernanceLogger deleted)")
     Rel(http, svc, "calls")
     Rel(http, idemp, "Require middleware on POST")
     Rel(svc, repo, "CreateTx / UpdateStatus / GetByID / List")

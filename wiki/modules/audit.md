@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-11 (adversarial-verification pass 2: documentsAuditAdapter anchor corrected to main.go:773-829; operationId listAuditEvents confirmed present at openapi.yaml:745 — T-008 false-missing claim retired from §2, §5.3, and route truth table; prior pass: error-discard claim corrected to log.Printf; ID-generation corrected from timestamp to uuid.NewString; T-001 §10 row updated to PASSES; migration paths corrected to archive/migrations/; TenantID added to §5.2 Event surface; prior: 2026-06-10 Stage-1 backend audit drift patch) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-12 (Wave 2.12 sync — Service.writer nil-check at service.go:182 annotated //cilint:allow-dualmode; deferred: hard-require writer via WithExports refactor. Prior: 2026-06-11 adversarial-verification pass 2: documentsAuditAdapter anchor corrected to main.go:773-829; operationId listAuditEvents confirmed present at openapi.yaml:745 — T-008 false-missing claim retired from §2, §5.3, and route truth table; prior pass: error-discard claim corrected to log.Printf; ID-generation corrected from timestamp to uuid.NewString; T-001 §10 row updated to PASSES; migration paths corrected to archive/migrations/; TenantID added to §5.2 Event surface; prior: 2026-06-10 Stage-1 backend audit drift patch) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/audit/domain/port.go:8-31` â€” `Event`, `ListEventsQuery`, `Writer`, `Reader`

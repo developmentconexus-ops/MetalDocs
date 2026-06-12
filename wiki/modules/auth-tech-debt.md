@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/auth.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/auth-refactor.md`.
 
-**Last verified:** 2026-06-12 (Wave 2 module sync — no debt rows opened or closed; stamp bumped) | **Prior:** 2026-06-11 (Stage-1 adversarial verification pass — T-004 false-open corrected; T-009 behavior + anchor corrected; T-014 line anchors corrected)
+**Last verified:** 2026-06-12 (Wave 2.12 sync — no debt rows opened or closed; loginCtxPort now panics on nil (was nil-guarded); InMemoryAuthFailureRateLimiter deleted — no new debt opened) | **Prior:** 2026-06-11 (Stage-1 adversarial verification pass — T-004 false-open corrected; T-009 behavior + anchor corrected; T-014 line anchors corrected)
 
 ## Severity scale
 

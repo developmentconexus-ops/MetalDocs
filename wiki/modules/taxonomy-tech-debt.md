@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/taxonomy.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/taxonomy-refactor.md`.
 
-**Last verified:** 2026-06-12 (Wave 2 module sync)
+**Last verified:** 2026-06-12 (Wave 2.12 sync — T-010 fully closed: DBGovernanceLogger deleted, AuditGovernanceAdapter is sole GovernanceLogger; new CI guards nosqltxindomain + nodualmode; prior Wave 2 sync)
 
 ## Severity scale
 
@@ -89,11 +89,11 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-009`
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md` (taxonomy is the residual unmigrated module)
 
-### T-010 · `DBGovernanceLogger` is a module-local parallel audit sink — CLOSED 2026-05-11 (Plan 6a)
-- **Severity:** major (closed)
-- **Surface:** `internal/modules/taxonomy/application/governance.go` (DBGovernanceLogger writes to `governance_events`); `internal/modules/audit/` (parallel `audit.Writer` writing to `metaldocs.audit_events`); `internal/modules/controlleddocuments/module.go:31` (controlled-documents imports + reuses `taxonomyapp.NewDBGovernanceLogger`)
-- **Observation:** Taxonomy ships its own audit sink (`governance_events` table) instead of consuming `auditdomain.Writer`. Controlled-documents re-exports the taxonomy logger rather than wiring its own audit writer. Result: regulated mutation events live in two sinks with no shared schema, no shared `actor_id` resolution, no shared retention story. Auditor query for "all regulated actions in time T" must JOIN/UNION across both. Same gap surfaced in audit T-007 (cross-module). Trigger fired: duplicated write surfaces with divergent semantics for the same use case (Major).
-- **Evidence:** `_artifacts/03-deps.md` §2 (controlled-documents imports `taxonomyapp.NewDBGovernanceLogger`); `_artifacts/03-deps.md` §1 (`internal/audit` ABSENT from taxonomy OUT-edges).
+### T-010 · `DBGovernanceLogger` is a module-local parallel audit sink — FULLY CLOSED 2026-06-12 (Wave 2.12)
+- **Severity:** major (fully closed)
+- **Surface (resolved):** `internal/modules/taxonomy/application/governance_logger.go` (file DELETED). `application/audit_governance_adapter.go` is now the sole `GovernanceLogger` implementation; it writes to `metaldocs.audit_events` via `auditdomain.Writer`. `internal/modules/controlleddocuments/module.go:35` now uses `taxonomyapp.NewAuditGovernanceAdapter(deps.AuditWriter)` — the `NewDBGovernanceLogger` fallback is removed and `AuditWriter` is required (panics on nil).
+- **Observation (original):** Taxonomy shipped its own audit sink (`governance_events` table) instead of consuming `auditdomain.Writer`. Controlled-documents re-exported the taxonomy logger rather than wiring its own audit writer. Both dual-sink paths closed by Wave 2.12.
+- **Evidence:** `internal/modules/taxonomy/application/audit_governance_adapter.go` (sole GovernanceLogger impl); `internal/modules/controlleddocuments/module.go:27-35` (AuditWriter nil-panic guard + NewAuditGovernanceAdapter call).
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-010`
 - **Linked ADR:** missing-ADR
 
