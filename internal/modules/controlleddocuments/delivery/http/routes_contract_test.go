@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 
 	controlleddocumentsapi "metaldocs/internal/modules/controlleddocuments/api"
@@ -42,6 +41,10 @@ func (f fakeRegistryDocs) List(ctx context.Context, tenantID string, filter cont
 }
 func (f fakeRegistryDocs) CanRead(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (bool, error) {
 	return true, nil
+}
+
+func (f fakeRegistryDocs) GetActiveInstance(ctx context.Context, tenantID, controlledDocumentID string) (*controlleddocumentsdomain.ActiveDocumentInstance, error) {
+	return nil, nil
 }
 
 func (f fakeRegistryDocs) Create(ctx context.Context, doc *controlleddocumentsdomain.ControlledDocument) error {
@@ -103,21 +106,23 @@ func (f fakeGovernanceLogger) LogTx(_ context.Context, _ *sql.Tx, _ taxonomydoma
 }
 
 type spyControlledDocumentService struct {
-	gotCreate       application.CreateControlledDocumentCmd
-	gotListFilter   application.CDFilter
-	gotListTenantID string
-	listResult      []controlleddocumentsdomain.ControlledDocument
-	gotRevision     application.CreateRevisionCmd
-	revisionResult  *controlleddocumentsdomain.DocumentRef
-	revisionErr     error
-	gotGetID        string
-	getResult       *controlleddocumentsdomain.ControlledDocument
-	getErr          error
-	gotObsoleteID   string
-	gotSupersedeID  string
-	gotPeekProfile  string
-	gotPeekArea     string
-	peekResult      int
+	gotCreate          application.CreateControlledDocumentCmd
+	gotListFilter      application.CDFilter
+	gotListTenantID    string
+	listResult         []controlleddocumentsdomain.ControlledDocument
+	gotRevision        application.CreateRevisionCmd
+	revisionResult     *controlleddocumentsdomain.DocumentRef
+	revisionErr        error
+	gotGetID           string
+	getResult          *controlleddocumentsdomain.ControlledDocument
+	getErr             error
+	gotObsoleteID      string
+	gotSupersedeID     string
+	gotPeekProfile     string
+	gotPeekArea        string
+	peekResult         int
+	activeInstResult   *controlleddocumentsdomain.ActiveDocumentInstance
+	activeInstErr      error
 }
 
 func (s *spyControlledDocumentService) Create(ctx context.Context, cmd application.CreateControlledDocumentCmd) (*application.CreateResult, error) {
@@ -159,6 +164,10 @@ func (s *spyControlledDocumentService) Get(ctx context.Context, tenantID, id str
 	return nil, controlleddocumentsdomain.ErrCDNotFound
 }
 
+func (s *spyControlledDocumentService) GetActiveInstance(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ActiveDocumentInstance, error) {
+	return s.activeInstResult, s.activeInstErr
+}
+
 func (s *spyControlledDocumentService) Obsolete(ctx context.Context, tenantID, id string) error {
 	s.gotObsoleteID = id
 	return nil
@@ -180,16 +189,6 @@ func (s *spyControlledDocumentService) PeekSeq(ctx context.Context, tenantID, pr
 
 // helpers
 
-func newSQLMock(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
-	t.Helper()
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("sqlmock.New: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	return db, mock
-}
-
 func newTestHandler(db *sql.DB) *Handler {
 	svc := application.NewControlledDocumentService(
 		db,
@@ -202,6 +201,12 @@ func newTestHandler(db *sql.DB) *Handler {
 		nil,
 	)
 	return NewHandler(svc, db)
+}
+
+// newSpyHandler builds a Handler backed by a configurable spy service.
+// Use for tests that need to control GetActiveInstance (and other) responses.
+func newSpyHandler(spy *spyControlledDocumentService) *Handler {
+	return &Handler{svc: spy}
 }
 
 func newAuthedRequest(t *testing.T, method, url, tenantID string) *http.Request {
@@ -820,36 +825,25 @@ func TestActiveDocumentResponse_IncludesApprovalInstanceID(t *testing.T) {
 	}
 }
 
-// E10 contract tests
+// E10 contract tests — use spyControlledDocumentService so the handler's
+// boundary with the service is tested without touching the database layer.
+
+func ptr[T any](v T) *T { return &v }
 
 // TestActiveDocument_OnlyPublished_Returns200_WithPublishedID: controlled document has only a
 // published revision (no draft/under_review/etc.) — getActiveDocument must return 200 with
 // publishedDocumentId set and documentId absent.
 func TestActiveDocument_OnlyPublished_Returns200_WithPublishedID(t *testing.T) {
-	db, mock := newSQLMock(t)
-	handler := newTestHandler(db)
-
-	defer func() {
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Fatalf("sql expectations: %v", err)
-		}
-	}()
+	publishedDocID := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+	spy := &spyControlledDocumentService{
+		activeInstResult: &controlleddocumentsdomain.ActiveDocumentInstance{
+			PublishedDocumentID: ptr(publishedDocID),
+		},
+	}
+	handler := newSpyHandler(spy)
 
 	tenantID := "tenant-1"
 	cdID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-	publishedDocID := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-
-	// Main FULL OUTER JOIN query: no active doc row — only published side
-	mainRows := sqlmock.NewRows([]string{
-		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
-	}).AddRow(nil, nil, nil, nil, publishedDocID)
-	mock.ExpectQuery(`SELECT EXISTS`).
-		WithArgs(tenantID, cdID, "user-1").
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-	mock.ExpectQuery(`SELECT`).
-		WithArgs(tenantID, cdID).
-		WillReturnRows(mainRows)
-
 	req := newAuthedRequest(t, http.MethodGet,
 		"/api/v1/controlled-documents/"+cdID+"/active-document", tenantID)
 	rec := httptest.NewRecorder()
@@ -877,32 +871,25 @@ func TestActiveDocument_OnlyPublished_Returns200_WithPublishedID(t *testing.T) {
 // TestActiveDocument_BothActiveAndPublished_Returns200_WithBoth: active draft + published revision
 // both exist — both documentId and publishedDocumentId must be present.
 func TestActiveDocument_BothActiveAndPublished_Returns200_WithBoth(t *testing.T) {
-	db, mock := newSQLMock(t)
-	handler := newTestHandler(db)
-	defer func() {
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Fatalf("sql expectations: %v", err)
-		}
-	}()
-
-	tenantID := "tenant-2"
-	cdID := "cccccccc-cccc-cccc-cccc-cccccccccccc"
 	activeDocID := "dddddddd-dddd-dddd-dddd-dddddddddddd"
 	publishedDocID := "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
 	contentHash := "abc123"
 	revVersion := 3
 	approvalState := "draft"
 
-	mainRows := sqlmock.NewRows([]string{
-		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
-	}).AddRow(activeDocID, contentHash, revVersion, approvalState, publishedDocID)
-	mock.ExpectQuery(`SELECT EXISTS`).
-		WithArgs(tenantID, cdID, "user-1").
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-	mock.ExpectQuery(`SELECT`).
-		WithArgs(tenantID, cdID).
-		WillReturnRows(mainRows)
+	spy := &spyControlledDocumentService{
+		activeInstResult: &controlleddocumentsdomain.ActiveDocumentInstance{
+			DocumentID:          ptr(activeDocID),
+			ContentHash:         ptr(contentHash),
+			RevisionVersion:     ptr(revVersion),
+			ApprovalState:       ptr(approvalState),
+			PublishedDocumentID: ptr(publishedDocID),
+		},
+	}
+	handler := newSpyHandler(spy)
 
+	tenantID := "tenant-2"
+	cdID := "cccccccc-cccc-cccc-cccc-cccccccccccc"
 	req := newAuthedRequest(t, http.MethodGet,
 		"/api/v1/controlled-documents/"+cdID+"/active-document", tenantID)
 	rec := httptest.NewRecorder()
@@ -928,31 +915,25 @@ func TestActiveDocument_BothActiveAndPublished_Returns200_WithBoth(t *testing.T)
 }
 
 func TestActiveDocument_ScheduledActive_ReturnsScheduledState(t *testing.T) {
-	db, mock := newSQLMock(t)
-	handler := newTestHandler(db)
-	defer func() {
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Fatalf("sql expectations: %v", err)
-		}
-	}()
-
-	tenantID := "tenant-2"
-	cdID := "11111111-2222-3333-4444-555555555555"
 	activeDocID := "66666666-7777-8888-9999-000000000000"
 	publishedDocID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 	contentHash := "abc123"
 	revVersion := 4
 	approvalState := "scheduled"
-	mainRows := sqlmock.NewRows([]string{
-		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
-	}).AddRow(activeDocID, contentHash, revVersion, approvalState, publishedDocID)
-	mock.ExpectQuery(`SELECT EXISTS`).
-		WithArgs(tenantID, cdID, "user-1").
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-	mock.ExpectQuery(`SELECT`).
-		WithArgs(tenantID, cdID).
-		WillReturnRows(mainRows)
 
+	spy := &spyControlledDocumentService{
+		activeInstResult: &controlleddocumentsdomain.ActiveDocumentInstance{
+			DocumentID:          ptr(activeDocID),
+			ContentHash:         ptr(contentHash),
+			RevisionVersion:     ptr(revVersion),
+			ApprovalState:       ptr(approvalState),
+			PublishedDocumentID: ptr(publishedDocID),
+		},
+	}
+	handler := newSpyHandler(spy)
+
+	tenantID := "tenant-2"
+	cdID := "11111111-2222-3333-4444-555555555555"
 	req := newAuthedRequest(t, http.MethodGet,
 		"/api/v1/controlled-documents/"+cdID+"/active-document", tenantID)
 	rec := httptest.NewRecorder()
@@ -975,16 +956,6 @@ func TestActiveDocument_ScheduledActive_ReturnsScheduledState(t *testing.T) {
 }
 
 func TestActiveDocument_UnderReview_ReturnsApprovalInstanceID(t *testing.T) {
-	db, mock := newSQLMock(t)
-	handler := newTestHandler(db)
-	defer func() {
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Fatalf("sql expectations: %v", err)
-		}
-	}()
-
-	tenantID := "tenant-4"
-	cdID := "12345678-1111-2222-3333-444444444444"
 	activeDocID := "aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb"
 	publishedDocID := "cccccccc-1111-2222-3333-dddddddddddd"
 	approvalInstanceID := "eeeeeeee-1111-2222-3333-ffffffffffff"
@@ -992,19 +963,20 @@ func TestActiveDocument_UnderReview_ReturnsApprovalInstanceID(t *testing.T) {
 	revVersion := 5
 	approvalState := "under_review"
 
-	mainRows := sqlmock.NewRows([]string{
-		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
-	}).AddRow(activeDocID, contentHash, revVersion, approvalState, publishedDocID)
-	mock.ExpectQuery(`SELECT EXISTS`).
-		WithArgs(tenantID, cdID, "user-1").
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-	mock.ExpectQuery(`SELECT`).
-		WithArgs(tenantID, cdID).
-		WillReturnRows(mainRows)
-	mock.ExpectQuery(`SELECT id::text`).
-		WithArgs(activeDocID, tenantID).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(approvalInstanceID))
+	spy := &spyControlledDocumentService{
+		activeInstResult: &controlleddocumentsdomain.ActiveDocumentInstance{
+			DocumentID:          ptr(activeDocID),
+			ContentHash:         ptr(contentHash),
+			RevisionVersion:     ptr(revVersion),
+			ApprovalState:       ptr(approvalState),
+			PublishedDocumentID: ptr(publishedDocID),
+			ApprovalInstanceID:  ptr(approvalInstanceID),
+		},
+	}
+	handler := newSpyHandler(spy)
 
+	tenantID := "tenant-4"
+	cdID := "12345678-1111-2222-3333-444444444444"
 	req := newAuthedRequest(t, http.MethodGet,
 		"/api/v1/controlled-documents/"+cdID+"/active-document", tenantID)
 	rec := httptest.NewRecorder()
@@ -1026,35 +998,14 @@ func TestActiveDocument_UnderReview_ReturnsApprovalInstanceID(t *testing.T) {
 	}
 }
 
-func TestActiveDocument_UnderReviewApprovalLookupFailure_Returns500(t *testing.T) {
-	db, mock := newSQLMock(t)
-	handler := newTestHandler(db)
-	defer func() {
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Fatalf("sql expectations: %v", err)
-		}
-	}()
+func TestActiveDocument_ServiceError_Returns500(t *testing.T) {
+	spy := &spyControlledDocumentService{
+		activeInstErr: errors.New("repository error"),
+	}
+	handler := newSpyHandler(spy)
 
 	tenantID := "tenant-5"
 	cdID := "87654321-1111-2222-3333-444444444444"
-	activeDocID := "11111111-aaaa-bbbb-cccc-222222222222"
-	contentHash := "hash-error"
-	revVersion := 6
-	approvalState := "under_review"
-
-	mainRows := sqlmock.NewRows([]string{
-		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
-	}).AddRow(activeDocID, contentHash, revVersion, approvalState, nil)
-	mock.ExpectQuery(`SELECT EXISTS`).
-		WithArgs(tenantID, cdID, "user-1").
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-	mock.ExpectQuery(`SELECT`).
-		WithArgs(tenantID, cdID).
-		WillReturnRows(mainRows)
-	mock.ExpectQuery(`SELECT id::text`).
-		WithArgs(activeDocID, tenantID).
-		WillReturnError(errors.New("approval lookup failed"))
-
 	req := newAuthedRequest(t, http.MethodGet,
 		"/api/v1/controlled-documents/"+cdID+"/active-document", tenantID)
 	rec := httptest.NewRecorder()
@@ -1146,22 +1097,12 @@ func TestGetPreviewCode_MissingParams_400(t *testing.T) {
 // TestActiveDocument_NoneExist_Returns404: no active doc and no published revision —
 // must return 404.
 func TestActiveDocument_NoneExist_Returns404(t *testing.T) {
-	db, mock := newSQLMock(t)
-	handler := newTestHandler(db)
+	// spy returns nil, nil → handler maps to 404.
+	spy := &spyControlledDocumentService{activeInstResult: nil}
+	handler := newSpyHandler(spy)
 
 	tenantID := "tenant-3"
 	cdID := "ffffffff-ffff-ffff-ffff-ffffffffffff"
-
-	mainRows := sqlmock.NewRows([]string{
-		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
-	})
-	mock.ExpectQuery(`SELECT EXISTS`).
-		WithArgs(tenantID, cdID, "user-1").
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-	mock.ExpectQuery(`SELECT`).
-		WithArgs(tenantID, cdID).
-		WillReturnRows(mainRows)
-
 	req := newAuthedRequest(t, http.MethodGet,
 		"/api/v1/controlled-documents/"+cdID+"/active-document", tenantID)
 	rec := httptest.NewRecorder()

@@ -313,6 +313,10 @@ func (f *fakeControlledDocumentRepository) CanRead(_ context.Context, _, _, _ st
 	return f.canRead, nil
 }
 
+func (f *fakeControlledDocumentRepository) GetActiveInstance(_ context.Context, _, _ string) (*controlleddocumentsdomain.ActiveDocumentInstance, error) {
+	return nil, nil
+}
+
 func (f *fakeControlledDocumentRepository) Create(_ context.Context, doc *controlleddocumentsdomain.ControlledDocument) error {
 	copy := *doc
 	f.created = &copy

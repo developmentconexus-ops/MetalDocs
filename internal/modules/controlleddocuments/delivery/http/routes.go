@@ -1,7 +1,6 @@
 package http
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -271,168 +270,51 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 		return
 	}
 	cdID := r.PathValue("id")
-	actorUserID, ok := authn.UserIDFromContext(r.Context())
-	if !ok {
-		h.writeDomainError(w, application.ErrActorMissing)
-		return
-	}
 
-	var canRead bool
-	if err := h.db.QueryRowContext(r.Context(), `
-SELECT EXISTS (
-  SELECT 1
-    FROM controlled_documents cd
-   WHERE cd.tenant_id = $1
-     AND cd.id = $2::uuid
-     AND (
-          cd.visibility_scope = 'company'
-       OR cd.owner_user_id = $3
-       OR (
-            cd.visibility_scope = 'restricted'
-            AND (
-                 EXISTS (
-                   SELECT 1
-                     FROM controlled_document_area_grants cdag
-                    WHERE cdag.tenant_id = cd.tenant_id
-                      AND cdag.controlled_document_id = cd.id
-                      AND EXISTS (
-                        SELECT 1
-                          FROM user_process_areas upa
-                         WHERE upa.tenant_id = cd.tenant_id
-                           AND upa.user_id = $3
-                           AND upa.area_code = cdag.area_code
-                           AND upa.effective_to IS NULL
-                      )
-                 )
-                 OR EXISTS (
-                   SELECT 1
-                     FROM controlled_document_user_grants cdug
-                    WHERE cdug.tenant_id = cd.tenant_id
-                      AND cdug.controlled_document_id = cd.id
-                      AND cdug.user_id = $3
-                 )
-            )
-       )
-     )
-)`, tenantID, cdID, actorUserID).Scan(&canRead); err != nil {
-		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
-		return
-	}
-	if !canRead {
-		httpresponse.WriteError(w, http.StatusNotFound, "NO_ACTIVE_INSTANCE", "no active document instance for this controlled document")
-		return
-	}
-
-	// FULL OUTER JOIN so we get a row whenever either an active doc or a published
-	// doc exists for this controlled document.  If neither exists the query returns
-	// no rows and we 404.
-	var (
-		docID          sql.NullString
-		contentHash    sql.NullString
-		revisionVer    sql.NullInt64
-		approvalState  sql.NullString
-		publishedDocID sql.NullString
-	)
-	err = h.db.QueryRowContext(r.Context(), `
-SELECT active.id,
-       COALESCE(active.content_hash_at_submit,
-                (SELECT r.content_hash FROM document_revisions r
-                  WHERE r.document_id = active.id
-                  ORDER BY r.created_at DESC LIMIT 1)),
-       active.revision_version,
-       active.status,
-       pub.id::text
-  FROM (SELECT id, content_hash_at_submit, revision_version, status
-          FROM documents
-         WHERE tenant_id = $1::uuid
-           AND controlled_document_id = $2::uuid
-           AND status IN ('draft','under_review','approved','rejected','scheduled')
-         LIMIT 1) active
-  FULL OUTER JOIN
-       (SELECT id FROM documents
-         WHERE tenant_id = $1::uuid
-           AND controlled_document_id = $2::uuid
-           AND status = 'published'
-         ORDER BY revision_number DESC
-         LIMIT 1) pub ON TRUE`,
-		tenantID, cdID,
-	).Scan(&docID, &contentHash, &revisionVer, &approvalState, &publishedDocID)
-
+	inst, err := h.svc.GetActiveInstance(r.Context(), tenantID, cdID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			httpresponse.WriteError(w, http.StatusNotFound, "NO_ACTIVE_INSTANCE", "no active document instance for this controlled document")
-			return
-		}
-		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		h.writeDomainError(w, err)
 		return
 	}
-
-	// If both sides are NULL the controlled document simply does not exist.
-	if !docID.Valid && !publishedDocID.Valid {
+	if inst == nil {
 		httpresponse.WriteError(w, http.StatusNotFound, "NO_ACTIVE_INSTANCE", "no active document instance for this controlled document")
 		return
 	}
 
 	var resp controlleddocumentsapi.ActiveDocumentResponse
-	if docID.Valid {
-		id, err := uuid.Parse(docID.String)
+	if inst.DocumentID != nil {
+		parsed, err := uuid.Parse(*inst.DocumentID)
 		if err != nil {
 			httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 			return
 		}
-		resp.DocumentId = &id
+		resp.DocumentId = &parsed
 	}
-	if contentHash.Valid {
-		resp.ContentHash = &contentHash.String
+	if inst.ContentHash != nil {
+		resp.ContentHash = inst.ContentHash
 	}
-	if revisionVer.Valid {
-		v := int(revisionVer.Int64)
-		resp.RevisionVersion = &v
+	if inst.RevisionVersion != nil {
+		resp.RevisionVersion = inst.RevisionVersion
 	}
-	if approvalState.Valid {
-		state := controlleddocumentsapi.ActiveDocumentResponseApprovalState(approvalState.String)
+	if inst.ApprovalState != nil {
+		state := controlleddocumentsapi.ActiveDocumentResponseApprovalState(*inst.ApprovalState)
 		resp.ApprovalState = &state
 	}
-	if publishedDocID.Valid {
-		id, err := uuid.Parse(publishedDocID.String)
+	if inst.PublishedDocumentID != nil {
+		parsed, err := uuid.Parse(*inst.PublishedDocumentID)
 		if err != nil {
 			httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 			return
 		}
-		resp.PublishedDocumentId = &id
+		resp.PublishedDocumentId = &parsed
 	}
-
-	// Approval instance enrichment is only meaningful for under-review documents.
-	if docID.Valid && approvalState.Valid && approvalState.String == string(controlleddocumentsapi.UnderReview) {
-		var approvalInstanceID sql.NullString
-		err := h.db.QueryRowContext(r.Context(), `
-SELECT id::text
-  FROM approval_instances
- WHERE document_id = $1::uuid
-   AND tenant_id = $2::uuid
-   AND status = 'in_progress'
- ORDER BY submitted_at DESC
- LIMIT 1`,
-			docID.String, tenantID,
-		).Scan(&approvalInstanceID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			slog.Error("controlled-documents: active approval instance lookup failed",
-				"controlledDocumentId", id.String(),
-				"documentId", docID.String,
-				"tenantId", tenantID,
-				"error", err,
-			)
+	if inst.ApprovalInstanceID != nil {
+		parsed, err := uuid.Parse(*inst.ApprovalInstanceID)
+		if err != nil {
 			httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 			return
 		}
-		if approvalInstanceID.Valid {
-			id, err := uuid.Parse(approvalInstanceID.String)
-			if err != nil {
-				httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
-				return
-			}
-			resp.ApprovalInstanceId = &id
-		}
+		resp.ApprovalInstanceId = &parsed
 	}
 
 	httpresponse.WriteJSON(w, http.StatusOK, resp)

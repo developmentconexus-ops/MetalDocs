@@ -98,6 +98,10 @@ func (s *moduleTestService) DeleteDocumentComment(context.Context, string, strin
 	return nil
 }
 
+func (s *moduleTestService) GetFinalizePrereqs(context.Context, string, string) (*domain.FinalizePrereqs, error) {
+	return nil, domain.ErrDocumentNotDraft
+}
+
 type moduleFillInService struct{}
 
 func (s *moduleFillInService) SetPlaceholderValue(context.Context, string, string, string, string, string) error {

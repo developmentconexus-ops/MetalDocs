@@ -1668,3 +1668,79 @@ func scanComment(row commentScanner) (*domain.Comment, error) {
 	c.ContentJSON = content
 	return &c, nil
 }
+
+// GetFinalizePrereqs loads all database data required by the finalizeDocument
+// handler in a set of queries sequenced to preserve the original error semantics.
+//
+//   - domain.ErrDocumentNotDraft when no draft document exists for (docID, tenantID)
+//   - domain.ErrProfileNotConfigured when the linked controlled document has no profile
+//   - domain.ErrApprovalRouteMissing when no active route exists for the profile
+func (r *Repository) GetFinalizePrereqs(ctx context.Context, tenantID, docID string) (*domain.FinalizePrereqs, error) {
+	// Step 1: load document revision metadata — must be draft.
+	var revisionVersion, revisionNumber int64
+	var cdID sql.NullString
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT revision_version, revision_number, controlled_document_id::text
+		   FROM documents
+		  WHERE id = $1 AND tenant_id = $2 AND status = 'draft'`,
+		docID, tenantID,
+	).Scan(&revisionVersion, &revisionNumber, &cdID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrDocumentNotDraft
+		}
+		return nil, fmt.Errorf("finalize prereqs: load document: %w", err)
+	}
+
+	// Step 2: load profile_code from the linked controlled document.
+	var profileCode string
+	if cdID.Valid && cdID.String != "" {
+		if err := r.db.QueryRowContext(ctx,
+			`SELECT profile_code FROM controlled_documents WHERE id = $1 AND tenant_id = $2`,
+			cdID.String, tenantID,
+		).Scan(&profileCode); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("finalize prereqs: load profile code: %w", err)
+		}
+	}
+	if profileCode == "" {
+		return nil, domain.ErrProfileNotConfigured
+	}
+
+	// Step 3: find the active approval route for this profile.
+	// Column name is `active` (migration 0146), not `is_active`.
+	var routeID string
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT id FROM approval_routes
+		  WHERE tenant_id    = $1
+		    AND profile_code = $2
+		    AND active       = true
+		  ORDER BY version DESC
+		  LIMIT 1`,
+		tenantID, profileCode,
+	).Scan(&routeID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrApprovalRouteMissing
+		}
+		return nil, fmt.Errorf("finalize prereqs: load approval route: %w", err)
+	}
+
+	// Step 4: retrieve the latest content hash from the most recent autosaved revision.
+	var contentHash string
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT COALESCE(content_hash, '') FROM document_revisions
+		  WHERE document_id = $1
+		  ORDER BY created_at DESC, id DESC LIMIT 1`,
+		docID,
+	).Scan(&contentHash); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("finalize prereqs: load content hash: %w", err)
+	}
+
+	prereqs := &domain.FinalizePrereqs{
+		RevisionVersion:      revisionVersion,
+		RevisionNumber:       revisionNumber,
+		ControlledDocumentID: cdID.String,
+		ProfileCode:          profileCode,
+		RouteID:              routeID,
+		ContentHash:          contentHash,
+	}
+	return prereqs, nil
+}

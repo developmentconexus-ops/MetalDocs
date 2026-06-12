@@ -22,6 +22,7 @@ type controlledDocumentService interface {
 	List(ctx context.Context, tenantID string, filter application.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, bool, error)
 	CreateRevision(ctx context.Context, cmd application.CreateRevisionCmd) (*controlleddocumentsdomain.DocumentRef, error)
 	Get(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error)
+	GetActiveInstance(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ActiveDocumentInstance, error)
 	Obsolete(ctx context.Context, tenantID, id string) error
 	Supersede(ctx context.Context, tenantID, id string) error
 	PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error)

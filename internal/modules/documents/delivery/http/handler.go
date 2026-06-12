@@ -55,6 +55,7 @@ type Service interface {
 	AddDocumentComment(ctx context.Context, tenantID, userID, authorDisplay, documentID string, in domain.CommentCreateInput) (*domain.Comment, error)
 	UpdateDocumentComment(ctx context.Context, tenantID, userID, documentID string, libraryID int, in domain.CommentUpdateInput) (*domain.Comment, error)
 	DeleteDocumentComment(ctx context.Context, tenantID, userID, documentID string, libraryID int) error
+	GetFinalizePrereqs(ctx context.Context, tenantID, docID string) (*domain.FinalizePrereqs, error)
 }
 
 // approvalSubmitter is the subset of the approval submit service used by finalizeDocument.
@@ -505,82 +506,31 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Load document revision version and controlled document ID.
-	var revisionVersion int64
-	var revisionNumber int64
-	var cdID sql.NullString
-	if err := h.db.QueryRowContext(r.Context(),
-		`SELECT revision_version, revision_number, controlled_document_id::text
-		   FROM documents
-		  WHERE id = $1 AND tenant_id = $2 AND status = 'draft'`,
-		docID, tenantID,
-	).Scan(&revisionVersion, &revisionNumber, &cdID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+	prereqs, err := h.svc.GetFinalizePrereqs(r.Context(), tenantID, docID)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrDocumentNotDraft):
 			httpErr(w, http.StatusConflict, problem.CodeStateTransitionInvalid)
-		} else {
+		case errors.Is(err, domain.ErrProfileNotConfigured):
+			httpErrDetail(w, http.StatusBadRequest, problem.CodeValidationError, "controlled document has no profile configured")
+		case errors.Is(err, domain.ErrApprovalRouteMissing):
+			httpErrDetail(w, http.StatusConflict, problem.CodeApprovalRouteMissing, "no active approval route for this profile")
+		default:
+			log.Printf("documents finalize prereqs error: doc_id=%s tenant_id=%s err=%v", docID, tenantID, err)
 			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		}
-		return
-	}
-
-	// Load profile code from controlled document.
-	var profileCode string
-	if cdID.Valid && cdID.String != "" {
-		if err := h.db.QueryRowContext(r.Context(),
-			`SELECT profile_code FROM controlled_documents WHERE id = $1 AND tenant_id = $2`,
-			cdID.String, tenantID,
-		).Scan(&profileCode); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
-			return
-		}
-	}
-	if profileCode == "" {
-		httpErrDetail(w, http.StatusBadRequest, problem.CodeValidationError, "controlled document has no profile configured")
-		return
-	}
-
-	// Find the most recent active approval route for this profile.
-	// Column name is `active` (migration 0146), not `is_active`.
-	var routeID string
-	if err := h.db.QueryRowContext(r.Context(),
-		`SELECT id FROM approval_routes
-		  WHERE tenant_id    = $1
-		    AND profile_code = $2
-		    AND active       = true
-		  ORDER BY version DESC
-		  LIMIT 1`,
-		tenantID, profileCode,
-	).Scan(&routeID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			httpErrDetail(w, http.StatusConflict, problem.CodeApprovalRouteMissing, "no active approval route for profile "+profileCode)
-		} else {
-			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
-		}
-		return
-	}
-
-	// Retrieve the latest content hash from the most recent autosaved revision.
-	var contentHash string
-	if err := h.db.QueryRowContext(r.Context(),
-		`SELECT COALESCE(content_hash, '') FROM document_revisions
-		  WHERE document_id = $1
-		  ORDER BY created_at DESC, id DESC LIMIT 1`,
-		docID,
-	).Scan(&contentHash); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		log.Printf("documents finalize load content hash error: doc_id=%s tenant_id=%s err=%v", docID, tenantID, err)
-		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
 
 	result, err := h.submitSvc.SubmitRevisionForReview(r.Context(), h.db, approvalapp.SubmitRequest{
 		TenantID:        tenantID,
 		DocumentID:      docID,
-		RouteID:         routeID,
+		RouteID:         prereqs.RouteID,
 		SubmittedBy:     actorID,
 		RevisionTitle:   revisionTitle,
-		ContentFormData: map[string]any{"_content_hash": contentHash},
-		RevisionVersion: int(revisionVersion),
-		RevisionNumber:  int(revisionNumber),
+		ContentFormData: map[string]any{"_content_hash": prereqs.ContentHash},
+		RevisionVersion: int(prereqs.RevisionVersion),
+		RevisionNumber:  int(prereqs.RevisionNumber),
 	})
 	if err != nil {
 		status, msg := mapErr(err)
