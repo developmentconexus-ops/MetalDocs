@@ -305,11 +305,11 @@ func (r *Repository) UpdateVersion(ctx context.Context, tenantID string, v *doma
 func (r *Repository) CreateTemplateTx(ctx context.Context, tx db.Tx, t *domain.Template) error {
 	const q = `
 INSERT INTO templates_template (
-	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
-	specific_areas, latest_version, published_version_id, created_by, system_owned, created_at, archived_at
+	id, tenant_id, doc_type_code, key, name, description,
+	latest_version, published_version_id, created_by, system_owned, created_at, archived_at
 ) VALUES (
-	$1, $2::uuid, $3, $4, $5, $6, '{}'::text[], 'public',
-	'{}'::text[], $7, $8, $9, $10, $11, $12
+	$1, $2::uuid, $3, $4, $5, $6,
+	$7, $8, $9, $10, $11, $12
 )`
 	_, err := tx.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,

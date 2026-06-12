@@ -432,8 +432,8 @@ ON CONFLICT (tenant_id, code) DO NOTHING`, tenantID, e2eAreaCode); err != nil {
 	}
 
 	if _, err := tx.ExecContext(ctx, `
-INSERT INTO metaldocs.document_profiles (tenant_id, code, family_code, name, description, review_interval_days, is_active)
-VALUES ($1, $2, $3, 'Seed Profile', 'E2E seed profile', 365, TRUE)
+INSERT INTO metaldocs.document_profiles (tenant_id, code, family_code, name, description, review_interval_days)
+VALUES ($1, $2, $3, 'Seed Profile', 'E2E seed profile', 365)
 ON CONFLICT (tenant_id, code) DO NOTHING`, tenantID, e2eProfileCode, familyCode); err != nil {
 		return fmt.Errorf("seed profile: %w", err)
 	}

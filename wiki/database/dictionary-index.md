@@ -1,6 +1,6 @@
 # Database Dictionary Index
 
-> **Last verified:** 2026-06-12 (F-20e: auth_failure_counters added — migration 0235)
+> **Last verified:** 2026-06-12 (FE-5: migration 0236 dead-schema drop — `document_subjects` table retired; `templates_template.areas/visibility/specific_areas` + `document_profiles.is_active` columns dropped)
 > **Source:** `db/baseline/0001_current_schema.sql`
 
 | Table | Schema | Owner | Page |
@@ -21,7 +21,6 @@
 | `document_profile_template_defaults` | `metaldocs` | taxonomy | `wiki/database/tables/document_profile_template_defaults.md` |
 | `document_profiles` | `metaldocs` | taxonomy | `wiki/database/tables/document_profiles.md` |
 | `document_sequences` | `metaldocs` | unknown-owner | `wiki/database/tables/document_sequences.md` |
-| `document_subjects` | `metaldocs` | taxonomy | `wiki/database/tables/document_subjects.md` |
 | `document_template_assignments` | `metaldocs` | templates | `wiki/database/tables/document_template_assignments.md` |
 | `document_template_versions` | `metaldocs` | templates | `wiki/database/tables/document_template_versions.md` |
 | `document_template_versions_mddm` | `metaldocs` | templates | `wiki/database/tables/document_template_versions_mddm.md` |

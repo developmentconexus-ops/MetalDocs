@@ -3,6 +3,7 @@
 > **Source:** `db/baseline/0001_current_schema.sql` + `db/migrations/0213_templates_tenant_id_uuid.sql`
 > **Schema:** `public`
 > **Owner:** templates
+> **Last verified:** 2026-06-12 (migration 0236 — `areas`/`visibility`/`specific_areas` dropped as dead schema; `CreateTemplateTx` and `db/reference-data/0001` stopped writing them in the same change; baseline file unchanged, columns removed by the forward migration)
 
 ## Purpose
 Current curated-baseline table owned by `templates`. See the owning module wiki and runtime repositories for business behavior.
@@ -17,9 +18,6 @@ Current curated-baseline table owned by `templates`. See the owning module wiki 
 | `key` | `text` | no | Baseline column. |
 | `name` | `text` | no | Baseline column. |
 | `description` | `text` | no | Baseline column. |
-| `areas` | `text[]` | no | Baseline column. |
-| `visibility` | `text` | no | Baseline column. |
-| `specific_areas` | `text[]` | no | Baseline column. |
 | `latest_version` | `integer` | no | Baseline column. |
 | `published_version_id` | `uuid` | yes | Baseline column. |
 | `created_by` | `text` | no | Baseline column. |

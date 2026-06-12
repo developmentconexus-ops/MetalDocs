@@ -3,6 +3,7 @@
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `metaldocs`
 > **Owner:** taxonomy
+> **Last verified:** 2026-06-12 (migration 0236 — `is_active` dropped as dead schema, superseded by `archived_at`; baseline file unchanged, the column is removed by the forward migration)
 
 ## Purpose
 Current curated-baseline table owned by `taxonomy`. See the owning module wiki and runtime repositories for business behavior.
@@ -16,7 +17,6 @@ Current curated-baseline table owned by `taxonomy`. See the owning module wiki a
 | `name` | `text` | no | Baseline column. |
 | `description` | `text` | no | Baseline column. |
 | `review_interval_days` | `integer` | no | Baseline column. |
-| `is_active` | `boolean` | no | Baseline column. |
 | `created_at` | `timestamp with time zone` | no | Baseline column. |
 | `alias` | `text` | no | Baseline column. |
 | `tenant_id` | `uuid` | no | Baseline column. |

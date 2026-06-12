@@ -139,8 +139,8 @@ SELECT set_config(
 );
 
 INSERT INTO public.templates_template (
-  id, tenant_id, doc_type_code, key, name, description, areas, visibility,
-  specific_areas, latest_version, published_version_id, created_by, system_owned, archived_at
+  id, tenant_id, doc_type_code, key, name, description,
+  latest_version, published_version_id, created_by, system_owned, archived_at
 ) VALUES (
   '00000000-0000-0000-0000-000000000101'::uuid,
   'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid,
@@ -148,9 +148,6 @@ INSERT INTO public.templates_template (
   '__system_blank__',
   'Em branco',
   'System blank template for controlled document creation.',
-  ARRAY[]::text[],
-  'internal',
-  ARRAY[]::text[],
   1,
   NULL,
   'system',
