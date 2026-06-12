@@ -108,6 +108,8 @@ Auth is the highest-risk location: failed-login, session errors, and middleware 
 
 **Stage-2 question:** Is the full request path — including auth — now log-correlation-safe?
 
+**Deferred (Wave F sweep, 2026-06-12):** low severity; not pulled into a Stage-2 master verdict (subsumed by the RF-1 observability-depth pass). The Wave 1.1 chain reorder added trace-ID-tagged structured `slog` on the request path and principal attribution across the authn boundary, so the highest-risk lines (login/middleware rejections) are now correlation-safe via `http_request` slog. Residual `log.Printf` call sites in auth/approval handlers + `platform/objectstore` are cosmetic. **Trigger:** next touch of those handlers, or the RF-1 OTel/observability-depth program (same trigger as [F-17] — "second host or first external-tenant SLA").
+
 ---
 
 ## F-03 — Parallel Contract Surface (spec2.yaml / internal/api/v2)
@@ -168,6 +170,8 @@ A secondary defect: `startOutboxWorker` has a restart loop that is dead code —
 | startOutboxWorker restart loop is dead code | `apps/api/cmd/metaldocs-api/main.go:462-486`; `internal/modules/render/fanout/pdf_outbox_worker.go:41`; `internal/modules/render/fanout/materialize_outbox_worker.go:40` |
 
 **Stage-2 question:** Extract shared generic outbox worker/repo or collapse to one table?
+
+**Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict SIMPLIFY, P2 (DRY / Go generics; RF-7). No correctness defect — the duplication is structural debt, not a bug; the two-stage relay was runtime-verified working in Wave F F.3 (worker claimed a `pdf_dispatch_outbox` row and relayed it to `outbox_events`). The `F-04-dead-loop` sub-item (dead restart loop in `startOutboxWorker`, DELETE/P3) rides the same trigger. **Trigger:** next time `render/fanout` is touched — extract `StagingOutboxWorker[R]`/`StagingOutboxRepository[R]` generics and delete the dead loop then.
 
 ---
 
@@ -496,6 +500,8 @@ Identical private helper functions have been independently re-implemented in mul
 
 **Stage-2 question:** Consolidate parseBoolEnv/splitCSV into one platform/config utility?
 
+**Deferred (Wave F sweep, 2026-06-12):** split Stage-2 verdict — `parseBoolEnv` semantic-drift consolidation is SIMPLIFY/P3 (export `ParseBoolEnv` with 4-value POSIX semantics, update 2 callers); `splitCSV` duplication is **KEEP** (Go proverb "a little copying is better than a little dependency" — two identical 5-line copies, no divergence risk worth a shared dep). **Trigger (parseBoolEnv only):** next time either caller (`platform/config/attachments.go` or `platform/authn/config.go`) is touched.
+
 ---
 
 ## F-16 — Server Timeout and Graceful-Shutdown Gaps
@@ -543,6 +549,8 @@ A secondary defect: `normalizeRoute` only covers 5 path patterns; all other rout
 | httpObs creates a trace ID internally but it is process-local only (no W3C propagation) | `internal/platform/observability/http.go:61-65` |
 
 **Stage-2 question:** What is the minimum instrumentation set to satisfy REQ-OBS-3?
+
+**Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict REFACTOR, P2 — but **trigger-gated by design (D-1)**: a full OTel/OTLP pipeline today would be over-engineering for the single-server Docker-Compose deployment. The interim bar (structured logs + propagated request IDs) is met by Wave 1.1 (trace-ID-tagged `slog`, principal attribution, RED metrics at `/api/v1/metrics` — all runtime-verified in Wave F F.3). **Trigger:** "second host or first external-tenant SLA" (D-1) / an infrastructure decision on an OTLP backend. Then: `otelhttp.NewHandler` auto-instrumentation, W3C `traceparent` replacing `X-Trace-Id`, `autoexport` OTLP. This is the headline Wave 3 item (RF-1).
 
 ---
 
@@ -643,6 +651,8 @@ Each of `buildMinioClients:158-178` (internal + public presigning clients) and `
 
 **Location:** `internal/platform/bootstrap/api.go:85-103, 158-178`
 
+**Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict SIMPLIFY, P2. No correctness defect — `minio-go` v7 clients are goroutine-safe; three clients from the same credentials is wasteful, not wrong. **Trigger:** next time bootstrap wiring is touched — change `miniostore.NewStore` to accept a `*minio.Client` and pass the internal client from `buildMinioClients` (3 → 2).
+
 ### D-03: 405 Method Not Allowed returned as bare status with no RFC 9457 body in two modules
 
 Both the search module (`internal/modules/search/delivery/http/handler.go:55-57`) and the security module (`internal/modules/security/delivery/http/handler.go:37-39, 58-60, 98-100`) return a bare `405` status with no `problem+json` body. Every other error path in both modules uses `problem.Write` / `httpresponse.WriteError`. This is a cross-module consistency defect affecting the same response type (REQ-H-2).
@@ -663,6 +673,8 @@ Both the search module (`internal/modules/search/delivery/http/handler.go:55-57`
 
 **Location:** `internal/platform/cache/.gitkeep`; `internal/modules/iam/application/cached_role_provider.go:80-83`
 
+**Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict REFACTOR, P2 — doc-only (REQ-CACHE-1). The empty `platform/cache` scaffold was deleted in Wave 1.9; the only production cache (`CachedRoleProvider`, in-process `sync.Map` TTL) works correctly but lacks a written contract (TTL, invalidation, staleness bound, failure behavior). No code change — a `// CacheContract:` doc block. **Trigger:** before the next IAM-module feature touch.
+
 ### D-06: `cmd/` root vs `apps/*/cmd/` — two binary entrypoint conventions
 
 `cmd/seed-test-document/` lives at the repository root under `cmd/`, while all active binaries live under `apps/<name>/cmd/<binary>/`. `go build ./...` traverses both locations. The `cmd/` root convention is a Go standard-library holdover; the `apps/` convention is MetalDocs-canonical. The only inhabitant of the root `cmd/` is the dead seed binary flagged in F-18.
@@ -674,6 +686,8 @@ Both the search module (`internal/modules/search/delivery/http/handler.go:55-57`
 ### D-07: Domain status enum fragmentation across modules
 
 `internal/modules/documents/domain/model.go:8-13` defines only 3 of 8 live `DocumentStatus` values; the remaining 5 (approved, published, superseded, obsolete, scheduled, rejected) exist only in `api.gen.go`. In the taxonomy module, `document_profiles.is_active` was superseded by `archived_at` (migration 0122) but the orphaned column and default remain. Both patterns represent the same root cause: incremental migration with no cleanup of the original type surface.
+
+**Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict SIMPLIFY, P2. The `DocumentStatus` enum gap is cosmetic — the full status set is enforced at the DB via the `public.documents.status` CHECK constraint (verified live in Wave F F.3: `draft/finalized/archived/under_review/approved/rejected/scheduled/published/superseded/obsolete`), so the 6 missing Go constants are a type-surface convenience, not a correctness gap. The `document_profiles.is_active` half was resolved by migration 0236 (Wave 2.13, F-14 tail). **Trigger:** next documents-domain touch — add the 6 `DocumentStatus` constants to `documents/domain/model.go` and convert string-literal callsites.
 
 ---
 
@@ -704,6 +718,12 @@ The following low-severity items are informational and do not fit cleanly into a
 ## Legacy & open flags
 
 This document is itself the legacy register. Wave 0–2 resolutions are marked inline per finding; entries without a resolution note remain open as of the Last verified date. Closed items carry a bolded `**Resolution (...)**` paragraph citing wave, date, and commit(s). Partially resolved items state the residual and its Wave 3 trigger or next-touch condition.
+
+**Wave F sweep (2026-06-12) — every F-*/D-* entry now carries a resolution note (commit) or an explicit deferral with a written trigger; no silent leftovers.** Disposition tally (24 families):
+- **Resolved (commit cited):** F-01, F-03, F-05, F-07, F-08, F-09 (raw-codes half), F-10, F-11 (3 confirmed violations), F-13 (a/b), F-14 (named set + 0236 tail), F-16 (timeouts half), F-18, F-19 (all 3 defects), F-20e; D-01, D-03, D-04, D-06.
+- **Partially resolved (residual + trigger):** F-06 (4 of 9; F-06e + security-JOIN + standalone-CD-repo → next-touch/Wave 3), F-09 (finalize-inline KEEP / TTL P3 / tenant_id-FK→F-12), F-12 (CD+audit_events done; iam_users→RF-6; rest→first-external-tenant), F-13 (c/d→next regen, e→merge-conflict).
+- **Deferred (Wave 3 / next-touch, trigger written this sweep):** F-02 (RF-1/handler-touch), F-04 (render/fanout touch), F-15 (parseBoolEnv next-caller-touch; splitCSV KEEP), F-17 (D-1 "second host or first external-tenant SLA"), F-20 sub-items (F-20b >50k rows/p95>200ms; F-20f KEEP); D-02 (bootstrap-touch), D-05 (next IAM feature), D-07 (next documents-domain touch).
+- **Informational appendix flags** (no family ID) are out of the F-*/D-* sweep scope by definition and remain advisory.
 
 See [../architecture/backend-blueprint.md](../architecture/backend-blueprint.md) for the maturity scoreboard that this register feeds into, and [../architecture/backend-target-architecture.md](../architecture/backend-target-architecture.md) for the normative requirements each family must satisfy before closure.
 
