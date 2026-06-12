@@ -39,12 +39,6 @@ func NewFillInService(db *sql.DB, s SchemaReader, w FillInWriter) *FillInService
 	return &FillInService{db: db, schemas: s, writer: w}
 }
 
-// NewFillInServiceNoAuthz is a TEST-ONLY constructor that skips capability checks.
-// Never use in production wiring — authz bypass is intentional and audited here.
-func NewFillInServiceNoAuthz(s SchemaReader, w FillInWriter) *FillInService {
-	return &FillInService{schemas: s, writer: w}
-}
-
 // WithIAMReader attaches an IAMUserOptionsReader for validating user-typed placeholders.
 func (s *FillInService) WithIAMReader(r IAMUserOptionsReader) *FillInService {
 	s.iam = r
@@ -97,10 +91,8 @@ func parsePlaceholderSchema(raw []byte) ([]templatesdomain.Placeholder, error) {
 }
 
 func (s *FillInService) SetPlaceholderValue(ctx context.Context, tenantID, actorID, revisionID, placeholderID, raw string) error {
-	if s.db != nil {
-		if err := requireDocEditDraft(ctx, s.db, tenantID, actorID, revisionID); err != nil {
-			return err
-		}
+	if err := requireDocEditDraft(ctx, s.db, tenantID, actorID, revisionID); err != nil {
+		return err
 	}
 	schema, err := s.schemas.LoadPlaceholderSchema(ctx, tenantID, revisionID)
 	if err != nil {

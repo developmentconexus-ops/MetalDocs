@@ -2,8 +2,11 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
+
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
@@ -35,10 +38,44 @@ func (f *fakeFillInWriter) UpsertValue(_ context.Context, v repository.Placehold
 	return nil
 }
 
+// newPermissiveFillInDB returns a sqlmock *sql.DB that satisfies the
+// requireDocEditDraft authz sequence (BeginTx → SeedTxIdentity GUC EXECs →
+// LoadDocumentAreaCode 2-arg query → authz.Require GUC reads + EXISTS).
+// Mirrors the established newPermissiveMockDB pattern from
+// controlleddocuments/delivery/http/routes_contract_test.go.
+func newPermissiveFillInDB(t *testing.T) *sql.DB {
+	t.Helper()
+	anyMatcher := sqlmock.QueryMatcherFunc(func(_, _ string) error { return nil })
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(anyMatcher))
+	if err != nil {
+		t.Fatalf("newPermissiveFillInDB: sqlmock.New: %v", err)
+	}
+	mock.MatchExpectationsInOrder(false)
+	t.Cleanup(func() { _ = mockDB.Close() })
+	for i := 0; i < 20; i++ {
+		mock.ExpectBegin()
+		mock.ExpectCommit()
+	}
+	for i := 0; i < 100; i++ {
+		mock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	for i := 0; i < 10; i++ {
+		mock.ExpectQuery("").
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	}
+	for i := 0; i < 10; i++ {
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("user-1"))
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("tenant-1"))
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow(""))
+	}
+	return mockDB
+}
+
 func TestFillInService_ValueRejectedIfFailsRegex(t *testing.T) {
 	re := "^[A-Z]{3}$"
 	schema := []templatesdomain.Placeholder{{ID: "p1", Type: templatesdomain.PHText, Regex: &re}}
-	svc := NewFillInServiceNoAuthz(fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{})
+	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{})
 	err := svc.SetPlaceholderValue(context.Background(), "tenant", "actor", "rev", "p1", "abc")
 	if !errors.Is(err, v2domain.ErrValidationFailed) {
 		t.Fatalf("got %v", err)
@@ -49,7 +86,7 @@ func TestFillInService_ValueAcceptedIfMatches(t *testing.T) {
 	re := "^[A-Z]{3}$"
 	schema := []templatesdomain.Placeholder{{ID: "p1", Type: templatesdomain.PHText, Regex: &re}}
 	writer := &fakeFillInWriter{}
-	svc := NewFillInServiceNoAuthz(fakeSchemaReader{placeholders: schema}, writer)
+	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{placeholders: schema}, writer)
 	if err := svc.SetPlaceholderValue(context.Background(), "tenant", "actor", "rev", "p1", "ABC"); err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +132,7 @@ func TestFillInService_SetPlaceholderValue_ValidationMatrix(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			writer := &fakeFillInWriter{}
-			svc := NewFillInServiceNoAuthz(fakeSchemaReader{placeholders: schema}, writer)
+			svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{placeholders: schema}, writer)
 			err := svc.SetPlaceholderValue(context.Background(), "tenant", "actor", "rev", tc.placeholderID, tc.value)
 			if tc.wantErr {
 				if !errors.Is(err, v2domain.ErrValidationFailed) {
@@ -129,7 +166,7 @@ func TestFillInService_UserPlaceholder_KnownUser_Accepted(t *testing.T) {
 	iam := &fakeIAMOptionsReader{opts: []UserOption{
 		{UserID: "u1", DisplayName: "Alice"},
 	}}
-	svc := NewFillInServiceNoAuthz(fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{}).
+	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{}).
 		WithIAMReader(iam)
 
 	if err := svc.SetPlaceholderValue(context.Background(), "t", "actor", "r", "p-user", "u1"); err != nil {
@@ -142,7 +179,7 @@ func TestFillInService_UserPlaceholder_UnknownUser_Returns422(t *testing.T) {
 	iam := &fakeIAMOptionsReader{opts: []UserOption{
 		{UserID: "u1", DisplayName: "Alice"},
 	}}
-	svc := NewFillInServiceNoAuthz(fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{}).
+	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{}).
 		WithIAMReader(iam)
 
 	err := svc.SetPlaceholderValue(context.Background(), "t", "actor", "r", "p-user", "unknown-uid")
@@ -152,7 +189,7 @@ func TestFillInService_UserPlaceholder_UnknownUser_Returns422(t *testing.T) {
 }
 
 func TestFillInService_GetPlaceholderValues_RequiresReader(t *testing.T) {
-	svc := NewFillInServiceNoAuthz(fakeSchemaReader{}, &fakeFillInWriter{})
+	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{}, &fakeFillInWriter{})
 
 	_, err := svc.GetPlaceholderValues(context.Background(), "tenant", "doc")
 	if err == nil {
@@ -161,7 +198,7 @@ func TestFillInService_GetPlaceholderValues_RequiresReader(t *testing.T) {
 }
 
 func TestFillInService_GetFillInSchema_RequiresSchemaReader(t *testing.T) {
-	svc := NewFillInServiceNoAuthz(fakeSchemaReader{}, &fakeFillInWriter{})
+	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{}, &fakeFillInWriter{})
 
 	_, err := svc.GetFillInSchema(context.Background(), "tenant", "doc")
 	if err == nil {
