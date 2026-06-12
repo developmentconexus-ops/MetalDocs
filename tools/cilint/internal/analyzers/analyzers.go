@@ -46,6 +46,8 @@ func RunAll(targets []string) []Finding {
 	out = append(out, OutboxPair(files)...)
 	out = append(out, PlatformBoundary(files)...)
 	out = append(out, PostCommitAudit(files)...)
+	out = append(out, NoSQLTxInDomain(files)...)
+	out = append(out, NoDualMode(files)...)
 	return out
 }
 

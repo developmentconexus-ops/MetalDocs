@@ -175,7 +175,11 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 		return domain.ExportJob{}, fmt.Errorf("audit: persist export job: %w", err)
 	}
 
-	if s.writer != nil {
+	// Export-requested governance event. s.writer is nil only when the audit
+	// export feature is disabled (WithExports not called) — a feature gate, not
+	// a single-mode db fallback. Making writer a hard ctor requirement (and
+	// gating the feature elsewhere) is a next-touch refactor of WithExports.
+	if s.writer != nil { //cilint:allow-dualmode
 		summary := map[string]any{
 			"format":        string(format),
 			"filterSummary": filterSummary(filter),

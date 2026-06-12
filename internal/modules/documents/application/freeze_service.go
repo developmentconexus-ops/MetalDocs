@@ -172,7 +172,10 @@ func (s *FreezeService) pinValidateAndHash(
 	if err != nil {
 		return nil, nil, fmt.Errorf("decode values_hash: %w", err)
 	}
-	if tx != nil {
+	// Optional-tx enlistment (ADR-0015 async freeze split): both branches perform
+	// the freeze write; tx is the in-tx "Pin" path, nil the standalone async path.
+	// Not a single-mode db fallback. Deferred at 2.11; in-tx-only is next-touch.
+	if tx != nil { //cilint:allow-dualmode
 		if err := s.finalize.WriteFreeze(ctx, tenantID, revisionID, hashBytes, time.Now().UTC(), tx); err != nil {
 			return nil, nil, err
 		}
@@ -305,7 +308,10 @@ func (s *FreezeService) Freeze(ctx context.Context, tx db.Tx, tenantID, revision
 		valuesFrozenAt *time.Time
 		err            error
 	)
-	if tx != nil {
+	// Optional-tx enlistment (ADR-0015 async freeze split): both branches read
+	// the snapshot; tx is the in-tx "Pin" path, nil the standalone async path.
+	// Not a single-mode db fallback. Deferred at 2.11; in-tx-only is next-touch.
+	if tx != nil { //cilint:allow-dualmode
 		snap, valuesFrozenAt, err = s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, revisionID, tx)
 	} else {
 		snap, valuesFrozenAt, err = s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, revisionID)
@@ -367,7 +373,10 @@ func (s *FreezeService) Freeze(ctx context.Context, tx db.Tx, tenantID, revision
 	if err != nil {
 		return fmt.Errorf("decode content_hash: %w", err)
 	}
-	if tx != nil {
+	// Optional-tx enlistment (ADR-0015 async freeze split): both branches write
+	// the final docx; tx is the in-tx "Pin" path, nil the standalone async path.
+	// Not a single-mode db fallback. Deferred at 2.11; in-tx-only is next-touch.
+	if tx != nil { //cilint:allow-dualmode
 		return s.finalDocx.WriteFinalDocx(ctx, tenantID, revisionID, resp.FinalDocxS3Key, contentHashBytes, tx)
 	}
 	return s.finalDocx.WriteFinalDocx(ctx, tenantID, revisionID, resp.FinalDocxS3Key, contentHashBytes)
