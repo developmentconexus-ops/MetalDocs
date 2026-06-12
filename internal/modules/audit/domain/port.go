@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Event struct {
@@ -144,7 +146,7 @@ const (
 // exports are written with status=ready in the same transaction.
 type ExportJob struct {
 	ID            string
-	TenantID      string
+	TenantID      uuid.UUID
 	ActorID       string
 	Format        ExportFormat
 	FilterJSON    string

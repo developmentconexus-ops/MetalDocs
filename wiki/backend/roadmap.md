@@ -1,7 +1,7 @@
 # Backend Professionalization — Execution Roadmap (LIVING TRACKER)
 
 > **Status:** ACTIVE · Waves 0–1 executed — awaiting user review gate before Wave 2
-> **Last updated:** 2026-06-11 (Wave 1 session close)
+> **Last updated:** 2026-06-11 (Wave 2.3: RLS + ExportJob.TenantID uuid)
 > **NOTE:** the 0.4 history rewrite (2026-06-11) changed every commit hash in the repo. Hashes below are the REWRITTEN ones. Any other clone of this repo must be re-cloned.
 > **Contract:** [`docs/superpowers/specs/2026-06-11-backend-professionalization-design.md`](../../docs/superpowers/specs/2026-06-11-backend-professionalization-design.md) (decisions D-1..D-5, protocol)
 > **Verdicts:** [`stage2-evaluation.md`](stage2-evaluation.md) · **Evidence:** [`legacy-register.md`](legacy-register.md)
@@ -62,7 +62,7 @@
 |---|------|----------|--------|--------|------------------|
 | 2.1 | **ADR 0027** — auth_identities tenant-global by design; RLS sequencing (write BEFORE 2.3) | D-3, F-12 | ✅ | pending (wave-close backfill) | `wiki/decisions/0027-rls-adoption-sequencing.md`: T-008 closed by-design; RLS sequencing recorded (Wave 2.3 = controlled_documents+audit_events, RF-6 = iam_users, trigger-gated = remaining tables); GUC `metaldocs.tenant_id` confirmed |
 | 2.2 | In-tx audit/governance writes (`RecordTx`/`LogTx`) across taxonomy/templates/documents-core + **CI guard vs post-commit audit calls** | F-07, D-01, D-2 | ✅ | `go build ./...` ✓ · `go vet ./...` ✓ · all targeted tests green · cilint exit 0 | `GovernanceLogger.LogTx(*sql.Tx)` added; taxonomy/templates/documents/controlleddocuments violations fixed; `PostCommitAudit` cilint analyzer added + 8 unit tests; `//cilint:allow-post-commit-audit` for legitimate no-tx else-branches |
-| 2.3 | RLS on `controlled_documents` + `audit_events`; `ExportJob.TenantID` → uuid.UUID | F-12 | ⏸ on 2.1 | | rest of tables ➖ trigger: first external tenant |
+| 2.3 | RLS on `controlled_documents` + `audit_events`; `ExportJob.TenantID` → uuid.UUID | F-12 | ✅ | pending (wave-close backfill) | Migration `0234`: ENABLE+FORCE RLS + NULL-permissive `tenant_isolation` policy on both tables. Owner/BYPASSRLS audit: `metaldocs_app` is superuser in dev → policies active only when `NOSUPERUSER+NOBYPASSRLS` production constraint is met (ADR 0022 §Item 7 + ADR 0027). Runtime proof (NOSUPERUSER `rls_test_role`): GUC-unset→both tenants visible; GUC=tenant-A→only A rows; GUC=tenant-B→only B rows (psql verified). `ExportJob.TenantID` changed `string→uuid.UUID` to match `audit_export_jobs.tenant_id uuid NOT NULL`; 3 compile sites fixed + test UUIDs updated. `go build ./...` ✓ · `go test ./internal/modules/audit/... ./internal/modules/controlleddocuments/...` all green. rest of tables ➖ trigger: first external tenant |
 | 2.4 | Capability literals: resolve `"template.admin"`; typed EventType consts; tier-1/2 pairing audit (ADR 0028 only if new cap minted) | F-11 | ☐ | | ask user if new capability needed |
 | 2.5 | Extract delivery-layer raw SQL (CD routes.go, documents handler.go) to repositories | F-06b | ☐ | | |
 | 2.6 | auth → iam_users write via `LoginContextPort` | F-06c | ☐ | | |

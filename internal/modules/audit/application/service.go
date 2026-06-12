@@ -150,10 +150,15 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 		return domain.ExportJob{}, fmt.Errorf("audit: marshal filter: %w", err)
 	}
 
+	tenantUUID, err := uuid.Parse(normalizedSizing.TenantID)
+	if err != nil {
+		return domain.ExportJob{}, fmt.Errorf("audit: invalid tenant id %q: %w", normalizedSizing.TenantID, err)
+	}
+
 	now := s.now()
 	job := domain.ExportJob{
 		ID:            uuid.NewString(),
-		TenantID:      normalizedSizing.TenantID,
+		TenantID:      tenantUUID,
 		ActorID:       actorID,
 		Format:        format,
 		FilterJSON:    string(filterJSON),
@@ -178,7 +183,7 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 			"actualRows":    job.ActualRows,
 			"export_id":      job.ID,
 		}
-		if event, evErr := domain.NewEvent(job.TenantID, "audit_export", job.ID, actorID, "audit.export.requested", summary); evErr == nil {
+		if event, evErr := domain.NewEvent(job.TenantID.String(), "audit_export", job.ID, actorID, "audit.export.requested", summary); evErr == nil {
 			_ = s.writer.Record(ctx, event)
 		}
 	}

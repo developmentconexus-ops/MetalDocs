@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"metaldocs/internal/modules/audit/application"
 	httpdelivery "metaldocs/internal/modules/audit/delivery/http"
 	"metaldocs/internal/modules/audit/domain"
@@ -143,11 +145,16 @@ func TestAuditHandler_CursorPagination(t *testing.T) {
 func TestAuditHandler_ExportCSVThenDownloadIsTenantScoped(t *testing.T) {
 	t.Parallel()
 
+	// Use valid UUIDs — ExportJob.TenantID is uuid.UUID (matches the DB column
+	// type), so the export service parses the tenantID from context as a UUID.
+	tenantA := uuid.MustParse("aaaaaaaa-0000-0000-0000-000000000001")
+	tenantB := uuid.MustParse("bbbbbbbb-0000-0000-0000-000000000001")
+
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	events := []domain.Event{
-		{ID: "evt-1", OccurredAt: now, ActorID: "alice", Action: "doc.create", ResourceType: "document", ResourceID: "d1", PayloadJSON: `{"k":"v"}`, TenantID: "tenant-a"},
-		{ID: "evt-2", OccurredAt: now.Add(time.Second), ActorID: "bob", Action: "doc.create", ResourceType: "document", ResourceID: "d2", PayloadJSON: `{"k":"v2"}`, TenantID: "tenant-a"},
-		{ID: "evt-x", OccurredAt: now, ActorID: "carol", Action: "doc.create", ResourceType: "document", ResourceID: "dx", PayloadJSON: `{}`, TenantID: "tenant-b"},
+		{ID: "evt-1", OccurredAt: now, ActorID: "alice", Action: "doc.create", ResourceType: "document", ResourceID: "d1", PayloadJSON: `{"k":"v"}`, TenantID: tenantA.String()},
+		{ID: "evt-2", OccurredAt: now.Add(time.Second), ActorID: "bob", Action: "doc.create", ResourceType: "document", ResourceID: "d2", PayloadJSON: `{"k":"v2"}`, TenantID: tenantA.String()},
+		{ID: "evt-x", OccurredAt: now, ActorID: "carol", Action: "doc.create", ResourceType: "document", ResourceID: "dx", PayloadJSON: `{}`, TenantID: tenantB.String()},
 	}
 	svc, _ := newExportService(t, events)
 	handler := httpdelivery.NewHandler(svc).WithExporter(svc)
@@ -155,7 +162,7 @@ func TestAuditHandler_ExportCSVThenDownloadIsTenantScoped(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, authedRequest(t, http.MethodPost, "/api/v1/audit/events/export", "tenant-a", "actor-test", `{"format":"csv","filter":{}}`))
+	mux.ServeHTTP(rec, authedRequest(t, http.MethodPost, "/api/v1/audit/events/export", tenantA.String(), "actor-test", `{"format":"csv","filter":{}}`))
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("export status = %d (%s)", rec.Code, rec.Body.String())
 	}
@@ -184,7 +191,7 @@ func TestAuditHandler_ExportCSVThenDownloadIsTenantScoped(t *testing.T) {
 	if strings.Count(bodyStr, "\n") < 3 {
 		t.Fatalf("csv shorter than expected (need header + 2 rows): %q", bodyStr)
 	}
-	if strings.Contains(bodyStr, "tenant-b") || strings.Contains(bodyStr, "carol") || strings.Contains(bodyStr, "evt-x") {
+	if strings.Contains(bodyStr, tenantB.String()) || strings.Contains(bodyStr, "carol") || strings.Contains(bodyStr, "evt-x") {
 		t.Fatalf("csv leaked tenant-b row: %q", bodyStr)
 	}
 }
@@ -201,8 +208,12 @@ func TestAuditHandler_ExportJobActorScoped(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
+	// Use a fixed valid UUID for the tenant — "tenant-a" was a placeholder that
+	// predates the uuid.UUID type change (ExportJob.TenantID is now uuid.UUID to
+	// match the DB column type). The test validates actor scoping, not tenant parsing.
+	tenantUUID := uuid.MustParse("aaaaaaaa-0000-0000-0000-000000000001")
 	other := domain.ExportJob{
-		ID: "exp-other", TenantID: "tenant-a", ActorID: "someone-else",
+		ID: "exp-other", TenantID: tenantUUID, ActorID: "someone-else",
 		Format: domain.ExportFormatCSV, FilterJSON: `{}`, Status: domain.ExportStatusReady,
 		DownloadToken: "tok-other", ExpiresAt: now.Add(time.Hour), CreatedAt: now,
 	}
@@ -210,7 +221,7 @@ func TestAuditHandler_ExportJobActorScoped(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, authedRequest(t, http.MethodGet, "/api/v1/audit/events/export/exp-other", "tenant-a", "actor-test", ""))
+	mux.ServeHTTP(rec, authedRequest(t, http.MethodGet, "/api/v1/audit/events/export/exp-other", tenantUUID.String(), "actor-test", ""))
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 for cross-actor lookup, got %d (%s)", rec.Code, rec.Body.String())
 	}

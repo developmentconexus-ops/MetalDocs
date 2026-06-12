@@ -28,7 +28,7 @@ func (r *ExportJobRepository) Get(_ context.Context, tenantID, exportID string) 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	job, ok := r.jobs[exportID]
-	if !ok || job.TenantID != tenantID {
+	if !ok || job.TenantID.String() != tenantID {
 		return domain.ExportJob{}, domain.ErrExportJobNotFound
 	}
 	return job, nil
