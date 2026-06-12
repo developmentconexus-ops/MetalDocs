@@ -3,6 +3,8 @@ package domain
 import (
 	"context"
 	"time"
+
+	"metaldocs/internal/platform/db"
 )
 
 // ActiveDocumentInstance is the result of a GetActiveInstance repository query.
@@ -38,9 +40,9 @@ type ControlledDocumentRepository interface {
 
 	// Write operations.
 	Create(ctx context.Context, doc *ControlledDocument) error
-	CreateTx(ctx context.Context, tx DBTX, doc *ControlledDocument) error
+	CreateTx(ctx context.Context, tx db.Tx, doc *ControlledDocument) error
 	UpdateStatus(ctx context.Context, tenantID, id string, status CDStatus, updatedAt time.Time) error
-	UpdateStatusTx(ctx context.Context, tx DBTX, tenantID, id string, status CDStatus, updatedAt time.Time) error
+	UpdateStatusTx(ctx context.Context, tx db.Tx, tenantID, id string, status CDStatus, updatedAt time.Time) error
 }
 
 type CDFilter struct {

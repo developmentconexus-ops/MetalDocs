@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -350,7 +351,7 @@ func (r *PostgresControlledDocumentRepository) Create(ctx context.Context, doc *
 	return nil
 }
 
-func (r *PostgresControlledDocumentRepository) CreateTx(ctx context.Context, tx controlleddocumentsdomain.DBTX, doc *controlleddocumentsdomain.ControlledDocument) error {
+func (r *PostgresControlledDocumentRepository) CreateTx(ctx context.Context, tx db.Tx, doc *controlleddocumentsdomain.ControlledDocument) error {
 	if tx == nil {
 		return errors.New("nil transaction")
 	}
@@ -447,7 +448,7 @@ func (r *PostgresControlledDocumentRepository) UpdateStatus(ctx context.Context,
 	return nil
 }
 
-func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Context, tx controlleddocumentsdomain.DBTX, tenantID, id string, status controlleddocumentsdomain.CDStatus, updatedAt time.Time) error {
+func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Context, tx db.Tx, tenantID, id string, status controlleddocumentsdomain.CDStatus, updatedAt time.Time) error {
 	res, err := tx.ExecContext(ctx,
 		`UPDATE controlled_documents SET status = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4`,
 		status, updatedAt, tenantID, id,
@@ -619,7 +620,7 @@ func (a *PostgresSequenceAllocator) EnsureCounter(ctx context.Context, tenantID,
 	return a.ensureCounterViaExec(ctx, a.db, tenantID, profileCode, areaCode)
 }
 
-func (a *PostgresSequenceAllocator) ensureCounterViaExec(ctx context.Context, exec controlleddocumentsdomain.DBTX, tenantID, profileCode, areaCode string) error {
+func (a *PostgresSequenceAllocator) ensureCounterViaExec(ctx context.Context, exec db.Tx, tenantID, profileCode, areaCode string) error {
 	_, err := exec.ExecContext(ctx, `
 		INSERT INTO cd_sequence_counters (tenant_id, profile_code, process_area_code, next_seq)
 		VALUES ($1, $2, $3, 1)
@@ -652,8 +653,8 @@ func (a *PostgresSequenceAllocator) Peek(ctx context.Context, tenantID, profileC
 }
 
 // NextAndIncrement atomically increments and returns the next sequence number.
-func (a *PostgresSequenceAllocator) NextAndIncrement(ctx context.Context, tx controlleddocumentsdomain.DBTX, tenantID, profileCode, areaCode string) (int, error) {
-	var exec controlleddocumentsdomain.DBTX = a.db
+func (a *PostgresSequenceAllocator) NextAndIncrement(ctx context.Context, tx db.Tx, tenantID, profileCode, areaCode string) (int, error) {
+	var exec db.Tx = a.db
 	if tx != nil {
 		exec = tx
 	}
