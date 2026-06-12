@@ -1,8 +1,8 @@
-# Tech Debt Register — templates
+﻿# Tech Debt Register — templates
 
 > Companion to `wiki/modules/templates.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates-refactor.md`.
 
-**Last verified:** 2026-06-11 (adversarial verification pass — corrected T-001 tripwire anchor to baseline DDL, added rename note for `templates_v2_*` → `templates_template*` history, fixed T-008 `ValidatePlaceholders` anchor to `schema.go:114`, fixed T-010 test file reference to `routes_contract_test.go:122`, fixed T-014 `schema.go:84` → `schema.go:114`, flagged stale line numbers in `_artifacts/02-flow-publish.md` in T-004 and T-007 evidence; prior: T-007 closed — transaction wrapping confirmed in code; 2026-06-10 Stage-1 backend audit drift patch; 2026-05-31 — fix/templates-publish-role-binding — T-004 fully closed; `PublishTemplateVersion` now enforces `pending_approver_role` binding parity with `Service.Approve`, denied attempts audited via `publish_forbidden_role`)
+**Last verified:** 2026-06-12 (Wave 2 module sync — typed CapTemplate* consts; upsertApprovalConfig fixed; publish tier-1 aligned; CompositionConfig deleted; AppendAuditTx in-tx. Prior: adversarial verification pass — corrected T-001 tripwire anchor to baseline DDL, added rename note for `templates_v2_*` → `templates_template*` history, fixed T-008 `ValidatePlaceholders` anchor to `schema.go:114`, fixed T-010 test file reference to `routes_contract_test.go:122`, fixed T-014 `schema.go:84` → `schema.go:114`, flagged stale line numbers in `_artifacts/02-flow-publish.md` in T-004 and T-007 evidence; prior: T-007 closed — transaction wrapping confirmed in code; 2026-06-10 Stage-1 backend audit drift patch; 2026-05-31 — fix/templates-publish-role-binding — T-004 fully closed; `PublishTemplateVersion` now enforces `pending_approver_role` binding parity with `Service.Approve`, denied attempts audited via `publish_forbidden_role`)
 
 ## Items
 

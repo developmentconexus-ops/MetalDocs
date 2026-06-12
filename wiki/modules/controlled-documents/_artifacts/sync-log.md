@@ -2,6 +2,22 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-06-12 - Wave 2 module sync (branch qa/iam-area-membership, commits 81213133c..5a6b407b2)
+
+- **Context:** Wave 2 backend professionalization — GetActiveInstance service+repo extraction; ActiveDocumentInstance domain type; ErrNoActiveInstance sentinel; govLogger.LogTx in changeStatus (in-tx governance for lifecycle transitions); AuditWriter nil-panic guard in module.go; DBGovernanceLogger nil-fallback removed; RLS migration 0234 on public.controlled_documents (F-14, F-07, D-3, ADR 0027).
+- **Mode:** structural refresh
+- **Anchors moved:** +5 new key file anchors (GetActiveInstance at service.go:497, GetActiveInstance at repository.go:517, ActiveDocumentInstance at domain/port.go:8, ErrNoActiveInstance at domain/controlled_document.go:37, module.go:27 nil-panic guard)
+- **Public surface:** `ActiveDocumentInstance` new domain struct (`domain/port.go:8`); `ErrNoActiveInstance` new sentinel (`domain/controlled_document.go:37`); `GetActiveInstance` on `ControlledDocumentRepository` interface (`domain/port.go:37`) and `PostgresControlledDocumentRepository` impl (`repository.go:517`); `ControlledDocumentService.GetActiveInstance` (`service.go:493`).
+- **Routes/API:** none (HTTP routes unchanged; getActiveDocument still at routes.go:266 but now delegates to service — delivery SQL-free)
+- **Runtime flows:** §6.2 sequence diagram redrawn to show service/repo delegation; §6.3 changeStatus flow updated with govLogger.LogTx before commit.
+- **Persistence:** migration 0234 added: ENABLE+FORCE RLS + NULL-permissive tenant_isolation policy on public.controlled_documents (ADR 0027 Tier 1, Wave 2.3); §7 deployment + §8.7 tenant scoping updated.
+- **Dependencies:** none (module dependency graph unchanged; AuditWriter already required at DI boundary — now enforced by panic)
+- **T-NNN touched:** T-005 partially resolved note added (controlled_documents RLS applied; cd_sequence_counters residual gap remains)
+- **R-NNN touched:** none
+- **Counts after:** Critical=2 Major=6 Minor=4; public symbols undocumented=79/94 (unchanged)
+- **Tally gate:** PASS (pre-existing)
+- **Patched files:** wiki/modules/controlled-documents.md; wiki/modules/controlled-documents-tech-debt.md; wiki/modules/controlled-documents/_artifacts/sync-log.md
+
 ## 2026-06-10 — Stage-1 backend audit drift patch
 
 - **Context:** Stage-1 mapper artifact `wiki/backend/_artifacts/stage1/module-controlled-documents.md` (written 2026-06-10) identified 5 drift categories between existing wiki docs and the current codebase on branch `qa/iam-area-membership`.

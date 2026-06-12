@@ -2,6 +2,22 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-06-12 - Wave 2 module sync (branch qa/iam-area-membership, commits 81213133c..5a6b407b2)
+
+- **Context:** Wave 2 backend professionalization — RecordLastLoginContext removed from Repository; login-context write delegated to iamdomain.LoginContextPort; ListUsers N+1 fixed with RolesByUserIDs batch; SessionAdminQuery/SessionListItem promoted to auth/domain (REQ-DATA-2, F-10, F-06c).
+- **Mode:** structural refresh
+- **Anchors moved:** none (no line-number changes; new items added to surface table)
+- **Public surface:** `RecordLastLoginContext` removed from `authdomain.Repository` (and both postgres + memory impls); `WithLoginContextPort(*Service) *Service` added to Service (`service.go:121`); `SessionAdminQuery` + `SessionListItem` added to `auth/domain` (`domain/session_admin.go`); `RolesByUserIDs` batch now used inside `ListUsers` (`service.go:457`).
+- **Routes/API:** none (no auth route changes this wave)
+- **Runtime flows:** §6.1 login sequence diagram updated with `loginCtxPort.RecordLoginContext` best-effort call post-session-create.
+- **Persistence:** none (no schema changes in auth this wave)
+- **Dependencies:** auth/application outbound dep on `iamdomain.LoginContextPort` added; §3.2 and §8.8 updated.
+- **T-NNN touched:** none (no debt rows opened or closed)
+- **R-NNN touched:** none
+- **Counts after:** Critical=2 Major=4 Minor=8; missing-ADR=8 (pre-existing tally FAIL on stated 0/3/7 vs actual 2/4/8 — pre-dates this wave; not caused by this sync)
+- **Tally gate:** FAIL pre-existing (C/M/m stated 0/3/7 in auth.md §11 vs actual 2/4/8 in register; predates Wave 2; this sync does not change debt counts)
+- **Patched files:** wiki/modules/auth.md; wiki/modules/auth-tech-debt.md; wiki/modules/auth/_artifacts/sync-log.md
+
 ## 2026-06-10 — Stage-1 backend audit drift patch
 
 - **Context:** Stage-1 backend proficiency mapper found mismatches between wiki docs and code; patch applies only verified code facts, no redesign.

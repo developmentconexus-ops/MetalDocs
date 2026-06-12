@@ -2,7 +2,7 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-06-11 (adversarial-verification anchor corrections pass 2: handler line numbers + route registration lines corrected; prior: 2026-06-11 pass 1 — Key files section anchors) | **Owner:** unassigned | **Status:** active (RFC 9457 envelope; auth event audit emission wired) | **Maturity:** L2
+**Last verified:** 2026-06-12 (Wave 2 module sync — RecordLastLoginContext removed from Repository; login-context write delegated to iamdomain.LoginContextPort; ListUsers N+1 fixed with RolesByUserIDs batch; SessionAdminQuery/SessionListItem promoted to auth/domain; see sync-log) | **Prior:** 2026-06-11 (adversarial-verification anchor corrections pass 2: handler line numbers + route registration lines corrected; prior: 2026-06-11 pass 1 — Key files section anchors) | **Owner:** unassigned | **Status:** active (RFC 9457 envelope; auth event audit emission wired) | **Maturity:** L2
 
 > **Key files:**
 > - Current Phase 11 anchors: `internal/modules/auth/delivery/http/handler.go:186` (`recordAudit`), `internal/modules/auth/application/service.go:340` (`ResolveSession`), `service.go:470` (`CreateUserWithInput` shared-tx path), `internal/modules/auth/domain/model.go:149`/`:159` (`AuthenticatedSession` redactors), `internal/modules/auth/infrastructure/postgres/repository.go:98` (`GetUserTenants` ordering), `repository.go:140` (`TouchSession` grace window).
@@ -122,8 +122,8 @@ Quality-managed app. Every controlled-document mutation must trace to a known ac
 - `internal/modules/iam/delivery/http/admin_handler.go:13` â€” `ManagedUser`, `OnlineUser`, `UpdateUserParams`, `ErrPasswordPolicy`, `ErrUserAlreadyExists`, `ErrIdentityNotFound`
 - `internal/modules/iam/delivery/http/middleware.go:8` â€” `CurrentUserFromContext`
 
-**Outbound Go (own imports, from `_artifacts/03-deps.md` Â§1):**
-- `internal/modules/iam/domain` â€” `Role`, `RoleProvider`, `RoleAdminRepository`, `WithAuthContext`, `ErrUserNotFound`, `ErrUserInactive`, `RoleSystemAdmin` (auth â†” iam bidirectional, T-007)
+**Outbound Go (own imports, from `_artifacts/03-deps.md` §1):**
+- `internal/modules/iam/domain` — `Role`, `RoleProvider`, `RoleAdminRepository`, `WithAuthContext`, `ErrUserNotFound`, `ErrUserInactive`, `RoleSystemAdmin`, `LoginContextPort` (Wave 2: `loginCtxPort iamdomain.LoginContextPort` field on Service; wired via `WithLoginContextPort` at composition root) (auth ↔ iam bidirectional, T-007)
 - `internal/platform/tenant` â€” `DevTenantID` (bootstrap/dev fallback), `WithTenantID` (middleware injects tenant into ctx), `FromContext` (ResolveSession reads tenant from session row)
 - `internal/platform/httpresponse` â€” `WriteJSON`
 
@@ -176,7 +176,8 @@ Full table in `_artifacts/01-surface.md` (98 exported symbols). Grouping:
 | `delivery/http/handler.go` | `Handler`, `NewHandler`, `RegisterRoutes` |
 | `delivery/http/middleware.go` | `PublicPathChecker`, `Middleware`, `NewMiddleware`, `WithPublicPathChecker`, `Wrap` |
 | `domain/model.go` | `Identity`, `Session`, `OnlineUser`, `ManagedUser`, `CreateUserParams`, `UpdateUserParams`, `BootstrapAdminParams`, `CurrentUser`, `AuthenticatedSession` |
-| `domain/port.go` | `Repository` (17 methods: FindIdentityBy*, WithinLoginLock, CreateSession, FindSession, TouchSession, RevokeSession*, RecordSuccessfulLogin, RecordLastLoginContext, CreateUser, ListUsers, UpdateUser, ListOnlineUsers, BootstrapAdmin, GetUserTenants, GetTenantByID); `CapabilityProvider`; `LoginState`; `LoginTx` |
+| `domain/port.go` | `Repository` (16 methods: FindIdentityBy*, WithinLoginLock, CreateSession, FindSession, TouchSession, RevokeSession*, RecordSuccessfulLogin, CreateUser, ListUsers, UpdateUser, ListOnlineUsers, BootstrapAdmin, GetUserTenants, GetTenantByID — `RecordLastLoginContext` removed Wave 2; login-context write delegated to iamdomain.LoginContextPort); `CapabilityProvider`; `LoginState`; `LoginTx` |
+| `domain/session_admin.go` | `SessionAdminQuery`, `SessionListItem` — promoted to auth/domain (Wave 2; previously in auth/infrastructure) |
 | `domain/context.go` | `WithCurrentUser`, `CurrentUserFromContext` |
 | `domain/errors.go` | `ErrInvalidCredentials`, `ErrSessionNotFound`, `ErrSessionExpired`, `ErrSessionRevoked`, `ErrPasswordPolicy`, `ErrPasswordChangeRequired`, `ErrIdentityLocked`, `ErrIdentityInactive`, `ErrIdentityNotFound`, `ErrUserAlreadyExists`, `ErrTenantNotPermitted`, `ErrTenantClaimRequired` |
 | `infrastructure/postgres/repository.go` | `Repository`, `NewRepository`, 13 methods (FindIdentityBy*, CreateSession, FindSession, TouchSession, RevokeSession*, RecordSuccessful/FailedLogin, CreateUser, ListUsers, ListOnlineUsers, UpdateUser, BootstrapAdmin) |
@@ -240,6 +241,7 @@ sequenceDiagram
             S->>R: CreateSession (INSERT auth_sessions WITH tenant_id)
             S->>R: FindIdentityByUserID
             S->>IAM: RolesByUserID(userID, tenantID)
+            S->>S: loginCtxPort.RecordLoginContext (best-effort; swallowed on error — Wave 2)
             S-->>H: AuthenticatedSession{rawToken, currentUser, expiresAt}
             H-->>C: 200 {user, expiresAt} + Set-Cookie session
         end
@@ -415,7 +417,7 @@ From artifact 03 Â§4. Loaded in `internal/platform/authn/config.go:101-116`.
 
 ### 8.8 Cross-deps (consumers + producers)
 
-- **Auth â†’ IAM (OUT):** `iamdomain.{Role, RoleProvider, RoleAdminRepository, WithAuthContext, ErrUserNotFound, ErrUserInactive, RoleSystemAdmin}` at `application/service.go:18`, `delivery/http/middleware.go:10`, `domain/model.go:6`, `infrastructure/memory/repository.go:10`.
+- **Auth → IAM (OUT):** `iamdomain.{Role, RoleProvider, RoleAdminRepository, WithAuthContext, ErrUserNotFound, ErrUserInactive, RoleSystemAdmin, LoginContextPort}` at `application/service.go:18`, `delivery/http/middleware.go:10`, `domain/model.go:6`, `infrastructure/memory/repository.go:10`. Wave 2: `Service.loginCtxPort iamdomain.LoginContextPort` wired via `WithLoginContextPort(p)` at composition root (`service.go:121`); called best-effort after `RecordSuccessfulLogin` (`service.go:294`). Also: `ListUsers` N+1 eliminated — per-user `RolesByUserID` loop replaced by single `iamdomain.RoleProvider.RolesByUserIDs` batch call (`service.go:457`).
 - **IAM â†’ Auth (IN):** `iam.AdminHandler` at `internal/modules/iam/delivery/http/admin_handler.go:13` consumes `authdomain.{ManagedUser, OnlineUser, UpdateUserParams, ErrPasswordPolicy, ErrUserAlreadyExists, ErrIdentityNotFound}`; `iam.middleware` at `:8` reads `CurrentUserFromContext`.
 - Bidirectional, non-circular today (different sub-packages on each side), but coupled enough that splitting either package requires touching both. T-007.
 - **Documents/templates/approval (IN):** read `authdomain.CurrentUserFromContext` after middleware injection. Cross-ref `wiki/modules/documents.md` Â§8.1, `wiki/modules/iam.md` Â§3.2.
@@ -525,6 +527,7 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 
 ## Changelog
 
+- 2026-06-12 — Wave 2 module sync: `RecordLastLoginContext` removed from `authdomain.Repository` and both postgres/memory impls; login-context write now delegated to `iamdomain.LoginContextPort` via `Service.loginCtxPort` (best-effort, swallowed) wired at composition root via `WithLoginContextPort` (`service.go:121`). `ListUsers` N+1 eliminated: per-user `RolesByUserID` loop replaced by single `iamdomain.RoleProvider.RolesByUserIDs` batch call (`service.go:457`). `SessionAdminQuery`/`SessionListItem` promoted to `auth/domain` (`domain/session_admin.go`) — public-surface addition. §5.2 public surface, §3.2 outbound deps, §8.8 cross-deps, §6.1 login flow updated.
 - 2026-06-11 — Adversarial-verification anchor corrections pass 2: corrected handler function line numbers in §5.3 (handleLogin 42→64, handleLogout 68→99, handleMe 80→119, handleChangePassword 94→132) and route registration line numbers in API Route Truth Table (handler.go:45/46/47/48 → 58/59/60/61); all four mux.HandleFunc calls confirmed at lines 58-61 in handler.go.
 - 2026-06-11 — Adversarial-verification anchor corrections pass 1: fixed 11 stale file:line anchors in Key files section (recordAudit 181→186, NewService 75→126, Authenticate 126→204, resolveLoginTenant 172→316, newSessionToken 470→725, tokenHashFromCookieValue 481→736, RegisterRoutes 34→57, Session struct 26→54, CurrentUser struct 93→133, CreateUser 174→379, TouchSession 103→140); corrected middleware context-injection range from 81-87 to 81-86; corrected migration paths from `migrations/` to `archive/migrations/` (all four files are archived post-application); corrected §6.1 audit emission from "NO — only log.Printf" to "YES — recordAudit() wired for both success and failure" (T-002 was already closed); corrected §6.4 failure-modes table body column from legacy envelope format to RFC 9457 code field (consistent with §8.2 and line 353); renamed `writeAPIError` anchor label to `writeAuthError` to match actual function name.
 - 2026-06-10 — Stage-1 backend audit drift patch: closed T-001 (LegacyHeaderEnabled bypass removed in commit 554c4007d — field and branch gone from middleware and Config); removed all stale T-001 references (§2 constraint, §6.2 sequence diagram branch, §8.1, §8.7 config table row, §9 ADR row, §12 glossary entry); fixed §6.4 RFC 9457 note from "not used" to "used" (T-003 closed 2026-05-12); adjusted §11 summary counts from Critical:2 to Critical:0 and updated Top 3 list; fixed bcrypt cost in §1.1, §1.2, §9 from `bcrypt.DefaultCost`/`service.go:431` to `bcryptCost = 12`/`service.go:29`; fixed ResolveSession anchor from `service.go:255` to `service.go:340`; fixed GetUserTenants anchor from `port.go:23` to `port.go:68`; updated port.go surface to reflect WithinLoginLock, RecordLastLoginContext, GetTenantByID, LoginState, LoginTx, CapabilityProvider; closed T-002 language in §1.3, §3.1, Failure modes, Cross-links.

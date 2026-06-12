@@ -1,9 +1,24 @@
-# Sync log — templates
+﻿# Sync log — templates
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
 Last verified: 2026-06-11 (adversarial QA pass — missing header, untagged runtime claims, tally gap corrected)
 
+## 2026-06-12 - Wave 2 module sync (branch qa/iam-area-membership, commits 81213133c..5a6b407b)
+
+- **Context:** Wave 2 backend professionalization — AppendAuditTx; typed CapTemplate* consts; upsertApprovalConfig tier-1 fix; publish tier-1 alignment; post-publication role gate fix; CompositionConfig deleted; legacy columns removed from CreateTemplate INSERT.
+- **Mode:** structural refresh
+- **Anchors moved:** none
+- **Public surface:** CompositionConfig marked DELETED; CapTemplate* typed consts replace raw strings in capability checks.
+- **Routes/API:** upsertApprovalConfig (PUT /approval-config) tier-1 fixed from phantom `template.admin` → `CapTemplateEdit`; publish route tier-1 aligned to `CapTemplatePublish`. HTTP ops table updated.
+- **Runtime flows:** §8.5 updated with AppendAuditTx atomic audit note.
+- **Persistence:** legacy `areas/visibility/specific_areas` columns removed from `CreateTemplate` INSERT (`CreateTemplateTx` residual noted).
+- **Dependencies:** none
+- **T-NNN touched:** T-013 note updated (write path now audit-atomic).
+- **R-NNN touched:** none
+- **Counts after:** Critical=4 Major=6 Minor=4; missing-ADR=8
+- **Tally gate:** PASS (pre-existing)
+- **Patched files:** wiki/modules/templates.md; wiki/modules/templates-tech-debt.md; wiki/modules/templates/_artifacts/sync-log.md
 ## 2026-06-10 - Stage-1 backend audit drift patch
 
 - **Context:** Stage-1 backend mapper found four mismatches between wiki docs and code; targeted surgical corrections only. No restructuring.

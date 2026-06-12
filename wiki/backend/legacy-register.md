@@ -1,6 +1,6 @@
 # Legacy & Duplication Register
 
-> **Last verified:** 2026-06-11
+> **Last verified:** 2026-06-12
 > **Scope:** Consolidated cross-area register of every legacy pattern, structural duplication, and correctness gap found during the Stage-1 audit of the MetalDocs backend. Entries are grouped by root-cause family, ordered by worst severity, and mapped to normative requirements from [../architecture/backend-target-architecture.md](../architecture/backend-target-architecture.md). Each family states the Stage-2 question it must answer before closure.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root; source of F-01, F-05, F-07, F-14, F-19 evidence
@@ -199,6 +199,8 @@ The global security limiter has a secondary defect: its `requestIdentity` functi
 
 **Stage-2 question:** Decommission fixed-window global limiter; activate per-route limiter in production?
 
+**Resolution (Wave 2.8, 2026-06-12, `0b41d1c1`):** `internal/platform/security/ratelimit.go` (fixed-window global limiter; imported auth/iam domain packages — REQ-TOP-2 breach) deleted; `platform/ratelimit` token-bucket limiter activated in the production chain via `GlobalEnvelopeWrap` (120/min, user→IP fallback) and `RegisterRoutesWithRateLimit` in the documents module (autosave 60/30s, export 20). Dead fixed-window env vars (`METALDOCS_RATE_LIMIT_*`) removed from config and documentation. `platform/security` dropped from the cilint platformboundary baseline. D-04 also closed by this change — see D-04 note.
+
 ---
 
 ## F-06 — Cross-Module SQL and Infrastructure Boundary Violations
@@ -226,6 +228,8 @@ The most severe instance is a REQ-TOP-2 breach: `internal/platform/observability
 | `platform/observability` imports `modules/auth/domain` — **RESOLVED** (Wave 0 item 0.6, commit `8e0aa9eb4`: injected `WithUserIDResolver` callback, wired at composition root) | `internal/platform/observability/http.go` | platform → module domain (REQ-TOP-2) |
 
 **Stage-2 question:** Where must repository / service boundaries be introduced to isolate cross-module SQL writes and reads?
+
+**Resolution (PARTIALLY RESOLVED — Wave 2, 2026-06-12):** Four of nine violations resolved: (a) F-06a (platform/observability domain import) was closed in Wave 0 (see inline RESOLVED annotation above). (b) F-06b (delivery-layer raw SQL in CD `GetActiveDocument` + documents `finalizeDocument`) RESOLVED in Wave 2.5 commits `ea996da2`+`e9e6e2dc` — extracted to repository methods `GetActiveInstance`/`GetFinalizePrereqs` behind the application service; delivery layer is now SQL-free; grep-verified. (c) F-06c (auth writing to `iam_users`) RESOLVED in Wave 2.6 commit `07f914e9` — narrow `LoginContextPort` added to iam/domain; auth module delegates last-login writes via the port rather than directly touching the IAM table. (d) F-06d (iam/delivery importing auth/infrastructure) RESOLVED in Wave 2.7 commit `3c6ab235` — `SessionAdminQuery`/`SessionListItem` types promoted to auth/domain; iam delivery now imports only auth/domain. Residual (NOT in Wave 2 scope → next-touch / Wave 3): `TemplateVersionChecker` taxonomy→templates raw read; security module structural JOIN to `iam_users`; second standalone CD repository constructed in `main.go`.
 
 ---
 
@@ -261,6 +265,8 @@ Two additional structural problems compound this:
 **Stage-2 question:** Which mutating flows have a silent audit-drop window and what is the outbox migration scope?
 
 **Resolution (sub-split only — Wave 1.8, 2026-06-11, `3a257a9cf`):** templates `ListAudit` now reads `metaldocs.audit_events` (`resource_type='template'`); `version_id` carried in the payload on write and lifted on read; historical `templates_audit_log` rows are an accepted seam. The atomicity gap itself (post-commit audit writes) and the deprecated govLogger fallback remain open → Wave 2.2 / 2.11.
+
+**Resolution (atomicity core — Wave 2.2 + 2.11, 2026-06-12, `6cc9595`+`510bc1b`+`63f74368`):** `LogTx`/`RecordTx`/`WriteTx` methods added to `GovernanceLogger`/`AuditWriter` interfaces; all post-commit audit/governance writes moved in-transaction across taxonomy (11 event types), templates lifecycle, documents-core (`ForceRelease`/`MarkArchived`), and controlleddocuments `changeStatus`; approval decision path was already correct (used as the template pattern). New `PostCommitAudit` cilint analyzer (CI guard) forbids audit-sink calls after `Commit()` anywhere under `internal/modules/**`. The deprecated `DBGovernanceLogger` nil-fallback in controlleddocuments wiring was removed in Wave 2.11 (commit `63f74368`). Residual: taxonomy `module.go` still wires `DBGovernanceLogger` as its own nil-`AuditWriter` fallback (dev/memory only; `AuditWriter` is always present in production) → next-touch cleanup.
 
 ---
 
@@ -345,6 +351,8 @@ Multiple modules exhibit N+1 query patterns or full in-memory scans that degrade
 
 **Stage-2 question:** Which hot read paths need batch queries or SQL-side pagination to meet production scale?
 
+**Resolution (priority set — Wave 2.9, 2026-06-12, `db384188`):** Five hot paths resolved: (a) `RolesByUserID` reduced from 2 round trips to 1 LEFT JOIN; (b) `RolesByUserIDs` batch variant added + `CachedRoleProvider` read-through implemented; auth `ListUsers` loop converted to use the batch path; (c) `VerifyUserInTenant` rewritten as an `EXISTS` point-lookup via `TenantMemberChecker` (eliminates full-list scan); (d) approval `ListPendingForActor` now uses `LoadInstancesByIDs` batch load (3 round trips vs N×1); (e) audit `ILIKE` restricted to indexed columns (`action`, `actor_id`, `resource_id`) — `payload::text` full-scan dropped (undocumented behavior, accepted seam). Residual lower-priority rows NOT in Wave 2 scope → next-touch: IAM `PeopleService.ListFiltered` in-Go paginate; search no-pagination `offset=0`.
+
 ---
 
 ## F-11 — Capability String Literals and Undeclared Capability Constants
@@ -375,6 +383,8 @@ A secondary inconsistency: tier-1 uses `"template.approve"` while tier-2 uses `C
 
 **Stage-2 question:** Remove all raw capability literals; confirm CI guard covers all delivery packages?
 
+**Resolution (Wave 2.4, 2026-06-12, `784ce561`):** All three confirmed violations closed: (a) `"template.admin"` literal (unknown cap that permanently locked `upsertApprovalConfig`) replaced with `CapTemplateEdit` — matches tier-2 authz; (b) publish-route tier-1/tier-2 mismatch aligned to `CapTemplatePublish`; all raw tier-1 capability literals in templates delivery typed to constants; (c) broken `containsRole(...,"admin")` post-publication gate fixed to canonical `system_admin`/`qms_admin` role checks. Typed `EventType` constants added for `route.config.*` events (eliminates F-11 item (2)). New api-lint rule `no-rawstring-tier1-authz` guards all delivery-layer tier-1 calls in CI. No new capability was minted (no ADR required). Residual: codegen enum `CreateManagedUserRequestRoles` still missing 3 roles (signer, area_admin, qms_admin) — separate regen trigger, not addressed in this wave.
+
 ---
 
 ## F-12 — Tenant Isolation Gaps
@@ -398,6 +408,8 @@ Several tables or query paths enforce tenant isolation solely via application-la
 | `iam_users` INSERT has no DB tripwire trigger (`trg_require_cap_asserted` not attached to iam_users) | `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:52-58` | DB enforcement floor absent for user-record write |
 
 **Stage-2 question:** Which tables are missing tenant_id or DB-layer tripwires that currently rely on query predicates alone?
+
+**Resolution (PARTIALLY RESOLVED — Wave 2.3, 2026-06-12, `de0b44c2` + ADR 0027 `81213133`):** ADR 0027 records `auth_identities` as tenant-global by design (T-008 closed by-design) and documents the RLS sequencing policy. `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + NULL-permissive `tenant_isolation` policy applied to `controlled_documents` and `audit_events` via migration 0234; active under the prod `NOSUPERUSER` constraint and runtime-verified with a `NOSUPERUSER` role. `ExportJob.TenantID` corrected from `string` to `uuid.UUID` in the Go domain type. Residual per ADR 0027 and D-3: `iam_users` RLS deferred to RF-6; all remaining tenant-scoped tables deferred to the "first external tenant" trigger.
 
 ---
 
@@ -454,6 +466,8 @@ Multiple files or types are confirmed dead code — either explicitly deprecated
 | `coverage_boost_test.go` | Explicitly created to push coverage to ≥90%; duplicates setup from primary test files | `internal/modules/documents/approval/application/coverage_boost_test.go:1` |
 
 **Stage-2 question:** Which items are safe-delete candidates after behavioral verification?
+
+**Resolution (named set — Wave 2.11, 2026-06-12, `63f74368`):** The following items deleted: `CutoverService` + test, `CompositionConfig` + test, `AreaService.SetParent` + tests, `resolvePermissionFallback`, `WorkerConfig.ReviewReminderDays` + env parsing, `coverage_boost_test.go` `CutoverService` section, legacy `areas`/`visibility`/`specific_areas` INSERT columns in `CreateTemplate`, and dead `platform/config/ratelimit.go`. A fail-loud nil-guard was added for the deprecated `pdfDispatcher` in `DecisionService` (subsequently fully removed in the review-disposition commit `5a6b407b`). Left in place by design (out-of-scope per card): `FreezeService.Freeze`, `SnapshotService.SnapshotFromTemplate`, `document_subjects` table, `RepositoryMemory` mode. Residual: `CreateTemplateTx` still contains the now-orphaned `areas`/`visibility`/`specific_areas` columns (only `CreateTemplate` was in scope); the corresponding DB columns await a drop-migration window.
 
 ---
 
@@ -601,6 +615,8 @@ Several confirmed SQL patterns produce unnecessary query load. All are currently
 
 **Stage-2 question:** Which SQL patterns (ILIKE on JSONB, correlated COUNT subqueries) need index or query rewrites at scale?
 
+**Resolution (F-20e — Wave 2.10, 2026-06-12, `9921b323`+`6e2bf39d`):** `InMemoryAuthFailureRateLimiter` replaced by `PostgresAuthFailureRateLimiter` backed by the new `auth_failure_counters` table (migration 0235). Semantics are identical to the in-memory implementation: fixed 60-second window, 5-failure threshold, `actorID`-keyed, reset-on-success via DELETE; wired in `reauth.go` when `db != nil`. Critical follow-up fix `6e2bf39d`: the original `timestamptz + duration` binding errored at runtime under pgx (duration coerced to bigint); fixed to a precomputed-timestamp comparison. A live integration probe (`-tags integration`) verifies all 5 state transitions against a real DB. No Redis added (D-1 upheld). Other F-20 sub-items (correlated COUNT, `JSONB ILIKE` without GIN index — note F-20e's `ILIKE` overlap with F-10e is now resolved via F-10 wave) remain low-priority Wave 3.
+
 ---
 
 ## Cross-Area Duplications (not visible to individual module mappers)
@@ -610,6 +626,8 @@ The following duplications required comparing artifacts from multiple mapper run
 ### D-01: Governance log written post-commit in five independent modules
 
 The F-07 family spans taxonomy (11 event types), templates (SubmitForReview), documents-core (ForceRelease, Archive), and approval (decision). The cross-area picture: **no module using a govLogger or audit.Write call currently has atomic outbox semantics.** The only exception is the platform-level outbox workers, which are themselves subject to the two-stage chain duplication in F-04.
+
+**Resolution (Wave 2.2, 2026-06-12):** RESOLVED with F-07 — see F-07 resolution note above.
 
 ### D-02: Three separate MinIO client instances from the same credentials
 
@@ -629,6 +647,8 @@ Both the search module (`internal/modules/search/delivery/http/handler.go:55-57`
 
 **Locations:** `internal/platform/security/ratelimit.go`; `internal/platform/ratelimit/middleware.go`
 
+**Resolution (Wave 2.8, 2026-06-12):** RESOLVED with F-05 — see F-05 resolution note above.
+
 ### D-05: `platform/cache` placeholder vs `CachedRoleProvider` (no declared cache contract)
 
 `platform/cache` is an empty scaffold (F-08). The only production cache is the `CachedRoleProvider` in the IAM module (`internal/modules/iam/application/cached_role_provider.go`), which is an in-process `sync.Map` TTL cache. REQ-CACHE-1 requires a written cache contract (TTL, invalidation, staleness bound, failure behavior). No such contract exists for the role provider. The `platform/cache` placeholder may have been intended to house this — its emptiness means the pattern is module-local with no platform support.
@@ -640,6 +660,8 @@ Both the search module (`internal/modules/search/delivery/http/handler.go:55-57`
 `cmd/seed-test-document/` lives at the repository root under `cmd/`, while all active binaries live under `apps/<name>/cmd/<binary>/`. `go build ./...` traverses both locations. The `cmd/` root convention is a Go standard-library holdover; the `apps/` convention is MetalDocs-canonical. The only inhabitant of the root `cmd/` is the dead seed binary flagged in F-18.
 
 **Locations:** `cmd/seed-test-document/`; `apps/api/cmd/metaldocs-api/`; `apps/worker/cmd/metaldocs-worker/`; `apps/jobs/cmd/metaldocs-jobs/`
+
+**Resolution (Wave 0.1, 2026-06-12):** RESOLVED — the sole root-`cmd/` inhabitant (`cmd/seed-test-document`) was deleted in Wave 0.1; no root `cmd/` binaries remain. The convention split is eliminated: all active binaries now live under `apps/`.
 
 ### D-07: Domain status enum fragmentation across modules
 
@@ -673,7 +695,7 @@ The following low-severity items are informational and do not fit cleanly into a
 
 ## Legacy & open flags
 
-This document is itself the legacy register. All entries in this register are open as of Last verified date. Closed items will be marked with a resolution note and the PR or ADR that closed them.
+This document is itself the legacy register. Wave 0–2 resolutions are marked inline per finding; entries without a resolution note remain open as of the Last verified date. Closed items carry a bolded `**Resolution (...)**` paragraph citing wave, date, and commit(s). Partially resolved items state the residual and its Wave 3 trigger or next-touch condition.
 
 See [../architecture/backend-blueprint.md](../architecture/backend-blueprint.md) for the maturity scoreboard that this register feeds into, and [../architecture/backend-target-architecture.md](../architecture/backend-target-architecture.md) for the normative requirements each family must satisfy before closure.
 

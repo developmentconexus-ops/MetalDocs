@@ -1,7 +1,22 @@
-# Sync log — documents
+﻿# Sync log — documents
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-06-12 - Wave 2 module sync (branch qa/iam-area-membership, commits 81213133c..5a6b407b)
+
+- **Context:** Wave 2 backend professionalization — ForceReleaseSession+Archive audit in-tx WriteTx; GetFinalizePrereqs extraction; RegisterRoutesWithRateLimit.
+- **Mode:** structural refresh
+- **Anchors moved:** none
+- **Public surface:** GetFinalizePrereqs (new repository+service method, 3 new domain sentinels); RegisterRoutesWithRateLimit added to module wiring entry.
+- **Routes/API:** autosave/export routes now rate-limited (presign 60/min, commit 30/min, exportPDF 20/min) via RegisterRoutesWithRateLimit.
+- **Runtime flows:** ForceReleaseSession and Archive audit writes in-tx (WriteTx) — now atomic; finalize handler inline SQL extracted to Repository.GetFinalizePrereqs behind service.
+- **Persistence:** none (no schema changes)
+- **Dependencies:** platform/ratelimit now in outbound edges (module.go:13 import confirmed).
+- **T-NNN touched:** T-005 closed status unchanged (RenameDocument audit-tx gap already closed by Plan 6a). No new debt opened.
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=4
+- **Tally gate:** PASS (pre-existing; T-007/T-010/T-011/T-012 warn rows noted)
+- **Patched files:** wiki/modules/documents.md; wiki/modules/documents-tech-debt.md; wiki/modules/documents/_artifacts/sync-log.md
 ## 2026-06-11 — Stage-1 backend audit drift patch
 
 - **Context:** Stage-1 backend audit (`wiki/backend/_artifacts/stage1/module-documents-core.md`) found three stale claims in the documents wiki. No code was changed; doc-only corrections.

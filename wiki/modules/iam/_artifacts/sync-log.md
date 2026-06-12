@@ -1,4 +1,20 @@
-> **Last verified:** 2026-06-11
+> **Last verified:** 2026-06-12
+
+## 2026-06-12 - Wave 2 module sync (branch qa/iam-area-membership, commits 81213133c..5a6b407b2)
+
+- **Context:** Wave 2 backend professionalization — batch role-load (RolesByUserIDs), TenantMemberChecker EXISTS probe, LoginContextPort ownership transfer from auth to iam (F-06c, REQ-DATA-2, F-10).
+- **Mode:** structural refresh
+- **Anchors moved:** +5 new key file anchors (RolesByUserIDs at role_provider.go:75, UserActiveInTenant at :119, LoginContextPort at domain/login_context_port.go:14, LoginContextRepository at infrastructure/postgres/login_context_repository.go:14, TenantMemberChecker at people_service.go:162)
+- **Public surface:** `RoleProvider` interface gained `RolesByUserIDs`; `RolesByUserID` rewritten as single LEFT JOIN; `UserActiveInTenant` added to postgres RoleProvider (satisfies TenantMemberChecker); `LoginContextPort` new interface in domain; `LoginContextRepository` new infra impl; `TenantMemberChecker` new port in application; `CachedRoleProvider.RolesByUserIDs` read-through batch added; `InvalidateUser` renamed `InvalidateUserTenant`.
+- **Routes/API:** none (no route changes in iam this wave)
+- **Runtime flows:** §8.3 caching updated with batch and renamed invalidation method; §3.2 cross-deps updated with LoginContextPort note; C4 diagram updated.
+- **Persistence:** none (no new tables or migrations in iam this wave)
+- **Dependencies:** auth/application now depends on iamdomain.LoginContextPort (iam publishes; auth composition root injects impl); C4 relationship updated.
+- **T-NNN touched:** none (no debt rows opened or closed)
+- **R-NNN touched:** none
+- **Counts after:** Critical=5 Major=5 Minor=5; missing-ADR=11 (pre-existing tally FAIL on stated 0/2/3 vs actual 5/5/5 — pre-dates this wave; not caused by this sync)
+- **Tally gate:** FAIL pre-existing (C/M/m stated 0/2/3 in iam.md §11 vs actual 5/5/5 in register; predates Wave 2; this sync does not change debt counts)
+- **Patched files:** wiki/modules/iam.md; wiki/modules/iam-tech-debt.md; wiki/modules/iam/_artifacts/sync-log.md
 
 ## 2026-06-10 — Stage-1 backend audit drift patch
 

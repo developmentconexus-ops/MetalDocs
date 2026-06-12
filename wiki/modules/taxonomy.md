@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-07 (commit `108439f42` — Phase C surface-prune stamp refresh) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-12 (Wave 2 module sync — GovernanceLogger.LogTx/RecordTx in-tx governance writes; CreateTx on repos; Unwrap() *sql.Tx on tx types; AreaService.SetParent DELETED; DBGovernanceLogger nil-tx guard; deferred removal recorded) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/taxonomy/domain/family.go:8` â€” `DocumentFamily` aggregate
@@ -11,10 +11,12 @@
 > - `internal/modules/taxonomy/domain/port.go:1` â€” repository ports + `GovernanceEvent`
 > - `internal/modules/taxonomy/application/family_service.go:13-19` â€” `FamilyService` (struct has `govLogger domain.GovernanceLogger`; `NewFamilyService` takes `govLogger` param; Create/Update/Deactivate all call `s.govLogger.Log` â€” T-004 closed)
 > - `internal/modules/taxonomy/application/profile_service.go:16-20` â€” `ProfileService` (panics if govLogger nil; Create `:70` and Update `:96` both call `s.govLogger.Log` â€” T-005 closed)
-> - `internal/modules/taxonomy/application/area_service.go:13-17` â€” `AreaService` (Create `:59` and Update `:98` both call `s.govLogger.Log`; Archive also emits â€” T-005 closed)
+> - `internal/modules/taxonomy/application/area_service.go:13-17` â€” `AreaService` (Create `:59` and Update `:98` both call `s.govLogger.Log`; Archive also emits â€” T-005 closed; `SetParent` DELETED Wave 2 — dead code)
 > - `internal/modules/taxonomy/delivery/http/handler.go:42-51` â€” `RegisterRoutes` calls `taxonomyapi.HandlerWithOptions`; routes mounted via oapi-codegen generated router (T-009 closed)
 > - `internal/modules/taxonomy/delivery/http/routes_profiles.go:255-257` â€” `tenantIDFromRequest` (delegates to `tenant.FromContext`; Plan 3 removed header trust)
 > - `internal/modules/taxonomy/infrastructure/repository.go:152` â€” `ProfileRepository.Create` (now in tx + `authz.Require(CapTaxonomyManage)` at `:162` â€” Plan 5 wired)
+> - `internal/modules/taxonomy/domain/port.go` -- `GovernanceLogger.LogTx(ctx, *sql.Tx, event)` (Wave 2: in-tx governance writes; `AuditGovernanceAdapter.RecordTx` routes to audit writer inside caller tx; tx types expose `Unwrap() *sql.Tx`)
+> - `internal/modules/taxonomy/infrastructure/repository.go` -- `ProfileRepository.CreateTx` / `AreaRepository.CreateTx` (Wave 2: transactional create variants added to all three repo pairs)
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:218-240` â€” `HasActiveProfilesTx` (takes `tenantID string`; WHERE `tenant_id=$1 AND family_code=$2` â€” tenant predicate present; T-007 TOCTOU resolved: `Deactivate` now uses `GetByCodeForUpdate` + `HasActiveProfilesTx` inside a single tx)
 > - `apps/api/cmd/metaldocs-api/permissions.go:165-181` — path-prefix capability dispatcher (taxonomy profiles/areas/families; F-001 split applied)
 > - `apps/api/cmd/metaldocs-api/main.go:314-315,358,412,908-924` â€” module wiring (`buildTaxonomyModule` call `:314-315`) + standalone `ProfileRepository` (`:358`) + `profileDefaultsAdapter` use (`:412`) + type definition (`:908-924`)
@@ -116,7 +118,7 @@ Outbound interfaces:
 - **Per-aggregate repository + service split.** Each of the 3 entities has its own service + repository pair. Driver: simplicity; cost: govLogger wired inconsistently (FamilyService omits it â€” T-004).
 - **DB-level code immutability for profile + area + family.** Triggers `trg_document_profiles_code_immutable` (`db/baseline/0001_current_schema.sql:3681`) and `trg_process_areas_code_immutable` (`:3688`) raise on `NEW.code <> OLD.code` via `public.reject_code_update()` (`:805-816`). Family immutability enforced by `trg_reject_families_code_update` (`:3695`) via `public.reject_families_code_update()` (`:823-834`); all triggers are in the curated baseline (Plan 5, T-013 closed). Handler still overwrites body `code` with path param as an additional guard.
 - **Tenant scoping on profile + area only; families are global.** `tenant_id` is present on `document_process_areas` (`db/baseline/0001_current_schema.sql:1062`) and `document_profiles` (`:1130`) but absent from `document_families` (`:1028-1034`); the asymmetry is baked into the curated baseline with no discrete migration history. No ADR justifies it (T-002).
-- **Application-layer cycle prevention for area parents.** `AreaService.SetParent` walks `ListAncestors` to reject cycles. Self-FK is structural; acyclicity is application-only.
+- **Application-layer cycle prevention for area parents.** `AreaService.SetParent` was DELETED (Wave 2, dead-code removal). The `SetParent` handler and service method were unreachable — no HTTP route was wired for the operation. Cycle check via `ListAncestors` is preserved as internal logic; the public `SetParent` entrypoint no longer exists.
 - **Two-tier authz now wired for Create/Update paths (Plan 5).** `authz.Require(CapTaxonomyManage)` in FamilyRepository + ProfileRepository + AreaRepository write methods; `trg_require_cap_asserted` on all 3 taxonomy tables (`db/baseline/0001_current_schema.sql:3699-3716`). PATCH dispatcher bypass fixed (T-003). Archive/deactivate + FamilyService govLogger gap remain (T-004, T-005, T-006 partial).
 - **oapi-codegen generated router.** `internal/modules/taxonomy/api/` ships `api.gen.go` + `cfg.yaml`; `handler.go:42-51` mounts via `taxonomyapi.HandlerWithOptions`; compile-time `ServerInterface` assertion at `routes_generated.go:10`. T-009 closed.
 
@@ -159,7 +161,7 @@ C4Container
 | `domain/port.go` | `GovernanceEvent` | struct | governance log row (`ActorID, EntityType, EntityCode, Action, BeforeJSON, AfterJSON, OccurredAt`) |
 | `application/family_service.go:13-19` | `FamilyService` | struct | List Â· Get Â· Create Â· Update Â· Deactivate; all mutating methods call `s.govLogger.Log` (T-004 closed) |
 | `application/profile_service.go:16-20` | `ProfileService` | struct | List Â· Get Â· Create Â· Update Â· Archive Â· SetDefaultTemplate; Create `:70`, Update `:96`, Archive, SetDefaultTemplate all emit govLogger events (T-005 closed) |
-| `application/area_service.go:13-17` | `AreaService` | struct | List Â· Get Â· Create Â· Update Â· Archive Â· SetParent; Create `:59`, Update `:98`, Archive, SetParent all emit govLogger events (T-005 closed); cycle check via `ListAncestors` |
+| `application/area_service.go:13-17` | `AreaService` | struct | List Â· Get Â· Create Â· Update Â· Archive; Create `:59`, Update `:98`, Archive all emit govLogger events (T-005 closed); `SetParent` DELETED (Wave 2 — dead code, no HTTP route wired) |
 | `application/governance.go` | `NewDBGovernanceLogger` | func | reused by `internal/modules/controlleddocuments/module.go:37` as fallback when no `AuditWriter` injected |
 | `infrastructure/family_repository.go:11` | `FamilyRepository` | struct | `*sql.DB`-backed; `HasActiveProfilesTx` takes `tenantID` + wraps in tx (T-007 resolved) |
 | `infrastructure/repository.go:14,180` | `ProfileRepository Â· AreaRepository` | structs | `*sql.DB`-backed; no tx |
@@ -349,7 +351,7 @@ Failure modes â€” reference `wiki/concepts/error-ux.md`:
 - No pagination. `listProfiles`, `listAreas`, `listFamilies` return full ordered slices. Catalog cardinality expected to stay small (< 1k rows per tenant). Latent risk; tracked as T-015.
 
 ### 8.6 Logging & Observability
-- No structured logging in module. `DBGovernanceLogger` writes to `metaldocs.governance_events` â€” a module-local parallel sink to `audit.Writer`. Same gap as audit T-007 (two parallel sinks; not unified).
+- No structured logging in module. `DBGovernanceLogger` writes to `metaldocs.governance_events` â€” a module-local parallel sink to `audit.Writer`. Same gap as audit T-007 (two parallel sinks; not unified). **Wave 2:** `DBGovernanceLogger` gained a nil-tx guard (returns error rather than panic when called with a nil `*sql.Tx`). Full removal is deferred; it remains the nil-`AuditWriter` fallback for the taxonomy module only.
 - No trace-id propagation; no metrics.
 
 ### 8.7 Concurrency / Transactions
@@ -457,6 +459,8 @@ Top 3 (by severity, then by blast-radius):
 - Artifacts: `wiki/modules/taxonomy/_artifacts/`
 
 ## Changelog (this doc)
+
+- 2026-06-12 - Wave 2 structural refresh: `GovernanceLogger.LogTx(ctx, *sql.Tx, event)` + `AuditGovernanceAdapter.RecordTx` in-tx governance write path documented; `CreateTx` variants on all three repository pairs noted; tx types `Unwrap() *sql.Tx` noted; `AreaService.SetParent` removed (dead code — no HTTP route); `DBGovernanceLogger` nil-tx guard noted; deferred removal of `DBGovernanceLogger` fallback recorded.
 
 - 2026-05-17 - Lite memory sync: active taxonomy docs now name the downstream consumer as `documents` instead of historical `documents_v2`; route and persistence behavior unchanged.
 

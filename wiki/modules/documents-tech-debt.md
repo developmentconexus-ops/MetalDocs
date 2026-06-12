@@ -1,8 +1,8 @@
-# Tech Debt Register — documents
+﻿# Tech Debt Register — documents
 
 > Companion to `wiki/modules/documents.md`. Debt only — fixes belong in `wiki/backlog/documents-refactor.md`.
 
-**Last verified:** 2026-06-11 (Stage-1 adversarial-verification pass round 2: T-001 httpErr anchor corrected :1027-1029 → :1202-1204; T-002 OpenAPI line refs corrected :1952/:2050 → :2292/:2405; T-003 migration reference corrected to live path 0231:64-69; T-009 non-actionable status updated — FK bug already resolved in curated baseline db/baseline/0001_current_schema.sql:4333; T-010 evidence ranges tightened to exact call-site lines; prior: T-004 anchor corrected :86/:115 → :117/:147; T-005 surface anchors and observation corrected to match post-fix code; T-006 backlog sync discrepancy noted; prior: T-010 stale "not mounted" claim corrected — routes ARE mounted via documentsapi.HandlerWithOptions at module.go:120/134; prior: 2026-06-08 Phase F F8: handler.go finalizeDocument anchor :316 → :435)
+**Last verified:** 2026-06-12 (Wave 2 module sync — ForceReleaseSession+Archive audit in-tx WriteTx; GetFinalizePrereqs extracted; rate-limited routes. Prior: Stage-1 adversarial-verification pass round 2: T-001 httpErr anchor corrected :1027-1029 → :1202-1204; T-002 OpenAPI line refs corrected :1952/:2050 → :2292/:2405; T-003 migration reference corrected to live path 0231:64-69; T-009 non-actionable status updated — FK bug already resolved in curated baseline db/baseline/0001_current_schema.sql:4333; T-010 evidence ranges tightened to exact call-site lines; prior: T-004 anchor corrected :86/:115 → :117/:147; T-005 surface anchors and observation corrected to match post-fix code; T-006 backlog sync discrepancy noted; prior: T-010 stale "not mounted" claim corrected — routes ARE mounted via documentsapi.HandlerWithOptions at module.go:120/134; prior: 2026-06-08 Phase F F8: handler.go finalizeDocument anchor :316 → :435)
 
 ## Severity scale
 

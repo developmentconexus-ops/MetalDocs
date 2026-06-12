@@ -1,9 +1,24 @@
-# Sync log — taxonomy
+﻿# Sync log — taxonomy
 
 **Last verified:** 2026-06-11 (Stage-1 backend audit drift patch)
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-06-12 - Wave 2 module sync (branch qa/iam-area-membership, commits 81213133c..5a6b407b)
+
+- **Context:** Wave 2 backend professionalization — GovernanceLogger.LogTx/RecordTx in-tx governance writes; CreateTx on repos; Unwrap() *sql.Tx; AreaService.SetParent DELETED; DBGovernanceLogger nil-tx guard; deferred removal recorded.
+- **Mode:** structural refresh
+- **Anchors moved:** +2 new key file anchors (GovernanceLogger.LogTx, CreateTx variants)
+- **Public surface:** AreaService: SetParent removed from public surface; CreateTx added to all 3 repo interfaces; GovernanceLogger.LogTx added to port.
+- **Routes/API:** none (no route changes in taxonomy this wave)
+- **Runtime flows:** §8.6 updated with nil-tx guard note; §4 area hierarchy note updated (SetParent dead).
+- **Persistence:** none
+- **Dependencies:** none
+- **T-NNN touched:** none (all taxonomy debt rows pre-date Wave 2)
+- **R-NNN touched:** none
+- **Counts after:** Critical=5 Major=5 Minor=6; missing-ADR=14
+- **Tally gate:** PASS (pre-existing)
+- **Patched files:** wiki/modules/taxonomy.md; wiki/modules/taxonomy-tech-debt.md; wiki/modules/taxonomy/_artifacts/sync-log.md
 ## 2026-06-10 — Stage-1 backend audit drift patch
 
 - **Context:** Stage-1 mapper found 8 mismatches between wiki text and current code.

@@ -2,7 +2,7 @@
 
 > Companion to [wiki/modules/controlled-documents.md](controlled-documents.md). Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in [wiki/backlog/controlled-documents-refactor.md](../backlog/controlled-documents-refactor.md).
 
-**Last verified:** 2026-06-11
+**Last verified:** 2026-06-12 (Wave 2 module sync — no debt rows opened or closed; T-005 partially addressed by RLS migration 0234 on controlled_documents; stamp bumped) | **Prior:** 2026-06-11
 
 ## Severity scale
 
@@ -64,10 +64,11 @@ The category names are useful only when paired with concrete triggers. Use the t
 - **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-004`](../backlog/controlled-documents-refactor.md)
 - **Linked ADR:** [wiki/decisions/0007-two-tier-authz.md](../decisions/0007-two-tier-authz.md)
 
-### T-005    Tenant scoping via query arg only     no GUC + RLS backstop
-- **Severity:** major
+### T-005    Tenant scoping via query arg only — no GUC + RLS backstop — PARTIALLY RESOLVED Wave 2
+- **Severity:** major (partially resolved — `controlled_documents` RLS applied; `cd_sequence_counters` still unguarded)
 - **Surface:** `internal/modules/controlleddocuments/infrastructure/repository.go` — `GetByID`, `GetByCode`, `CodeExists`, `List`, `CreateTx`, `UpdateStatus`, `NextAndIncrement` (all include `tenant_id = $...` predicate)
-- **Observation:** Every WHERE clause includes `tenant_id = $...` from the request context (sourced via `tenant.FromContext`     Plan 3 removed the `X-Tenant-ID` header source). No `SET LOCAL metaldocs.tenant_id` GUC is issued before the query; no RLS policy on `controlled_documents` / `cd_sequence_counters`. A repository method that forgets the `tenant_id` predicate has no DB-level backstop. Defense-in-depth gap on a multi-tenant table.
+- **Wave 2 progress:** Migration 0234 (`db/migrations/0234_rls_controlled_documents_audit_events.sql`) applied ENABLE + FORCE ROW LEVEL SECURITY + NULL-permissive `tenant_isolation` policy to `public.controlled_documents`. RLS is effective for NOSUPERUSER+NOBYPASSRLS production roles (dev Docker superuser bypasses). `cd_sequence_counters` RLS not yet applied — residual gap.
+- **Observation:** Every WHERE clause includes `tenant_id = $...` from the request context (sourced via `tenant.FromContext` — Plan 3 removed the `X-Tenant-ID` header source). Wave 2 added RLS backstop on `controlled_documents`. Residual: `cd_sequence_counters` still has query-arg-only scoping with no RLS or GUC backstop.
 - **Evidence:** `controlled-documents/_artifacts/04-persistence.md`   5; `controlled-documents/_artifacts/05-industry.md` IP-008
 - **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-005`](../backlog/controlled-documents-refactor.md)
 - **Linked ADR:** missing-ADR

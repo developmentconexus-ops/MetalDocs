@@ -1,8 +1,8 @@
-# Tech Debt Register — taxonomy
+﻿# Tech Debt Register — taxonomy
 
 > Companion to `wiki/modules/taxonomy.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/taxonomy-refactor.md`.
 
-**Last verified:** 2026-06-10 (Stage-1 backend audit drift patch)
+**Last verified:** 2026-06-12 (Wave 2 module sync)
 
 ## Severity scale
 
