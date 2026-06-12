@@ -10,7 +10,6 @@ package application
 //   5. walkAny / validateNoFloats  (nested arrays, maps, ok-paths)
 //   6. canonicalize  ([]any, bool, int64, json.Number, nil)
 //   7. ComputeContentHash  (additional paths)
-//   8. ValidateLegacyCutoverReady  (db error path)
 //   9. WithMembershipContext  (SET LOCAL failure paths)
 //  10. SubmitRevisionForReview  (route-not-found, stage insert error, emit error, float payload)
 //  11. RecordSignoff  (BeginTx failure, LoadInstance not found/error, stale instance, stageNotActive,
@@ -37,7 +36,6 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
-	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -382,58 +380,7 @@ func TestComputeContentHash_FloatInNestedArray(t *testing.T) {
 }
 
 // ============================================================
-// 8. ValidateLegacyCutoverReady — db query error path
-// ============================================================
-
-// errorQueryConn returns an error only from Query (not Prepare).
-type errorQueryStmt struct{}
-
-func (s *errorQueryStmt) Close() error  { return nil }
-func (s *errorQueryStmt) NumInput() int { return -1 }
-func (s *errorQueryStmt) Exec(_ []driver.Value) (driver.Result, error) {
-	return nil, errors.New("exec error")
-}
-func (s *errorQueryStmt) Query(_ []driver.Value) (driver.Rows, error) {
-	return nil, errors.New("query error")
-}
-
-type errorQueryConn struct{}
-
-func (c *errorQueryConn) Prepare(_ string) (driver.Stmt, error) { return &errorQueryStmt{}, nil }
-func (c *errorQueryConn) Close() error                          { return nil }
-func (c *errorQueryConn) Begin() (driver.Tx, error)             { return c, nil }
-func (c *errorQueryConn) Commit() error                         { return nil }
-func (c *errorQueryConn) Rollback() error                       { return nil }
-
-type errorQueryDriver struct{}
-
-func (d *errorQueryDriver) Open(_ string) (driver.Conn, error) { return &errorQueryConn{}, nil }
-
-var errorQueryDBCounter int
-
-func newErrorQueryDB(t *testing.T) *sql.DB {
-	t.Helper()
-	errorQueryDBCounter++
-	name := fmt.Sprintf("error_query_test_%d", errorQueryDBCounter)
-	sql.Register(name, &errorQueryDriver{})
-	db, err := sql.Open(name, "")
-	if err != nil {
-		t.Fatalf("open error query test db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	return db
-}
-
-func TestValidateLegacyCutoverReady_DBError(t *testing.T) {
-	db := newErrorQueryDB(t)
-	svc := NewCutoverService(&MemoryEmitter{}, fixedClock{t: time.Now()})
-	err := svc.ValidateLegacyCutoverReady(authz.WithBackgroundBypass(context.Background()), db)
-	if err == nil {
-		t.Fatal("expected error from db; got nil")
-	}
-}
-
-// ============================================================`r`n// 10. SubmitRevisionForReview — error paths
+// 10. SubmitRevisionForReview — error paths
 // ============================================================
 
 // submitRouteNotFoundConn returns empty rows for approval_routes (simulates not found).
@@ -1461,10 +1408,18 @@ func TestSubmitRevisionForReview_ContentHashError(t *testing.T) {
 // Shared error-injecting SQL drivers for coverage of error branches
 // ============================================================
 
+// noopStmt is a minimal driver.Stmt that reports no success.
+type noopStmt struct{}
+
+func (s *noopStmt) Close() error                                  { return nil }
+func (s *noopStmt) NumInput() int                                  { return -1 }
+func (s *noopStmt) Exec(_ []driver.Value) (driver.Result, error)  { return submitNoopResult{}, nil }
+func (s *noopStmt) Query(_ []driver.Value) (driver.Rows, error)   { return submitEmptyRows{}, nil }
+
 // beginFailConn fails on Begin/BeginTx.
 type beginFailConn struct{}
 
-func (c *beginFailConn) Prepare(_ string) (driver.Stmt, error) { return &errorQueryStmt{}, nil }
+func (c *beginFailConn) Prepare(_ string) (driver.Stmt, error) { return &noopStmt{}, nil }
 func (c *beginFailConn) Close() error                          { return nil }
 func (c *beginFailConn) Begin() (driver.Tx, error)             { return nil, errors.New("begin failed") }
 

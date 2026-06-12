@@ -71,24 +71,3 @@ func TestPlaceholder_NameField_OmitEmpty(t *testing.T) {
 		t.Fatalf("JSON contains omitted name field: %s", b)
 	}
 }
-
-func TestCompositionConfig_RoundTrip(t *testing.T) {
-	c := CompositionConfig{
-		HeaderSubBlocks: []string{"doc_header_standard"},
-		FooterSubBlocks: []string{"footer_page_numbers", "footer_controlled_copy_notice"},
-		SubBlockParams: map[string]map[string]any{
-			"doc_header_standard": {"show_logo": true},
-		},
-	}
-	b, _ := json.Marshal(c)
-	var back CompositionConfig
-	if err := json.Unmarshal(b, &back); err != nil {
-		t.Fatal(err)
-	}
-	if len(back.FooterSubBlocks) != 2 {
-		t.Fatalf("footer: %+v", back.FooterSubBlocks)
-	}
-	if back.SubBlockParams["doc_header_standard"]["show_logo"] != true {
-		t.Fatalf("params lost: %+v", back.SubBlockParams)
-	}
-}

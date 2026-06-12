@@ -10,7 +10,6 @@ import (
 	dhttp "metaldocs/internal/modules/controlleddocuments/delivery/http"
 	"metaldocs/internal/modules/controlleddocuments/infrastructure"
 	taxonomyapp "metaldocs/internal/modules/taxonomy/application"
-	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
 type Module struct {
@@ -25,17 +24,15 @@ type Dependencies struct {
 }
 
 func New(deps Dependencies) *Module {
+	if deps.AuditWriter == nil {
+		panic("controlled_documents: AuditWriter is required (nil provided)")
+	}
 	repo := infrastructure.NewPostgresControlledDocumentRepository(deps.DB)
 	seq := infrastructure.NewPostgresSequenceAllocator(deps.DB)
 	tplCheck := infrastructure.NewPostgresTemplateVersionChecker(deps.DB)
 	profiles := infrastructure.NewTaxonomyProfileReader(deps.DB)
 	areas := infrastructure.NewTaxonomyAreaReader(deps.DB)
-	var govLogger taxonomydomain.GovernanceLogger
-	if deps.AuditWriter != nil {
-		govLogger = taxonomyapp.NewAuditGovernanceAdapter(deps.AuditWriter)
-	} else {
-		govLogger = taxonomyapp.NewDBGovernanceLogger(deps.DB)
-	}
+	govLogger := taxonomyapp.NewAuditGovernanceAdapter(deps.AuditWriter)
 	svc := application.NewControlledDocumentService(deps.DB, repo, seq, tplCheck, profiles, areas, govLogger, nil)
 	h := dhttp.NewHandler(svc, deps.DB)
 	if svc == nil {

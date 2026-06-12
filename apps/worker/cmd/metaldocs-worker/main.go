@@ -105,8 +105,8 @@ func main() {
 
 	ticker := time.NewTicker(time.Duration(workerCfg.PollIntervalSeconds) * time.Second)
 	defer ticker.Stop()
-	log.Printf("MetalDocs Worker running (poll_interval_s=%d batch_size=%d review_reminder_days=%d max_attempts=%d retry_base_seconds=%d retry_max_seconds=%d)",
-		workerCfg.PollIntervalSeconds, workerCfg.BatchSize, workerCfg.ReviewReminderDays, workerCfg.MaxAttempts, workerCfg.RetryBaseSeconds, workerCfg.RetryMaxSeconds)
+	log.Printf("MetalDocs Worker running (poll_interval_s=%d batch_size=%d max_attempts=%d retry_base_seconds=%d retry_max_seconds=%d)",
+		workerCfg.PollIntervalSeconds, workerCfg.BatchSize, workerCfg.MaxAttempts, workerCfg.RetryBaseSeconds, workerCfg.RetryMaxSeconds)
 
 	runWorkerLoop(ctx, workerSvc, workerCfg.BatchSize, ticker.C)
 }

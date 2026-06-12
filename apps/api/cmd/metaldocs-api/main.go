@@ -88,9 +88,8 @@ type controlledDocumentDuplicatorAdapter struct {
 }
 
 type fanoutComponents struct {
-	client             *fanout.Client
-	freezeService      *docapp.FreezeService
-	pdfDispatchAdapter approvalapp.PDFDispatchInvoker
+	client        *fanout.Client
+	freezeService *docapp.FreezeService
 }
 
 func newControlledDocumentDuplicatorAdapter(svc *controlleddocumentsapp.ControlledDocumentService) *controlledDocumentDuplicatorAdapter {
@@ -439,10 +438,6 @@ func main() {
 			resolverReg, snapRepo, ctxBuilder,
 			snapRepo, snapRepo, fanoutCfg.client,
 		)
-		if deps.Publisher != nil {
-			pdfDispatcher := fanout.NewPDFDispatcher(deps.Publisher)
-			fanoutCfg.pdfDispatchAdapter = fanout.NewPDFDispatchAdapter(pdfDispatcher, snapRepo)
-		}
 	}
 
 	docSnapshotReader := docgenv2.NewTemplatesSnapshotReader(deps.SQLDB)
@@ -543,7 +538,7 @@ func main() {
 	startOutboxWorker("materialize outbox worker", materializeOutboxWorker.Run)
 
 	approvalServices.Decision = approvalapp.NewDecisionService(
-		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService, fanoutCfg.pdfDispatchAdapter,
+		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService, nil,
 	).WithPDFOutbox(pdfOutboxRepo).WithPinInvoker(fanoutCfg.freezeService).
 		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB))
 	docDeps.SubmitSvc = approvalServices.Submit

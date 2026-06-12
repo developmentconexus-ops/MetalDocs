@@ -10,7 +10,6 @@ import (
 type WorkerConfig struct {
 	PollIntervalSeconds int
 	BatchSize           int
-	ReviewReminderDays  int
 	RunOnce             bool
 	MaxAttempts         int
 	// RetryMaxSeconds must stay >= RetryBaseSeconds so backoff growth remains monotonic.
@@ -22,7 +21,6 @@ func LoadWorkerConfig() (WorkerConfig, error) {
 	cfg := WorkerConfig{
 		PollIntervalSeconds: 10,
 		BatchSize:           25,
-		ReviewReminderDays:  14,
 		MaxAttempts:         5,
 		RetryBaseSeconds:    10,
 		RetryMaxSeconds:     300,
@@ -41,13 +39,6 @@ func LoadWorkerConfig() (WorkerConfig, error) {
 			return WorkerConfig{}, fmt.Errorf("invalid METALDOCS_WORKER_BATCH_SIZE")
 		}
 		cfg.BatchSize = value
-	}
-	if raw := strings.TrimSpace(os.Getenv("METALDOCS_WORKER_REVIEW_REMINDER_DAYS")); raw != "" {
-		value, err := strconv.Atoi(raw)
-		if err != nil || value < 1 {
-			return WorkerConfig{}, fmt.Errorf("invalid METALDOCS_WORKER_REVIEW_REMINDER_DAYS")
-		}
-		cfg.ReviewReminderDays = value
 	}
 	if raw := strings.TrimSpace(os.Getenv("METALDOCS_WORKER_RUN_ONCE")); raw != "" {
 		cfg.RunOnce = strings.EqualFold(raw, "true") || raw == "1"

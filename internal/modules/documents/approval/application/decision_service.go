@@ -75,6 +75,12 @@ func NewDecisionService(
 	freezeInvoker FreezeInvoker,
 	pdfDispatcher PDFDispatchInvoker,
 ) *DecisionService {
+	// F-14: fail loud if the deprecated post-commit dispatcher is wired without
+	// the transactional outbox replacement. Callers must pass nil for pdfDispatcher
+	// and wire the outbox via WithPDFOutbox instead.
+	if pdfDispatcher != nil {
+		panic("DecisionService: deprecated pdfDispatcher must not be set; use WithPDFOutbox for transactional PDF dispatch")
+	}
 	return &DecisionService{
 		repo:          repo,
 		emitter:       emitter,

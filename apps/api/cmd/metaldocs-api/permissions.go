@@ -254,7 +254,7 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		}
 		// Fail-closed default. Any route not enumerated above demands at
 		// least a session — never silently public.
-		return resolvePermissionFallback(path)
+		return "", iamdelivery.VisibilitySessionRequired
 	}
 }
 
@@ -265,17 +265,6 @@ func resolveRoutePermission(method, path string) (iamdomain.Capability, iamdeliv
 		}
 	}
 	return "", iamdelivery.VisibilityPermissionGuarded, false
-}
-
-func resolvePermissionFallback(path string) (iamdomain.Capability, iamdelivery.Visibility) {
-	_ = path
-	// Fail-closed default. Any route not enumerated above demands at least a
-	// session and does not receive an inferred capability grant.
-	switch {
-	default:
-		// no permission granted
-		return "", iamdelivery.VisibilitySessionRequired
-	}
 }
 
 func newPublicPathChecker(resolver iamdelivery.PermissionResolver) authdelivery.PublicPathChecker {

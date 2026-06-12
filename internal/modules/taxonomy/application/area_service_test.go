@@ -41,46 +41,6 @@ func TestAreaServiceCreate_UsesDomainConstructorNormalizationAndValidation(t *te
 	}
 }
 
-func TestAreaServiceSetParentValid(t *testing.T) {
-	repo := newFakeAreaRepository()
-	repo.put(&domain.ProcessArea{Code: "root", TenantID: "tenant-a"})
-	repo.put(&domain.ProcessArea{Code: "child", TenantID: "tenant-a"})
-
-	service := NewAreaService(repo, &fakeGovernanceLogger{})
-	err := service.SetParent(context.Background(), "tenant-a", "child", areaCodePtr("root"), "user-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	updated := repo.get("tenant-a", "child")
-	if updated.ParentCode == nil || *updated.ParentCode != "root" {
-		t.Fatalf("expected parent code root, got %+v", updated.ParentCode)
-	}
-}
-
-func TestAreaServiceSetParentFailsWhenCycleDetected(t *testing.T) {
-	repo := newFakeAreaRepository()
-	repo.put(&domain.ProcessArea{Code: "parent", TenantID: "tenant-a"})
-	repo.put(&domain.ProcessArea{Code: "child", TenantID: "tenant-a"})
-	repo.ancestorsByCode["parent"] = []domain.AreaCode{"child"}
-
-	service := NewAreaService(repo, &fakeGovernanceLogger{})
-	err := service.SetParent(context.Background(), "tenant-a", "child", areaCodePtr("parent"), "user-1")
-	if !errors.Is(err, domain.ErrAreaParentCycle) {
-		t.Fatalf("expected ErrAreaParentCycle, got %v", err)
-	}
-}
-
-func TestAreaServiceSetParentRequiresParentCode(t *testing.T) {
-	repo := newFakeAreaRepository()
-	repo.put(&domain.ProcessArea{Code: "child", TenantID: "tenant-a"})
-
-	service := NewAreaService(repo, &fakeGovernanceLogger{})
-	if err := service.SetParent(context.Background(), "tenant-a", "child", nil, "user-1"); !errors.Is(err, domain.ErrAreaParentCodeRequired) {
-		t.Fatalf("expected ErrAreaParentCodeRequired, got %v", err)
-	}
-}
-
 func TestAreaServiceArchiveSetsArchivedAt(t *testing.T) {
 	repo := newFakeAreaRepository()
 	repo.put(&domain.ProcessArea{Code: "child", TenantID: "tenant-a"})
@@ -180,11 +140,6 @@ func (r *fakeAreaRepository) put(a *domain.ProcessArea) {
 
 func (r *fakeAreaRepository) get(tenantID, code string) *domain.ProcessArea {
 	return r.byKey[tenantID+"|"+code]
-}
-
-func areaCodePtr(v string) *domain.AreaCode {
-	code := domain.AreaCode(v)
-	return &code
 }
 
 // commitTrackingTx records whether Commit was called; does not implement

@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"metaldocs/internal/modules/taxonomy/domain"
@@ -129,68 +128,6 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("taxonomy: commit area update tx: %w", err)
-	}
-	committed = true
-	return nil
-}
-
-func (s *AreaService) SetParent(ctx context.Context, tenantID string, areaCode domain.AreaCode, parentCode *domain.AreaCode, actorID string) error {
-	if parentCode == nil || strings.TrimSpace(string(*parentCode)) == "" {
-		return domain.ErrAreaParentCodeRequired
-	}
-	tx, err := s.areas.BeginTx(ctx)
-	if err != nil {
-		return fmt.Errorf("taxonomy: begin set area parent tx: %w", err)
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback()
-		}
-	}()
-
-	area, err := s.areas.GetByCodeForUpdate(ctx, tx, tenantID, areaCode)
-	if err != nil {
-		return fmt.Errorf("taxonomy: lock area %q: %w", areaCode, err)
-	}
-	if !area.IsActive() {
-		return domain.ErrAreaArchived
-	}
-
-	if parentCode != nil {
-		if *parentCode == areaCode {
-			return domain.ErrAreaParentCycle
-		}
-		if _, err := s.areas.GetByCodeForUpdate(ctx, tx, tenantID, *parentCode); err != nil {
-			return fmt.Errorf("taxonomy: lock parent area %q: %w", *parentCode, err)
-		}
-		ancestors, err := s.areas.ListAncestorsTx(ctx, tx, tenantID, *parentCode)
-		if err != nil {
-			return fmt.Errorf("taxonomy: list parent area ancestors %q: %w", *parentCode, err)
-		}
-		for _, ancestorCode := range ancestors {
-			if ancestorCode == areaCode {
-				return domain.ErrAreaParentCycle
-			}
-		}
-	}
-
-	area.ParentCode = parentCode
-	if err := s.areas.UpdateTx(ctx, tx, area); err != nil {
-		return fmt.Errorf("taxonomy: update area parent %q: %w", areaCode, err)
-	}
-	if err := s.govLogger.LogTx(ctx, sqlTxFromFamilyTx(tx), domain.GovernanceEvent{
-		TenantID:     tenantID,
-		EventType:    domain.GovernanceEventTypeAreaParentChanged,
-		ActorUserID:  actorID,
-		ResourceType: "process_area",
-		ResourceID:   string(areaCode),
-		PayloadJSON:  []byte(`{}`),
-	}); err != nil {
-		return fmt.Errorf("taxonomy: log area parent governance event: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("taxonomy: commit set area parent tx: %w", err)
 	}
 	committed = true
 	return nil

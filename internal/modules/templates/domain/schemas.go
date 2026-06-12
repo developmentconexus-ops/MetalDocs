@@ -77,9 +77,3 @@ type Placeholder struct {
 	Computed    bool                 `json:"computed,omitempty"`
 	ResolverKey *string              `json:"resolver_key,omitempty"`
 }
-
-type CompositionConfig struct {
-	HeaderSubBlocks []string                  `json:"header_sub_blocks"`
-	FooterSubBlocks []string                  `json:"footer_sub_blocks"`
-	SubBlockParams  map[string]map[string]any `json:"sub_block_params"`
-}
