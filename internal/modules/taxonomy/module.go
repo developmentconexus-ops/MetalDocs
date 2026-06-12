@@ -1,15 +1,12 @@
 package taxonomy
 
 import (
-	"context"
 	"database/sql"
-	"log/slog"
 	"net/http"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/modules/taxonomy/application"
 	thttp "metaldocs/internal/modules/taxonomy/delivery/http"
-	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/modules/taxonomy/infrastructure"
 )
 
@@ -30,19 +27,16 @@ func New(deps Dependencies) *Module {
 	if tplChecker == nil {
 		tplChecker = infrastructure.NewTemplateVersionChecker(deps.DB)
 	}
-	var govLogger domain.GovernanceLogger
-	if deps.AuditWriter != nil {
-		govLogger = application.NewAuditGovernanceAdapter(deps.AuditWriter)
-	} else {
-		slog.WarnContext(context.Background(), "taxonomy audit writer missing; using legacy DB governance logger")
-		govLogger = application.NewDBGovernanceLogger(deps.DB)
+	if deps.AuditWriter == nil {
+		panic("taxonomy.module: AuditWriter is required; nil fallback to DBGovernanceLogger was removed (FE / Wave 2.12)")
 	}
+	logger := application.NewAuditGovernanceAdapter(deps.AuditWriter)
 
 	familyRepo := infrastructure.NewFamilyRepository(deps.DB)
 
-	profileService := application.NewProfileService(profileRepo, tplChecker, govLogger)
-	areaService := application.NewAreaService(areaRepo, govLogger)
-	familyService := application.NewFamilyService(familyRepo, govLogger)
+	profileService := application.NewProfileService(profileRepo, tplChecker, logger)
+	areaService := application.NewAreaService(areaRepo, logger)
+	familyService := application.NewFamilyService(familyRepo, logger)
 	handler := thttp.NewHandler(profileService, areaService, familyService)
 
 	return &Module{Handler: handler}

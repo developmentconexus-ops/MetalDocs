@@ -3,6 +3,9 @@ package taxonomy
 import (
 	"context"
 	"testing"
+
+	auditdomain "metaldocs/internal/modules/audit/domain"
+	"metaldocs/internal/platform/db"
 )
 
 type stubTemplateChecker struct{}
@@ -11,8 +14,13 @@ func (stubTemplateChecker) IsPublished(_ context.Context, _ string) (bool, strin
 	return false, "", nil
 }
 
+type stubAuditWriter struct{}
+
+func (stubAuditWriter) Record(_ context.Context, _ auditdomain.Event) error       { return nil }
+func (stubAuditWriter) RecordTx(_ context.Context, _ db.Tx, _ auditdomain.Event) error { return nil }
+
 func TestNew_UsesDefaultTemplateCheckerWhenDependencyIsNil(t *testing.T) {
-	mod := New(Dependencies{TplChecker: stubTemplateChecker{}})
+	mod := New(Dependencies{TplChecker: stubTemplateChecker{}, AuditWriter: stubAuditWriter{}})
 	if mod == nil || mod.Handler == nil {
 		t.Fatal("expected module handler to be initialized")
 	}
