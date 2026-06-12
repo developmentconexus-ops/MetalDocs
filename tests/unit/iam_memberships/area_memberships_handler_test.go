@@ -43,6 +43,16 @@ const (
 
 // ─── fakes ───────────────────────────────────────────────────────────────
 
+// noopMembershipLogger satisfies iamapp.MembershipGovernanceLogger with a no-op.
+// Tests that need to assert governance log calls should use a recording variant;
+// this harness focuses on the HTTP-layer audit (recordingAudit), not the
+// service-layer governance log.
+type noopMembershipLogger struct{}
+
+func (noopMembershipLogger) Log(_ context.Context, _ string, _ iamdomain.UserProcessArea) error {
+	return nil
+}
+
 // memAreaRepo is an in-memory UserAreaWriteRepository. Tracks active rows
 // keyed by (userID, tenantID, areaCode); revoked rows are dropped (the
 // service only ever lists active anyway).
@@ -232,7 +242,7 @@ func newHarness(t *testing.T) *harness {
 	repo.tenantWide[adminID] = true
 	verifier := newTenantScopedVerifier()
 	audit := &recordingAudit{}
-	svc := iamapp.NewAreaMembershipService(repo, nil)
+	svc := iamapp.NewAreaMembershipService(repo, noopMembershipLogger{})
 	h := iamdelivery.NewMembershipHandler(svc, verifier, audit)
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)

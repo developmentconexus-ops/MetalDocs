@@ -39,8 +39,17 @@ const (
 	areaUnmanaged = "rh"
 )
 
+// noopMembershipLogger satisfies MembershipGovernanceLogger with a no-op so
+// integration tests that exercise tier-2 authz can construct the service
+// without a real audit sink.
+type noopMembershipLogger struct{}
+
+func (noopMembershipLogger) Log(_ context.Context, _ string, _ iamdomain.UserProcessArea) error {
+	return nil
+}
+
 func newAreaMembershipService(db *sql.DB) *iamapp.AreaMembershipService {
-	return iamapp.NewAreaMembershipService(pgrepo.NewUserAreaRepository(db), nil)
+	return iamapp.NewAreaMembershipService(pgrepo.NewUserAreaRepository(db), noopMembershipLogger{})
 }
 
 // seedIdentity inserts a minimal iam_users row (no tripwire on this table).

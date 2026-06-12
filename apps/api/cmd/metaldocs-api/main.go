@@ -358,8 +358,10 @@ func main() {
 	if deps.SQLDB != nil {
 		// WithRoleCacheInvalidator: grant/revoke must flush the cached role set so a
 		// changed area membership stops authorizing immediately, not after the TTL (A3).
-		membershipService = iamapp.NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), nil).
-			WithRoleCacheInvalidator(cachedProvider)
+		membershipService = iamapp.NewAreaMembershipService(
+			iampg.NewUserAreaRepository(deps.SQLDB),
+			newMembershipGovernanceLogger(deps.AuditWriter),
+		).WithRoleCacheInvalidator(cachedProvider)
 	}
 
 	// PR-4: People-tab orchestrator. AreaCatalogReader validates an invite's
@@ -961,6 +963,49 @@ type searchDocumentReaderAdapter struct {
 
 func (a searchDocumentReaderAdapter) GetDocumentTitle(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (string, error) {
 	return a.reader.GetDocumentTitle(ctx, string(tenantID), string(revisionID))
+}
+
+// membershipGovernanceLogger adapts the audit Writer to the
+// iamapp.MembershipGovernanceLogger port so grant/revoke write governance events
+// into the canonical audit_events sink (closes T-007). Identical pattern to
+// bypassAuditAdapter and documentsAuditAdapter.
+type membershipGovernanceLogger struct {
+	writer auditdomain.Writer
+}
+
+func newMembershipGovernanceLogger(writer auditdomain.Writer) *membershipGovernanceLogger {
+	if writer == nil {
+		panic("membershipGovernanceLogger: audit writer is required")
+	}
+	return &membershipGovernanceLogger{writer: writer}
+}
+
+func (l *membershipGovernanceLogger) Log(ctx context.Context, action string, membership iamdomain.UserProcessArea) error {
+	payload, err := json.Marshal(map[string]any{
+		"area_code": membership.AreaCode,
+		"role":      string(membership.Role),
+	})
+	if err != nil {
+		payload = []byte("{}")
+	}
+	grantedBy := ""
+	if membership.GrantedBy != nil {
+		grantedBy = *membership.GrantedBy
+	}
+	eventAction := "iam.area_membership.granted"
+	if action == "role.revoke" {
+		eventAction = "iam.area_membership.revoked"
+	}
+	return l.writer.Record(ctx, auditdomain.Event{
+		ID:           uuid.NewString(),
+		OccurredAt:   time.Now().UTC(),
+		ActorID:      grantedBy,
+		Action:       eventAction,
+		ResourceType: "area_membership",
+		ResourceID:   membership.UserID,
+		PayloadJSON:  string(payload),
+		TenantID:     membership.TenantID,
+	})
 }
 
 // profileDefaultsAdapter bridges taxonomy ProfileRepository → documents module ProfileDefaultTemplateReader.

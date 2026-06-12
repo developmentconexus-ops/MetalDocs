@@ -226,7 +226,7 @@ func newPeopleServiceForTest(t *testing.T) (*iamapp.PeopleService, *peopleServic
 	// we use a noop in-memory shim. The Invite happy-path test does not pass
 	// memberships, and the deferred PR-7 force-logout test does not need it.
 	noopMembership := &noopAreaRepo{}
-	memberships := iamapp.NewAreaMembershipService(noopMembership, nil)
+	memberships := iamapp.NewAreaMembershipService(noopMembership, noopMembershipLogger{})
 
 	// We pass our fakeAuthService through the iface-only constructor by
 	// reaching into the package; PeopleService accepts an interface in
@@ -273,6 +273,13 @@ func (noopAreaRepo) GrantAtomic(context.Context, iamdomain.UserProcessArea, iamd
 }
 func (noopAreaRepo) GetActiveByUserAndArea(context.Context, string, string, string, time.Time) (*iamdomain.UserProcessArea, error) {
 	return nil, nil
+}
+
+// noopMembershipLogger satisfies iamapp.MembershipGovernanceLogger with a no-op.
+type noopMembershipLogger struct{}
+
+func (noopMembershipLogger) Log(_ context.Context, _ string, _ iamdomain.UserProcessArea) error {
+	return nil
 }
 
 // Builds a PeopleService using the test fakes. We cannot reach the unexported

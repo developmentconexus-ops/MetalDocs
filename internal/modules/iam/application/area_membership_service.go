@@ -50,6 +50,12 @@ type AreaMembershipService struct {
 }
 
 func NewAreaMembershipService(repo UserAreaWriteRepository, logger MembershipGovernanceLogger) *AreaMembershipService {
+	if repo == nil {
+		panic("iam.NewAreaMembershipService: repo is required")
+	}
+	if logger == nil {
+		panic("iam.NewAreaMembershipService: logger is required")
+	}
 	return &AreaMembershipService{
 		repo:   repo,
 		logger: logger,
@@ -126,10 +132,8 @@ func (s *AreaMembershipService) Grant(
 		// the cache flush is a best-effort safety net and must not be gated on the
 		// governance-logger outcome (A3).
 		s.invalidate(userID, tenantID)
-		if s.logger != nil {
-			if err := s.logger.Log(ctx, "role.grant", membership); err != nil {
-				return fmt.Errorf("log membership grant: %w", err)
-			}
+		if err := s.logger.Log(ctx, "role.grant", membership); err != nil {
+			return fmt.Errorf("log membership grant: %w", err)
 		}
 		return nil
 	}
@@ -140,10 +144,8 @@ func (s *AreaMembershipService) Grant(
 	// Flush the actor's cached roles unconditionally once the mutation commits
 	// (see above): not gated on the governance-logger outcome (A3).
 	s.invalidate(userID, tenantID)
-	if s.logger != nil {
-		if err := s.logger.Log(ctx, "role.grant", membership); err != nil {
-			return fmt.Errorf("log membership grant: %w", err)
-		}
+	if err := s.logger.Log(ctx, "role.grant", membership); err != nil {
+		return fmt.Errorf("log membership grant: %w", err)
 	}
 	return nil
 }
@@ -184,14 +186,12 @@ func (s *AreaMembershipService) Revoke(
 	// the cache flush is a best-effort safety net and must not be gated on the
 	// governance-logger outcome (A3).
 	s.invalidate(userID, tenantID)
-	if s.logger != nil {
-		membership := *active
-		if revokedBy != "" {
-			membership.GrantedBy = &revokedBy
-		}
-		if err := s.logger.Log(ctx, "role.revoke", membership); err != nil {
-			return fmt.Errorf("log membership revoke: %w", err)
-		}
+	membership := *active
+	if revokedBy != "" {
+		membership.GrantedBy = &revokedBy
+	}
+	if err := s.logger.Log(ctx, "role.revoke", membership); err != nil {
+		return fmt.Errorf("log membership revoke: %w", err)
 	}
 	return nil
 }

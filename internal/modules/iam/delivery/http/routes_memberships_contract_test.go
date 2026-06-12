@@ -15,6 +15,15 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// noopMembershipLogger satisfies MembershipGovernanceLogger with a no-op so
+// contract tests that exercise error-envelope shapes can construct the service
+// without a real audit sink.
+type noopMembershipLogger struct{}
+
+func (noopMembershipLogger) Log(_ context.Context, _ string, _ iamdomain.UserProcessArea) error {
+	return nil
+}
+
 type fakeUserAreaWriteRepository struct{}
 
 func (f fakeUserAreaWriteRepository) ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]iamdomain.UserProcessArea, error) {
@@ -87,7 +96,7 @@ func (capDeniedAreaRepo) CloseActive(ctx context.Context, userID, tenantID, area
 // the removed RoleSystemAdmin handler gate; the equivalent forbidden outcome is
 // now ErrCapDenied bubbling from the repository, mapped to 403 AUTH_FORBIDDEN.
 func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
-	svc := iamapp.NewAreaMembershipService(capDeniedAreaRepo{}, nil)
+	svc := iamapp.NewAreaMembershipService(capDeniedAreaRepo{}, noopMembershipLogger{})
 	handler := NewMembershipHandler(svc, passThroughVerifier{}, nil)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
@@ -116,7 +125,7 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 }
 
 func TestMembershipsHandler_SystemAdminCanTargetOtherUser(t *testing.T) {
-	svc := iamapp.NewAreaMembershipService(fakeUserAreaWriteRepository{}, nil)
+	svc := iamapp.NewAreaMembershipService(fakeUserAreaWriteRepository{}, noopMembershipLogger{})
 	handler := NewMembershipHandler(svc, passThroughVerifier{}, nil)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
