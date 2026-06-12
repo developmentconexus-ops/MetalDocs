@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -188,7 +189,11 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 			"export_id":      job.ID,
 		}
 		if event, evErr := domain.NewEvent(job.TenantID.String(), "audit_export", job.ID, actorID, "audit.export.requested", summary); evErr == nil {
-			_ = s.writer.Record(ctx, event)
+			// Best-effort governance event (the export job is already persisted), but a
+			// silent drop would lose an audit-trail record with no trace — log it.
+			if recErr := s.writer.Record(ctx, event); recErr != nil {
+				slog.Warn("audit export governance event dropped", "export_id", job.ID, "err", recErr)
+			}
 		}
 	}
 

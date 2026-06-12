@@ -25,13 +25,13 @@ func NewPDFOutboxRepository(db *sql.DB) *PDFOutboxRepository {
 }
 
 func (r *PDFOutboxRepository) Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error {
-	var exec interface {
-		ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-	} = r.db
-	if tx != nil {
-		exec = tx
+	// The outbox INSERT MUST share the caller's business transaction (atomic dispatch).
+	// A nil tx would silently autocommit the outbox row outside that transaction, breaking
+	// the transactional-outbox guarantee — fail loud (db.Tx contract: a nil Tx is never valid).
+	if tx == nil {
+		return fmt.Errorf("pdf outbox enqueue: tx must not be nil")
 	}
-	_, err := exec.ExecContext(ctx, `
+	_, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.pdf_dispatch_outbox (tenant_id, revision_id, content_hash)
 VALUES ($1::uuid, $2::uuid, $3)
 ON CONFLICT (tenant_id, revision_id) DO NOTHING`,
