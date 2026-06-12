@@ -63,7 +63,7 @@ func TestUpsertApprovalConfig_Happy_NeverPublished_AsAuthor(t *testing.T) {
 	}
 }
 
-func TestUpsertApprovalConfig_Happy_NeverPublished_AsAdmin(t *testing.T) {
+func TestUpsertApprovalConfig_Happy_NeverPublished_AsSystemAdmin(t *testing.T) {
 	repo := newFakeRepo()
 	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1"}
 	repo.templates[tpl.ID] = tpl
@@ -74,7 +74,7 @@ func TestUpsertApprovalConfig_Happy_NeverPublished_AsAdmin(t *testing.T) {
 		TenantID:     "tenant-a",
 		ActorUserID:  "admin-1",
 		TemplateID:   tpl.ID,
-		ActorRoles:   []string{"admin"},
+		ActorRoles:   []string{"system_admin"},
 		ReviewerRole: nil,
 		ApproverRole: "approver",
 	})
@@ -86,7 +86,65 @@ func TestUpsertApprovalConfig_Happy_NeverPublished_AsAdmin(t *testing.T) {
 	}
 }
 
-func TestUpsertApprovalConfig_Happy_EverPublished_AsAdmin(t *testing.T) {
+func TestUpsertApprovalConfig_Happy_NeverPublished_AsQmsAdmin(t *testing.T) {
+	repo := newFakeRepo()
+	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1"}
+	repo.templates[tpl.ID] = tpl
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
+		TenantID:     "tenant-a",
+		ActorUserID:  "qms-1",
+		TemplateID:   tpl.ID,
+		ActorRoles:   []string{"qms_admin"},
+		ApproverRole: "approver",
+	})
+	if err != nil {
+		t.Fatalf("UpsertApprovalConfig returned error for qms_admin: %v", err)
+	}
+}
+
+func TestUpsertApprovalConfig_Happy_EverPublished_AsSystemAdmin(t *testing.T) {
+	repo := newFakeRepo()
+	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1", PublishedVersionID: strPtr("ver-1")}
+	repo.templates[tpl.ID] = tpl
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
+		TenantID:     "tenant-a",
+		ActorUserID:  "admin-1",
+		TemplateID:   tpl.ID,
+		ActorRoles:   []string{"system_admin"},
+		ApproverRole: "approver",
+	})
+	if err != nil {
+		t.Fatalf("UpsertApprovalConfig returned error: %v", err)
+	}
+}
+
+func TestUpsertApprovalConfig_Happy_EverPublished_AsQmsAdmin(t *testing.T) {
+	repo := newFakeRepo()
+	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1", PublishedVersionID: strPtr("ver-1")}
+	repo.templates[tpl.ID] = tpl
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
+		TenantID:     "tenant-a",
+		ActorUserID:  "qms-1",
+		TemplateID:   tpl.ID,
+		ActorRoles:   []string{"qms_admin"},
+		ApproverRole: "approver",
+	})
+	if err != nil {
+		t.Fatalf("UpsertApprovalConfig returned error for qms_admin on published template: %v", err)
+	}
+}
+
+func TestUpsertApprovalConfig_Forbidden_EverPublished_PhantomAdminRole(t *testing.T) {
+	// "admin" is not a canonical role — must be denied even on published templates.
 	repo := newFakeRepo()
 	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1", PublishedVersionID: strPtr("ver-1")}
 	repo.templates[tpl.ID] = tpl
@@ -100,8 +158,28 @@ func TestUpsertApprovalConfig_Happy_EverPublished_AsAdmin(t *testing.T) {
 		ActorRoles:   []string{"admin"},
 		ApproverRole: "approver",
 	})
+	if !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for phantom admin role on published template, got %v", err)
+	}
+}
+
+func TestUpsertApprovalConfig_Forbidden_NeverPublished_AuthorAsQmsAdmin_Creator_Passes(t *testing.T) {
+	// creator + no operator role → allowed (creator bypass)
+	repo := newFakeRepo()
+	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1"}
+	repo.templates[tpl.ID] = tpl
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
+		TenantID:     "tenant-a",
+		ActorUserID:  "author-1",
+		TemplateID:   tpl.ID,
+		ActorRoles:   []string{"author"},
+		ApproverRole: "approver",
+	})
 	if err != nil {
-		t.Fatalf("UpsertApprovalConfig returned error: %v", err)
+		t.Fatalf("creator (not operator) should be allowed on unpublished template, got %v", err)
 	}
 }
 
@@ -155,7 +233,7 @@ func TestUpsertApprovalConfig_Archived(t *testing.T) {
 		TenantID:     "tenant-a",
 		ActorUserID:  "admin-1",
 		TemplateID:   tpl.ID,
-		ActorRoles:   []string{"admin"},
+		ActorRoles:   []string{"system_admin"},
 		ApproverRole: "approver",
 	})
 	if !errors.Is(err, domain.ErrArchived) {

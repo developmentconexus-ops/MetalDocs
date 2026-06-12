@@ -2,6 +2,8 @@ package http
 
 import (
 	"net/http"
+
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 type catalogEntry struct {
@@ -26,7 +28,7 @@ func (h *Handler) listPlaceholderCatalog(w http.ResponseWriter, r *http.Request)
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
-	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}

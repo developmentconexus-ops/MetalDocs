@@ -100,6 +100,12 @@ func RunRegistryRules(modulesRoot string, fset *token.FileSet, strict bool) ([]V
 	}
 	out = append(out, rolestr...)
 
+	tier1, err := checkNoRawStringTier1Authz(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, tier1...)
+
 	return out, nil
 }
 
@@ -739,6 +745,73 @@ func checkWikiCapabilityParity(modulesRoot string, strict bool) ([]Violation, er
 		}
 	}
 	return out, nil
+}
+
+// checkNoRawStringTier1Authz is the ADR 0022 tier-1 companion to
+// checkNoRawStringCapability. While no-rawstring-capability covers authz.Require
+// / authz.RequireAll (tier-2 application-layer calls), tier-1 delivery gates go
+// through the AuthzFunc field `h.authz(r, tenantID, area, cap)` — a method-value
+// call where the capability is the 4th argument (index 3). This rule bans a raw
+// capability-shaped string literal in that position.
+//
+// Detection: any call expression whose callee is a SelectorExpr with selector
+// name "authz" (i.e. `h.authz(...)` — the canonical delivery-layer pattern) AND
+// whose 4th argument is a BasicLit string. A variable / typed-const conversion
+// (`string(iamdomain.CapXxx)`) is not a BasicLit and is correctly ignored.
+// Scoped to non-test .go files whose path contains "/delivery/http/".
+func checkNoRawStringTier1Authz(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
+	out := []Violation{}
+	err := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".claude", "node_modules", "vendor":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		lower := strings.ToLower(path)
+		if !strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, "_test.go") {
+			return nil
+		}
+		if !strings.Contains(filepath.ToSlash(path), "/delivery/http/") {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			// Match: X.authz(...) — the AuthzFunc field call pattern.
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "authz" {
+				return true
+			}
+			// The capability is the 4th argument (index 3).
+			if len(call.Args) < 4 {
+				return true
+			}
+			lit, ok := call.Args[3].(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return true
+			}
+			out = append(out, Violation{
+				File:    path,
+				Line:    fset.Position(call.Pos()).Line,
+				Rule:    "no-rawstring-tier1-authz",
+				Message: "raw-string capability literal " + lit.Value + " passed as the tier-1 authz action arg; reference a typed const from internal/modules/iam/domain (string(iamdomain.CapXxx)) — a phantom capability compiles clean but permanently locks the route (ADR 0022 F-11)",
+			})
+			return true
+		})
+		return nil
+	})
+	return out, err
 }
 
 // lineOf returns the 1-based line number of byte offset off in content.

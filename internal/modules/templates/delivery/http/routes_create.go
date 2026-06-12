@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
 )
@@ -17,7 +18,7 @@ func (h *Handler) createNextVersion(w http.ResponseWriter, r *http.Request) {
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 
-	if err := h.authz(r, tenantID, "*", "template.create"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateCreate)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}

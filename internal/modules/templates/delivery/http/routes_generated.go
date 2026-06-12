@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
 )
@@ -23,7 +24,7 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 		return
 	}
 	actorID := userIDFromReq(r)
-	if err := h.authz(r, tenantID, "*", "template.create"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateCreate)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -102,7 +103,7 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	actorID := userIDFromReq(r)
-	if err := h.authz(r, tenantID, "*", "template.edit"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -145,7 +146,7 @@ func (h *Handler) SaveTemplateDraft(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 	actorID := userIDFromReq(r)
-	if err := h.authz(r, tenantID, "*", "template.edit"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -200,7 +201,7 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	actorID := userIDFromReq(r)
-	if err := h.authz(r, tenantID, "*", "template.approve"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplatePublish)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}

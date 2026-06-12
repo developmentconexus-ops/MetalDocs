@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/application"
 )
 
@@ -20,7 +21,7 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
-	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -80,7 +81,7 @@ func (h *Handler) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request)
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
-	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -108,7 +109,7 @@ func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	templateID := r.PathValue("id")
-	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -140,7 +141,7 @@ func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	templateID := r.PathValue("id")
-	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -170,7 +171,7 @@ func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	templateID := r.PathValue("id")
-	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -202,7 +203,7 @@ func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	templateID := r.PathValue("id")
-	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateView)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}

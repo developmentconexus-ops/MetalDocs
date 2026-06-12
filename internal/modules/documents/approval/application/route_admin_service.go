@@ -220,7 +220,7 @@ func (s *RouteAdminService) createTx(ctx context.Context, db *sql.DB, in CreateR
 	}
 	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
 		TenantID:     in.TenantID,
-		EventType:    "route.config.created",
+		EventType:    EventTypeRouteConfigCreated,
 		ActorUserID:  in.ActorUserID,
 		ResourceType: "approval_route",
 		ResourceID:   routeID,
@@ -372,7 +372,7 @@ func (s *RouteAdminService) updateTx(ctx context.Context, db *sql.DB, in UpdateR
 	}
 	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
 		TenantID:     in.TenantID,
-		EventType:    "route.config.updated",
+		EventType:    EventTypeRouteConfigUpdated,
 		ActorUserID:  in.ActorUserID,
 		ResourceType: "approval_route",
 		ResourceID:   in.RouteID,
@@ -517,7 +517,7 @@ func (s *RouteAdminService) deactivateTx(ctx context.Context, db *sql.DB, in Dea
 	}
 	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
 		TenantID:     in.TenantID,
-		EventType:    "route.config.deactivated",
+		EventType:    EventTypeRouteConfigDeactivated,
 		ActorUserID:  in.ActorUserID,
 		ResourceType: "approval_route",
 		ResourceID:   in.RouteID,

@@ -32,12 +32,14 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 	}
 
 	hasEverPublished := template.PublishedVersionID != nil
+	isOperator := containsRole(cmd.ActorRoles, string(iamdomain.RoleSystemAdmin)) ||
+		containsRole(cmd.ActorRoles, string(iamdomain.RoleQmsAdmin))
 	if hasEverPublished {
-		if !containsRole(cmd.ActorRoles, "admin") {
+		if !isOperator {
 			return nil, domain.ErrForbidden
 		}
 	} else {
-		if template.CreatedBy != cmd.ActorUserID && !containsRole(cmd.ActorRoles, "admin") {
+		if template.CreatedBy != cmd.ActorUserID && !isOperator {
 			return nil, domain.ErrForbidden
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
 )
@@ -22,7 +23,7 @@ func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authz(r, tenantID, "*", "template.edit"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}

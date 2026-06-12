@@ -467,3 +467,67 @@ func containsMsg(vs []Violation, sub string) bool {
 	}
 	return false
 }
+
+// --- no-rawstring-tier1-authz (ADR 0022 F-11 tier-1 lint) -------------------
+
+func TestNoRawStringTier1Authz_BitesOnLiteralCap(t *testing.T) {
+	dir := t.TempDir()
+	// Simulates h.authz(r, tenantID, "*", "template.admin") — the pre-fix defect.
+	writeFile(t, dir, "pkg/delivery/http/h.go",
+		"package http\nfunc f(h *Handler, r interface{}, tenantID string) error {\n\treturn h.authz(r, tenantID, \"*\", \"template.admin\")\n}\ntype Handler struct { authz func(interface{}, string, string, string) error }\n")
+	got, err := checkNoRawStringTier1Authz(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rawstring-tier1-authz"); n != 1 {
+		t.Fatalf("raw cap literal in tier-1: want 1 violation, got %d: %+v", n, got)
+	}
+	if !containsMsg(got, "template.admin") {
+		t.Fatalf("violation message should name the literal: %+v", got)
+	}
+}
+
+func TestNoRawStringTier1Authz_GreenOnTypedConst(t *testing.T) {
+	dir := t.TempDir()
+	// string(iamdomain.CapTemplateEdit) is a CallExpr, not a BasicLit — passes.
+	writeFile(t, dir, "pkg/delivery/http/h.go",
+		"package http\nfunc f(h *Handler, r interface{}, tenantID string) error {\n\treturn h.authz(r, tenantID, \"*\", string(iamdomain.CapTemplateEdit))\n}\ntype Handler struct { authz func(interface{}, string, string, string) error }\n")
+	got, err := checkNoRawStringTier1Authz(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rawstring-tier1-authz"); n != 0 {
+		t.Fatalf("typed const: want 0, got %d: %+v", n, got)
+	}
+}
+
+func TestNoRawStringTier1Authz_IgnoresTestFilesAndNonDelivery(t *testing.T) {
+	dir := t.TempDir()
+	// Test file — exempt.
+	writeFile(t, dir, "pkg/delivery/http/h_test.go",
+		"package http\nfunc f(h *Handler, r interface{}) { h.authz(r, \"t\", \"*\", \"template.admin\") }\ntype Handler struct { authz func(interface{}, string, string, string) error }\n")
+	// Non-delivery path — exempt.
+	writeFile(t, dir, "pkg/application/svc.go",
+		"package app\nfunc f(h *Handler, r interface{}) { h.authz(r, \"t\", \"*\", \"template.admin\") }\ntype Handler struct { authz func(interface{}, string, string, string) error }\n")
+	got, err := checkNoRawStringTier1Authz(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rawstring-tier1-authz"); n != 0 {
+		t.Fatalf("test+non-delivery: want 0, got %d: %+v", n, got)
+	}
+}
+
+func TestNoRawStringTier1Authz_IgnoresVariableCap(t *testing.T) {
+	dir := t.TempDir()
+	// Variable cap arg (e.g. passed as parameter) is not a BasicLit — exempt.
+	writeFile(t, dir, "pkg/delivery/http/h.go",
+		"package http\nfunc f(h *Handler, r interface{}, tenantID, cap string) error {\n\treturn h.authz(r, tenantID, \"*\", cap)\n}\ntype Handler struct { authz func(interface{}, string, string, string) error }\n")
+	got, err := checkNoRawStringTier1Authz(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rawstring-tier1-authz"); n != 0 {
+		t.Fatalf("variable cap: want 0, got %d: %+v", n, got)
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/application"
 )
 
@@ -22,7 +23,7 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authz(r, tenantID, "*", "template.edit"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -61,7 +62,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authz(r, tenantID, "*", "template.edit"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}

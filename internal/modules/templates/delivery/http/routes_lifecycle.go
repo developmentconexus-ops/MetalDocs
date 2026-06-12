@@ -22,7 +22,7 @@ func (h *Handler) submitForReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authz(r, tenantID, "*", "template.submit"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateSubmit)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -59,7 +59,7 @@ func (h *Handler) review(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authz(r, tenantID, "*", "template.review"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateReview)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -108,7 +108,7 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authz(r, tenantID, "*", "template.approve"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateApprove)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -158,7 +158,7 @@ func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 
-	if err := h.authz(r, tenantID, "*", "template.archive"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateArchive)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -189,7 +189,7 @@ func (h *Handler) upsertApprovalConfig(w http.ResponseWriter, r *http.Request) {
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 
-	if err := h.authz(r, tenantID, "*", "template.admin"); err != nil {
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
 		writeMappedErr(w, err)
 		return
 	}

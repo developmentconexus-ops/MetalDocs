@@ -15,6 +15,10 @@ const (
 	EventTypePublishScheduled          EventType = "publish_scheduled"
 	EventTypeSignoffRejected           EventType = "signoff.rejected"
 	EventTypeSignoffRecorded           EventType = "signoff_recorded"
+
+	EventTypeRouteConfigCreated     EventType = "route.config.created"
+	EventTypeRouteConfigUpdated     EventType = "route.config.updated"
+	EventTypeRouteConfigDeactivated EventType = "route.config.deactivated"
 )
 
 // GovernanceEvent mirrors the governance_events table columns.
