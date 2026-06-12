@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
@@ -39,14 +40,22 @@ func (slogReauthEmitter) EmitAuthFailed(ctx context.Context, actorUserID, reason
 }
 
 // newSignoffReauthRegistry builds the e-signature verifier registry wired into
-// the approval DecisionService. The process-local rate limiter throttles
-// repeated bad attempts per acting user.
-func newSignoffReauthRegistry(repo authdomain.Repository) *signature.Registry {
+// the approval DecisionService. When a real database is available (production /
+// integration mode) a Postgres-backed rate limiter is used so lockout state
+// survives API restarts and is shared across replicas (F-20e, REQ-REL-3, D-1).
+// In-memory is kept for dev/test mode (nil db).
+func newSignoffReauthRegistry(repo authdomain.Repository, db *sql.DB) *signature.Registry {
+	var limiter signature.AuthFailureRateLimiter
+	if db != nil {
+		limiter = signature.NewPostgresAuthFailureRateLimiter(db)
+	} else {
+		limiter = signature.NewInMemoryAuthFailureRateLimiter()
+	}
 	registry := signature.NewRegistry()
 	registry.Register(signature.NewPasswordReauthProvider(
 		authPasswordHashReader{repo: repo},
 		slogReauthEmitter{},
-		signature.NewInMemoryAuthFailureRateLimiter(),
+		limiter,
 	))
 	return registry
 }

@@ -1,6 +1,6 @@
 # Database Dictionary Index
 
-> **Last verified:** 2026-05-21 (controlled-documents/platform rename — registry classification retired)
+> **Last verified:** 2026-06-12 (F-20e: auth_failure_counters added — migration 0235)
 > **Source:** `db/baseline/0001_current_schema.sql`
 
 | Table | Schema | Owner | Page |
@@ -47,6 +47,7 @@
 | `template_drafts` | `metaldocs` | templates | `wiki/database/tables/template_drafts.md` |
 | `workflow_approvals` | `metaldocs` | approval | `wiki/database/tables/workflow_approvals.md` |
 | `approval_instances` | `public` | approval | `wiki/database/tables/approval_instances.md` |
+| `auth_failure_counters` | `public` | approval | `wiki/database/tables/auth_failure_counters.md` |
 | `approval_route_stages` | `public` | approval | `wiki/database/tables/approval_route_stages.md` |
 | `approval_routes` | `public` | approval | `wiki/database/tables/approval_routes.md` |
 | `approval_signoffs` | `public` | approval | `wiki/database/tables/approval_signoffs.md` |

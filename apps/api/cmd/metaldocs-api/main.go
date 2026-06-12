@@ -545,7 +545,7 @@ func main() {
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService, fanoutCfg.pdfDispatchAdapter,
 	).WithPDFOutbox(pdfOutboxRepo).WithPinInvoker(fanoutCfg.freezeService).
-		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo))
+		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB))
 	docDeps.SubmitSvc = approvalServices.Submit
 
 	docMod := documents.New(docDeps)
