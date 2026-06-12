@@ -179,6 +179,10 @@ func (fakeRoleProvider) RolesByUserIDs(_ context.Context, _ string, userIDs []st
 	return out, nil
 }
 
+func (fakeRoleProvider) UserActiveInTenant(_ context.Context, _, _ string) (bool, error) {
+	return true, nil
+}
+
 type fakeAuditWriter struct {
 	mu     sync.Mutex
 	events []auditdomain.Event

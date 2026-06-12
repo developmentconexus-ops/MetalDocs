@@ -408,8 +408,8 @@ func (r *Repository) RolesByUserID(_ context.Context, userID, _ string) ([]iamdo
 
 // RolesByUserIDs resolves roles for multiple users in a single call (in-memory).
 // Mirrors batch semantics: inactive/absent users are omitted; active users with
-// no roles are present with an empty slice.
-func (r *Repository) RolesByUserIDs(_ context.Context, _ string, userIDs []string) (map[string][]iamdomain.Role, error) {
+// no roles are present with an empty slice. M-6: tenantID is now honored.
+func (r *Repository) RolesByUserIDs(_ context.Context, tenantID string, userIDs []string) (map[string][]iamdomain.Role, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := make(map[string][]iamdomain.Role, len(userIDs))
@@ -418,11 +418,36 @@ func (r *Repository) RolesByUserIDs(_ context.Context, _ string, userIDs []strin
 		if !ok || !identity.IsActive {
 			continue
 		}
+		// M-6: only include users that belong to the requested tenant.
+		if !sliceContains(r.tenants[uid], tenantID) {
+			continue
+		}
 		clone := make([]iamdomain.Role, len(identity.Roles))
 		copy(clone, identity.Roles)
 		out[uid] = clone
 	}
 	return out, nil
+}
+
+// UserActiveInTenant returns true iff the user is active and belongs to tenantID.
+func (r *Repository) UserActiveInTenant(_ context.Context, tenantID, userID string) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	identity, ok := r.users[userID]
+	if !ok || !identity.IsActive {
+		return false, nil
+	}
+	return sliceContains(r.tenants[userID], tenantID), nil
+}
+
+// sliceContains reports whether s contains v.
+func sliceContains(s []string, v string) bool {
+	for _, e := range s {
+		if e == v {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, _ string, role iamdomain.Role, _ string) error {

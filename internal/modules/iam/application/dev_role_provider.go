@@ -43,6 +43,20 @@ func (p *DevRoleProvider) RolesByUserID(_ context.Context, userID, tenantID stri
 	return out, nil
 }
 
+// UserActiveInTenant returns true iff tenantID matches the allowed tenant and
+// userID is present in the known-user set. Dev mode has no deactivation state.
+func (p *DevRoleProvider) UserActiveInTenant(_ context.Context, tenantID, userID string) (bool, error) {
+	if strings.TrimSpace(tenantID) != p.allowedTenantID {
+		return false, nil
+	}
+	id := strings.TrimSpace(userID)
+	if id == "" {
+		return false, nil
+	}
+	_, ok := p.rolesByUser[id]
+	return ok, nil
+}
+
 // RolesByUserIDs resolves roles for multiple users in a single call (dev mode).
 // Mirrors the batch semantics: absent/inactive users are omitted from the map;
 // active users with no roles are present with an empty slice.

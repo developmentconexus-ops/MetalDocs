@@ -43,6 +43,10 @@ func (m *mockRoleProvider) RolesByUserID(_ context.Context, userID, tenantID str
 	return roles, nil
 }
 
+func (m *mockRoleProvider) UserActiveInTenant(_ context.Context, _, _ string) (bool, error) {
+	return true, nil
+}
+
 func (m *mockRoleProvider) RolesByUserIDs(_ context.Context, tenantID string, userIDs []string) (map[string][]iamdomain.Role, error) {
 	out := make(map[string][]iamdomain.Role, len(userIDs))
 	for _, uid := range userIDs {

@@ -378,18 +378,6 @@ func main() {
 		areaCatalog = iampg.NewProcessAreaCatalog(deps.SQLDB)
 	}
 	peopleService := iamapp.NewPeopleService(authService, cachedProvider, deps.RoleAdminRepo, membershipService, areaCatalog, cachedProvider)
-	if deps.SQLDB != nil {
-		// Wire the EXISTS-based tenant membership checker (F-10/REQ-DATA-2):
-		// VerifyUserInTenant now does a single EXISTS query instead of loading
-		// the full user list. deps.RoleProvider is *iampg.RoleProvider (Postgres
-		// mode) which satisfies iamapp.TenantMemberChecker via UserActiveInTenant.
-		if checker, ok := deps.RoleProvider.(iamapp.TenantMemberChecker); ok {
-			peopleService.WithTenantMemberChecker(checker)
-		} else {
-			slog.Warn("TenantMemberChecker type assertion failed: EXISTS fast path inactive; VerifyUserInTenant will fall back to full-scan",
-				"role_provider_type", fmt.Sprintf("%T", deps.RoleProvider))
-		}
-	}
 	iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter).RegisterRoutes(mux)
 
 	// PR-1 (area-memberships rebuild): MembershipHandler now takes a

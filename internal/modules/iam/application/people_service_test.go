@@ -40,6 +40,10 @@ func (stubRoles) RolesByUserIDs(_ context.Context, _ string, userIDs []string) (
 	return out, nil
 }
 
+func (stubRoles) UserActiveInTenant(_ context.Context, _, _ string) (bool, error) {
+	return true, nil
+}
+
 // spyInvalidator records InvalidateUserTenant calls so the create-path guard
 // (A3) can assert Invite flushes the role cache after the user is created.
 type spyInvalidator struct {

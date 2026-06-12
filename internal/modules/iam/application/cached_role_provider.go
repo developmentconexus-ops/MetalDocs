@@ -134,6 +134,12 @@ func (c *CachedRoleProvider) RolesByUserIDs(ctx context.Context, tenantID string
 	return out, nil
 }
 
+// UserActiveInTenant delegates to the base provider. Not cached: the answer
+// is deactivation-sensitive and must be authoritative on every call.
+func (c *CachedRoleProvider) UserActiveInTenant(ctx context.Context, tenantID, userID string) (bool, error) {
+	return c.base.UserActiveInTenant(ctx, tenantID, userID)
+}
+
 func (c *CachedRoleProvider) InvalidateUserTenant(userID, tenantID string) {
 	c.evict(userID, tenantID)
 }

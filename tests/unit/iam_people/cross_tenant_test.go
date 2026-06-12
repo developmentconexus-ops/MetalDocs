@@ -69,9 +69,32 @@ func (a *tenantAwareAuth) CreateUser(context.Context, string, string, string, st
 	return nil
 }
 
+// tenantAwareRoleProvider wraps tenantAwareAuth to implement the full
+// peopleRoleProvider interface, including tenant-scoped UserActiveInTenant.
+type tenantAwareRoleProvider struct{ auth *tenantAwareAuth }
+
+func (p tenantAwareRoleProvider) RolesByUserID(_ context.Context, _, _ string) ([]iamdomain.Role, error) {
+	return []iamdomain.Role{iamdomain.RoleAuthor}, nil
+}
+func (p tenantAwareRoleProvider) RolesByUserIDs(_ context.Context, tenantID string, userIDs []string) (map[string][]iamdomain.Role, error) {
+	out := make(map[string][]iamdomain.Role, len(userIDs))
+	for _, uid := range userIDs {
+		out[uid] = []iamdomain.Role{iamdomain.RoleAuthor}
+	}
+	return out, nil
+}
+func (p tenantAwareRoleProvider) UserActiveInTenant(_ context.Context, tenantID, userID string) (bool, error) {
+	for _, u := range p.auth.usersByTenant[tenantID] {
+		if u.UserID == userID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func newCrossTenantMux(auth *tenantAwareAuth) *http.ServeMux {
 	roleAdmin := iammemory.NewRoleAdminRepository()
-	svc := iamapp.PeopleServiceFromInterfaces(auth, fakeRoleProvider{}, roleAdmin, nil, iamapp.PermissiveAreaCatalog{}, nil)
+	svc := iamapp.PeopleServiceFromInterfaces(auth, tenantAwareRoleProvider{auth}, roleAdmin, nil, iamapp.PermissiveAreaCatalog{}, nil)
 	h := iamdelivery.NewPeopleHandler(svc, auth, nil)
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)

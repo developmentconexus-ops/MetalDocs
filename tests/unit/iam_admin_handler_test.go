@@ -59,6 +59,10 @@ func (peopleRoleProviderShim) RolesByUserIDs(_ context.Context, _ string, userID
 	return out, nil
 }
 
+func (peopleRoleProviderShim) UserActiveInTenant(_ context.Context, _, _ string) (bool, error) {
+	return true, nil
+}
+
 type fakeInvalidator struct {
 	called bool
 	userID string
