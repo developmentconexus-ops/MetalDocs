@@ -1,6 +1,6 @@
 # Decisions
 
-> **Last verified:** 2026-06-08 (Phase F: ADR 0022 added to index; stamps bumped on 0007, 0022)
+> **Last verified:** 2026-06-11 (ADR 0027 added)
 > **Scope:** Durable ADRs and consequential technical decisions.
 
 - [0001-eigenpal-adoption.md](0001-eigenpal-adoption.md)
@@ -23,6 +23,7 @@
 - [0024-openapi-single-base-path.md](0024-openapi-single-base-path.md) — **Accepted** — AD-1: one `servers.url: /api/v1` + relative path keys; PATH-BASE-PREFIX gate kills the double-prefix bug class
 - [0025-error-envelope-rfc9457.md](0025-error-envelope-rfc9457.md) — **Accepted** — AD-2: RFC 9457 Problem is the only error shape; ApiErrorEnvelope retired; ENVELOPE-DRIFT blocking, zero exemptions
 - [0026-unified-authz-enforcement.md](0026-unified-authz-enforcement.md) — **Accepted** — AD-3: unified capability+area+grants is the only per-resource authz model; dead ABAC AccessPolicy path removed (extends ADR 0022)
+- [0027-rls-adoption-sequencing.md](0027-rls-adoption-sequencing.md) — **Accepted** — D-3: auth_identities tenant-global by design (T-008 closed); RLS sequencing: controlled_documents+audit_events Wave 2.3, iam_users deferred RF-6, remaining tables trigger-gated on first external tenant
 - [2026-06-03-audit-events-cursor-shape.md](2026-06-03-audit-events-cursor-shape.md) — **Closed 2026-06-08** — `/audit/events` runtime reconciled to the nested `page.{next_cursor,has_more}` CursorPage shape (Phase F re-audit); FE dual-shape adapter removed
 
 Legacy ADR material in `docs/adr/` remains historical/reference content until reconciled deliberately.
