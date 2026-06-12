@@ -1,6 +1,6 @@
 # Backend Blueprint — Composition, Standards, Maturity
 
-> **Last verified:** 2026-06-11 (Wave 1)
+> **Last verified:** 2026-06-12 (Wave F re-score — see §7)
 > **Scope:** The canonical answer to "what is the MetalDocs backend composed of". Defines every backend concern, maps it to our implementation, names the industry standard it must satisfy, and grades maturity. This is the reference for the industry-grade refactoring program.
 > **Out of scope:** Runtime topology ([system-overview.md](system-overview.md)), route truth ([backend-api-structure.md](backend-api-structure.md)), per-module deep dives (`wiki/modules/*`).
 > **Definition layer:** The implementation-independent canon this blueprint maps against is [../standards/backend-canon.md](../standards/backend-canon.md) — read it first if you want the universal model before our specifics.
@@ -239,7 +239,7 @@ flowchart LR
 
 #### D9. Quality gates & testing — ✅
 - **Definition:** CI enforces the contract: unit + integration + race detector + API lint.
-- **We have:** `go test -race`, `scripts/api-lint` exit-code gated, module-level `*_test.go` throughout, `internal/test` + `internal/testsupport` fixtures. `tools/cilint` custom analyzers (6 analyzers; Wave 1 added `platformboundary` enforcing REQ-TOP-2). QA operating system in [../quality/qa-operating-system.md](../quality/qa-operating-system.md).
+- **We have:** `go test -race`, `scripts/api-lint` exit-code gated, module-level `*_test.go` throughout, `internal/test` + `internal/testsupport` fixtures. `tools/cilint` custom analyzers (**7 analyzers**, all exit 0 at Wave F: `txownership`, `legacyvocab`, `outboxpair`, `platformboundary` [REQ-TOP-2, Wave 1], `postcommitaudit` [REQ-ASYNC-1, Wave 2.2], `nosqltxindomain` + `nodualmode` [Wave 2.13]) plus the `chain_test.go` order test and gitleaks secret-scan — 6 program CI guards. QA operating system in [../quality/qa-operating-system.md](../quality/qa-operating-system.md).
 
 ---
 
@@ -255,7 +255,7 @@ The named external standards this backend is held to. Cite these in reviews inst
 | **OWASP ASVS / Top 10** | B*, D3 | Working checklist for security review |
 | **12-Factor App** (config, processes, logs) | D4, binaries | Adopted |
 | **Transactional Outbox** (microservices.io) | C6 | Adopted (ADR 0009, 0015) |
-| **OpenTelemetry** semantic conventions | D2 | Target — wiring depth unverified |
+| **OpenTelemetry** semantic conventions | D2 | Deferred by design (D-1; RF-1/F-17) — interim bar = trace-ID `slog` + RED metrics |
 | **C4 model** (Simon Brown) | architecture docs | Adopted (`wiki/diagrams/c4-*.md`) |
 | **ADR practice** (Nygard) | decisions | Adopted (`wiki/decisions/`) |
 | **ISO 9001** controlled-document semantics | domain itself | Product requirement, drives freeze/audit design |
@@ -273,10 +273,44 @@ The named external standards this backend is held to. Cite these in reviews inst
 | C1 modules, C2 persistence, C3 blobs, C5 search, C6 async | ✅ | — |
 | C4 caching | 🟡 | empty `platform/cache` deleted (Wave 1); authz-cache invalidation contract still open (RF-3) |
 | D1 errors, D3 security, D4 config, D5 audit, D6 internal HTTP, D9 quality | ✅ | backend-standardization (final polish in flight) |
-| D2 observability | 🟡 | **unowned — needs audit** (exporters, cross-service trace, readiness depth) |
-| D7 feature flags, D8 messaging | 🟡 | document-or-fence decision pending |
+| D2 observability | 🟡 | RF-1 / F-17 — **deferred by design (D-1)**: OTel exporter + W3C `traceparent` + readiness depth gated on "second host or first external-tenant SLA". The audit is *done* (no longer "unowned"); interim bar (trace-ID `slog` + RED metrics + principal attribution) met Wave 1.1, runtime-verified Wave F F.3 |
+| D7 feature flags, D8 messaging | 🟡 | RF-8 (flag lifecycle doc) / RF-7 (servicebus fence) — document-or-fence, trigger: first production flag / broker decision |
 
 **Rule:** a 🟡 → ✅ promotion requires evidence (commands run, QA outcome) per the close-out loop in `CLAUDE.md` §4, recorded in the owning program doc.
+
+### Wave F re-score (2026-06-12)
+
+The backend-professionalization program (Waves 0–2) fixed **defects within** concerns more than it promoted grades — several concerns were graded ✅ while harboring open correctness/compliance defects; those defects are now closed, so the ✅ is genuinely earned. Grade deltas:
+
+| Concern | Before | After | Why |
+|---|---|---|---|
+| C6 async | ✅ (with F-19 silent failure) | ✅ (earned) | F-19 fully closed (jobs Dockerfile+compose, single River-migration owner, lease_reaper JOIN bug) — Wave 0.5/1.6/1.7; **runtime-verified Wave F F.3** (live jobs host claims+executes `scheduled_publish_cutover`; worker relays `pdf_dispatch_outbox`→`outbox_events`) |
+| D5 audit | ✅ (with F-07 atomicity gap) | ✅ (earned) | Post-commit audit/governance writes moved in-transaction across 5 modules (F-07/D-01, Wave 2.2); `PostCommitAudit` cilint guard blocks regression; **runtime-verified Wave F F.3** (in-tx `family.created` row) |
+| D3 security | ✅ | ✅ (strengthened) | F-18 credentials scrubbed + gitleaks CI (Wave 0); F-05 domain-importing limiter deleted, `platform/ratelimit` activated (Wave 2.8); F-20e in-memory→Postgres auth-failure counter (Wave 2.10) |
+| D2 observability | 🟡 "unowned — needs audit" | 🟡 (owned, deferred) | No grade change (OTel still absent **by design**), but the gap is now an audited, trigger-gated defer (D-1), not an unknown |
+| C4 caching, D7 flags, D8 messaging | 🟡 | 🟡 (clarified) | No code-level change; each now carries a written RF/trigger (RF-3, RF-8, RF-7) instead of an open question |
+
+**Deliberately NOT promoted (honest):** **B2 authz** stays 🟡 — Wave 2.4 closed the capability-literal correctness defect (F-11) and added the `no-rawstring-tier1-authz` lint, and ADR 0022 phases 1–13 are done, but Phase 6 (wiki sync, F.7) and the RF-3 authz-cache invalidation contract remain open. **A3 contract** stays 🟡 — the program's contract items closed (F-03 parallel-surface delete + RF-4, F-13a/b, api-lint **0 violations** at Wave F), but the separate `api-contract-hardening` C–F backlog is the residual owner. Promotion to ✅ for both requires those residuals closed, per the evidence rule above.
+
+### REQ-* compliance (Wave F check against `backend-target-architecture.md`)
+
+| REQ-* | Finding(s) | State | Evidence |
+|---|---|---|---|
+| REQ-MW-1/2/4/5/7 (middleware chain) | F-01 | **MET** | Wave 1.1 reorder + `chain_test.go`; F.3 live (panic→500 problem+json, 401s in RED metrics, pre-auth 429) |
+| REQ-TOP-1 (no cross-module SQL/infra) | F-06b/c/d | **MET (4/9); residual next-touch** | Wave 2.5/2.6/2.7; F-06e + security-JOIN + standalone-CD-repo deferred |
+| REQ-TOP-2 (platform domain-free) | F-06a, F-05 | **MET + CI-locked** | Wave 0.6/2.8; `platformboundary` analyzer exit 0 (F.1) |
+| REQ-TOP-3 (no dead platform pkgs) | F-08 | **MET** | Wave 1.9/2.13 |
+| REQ-ASYNC-1 (in-tx audit) | F-07, D-01 | **MET + CI-locked** | Wave 2.2; `PostCommitAudit` analyzer exit 0 (F.1); F.3 live |
+| REQ-ASYNC-4 (jobs deployment) | F-19 | **MET** | Wave 0.5/1.6/1.7; F.3 live |
+| REQ-REL-1/2 (server timeouts) | F-16 | **MET (timeouts); F-16B/C deferred** | Wave 1.2 |
+| REQ-REL-3 (durable auth-failure limit) | F-20e | **MET** | Wave 2.10 live PG probe |
+| REQ-AUTHZ-2/5/6 (typed caps, registry, batch) | F-11, F-10 | **MET + CI-locked** | Wave 2.4/2.9; `no-rawstring-tier1-authz` api-lint rule |
+| REQ-TEN-1 / REQ-DATA-2 (DB-layer isolation) | F-12 | **MET (2 tables); rest trigger-gated** | Wave 2.3 RLS on controlled_documents+audit_events; F.3 live NOSUPERUSER probe; iam_users→RF-6, rest→first-external-tenant |
+| REQ-SEC-1 (no secrets in VCS) | F-18 | **MET (working tree); history→D-4b re-baseline** | Wave 0; gitleaks CI |
+| REQ-API-2 (single contract surface) | F-03 | **MET** | Wave 1.3; RF-4 closed |
+| REQ-H-1/H-2 (repo boundary, problem+json everywhere) | F-06b, F-09, D-03 | **MET** | Wave 1.4/1.5/2.5 |
+| REQ-OBS-1/2/3 (OTel, W3C trace) | F-17 | **DEFERRED (D-1 trigger)** | interim bar met (trace-ID slog + RED metrics); see D2 |
+| REQ-CACHE-1 (cache contract) | D-05 | **DEFERRED (next IAM feature)** | doc-only |
 
 ---
 
