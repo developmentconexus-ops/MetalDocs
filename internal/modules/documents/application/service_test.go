@@ -2,10 +2,13 @@ package application_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"testing"
 	"time"
+
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
@@ -13,6 +16,28 @@ import (
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
 )
+
+// newPermissiveMockDB returns a *sql.DB that satisfies Begin/Commit/Exec calls
+// without any SQL assertions. Used by tests that exercise code paths touching
+// s.db but whose repo/audit fakes absorb all real work.
+func newPermissiveMockDB(t *testing.T) *sql.DB {
+	t.Helper()
+	anyMatcher := sqlmock.QueryMatcherFunc(func(_, _ string) error { return nil })
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(anyMatcher))
+	if err != nil {
+		t.Fatalf("newPermissiveMockDB: %v", err)
+	}
+	mock.MatchExpectationsInOrder(false)
+	t.Cleanup(func() { _ = mockDB.Close() })
+	for i := 0; i < 10; i++ {
+		mock.ExpectBegin()
+		mock.ExpectCommit()
+	}
+	for i := 0; i < 50; i++ {
+		mock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	return mockDB
+}
 
 type fakeRepo struct {
 	createDocErr     error
@@ -498,7 +523,8 @@ func TestCreateCheckpoint_OK(t *testing.T) {
 
 func TestRenameDocument_OK(t *testing.T) {
 	repo := &fakeRepo{docReturn: &domain.Document{ID: "doc_1", TenantID: "tenant_1", Status: domain.DocStatusDraft}}
-	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{}).
+		WithDB(newPermissiveMockDB(t))
 
 	err := svc.RenameDocument(context.Background(), "tenant_1", "user_1", "doc_1", "  New Name  ")
 	if err != nil {

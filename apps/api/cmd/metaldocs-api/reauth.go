@@ -40,22 +40,14 @@ func (slogReauthEmitter) EmitAuthFailed(ctx context.Context, actorUserID, reason
 }
 
 // newSignoffReauthRegistry builds the e-signature verifier registry wired into
-// the approval DecisionService. When a real database is available (production /
-// integration mode) a Postgres-backed rate limiter is used so lockout state
-// survives API restarts and is shared across replicas (F-20e, REQ-REL-3, D-1).
-// In-memory is kept for dev/test mode (nil db).
+// the approval DecisionService. The Postgres-backed rate limiter ensures lockout
+// state survives API restarts and is shared across replicas (F-20e, REQ-REL-3, D-1).
 func newSignoffReauthRegistry(repo authdomain.Repository, db *sql.DB) *signature.Registry {
-	var limiter signature.AuthFailureRateLimiter
-	if db != nil {
-		limiter = signature.NewPostgresAuthFailureRateLimiter(db)
-	} else {
-		limiter = signature.NewInMemoryAuthFailureRateLimiter()
-	}
 	registry := signature.NewRegistry()
 	registry.Register(signature.NewPasswordReauthProvider(
 		authPasswordHashReader{repo: repo},
 		slogReauthEmitter{},
-		limiter,
+		signature.NewPostgresAuthFailureRateLimiter(db),
 	))
 	return registry
 }

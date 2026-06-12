@@ -69,34 +69,25 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 		return nil, err
 	}
 
-	if s.db != nil {
-		tx, err := s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, fmt.Errorf("templates approval config: begin tx: %w", err)
-		}
-		defer func() { _ = tx.Rollback() }()
-		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return nil, fmt.Errorf("templates approval config: setAuthzGUC: %w", err)
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
-			return nil, fmt.Errorf("templates approval config: authz: %w", err)
-		}
-		if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &config); err != nil {
-			return nil, wrapAppErr("templates approval config: upsert", err)
-		}
-		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-			return nil, wrapAppErr("templates approval config: append audit", err)
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := s.repo.UpsertApprovalConfig(ctx, &config); err != nil {
-			return nil, wrapAppErr("templates approval config: upsert", err)
-		}
-		if err := s.repo.AppendAudit(ctx, audit); err != nil { //cilint:allow-post-commit-audit
-			return nil, wrapAppErr("templates approval config: append audit", err)
-		}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("templates approval config: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+		return nil, fmt.Errorf("templates approval config: setAuthzGUC: %w", err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+		return nil, fmt.Errorf("templates approval config: authz: %w", err)
+	}
+	if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &config); err != nil {
+		return nil, wrapAppErr("templates approval config: upsert", err)
+	}
+	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+		return nil, wrapAppErr("templates approval config: append audit", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 
 	return &config, nil

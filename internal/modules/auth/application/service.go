@@ -95,8 +95,7 @@ type Service struct {
 	roleAdmin    iamdomain.RoleAdminRepository
 	capProvider  authdomain.CapabilityProvider
 	// loginCtxPort records governance metadata on iam_users after a successful
-	// login. Optional: when nil the write is skipped (memory/test mode). Wired
-	// at the composition root via WithLoginContextPort (F-06c).
+	// login. Required: must be non-nil at construction (F-06c, 2.13 step 1).
 	loginCtxPort iamdomain.LoginContextPort
 	cfg          Config
 	now          func() time.Time
@@ -115,14 +114,6 @@ func (s *Service) WithCapabilityProvider(p authdomain.CapabilityProvider) *Servi
 	return s
 }
 
-// WithLoginContextPort wires the IAM port that records governance metadata on
-// iam_users after a successful login (last_login_ip, user_agent, device_label).
-// When not wired the write is skipped — memory/test mode does not need it.
-func (s *Service) WithLoginContextPort(p iamdomain.LoginContextPort) *Service {
-	s.loginCtxPort = p
-	return s
-}
-
 type createUserTxRepository interface {
 	CreateUserTx(ctx context.Context, tx *sql.Tx, params authdomain.CreateUserParams) error
 }
@@ -135,7 +126,10 @@ type beginTxRepository interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
-func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, cfg Config) (*Service, error) {
+func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, loginCtxPort iamdomain.LoginContextPort, cfg Config) (*Service, error) {
+	if loginCtxPort == nil {
+		panic("auth.NewService: loginCtxPort is required")
+	}
 	if len(cfg.SessionSecret.Value()) < 32 {
 		return nil, fmt.Errorf("new auth service: session secret must be at least 32 characters")
 	}
@@ -149,6 +143,7 @@ func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider,
 		repo:         repo,
 		roleProvider: roleProvider,
 		roleAdmin:    roleAdmin,
+		loginCtxPort: loginCtxPort,
 		cfg:          cfg,
 		now:          time.Now,
 		dummyHash:    dummyHash,
@@ -291,11 +286,9 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	// is the source of truth. PR-7 will populate deviceLabel via UA parsing.
 	// The write is delegated to the IAM module via LoginContextPort (F-06c) so
 	// that auth does not hold a direct SQL dependency on iam_users.
-	if s.loginCtxPort != nil {
-		if err := s.loginCtxPort.RecordLoginContext(ctx, identity.UserID, tenantID, s.remoteIP(r), truncate(strings.TrimSpace(r.UserAgent()), 512), ""); err != nil {
-			// Swallow — governance hint must not block login.
-			_ = err
-		}
+	if err := s.loginCtxPort.RecordLoginContext(ctx, identity.UserID, tenantID, s.remoteIP(r), truncate(strings.TrimSpace(r.UserAgent()), 512), ""); err != nil {
+		// Swallow — governance hint must not block login.
+		_ = err
 	}
 
 	rawToken, sessionID, err := s.newSessionToken()

@@ -109,6 +109,14 @@ func newMockRoleAdminRepository() *mockRoleAdminRepository {
 	}
 }
 
+// noopLoginCtxPort satisfies iamdomain.LoginContextPort with no-op writes.
+// Used in tests that do not require governance metadata recording.
+type noopLoginCtxPort struct{}
+
+func (noopLoginCtxPort) RecordLoginContext(_ context.Context, _, _, _, _, _ string) error {
+	return nil
+}
+
 const testSessionSecret = "0123456789abcdef0123456789abcdef"
 
 func mustHashPassword(t *testing.T, password string) authdomain.PasswordHash {
@@ -122,7 +130,7 @@ func mustHashPassword(t *testing.T, password string) authdomain.PasswordHash {
 
 func mustNewService(t *testing.T, repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, cfg Config) *Service {
 	t.Helper()
-	svc, err := NewService(repo, roleProvider, roleAdmin, cfg)
+	svc, err := NewService(repo, roleProvider, roleAdmin, noopLoginCtxPort{}, cfg)
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
@@ -130,7 +138,7 @@ func mustNewService(t *testing.T, repo authdomain.Repository, roleProvider iamdo
 }
 
 func TestNewService_RejectsShortSessionSecret(t *testing.T) {
-	svc, err := NewService(memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), Config{
+	svc, err := NewService(memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), noopLoginCtxPort{}, Config{
 		SessionSecret: "too-short",
 	})
 	if err == nil {

@@ -11,10 +11,8 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
-	auditmemory "metaldocs/internal/modules/audit/infrastructure/memory"
 	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
 	authdomain "metaldocs/internal/modules/auth/domain"
-	authmemory "metaldocs/internal/modules/auth/infrastructure/memory"
 	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
@@ -22,13 +20,11 @@ import (
 	"metaldocs/internal/platform/config"
 	pgdb "metaldocs/internal/platform/db/postgres"
 	"metaldocs/internal/platform/messaging"
-	nooppub "metaldocs/internal/platform/messaging/noop"
 	outboxpg "metaldocs/internal/platform/messaging/outbox/postgres"
 	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/render/gotenberg"
 	"metaldocs/internal/platform/servicebus"
 	miniostore "metaldocs/internal/platform/storage/minio"
-	"metaldocs/internal/platform/tenant"
 )
 
 type APIDependencies struct {
@@ -72,7 +68,7 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 	}
 
 	switch repoMode {
-	case config.RepositoryPostgres:
+	case config.RepositoryPostgres: //nolint:gocritic // single-case switch reserved for future modes
 		pgCfg, err := config.LoadPostgresConfig()
 		if err != nil {
 			return APIDependencies{}, fmt.Errorf("load postgres config: %w", err)
@@ -124,34 +120,7 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			Cleanup:           func() { _ = closeDB(db) },
 		}, nil
 	default:
-		roles := authn.DevRoleMap()
-		authRepo := authmemory.NewRepository()
-		for userID, userRoles := range roles {
-			if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, tenant.DevTenantID, userRoles[0], "bootstrap"); err != nil {
-				return APIDependencies{}, err
-			}
-			for _, role := range userRoles[1:] {
-				if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, tenant.DevTenantID, role, "bootstrap"); err != nil {
-					return APIDependencies{}, err
-				}
-			}
-		}
-		auditStore := auditmemory.NewWriter()
-		auditExports := auditmemory.NewExportJobRepository()
-		return APIDependencies{
-			RoleProvider:    authRepo,
-			RoleAdminRepo:   authRepo,
-			AuthRepo:        authRepo,
-			AuditWriter:     auditStore,
-			AuditReader:     auditStore,
-			AuditCounter:    auditStore,
-			AuditExports:    auditExports,
-			AuditValidator:  auditStore,
-			Publisher:       nooppub.NewPublisher(),
-			GotenbergClient: gotenbergClient,
-			StatusProvider:  observability.NewStaticRuntimeStatusProvider(repoMode, string(attachmentsCfg.Provider), authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
-			Cleanup:         func() {},
-		}, nil
+		return APIDependencies{}, fmt.Errorf("unsupported repository mode: %q", repoMode)
 	}
 }
 

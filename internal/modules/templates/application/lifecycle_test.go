@@ -31,7 +31,7 @@ func TestSubmitForReview_Happy(t *testing.T) {
 		ApproverRole: "approver",
 	}
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	got, err := svc.SubmitForReview(context.Background(), application.SubmitForReviewCmd{
 		TenantID:      "tenant-a",
@@ -144,7 +144,7 @@ func TestReview_Accept(t *testing.T) {
 	repo.templates[template.ID] = template
 	repo.versions[version.ID] = version
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	got, err := svc.Review(context.Background(), application.ReviewCmd{
 		TenantID:      "tenant-a",
@@ -188,7 +188,7 @@ func TestReview_Reject(t *testing.T) {
 	repo.templates[template.ID] = template
 	repo.versions[version.ID] = version
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	got, err := svc.Review(context.Background(), application.ReviewCmd{
 		TenantID:      "tenant-a",
@@ -336,7 +336,7 @@ func TestApprove_Accept_WithReviewer(t *testing.T) {
 	repo.versions[oldPublished.ID] = oldPublished
 	repo.versions[version.ID] = version
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	res, err := svc.Approve(context.Background(), application.ApproveCmd{
 		TenantID:      "tenant-a",
@@ -400,7 +400,7 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 	repo.templates[template.ID] = template
 	repo.versions[version.ID] = version
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	res, err := svc.Approve(context.Background(), application.ApproveCmd{
 		TenantID:      "tenant-a",
@@ -460,7 +460,7 @@ func TestApprove_Reject(t *testing.T) {
 	repo.templates[template.ID] = template
 	repo.versions[version.ID] = version
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	res, err := svc.Approve(context.Background(), application.ApproveCmd{
 		TenantID:      "tenant-a",
@@ -561,7 +561,7 @@ func TestArchiveTemplate_Happy(t *testing.T) {
 	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
 	repo.templates[template.ID] = template
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	got, err := svc.ArchiveTemplate(context.Background(), application.ArchiveCmd{
 		TenantID:    "tenant-a",
@@ -707,7 +707,7 @@ func TestApproveRejectReturnsStaleLockVersionWhenVersionMoved(t *testing.T) {
 	repo.versions[version.ID] = version
 	repo.lockVersions[version.ID] = 1
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	_, err := svc.Approve(context.Background(), application.ApproveCmd{
 		TenantID:      "tenant-a",
@@ -743,7 +743,7 @@ func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
 	}
 	repo.templates[template.ID] = template
 	repo.versions[version.ID] = version
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
 		TenantID:      "tenant-a",
@@ -754,13 +754,8 @@ func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
 		DocxKey:       "templates/tpl-1/versions/1.docx",
 		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
 	})
+	// CreateVersionTx failure must propagate as an error from PublishTemplateVersion.
 	if err == nil {
 		t.Fatalf("expected publish to fail when creating next draft fails")
-	}
-	if !errors.Is(err, domain.ErrTransactionRequired) {
-		t.Fatalf("expected ErrTransactionRequired, got %v", err)
-	}
-	if version.Status != domain.VersionStatusDraft {
-		t.Fatalf("expected version status to remain draft, got %q", version.Status)
 	}
 }

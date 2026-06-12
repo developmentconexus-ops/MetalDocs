@@ -38,11 +38,6 @@ func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	if h.db == nil {
-		WriteError(w, errors.New("database not configured"))
-		return
-	}
-
 	var body contracts.SupersedeRequest
 	if err := contracts.Decode(r, &body); err != nil {
 		WriteError(w, err)

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
@@ -55,10 +56,19 @@ func TestNewControlledDocumentService_PanicsOnNilRequiredDependencies(t *testing
 }
 
 func TestCreate_AutoCode(t *testing.T) {
+	mockDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	t.Cleanup(func() { _ = mockDB.Close() })
+	mock.ExpectBegin()
+	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
+	mock.ExpectCommit()
+
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	seq := &fakeSequenceAllocator{next: 1}
-	svc := NewControlledDocumentService(nil, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
+	svc := NewControlledDocumentService(mockDB, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
 	svc.now = func() time.Time { return time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC) }
 
 	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
@@ -66,6 +76,7 @@ func TestCreate_AutoCode(t *testing.T) {
 		ProfileCode:     "po",
 		ProcessAreaCode: "quality",
 		Title:           "Welding Procedure",
+		DocumentName:    "Welding Procedure v1",
 		OwnerUserID:     "owner-1",
 		ActorUserID:     "actor-1",
 		VisibilityScope: "restricted",
@@ -159,8 +170,17 @@ func TestCreate_ManualCode_ShortReason(t *testing.T) {
 }
 
 func TestCreate_UsesControlledDocumentConstructorValidation(t *testing.T) {
-	svc := NewControlledDocumentService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
-	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+	mockDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	t.Cleanup(func() { _ = mockDB.Close() })
+	mock.ExpectBegin()
+	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
+	mock.ExpectRollback()
+
+	svc := NewControlledDocumentService(mockDB, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
+	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "po",
 		ProcessAreaCode: "quality",
@@ -195,18 +215,28 @@ func TestCreate_DuplicateCode(t *testing.T) {
 }
 
 func TestCreate_OverrideTemplate_GovernanceEvent(t *testing.T) {
+	mockDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	t.Cleanup(func() { _ = mockDB.Close() })
+	mock.ExpectBegin()
+	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
+	mock.ExpectCommit()
+
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "po"},
 	}}
-	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
+	svc := NewControlledDocumentService(mockDB, repo, &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
 
-	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
 		ProfileCode:               "po",
 		ProcessAreaCode:           "quality",
 		Title:                     "Welding Procedure",
+		DocumentName:              "Welding Procedure v1",
 		OwnerUserID:               "owner-1",
 		ActorUserID:               "actor-1",
 		OverrideTemplateVersionID: stringPtr("tpl-ovr-1"),
@@ -224,7 +254,7 @@ func TestCreate_OverrideTemplate_MissingReason(t *testing.T) {
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "po"},
 	}}
-	svc := NewControlledDocumentService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
+	svc := NewControlledDocumentService(newPermissiveMockDB(t), newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
@@ -415,6 +445,42 @@ func (f *fakeGovernanceLogger) LogTx(_ context.Context, _ db.Tx, e taxonomydomai
 
 func stringPtr(v string) *string { return &v }
 
+// newPermissiveMockDB returns a *sql.DB that accepts Begin/Exec/Query/Rollback/Commit
+// calls without hard per-query assertions. It is used by tests that exercise code
+// paths touching s.db (authz GUC calls) but whose repo/logger fakes absorb the real
+// work. The actor/tenant IDs default to "actor-1"/"tenant-a" matching most test cmds.
+func newPermissiveMockDB(t *testing.T) *sql.DB {
+	t.Helper()
+	anyMatcher := sqlmock.QueryMatcherFunc(func(_, _ string) error { return nil })
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(anyMatcher))
+	if err != nil {
+		t.Fatalf("newPermissiveMockDB: sqlmock.New: %v", err)
+	}
+	mock.MatchExpectationsInOrder(false)
+	t.Cleanup(func() { _ = mockDB.Close() })
+	for i := 0; i < 10; i++ {
+		mock.ExpectBegin()
+		mock.ExpectCommit()
+		mock.ExpectRollback()
+	}
+	for i := 0; i < 100; i++ {
+		mock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	// 2-arg pool: system_admin EXISTS check → bool true
+	for i := 0; i < 20; i++ {
+		mock.ExpectQuery("").
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	}
+	// 0-arg pool: actor_id, tenant_id, asserted_caps
+	for i := 0; i < 20; i++ {
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("actor-1"))
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("tenant-a"))
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow(""))
+	}
+	return mockDB
+}
+
 func newInvariantReadyDocumentInitializer() *fakeDocumentInitializer {
 	return &fakeDocumentInitializer{exists: true}
 }
@@ -550,7 +616,7 @@ func TestControlledDocumentService_Create_AtomicTemplateArtifactMissing_FailsClo
 		storageKey: "system/templates/blank.docx",
 		exists:     false,
 	}
-	svc := NewControlledDocumentService(nil, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
+	svc := NewControlledDocumentService(newPermissiveMockDB(t), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
 
 	templateVersionID := "00000000-0000-0000-0000-000000000102"
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
@@ -589,7 +655,7 @@ func TestControlledDocumentService_Create_AtomicTemplateArtifactMissing_FailsClo
 func TestControlledDocumentService_Create_TemplateArtifactInvariantUnconfigured_FailsClosed(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	seq := &fakeSequenceAllocator{next: 5}
-	svc := NewControlledDocumentService(nil, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+	svc := NewControlledDocumentService(newPermissiveMockDB(t), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
 
 	templateVersionID := "00000000-0000-0000-0000-000000000102"
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
@@ -690,7 +756,7 @@ func TestControlledDocumentService_Create_OverrideTemplateValidationWinsBeforeAr
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "qa"},
 	}}
-	svc := NewControlledDocumentService(nil, repo, seq, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
+	svc := NewControlledDocumentService(newPermissiveMockDB(t), repo, seq, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",

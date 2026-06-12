@@ -1,3 +1,4 @@
+// Test fixture only; not wired by bootstrap.
 package memory
 
 import (

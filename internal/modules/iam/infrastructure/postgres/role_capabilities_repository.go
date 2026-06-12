@@ -23,9 +23,6 @@ func NewRoleCapabilitiesRepository(db *sql.DB) *RoleCapabilitiesRepository {
 // ListRoleCapabilities returns every (role, capability) row from
 // metaldocs.role_capabilities, ordered for deterministic output.
 func (r *RoleCapabilitiesRepository) ListRoleCapabilities(ctx context.Context) ([]iamdomain.RoleCapabilityLink, error) {
-	if r == nil || r.db == nil {
-		return nil, fmt.Errorf("role_capabilities repository: db is nil")
-	}
 	const query = `
 SELECT role, capability
   FROM metaldocs.role_capabilities

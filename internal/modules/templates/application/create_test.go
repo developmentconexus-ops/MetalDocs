@@ -16,7 +16,7 @@ import (
 
 func TestCreateTemplate_Happy(t *testing.T) {
 	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	cmd := application.CreateTemplateCmd{
 		TenantID:     "tenant-a",
@@ -171,7 +171,7 @@ func TestCreateNextVersion_FromPublished(t *testing.T) {
 	}
 	repo.templates[template.ID] = template
 	repo.versions[v1.ID] = v1
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	got, err := svc.CreateNextVersion(context.Background(), application.CreateVersionCmd{
 		TenantID:    "tenant-a",
@@ -213,7 +213,7 @@ func TestCreateNextVersion_NoPublished_ClonesLatest(t *testing.T) {
 	}
 	repo.templates[template.ID] = template
 	repo.versions[v1.ID] = v1
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	got, err := svc.CreateNextVersion(context.Background(), application.CreateVersionCmd{
 		TenantID:    "tenant-a",

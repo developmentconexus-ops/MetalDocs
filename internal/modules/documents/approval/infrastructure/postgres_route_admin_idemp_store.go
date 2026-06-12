@@ -56,7 +56,7 @@ type PostgresRouteAdminIdempStore struct {
 
 func NewPostgresRouteAdminIdempStore(db *sql.DB) *PostgresRouteAdminIdempStore {
 	if db == nil {
-		return &PostgresRouteAdminIdempStore{}
+		panic("postgres_route_admin_idemp_store: db is nil")
 	}
 	return &PostgresRouteAdminIdempStore{
 		create:     idempotency.New(db, routeAdminCreateRouteTemplate),

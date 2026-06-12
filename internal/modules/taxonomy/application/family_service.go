@@ -16,6 +16,9 @@ type FamilyService struct {
 }
 
 func NewFamilyService(families domain.FamilyRepository, govLogger domain.GovernanceLogger) *FamilyService {
+	if govLogger == nil {
+		panic("taxonomy: FamilyService requires a non-nil GovernanceLogger")
+	}
 	return &FamilyService{families: families, govLogger: govLogger}
 }
 
@@ -53,23 +56,21 @@ func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) er
 	if err := s.families.CreateTx(ctx, tx, newFamily); err != nil {
 		return fmt.Errorf("taxonomy: create family %q: %w", newFamily.Code, err)
 	}
-	if s.govLogger != nil {
-		payload, err := marshalGovernancePayload(map[string]string{"code": string(newFamily.Code), "name": newFamily.Name})
-		if err != nil {
-			return fmt.Errorf("taxonomy: marshal family create governance payload: %w", err)
-		}
-		tenantID, _ := tenant.FromContext(ctx)
-		actorUserID, _ := authn.UserIDFromContext(ctx)
-		if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
-			TenantID:     tenantID,
-			EventType:    domain.GovernanceEventTypeFamilyCreated,
-			ActorUserID:  actorUserID,
-			ResourceType: "document_family",
-			ResourceID:   string(newFamily.Code),
-			PayloadJSON:  payload,
-		}); err != nil {
-			return fmt.Errorf("taxonomy: log family create governance event: %w", err)
-		}
+	payload, err := marshalGovernancePayload(map[string]string{"code": string(newFamily.Code), "name": newFamily.Name})
+	if err != nil {
+		return fmt.Errorf("taxonomy: marshal family create governance payload: %w", err)
+	}
+	tenantID, _ := tenant.FromContext(ctx)
+	actorUserID, _ := authn.UserIDFromContext(ctx)
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
+		TenantID:     tenantID,
+		EventType:    domain.GovernanceEventTypeFamilyCreated,
+		ActorUserID:  actorUserID,
+		ResourceType: "document_family",
+		ResourceID:   string(newFamily.Code),
+		PayloadJSON:  payload,
+	}); err != nil {
+		return fmt.Errorf("taxonomy: log family create governance event: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("taxonomy: commit family create tx: %w", err)
@@ -110,23 +111,21 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 	if err := s.families.UpdateTx(ctx, tx, existing); err != nil {
 		return nil, fmt.Errorf("taxonomy: update family %q: %w", existing.Code, err)
 	}
-	if s.govLogger != nil {
-		payload, err := marshalGovernancePayload(map[string]string{"code": string(existing.Code), "name": existing.Name})
-		if err != nil {
-			return nil, fmt.Errorf("taxonomy: marshal family update governance payload: %w", err)
-		}
-		tenantID, _ := tenant.FromContext(ctx)
-		actorUserID, _ := authn.UserIDFromContext(ctx)
-		if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
-			TenantID:     tenantID,
-			EventType:    domain.GovernanceEventTypeFamilyUpdated,
-			ActorUserID:  actorUserID,
-			ResourceType: "document_family",
-			ResourceID:   string(existing.Code),
-			PayloadJSON:  payload,
-		}); err != nil {
-			return nil, fmt.Errorf("taxonomy: log family update governance event: %w", err)
-		}
+	payload, err := marshalGovernancePayload(map[string]string{"code": string(existing.Code), "name": existing.Name})
+	if err != nil {
+		return nil, fmt.Errorf("taxonomy: marshal family update governance payload: %w", err)
+	}
+	tenantID, _ := tenant.FromContext(ctx)
+	actorUserID, _ := authn.UserIDFromContext(ctx)
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
+		TenantID:     tenantID,
+		EventType:    domain.GovernanceEventTypeFamilyUpdated,
+		ActorUserID:  actorUserID,
+		ResourceType: "document_family",
+		ResourceID:   string(existing.Code),
+		PayloadJSON:  payload,
+	}); err != nil {
+		return nil, fmt.Errorf("taxonomy: log family update governance event: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("taxonomy: commit update family tx: %w", err)
@@ -168,22 +167,20 @@ func (s *FamilyService) Deactivate(ctx context.Context, code domain.FamilyCode) 
 	if err := s.families.UpdateTx(ctx, tx, f); err != nil {
 		return fmt.Errorf("taxonomy: update deactivated family %q: %w", code, err)
 	}
-	if s.govLogger != nil {
-		payload, err := marshalGovernancePayload(map[string]string{"code": string(code)})
-		if err != nil {
-			return fmt.Errorf("taxonomy: marshal family deactivate governance payload: %w", err)
-		}
-		actorUserID, _ := authn.UserIDFromContext(ctx)
-		if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
-			TenantID:     tenantID,
-			EventType:    domain.GovernanceEventTypeFamilyDeactivated,
-			ActorUserID:  actorUserID,
-			ResourceType: "document_family",
-			ResourceID:   string(code),
-			PayloadJSON:  payload,
-		}); err != nil {
-			return fmt.Errorf("taxonomy: log family deactivate governance event: %w", err)
-		}
+	payload, err := marshalGovernancePayload(map[string]string{"code": string(code)})
+	if err != nil {
+		return fmt.Errorf("taxonomy: marshal family deactivate governance payload: %w", err)
+	}
+	actorUserID, _ := authn.UserIDFromContext(ctx)
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
+		TenantID:     tenantID,
+		EventType:    domain.GovernanceEventTypeFamilyDeactivated,
+		ActorUserID:  actorUserID,
+		ResourceType: "document_family",
+		ResourceID:   string(code),
+		PayloadJSON:  payload,
+	}); err != nil {
+		return fmt.Errorf("taxonomy: log family deactivate governance event: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("taxonomy: commit deactivate family tx: %w", err)

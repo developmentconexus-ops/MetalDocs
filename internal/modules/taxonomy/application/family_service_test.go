@@ -91,7 +91,7 @@ func (r *fakeFamilyRepo) UpdateTx(_ context.Context, _ domain.FamilyTx, f *domai
 
 func TestFamilyService_Create(t *testing.T) {
 	repo := newFakeFamilyRepo()
-	svc := NewFamilyService(repo, nil)
+	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 
 	f := &domain.DocumentFamily{Code: "policy", Name: "Policy"}
 	if err := svc.Create(context.Background(), f); err != nil {
@@ -150,7 +150,7 @@ func TestFamilyService_Deactivate_BlockedByProfiles(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	repo.families["policy"] = &domain.DocumentFamily{Code: "policy", IsActive: true}
 	repo.activeProfiles["policy"] = true
-	svc := NewFamilyService(repo, nil)
+	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 	if err := svc.Deactivate(ctx, "policy"); err != domain.ErrFamilyHasProfiles {
@@ -164,7 +164,7 @@ func TestFamilyService_Deactivate_BlockedByProfiles(t *testing.T) {
 func TestFamilyService_Deactivate_OK(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	repo.families["orphan"] = &domain.DocumentFamily{Code: "orphan", IsActive: true}
-	svc := NewFamilyService(repo, nil)
+	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
 	if err := svc.Deactivate(ctx, "orphan"); err != nil {
@@ -179,7 +179,7 @@ func TestFamilyService_Deactivate_OK(t *testing.T) {
 func TestFamilyService_Update_PreservesIsActive(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	repo.families["policy"] = &domain.DocumentFamily{Code: "policy", Name: "Old", IsActive: false}
-	svc := NewFamilyService(repo, nil)
+	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 
 	if _, err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "policy", Name: "New"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -195,7 +195,7 @@ func TestFamilyService_Update_PreservesIsActive(t *testing.T) {
 
 func TestFamilyService_Update_NotFound(t *testing.T) {
 	repo := newFakeFamilyRepo()
-	svc := NewFamilyService(repo, nil)
+	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 	_, err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "missing", Name: "X"})
 	if !errors.Is(err, domain.ErrFamilyNotFound) {
 		t.Fatalf("want ErrFamilyNotFound, got %v", err)
@@ -204,7 +204,7 @@ func TestFamilyService_Update_NotFound(t *testing.T) {
 
 func TestFamilyService_Create_ValidationFromDomainConstructor(t *testing.T) {
 	repo := newFakeFamilyRepo()
-	svc := NewFamilyService(repo, nil)
+	svc := NewFamilyService(repo, &fakeGovernanceLogger{})
 
 	err := svc.Create(context.Background(), &domain.DocumentFamily{Code: "  ", Name: "Policy"})
 	if !errors.Is(err, domain.ErrFamilyCodeRequired) {

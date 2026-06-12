@@ -104,7 +104,7 @@ func NewHandlerWithSubmit(svc Service, db *sql.DB, submitSvc approvalSubmitter) 
 
 func NewHandlerWithSubmitAndFinalizeStore(svc Service, db *sql.DB, submitSvc approvalSubmitter, store finalizeIdempotencyStore) *Handler {
 	h := &Handler{svc: svc, db: db, submitSvc: submitSvc, idempFinalize: store}
-	if h.idempFinalize == nil && db != nil {
+	if h.idempFinalize == nil {
 		h.idempFinalize = idempotency.New(db, "POST /api/v1/documents/{id}/finalize")
 	}
 	return h
@@ -466,9 +466,6 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	actorForReplay := userIDFromReq(r)
 	idempStore := h.idempFinalize
-	if idempStore == nil && h.db != nil {
-		idempStore = idempotency.New(h.db, "POST /api/v1/documents/{id}/finalize")
-	}
 	var idempHandle *idempotency.ReplayHandle
 	idempReleased := false
 	if idempStore != nil {

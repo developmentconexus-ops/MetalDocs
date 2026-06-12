@@ -59,70 +59,43 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 	version.PendingApproverRole = cmd.ApproverRole
 	version.PendingReviewerRole = cmd.ReviewerRole
 
-	if s.db != nil {
-		tx, err := s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, fmt.Errorf("templates create: begin tx: %w", err)
-		}
-		defer func() { _ = tx.Rollback() }()
-		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return nil, fmt.Errorf("templates create: set authz context: %w", err)
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateCreate), "tenant"); err != nil {
-			return nil, fmt.Errorf("templates create: authz: %w", err)
-		}
-		if err := s.repo.CreateTemplateTx(ctx, tx, template); err != nil {
-			return nil, err
-		}
-		if err := s.repo.CreateVersionTx(ctx, tx, version); err != nil {
-			return nil, err
-		}
-		if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &domain.ApprovalConfig{
-			TemplateID:   template.ID,
-			ApproverRole: cmd.ApproverRole,
-			ReviewerRole: cmd.ReviewerRole,
-		}); err != nil {
-			return nil, err
-		}
-		if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{
-			TenantID:   cmd.TenantID,
-			TemplateID: template.ID,
-			VersionID:  &version.ID,
-			ActorID:    cmd.ActorUserID,
-			Action:     domain.AuditCreated,
-			Details:    map[string]any{},
-			OccurredAt: s.clock.Now(),
-		}); err != nil {
-			return nil, err
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := s.repo.CreateTemplate(ctx, template); err != nil {
-			return nil, err
-		}
-		if err := s.repo.CreateVersion(ctx, version); err != nil {
-			return nil, err
-		}
-		if err := s.repo.UpsertApprovalConfig(ctx, &domain.ApprovalConfig{
-			TemplateID:   template.ID,
-			ApproverRole: cmd.ApproverRole,
-			ReviewerRole: cmd.ReviewerRole,
-		}); err != nil {
-			return nil, err
-		}
-		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{ //cilint:allow-post-commit-audit
-			TenantID:   cmd.TenantID,
-			TemplateID: template.ID,
-			VersionID:  &version.ID,
-			ActorID:    cmd.ActorUserID,
-			Action:     domain.AuditCreated,
-			Details:    map[string]any{},
-			OccurredAt: s.clock.Now(),
-		}); err != nil {
-			return nil, err
-		}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("templates create: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+		return nil, fmt.Errorf("templates create: set authz context: %w", err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateCreate), "tenant"); err != nil {
+		return nil, fmt.Errorf("templates create: authz: %w", err)
+	}
+	if err := s.repo.CreateTemplateTx(ctx, tx, template); err != nil {
+		return nil, err
+	}
+	if err := s.repo.CreateVersionTx(ctx, tx, version); err != nil {
+		return nil, err
+	}
+	if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &domain.ApprovalConfig{
+		TemplateID:   template.ID,
+		ApproverRole: cmd.ApproverRole,
+		ReviewerRole: cmd.ReviewerRole,
+	}); err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{
+		TenantID:   cmd.TenantID,
+		TemplateID: template.ID,
+		VersionID:  &version.ID,
+		ActorID:    cmd.ActorUserID,
+		Action:     domain.AuditCreated,
+		Details:    map[string]any{},
+		OccurredAt: s.clock.Now(),
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 
 	return &CreateTemplateResult{
@@ -178,58 +151,37 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 		s.clock.Now(),
 	)
 
-	if s.db != nil {
-		tx, err := s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, fmt.Errorf("templates create next version: begin tx: %w", err)
-		}
-		defer func() { _ = tx.Rollback() }()
-		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return nil, fmt.Errorf("templates create next version: setAuthzGUC: %w", err)
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
-			return nil, fmt.Errorf("templates create next version: authz: %w", err)
-		}
-		if err := s.repo.CreateVersionTx(ctx, tx, version); err != nil {
-			return nil, err
-		}
-		template.LatestVersion = newNum
-		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
-			return nil, err
-		}
-		if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{
-			TenantID:   cmd.TenantID,
-			TemplateID: template.ID,
-			VersionID:  &version.ID,
-			ActorID:    cmd.ActorUserID,
-			Action:     domain.AuditCreated,
-			Details:    map[string]any{},
-			OccurredAt: s.clock.Now(),
-		}); err != nil {
-			return nil, err
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := s.repo.CreateVersion(ctx, version); err != nil {
-			return nil, err
-		}
-		template.LatestVersion = newNum
-		if err := s.repo.UpdateTemplate(ctx, template); err != nil {
-			return nil, err
-		}
-		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{ //cilint:allow-post-commit-audit
-			TenantID:   cmd.TenantID,
-			TemplateID: template.ID,
-			VersionID:  &version.ID,
-			ActorID:    cmd.ActorUserID,
-			Action:     domain.AuditCreated,
-			Details:    map[string]any{},
-			OccurredAt: s.clock.Now(),
-		}); err != nil {
-			return nil, err
-		}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("templates create next version: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+		return nil, fmt.Errorf("templates create next version: setAuthzGUC: %w", err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+		return nil, fmt.Errorf("templates create next version: authz: %w", err)
+	}
+	if err := s.repo.CreateVersionTx(ctx, tx, version); err != nil {
+		return nil, err
+	}
+	template.LatestVersion = newNum
+	if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{
+		TenantID:   cmd.TenantID,
+		TemplateID: template.ID,
+		VersionID:  &version.ID,
+		ActorID:    cmd.ActorUserID,
+		Action:     domain.AuditCreated,
+		Details:    map[string]any{},
+		OccurredAt: s.clock.Now(),
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 
 	return version, nil

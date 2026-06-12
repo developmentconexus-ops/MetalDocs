@@ -3,6 +3,7 @@ package signature
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,9 +41,68 @@ func (e *fakeEmitter) EmitAuthFailed(_ context.Context, actorID, _ string) {
 	e.failures = append(e.failures, actorID)
 }
 
+// testInMemoryLimiter is a test-only process-local rate limiter.
+// Not for production use — InMemoryAuthFailureRateLimiter was deleted (2.13 step 1).
+type testInMemoryLimiter struct {
+	mu      sync.Mutex
+	entries map[string]*struct {
+		count  int
+		oldest time.Time
+	}
+}
+
+func newTestLimiter() *testInMemoryLimiter {
+	return &testInMemoryLimiter{entries: make(map[string]*struct {
+		count  int
+		oldest time.Time
+	})}
+}
+
+func (l *testInMemoryLimiter) Allow(_ context.Context, actorID string) (bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	e, ok := l.entries[actorID]
+	if !ok {
+		return true, nil
+	}
+	if time.Now().Sub(e.oldest) >= windowDur {
+		delete(l.entries, actorID)
+		return true, nil
+	}
+	return e.count < maxFailures, nil
+}
+
+func (l *testInMemoryLimiter) RecordFailure(_ context.Context, actorID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	e, ok := l.entries[actorID]
+	if !ok {
+		l.entries[actorID] = &struct {
+			count  int
+			oldest time.Time
+		}{count: 1, oldest: now}
+		return nil
+	}
+	if now.Sub(e.oldest) >= windowDur {
+		e.count = 1
+		e.oldest = now
+	} else {
+		e.count++
+	}
+	return nil
+}
+
+func (l *testInMemoryLimiter) Reset(_ context.Context, actorID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.entries, actorID)
+	return nil
+}
+
 func newProvider(users map[string]string) (*PasswordReauthProvider, *fakeEmitter) {
 	em := &fakeEmitter{}
-	p := NewPasswordReauthProvider(newFakeReader(users), em, NewInMemoryAuthFailureRateLimiter())
+	p := NewPasswordReauthProvider(newFakeReader(users), em, newTestLimiter())
 	return p, em
 }
 
@@ -98,32 +158,6 @@ func TestPasswordReauthRateLimitTrip(t *testing.T) {
 	}
 }
 
-func TestPasswordReauthRateLimitResetAfterWindow(t *testing.T) {
-	p, _ := newProvider(map[string]string{"u1": "correct"})
-	req := SignRequest{ActorUserID: "u1", Credentials: map[string]string{"password": "wrong"}}
-
-	for i := 0; i < maxFailures; i++ {
-		p.Sign(context.Background(), req) //nolint
-	}
-
-	// Fake expiry by directly manipulating entry.
-	limiter, ok := p.limiter.(*InMemoryAuthFailureRateLimiter)
-	if !ok {
-		t.Fatalf("expected in-memory limiter")
-	}
-	limiter.mu.Lock()
-	limiter.entries["u1"].oldest = time.Now().Add(-windowDur - time.Second)
-	limiter.mu.Unlock()
-
-	// Window expired — rate limit should reset; still fails (wrong pw) but not rate-limited.
-	_, err := p.Sign(context.Background(), req)
-	if errors.Is(err, ErrRateLimited) {
-		t.Error("rate limit should reset after window expires")
-	}
-	if !errors.Is(err, ErrInvalidCredentials) {
-		t.Errorf("want ErrInvalidCredentials after reset; got %v", err)
-	}
-}
 
 func TestPasswordReauthFailsClosedWhenLimiterMissing(t *testing.T) {
 	em := &fakeEmitter{}

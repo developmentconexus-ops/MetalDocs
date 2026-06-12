@@ -3,12 +3,15 @@ package http_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/application"
@@ -17,6 +20,81 @@ import (
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
+
+// newPermissiveMockDB creates a *sql.DB backed by sqlmock that accepts any SQL
+// and returns suitable values for the two SQL layers that fire on every
+// write-path in the templates HTTP handler:
+//
+//  1. Idempotency middleware (routes wrapped in h.idempotent):
+//     BeginTx → QueryRowContext(INSERT…RETURNING, 5 args) → [handler runs] →
+//     Exec(UPDATE idempotency_keys) → Commit
+//
+//  2. authz.Require inside the service:
+//     BeginTx → 2×Exec(setAuthzGUC) →
+//     QueryRowContext(actor_id, 0 args) → QueryRowContext(tenant_id, 0 args) →
+//     QueryRowContext(system_admin EXISTS, 2 args) →
+//     QueryRowContext(asserted_caps, 0 args) → Exec(set asserted_caps) → Commit
+//
+// With MatchExpectationsInOrder(false) sqlmock picks the first unfulfilled
+// expectation whose arg count matches via attemptArgMatch.  We exploit this to
+// separate the three query shapes so each pool is consumed independently:
+//
+//   • 5-arg pool → idempotency INSERT…RETURNING (returns a non-empty string so
+//     the middleware treats the request as the "winner")
+//   • 2-arg pool → system_admin EXISTS (returns bool true)
+//   • 0-arg pool (WithoutArgs) → GUC reads: actor_id, tenant_id, asserted_caps
+//     (returned in cycles of three; true/true/"" so every 3rd is empty)
+//
+// Used exclusively in delivery/http tests that verify routing and marshalling,
+// not authz or idempotency SQL fidelity.
+func newPermissiveMockDB(t *testing.T) *sql.DB {
+	t.Helper()
+	anyMatcher := sqlmock.QueryMatcherFunc(func(_, _ string) error { return nil })
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(anyMatcher))
+	if err != nil {
+		t.Fatalf("newPermissiveMockDB: sqlmock.New: %v", err)
+	}
+	mock.MatchExpectationsInOrder(false)
+	t.Cleanup(func() { _ = mockDB.Close() })
+
+	// Begin / Commit / Exec pools (untyped; ordered=false picks first available).
+	for i := 0; i < 20; i++ {
+		mock.ExpectBegin()
+		mock.ExpectCommit()
+	}
+	for i := 0; i < 100; i++ {
+		mock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+
+	// 5-arg query pool: idempotency INSERT…RETURNING.
+	// Returns a non-empty string so the middleware sees itself as the "winner".
+	for i := 0; i < 10; i++ {
+		mock.ExpectQuery("").
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+				sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnRows(sqlmock.NewRows([]string{"tenant_id"}).AddRow("tenant-a"))
+	}
+
+	// 2-arg query pool: system_admin EXISTS check → bool true.
+	for i := 0; i < 10; i++ {
+		mock.ExpectQuery("").
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	}
+
+	// 0-arg query pool: actor_id, tenant_id, asserted_caps GUC reads.
+	// Each Require call consumes three 0-arg queries in this order:
+	//   1. actor_id  → "user-a"  (non-empty, passes MustActorID check)
+	//   2. tenant_id → "tenant-a" (non-empty, passes MustTenantID check)
+	//   3. asserted_caps → "" (empty, skips json.Unmarshal in loadAssertedCaps)
+	// 10 cycles covers up to 10 Require calls per test.
+	for i := 0; i < 10; i++ {
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("user-a"))
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("tenant-a"))
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow(""))
+	}
+	return mockDB
+}
 
 type fakeRepo struct {
 	templates       map[string]*domain.Template
@@ -266,7 +344,7 @@ func (fakePresigner) Delete(_ context.Context, _ string) error { return nil }
 
 func newMux(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo) *http.ServeMux {
 	t.Helper()
-	svc := application.New(repo, fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 	h := tmplhttp.New(svc, authz)
 	mux := http.NewServeMux()
 	h.Register(mux)

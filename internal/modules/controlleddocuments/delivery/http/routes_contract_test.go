@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
@@ -23,6 +24,42 @@ import (
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
+
+// newPermissiveMockDB returns a sqlmock *sql.DB with permissive expectations for
+// the authz.Require GUC sequence.  Used in tests that exercise handler routing
+// when the service now unconditionally uses a DB transaction for authz.
+//
+// Query pool uses arg-count discrimination (WithoutArgs / 2-arg AnyArg) so that
+// 0-arg GUC reads and 2-arg EXISTS checks each consume from their own ordered
+// sub-pool, matching the templates delivery/http pattern.
+func newPermissiveMockDB(t *testing.T) *sql.DB {
+	t.Helper()
+	anyMatcher := sqlmock.QueryMatcherFunc(func(_, _ string) error { return nil })
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(anyMatcher))
+	if err != nil {
+		t.Fatalf("newPermissiveMockDB: sqlmock.New: %v", err)
+	}
+	mock.MatchExpectationsInOrder(false)
+	t.Cleanup(func() { _ = mockDB.Close() })
+	for i := 0; i < 20; i++ {
+		mock.ExpectBegin()
+		mock.ExpectCommit()
+	}
+	for i := 0; i < 100; i++ {
+		mock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	for i := 0; i < 10; i++ {
+		mock.ExpectQuery("").
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	}
+	for i := 0; i < 10; i++ {
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("user-1"))
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("tenant-1"))
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow(""))
+	}
+	return mockDB
+}
 
 type fakeRegistryDocs struct{}
 
@@ -1054,14 +1091,17 @@ func TestPostControlledDocuments_MissingIdempotencyKey_400(t *testing.T) {
 }
 
 // TestGetPreviewCode_200: GET /api/v1/controlled-documents/preview-code with valid
-// query params returns 200 with profileCode, areaCode, nextSeq, and code fields.
+// query params returns 200 with profile_code, area_code, next_seq, and code fields.
 func TestGetPreviewCode_200(t *testing.T) {
-	handler := newTestHandler(nil)
+	mockDB := newPermissiveMockDB(t)
+	handler := newTestHandler(mockDB)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/preview-code?profile_code=DC&area_code=RH", nil)
-	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	ctx := tenant.WithTenantID(req.Context(), "tenant-1")
+	ctx = iamdomain.WithAuthContext(ctx, "user-1", []iamdomain.Role{"author"})
+	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

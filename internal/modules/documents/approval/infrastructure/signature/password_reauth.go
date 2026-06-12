@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"sync"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -36,15 +35,9 @@ type AuthFailureRateLimiter interface {
 }
 
 const (
-	maxFailures   = 5
-	windowDur     = 60 * time.Second
+	maxFailures = 5
+	windowDur   = 60 * time.Second
 )
-
-type failEntry struct {
-	count  int
-	oldest time.Time // oldest failure in window
-	lastAt time.Time
-}
 
 // PasswordReauthProvider implements Provider using bcrypt against iam_users.password_hash.
 type PasswordReauthProvider struct {
@@ -121,56 +114,3 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 	return SignatureResult{Method: "password_reauth", Payload: payload, SignedAt: now}, nil
 }
 
-// InMemoryAuthFailureRateLimiter is process-local and intended for tests/dev only.
-// Production should provide a shared implementation.
-type InMemoryAuthFailureRateLimiter struct {
-	mu      sync.Mutex
-	entries map[string]*failEntry
-}
-
-func NewInMemoryAuthFailureRateLimiter() *InMemoryAuthFailureRateLimiter {
-	return &InMemoryAuthFailureRateLimiter{entries: make(map[string]*failEntry)}
-}
-
-func (l *InMemoryAuthFailureRateLimiter) Allow(_ context.Context, actorID string) (bool, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	e, ok := l.entries[actorID]
-	if !ok {
-		return true, nil
-	}
-	now := time.Now()
-	if now.Sub(e.oldest) >= windowDur {
-		delete(l.entries, actorID)
-		return true, nil
-	}
-	return e.count < maxFailures, nil
-}
-
-func (l *InMemoryAuthFailureRateLimiter) RecordFailure(_ context.Context, actorID string) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	now := time.Now()
-	e, ok := l.entries[actorID]
-	if !ok {
-		l.entries[actorID] = &failEntry{count: 1, oldest: now, lastAt: now}
-		return nil
-	}
-	if now.Sub(e.oldest) >= windowDur {
-		e.count = 1
-		e.oldest = now
-	} else {
-		e.count++
-	}
-	e.lastAt = now
-	return nil
-}
-
-func (l *InMemoryAuthFailureRateLimiter) Reset(_ context.Context, actorID string) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	delete(l.entries, actorID)
-	return nil
-}

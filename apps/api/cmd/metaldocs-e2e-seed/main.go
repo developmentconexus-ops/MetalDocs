@@ -11,6 +11,7 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
@@ -55,7 +56,7 @@ func main() {
 	}
 	defer deps.Cleanup()
 
-	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, authCfg)
+	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, iampg.NewLoginContextRepository(deps.SQLDB), authCfg)
 	if err != nil {
 		log.Fatalf("new auth service: %v", err)
 	}

@@ -130,7 +130,7 @@ func TestCommitAutosave_Happy(t *testing.T) {
 		DocxStorageKey: "templates/tpl-1/versions/7.docx",
 	}
 	presigner := &fakePresigner{HeadResult: "hash_abc"}
-	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	got, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
 		TenantID:            "tenant-a",
@@ -309,7 +309,7 @@ func TestSaveTemplateDraft_StaleLockVersion(t *testing.T) {
 		DocxStorageKey: "templates/tpl-1/versions/1.docx",
 	}
 	repo.lockVersions["ver-1"] = 2
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	err := svc.SaveTemplateDraft(context.Background(), application.SaveTemplateDraftCmd{
 		TenantID:            "tenant-a",

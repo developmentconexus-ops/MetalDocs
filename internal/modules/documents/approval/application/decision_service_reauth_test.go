@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -39,14 +40,60 @@ func (r reauthFakeUserReader) GetPasswordHash(_ context.Context, userID string) 
 	return h, nil
 }
 
+// testNoopRateLimiter is a test-only rate limiter that always allows.
+type testNoopRateLimiter struct{}
+
+func (testNoopRateLimiter) Allow(_ context.Context, _ string) (bool, error)         { return true, nil }
+func (testNoopRateLimiter) RecordFailure(_ context.Context, _ string) error          { return nil }
+func (testNoopRateLimiter) Reset(_ context.Context, _ string) error                  { return nil }
+
+// testCountingRateLimiter is a test-only in-process rate limiter that counts
+// failures and enforces maxFailures=5 per actor (mirrors signature.testInMemoryLimiter).
+type testCountingRateLimiter struct {
+	mu      sync.Mutex
+	counts  map[string]int
+	maxFail int
+}
+
+func newCountingRateLimiter(maxFail int) *testCountingRateLimiter {
+	return &testCountingRateLimiter{counts: make(map[string]int), maxFail: maxFail}
+}
+
+func (l *testCountingRateLimiter) Allow(_ context.Context, actorID string) (bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.counts[actorID] < l.maxFail, nil
+}
+
+func (l *testCountingRateLimiter) RecordFailure(_ context.Context, actorID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.counts[actorID]++
+	return nil
+}
+
+func (l *testCountingRateLimiter) Reset(_ context.Context, actorID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.counts, actorID)
+	return nil
+}
+
 // newReauthRegistry wires a real password_reauth provider backed by the fake reader.
 func newReauthRegistry(reader signature.IamUserReader) *signature.Registry {
 	reg := signature.NewRegistry()
 	reg.Register(signature.NewPasswordReauthProvider(
 		reader,
 		nil,
-		signature.NewInMemoryAuthFailureRateLimiter(),
+		testNoopRateLimiter{},
 	))
+	return reg
+}
+
+// newReauthRegistryWithLimiter wires a provider with a caller-supplied rate limiter.
+func newReauthRegistryWithLimiter(reader signature.IamUserReader, limiter signature.AuthFailureRateLimiter) *signature.Registry {
+	reg := signature.NewRegistry()
+	reg.Register(signature.NewPasswordReauthProvider(reader, nil, limiter))
 	return reg
 }
 
@@ -186,7 +233,8 @@ func TestRecordSignoff_Reauth_RateLimitTrips(t *testing.T) {
 		authorID   = "author-rl"
 	)
 	inst := buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID})
-	reg := newReauthRegistry(newReauthReader(t, map[string]string{actorID: "correct-pass"}))
+	limiter := newCountingRateLimiter(5)
+	reg := newReauthRegistryWithLimiter(newReauthReader(t, map[string]string{actorID: "correct-pass"}), limiter)
 	repo := &fakeDecisionRepo{instance: inst}
 	svc := newReauthDecisionService(reg, repo, &MemoryEmitter{})
 

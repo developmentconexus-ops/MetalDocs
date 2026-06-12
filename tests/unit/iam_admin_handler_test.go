@@ -23,7 +23,7 @@ const testTenantID = "test-tenant"
 func newAuthServiceForTest(t *testing.T, authRepo *authmemory.Repository, roleAdminRepo iamdomain.RoleAdminRepository, userRoles map[string][]iamdomain.Role) *authapp.Service {
 	t.Helper()
 	provider := iamapp.NewDevRoleProvider(userRoles, testTenantID)
-	svc, err := authapp.NewService(authRepo, provider, roleAdminRepo, authapp.Config{
+	svc, err := authapp.NewService(authRepo, provider, roleAdminRepo, noopLoginCtxPort{}, authapp.Config{
 		SessionSecret:          "0123456789abcdef0123456789abcdef",
 		SessionTTL:             time.Hour,
 		PasswordMinLength:      8,

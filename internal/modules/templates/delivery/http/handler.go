@@ -66,11 +66,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 
 func (h *Handler) idempotent(routeTemplate string, next http.HandlerFunc) http.Handler {
-	db := h.svc.DB()
-	if db == nil {
-		return http.HandlerFunc(next)
-	}
-	store := idempotency.New(db, routeTemplate)
+	store := idempotency.New(h.svc.DB(), routeTemplate)
 	return idempotency.Require(store, func(ctx context.Context) (string, string) {
 		tenantID, _ := tenant.FromContext(ctx)
 		return tenantID, iamdomain.UserIDFromContext(ctx)

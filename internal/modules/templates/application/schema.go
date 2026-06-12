@@ -71,34 +71,25 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 		return nil, err
 	}
 
-	if s.db != nil {
-		tx, err := s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, fmt.Errorf("templates update schemas: begin tx: %w", err)
-		}
-		defer func() { _ = tx.Rollback() }()
-		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return nil, fmt.Errorf("templates update schemas: setAuthzGUC: %w", err)
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
-			return nil, fmt.Errorf("templates update schemas: authz: %w", err)
-		}
-		if err := s.repo.UpdateVersionSchemaCASTx(ctx, tx, cmd.TenantID, version, cmd.ExpectedLockVersion); err != nil {
-			return nil, wrapAppErr("templates update schemas: update version", err)
-		}
-		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-			return nil, wrapAppErr("templates update schemas: append audit", err)
-		}
-		if err := tx.Commit(); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := s.repo.UpdateVersionSchemaCAS(ctx, cmd.TenantID, version, cmd.ExpectedLockVersion); err != nil {
-			return nil, wrapAppErr("templates update schemas: update version", err)
-		}
-		if err := s.repo.AppendAudit(ctx, audit); err != nil { //cilint:allow-post-commit-audit
-			return nil, wrapAppErr("templates update schemas: append audit", err)
-		}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("templates update schemas: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+		return nil, fmt.Errorf("templates update schemas: setAuthzGUC: %w", err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+		return nil, fmt.Errorf("templates update schemas: authz: %w", err)
+	}
+	if err := s.repo.UpdateVersionSchemaCASTx(ctx, tx, cmd.TenantID, version, cmd.ExpectedLockVersion); err != nil {
+		return nil, wrapAppErr("templates update schemas: update version", err)
+	}
+	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+		return nil, wrapAppErr("templates update schemas: append audit", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 
 	return version, nil

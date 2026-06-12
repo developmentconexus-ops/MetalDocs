@@ -7,7 +7,21 @@ import (
 	"testing"
 
 	"metaldocs/internal/platform/config"
+	"metaldocs/internal/testsupport/pgtest"
 )
+
+// buildTestDeps is a helper that calls BuildAPIDependencies with a real postgres
+// test DB (skipped when DATABASE_URL is not set). Memory mode was removed in 2.13.
+func buildTestDeps(t *testing.T, attachmentsCfg config.AttachmentsConfig) APIDependencies {
+	t.Helper()
+	pgtest.OpenAndMigrate(t) // skip if no DB configured
+	deps, err := BuildAPIDependencies(context.Background(), config.RepositoryPostgres, attachmentsCfg)
+	if err != nil {
+		t.Fatalf("BuildAPIDependencies() error = %v", err)
+	}
+	t.Cleanup(deps.Cleanup)
+	return deps
+}
 
 func TestBuildAPIDependenciesIncludesGotenbergCheckWhenHealthy(t *testing.T) {
 	t.Setenv("METALDOCS_GOTENBERG_URL", "")
@@ -22,12 +36,7 @@ func TestBuildAPIDependenciesIncludesGotenbergCheckWhenHealthy(t *testing.T) {
 
 	t.Setenv("METALDOCS_GOTENBERG_URL", server.URL)
 
-	deps, err := BuildAPIDependencies(context.Background(), config.RepositoryMemory, config.AttachmentsConfig{
-		Provider: config.StorageProviderMemory,
-	})
-	if err != nil {
-		t.Fatalf("BuildAPIDependencies() error = %v", err)
-	}
+	deps := buildTestDeps(t, config.AttachmentsConfig{Provider: config.StorageProviderMemory})
 
 	statusCode, payload := deps.StatusProvider.Ready(context.Background())
 	if statusCode != http.StatusOK {
@@ -46,12 +55,7 @@ func TestBuildAPIDependenciesIncludesGotenbergCheckWhenHealthy(t *testing.T) {
 func TestBuildAPIDependenciesMarksGotenbergSkippedWhenNotConfigured(t *testing.T) {
 	t.Setenv("METALDOCS_GOTENBERG_URL", "")
 
-	deps, err := BuildAPIDependencies(context.Background(), config.RepositoryMemory, config.AttachmentsConfig{
-		Provider: config.StorageProviderMemory,
-	})
-	if err != nil {
-		t.Fatalf("BuildAPIDependencies() error = %v", err)
-	}
+	deps := buildTestDeps(t, config.AttachmentsConfig{Provider: config.StorageProviderMemory})
 
 	statusCode, payload := deps.StatusProvider.Ready(context.Background())
 	if statusCode != http.StatusOK {
@@ -80,12 +84,7 @@ func TestBuildAPIDependenciesMarksGotenbergDownWhenHealthCheckFails(t *testing.T
 
 	t.Setenv("METALDOCS_GOTENBERG_URL", server.URL)
 
-	deps, err := BuildAPIDependencies(context.Background(), config.RepositoryMemory, config.AttachmentsConfig{
-		Provider: config.StorageProviderMemory,
-	})
-	if err != nil {
-		t.Fatalf("BuildAPIDependencies() error = %v", err)
-	}
+	deps := buildTestDeps(t, config.AttachmentsConfig{Provider: config.StorageProviderMemory})
 
 	statusCode, payload := deps.StatusProvider.Ready(context.Background())
 	if statusCode != http.StatusServiceUnavailable {

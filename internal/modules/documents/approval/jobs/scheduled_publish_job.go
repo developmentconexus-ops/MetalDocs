@@ -14,8 +14,7 @@ import (
 )
 
 var (
-	ErrScheduledPublishJobNil     = errors.New("scheduled publish job is nil")
-	ErrScheduledPublishWorkerDeps = errors.New("scheduled publish worker dependencies not configured")
+	ErrScheduledPublishJobNil = errors.New("scheduled publish job is nil")
 )
 
 type ScheduledPublishWorker struct {
@@ -26,6 +25,12 @@ type ScheduledPublishWorker struct {
 }
 
 func NewScheduledPublishWorker(service *application.SchedulerService, db *sql.DB) *ScheduledPublishWorker {
+	if service == nil {
+		panic("scheduled_publish_worker: service is nil")
+	}
+	if db == nil {
+		panic("scheduled_publish_worker: db is nil")
+	}
 	return &ScheduledPublishWorker{
 		service: service,
 		db:      db,
@@ -33,9 +38,6 @@ func NewScheduledPublishWorker(service *application.SchedulerService, db *sql.DB
 }
 
 func (w *ScheduledPublishWorker) Work(ctx context.Context, job *river.Job[ScheduledPublishArgs]) error {
-	if w == nil || w.service == nil || w.db == nil {
-		return ErrScheduledPublishWorkerDeps
-	}
 	if job == nil {
 		return ErrScheduledPublishJobNil
 	}

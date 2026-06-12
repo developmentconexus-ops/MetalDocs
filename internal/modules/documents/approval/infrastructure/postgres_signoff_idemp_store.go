@@ -58,6 +58,7 @@ type PostgresSignoffIdempStore struct {
 
 func NewPostgresSignoffIdempStore(db *sql.DB) *PostgresSignoffIdempStore {
 	if db == nil {
+		// Return a store with nil sub-stores; beginReplay returns an error for each call.
 		return &PostgresSignoffIdempStore{}
 	}
 	return &PostgresSignoffIdempStore{

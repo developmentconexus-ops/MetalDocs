@@ -108,9 +108,6 @@ func (h *Handler) resolveEligibleActorNames(ctx context.Context, tenantID string
 			}
 		}
 	}
-	if h.db == nil {
-		return names, nil
-	}
 	actorSet := make(map[string]struct{})
 	for _, stage := range inst.Stages {
 		for _, actorID := range stage.EligibleActorIDs {

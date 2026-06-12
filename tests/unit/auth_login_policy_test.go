@@ -13,6 +13,14 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// noopLoginCtxPort satisfies iamdomain.LoginContextPort with no-op writes.
+// Used in tests that do not require governance metadata recording.
+type noopLoginCtxPort struct{}
+
+func (noopLoginCtxPort) RecordLoginContext(_ context.Context, _, _, _, _, _ string) error {
+	return nil
+}
+
 func TestAuthenticateLocksAfterRepeatedFailures(t *testing.T) {
 	repo := authmemory.NewRepository()
 	cfg := authapp.Config{
@@ -23,7 +31,7 @@ func TestAuthenticateLocksAfterRepeatedFailures(t *testing.T) {
 		LoginMaxFailedAttempts: 3,
 		LoginLockDuration:      5 * time.Minute,
 	}
-	svc, err := authapp.NewService(repo, repo, repo, cfg)
+	svc, err := authapp.NewService(repo, repo, repo, noopLoginCtxPort{}, cfg)
 	if err != nil {
 		t.Fatalf("new auth service: %v", err)
 	}
@@ -53,7 +61,7 @@ func TestAuthenticateRejectsInactiveUser(t *testing.T) {
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      5 * time.Minute,
 	}
-	svc, err := authapp.NewService(repo, repo, repo, cfg)
+	svc, err := authapp.NewService(repo, repo, repo, noopLoginCtxPort{}, cfg)
 	if err != nil {
 		t.Fatalf("new auth service: %v", err)
 	}

@@ -27,7 +27,7 @@ func TestPasswordChangePreservesSessionAndClearsMustChangePassword(t *testing.T)
 		LoginLockDuration:      5 * time.Minute,
 		AllowDevTenantFallback: true,
 	}
-	svc, err := authapp.NewService(repo, repo, repo, cfg)
+	svc, err := authapp.NewService(repo, repo, repo, noopLoginCtxPort{}, cfg)
 	if err != nil {
 		t.Fatalf("new auth service: %v", err)
 	}

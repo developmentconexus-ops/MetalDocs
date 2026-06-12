@@ -2,14 +2,58 @@ package application_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"testing"
 	"time"
+
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
 )
+
+// newPermissiveMockDB returns a *sql.DB backed by sqlmock configured to accept
+// any SQL without strict matching.  Use it when a test exercises business logic
+// that requires a DB (Begin/authz-GUC/Commit) but does not need to assert on
+// the exact SQL emitted.  The mock is seeded with enough Begin/Exec/Query/Commit
+// expectations (out-of-order) to cover all templates service operations;
+// leftover expectations are silently dropped when the DB is closed at test end.
+func newPermissiveMockDB(t *testing.T) *sql.DB {
+	t.Helper()
+	anyMatcher := sqlmock.QueryMatcherFunc(func(_, _ string) error { return nil })
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(anyMatcher))
+	if err != nil {
+		t.Fatalf("newPermissiveMockDB: sqlmock.New: %v", err)
+	}
+	mock.MatchExpectationsInOrder(false)
+	t.Cleanup(func() { _ = mockDB.Close() })
+
+	// Seed more expectations than any single operation needs.
+	// Out-of-order matching ensures any call sequence is satisfied.
+	for i := 0; i < 5; i++ {
+		mock.ExpectBegin()
+		mock.ExpectCommit()
+	}
+	for i := 0; i < 30; i++ {
+		mock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	// Queries must return at least one column with a value that scans into the
+	// expected types.  The authz sequence reads:
+	//   1. actor_id GUC  (string)
+	//   2. tenant_id GUC (string)
+	//   3. system_admin EXISTS (bool → true so the check passes without cap query)
+	//   4. asserted_caps GUC  (string)
+	for i := 0; i < 5; i++ {
+		mock.ExpectQuery("").WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("user-a"))
+		mock.ExpectQuery("").WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("tenant-a"))
+		mock.ExpectQuery("").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+		mock.ExpectQuery("").WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow(""))
+	}
+	return mockDB
+}
 
 type fakeRepo struct {
 	templates       map[string]*domain.Template

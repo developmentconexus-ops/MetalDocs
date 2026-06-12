@@ -19,7 +19,7 @@ func TestUpsertApprovalConfig_Happy_NeverPublished_AsAuthor(t *testing.T) {
 	repo.templates[tpl.ID] = tpl
 	reviewerRole := "reviewer"
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	got, err := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
 		TenantID:     "tenant-a",
@@ -68,7 +68,7 @@ func TestUpsertApprovalConfig_Happy_NeverPublished_AsSystemAdmin(t *testing.T) {
 	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1"}
 	repo.templates[tpl.ID] = tpl
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	got, err := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
 		TenantID:     "tenant-a",
@@ -91,7 +91,7 @@ func TestUpsertApprovalConfig_Happy_NeverPublished_AsQmsAdmin(t *testing.T) {
 	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1"}
 	repo.templates[tpl.ID] = tpl
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	_, err := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
 		TenantID:     "tenant-a",
@@ -110,7 +110,7 @@ func TestUpsertApprovalConfig_Happy_EverPublished_AsSystemAdmin(t *testing.T) {
 	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1", PublishedVersionID: strPtr("ver-1")}
 	repo.templates[tpl.ID] = tpl
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	_, err := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
 		TenantID:     "tenant-a",
@@ -129,7 +129,7 @@ func TestUpsertApprovalConfig_Happy_EverPublished_AsQmsAdmin(t *testing.T) {
 	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1", PublishedVersionID: strPtr("ver-1")}
 	repo.templates[tpl.ID] = tpl
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	_, err := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
 		TenantID:     "tenant-a",
@@ -169,7 +169,7 @@ func TestUpsertApprovalConfig_Forbidden_NeverPublished_AuthorAsQmsAdmin_Creator_
 	tpl := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "author-1"}
 	repo.templates[tpl.ID] = tpl
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
 
 	_, err := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
 		TenantID:     "tenant-a",

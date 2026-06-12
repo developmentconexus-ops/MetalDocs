@@ -194,26 +194,24 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			PayloadJSON:  payload,
 		})
 	} else {
-		if s.db != nil {
-			tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-			if err != nil {
-				return nil, fmt.Errorf("controlled_documents: begin create tx: %w", err)
+		tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+		if err != nil {
+			return nil, fmt.Errorf("controlled_documents: begin create tx: %w", err)
+		}
+		defer func() {
+			if createTx != nil {
+				_ = tx.Rollback()
 			}
-			defer func() {
-				if createTx != nil {
-					_ = tx.Rollback()
-				}
-			}()
-			createTx = tx
-			if err := setAuthzGUC(ctx, createTx, cmd.TenantID, cmd.ActorUserID); err != nil {
-				return nil, fmt.Errorf("controlled_documents: set authz context: %w", err)
-			}
-			// ADR 0022 Phase 7: area-scoped tier-2 — a CD is created INTO a process
-			// area, so authorize against that area (least-privilege; system_admin
-			// still bypasses). cmd.ProcessAreaCode validated active above.
-			if err := authz.Require(ctx, createTx, string(iamdomain.CapControlledDocumentCreate), cmd.ProcessAreaCode); err != nil {
-				return nil, fmt.Errorf("controlled_documents: authz check sequence allocation: %w", err)
-			}
+		}()
+		createTx = tx
+		if err := setAuthzGUC(ctx, createTx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return nil, fmt.Errorf("controlled_documents: set authz context: %w", err)
+		}
+		// ADR 0022 Phase 7: area-scoped tier-2 — a CD is created INTO a process
+		// area, so authorize against that area (least-privilege; system_admin
+		// still bypasses). cmd.ProcessAreaCode validated active above.
+		if err := authz.Require(ctx, createTx, string(iamdomain.CapControlledDocumentCreate), cmd.ProcessAreaCode); err != nil {
+			return nil, fmt.Errorf("controlled_documents: authz check sequence allocation: %w", err)
 		}
 	}
 	if cmd.OverrideTemplateVersionID != nil {
@@ -401,9 +399,6 @@ func (s *ControlledDocumentService) PreviewCode(ctx context.Context, tenantID, p
 func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
 	if err := s.validateSequenceSeries(ctx, tenantID, profileCode, areaCode); err != nil {
 		return 0, fmt.Errorf("controlled_documents: validate sequence series: %w", err)
-	}
-	if s.db == nil {
-		return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
 	}
 	actorUserID, ok := authn.UserIDFromContext(ctx)
 	if !ok {

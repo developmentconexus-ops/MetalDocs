@@ -3,7 +3,6 @@ package jobs
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"testing"
 	"time"
 
@@ -18,14 +17,6 @@ type fixedClock struct {
 	t time.Time
 }
 
-func TestScheduledPublishWorker_GuardsNilDependencies(t *testing.T) {
-	if err := (*ScheduledPublishWorker)(nil).Work(context.Background(), &river.Job[ScheduledPublishArgs]{}); !errors.Is(err, ErrScheduledPublishWorkerDeps) {
-		t.Fatalf("nil worker error = %v, want %v", err, ErrScheduledPublishWorkerDeps)
-	}
-	if err := NewScheduledPublishWorker(nil, nil).Work(context.Background(), &river.Job[ScheduledPublishArgs]{}); !errors.Is(err, ErrScheduledPublishWorkerDeps) {
-		t.Fatalf("nil deps error = %v, want %v", err, ErrScheduledPublishWorkerDeps)
-	}
-}
 
 func (c fixedClock) Now() time.Time {
 	return c.t
