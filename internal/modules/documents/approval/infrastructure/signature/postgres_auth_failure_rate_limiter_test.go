@@ -94,9 +94,14 @@ func TestPostgresLimiter_Allow_ExpiredWindow(t *testing.T) {
 	}
 }
 
-// TestPostgresLimiter_RecordFailure — executes UPSERT without error.
+// TestPostgresLimiter_RecordFailure — executes UPSERT with three timestamptz
+// args: ($1=actorID, $2=now, $3=windowExpiredBefore). No time.Duration is sent
+// to Postgres — precomputed in Go to avoid the "timestamptz + bigint" type error
+// that pgx/v5/stdlib causes when encoding time.Duration as bigint.
 func TestPostgresLimiter_RecordFailure(t *testing.T) {
 	l, mock := newMockLimiter(t)
+	// $1 = actorID (string), $2 = now (time.Time/timestamptz),
+	// $3 = windowExpiredBefore (time.Time/timestamptz).
 	mock.ExpectExec(`INSERT INTO public.auth_failure_counters`).
 		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))

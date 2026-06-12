@@ -50,26 +50,32 @@ func (l *PostgresAuthFailureRateLimiter) Allow(ctx context.Context, actorID stri
 
 // RecordFailure increments the failure counter. If no row exists, or the existing
 // window has expired, a new window is started at the current time (count = 1).
-// Stale rows older than 2×windowDur are pruned in the same statement to bound
-// table size without a separate janitor job.
+//
+// Timestamps are precomputed in Go so only timestamptz parameters are passed to
+// Postgres — pgx/v5/stdlib encodes time.Duration as bigint, and
+// "timestamptz + bigint" has no operator in Postgres, causing a runtime error.
+// $2 = now (new window_start when inserting or resetting), $3 = windowExpiredBefore
+// (cutoff: if the existing window_start is at or before this value, the window
+// has expired and the counter resets to 1).
 func (l *PostgresAuthFailureRateLimiter) RecordFailure(ctx context.Context, actorID string) error {
 	const q = `
 		INSERT INTO public.auth_failure_counters (actor_id, fail_count, window_start)
 		VALUES ($1, 1, $2)
 		ON CONFLICT (actor_id) DO UPDATE SET
 		    fail_count   = CASE
-		                       WHEN public.auth_failure_counters.window_start + $3 <= EXCLUDED.window_start
+		                       WHEN public.auth_failure_counters.window_start <= $3
 		                       THEN 1
 		                       ELSE public.auth_failure_counters.fail_count + 1
 		                   END,
 		    window_start = CASE
-		                       WHEN public.auth_failure_counters.window_start + $3 <= EXCLUDED.window_start
+		                       WHEN public.auth_failure_counters.window_start <= $3
 		                       THEN EXCLUDED.window_start
 		                       ELSE public.auth_failure_counters.window_start
 		                   END`
 
 	now := time.Now().UTC()
-	_, err := l.db.ExecContext(ctx, q, actorID, now, windowDur)
+	windowExpiredBefore := now.Add(-windowDur)
+	_, err := l.db.ExecContext(ctx, q, actorID, now, windowExpiredBefore)
 	return err
 }
 
