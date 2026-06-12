@@ -145,13 +145,6 @@ func (r *Repository) RecordSuccessfulLogin(_ context.Context, userID string, log
 	return nil
 }
 
-// RecordLastLoginContext is a no-op for the in-memory repository — tenant-
-// scoped iam_users rows do not exist in this implementation. The Postgres
-// implementation persists the values for the People-tab "Last login" drawer.
-func (r *Repository) RecordLastLoginContext(_ context.Context, _, _, _, _, _ string) error {
-	return nil
-}
-
 // RecordFailedLogin is no longer part of authdomain.Repository (the production
 // failed-attempt write goes through LoginTx.RecordFailedLogin inside the login
 // lock). It is retained as a concrete helper: memoryLoginTx.RecordFailedLogin

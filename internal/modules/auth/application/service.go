@@ -94,6 +94,10 @@ type Service struct {
 	roleProvider iamdomain.RoleProvider
 	roleAdmin    iamdomain.RoleAdminRepository
 	capProvider  authdomain.CapabilityProvider
+	// loginCtxPort records governance metadata on iam_users after a successful
+	// login. Optional: when nil the write is skipped (memory/test mode). Wired
+	// at the composition root via WithLoginContextPort (F-06c).
+	loginCtxPort iamdomain.LoginContextPort
 	cfg          Config
 	now          func() time.Time
 	// dummyHash is a fixed bcrypt hash compared against on the unknown-identifier
@@ -108,6 +112,14 @@ type Service struct {
 // sole authorization boundary.
 func (s *Service) WithCapabilityProvider(p authdomain.CapabilityProvider) *Service {
 	s.capProvider = p
+	return s
+}
+
+// WithLoginContextPort wires the IAM port that records governance metadata on
+// iam_users after a successful login (last_login_ip, user_agent, device_label).
+// When not wired the write is skipped — memory/test mode does not need it.
+func (s *Service) WithLoginContextPort(p iamdomain.LoginContextPort) *Service {
+	s.loginCtxPort = p
 	return s
 }
 
@@ -277,9 +289,13 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	// Governance hint for the People-tab "Last login" drawer (PR-4). Best-effort:
 	// failure to update iam_users must not block login — the credential row above
 	// is the source of truth. PR-7 will populate deviceLabel via UA parsing.
-	if err := s.repo.RecordLastLoginContext(ctx, identity.UserID, tenantID, s.remoteIP(r), truncate(strings.TrimSpace(r.UserAgent()), 512), ""); err != nil {
-		// Swallow — already journalled by RecordSuccessfulLogin above.
-		_ = err
+	// The write is delegated to the IAM module via LoginContextPort (F-06c) so
+	// that auth does not hold a direct SQL dependency on iam_users.
+	if s.loginCtxPort != nil {
+		if err := s.loginCtxPort.RecordLoginContext(ctx, identity.UserID, tenantID, s.remoteIP(r), truncate(strings.TrimSpace(r.UserAgent()), 512), ""); err != nil {
+			// Swallow — governance hint must not block login.
+			_ = err
+		}
 	}
 
 	rawToken, sessionID, err := s.newSessionToken()

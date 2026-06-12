@@ -230,6 +230,9 @@ func main() {
 		// Wire optional capability hint into /auth/me + login responses.
 		// Backend remains sole authz enforcer — FE consumes for UX hints only.
 		authService.WithCapabilityProvider(capabilityService)
+		// Wire IAM login-context port so auth can record governance metadata on
+		// iam_users without a direct SQL dependency on that table (F-06c).
+		authService.WithLoginContextPort(iampg.NewLoginContextRepository(deps.SQLDB))
 	}
 	cachedProvider := iamapp.NewCachedRoleProvider(ctx, deps.RoleProvider, authn.CacheTTL())
 	// permResolver is the single authoritative source of truth for route
