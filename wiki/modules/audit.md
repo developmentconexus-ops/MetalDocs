@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-12 (Wave 2.12 sync — Service.writer nil-check at service.go:182 annotated //cilint:allow-dualmode; deferred: hard-require writer via WithExports refactor. Prior: 2026-06-11 adversarial-verification pass 2: documentsAuditAdapter anchor corrected to main.go:773-829; operationId listAuditEvents confirmed present at openapi.yaml:745 — T-008 false-missing claim retired from §2, §5.3, and route truth table; prior pass: error-discard claim corrected to log.Printf; ID-generation corrected from timestamp to uuid.NewString; T-001 §10 row updated to PASSES; migration paths corrected to archive/migrations/; TenantID added to §5.2 Event surface; prior: 2026-06-10 Stage-1 backend audit drift patch) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-12 (Wave F — `ExportEvents` governance error now logged via `slog.Warn` at service.go:195 instead of silently discarded; `//cilint:allow-dualmode` annotation at service.go:183 (feature-gate, not db fallback). Prior: Wave 2.12 sync; prior: 2026-06-11 adversarial-verification pass 2: documentsAuditAdapter anchor corrected to main.go:773-829; operationId listAuditEvents confirmed present at openapi.yaml:745 — T-008 false-missing claim retired from §2, §5.3, and route truth table; prior pass: error-discard claim corrected to log.Printf; ID-generation corrected from timestamp to uuid.NewString; T-001 §10 row updated to PASSES; migration paths corrected to archive/migrations/; TenantID added to §5.2 Event surface; prior: 2026-06-10 Stage-1 backend audit drift patch) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/audit/domain/port.go:8-31` â€” `Event`, `ListEventsQuery`, `Writer`, `Reader`
@@ -291,6 +291,7 @@ Wiring: `iamdelivery.NewAdminHandler(..., deps.AuditWriter).WithAuditReader(deps
 ### 8.5 Logging & Observability
 - `trace_id` is stored per event (`port.go:16`) â€” sourced at the postgres writer from the request context / `X-Trace-Id` header; defaults to `”trace-local”`. Single-header correlation; structured logging is not used by the audit module itself.
 - Audit-emission failure on the **adapter** path is `log.Printf`'d (`main.go:827`). Audit-emission failure on the **iam handler** path is also `log.Printf`'d (`admin_handler.go:414`). Neither path emits a structured log entry or a metric (T-005).
+- **`ExportEvents` governance event (Wave F fix):** the best-effort governance event in `ExportEvents` (`application/service.go:194-196`) now logs a dropped emission via `slog.Warn(“audit export governance event dropped”, ...)` instead of silently discarding the error. This closes the silent-discard gap for the export path specifically; the general `Record` fire-and-forget contract (above) remains unchanged for other callers.
 
 ### 8.6 Concurrency / Transactions
 - `postgres.Writer.Record` (`postgres/writer.go:27`) opens its own `*sql.Tx` internally via `db.BeginTx` and delegates to `RecordTx`. `ListEvents` calls `db.QueryContext` directly.

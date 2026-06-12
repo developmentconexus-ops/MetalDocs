@@ -1,7 +1,6 @@
 # Module: render-fanout
 
-> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section; prior: 2026-05-24)
-> **Last verified:** 2026-06-01 (docgen-v2 → docx-renderer rename)
+> **Last verified:** 2026-06-12 (Wave F — `Enqueue` now fails loud on nil tx; prior: 2026-06-01 P2 consolidation)
 > **Status:** active (pipeline module)`r`n> **Maturity:** L2
 > **Scope:** DOCX → PDF rendering pipeline, token substitution engine, outbox-driven dispatch.
 > **Out of scope:** Approval-triggered freeze invocation (see `modules/approval.md`).
@@ -33,6 +32,7 @@
 | Gotenberg / LibreOffice down | PDF outbox rows accumulate in `pdf_dispatch_outbox` with `pending`; published doc shows `pdf_status=pending` for >SLA | `pdf_outbox_worker` logs HTTP error; `pdf_outbox_repository.ReadState` returns `pending`/`failed` | Restart Gotenberg container; failed rows retried by worker until `max_attempts`, then marked `failed` (see [`render-fanout-tech-debt.md`](render-fanout-tech-debt.md)) |
 | docx-renderer fanout substitution error | Freeze emits `docgen.substitution_failed`; outbox row may be `failed` | `apps/docx-renderer/src/routes/fanout.ts` returns 5xx; `internal/modules/render/fanout/client.go` surfaces error | Inspect docx-renderer logs for token/resolver mismatch; check `concepts/placeholders.md` 7-token catalog drift |
 | Resolver returns empty value for required token | Frozen DOCX renders blank placeholder | `internal/modules/render/resolvers/builtins.go` returns `""`; tracked by `concepts/placeholders.md` | Confirm upstream data populated (e.g. controlled-document fields); add resolver coverage |
+| Nil tx passed to `Enqueue` | `Enqueue` returns an error immediately (`"pdf outbox enqueue: tx must not be nil"` / `"materialize outbox enqueue: tx must not be nil"`) — `pdf_outbox_repository.go:31` / `materialize_outbox_repository.go:31` | Error propagates to caller; no outbox row written | Fix caller to pass the business transaction; a nil tx would break the transactional-outbox guarantee (Wave F, commit `f698d1fd2`) |
 | Outbox replay (worker restart mid-dispatch) | Same `(tenant_id, revision_id)` processed twice | `ON CONFLICT (tenant_id, revision_id) DO NOTHING` on outbox INSERT dedupes; consumer is idempotent | Expected; no operator action |
 | MinIO upload fails for frozen PDF | Worker logs S3 PUT error; outbox row marked `failed` | Worker error log + outbox status | MinIO healthcheck; retry by clearing `failed` status or reissuing freeze |
 

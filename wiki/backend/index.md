@@ -1,6 +1,6 @@
 # MetalDocs Backend Atlas
 
-> **Last verified:** 2026-06-11 (Wave 1)
+> **Last verified:** 2026-06-12 (Wave F coherence pass)
 > **Scope:** Atlas entrypoint for the MetalDocs backend Stage-1 truth map. Covers every binary, domain module, platform package, contract surface, and cross-cutting concern. Every behavioral claim carries a `file:line` anchor derived from Stage-1 audit artifacts. Runtime-only behavior tagged `[runtime-unverified]`.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (all wiring)
@@ -39,7 +39,7 @@ Domain module deep dives: [`../modules/index.md`](../modules/index.md)
 | **[index.md](index.md)** (this file) | Atlas entrypoint, full composition map, Mermaid diagrams, dependency matrix |
 | [binaries/api.md](binaries/api.md) | `metaldocs-api` binary — startup, wiring, in-process goroutines |
 | [binaries/worker.md](binaries/worker.md) | `metaldocs-worker` binary — outbox polling, job runners |
-| [binaries/jobs.md](binaries/jobs.md) | `metaldocs-jobs` binary — River scheduler host; deployment gap |
+| [binaries/jobs.md](binaries/jobs.md) | `metaldocs-jobs` binary — River scheduler host; `jobs.Dockerfile` + compose service added Wave 0 (F-19 closed) |
 | [binaries/docx-renderer.md](binaries/docx-renderer.md) | `docx-renderer` Node.js sidecar — Fastify, MinIO, render fanout |
 | [platform/identity-tenancy.md](platform/identity-tenancy.md) | `platform/authn`, `platform/tenant`, `platform/security`, `platform/ratelimit`, `platform/sqlescape` |
 | [platform/http-toolkit.md](platform/http-toolkit.md) | `platform/problem`, `platform/httpresponse`, `platform/pagination`, `platform/idempotency`, `platform/requesttrace`, `platform/useragent`, `platform/httpclient`, `platform/formval` |
@@ -230,9 +230,9 @@ Sources: `synthesis-composition.md §2.1`
 
 | # | Violation | Evidence | Severity |
 |---|---|---|---|
-| V-01 | `iam/delivery/http/sessions_handler.go` imports `auth/infrastructure/postgres` directly — delivery layer of one module crossing into infrastructure layer of another | `module-iam.md §5 FLAG-08`; `internal/modules/iam/delivery/http/sessions_handler.go:19` | HIGH |
+| ~~V-01~~ | ~~`iam/delivery/http/sessions_handler.go` imports `auth/infrastructure/postgres` directly~~ | **CLOSED Wave 2.7 (F-06d):** `SessionAdminQuery`/`SessionListItem` promoted to `auth/domain`; `sessions_handler.go` now depends on `authdomain` only — zero `auth/infrastructure` imports under `iam/`. | ~~HIGH~~ |
 | V-02 | `auth` imports `iam/domain`; `iam` imports `auth/application` — bidirectional coupling between the two lowest-level modules | `module-auth.md §5`; `module-iam.md §5` | HIGH |
-| V-03 | `platform/security` imports `auth/domain` and `iam/domain` — platform package imports module domain | `internal/platform/security/ratelimit.go:12-13`; `platform-identity-tenancy.md §10` | MEDIUM |
+| ~~V-03~~ | ~~`platform/security` imports `auth/domain` and `iam/domain`~~ | **CLOSED Wave 2.8 (F-05):** `internal/platform/security/ratelimit.go` deleted entirely; `platform/security` no longer imports any module domain. | ~~MEDIUM~~ |
 | ~~V-04~~ | ~~`platform/observability` imports `auth/domain`~~ | **CLOSED Wave 0 (F-06a):** import removed; user attribution now injected via constructor param. | ~~MEDIUM~~ |
 | V-05 | `platform/authn` imports `auth/application` — platform package imports module application layer | `platform-identity-tenancy.md §5` | MEDIUM |
 | V-06 | `platform/objectstore` imports `documents/domain` and `templates/domain` for error types | `platform-data-layer.md §5` | LOW |
@@ -249,7 +249,7 @@ graph TB
     subgraph Binaries["Binaries (3 Go + 1 Node runtime processes)"]
         API["metaldocs-api\napps/api/cmd/metaldocs-api\n:8081"]
         WORKER["metaldocs-worker\napps/worker/cmd/metaldocs-worker"]
-        JOBS["metaldocs-jobs\napps/jobs/cmd/metaldocs-jobs\n[NO Dockerfile — deploy gap F-19]"]
+        JOBS["metaldocs-jobs\napps/jobs/cmd/metaldocs-jobs\njobs.Dockerfile + compose service (Wave 0, F-19 closed)"]
     end
 
     subgraph Sidecar["External Services"]
@@ -453,13 +453,13 @@ graph LR
 
 | Artifact | Evidence | Severity |
 |---|---|---|
-| `approval/application.CutoverService` | Post-migration-0142 dead code; reachable only from `coverage_boost_test.go` (`module-approval.md §10 F-02`) | MEDIUM |
-| `approval.PDFDispatchInvoker` deprecated path | Compiled; silently activates if outbox wiring is omitted (`internal/modules/documents/approval/application/decision_service.go:43`) | LOW |
+| ~~`approval/application.CutoverService`~~ | **DELETED Wave 2.11 (F-14):** zero non-test callers confirmed; `cutover_service.go` + test file removed. | ~~MEDIUM~~ |
+| ~~`approval.PDFDispatchInvoker` deprecated path~~ | **DELETED Wave 2.11 (F-14):** `NewDecisionService` panics if `pdfDispatcher` non-nil; composition root updated to pass nil; field + dead assignment removed. | ~~LOW~~ |
 | `FreezeService.Freeze` synchronous path | Annotated "New code should use Pin + Materialize instead" at `freeze_service.go:300`; no confirmed active callsite `[runtime-unverified]` | MEDIUM |
-| `iam.MembershipGovernanceLogger` | Wired as `nil` in `apps/api/cmd/metaldocs-api/main.go:325` — IAM membership governance events are never written | HIGH |
-| `taxonomy.AreaService.SetParent` (cycle-safe) | HTTP `updateArea` bypasses it; only called from tests (`module-taxonomy.md §10 F-02`) | LOW |
-| `METALDOCS_WORKER_REVIEW_REMINDER_DAYS` env var | Loaded, logged at startup, never consumed downstream (`async-runtime.md §10`) | LOW |
-| `resolvePermissionFallback` function | Switch with only a default case and a discarded path parameter (`apps/api/cmd/metaldocs-api/permissions.go:270-279`) | INFO |
+| ~~`iam.MembershipGovernanceLogger` wired as nil~~ | **FIXED Wave 2.13:** `newMembershipGovernanceLogger` is a required port; wired at `apps/api/cmd/metaldocs-api/main.go:363`; fails loud on nil writer. IAM membership governance events are now written. | ~~HIGH~~ |
+| ~~`taxonomy.AreaService.SetParent` (cycle-safe)~~ | **DELETED Wave 2.11 (F-14):** zero non-test callers; method + 3 tests + `areaCodePtr` helper removed. | ~~LOW~~ |
+| ~~`METALDOCS_WORKER_REVIEW_REMINDER_DAYS` env var~~ | **DELETED Wave 2.11 (F-14):** field + env-var parse block + startup log token removed from `WorkerConfig`; variable removed from `.env.example` and `docker-compose.yml`. | ~~LOW~~ |
+| ~~`resolvePermissionFallback` function~~ | **DELETED Wave 2.11 (F-14):** logic inlined at call site (single-default switch); `permissions.go:270-279` no longer exists. | ~~INFO~~ |
 
 ---
 
@@ -471,13 +471,17 @@ graph LR
 
 Sources: `module-iam.md §5`; grep (35 production files confirmed)
 
-### 7.2 Governance event dual-sink is broken
+### 7.2 Governance event dual-sink — CLOSED (Waves 2.2/2.11/2.12/2.13)
 
-Two paths write governance events:
-1. **DBGovernanceLogger** → legacy `public.governance_events` table (active when `AuditGovernanceAdapter` is nil)
-2. **AuditGovernanceAdapter** → canonical `metaldocs.audit_events` table
+The dual-sink gap described in the Stage-1 audit has been resolved across the program:
 
-Both exist simultaneously. `taxonomy` writes governance events AFTER `tx.Commit` (no outbox), making them losable on crash (`module-taxonomy.md §10 F-03`). `iam.MembershipGovernanceLogger` is wired as `nil` in `main.go:325` — IAM membership governance events are never written (`module-iam.md §10 FLAG-03`). `templates` read/write split: `ListAudit` now reads `metaldocs.audit_events` (resource_type='template') — the legacy `templates_audit_log` read path was fixed in Wave 1 (F-07-sub-split). Historical rows in `templates_audit_log` are accepted as a seam. Full classification: F-07 in [legacy-register.md](legacy-register.md).
+- **Wave 2.2 (F-07):** `GovernanceLogger.LogTx` added; taxonomy/templates/documents/controlleddocuments governance calls moved inside the mutation transaction (`RecordTx`/`LogTx`). Post-commit audit-drop window eliminated. `PostCommitAudit` cilint analyzer enforces the pattern.
+- **Wave 2.11 (F-14):** `DBGovernanceLogger` nil-fallback in `controlleddocuments/module.go` replaced with a fail-loud panic.
+- **Wave 2.12 (F-07-sub):** `taxonomy/application/governance_logger.go` (`DBGovernanceLogger`) deleted entirely. `taxonomy/module.go` now requires `AuditWriter` at construction (panics on nil).
+- **Wave 2.13 (ADR-0022 / F-07-sub):** `iam.MembershipGovernanceLogger` promoted to a required port (`apps/api/cmd/metaldocs-api/main.go:363`); `newMembershipGovernanceLogger` panics on nil writer. IAM membership governance events are now written.
+- **Templates audit sink split:** `ListAudit` reads `metaldocs.audit_events` (resource_type='template') since Wave 1 (F-07-sub-split). Historical `templates_audit_log` rows are an accepted seam.
+
+Remaining open item: `FreezeService` optional-tx enlistment branches at `freeze_service.go:175/308/370` carry `//cilint:allow-dualmode` (ADR-0015 dual-path by design — both branches write; deferred per Wave 2.13 disposition). Full classification: F-07 in [legacy-register.md](legacy-register.md).
 
 ### 7.3 `metaldocs-jobs` binary container image — CLOSED (Wave 0, F-19)
 
@@ -515,9 +519,9 @@ Summary of severity distribution:
 
 | Severity | Count | Families |
 |---|---|---|
-| Critical | 1 | F-18 (Wave 0 remediation complete; history residual resolved-by-plan at re-baseline) |
-| High | 7 | F-01 ✅ Wave 1, F-03 ✅ Wave 1, F-07 🟡 sub-split ✅ Wave 1, F-11, F-17, F-19 ✅ Wave 0/1, + nil MembershipGovernanceLogger (F-07 sub-item) |
-| Medium | 10 | F-04, F-05, F-06, F-08 ✅ Wave 1, F-09 🟡 Wave 1 half, F-10, F-12, F-13 ✅ Wave 1, F-14, F-16 ✅ Wave 1 |
+| Critical | 1 | F-18 ✅ Wave 0 + history residual resolved-by-plan at re-baseline |
+| High | 7 | F-01 ✅ Wave 1, F-03 ✅ Wave 1, F-07 ✅ Waves 2.2/2.11/2.12/2.13 (in-tx + DBGovernanceLogger deleted + MembershipGovernanceLogger wired), F-11 ✅ Wave 2.4, F-17 ➖ deferred (trigger: OTel adoption), F-19 ✅ Wave 0/1 |
+| Medium | 10 | F-04 ➖ deferred (trigger: generics/simplification), F-05 ✅ Wave 2.8, F-06 ✅ Waves 2.5/2.6/2.7, F-08 ✅ Wave 1, F-09 🟡 Wave 1 half (finalize-handler inline deferred), F-10 ✅ Wave 2.9, F-12 ✅ Wave 2.3, F-13 ✅ Wave 1, F-14 ✅ Wave 2.11, F-16 ✅ Wave 1 |
 | Low | 2 | F-02, F-15 |
 | Info | 1 | F-20 (correlated SQL performance patterns) |
 

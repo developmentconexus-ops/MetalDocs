@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/audit.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/audit-refactor.md`.
 
-**Last verified:** 2026-06-12 (Wave 2.12 sync — Service.writer nil-check //cilint:allow-dualmode annotated at service.go:182; deferred: WithExports refactor to hard-require writer. Prior: 2026-06-11 adversarial verification pass 2: T-005 anchor corrected to admin_handler.go:403 + main.go:816; T-006 anchor corrected to admin_handler.go:404, claim updated from timestamp-based to uuid.NewString(); T-003/T-010 migration paths corrected to archive/migrations/; T-010 payload anchor corrected to admin_handler.go:403-414 + main.go:816-828; T-007 wording corrected — tenant_id filter is unconditional; prior: T-001/T-005/T-007 closed-item observations labeled (original); T-008 anchor corrected to openapi.yaml:741-745; 2026-06-10 Stage-1 drift patch T-009)
+**Last verified:** 2026-06-12 (Wave F — T-012 anchor corrected to service.go:183; ExportEvents governance drop now logged via slog.Warn at service.go:195 (Wave F fix). Prior: Wave 2.12 sync — Service.writer nil-check //cilint:allow-dualmode annotated; prior: 2026-06-11 adversarial verification pass 2: T-005 anchor corrected to admin_handler.go:403 + main.go:816; T-006 anchor corrected to admin_handler.go:404, claim updated from timestamp-based to uuid.NewString(); T-003/T-010 migration paths corrected to archive/migrations/; T-010 payload anchor corrected to admin_handler.go:403-414 + main.go:816-828; T-007 wording corrected — tenant_id filter is unconditional; prior: T-001/T-005/T-007 closed-item observations labeled (original); T-008 anchor corrected to openapi.yaml:741-745; 2026-06-10 Stage-1 drift patch T-009)
 
 ## Severity scale
 
@@ -100,8 +100,8 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-012 · `Service.writer` nil-guarded by feature-gate (WithExports deferred) — OPEN
 - **Severity:** major (open — feature-gate nil, not a single-mode fallback)
-- **Surface:** `internal/modules/audit/application/service.go:182` — `if s.writer != nil { //cilint:allow-dualmode }` inside the export-feature governance path. `s.writer` is nil only when `WithExports` is not called (export pipeline disabled).
-- **Observation:** Wave 2.12 removed all other `db==nil` dual-mode branches across the codebase. This nil-check is explicitly annotated `//cilint:allow-dualmode` and retained because it is a feature-gate pattern (export pipeline may be off), not a single-mode fallback. However, `WithExports` still accepts an optional `Writer`; making it a hard requirement when exports are enabled would close this item. Trigger fired: governance/observability sink wired to nil on a potentially regulated path.
+- **Surface:** `internal/modules/audit/application/service.go:183` — `if s.writer != nil { //cilint:allow-dualmode }` inside the export-feature governance path. `s.writer` is nil only when `WithExports` is not called (export pipeline disabled).
+- **Observation:** Wave 2.12 removed all other `db==nil` dual-mode branches across the codebase. This nil-check is explicitly annotated `//cilint:allow-dualmode` and retained because it is a feature-gate pattern (export pipeline may be off), not a single-mode fallback. Wave F improved the non-nil branch: a dropped governance event is now logged via `slog.Warn` at `service.go:195` instead of silently discarded. Remaining gap: `WithExports` still accepts an optional `Writer`; making it a hard requirement when exports are enabled would close this item. Trigger fired: governance/observability sink wired to nil on a potentially regulated path.
 - **Resolution path:** Refactor `WithExports` to require `writer domain.Writer` as a non-nil argument; validate at call-site.
 - **Linked backlog row:** none yet
 - **Linked ADR:** missing-ADR
