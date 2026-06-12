@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"metaldocs/internal/modules/iam/domain"
@@ -133,7 +134,11 @@ func (s *AreaMembershipService) Grant(
 		// governance-logger outcome (A3).
 		s.invalidate(userID, tenantID)
 		if err := s.logger.Log(ctx, "role.grant", membership); err != nil {
-			return fmt.Errorf("log membership grant: %w", err)
+			// Best-effort governance (A3): the membership mutation is already
+			// committed; a governance-sink failure must not produce a torn outcome.
+			// Atomic in-tx governance via RecordTx is the eventual target (T-007 /
+			// next-touch refactor of the membership repo to share a tx).
+			slog.WarnContext(ctx, "membership governance log failed (best-effort)", "action", "role.grant", "tenant_id", membership.TenantID, "user_id", membership.UserID, "err", err)
 		}
 		return nil
 	}
@@ -145,7 +150,11 @@ func (s *AreaMembershipService) Grant(
 	// (see above): not gated on the governance-logger outcome (A3).
 	s.invalidate(userID, tenantID)
 	if err := s.logger.Log(ctx, "role.grant", membership); err != nil {
-		return fmt.Errorf("log membership grant: %w", err)
+		// Best-effort governance (A3): the membership mutation is already
+		// committed; a governance-sink failure must not produce a torn outcome.
+		// Atomic in-tx governance via RecordTx is the eventual target (T-007 /
+		// next-touch refactor of the membership repo to share a tx).
+		slog.WarnContext(ctx, "membership governance log failed (best-effort)", "action", "role.grant", "tenant_id", membership.TenantID, "user_id", membership.UserID, "err", err)
 	}
 	return nil
 }
@@ -191,7 +200,11 @@ func (s *AreaMembershipService) Revoke(
 		membership.GrantedBy = &revokedBy
 	}
 	if err := s.logger.Log(ctx, "role.revoke", membership); err != nil {
-		return fmt.Errorf("log membership revoke: %w", err)
+		// Best-effort governance (A3): the membership mutation is already
+		// committed; a governance-sink failure must not produce a torn outcome.
+		// Atomic in-tx governance via RecordTx is the eventual target (T-007 /
+		// next-touch refactor of the membership repo to share a tx).
+		slog.WarnContext(ctx, "membership governance log failed (best-effort)", "action", "role.revoke", "tenant_id", membership.TenantID, "user_id", membership.UserID, "err", err)
 	}
 	return nil
 }
