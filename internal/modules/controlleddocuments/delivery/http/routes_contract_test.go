@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	controlleddocumentsapi "metaldocs/internal/modules/controlleddocuments/api"
 	"metaldocs/internal/modules/controlleddocuments/application"
@@ -1124,5 +1125,35 @@ func TestActiveDocument_InvalidPathUUID_Returns400(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestGetActiveDocument_ServiceReturnsErrNoActiveInstance_WiresNO_ACTIVE_INSTANCE
+// asserts that ErrNoActiveInstance (returned by the service for the denied/absent
+// paths) is mapped to 404 NO_ACTIVE_INSTANCE — not CONTROLLED_DOCUMENT_NOT_FOUND.
+func TestGetActiveDocument_ServiceReturnsErrNoActiveInstance_WiresNO_ACTIVE_INSTANCE(t *testing.T) {
+	spy := &spyControlledDocumentService{
+		activeInstErr: controlleddocumentsdomain.ErrNoActiveInstance,
+	}
+	handler := &Handler{svc: spy}
+	req := newAuthedRequest(t, http.MethodGet,
+		"/api/v1/controlled-documents/11111111-1111-1111-1111-111111111111/active-document",
+		"88888888-8888-8888-8888-888888888888",
+	)
+	rec := httptest.NewRecorder()
+
+	handler.GetActiveDocument(rec, req, openapi_types.UUID{})
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status=%d, want 404; body=%s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
+	}
+	if body.Code != "NO_ACTIVE_INSTANCE" {
+		t.Fatalf("code=%q, want NO_ACTIVE_INSTANCE", body.Code)
 	}
 }

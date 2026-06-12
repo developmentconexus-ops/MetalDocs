@@ -504,7 +504,7 @@ func (s *ControlledDocumentService) GetActiveInstance(ctx context.Context, tenan
 		return nil, fmt.Errorf("controlled_documents: check read access: %w", err)
 	}
 	if !canRead {
-		return nil, controlleddocumentsdomain.ErrCDNotFound
+		return nil, controlleddocumentsdomain.ErrNoActiveInstance
 	}
 	inst, err := s.docs.GetActiveInstance(ctx, tenantID, id)
 	if err != nil {

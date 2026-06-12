@@ -419,6 +419,8 @@ func optionalUUID(value *string) (*openapi_types.UUID, error) {
 
 func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, controlleddocumentsdomain.ErrNoActiveInstance):
+		httpresponse.WriteError(w, http.StatusNotFound, "NO_ACTIVE_INSTANCE", "no active document instance for this controlled document")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDNotFound):
 		httpresponse.WriteError(w, http.StatusNotFound, "CONTROLLED_DOCUMENT_NOT_FOUND", "controlled document not found")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDNotActive):

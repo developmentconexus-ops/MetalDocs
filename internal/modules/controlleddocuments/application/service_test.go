@@ -975,6 +975,18 @@ SELECT EXISTS (
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(exists))
 }
 
+func TestGetActiveInstance_CanReadFalseReturnsErrNoActiveInstance(t *testing.T) {
+	repo := newFakeControlledDocumentRepository()
+	repo.canRead = false
+	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+
+	ctx := iamdomain.WithAuthContext(context.Background(), "actor-1", []iamdomain.Role{"author"})
+	_, err := svc.GetActiveInstance(ctx, "tenant-a", "cd-1")
+	if !errors.Is(err, controlleddocumentsdomain.ErrNoActiveInstance) {
+		t.Fatalf("expected ErrNoActiveInstance, got %v", err)
+	}
+}
+
 type profileReaderFunc func(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error)
 
 func (f profileReaderFunc) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error) {

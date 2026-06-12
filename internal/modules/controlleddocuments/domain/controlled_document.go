@@ -34,6 +34,7 @@ type ControlledDocument struct {
 
 var (
 	ErrCDNotFound               = errors.New("controlled document not found")
+	ErrNoActiveInstance         = errors.New("no active document instance for this controlled document")
 	ErrCDCodeTaken              = errors.New("controlled document code already taken")
 	ErrCDArchivedCodeReuse      = errors.New("cannot reuse code from archived controlled document")
 	ErrSequenceCounterNotFound  = errors.New("sequence counter not initialized for profile")
