@@ -66,22 +66,22 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		cookie, err := r.Cookie(m.cfg.SessionCookieName)
 		if err != nil || strings.TrimSpace(cookie.Value) == "" {
-			_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+			_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
 			return
 		}
 
 		currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value)
 		if err != nil {
 			if errors.Is(err, authdomain.ErrSessionNotFound) || errors.Is(err, authdomain.ErrSessionExpired) || errors.Is(err, authdomain.ErrSessionRevoked) {
-				_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+				_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
 				return
 			}
 			slog.Error("auth resolve session failed", "err", err)
-			_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Authentication failed"))
+			_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Authentication failed"))
 			return
 		}
 		if currentUser.MustChangePassword && !isPasswordChangeAllowedPath(r.URL.Path, r.Method) {
-			_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_PASSWORD_CHANGE_REQUIRED", "Password change is required before accessing the application"))
+			_ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodeAuthPasswordChangeRequired, "Password change is required before accessing the application"))
 			return
 		}
 

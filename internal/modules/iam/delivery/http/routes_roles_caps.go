@@ -51,7 +51,7 @@ func (h *RolesCapsHandler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *RolesCapsHandler) listRoles(w http.ResponseWriter, r *http.Request) {
 	if _, err := tenant.FromContext(r.Context()); err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, iamapi.ListRolesResponse{Items: h.cachedRoles})
@@ -59,7 +59,7 @@ func (h *RolesCapsHandler) listRoles(w http.ResponseWriter, r *http.Request) {
 
 func (h *RolesCapsHandler) listCapabilities(w http.ResponseWriter, r *http.Request) {
 	if _, err := tenant.FromContext(r.Context()); err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 	writeJSON(w, http.StatusOK, iamapi.ListCapabilitiesResponse{Items: h.cachedCaps})
@@ -67,16 +67,16 @@ func (h *RolesCapsHandler) listCapabilities(w http.ResponseWriter, r *http.Reque
 
 func (h *RolesCapsHandler) listRoleCapabilities(w http.ResponseWriter, r *http.Request) {
 	if _, err := tenant.FromContext(r.Context()); err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 	if h.roleCaps == nil {
-		_ = problem.Write(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "role_capabilities repository is not configured"))
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "role_capabilities repository is not configured"))
 		return
 	}
 	links, err := h.roleCaps.ListRoleCapabilities(r.Context())
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list role capabilities"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list role capabilities"))
 		return
 	}
 	items := make([]iamapi.RoleCapabilityLink, 0, len(links))

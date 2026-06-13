@@ -77,7 +77,10 @@ Once the `TxRunner` seam exists (H-1d), wrap each of `RevokeSession`, `people_ha
 
 ---
 
-### H-4 — Contract  ·  audit: Contract (C)  ·  assessor: contract-api C PATCH
+### H-4 — Contract  ·  audit: Contract (C)  ·  assessor: contract-api C PATCH  ·  ✅ DONE (commit pending push)
+
+**Discovery during execution (2026-06-13):** the FE `error-codes.generated.json` already listed `MEMBERSHIP_EXISTS`, `MEMBERSHIP_NOT_FOUND`, `UNKNOWN_ROLE` (the dump tool scans literals, not catalog membership) — so the iam-package guard extension would catch 3 more off-catalog codes than the plan's "2". Resolution: promote all **5** to typed consts with their exact existing string values (not remap) → generated JSON stays byte-identical, zero FE/wire change. 164 literals converted; guard 5→10 pkgs. Status/message args left untouched: several "service not configured" sites pair 501 with `INTERNAL_ERROR` (a contract smell) — re-statusing is a wire change, **deferred** (not in codes-only scope). search/handler.go gained the `problem` import (it used `httpresponse.WriteError`).
+
 
 **Goal:** close the typed `problem.Code` catalog over all delivery packages; kill raw error-code string literals.
 

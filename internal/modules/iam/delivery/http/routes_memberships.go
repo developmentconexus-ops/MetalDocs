@@ -94,13 +94,13 @@ func (h *MembershipHandler) RegisterRoutes(mux *http.ServeMux) {
 // listMemberships — operationId listAreaMemberships.
 func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Request) {
 	if h.svc == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Membership service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Membership service is not configured"))
 		return
 	}
 
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 
@@ -121,20 +121,20 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 	actor, ok := authn.UserIDFromContext(r.Context())
 	actor = strings.TrimSpace(actor)
 	if !ok || actor == "" {
-		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthForbidden, "Insufficient permissions"))
 		return
 	}
 	tenantWide, hasManagedAreas, err := h.svc.DirectoryScope(r.Context(), tenantID, actor, string(iamdomain.CapMembershipManage))
 	if err != nil {
 		slog.Error("iam memberships: resolve directory scope failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list memberships"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list memberships"))
 		return
 	}
 
 	if !tenantWide && !hasManagedAreas {
 		// Self-only: ignore any userId filter that isn't the actor (no probing).
 		if userID != "" && !strings.EqualFold(userID, actor) {
-			h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+			h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthForbidden, "Insufficient permissions"))
 			return
 		}
 		userID = actor
@@ -158,7 +158,7 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 	}
 	if err != nil {
 		slog.Error("iam memberships: list failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list memberships"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list memberships"))
 		return
 	}
 	dtos := make([]membershipDTO, 0, len(items))
@@ -171,20 +171,20 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 // grantMembership — operationId grantAreaMembership.
 func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Request) {
 	if h.svc == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Membership service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Membership service is not configured"))
 		return
 	}
 
 	var req grantMembershipRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON payload"))
 		return
 	}
 	userID := strings.TrimSpace(req.UserID)
 	areaCode := strings.TrimSpace(req.AreaCode)
 	role := strings.ToLower(strings.TrimSpace(req.Role))
 	if userID == "" || areaCode == "" || role == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId, areaCode and role are required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "userId, areaCode and role are required"))
 		return
 	}
 	// ADR 0022 Phase 3: authorization is tier-1 (route cap) + tier-2 (area,
@@ -198,12 +198,12 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 	// System admins bypass via the non-self path (target != actor); area admins
 	// lose self-escalation here but retain cross-target grants in their area.
 	if isSelf(r.Context(), userID) {
-		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Self-grant is not permitted"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthForbidden, "Self-grant is not permitted"))
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 
@@ -213,7 +213,7 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 
 	grantedBy, ok := authn.UserIDFromContext(r.Context())
 	if !ok {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 	err = h.svc.Grant(
@@ -236,21 +236,21 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 		"user_id":   userID,
 		"tenant_id": tenantID,
 		"area_code": areaCode,
-		"role":     role,
+		"role":      role,
 	})
 }
 
 // revokeMembership — operationId revokeAreaMembership.
 func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Request) {
 	if h.svc == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Membership service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Membership service is not configured"))
 		return
 	}
 
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	areaCode := strings.TrimSpace(r.PathValue("area_code"))
 	if userID == "" || areaCode == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id and area_code are required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "user_id and area_code are required"))
 		return
 	}
 	// ADR 0022 Phase 3: tier-2 area enforcement (repository authz.Require with the
@@ -259,7 +259,7 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 
@@ -269,7 +269,7 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 
 	revokedBy, ok := authn.UserIDFromContext(r.Context())
 	if !ok {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 
@@ -299,16 +299,16 @@ func (h *MembershipHandler) writeMembershipError(w http.ResponseWriter, err erro
 	case errors.As(err, &capDenied):
 		// ADR 0022 Phase 3: tier-2 area denial (area_admin acting outside a
 		// managed area, or actor lacking membership.manage there) → 403, not 500.
-		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthForbidden, "Insufficient permissions"))
 	case errors.Is(err, iamapp.ErrMembershipExists):
-		h.writeProblem(w, problem.New(http.StatusConflict, "MEMBERSHIP_EXISTS", "Membership already exists for this user and area with the same role"))
+		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeMembershipExists, "Membership already exists for this user and area with the same role"))
 	case errors.Is(err, iamapp.ErrMembershipNotFound):
-		h.writeProblem(w, problem.New(http.StatusNotFound, "MEMBERSHIP_NOT_FOUND", "Membership not found"))
+		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeMembershipNotFound, "Membership not found"))
 	case errors.Is(err, iamapp.ErrUnknownRole):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "UNKNOWN_ROLE", "Unknown role"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeUnknownRole, "Unknown role"))
 	default:
 		slog.Error("iam memberships: handler error", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", defaultMessage))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, defaultMessage))
 	}
 }
 
@@ -318,16 +318,16 @@ func (h *MembershipHandler) writeMembershipError(w http.ResponseWriter, err erro
 // (e.g. SQLDB-less boot path), the guard fails closed with NOT_IMPLEMENTED.
 func (h *MembershipHandler) guardMembershipUserInTenant(w http.ResponseWriter, r *http.Request, tenantID, userID string) bool {
 	if h.verifier == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Membership tenant verifier is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Membership tenant verifier is not configured"))
 		return false
 	}
 	if err := h.verifier.VerifyUserInTenant(r.Context(), tenantID, userID); err != nil {
 		if errors.Is(err, iamapp.ErrUserNotInTenant) {
-			h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
+			h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "User not found"))
 			return false
 		}
 		slog.Error("iam memberships: verify user-in-tenant failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to verify user"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to verify user"))
 		return false
 	}
 	return true

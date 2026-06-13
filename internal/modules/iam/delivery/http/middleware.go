@@ -61,7 +61,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		// C3: nil resolver is a misconfiguration — fail closed, never pass unauthenticated.
 		if m.resolver == nil {
-			m.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Permission resolver not configured"))
+			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Permission resolver not configured"))
 			return
 		}
 		capability, visibility := m.resolver(r.Method, r.URL.Path)
@@ -69,7 +69,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		case VisibilityPublic, VisibilitySessionRequired, VisibilityPermissionGuarded:
 		default:
 			slog.Warn("iam: unknown route visibility", "method", r.Method, "path", r.URL.Path, "visibility", visibility)
-			m.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Permission resolver returned unknown visibility"))
+			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Permission resolver returned unknown visibility"))
 			return
 		}
 
@@ -84,7 +84,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		// header bypasses cookie/HMAC/revocation/expiry/tenant checks entirely.
 		userID := iamdomain.UserIDFromContext(r.Context())
 		if userID == "" {
-			m.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+			m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
 			return
 		}
 
@@ -93,7 +93,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		// client-controllable and allow cross-tenant access.
 		tenantID, err := tenant.FromContext(r.Context())
 		if err != nil {
-			m.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+			m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
 			return
 		}
 
@@ -112,12 +112,12 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		// C8: nil caps is a misconfiguration — fail closed, never silently skip check.
 		if m.caps == nil {
-			m.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Capability service not configured"))
+			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Capability service not configured"))
 			return
 		}
 
 		if err := m.caps.CanDo(r.Context(), userID, tenantID, string(capability)); err != nil {
-			m.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+			m.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthForbidden, "Insufficient permissions"))
 			return
 		}
 
@@ -141,15 +141,15 @@ func (m *Middleware) resolveRoles(w http.ResponseWriter, r *http.Request, userID
 	if m.roleProvider != nil {
 		resolvedRoles, err := m.roleProvider.RolesByUserID(r.Context(), userID, tenantID)
 		if errors.Is(err, iamdomain.ErrUserNotFound) || errors.Is(err, iamdomain.ErrUserInactive) {
-			m.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "User is not authorized"))
+			m.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "User is not authorized"))
 			return nil, false
 		}
 		if errors.Is(err, iamdomain.ErrNoRolesAssigned) {
-			m.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+			m.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthForbidden, "Insufficient permissions"))
 			return nil, false
 		}
 		if err != nil {
-			m.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Authorization lookup failed"))
+			m.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Authorization lookup failed"))
 			return nil, false
 		}
 		roles = resolvedRoles

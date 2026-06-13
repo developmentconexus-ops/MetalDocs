@@ -29,6 +29,8 @@ const (
 	CodeRequestBodyTooLarge    Code = "REQUEST_BODY_TOO_LARGE"
 	CodeRateLimited            Code = "RATE_LIMITED" // emitted by the rate-limit middlewares (platform/ratelimit + platform/security)
 	CodeInternalError          Code = "INTERNAL_ERROR"
+	CodeNotImplemented         Code = "NOT_IMPLEMENTED" // 501: endpoint/feature wired but not yet implemented
+	CodeCursorExpired          Code = "CURSOR_EXPIRED"  // 410: pagination cursor refers to an item that no longer exists
 	CodeConflict               Code = "CONFLICT_ERROR"
 	CodeIdempotencyKeyRequired Code = "IDEMPOTENCY_KEY_REQUIRED"
 
@@ -50,6 +52,16 @@ const (
 	CodeStaleBase               Code = "STALE_BASE"
 	CodeISOSegregationViolation Code = "ISO_SEGREGATION_VIOLATION"
 	CodeSystemTemplateImmutable Code = "SYSTEM_TEMPLATE_IMMUTABLE"
+)
+
+// IAM area-membership domain codes (used in Problem.code by the memberships
+// handler). These have been part of the wire contract — and the frontend
+// error-code catalog — since Wave 1; they are promoted to typed constants here
+// (H-4) with their exact existing string values, so the contract is unchanged.
+const (
+	CodeMembershipExists   Code = "MEMBERSHIP_EXISTS"
+	CodeMembershipNotFound Code = "MEMBERSHIP_NOT_FOUND"
+	CodeUnknownRole        Code = "UNKNOWN_ROLE"
 )
 
 // Field-level codes (used in FieldError.code).

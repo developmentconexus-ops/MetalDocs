@@ -34,6 +34,16 @@ var guardedPackages = []string{
 	filepath.Join("internal", "modules", "documents", "delivery", "http"),
 	filepath.Join("internal", "modules", "templates", "delivery", "http"),
 	filepath.Join("internal", "platform", "idempotency"), // F-09: middleware raw codes closed Wave 1.4
+	// H-4: identity/auth/audit/security/search delivery packages standardized onto
+	// the canonical catalog. Every Problem.code in these packages is now a typed
+	// problem.Code constant (the membership domain codes were promoted into the
+	// catalog with their exact existing string values, so the wire contract and
+	// the frontend error-code map are unchanged).
+	filepath.Join("internal", "modules", "iam", "delivery", "http"),
+	filepath.Join("internal", "modules", "auth", "delivery", "http"),
+	filepath.Join("internal", "modules", "audit", "delivery", "http"),
+	filepath.Join("internal", "modules", "security", "delivery", "http"),
+	filepath.Join("internal", "modules", "search", "delivery", "http"),
 	"pdf_webhook", // documents/http: only the pdf-complete webhook handler
 	// F-09 Wave 2.4: only handler.go is on the canonical catalog. The sibling
 	// routes.go (writeDomainError) owns a separate CD/template domain taxonomy

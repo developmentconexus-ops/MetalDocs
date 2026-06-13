@@ -48,7 +48,7 @@ func (h *Handler) handleMfaCoverage(w http.ResponseWriter, r *http.Request) {
 	coverage, err := h.service.MfaCoverage(r.Context(), tenantID)
 	if err != nil {
 		slog.Error("security: mfa coverage failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load MFA coverage"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to load MFA coverage"))
 		return
 	}
 	writeJSON(w, http.StatusOK, mfaCoverageToJSON(coverage))
@@ -70,7 +70,7 @@ func (h *Handler) handleLockouts(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListLockouts(r.Context(), tenantID)
 	if err != nil {
 		slog.Error("security: lockouts failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list lockouts"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list lockouts"))
 		return
 	}
 	out := make([]map[string]any, 0, len(items))
@@ -110,7 +110,7 @@ func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
 	signals, err := h.service.ListSignals(r.Context(), tenantID)
 	if err != nil {
 		slog.Error("security: signals failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list security signals"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list security signals"))
 		return
 	}
 	out := make([]map[string]any, 0, len(signals))
@@ -133,7 +133,7 @@ func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) requireTenant(w http.ResponseWriter, r *http.Request) (string, bool) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
 		return "", false
 	}
 	return tenantID, true

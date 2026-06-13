@@ -68,7 +68,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON payload"))
 		return
 	}
 
@@ -123,7 +123,7 @@ func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, user)
@@ -136,13 +136,13 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
 		return
 	}
 
 	var req changePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON payload"))
 		return
 	}
 	if err := h.service.ChangePasswordForUser(r.Context(), user, req.CurrentPassword, req.NewPassword); err != nil {
@@ -152,7 +152,7 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	currentUser, err := h.service.CurrentUser(r.Context(), user.UserID, user.TenantID)
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
@@ -165,21 +165,21 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, authdomain.ErrInvalidCredentials):
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthInvalidCredentials, "Invalid username/email or password"))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthInvalidCredentials, "Invalid username/email or password"))
 	case errors.Is(err, authdomain.ErrIdentityLocked):
-		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_LOCKED", "Account is temporarily locked"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthAccountLocked, "Account is temporarily locked"))
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
 	case errors.Is(err, authdomain.ErrIdentityInactive):
-		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_INACTIVE", "User account is inactive"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthAccountInactive, "User account is inactive"))
 	case errors.Is(err, authdomain.ErrTenantNotPermitted):
-		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_TENANT_FORBIDDEN", "User has no role in the requested tenant"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthTenantForbidden, "User has no role in the requested tenant"))
 	case errors.Is(err, authdomain.ErrTenantClaimRequired):
-		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_TENANT_REQUIRED", "Tenant selection required"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeAuthTenantRequired, "Tenant selection required"))
 	default:
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error"))
 	}
 }
 

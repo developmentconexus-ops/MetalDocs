@@ -63,12 +63,12 @@ func (h *PeopleHandler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "People service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "People service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 	filters := iamapp.ListFilters{
@@ -81,7 +81,7 @@ func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) 
 	if rawRole := strings.TrimSpace(r.URL.Query().Get("role")); rawRole != "" {
 		role := iamdomain.Role(rawRole)
 		if !iamdomain.IsValidRole(role) {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid role filter"))
+			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid role filter"))
 			return
 		}
 		filters.Role = &role
@@ -90,11 +90,11 @@ func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) 
 	result, err := h.service.ListFiltered(r.Context(), tenantID, filters)
 	if err != nil {
 		if errors.Is(err, iamapp.ErrCursorExpired) {
-			h.writeProblem(w, problem.New(http.StatusGone, "CURSOR_EXPIRED", "The pagination cursor refers to an item that is no longer available. Restart from the first page."))
+			h.writeProblem(w, problem.New(http.StatusGone, problem.CodeCursorExpired, "The pagination cursor refers to an item that is no longer available. Restart from the first page."))
 			return
 		}
 		slog.Error("iam people: list users failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list users"))
 		return
 	}
 
@@ -122,17 +122,17 @@ func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) 
 
 func (h *PeopleHandler) handleInvite(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "People service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "People service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 	var body iamapi.UserInviteRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON payload"))
 		return
 	}
 	input := iamapp.InviteInput{
@@ -181,17 +181,17 @@ func (h *PeopleHandler) handleInvite(w http.ResponseWriter, r *http.Request) {
 
 func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "People service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "People service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "user_id required"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
@@ -199,7 +199,7 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	}
 	var body iamapi.UpdateManagedUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON payload"))
 		return
 	}
 
@@ -239,17 +239,17 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 
 func (h *PeopleHandler) handleResetPassword(w http.ResponseWriter, r *http.Request) {
 	if h.authSvc == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Auth service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Auth service is not configured"))
 		return
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "user_id required"))
 		return
 	}
 	var body iamapi.ResetManagedUserPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON payload"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
@@ -271,12 +271,12 @@ func (h *PeopleHandler) handleResetPassword(w http.ResponseWriter, r *http.Reque
 
 func (h *PeopleHandler) handleUnlock(w http.ResponseWriter, r *http.Request) {
 	if h.authSvc == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Auth service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Auth service is not configured"))
 		return
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "user_id required"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
@@ -294,21 +294,21 @@ func (h *PeopleHandler) handleUnlock(w http.ResponseWriter, r *http.Request) {
 
 func (h *PeopleHandler) handleBulk(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "People service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "People service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 	var body iamapi.UserBulkActionRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid JSON payload"))
 		return
 	}
 	if len(body.UserIds) == 0 {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_ids required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "user_ids required"))
 		return
 	}
 	action := string(body.Action)
@@ -318,15 +318,15 @@ func (h *PeopleHandler) handleBulk(w http.ResponseWriter, r *http.Request) {
 		if iamapp.IsForceLogoutDeferred(err) {
 			// Spec: 501 with code NOT_IMPLEMENTED + detail "PR-7 dependency".
 			detail := "PR-7 dependency"
-			h.writeProblem(w, problem.New(http.StatusNotImplemented, "NOT_IMPLEMENTED", "Force logout is not yet implemented").WithDetail(detail))
+			h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeNotImplemented, "Force logout is not yet implemented").WithDetail(detail))
 			return
 		}
 		if errors.Is(err, iamapp.ErrPeopleValidation) {
-			h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
+			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
 			return
 		}
 		slog.Error("iam people: bulk action failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Bulk action failed"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Bulk action failed"))
 		return
 	}
 
@@ -358,17 +358,17 @@ func (h *PeopleHandler) handleBulk(w http.ResponseWriter, r *http.Request) {
 
 func (h *PeopleHandler) handleListMemberships(w http.ResponseWriter, r *http.Request) {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "People service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "People service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
 		return
 	}
 	userID := strings.TrimSpace(r.PathValue("user_id"))
 	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "user_id required"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "user_id required"))
 		return
 	}
 	if !h.guardUserInTenant(w, r, userID) {
@@ -405,21 +405,21 @@ func (h *PeopleHandler) handleListMemberships(w http.ResponseWriter, r *http.Req
 // distinguish "exists elsewhere" from "does not exist".
 func (h *PeopleHandler) guardUserInTenant(w http.ResponseWriter, r *http.Request, userID string) bool {
 	if h.service == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "People service is not configured"))
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "People service is not configured"))
 		return false
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
 		return false
 	}
 	if err := h.service.VerifyUserInTenant(r.Context(), tenantID, userID); err != nil {
 		if errors.Is(err, iamapp.ErrUserNotInTenant) {
-			h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
+			h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "User not found"))
 			return false
 		}
 		slog.Error("iam people: verify user-in-tenant failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to verify user"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to verify user"))
 		return false
 	}
 	return true
@@ -434,33 +434,33 @@ func (h *PeopleHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) 
 func (h *PeopleHandler) writePeopleError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, iamapp.ErrPeopleValidation):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
 	case errors.Is(err, iamapp.ErrAreaUnknown):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
 	case errors.Is(err, authdomain.ErrUserAlreadyExists):
-		h.writeProblem(w, problem.New(http.StatusConflict, "CONFLICT_ERROR", "User already exists"))
+		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeConflict, "User already exists"))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
+		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "User not found"))
 	case errors.Is(err, iamapp.ErrUserNotInTenant):
-		h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
+		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "User not found"))
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
 	case errors.Is(err, iamdomain.ErrInvalidRole):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid role"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "Invalid role"))
 	default:
 		slog.Error("iam people: handler error", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to process people request"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to process people request"))
 	}
 }
 
 func (h *PeopleHandler) writeAuthError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
+		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "User not found"))
 	default:
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to process auth request"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to process auth request"))
 	}
 }
 
