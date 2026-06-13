@@ -136,3 +136,35 @@ The operator overrode D-1/D-3 and ordered a zero-defer finish (register-zero + o
 **Excluded forever (KEEP / at-release — written rationale, NOT defers):** F-09a finalize inline idempotency (KEEP), F-20f sequential security queries (KEEP), `splitCSV` duplication (KEEP), F-18 git-history residual (closes physically at the Sunday re-baseline via the Z-32 runbook).
 
 **DONE gate (spec §2) — all green 2026-06-13:** G1 build+vet 0 · G2 `go test -p 2 ./...` 87 ok/0 FAIL · G3 api-lint 0 · G4 cilint 0 **+ zero allow-dualmode** · G5 manifest empty · G6 register closed · G7 blueprint all-green · G8 ADR index trustworthy · G9 runtime smoke (inert+console OTel, RLS NOSUPERUSER, in-tx governance, 429+403, panic→500) · **G10 regression-only review: ZERO Wave-Z-caused defects** (2 critical claims raised + both refuted with evidence) · G11 deliverables (post-v1-backlog, Z-32 runbook, handoff close-out). **NOT merged — awaiting operator sign-off + Sunday v1 release via Z-32 runbook.**
+
+---
+
+## Wave H — Independent Architecture Audit remediation (2026-06-13, fresh session)
+
+> **Trigger:** independent 39-agent architecture audit ([`_artifacts/architecture-audit-2026-06-13.md`](_artifacts/architecture-audit-2026-06-13.md)) graded the backend **B** (7×B, 3×C) and surfaced ~23 NEW, mostly *structural* defects the Wave 0–Z register never catalogued. Goal: lift the 3 C-grade dimensions (module boundaries, contract layer, composition/observability) to A, fix the 6 MUST-FIX defects, close the program.
+> **Branch:** `qa/iam-area-membership`. One commit per defect family, tracker + audit disposition updated same-commit. Do NOT merge — operator review gate.
+> **Skeptic dispositions (NOT re-raised):** oapi `NewStrictHandler` text/plain (REFUTED, dead code) · `tenantIDFromContext` DevTenantID fallback (REFUTED, idempotency-only) · CD/taxonomy infra importing `iam/authz` (intentional, ADR 0007) · role-name check / GeneratedServerAdapter / `authn` live os.Getenv (DOWNGRADED Minor).
+
+### Tier 1 — MUST-FIX (block frontend / security)
+
+| # | Sev | Defect | Status | Commit | Evidence |
+|---|-----|--------|--------|--------|----------|
+| A1 | 🔴 CRITICAL | `statusWriter` lacks `Unwrap()` → WS upgrade 501 in prod; `/iam/presence/stream` dead | ☐ | | |
+| A2 | 🔒 Major | LIKE wildcard injection (`opts.Q` unescaped, CWE-943) | ☐ | | |
+| A3 | 🔒 Major | self-service password change does not revoke sessions (CWE-613) | ☐ | | |
+| A4 | 🔒 Major | sliding idle timeout ships disabled (default 0) + absent from deploy artifacts | ☐ | | |
+| A5 | 📑 Major | `PATCH /iam/users/{id}` returns ad-hoc map, spec declares `ManagedUserCore` (breaks FE codegen) | ☐ | | |
+| A6 | 📑 Major | `GET /documents` + `/documents/{id}` return domain structs / `map[string]any`, not generated types | ☐ | | |
+
+### Tier 2 — Architecture debt (lifts the 3 C-grades)
+
+| # | Family | Status | Commit | Evidence |
+|---|--------|--------|--------|----------|
+| H-1 | Module boundaries: documents delivery consolidation, CD→taxonomy ports, `*sql.DB` out of app signatures, `setAuthzGUC` dedup, approval delivery↛infrastructure | ☐ | | |
+| H-2 | Composition/observability: extract `main.go` god-file → `wiring` builders, `os.Getenv`→typed config, `slog.SetDefault(JSON)` per binary, worker drain + jobs cleanup + per-binary OTel `service.name` | ☐ | | |
+| H-3 | Persistence: post-commit audit→in-tx `RecordTx`/`LogTx` (5 handlers) + extend `postcommitaudit` analyzer; reject nil-tx in `PostgresSequenceAllocator.NextAndIncrement` | ☐ | | |
+| H-4 | Contract: expand codes-catalog guard to auth/iam/audit/security/search, typed `problem.Code` constants, add `CURSOR_EXPIRED`/`NOT_IMPLEMENTED` to catalog | ☐ | | |
+| H-5 | Code quality: decompose `RecordSignoff` (407 lines), split documents `Handler.Service` 28-method interface (drop 4 unused), rewrite `PeopleService.ListFiltered` to SQL filter+paginate | ☐ | | |
+| H-6 | Dead-code: delete `SnapshotFromTemplate`; migrate `DuplicateDocument` to atomic path then delete legacy `CreateDocument` chain | ☐ | | |
+
+**Wave H DONE gate:** all Tier-1 + Tier-2 rows ✅-or-deferred-with-trigger · static gates green (build/vet/test -p2/api-lint -strict/cilint) · runtime QA (A1 WS upgrade, in-tx audit, RLS, 429/lockout, panic→500) · FE types regen + coverage green · audit dispositions + this tracker + handoff close-out updated. **NOT merged.**
