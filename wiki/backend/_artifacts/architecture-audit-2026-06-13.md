@@ -85,7 +85,7 @@ Per-finding closure. Tracker rows mirror these in [`../roadmap.md`](../roadmap.m
 
 | # | Disposition | Commit | Evidence |
 |---|-------------|--------|----------|
-| A1 | ☐ open | | |
+| A1 | ✅ RESOLVED | (this commit) | `Unwrap()` added to `statusWriter`; coder/websocket hijacker follows the Unwrap chain. Runtime proof at close. |
 | A2 | ☐ open | | |
 | A3 | ☐ open | | |
 | A4 | ☐ open | | |

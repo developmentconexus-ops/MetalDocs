@@ -321,6 +321,14 @@ func (w *statusWriter) Flush() {
 	}
 }
 
+// Unwrap exposes the wrapped ResponseWriter so http.ResponseController and
+// libraries that follow the Unwrap chain (e.g. coder/websocket's hijacker)
+// can reach the underlying http.Hijacker/Flusher. Without this, WebSocket
+// upgrades through the observability middleware fail with 501 (A1).
+func (w *statusWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 func (m *routeMetrics) record(durationMs uint64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
