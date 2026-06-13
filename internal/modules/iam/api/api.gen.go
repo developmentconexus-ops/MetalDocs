@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -28,24 +27,6 @@ import (
 const (
 	SessionCookieScopes sessionCookieContextKey = "sessionCookie.Scopes"
 )
-
-// Defines values for AuditExportFormat.
-const (
-	Csv   AuditExportFormat = "csv"
-	Jsonl AuditExportFormat = "jsonl"
-)
-
-// Valid indicates whether the value is a known member of the AuditExportFormat enum.
-func (e AuditExportFormat) Valid() bool {
-	switch e {
-	case Csv:
-		return true
-	case Jsonl:
-		return true
-	default:
-		return false
-	}
-}
 
 // Defines values for CreateManagedUserRequestRoles.
 const (
@@ -149,51 +130,6 @@ func (e RoleDescriptorCategory) Valid() bool {
 	case Area:
 		return true
 	case Tenant:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for SecuritySignalKind.
-const (
-	LockoutSpike        SecuritySignalKind = "lockout-spike"
-	NewDeviceLogin      SecuritySignalKind = "new-device-login"
-	OffHoursAdminAction SecuritySignalKind = "off-hours-admin-action"
-	RepeatedFailedLogin SecuritySignalKind = "repeated-failed-login"
-)
-
-// Valid indicates whether the value is a known member of the SecuritySignalKind enum.
-func (e SecuritySignalKind) Valid() bool {
-	switch e {
-	case LockoutSpike:
-		return true
-	case NewDeviceLogin:
-		return true
-	case OffHoursAdminAction:
-		return true
-	case RepeatedFailedLogin:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for SecuritySignalSeverity.
-const (
-	Critical SecuritySignalSeverity = "critical"
-	Info     SecuritySignalSeverity = "info"
-	Warn     SecuritySignalSeverity = "warn"
-)
-
-// Valid indicates whether the value is a known member of the SecuritySignalSeverity enum.
-func (e SecuritySignalSeverity) Valid() bool {
-	switch e {
-	case Critical:
-		return true
-	case Info:
-		return true
-	case Warn:
 		return true
 	default:
 		return false
@@ -343,43 +279,6 @@ type AuditEventItem struct {
 	TraceId      string                 `json:"trace_id"`
 }
 
-// AuditExportFormat defines model for AuditExportFormat.
-type AuditExportFormat string
-
-// AuditExportRequest defines model for AuditExportRequest.
-type AuditExportRequest struct {
-	// Filter Multi-axis audit filter (mirrors GET /audit/events query params).
-	Filter AuditFilter       `json:"filter"`
-	Format AuditExportFormat `json:"format"`
-}
-
-// AuditExportResponse defines model for AuditExportResponse.
-type AuditExportResponse struct {
-	ExpiresAt time.Time `json:"expires_at"`
-	ExportId  string    `json:"export_id"`
-	SignedUrl string    `json:"signed_url"`
-}
-
-// AuditExportStatusResponse defines model for AuditExportStatusResponse.
-type AuditExportStatusResponse struct {
-	Error     *string    `json:"error,omitempty"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-	ExportId  string     `json:"export_id"`
-	SignedUrl string     `json:"signed_url"`
-	Status    string     `json:"status"`
-}
-
-// AuditFilter Multi-axis audit filter (mirrors GET /audit/events query params).
-type AuditFilter struct {
-	Action         *string    `json:"action,omitempty"`
-	ActorId        *string    `json:"actor_id,omitempty"`
-	OccurredAfter  *time.Time `json:"occurred_after,omitempty"`
-	OccurredBefore *time.Time `json:"occurred_before,omitempty"`
-	Q              *string    `json:"q,omitempty"`
-	ResourceId     *string    `json:"resource_id,omitempty"`
-	ResourceType   *string    `json:"resource_type,omitempty"`
-}
-
 // CapabilityDescriptor defines model for CapabilityDescriptor.
 type CapabilityDescriptor struct {
 	Category    string `json:"category"`
@@ -457,21 +356,9 @@ type IamKpiSnapshot struct {
 	RoleDistribution     []IamKpiRoleCount `json:"role_distribution"`
 }
 
-// ListAuditEventsResponse defines model for ListAuditEventsResponse.
-type ListAuditEventsResponse struct {
-	Items []AuditEventItem `json:"items"`
-	Page  CursorPage       `json:"page"`
-	Total *int             `json:"total,omitempty"`
-}
-
 // ListCapabilitiesResponse defines model for ListCapabilitiesResponse.
 type ListCapabilitiesResponse struct {
 	Items []CapabilityDescriptor `json:"items"`
-}
-
-// ListLockoutsResponse defines model for ListLockoutsResponse.
-type ListLockoutsResponse struct {
-	Items []LockoutItem `json:"items"`
 }
 
 // ListMembershipsResponse defines model for ListMembershipsResponse.
@@ -489,11 +376,6 @@ type ListRolesResponse struct {
 	Items []RoleDescriptor `json:"items"`
 }
 
-// ListSecuritySignalsResponse defines model for ListSecuritySignalsResponse.
-type ListSecuritySignalsResponse struct {
-	Items []SecuritySignal `json:"items"`
-}
-
 // ListSessionsResponse defines model for ListSessionsResponse.
 type ListSessionsResponse struct {
 	Items []SessionItem `json:"items"`
@@ -506,16 +388,6 @@ type ListUsersResponse struct {
 	Items []ManagedUserCore `json:"items"`
 	Page  CursorPage        `json:"page"`
 	Total *int              `json:"total,omitempty"`
-}
-
-// LockoutItem defines model for LockoutItem.
-type LockoutItem struct {
-	DisplayName    string     `json:"display_name"`
-	FailedAttempts int        `json:"failed_attempts"`
-	LastFailedAt   *time.Time `json:"last_failed_at,omitempty"`
-	LastFailedIp   *string    `json:"last_failed_ip,omitempty"`
-	LockedUntil    *time.Time `json:"locked_until,omitempty"`
-	UserId         string     `json:"user_id"`
 }
 
 // ManagedUserCore Canonical user shape — single tenantRole + multi area memberships.
@@ -536,24 +408,6 @@ type ManagedUserCore struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 	UserId     string    `json:"user_id"`
 	Username   string    `json:"username"`
-}
-
-// MfaCoverage defines model for MfaCoverage.
-type MfaCoverage struct {
-	ByRole        []MfaCoverageRoleSlice `json:"by_role"`
-	MfaEnabled    int                    `json:"mfa_enabled"`
-	MfaEnabledPct float32                `json:"mfa_enabled_pct"`
-	TotalUsers    int                    `json:"total_users"`
-}
-
-// MfaCoverageRoleSlice defines model for MfaCoverageRoleSlice.
-type MfaCoverageRoleSlice struct {
-	MfaEnabled int     `json:"mfa_enabled"`
-	Pct        float32 `json:"pct"`
-
-	// Role Canonical tenant role. 8 values; no `admin` or `reviewer` phantoms.
-	Role  UserRole `json:"role"`
-	Total int      `json:"total"`
 }
 
 // OnlinePresenceItem defines model for OnlinePresenceItem.
@@ -634,22 +488,6 @@ type RoleDescriptor struct {
 
 // RoleDescriptorCategory tenant — global tenant role; area — granted per process-area membership.
 type RoleDescriptorCategory string
-
-// SecuritySignal defines model for SecuritySignal.
-type SecuritySignal struct {
-	DetectedAt time.Time               `json:"detected_at"`
-	Evidence   *map[string]interface{} `json:"evidence,omitempty"`
-	Kind       SecuritySignalKind      `json:"kind"`
-	Severity   SecuritySignalSeverity  `json:"severity"`
-	SignalId   string                  `json:"signal_id"`
-	Summary    string                  `json:"summary"`
-}
-
-// SecuritySignalKind defines model for SecuritySignalKind.
-type SecuritySignalKind string
-
-// SecuritySignalSeverity defines model for SecuritySignalSeverity.
-type SecuritySignalSeverity string
 
 // SessionItem defines model for SessionItem.
 type SessionItem struct {
@@ -785,26 +623,6 @@ type Unauthorized = Problem
 // sessionCookieContextKey is the context key for sessionCookie security scheme
 type sessionCookieContextKey string
 
-// ListAuditEventsParams defines parameters for ListAuditEvents.
-type ListAuditEventsParams struct {
-	ActorId        *string    `form:"actor_id,omitempty" json:"actor_id,omitempty"`
-	Action         *string    `form:"action,omitempty" json:"action,omitempty"`
-	ResourceType   *string    `form:"resource_type,omitempty" json:"resource_type,omitempty"`
-	ResourceId     *string    `form:"resource_id,omitempty" json:"resource_id,omitempty"`
-	OccurredAfter  *time.Time `form:"occurred_after,omitempty" json:"occurred_after,omitempty"`
-	OccurredBefore *time.Time `form:"occurred_before,omitempty" json:"occurred_before,omitempty"`
-
-	// Q Free-text search on action / payload summary
-	Q      *string `form:"q,omitempty" json:"q,omitempty"`
-	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
-	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
-}
-
-// DownloadAuditExportParams defines parameters for DownloadAuditExport.
-type DownloadAuditExportParams struct {
-	Token string `form:"token" json:"token"`
-}
-
 // ListSessionsParams defines parameters for ListSessions.
 type ListSessionsParams struct {
 	UserId   *string `form:"user_id,omitempty" json:"user_id,omitempty"`
@@ -837,9 +655,6 @@ type ListUsersParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
-// ExportAuditEventsJSONRequestBody defines body for ExportAuditEvents for application/json ContentType.
-type ExportAuditEventsJSONRequestBody = AuditExportRequest
-
 // GrantAreaMembershipJSONRequestBody defines body for GrantAreaMembership for application/json ContentType.
 type GrantAreaMembershipJSONRequestBody = GrantAreaMembershipRequest
 
@@ -866,18 +681,6 @@ type ReplaceUserRolesJSONRequestBody = ReplaceUserRolesRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Lista eventos de auditoria append-only (multi-axis filter, cursor-paginated)
-	// (GET /audit/events)
-	ListAuditEvents(w http.ResponseWriter, r *http.Request, params ListAuditEventsParams)
-	// Export filtered audit events as CSV or JSONL (signed URL, async if large)
-	// (POST /audit/events/export)
-	ExportAuditEvents(w http.ResponseWriter, r *http.Request)
-	// Read the status of an audit export job
-	// (GET /audit/events/export/{export_id})
-	GetAuditExportStatus(w http.ResponseWriter, r *http.Request, exportId string)
-	// Download the rendered audit export payload via a signed token
-	// (GET /audit/events/export/{export_id}/download)
-	DownloadAuditExport(w http.ResponseWriter, r *http.Request, exportId string, params DownloadAuditExportParams)
 	// List active sessions in the current tenant
 	// (GET /auth/sessions)
 	ListSessions(w http.ResponseWriter, r *http.Request, params ListSessionsParams)
@@ -944,15 +747,6 @@ type ServerInterface interface {
 	// Clear operational lock + failed-login counter for a user
 	// (POST /iam/users/{user_id}/unlock)
 	UnlockUser(w http.ResponseWriter, r *http.Request, userId string)
-	// Current account lockouts (locked-until window)
-	// (GET /security/lockouts)
-	ListLockouts(w http.ResponseWriter, r *http.Request)
-	// MFA enrollment coverage by tenant + by role
-	// (GET /security/mfa-coverage)
-	GetMfaCoverage(w http.ResponseWriter, r *http.Request)
-	// Anomaly cards (repeated-failed-login, new-device-login, lockout-spike, off-hours-admin-action)
-	// (GET /security/signals)
-	ListSecuritySignals(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -963,249 +757,6 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
-
-// ListAuditEvents operation middleware
-func (siw *ServerInterfaceWrapper) ListAuditEvents(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListAuditEventsParams
-
-	// ------------- Optional query parameter "actor_id" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "actor_id", r.URL.Query(), &params.ActorId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor_id"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor_id", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "action" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "action", r.URL.Query(), &params.Action, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "action"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "action", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "resource_type" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "resource_type", r.URL.Query(), &params.ResourceType, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resource_type"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resource_type", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "resource_id" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "resource_id", r.URL.Query(), &params.ResourceId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "resource_id"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "resource_id", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "occurred_after" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "occurred_after", r.URL.Query(), &params.OccurredAfter, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "occurred_after"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "occurred_after", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "occurred_before" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "occurred_before", r.URL.Query(), &params.OccurredBefore, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "occurred_before"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "occurred_before", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "q" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "cursor" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
-		}
-		return
-	}
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		}
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAuditEvents(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ExportAuditEvents operation middleware
-func (siw *ServerInterfaceWrapper) ExportAuditEvents(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ExportAuditEvents(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetAuditExportStatus operation middleware
-func (siw *ServerInterfaceWrapper) GetAuditExportStatus(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "export_id" -------------
-	var exportId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "export_id", r.PathValue("export_id"), &exportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "export_id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAuditExportStatus(w, r, exportId)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// DownloadAuditExport operation middleware
-func (siw *ServerInterfaceWrapper) DownloadAuditExport(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "export_id" -------------
-	var exportId string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "export_id", r.PathValue("export_id"), &exportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "export_id", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params DownloadAuditExportParams
-
-	// ------------- Required query parameter "token" -------------
-
-	err = runtime.BindQueryParameterWithOptions("form", true, true, "token", r.URL.Query(), &params.Token, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
-	if err != nil {
-		var requiredError *runtime.RequiredParameterError
-		if errors.As(err, &requiredError) {
-			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "token"})
-		} else {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
-		}
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DownloadAuditExport(w, r, exportId, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
 
 // ListSessions operation middleware
 func (siw *ServerInterfaceWrapper) ListSessions(w http.ResponseWriter, r *http.Request) {
@@ -1939,66 +1490,6 @@ func (siw *ServerInterfaceWrapper) UnlockUser(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
-// ListLockouts operation middleware
-func (siw *ServerInterfaceWrapper) ListLockouts(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListLockouts(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetMfaCoverage operation middleware
-func (siw *ServerInterfaceWrapper) GetMfaCoverage(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetMfaCoverage(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListSecuritySignals operation middleware
-func (siw *ServerInterfaceWrapper) ListSecuritySignals(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListSecuritySignals(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -2119,10 +1610,6 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events", wrapper.ListAuditEvents)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/audit/events/export", wrapper.ExportAuditEvents)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events/export/{export_id}", wrapper.GetAuditExportStatus)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events/export/{export_id}/download", wrapper.DownloadAuditExport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/sessions", wrapper.ListSessions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/auth/sessions/{session_id}", wrapper.RevokeSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/iam/admin/overview", wrapper.GetIamAdminOverview)
@@ -2145,9 +1632,6 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users/{user_id}/roles", wrapper.UpsertUserRole)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/iam/users/{user_id}/roles", wrapper.ReplaceUserRoles)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/users/{user_id}/unlock", wrapper.UnlockUser)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/security/lockouts", wrapper.ListLockouts)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/security/mfa-coverage", wrapper.GetMfaCoverage)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/security/signals", wrapper.ListSecuritySignals)
 
 	return m
 }
@@ -2163,373 +1647,6 @@ type InternalServerErrorApplicationProblemPlusJSONResponse Problem
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
 type UnauthorizedApplicationProblemPlusJSONResponse Problem
-
-type ListAuditEventsRequestObject struct {
-	Params ListAuditEventsParams
-}
-
-type ListAuditEventsResponseObject interface {
-	VisitListAuditEventsResponse(w http.ResponseWriter) error
-}
-
-type ListAuditEvents200JSONResponse ListAuditEventsResponse
-
-func (response ListAuditEvents200JSONResponse) VisitListAuditEventsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListAuditEvents400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response ListAuditEvents400ApplicationProblemPlusJSONResponse) VisitListAuditEventsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListAuditEvents401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response ListAuditEvents401ApplicationProblemPlusJSONResponse) VisitListAuditEventsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListAuditEvents403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response ListAuditEvents403ApplicationProblemPlusJSONResponse) VisitListAuditEventsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListAuditEvents500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response ListAuditEvents500ApplicationProblemPlusJSONResponse) VisitListAuditEventsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ExportAuditEventsRequestObject struct {
-	Body *ExportAuditEventsJSONRequestBody
-}
-
-type ExportAuditEventsResponseObject interface {
-	VisitExportAuditEventsResponse(w http.ResponseWriter) error
-}
-
-type ExportAuditEvents202JSONResponse AuditExportResponse
-
-func (response ExportAuditEvents202JSONResponse) VisitExportAuditEventsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(202)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ExportAuditEvents400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response ExportAuditEvents400ApplicationProblemPlusJSONResponse) VisitExportAuditEventsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ExportAuditEvents401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response ExportAuditEvents401ApplicationProblemPlusJSONResponse) VisitExportAuditEventsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ExportAuditEvents403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response ExportAuditEvents403ApplicationProblemPlusJSONResponse) VisitExportAuditEventsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ExportAuditEvents500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response ExportAuditEvents500ApplicationProblemPlusJSONResponse) VisitExportAuditEventsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetAuditExportStatusRequestObject struct {
-	ExportId string `json:"export_id"`
-}
-
-type GetAuditExportStatusResponseObject interface {
-	VisitGetAuditExportStatusResponse(w http.ResponseWriter) error
-}
-
-type GetAuditExportStatus200JSONResponse AuditExportStatusResponse
-
-func (response GetAuditExportStatus200JSONResponse) VisitGetAuditExportStatusResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetAuditExportStatus401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response GetAuditExportStatus401ApplicationProblemPlusJSONResponse) VisitGetAuditExportStatusResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetAuditExportStatus403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response GetAuditExportStatus403ApplicationProblemPlusJSONResponse) VisitGetAuditExportStatusResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetAuditExportStatus404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response GetAuditExportStatus404ApplicationProblemPlusJSONResponse) VisitGetAuditExportStatusResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetAuditExportStatus500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response GetAuditExportStatus500ApplicationProblemPlusJSONResponse) VisitGetAuditExportStatusResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DownloadAuditExportRequestObject struct {
-	ExportId string `json:"export_id"`
-	Params   DownloadAuditExportParams
-}
-
-type DownloadAuditExportResponseObject interface {
-	VisitDownloadAuditExportResponse(w http.ResponseWriter) error
-}
-
-type DownloadAuditExport200ApplicationoctetStreamResponse struct {
-	Body          io.Reader
-	ContentLength int64
-}
-
-func (response DownloadAuditExport200ApplicationoctetStreamResponse) VisitDownloadAuditExportResponse(w http.ResponseWriter) error {
-
-	w.Header().Set("Content-Type", "application/octet-stream")
-	if response.ContentLength != 0 {
-		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
-	}
-	w.WriteHeader(200)
-
-	if closer, ok := response.Body.(io.ReadCloser); ok {
-		defer closer.Close()
-	}
-	_, err := io.Copy(w, response.Body)
-	return err
-}
-
-type DownloadAuditExport400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response DownloadAuditExport400ApplicationProblemPlusJSONResponse) VisitDownloadAuditExportResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DownloadAuditExport401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response DownloadAuditExport401ApplicationProblemPlusJSONResponse) VisitDownloadAuditExportResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DownloadAuditExport403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response DownloadAuditExport403ApplicationProblemPlusJSONResponse) VisitDownloadAuditExportResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DownloadAuditExport404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response DownloadAuditExport404ApplicationProblemPlusJSONResponse) VisitDownloadAuditExportResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type DownloadAuditExport500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response DownloadAuditExport500ApplicationProblemPlusJSONResponse) VisitDownloadAuditExportResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
 
 type ListSessionsRequestObject struct {
 	Params ListSessionsParams
@@ -4377,227 +3494,8 @@ func (response UnlockUser500ApplicationProblemPlusJSONResponse) VisitUnlockUserR
 	return err
 }
 
-type ListLockoutsRequestObject struct {
-}
-
-type ListLockoutsResponseObject interface {
-	VisitListLockoutsResponse(w http.ResponseWriter) error
-}
-
-type ListLockouts200JSONResponse ListLockoutsResponse
-
-func (response ListLockouts200JSONResponse) VisitListLockoutsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListLockouts401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response ListLockouts401ApplicationProblemPlusJSONResponse) VisitListLockoutsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListLockouts403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response ListLockouts403ApplicationProblemPlusJSONResponse) VisitListLockoutsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListLockouts500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response ListLockouts500ApplicationProblemPlusJSONResponse) VisitListLockoutsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetMfaCoverageRequestObject struct {
-}
-
-type GetMfaCoverageResponseObject interface {
-	VisitGetMfaCoverageResponse(w http.ResponseWriter) error
-}
-
-type GetMfaCoverage200JSONResponse MfaCoverage
-
-func (response GetMfaCoverage200JSONResponse) VisitGetMfaCoverageResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetMfaCoverage401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response GetMfaCoverage401ApplicationProblemPlusJSONResponse) VisitGetMfaCoverageResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetMfaCoverage403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response GetMfaCoverage403ApplicationProblemPlusJSONResponse) VisitGetMfaCoverageResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type GetMfaCoverage500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response GetMfaCoverage500ApplicationProblemPlusJSONResponse) VisitGetMfaCoverageResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListSecuritySignalsRequestObject struct {
-}
-
-type ListSecuritySignalsResponseObject interface {
-	VisitListSecuritySignalsResponse(w http.ResponseWriter) error
-}
-
-type ListSecuritySignals200JSONResponse ListSecuritySignalsResponse
-
-func (response ListSecuritySignals200JSONResponse) VisitListSecuritySignalsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListSecuritySignals401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response ListSecuritySignals401ApplicationProblemPlusJSONResponse) VisitListSecuritySignalsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListSecuritySignals403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response ListSecuritySignals403ApplicationProblemPlusJSONResponse) VisitListSecuritySignalsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type ListSecuritySignals500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response ListSecuritySignals500ApplicationProblemPlusJSONResponse) VisitListSecuritySignalsResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-	// Lista eventos de auditoria append-only (multi-axis filter, cursor-paginated)
-	// (GET /audit/events)
-	ListAuditEvents(ctx context.Context, request ListAuditEventsRequestObject) (ListAuditEventsResponseObject, error)
-	// Export filtered audit events as CSV or JSONL (signed URL, async if large)
-	// (POST /audit/events/export)
-	ExportAuditEvents(ctx context.Context, request ExportAuditEventsRequestObject) (ExportAuditEventsResponseObject, error)
-	// Read the status of an audit export job
-	// (GET /audit/events/export/{export_id})
-	GetAuditExportStatus(ctx context.Context, request GetAuditExportStatusRequestObject) (GetAuditExportStatusResponseObject, error)
-	// Download the rendered audit export payload via a signed token
-	// (GET /audit/events/export/{export_id}/download)
-	DownloadAuditExport(ctx context.Context, request DownloadAuditExportRequestObject) (DownloadAuditExportResponseObject, error)
 	// List active sessions in the current tenant
 	// (GET /auth/sessions)
 	ListSessions(ctx context.Context, request ListSessionsRequestObject) (ListSessionsResponseObject, error)
@@ -4664,15 +3562,6 @@ type StrictServerInterface interface {
 	// Clear operational lock + failed-login counter for a user
 	// (POST /iam/users/{user_id}/unlock)
 	UnlockUser(ctx context.Context, request UnlockUserRequestObject) (UnlockUserResponseObject, error)
-	// Current account lockouts (locked-until window)
-	// (GET /security/lockouts)
-	ListLockouts(ctx context.Context, request ListLockoutsRequestObject) (ListLockoutsResponseObject, error)
-	// MFA enrollment coverage by tenant + by role
-	// (GET /security/mfa-coverage)
-	GetMfaCoverage(ctx context.Context, request GetMfaCoverageRequestObject) (GetMfaCoverageResponseObject, error)
-	// Anomaly cards (repeated-failed-login, new-device-login, lockout-spike, off-hours-admin-action)
-	// (GET /security/signals)
-	ListSecuritySignals(ctx context.Context, request ListSecuritySignalsRequestObject) (ListSecuritySignalsResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -4702,116 +3591,6 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
-}
-
-// ListAuditEvents operation middleware
-func (sh *strictHandler) ListAuditEvents(w http.ResponseWriter, r *http.Request, params ListAuditEventsParams) {
-	var request ListAuditEventsRequestObject
-
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListAuditEvents(ctx, request.(ListAuditEventsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListAuditEvents")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListAuditEventsResponseObject); ok {
-		if err := validResponse.VisitListAuditEventsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// ExportAuditEvents operation middleware
-func (sh *strictHandler) ExportAuditEvents(w http.ResponseWriter, r *http.Request) {
-	var request ExportAuditEventsRequestObject
-
-	var body ExportAuditEventsJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ExportAuditEvents(ctx, request.(ExportAuditEventsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ExportAuditEvents")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ExportAuditEventsResponseObject); ok {
-		if err := validResponse.VisitExportAuditEventsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetAuditExportStatus operation middleware
-func (sh *strictHandler) GetAuditExportStatus(w http.ResponseWriter, r *http.Request, exportId string) {
-	var request GetAuditExportStatusRequestObject
-
-	request.ExportId = exportId
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetAuditExportStatus(ctx, request.(GetAuditExportStatusRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetAuditExportStatus")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetAuditExportStatusResponseObject); ok {
-		if err := validResponse.VisitGetAuditExportStatusResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// DownloadAuditExport operation middleware
-func (sh *strictHandler) DownloadAuditExport(w http.ResponseWriter, r *http.Request, exportId string, params DownloadAuditExportParams) {
-	var request DownloadAuditExportRequestObject
-
-	request.ExportId = exportId
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DownloadAuditExport(ctx, request.(DownloadAuditExportRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DownloadAuditExport")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DownloadAuditExportResponseObject); ok {
-		if err := validResponse.VisitDownloadAuditExportResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
 }
 
 // ListSessions operation middleware
@@ -5421,191 +4200,103 @@ func (sh *strictHandler) UnlockUser(w http.ResponseWriter, r *http.Request, user
 	}
 }
 
-// ListLockouts operation middleware
-func (sh *strictHandler) ListLockouts(w http.ResponseWriter, r *http.Request) {
-	var request ListLockoutsRequestObject
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListLockouts(ctx, request.(ListLockoutsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListLockouts")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListLockoutsResponseObject); ok {
-		if err := validResponse.VisitListLockoutsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetMfaCoverage operation middleware
-func (sh *strictHandler) GetMfaCoverage(w http.ResponseWriter, r *http.Request) {
-	var request GetMfaCoverageRequestObject
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetMfaCoverage(ctx, request.(GetMfaCoverageRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetMfaCoverage")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetMfaCoverageResponseObject); ok {
-		if err := validResponse.VisitGetMfaCoverageResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// ListSecuritySignals operation middleware
-func (sh *strictHandler) ListSecuritySignals(w http.ResponseWriter, r *http.Request) {
-	var request ListSecuritySignalsRequestObject
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListSecuritySignals(ctx, request.(ListSecuritySignalsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListSecuritySignals")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListSecuritySignalsResponseObject); ok {
-		if err := validResponse.VisitListSecuritySignalsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"ayJp3939fwAAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
