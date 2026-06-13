@@ -64,7 +64,7 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		return nil, fmt.Errorf("templates create: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 		return nil, fmt.Errorf("templates create: set authz context: %w", err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateCreate), "tenant"); err != nil {
@@ -156,7 +156,7 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 		return nil, fmt.Errorf("templates create next version: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 		return nil, fmt.Errorf("templates create next version: setAuthzGUC: %w", err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {

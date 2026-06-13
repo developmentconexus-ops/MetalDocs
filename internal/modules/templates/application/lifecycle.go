@@ -73,7 +73,7 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 		return nil, fmt.Errorf("templates submit: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 		return nil, fmt.Errorf("templates submit: setAuthzGUC: %w", err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateSubmit), "tenant"); err != nil {
@@ -257,7 +257,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 			return nil, fmt.Errorf("templates approve: begin tx: %w", err)
 		}
 		defer func() { _ = tx.Rollback() }()
-		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 			return nil, fmt.Errorf("templates approve: setAuthzGUC: %w", err)
 		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateApprove), "tenant"); err != nil {
@@ -405,7 +405,7 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 		return nil, fmt.Errorf("templates publish: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 		return nil, fmt.Errorf("templates publish: setAuthzGUC: %w", err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplatePublish), "tenant"); err != nil {
@@ -480,7 +480,7 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 		return nil, fmt.Errorf("templates archive: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 		return nil, fmt.Errorf("templates archive: setAuthzGUC: %w", err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateArchive), "tenant"); err != nil {
@@ -507,7 +507,7 @@ func (s *Service) updateVersionWithAuthzAndAudit(ctx context.Context, tenantID, 
 		return fmt.Errorf("templates update version: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return fmt.Errorf("templates update version: setAuthzGUC: %w", err)
 	}
 	if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {

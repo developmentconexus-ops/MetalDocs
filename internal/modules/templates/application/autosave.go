@@ -127,7 +127,7 @@ func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCm
 		return fmt.Errorf("templates save draft: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 		return fmt.Errorf("templates save draft: set authz context: %w", err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
@@ -182,7 +182,7 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 		return nil, fmt.Errorf("templates commit autosave: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 		return nil, fmt.Errorf("templates commit autosave: set authz context: %w", err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {

@@ -101,13 +101,21 @@ Once the `TxRunner` seam exists (H-1d), wrap each of `RevokeSession`, `people_ha
 
 5 sub-commits. **H-1a → H-1b → H-1c → H-1d → H-1e.**
 
-#### H-1a — `setAuthzGUC` ×4 dedup → `authz.SeedTxIdentity`
+#### H-1a — `setAuthzGUC` ×4 dedup → `authz.SeedTxIdentity`  ·  ✅ DONE (this commit)
 Delete the 4 copies, replace all call sites (19 in approval) with the canonical `authz.SeedTxIdentity` (`internal/modules/iam/authz/context.go:48` — has the empty-string guard the copies skip; batches both GUCs in one query):
 - `internal/modules/documents/approval/application/authz_guc.go:11`
 - `internal/modules/templates/application/authz_guc.go:9`
 - `internal/modules/taxonomy/infrastructure/authz_guc.go:14`
 - `internal/modules/controlleddocuments/application/service.go` (inline `setAuthzGUC` ~:377)
 **Verify:** build/vet + `go test -p 2 ./internal/modules/{documents/approval,templates,taxonomy,controlleddocuments}/...`. **Commit:** `refactor(authz): dedup setAuthzGUC x4 to authz.SeedTxIdentity (H-1a)`
+
+**Discovery during execution (2026-06-13):**
+- **approval (17 sites) / templates (11) / CD (4)** — pure textual swap to `authz.SeedTxIdentity(`; all files already import `authz`. Behavioral delta: canonical adds empty-string guards (`ErrTenantContextMissing`/`ErrActorContextMissing`) + `TrimSpace` + single batched query — strictly better; these are authenticated mutation flows so non-empty always holds.
+- **taxonomy (24 sites) — deviation from the plan's literal "replace all call sites":** taxonomy's `setAuthzGUC(ctx, tx)` is a *ctx-resolving wrapper* (resolves tenant via `tenant.FromContext` + actor via `iamdomain.UserIDFromContext`), not a bare GUC writer. Inlining that resolution at 24 sites is worse DRY than keeping the one wrapper. **Resolution:** kept the thin wrapper, delegated only the duplicated GUC *SQL* to `authz.SeedTxIdentity`; the 24 call sites are untouched. The real duplication target (the two-query GUC write) is now centralized.
+- **Test fixtures:** sqlmock helpers + custom `database/sql/driver` fakes asserted the old *two-separate-query* GUC form (`set_config(tenant_id)` then `set_config(actor_id)`, each 1-arg) → migrated to the canonical *single batched 2-arg* query (`SELECT set_config($1,…), set_config($2,…)`). Custom fakes that captured the actor from `args[0]` re-pointed to `args[1]` (actor is now the 2nd bind in the batched call).
+- **Surfaced (out of H-1a scope, fixed separately):** the full-suite gate run flagged `TestPasswordChangePreservesSessionAndClearsMustChangePassword` (tests/unit) failing — a **pre-existing A3 stale test** (A3 revokes the current session; the older flow test still asserted survival). Confirmed pre-existing on clean HEAD (stash test). Reconciled + renamed in its own bounded commit `50e60e333` (A3 family, not H-1a).
+
+**Gates (all green):** `go build ./...` 0 · `go vet ./...` 0 · `go test -p 2 ./...` 0 failures · `api-lint -strict` 0 violations · `cilint` exit 0. Contract-neutral (internal authz wiring only — no OpenAPI/route change).
 
 #### H-1b — CD → taxonomy read port (closes authz-skip + stale-column drift)
 Delete `controlleddocuments/infrastructure` `TaxonomyProfileReader` / `TaxonomyAreaReader` (`repository.go:720-799`) — they re-implement taxonomy `GetByCode` **without** the authz GUC + `CapTaxonomyView` check and **omit the `alias` column** the canonical reader has (`taxonomy/infrastructure/repository.go:103-126`). Define a **taxonomy read port** (interface in `taxonomy/domain` or a shared read-port package) that CD consumes via `controlleddocuments/module.go:34-35` wiring; CD calls taxonomy through a background-bypass context so the authz GUC + cap check + alias column are honored. **Regression-test the CD creation flow** (the missing-alias divergence is a real schema risk).

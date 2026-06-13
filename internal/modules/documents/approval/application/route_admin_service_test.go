@@ -85,8 +85,8 @@ func (s *routeAdminStmt) Exec(args []driver.Value) (driver.Result, error) {
 			s.conn.capturedTenantGUC = v
 		}
 	}
-	if strings.Contains(lower, "set_config('metaldocs.actor_id'") && len(args) > 0 {
-		if v, ok := args[0].(string); ok {
+	if strings.Contains(lower, "set_config('metaldocs.actor_id'") && len(args) > 1 {
+		if v, ok := args[1].(string); ok {
 			s.conn.capturedActorGUC = v
 		}
 	}
@@ -119,8 +119,8 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 			s.conn.capturedTenantGUC = v
 		}
 	}
-	if strings.Contains(lower, "set_config('metaldocs.actor_id'") && len(args) > 0 {
-		if v, ok := args[0].(string); ok {
+	if strings.Contains(lower, "set_config('metaldocs.actor_id'") && len(args) > 1 {
+		if v, ok := args[1].(string); ok {
 			s.conn.capturedActorGUC = v
 		}
 	}

@@ -49,7 +49,7 @@ func (s *ReadService) LoadInstance(ctx context.Context, db *sql.DB, tenantID, in
 	defer tx.Rollback()
 
 	actorID := iamdomain.UserIDFromContext(ctx)
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return nil, fmt.Errorf("read load instance: %w", err)
 	}
 
@@ -98,7 +98,7 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, db *sql.
 	defer tx.Rollback()
 
 	actorID := iamdomain.UserIDFromContext(ctx)
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return nil, fmt.Errorf("read load instance by document: %w", err)
 	}
 
@@ -147,7 +147,7 @@ func (s *ReadService) LoadActiveInstanceByDocumentForMutation(ctx context.Contex
 	defer tx.Rollback()
 
 	actorID := iamdomain.UserIDFromContext(ctx)
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return nil, fmt.Errorf("mutation load instance by document: %w", err)
 	}
 
@@ -247,7 +247,7 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 	}
 	defer tx.Rollback()
 
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return nil, fmt.Errorf("list inbox: %w", err)
 	}
 
@@ -332,7 +332,7 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, db *sql.DB, tena
 	}
 	defer tx.Rollback()
 
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return 0, fmt.Errorf("count pending: %w", err)
 	}
 

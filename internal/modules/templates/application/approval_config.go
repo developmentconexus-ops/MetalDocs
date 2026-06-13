@@ -74,7 +74,7 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 		return nil, fmt.Errorf("templates approval config: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 		return nil, fmt.Errorf("templates approval config: setAuthzGUC: %w", err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {

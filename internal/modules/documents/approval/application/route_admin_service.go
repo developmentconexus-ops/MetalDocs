@@ -159,7 +159,7 @@ func (s *RouteAdminService) createTx(ctx context.Context, db *sql.DB, in CreateR
 		return CreateRouteResult{}, fmt.Errorf("begin tx: %w", err)
 	}
 
-	if err := setAuthzGUC(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
 		_ = tx.Rollback()
 		return CreateRouteResult{}, err
 	}
@@ -290,7 +290,7 @@ func (s *RouteAdminService) updateTx(ctx context.Context, db *sql.DB, in UpdateR
 		return UpdateRouteResult{}, fmt.Errorf("begin tx: %w", err)
 	}
 
-	if err := setAuthzGUC(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
 		_ = tx.Rollback()
 		return UpdateRouteResult{}, err
 	}
@@ -454,7 +454,7 @@ func (s *RouteAdminService) deactivateTx(ctx context.Context, db *sql.DB, in Dea
 		return DeactivateRouteResult{}, fmt.Errorf("begin tx: %w", err)
 	}
 
-	if err := setAuthzGUC(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
 		_ = tx.Rollback()
 		return DeactivateRouteResult{}, err
 	}
@@ -546,7 +546,7 @@ func (s *RouteAdminService) List(ctx context.Context, db *sql.DB, tenantID, acto
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return ListRoutesResult{}, wrapRouteAdminErr(op, err)
 	}
 	ctx = authz.WithCapCache(ctx)

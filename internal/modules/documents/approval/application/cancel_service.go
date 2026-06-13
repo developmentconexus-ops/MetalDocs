@@ -69,7 +69,7 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 			return CancelResult{}, fmt.Errorf("cancel: system authz bypass: %w", err)
 		}
 	} else {
-		if err = setAuthzGUC(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
+		if err = authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
 			rollback()
 			return CancelResult{}, fmt.Errorf("cancel: %w", err)
 		}

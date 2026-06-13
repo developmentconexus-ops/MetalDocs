@@ -292,11 +292,12 @@ func TestUpsertApprovalConfig_WithDB_UsesTxAndAuthz(t *testing.T) {
 }
 
 func expectTemplateEditAuthzConfig(mock sqlmock.Sqlmock, actorID, tenantID string) {
-	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.tenant_id', $1, true)")).
-		WithArgs(tenantID).
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.actor_id', $1, true)")).
-		WithArgs(actorID).
+	mock.ExpectExec(regexp.QuoteMeta(`
+SELECT
+	set_config('metaldocs.tenant_id', $1, true),
+	set_config('metaldocs.actor_id', $2, true)
+`)).
+		WithArgs(tenantID, actorID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(actorID))

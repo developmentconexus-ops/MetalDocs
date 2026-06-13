@@ -124,11 +124,8 @@ func (s *publishTestStmt) Exec(args []driver.Value) (driver.Result, error) {
 				s.conn.tenantID = tenantID
 			}
 		}
-		return publishTestResult{rowsAffected: 1}, nil
-	}
-	if strings.Contains(q, "set_config('metaldocs.actor_id'") {
-		if len(args) > 0 {
-			if actorID, ok := args[0].(string); ok {
+		if len(args) > 1 {
+			if actorID, ok := args[1].(string); ok {
 				s.conn.actorID = actorID
 			}
 		}

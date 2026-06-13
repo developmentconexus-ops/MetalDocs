@@ -74,11 +74,8 @@ func TestListInboxItems_PopulatesTitleAndQuorumProgress(t *testing.T) {
 	)
 
 	mock.ExpectBegin()
-	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id'`).
-		WithArgs("tenant-1").
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(`SELECT set_config\('metaldocs\.actor_id'`).
-		WithArgs("actor-1").
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT[\s\S]+FROM approval_instances ai`).
 		WithArgs("tenant-1", sqlmock.AnyArg(), "finance", 25, 0).
@@ -124,11 +121,8 @@ func TestListInboxItems_FiltersByActor(t *testing.T) {
 
 	// We assert the actorID is JSON-marshalled into the eligible_actor_ids @> filter arg ($2).
 	mock.ExpectBegin()
-	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id'`).
-		WithArgs("tenant-1").
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(`SELECT set_config\('metaldocs\.actor_id'`).
-		WithArgs("actor-xyz").
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-xyz").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`asi\.eligible_actor_ids @> \$2::jsonb`).
 		WithArgs("tenant-1", []byte(`["actor-xyz"]`), "", 25, 0).
@@ -156,11 +150,8 @@ func TestCountPendingForActor_ReturnsTotal(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectBegin()
-	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id'`).
-		WithArgs("tenant-1").
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(`SELECT set_config\('metaldocs\.actor_id'`).
-		WithArgs("actor-1").
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT COUNT\(DISTINCT ai\.id\)`).
 		WithArgs("tenant-1", sqlmock.AnyArg(), "").
@@ -191,11 +182,8 @@ func TestLoadActiveInstanceByDocument_RequiresDocumentViewBeforeRepoLoad(t *test
 	svc := &ReadService{repo: repoSpy}
 
 	mock.ExpectBegin()
-	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id'`).
-		WithArgs("tenant-1").
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(`SELECT set_config\('metaldocs\.actor_id'`).
-		WithArgs("actor-1").
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT COALESCE\(d\.process_area_code_snapshot`).
 		WithArgs("doc-1", "tenant-1").
@@ -239,11 +227,8 @@ func TestLoadActiveInstanceByDocumentForMutation_DoesNotRequireDocumentView(t *t
 	svc := &ReadService{repo: repoSpy}
 
 	mock.ExpectBegin()
-	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id'`).
-		WithArgs("tenant-1").
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(`SELECT set_config\('metaldocs\.actor_id'`).
-		WithArgs("actor-1").
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 

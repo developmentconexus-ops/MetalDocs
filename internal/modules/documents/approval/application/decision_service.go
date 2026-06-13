@@ -162,7 +162,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, fmt.Errorf("recordSignoff: begin tx: %w", err)
 	}
 
-	if err := setAuthzGUC(ctx, tx, req.TenantID, req.ActorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.ActorUserID); err != nil {
 		_ = tx.Rollback()
 		return SignoffResult{}, fmt.Errorf("recordSignoff: %w", err)
 	}
@@ -565,7 +565,7 @@ func (s *DecisionService) emitEligibilityRejection(ctx context.Context, db *sql.
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return err
 	}
 	if err := s.emitter.Emit(ctx, tx, event); err != nil {

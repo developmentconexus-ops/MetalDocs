@@ -74,7 +74,7 @@ func (s *ObsoleteService) MarkObsolete(ctx context.Context, db *sql.DB, req Mark
 		return MarkObsoleteResult{}, ErrInvalidObsoleteSource
 	}
 
-	if err := setAuthzGUC(ctx, tx, req.TenantID, req.MarkedBy); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.MarkedBy); err != nil {
 		_ = tx.Rollback()
 		return MarkObsoleteResult{}, fmt.Errorf("markObsolete: %w", err)
 	}

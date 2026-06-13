@@ -53,7 +53,7 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 		return PublishResult{}, fmt.Errorf("publishApproved: begin tx: %w", err)
 	}
 
-	if err := setAuthzGUC(ctx, tx, req.TenantID, req.PublishedBy); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.PublishedBy); err != nil {
 		_ = tx.Rollback()
 		return PublishResult{}, fmt.Errorf("publishApproved: %w", err)
 	}
@@ -200,7 +200,7 @@ func (s *PublishService) SchedulePublish(ctx context.Context, db *sql.DB, req Sc
 		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: begin tx: %w", err)
 	}
 
-	if err := setAuthzGUC(ctx, tx, req.TenantID, req.ScheduledBy); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.ScheduledBy); err != nil {
 		_ = tx.Rollback()
 		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: %w", err)
 	}

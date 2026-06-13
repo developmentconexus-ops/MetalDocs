@@ -204,7 +204,7 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			}
 		}()
 		createTx = tx
-		if err := setAuthzGUC(ctx, createTx, cmd.TenantID, cmd.ActorUserID); err != nil {
+		if err := authz.SeedTxIdentity(ctx, createTx, cmd.TenantID, cmd.ActorUserID); err != nil {
 			return nil, fmt.Errorf("controlled_documents: set authz context: %w", err)
 		}
 		// ADR 0022 Phase 7: area-scoped tier-2 — a CD is created INTO a process
@@ -361,16 +361,6 @@ func (s *ControlledDocumentService) ensureTemplateArtifact(ctx context.Context, 
 	return nil
 }
 
-func setAuthzGUC(ctx context.Context, tx *sql.Tx, tenantID, actorID string) error {
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
-		return fmt.Errorf("set metaldocs.tenant_id: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", actorID); err != nil {
-		return fmt.Errorf("set metaldocs.actor_id: %w", err)
-	}
-	return nil
-}
-
 // PreviewCode returns the next auto-allocated CD code for (profile, area)
 // without consuming the sequence. Used by the wizard's preview endpoint.
 func (s *ControlledDocumentService) PreviewCode(ctx context.Context, tenantID, profileCode, areaCode string) (string, error) {
@@ -398,7 +388,7 @@ func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profi
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := setAuthzGUC(ctx, tx, tenantID, actorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
 		return 0, fmt.Errorf("controlled_documents: set authz context preview code: %w", err)
 	}
 	// ADR 0022 Phase 7: preview-code allocation is part of CD create — authorize
@@ -514,7 +504,7 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := setAuthzGUC(ctx, tx, tenantID, actorUserID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
 		return fmt.Errorf("controlled_documents: set authz context changeStatus: %w", err)
 	}
 
@@ -622,7 +612,7 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 			_ = tx.Rollback()
 		}
 	}()
-	if txErr = setAuthzGUC(ctx, tx, cmd.TenantID, actorUserID); txErr != nil {
+	if txErr = authz.SeedTxIdentity(ctx, tx, cmd.TenantID, actorUserID); txErr != nil {
 		return nil, fmt.Errorf("controlled_documents: set authz guc for create revision: %w", txErr)
 	}
 	// ADR 0022 Phase 7: a revision is created within the CD's own process area —

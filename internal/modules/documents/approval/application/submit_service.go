@@ -80,7 +80,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 
 	ctx = authz.WithCapCache(ctx)
 
-	if err := setAuthzGUC(ctx, tx, req.TenantID, req.SubmittedBy); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.SubmittedBy); err != nil {
 		_ = tx.Rollback()
 		return SubmitResult{}, fmt.Errorf("submit: %w", err)
 	}
