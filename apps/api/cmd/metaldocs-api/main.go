@@ -980,7 +980,7 @@ func newMembershipGovernanceLogger(writer auditdomain.Writer) *membershipGoverna
 	return &membershipGovernanceLogger{writer: writer}
 }
 
-func (l *membershipGovernanceLogger) Log(ctx context.Context, action string, membership iamdomain.UserProcessArea) error {
+func (l *membershipGovernanceLogger) buildEvent(action string, membership iamdomain.UserProcessArea) auditdomain.Event {
 	payload, err := json.Marshal(map[string]any{
 		"area_code": membership.AreaCode,
 		"role":      string(membership.Role),
@@ -996,7 +996,7 @@ func (l *membershipGovernanceLogger) Log(ctx context.Context, action string, mem
 	if action == "role.revoke" {
 		eventAction = "iam.area_membership.revoked"
 	}
-	return l.writer.Record(ctx, auditdomain.Event{
+	return auditdomain.Event{
 		ID:           uuid.NewString(),
 		OccurredAt:   time.Now().UTC(),
 		ActorID:      grantedBy,
@@ -1005,7 +1005,11 @@ func (l *membershipGovernanceLogger) Log(ctx context.Context, action string, mem
 		ResourceID:   membership.UserID,
 		PayloadJSON:  string(payload),
 		TenantID:     membership.TenantID,
-	})
+	}
+}
+
+func (l *membershipGovernanceLogger) LogTx(ctx context.Context, tx db.Tx, action string, membership iamdomain.UserProcessArea) error {
+	return l.writer.RecordTx(ctx, tx, l.buildEvent(action, membership))
 }
 
 // profileDefaultsAdapter bridges taxonomy ProfileRepository → documents module ProfileDefaultTemplateReader.

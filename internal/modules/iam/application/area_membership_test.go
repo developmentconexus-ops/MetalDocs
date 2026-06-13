@@ -2,12 +2,47 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 	"time"
 
 	"metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 )
+
+// noopMembershipTx satisfies MembershipTx for unit tests; Commit is a no-op.
+type noopMembershipTx struct{}
+
+func (noopMembershipTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	return nil, nil
+}
+func (noopMembershipTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
+	return nil, nil
+}
+func (noopMembershipTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row {
+	return nil
+}
+func (noopMembershipTx) Commit() error   { return nil }
+func (noopMembershipTx) Rollback() error { return nil }
+
+// commitTrackingMembershipTx records whether Commit was called so rollback
+// atomicity tests can assert the mutation was not committed when governance fails.
+type commitTrackingMembershipTx struct {
+	committed bool
+}
+
+func (t *commitTrackingMembershipTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	return nil, nil
+}
+func (t *commitTrackingMembershipTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
+	return nil, nil
+}
+func (t *commitTrackingMembershipTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row {
+	return nil
+}
+func (t *commitTrackingMembershipTx) Commit() error   { t.committed = true; return nil }
+func (t *commitTrackingMembershipTx) Rollback() error { return nil }
 
 type userAreaWriteRepoStub struct {
 	activeList       []domain.UserProcessArea
@@ -25,6 +60,15 @@ type userAreaWriteRepoStub struct {
 	insertErr        error
 	grantAtomicErr   error
 	tenantFilter     [4]string
+	// tx returned by BeginTx; defaults to noopMembershipTx{} when nil.
+	tx MembershipTx
+}
+
+func (s *userAreaWriteRepoStub) beginTx() MembershipTx {
+	if s.tx != nil {
+		return s.tx
+	}
+	return noopMembershipTx{}
 }
 
 func (s *userAreaWriteRepoStub) ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error) {
@@ -44,7 +88,18 @@ func (s *userAreaWriteRepoStub) ListByTenantInManagedAreas(ctx context.Context, 
 	return append([]domain.UserProcessArea(nil), s.activeList...), nil
 }
 
-func (s *userAreaWriteRepoStub) Insert(ctx context.Context, membership domain.UserProcessArea) error {
+func (s *userAreaWriteRepoStub) GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*domain.UserProcessArea, error) {
+	if s.getActiveErr != nil {
+		return nil, s.getActiveErr
+	}
+	return s.active, nil
+}
+
+func (s *userAreaWriteRepoStub) BeginTx(_ context.Context) (MembershipTx, error) {
+	return s.beginTx(), nil
+}
+
+func (s *userAreaWriteRepoStub) InsertTx(_ context.Context, _ MembershipTx, membership domain.UserProcessArea) error {
 	if s.insertErr != nil {
 		return s.insertErr
 	}
@@ -53,7 +108,7 @@ func (s *userAreaWriteRepoStub) Insert(ctx context.Context, membership domain.Us
 	return nil
 }
 
-func (s *userAreaWriteRepoStub) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
+func (s *userAreaWriteRepoStub) CloseActiveTx(_ context.Context, _ MembershipTx, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
 	if s.closeActiveErr != nil {
 		return s.closeActiveErr
 	}
@@ -63,7 +118,7 @@ func (s *userAreaWriteRepoStub) CloseActive(ctx context.Context, userID, tenantI
 	return nil
 }
 
-func (s *userAreaWriteRepoStub) GrantAtomic(ctx context.Context, oldMembership, newMembership domain.UserProcessArea) error {
+func (s *userAreaWriteRepoStub) GrantAtomicTx(_ context.Context, _ MembershipTx, oldMembership, newMembership domain.UserProcessArea) error {
 	if s.grantAtomicErr != nil {
 		return s.grantAtomicErr
 	}
@@ -73,18 +128,15 @@ func (s *userAreaWriteRepoStub) GrantAtomic(ctx context.Context, oldMembership, 
 	return nil
 }
 
-func (s *userAreaWriteRepoStub) GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*domain.UserProcessArea, error) {
-	if s.getActiveErr != nil {
-		return nil, s.getActiveErr
-	}
-	return s.active, nil
-}
-
 type membershipLoggerStub struct {
 	actions []string
+	logTxErr error
 }
 
-func (s *membershipLoggerStub) Log(ctx context.Context, action string, membership domain.UserProcessArea) error {
+func (s *membershipLoggerStub) LogTx(_ context.Context, _ db.Tx, action string, _ domain.UserProcessArea) error {
+	if s.logTxErr != nil {
+		return s.logTxErr
+	}
 	s.actions = append(s.actions, action)
 	return nil
 }
@@ -330,6 +382,92 @@ func equalCalls(got, want [][2]string) bool {
 		}
 	}
 	return true
+}
+
+// TestGrant_GovernanceError_RollsBack asserts that when LogTx returns an error
+// Commit is never called (the mutation is rolled back atomically — T-007 /
+// REQ-ASYNC-1).
+func TestGrant_GovernanceError_RollsBack(t *testing.T) {
+	govErr := errors.New("governance write failed")
+
+	t.Run("insert path", func(t *testing.T) {
+		trackedTx := &commitTrackingMembershipTx{}
+		repo := &userAreaWriteRepoStub{tx: trackedTx}
+		logger := &membershipLoggerStub{logTxErr: govErr}
+		service := NewAreaMembershipService(repo, logger)
+
+		err := service.Grant(context.Background(), "u1", "t1", "A1", domain.RoleEditor, "admin")
+		if err == nil {
+			t.Fatal("expected error when LogTx fails, got nil")
+		}
+		if !errors.Is(err, govErr) {
+			t.Fatalf("expected wrapped govErr, got: %v", err)
+		}
+		if trackedTx.committed {
+			t.Fatal("Commit must NOT be called when LogTx fails")
+		}
+	})
+
+	t.Run("atomic (role change) path", func(t *testing.T) {
+		now := time.Date(2026, 4, 21, 12, 0, 0, 0, time.UTC)
+		trackedTx := &commitTrackingMembershipTx{}
+		repo := &userAreaWriteRepoStub{
+			tx: trackedTx,
+			active: &domain.UserProcessArea{
+				UserID:        "u1",
+				TenantID:      "t1",
+				AreaCode:      "A1",
+				Role:          domain.RoleViewer,
+				EffectiveFrom: now.Add(-time.Hour),
+			},
+		}
+		logger := &membershipLoggerStub{logTxErr: govErr}
+		service := NewAreaMembershipService(repo, logger)
+		service.nowFn = func() time.Time { return now }
+
+		err := service.Grant(context.Background(), "u1", "t1", "A1", domain.RoleApprover, "admin")
+		if err == nil {
+			t.Fatal("expected error when LogTx fails, got nil")
+		}
+		if !errors.Is(err, govErr) {
+			t.Fatalf("expected wrapped govErr, got: %v", err)
+		}
+		if trackedTx.committed {
+			t.Fatal("Commit must NOT be called when LogTx fails")
+		}
+	})
+}
+
+// TestRevoke_GovernanceError_RollsBack asserts that when LogTx returns an error
+// during revoke, Commit is never called (REQ-ASYNC-1).
+func TestRevoke_GovernanceError_RollsBack(t *testing.T) {
+	govErr := errors.New("governance write failed")
+	now := time.Date(2026, 4, 21, 12, 0, 0, 0, time.UTC)
+	trackedTx := &commitTrackingMembershipTx{}
+	repo := &userAreaWriteRepoStub{
+		tx: trackedTx,
+		active: &domain.UserProcessArea{
+			UserID:        "u1",
+			TenantID:      "t1",
+			AreaCode:      "A1",
+			Role:          domain.RoleApprover,
+			EffectiveFrom: now.Add(-time.Hour),
+		},
+	}
+	logger := &membershipLoggerStub{logTxErr: govErr}
+	service := NewAreaMembershipService(repo, logger)
+	service.nowFn = func() time.Time { return now }
+
+	err := service.Revoke(context.Background(), "u1", "t1", "A1", "admin")
+	if err == nil {
+		t.Fatal("expected error when LogTx fails, got nil")
+	}
+	if !errors.Is(err, govErr) {
+		t.Fatalf("expected wrapped govErr, got: %v", err)
+	}
+	if trackedTx.committed {
+		t.Fatal("Commit must NOT be called when LogTx fails")
+	}
 }
 
 func TestTemporalQuery_EffectiveTo_Past(t *testing.T) {

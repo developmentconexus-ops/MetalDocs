@@ -2,6 +2,7 @@ package httpdelivery
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
@@ -20,9 +22,24 @@ import (
 // without a real audit sink.
 type noopMembershipLogger struct{}
 
-func (noopMembershipLogger) Log(_ context.Context, _ string, _ iamdomain.UserProcessArea) error {
+func (noopMembershipLogger) LogTx(_ context.Context, _ db.Tx, _ string, _ iamdomain.UserProcessArea) error {
 	return nil
 }
+
+// noopMembershipTx satisfies iamapp.MembershipTx for contract test repos.
+type noopMembershipTx struct{}
+
+func (noopMembershipTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	return nil, nil
+}
+func (noopMembershipTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
+	return nil, nil
+}
+func (noopMembershipTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row {
+	return nil
+}
+func (noopMembershipTx) Commit() error   { return nil }
+func (noopMembershipTx) Rollback() error { return nil }
 
 type fakeUserAreaWriteRepository struct{}
 
@@ -42,20 +59,24 @@ func (f fakeUserAreaWriteRepository) ListByTenantInManagedAreas(ctx context.Cont
 	return nil, nil
 }
 
-func (f fakeUserAreaWriteRepository) Insert(ctx context.Context, membership iamdomain.UserProcessArea) error {
-	return nil
-}
-
-func (f fakeUserAreaWriteRepository) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
-	return nil
-}
-
-func (f fakeUserAreaWriteRepository) GrantAtomic(ctx context.Context, oldMembership, newMembership iamdomain.UserProcessArea) error {
-	return nil
-}
-
 func (f fakeUserAreaWriteRepository) GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*iamdomain.UserProcessArea, error) {
 	return nil, nil
+}
+
+func (f fakeUserAreaWriteRepository) BeginTx(_ context.Context) (iamapp.MembershipTx, error) {
+	return noopMembershipTx{}, nil
+}
+
+func (f fakeUserAreaWriteRepository) InsertTx(_ context.Context, _ iamapp.MembershipTx, _ iamdomain.UserProcessArea) error {
+	return nil
+}
+
+func (f fakeUserAreaWriteRepository) CloseActiveTx(_ context.Context, _ iamapp.MembershipTx, _, _, _ string, _ time.Time, _ string) error {
+	return nil
+}
+
+func (f fakeUserAreaWriteRepository) GrantAtomicTx(_ context.Context, _ iamapp.MembershipTx, _, _ iamdomain.UserProcessArea) error {
+	return nil
 }
 
 // passThroughVerifier accepts every (tenant, user) combination so the handler
@@ -84,7 +105,7 @@ func (capDeniedAreaRepo) GetActiveByUserAndArea(ctx context.Context, userID, ten
 	}, nil
 }
 
-func (capDeniedAreaRepo) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
+func (capDeniedAreaRepo) CloseActiveTx(_ context.Context, _ iamapp.MembershipTx, userID, tenantID, areaCode string, _ time.Time, actorID string) error {
 	// Returns the bare ErrCapDenied value. The real repository wraps it once in
 	// fmt.Errorf("...: %w", err); writeMembershipError uses errors.As, which
 	// resolves both forms, so the unwrapped value is sufficient for this contract.

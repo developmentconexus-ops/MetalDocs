@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/iam/authz"
+	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
@@ -174,6 +175,66 @@ ORDER BY user_id ASC, area_code ASC, effective_from DESC
 	return result, nil
 }
 
+// BeginTx opens a database transaction. The caller owns Commit/Rollback.
+func (r *UserAreaRepository) BeginTx(ctx context.Context) (iamapp.MembershipTx, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin membership tx: %w", err)
+	}
+	return tx, nil
+}
+
+// InsertTx writes a new membership row inside the provided open transaction.
+// The caller is responsible for Commit/Rollback.
+func (r *UserAreaRepository) InsertTx(ctx context.Context, tx iamapp.MembershipTx, membership iamdomain.UserProcessArea) error {
+	rawTx, ok := tx.(*sql.Tx)
+	if !ok {
+		return fmt.Errorf("iam: InsertTx: unexpected tx type %T", tx)
+	}
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, rawTx, membership.TenantID, grantedByActor(membership.GrantedBy)); err != nil {
+		return fmt.Errorf("iam: seed authz InsertTx area: %w", err)
+	}
+	if err := authz.Require(ctx, rawTx, string(iamdomain.CapMembershipManage), membership.AreaCode); err != nil {
+		return fmt.Errorf("iam: authz check InsertTx area: %w", err)
+	}
+	const q = `
+INSERT INTO public.user_process_areas
+  (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by)
+VALUES
+  ($1, $2::uuid, $3, $4, $5, $6, $7)
+`
+	// TODO: migration 0136 hangs these FKs off a non-PK unique key on iam_users; keep caller identity writes aligned with iam_users uniqueness.
+	result, err := rawTx.ExecContext(
+		ctx, q,
+		membership.UserID,
+		membership.TenantID,
+		membership.AreaCode,
+		string(membership.Role),
+		membership.EffectiveFrom,
+		membership.EffectiveTo,
+		membership.GrantedBy,
+	)
+	if err != nil {
+		return fmt.Errorf("insert user process area: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("insert user process area rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		slog.Warn("iam user area zero rows",
+			"action", "insert",
+			"user_id", membership.UserID,
+			"tenant_id", membership.TenantID,
+			"area_code", membership.AreaCode,
+			"role", membership.Role,
+		)
+		return fmt.Errorf("insert user process area: no rows inserted")
+	}
+	return nil
+}
+
 func (r *UserAreaRepository) Insert(ctx context.Context, membership iamdomain.UserProcessArea) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -229,6 +290,49 @@ VALUES
 	return tx.Commit()
 }
 
+// CloseActiveTx closes the active membership row inside the provided open
+// transaction. The caller is responsible for Commit/Rollback.
+func (r *UserAreaRepository) CloseActiveTx(ctx context.Context, tx iamapp.MembershipTx, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
+	rawTx, ok := tx.(*sql.Tx)
+	if !ok {
+		return fmt.Errorf("iam: CloseActiveTx: unexpected tx type %T", tx)
+	}
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, rawTx, tenantID, actorID); err != nil {
+		return fmt.Errorf("iam: seed authz CloseActiveTx area: %w", err)
+	}
+	if err := authz.Require(ctx, rawTx, string(iamdomain.CapMembershipManage), areaCode); err != nil {
+		return fmt.Errorf("iam: authz check CloseActiveTx area: %w", err)
+	}
+	const q = `
+UPDATE public.user_process_areas
+SET effective_to = $4,
+    revoked_by   = $5
+WHERE user_id = $1
+  AND tenant_id = $2::uuid
+  AND area_code = $3
+  AND effective_to IS NULL
+`
+	result, err := rawTx.ExecContext(ctx, q, userID, tenantID, areaCode, effectiveTo, actorID)
+	if err != nil {
+		return fmt.Errorf("close active user process area: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("close active user process area rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		slog.Warn("iam user area zero rows",
+			"action", "close_active",
+			"user_id", userID,
+			"tenant_id", tenantID,
+			"area_code", areaCode,
+		)
+		return fmt.Errorf("close active user process area: no rows updated")
+	}
+	return nil
+}
+
 func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -272,6 +376,81 @@ WHERE user_id = $1
 		return fmt.Errorf("close active user process area: no rows updated")
 	}
 	return tx.Commit()
+}
+
+// GrantAtomicTx closes oldMembership and inserts newMembership inside the
+// provided open transaction (role-change path). The caller is responsible for
+// Commit/Rollback.
+func (r *UserAreaRepository) GrantAtomicTx(ctx context.Context, tx iamapp.MembershipTx, oldMembership, newMembership iamdomain.UserProcessArea) error {
+	rawTx, ok := tx.(*sql.Tx)
+	if !ok {
+		return fmt.Errorf("iam: GrantAtomicTx: unexpected tx type %T", tx)
+	}
+	if oldMembership.AreaCode != newMembership.AreaCode {
+		return fmt.Errorf("iam: GrantAtomicTx area mismatch: old=%q new=%q", oldMembership.AreaCode, newMembership.AreaCode)
+	}
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, rawTx, newMembership.TenantID, grantedByActor(newMembership.GrantedBy)); err != nil {
+		return fmt.Errorf("iam: seed authz GrantAtomicTx: %w", err)
+	}
+	if err := authz.Require(ctx, rawTx, string(iamdomain.CapMembershipManage), newMembership.AreaCode); err != nil {
+		return fmt.Errorf("iam: authz check GrantAtomicTx: %w", err)
+	}
+	const closeQ = `
+UPDATE public.user_process_areas
+SET effective_to = $5,
+    revoked_by   = $6
+WHERE user_id = $1
+  AND tenant_id = $2::uuid
+  AND area_code = $3
+  AND effective_from = $4
+  AND effective_to IS NULL
+`
+	closeResult, err := rawTx.ExecContext(
+		ctx, closeQ,
+		oldMembership.UserID,
+		oldMembership.TenantID,
+		oldMembership.AreaCode,
+		oldMembership.EffectiveFrom,
+		newMembership.EffectiveFrom,
+		grantedByActor(newMembership.GrantedBy),
+	)
+	if err != nil {
+		return fmt.Errorf("close active membership in grant transaction: %w", err)
+	}
+	rowsAffected, err := closeResult.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("read affected rows for close active membership: %w", err)
+	}
+	if rowsAffected == 0 {
+		slog.Warn("iam user area zero rows",
+			"action", "grant_atomic_close",
+			"user_id", oldMembership.UserID,
+			"tenant_id", oldMembership.TenantID,
+			"area_code", oldMembership.AreaCode,
+		)
+		return fmt.Errorf("close active membership in grant transaction: no rows updated")
+	}
+	const insertQ = `
+INSERT INTO public.user_process_areas
+  (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by)
+VALUES
+  ($1, $2::uuid, $3, $4, $5, $6, $7)
+`
+	// TODO: migration 0136 hangs these FKs off a non-PK unique key on iam_users; keep caller identity writes aligned with iam_users uniqueness.
+	if _, err := rawTx.ExecContext(
+		ctx, insertQ,
+		newMembership.UserID,
+		newMembership.TenantID,
+		newMembership.AreaCode,
+		string(newMembership.Role),
+		newMembership.EffectiveFrom,
+		newMembership.EffectiveTo,
+		newMembership.GrantedBy,
+	); err != nil {
+		return fmt.Errorf("insert membership in grant transaction: %w", err)
+	}
+	return nil
 }
 
 func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, newMembership iamdomain.UserProcessArea) error {

@@ -4,11 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 )
+
+// MembershipTx is the transaction handle services receive from the repository
+// for in-tx mutation + governance writes (REQ-ASYNC-1). It embeds db.Tx so the
+// governance logger can write audit rows inside the same database transaction.
+// *sql.Tx satisfies this interface without an adapter.
+type MembershipTx interface {
+	db.Tx
+	Commit() error
+	Rollback() error
+}
 
 var (
 	ErrMembershipNotFound = errors.New("membership_not_found")
@@ -33,14 +43,24 @@ type UserAreaWriteRepository interface {
 	// where the actor holds the given capability. The managed-area restriction is
 	// applied IN SQL (ADR 0022 R3 — data-layer enforcement, not post-fetch).
 	ListByTenantInManagedAreas(ctx context.Context, tenantID, userID, areaCode, role, actorID, capability string, now time.Time) ([]domain.UserProcessArea, error)
-	Insert(ctx context.Context, membership domain.UserProcessArea) error
-	CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error
-	GrantAtomic(ctx context.Context, oldMembership, newMembership domain.UserProcessArea) error
 	GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*domain.UserProcessArea, error)
+	// BeginTx opens a database transaction for in-tx mutation + governance writes
+	// (REQ-ASYNC-1). The caller owns Commit/Rollback.
+	BeginTx(ctx context.Context) (MembershipTx, error)
+	// InsertTx writes a new membership row inside an open transaction.
+	InsertTx(ctx context.Context, tx MembershipTx, membership domain.UserProcessArea) error
+	// CloseActiveTx sets effective_to on the active row inside an open transaction.
+	CloseActiveTx(ctx context.Context, tx MembershipTx, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error
+	// GrantAtomicTx closes the old membership and inserts the new one inside an
+	// open transaction (role-change path).
+	GrantAtomicTx(ctx context.Context, tx MembershipTx, oldMembership, newMembership domain.UserProcessArea) error
 }
 
 type MembershipGovernanceLogger interface {
-	Log(ctx context.Context, action string, membership domain.UserProcessArea) error
+	// LogTx writes the governance event inside an open transaction so the audit
+	// record is atomically committed with the membership mutation (REQ-ASYNC-1,
+	// T-007). A failure rolls back the mutation.
+	LogTx(ctx context.Context, tx db.Tx, action string, membership domain.UserProcessArea) error
 }
 
 type AreaMembershipService struct {
@@ -126,36 +146,55 @@ func (s *AreaMembershipService) Grant(
 		if existing.Role == role {
 			return ErrMembershipExists
 		}
-		if err := s.repo.GrantAtomic(ctx, *existing, membership); err != nil {
+		tx, err := s.repo.BeginTx(ctx)
+		if err != nil {
+			return fmt.Errorf("begin grant tx: %w", err)
+		}
+		committed := false
+		defer func() {
+			if !committed {
+				_ = tx.Rollback()
+			}
+		}()
+		if err := s.repo.GrantAtomicTx(ctx, tx, *existing, membership); err != nil {
 			return fmt.Errorf("grant membership atomically: %w", err)
 		}
-		// Flush the actor's cached roles unconditionally once the mutation commits:
-		// the cache flush is a best-effort safety net and must not be gated on the
-		// governance-logger outcome (A3).
-		s.invalidate(userID, tenantID)
-		if err := s.logger.Log(ctx, "role.grant", membership); err != nil {
-			// Best-effort governance (A3): the membership mutation is already
-			// committed; a governance-sink failure must not produce a torn outcome.
-			// Atomic in-tx governance via RecordTx is the eventual target (T-007 /
-			// next-touch refactor of the membership repo to share a tx).
-			slog.WarnContext(ctx, "membership governance log failed (best-effort)", "action", "role.grant", "tenant_id", membership.TenantID, "user_id", membership.UserID, "err", err)
+		if err := s.logger.LogTx(ctx, tx, "role.grant", membership); err != nil {
+			return fmt.Errorf("log grant governance: %w", err)
 		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit grant tx: %w", err)
+		}
+		committed = true
+		// Flush the actor's cached roles once the mutation and governance are
+		// committed atomically (A3).
+		s.invalidate(userID, tenantID)
 		return nil
 	}
 
-	if err := s.repo.Insert(ctx, membership); err != nil {
+	tx, err := s.repo.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("begin insert tx: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if err := s.repo.InsertTx(ctx, tx, membership); err != nil {
 		return fmt.Errorf("insert membership: %w", err)
 	}
-	// Flush the actor's cached roles unconditionally once the mutation commits
-	// (see above): not gated on the governance-logger outcome (A3).
-	s.invalidate(userID, tenantID)
-	if err := s.logger.Log(ctx, "role.grant", membership); err != nil {
-		// Best-effort governance (A3): the membership mutation is already
-		// committed; a governance-sink failure must not produce a torn outcome.
-		// Atomic in-tx governance via RecordTx is the eventual target (T-007 /
-		// next-touch refactor of the membership repo to share a tx).
-		slog.WarnContext(ctx, "membership governance log failed (best-effort)", "action", "role.grant", "tenant_id", membership.TenantID, "user_id", membership.UserID, "err", err)
+	if err := s.logger.LogTx(ctx, tx, "role.grant", membership); err != nil {
+		return fmt.Errorf("log grant governance: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit insert tx: %w", err)
+	}
+	committed = true
+	// Flush the actor's cached roles once the mutation and governance are
+	// committed atomically (A3).
+	s.invalidate(userID, tenantID)
 	return nil
 }
 
@@ -187,24 +226,33 @@ func (s *AreaMembershipService) Revoke(
 		return ErrMembershipNotFound
 	}
 
-	if err := s.repo.CloseActive(ctx, userID, tenantID, areaCode, now, revokedBy); err != nil {
-		return fmt.Errorf("close active membership: %w", err)
-	}
-
-	// Flush the actor's cached roles unconditionally once the mutation commits:
-	// the cache flush is a best-effort safety net and must not be gated on the
-	// governance-logger outcome (A3).
-	s.invalidate(userID, tenantID)
 	membership := *active
 	if revokedBy != "" {
 		membership.GrantedBy = &revokedBy
 	}
-	if err := s.logger.Log(ctx, "role.revoke", membership); err != nil {
-		// Best-effort governance (A3): the membership mutation is already
-		// committed; a governance-sink failure must not produce a torn outcome.
-		// Atomic in-tx governance via RecordTx is the eventual target (T-007 /
-		// next-touch refactor of the membership repo to share a tx).
-		slog.WarnContext(ctx, "membership governance log failed (best-effort)", "action", "role.revoke", "tenant_id", membership.TenantID, "user_id", membership.UserID, "err", err)
+
+	tx, err := s.repo.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("begin revoke tx: %w", err)
 	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if err := s.repo.CloseActiveTx(ctx, tx, userID, tenantID, areaCode, now, revokedBy); err != nil {
+		return fmt.Errorf("close active membership: %w", err)
+	}
+	if err := s.logger.LogTx(ctx, tx, "role.revoke", membership); err != nil {
+		return fmt.Errorf("log revoke governance: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit revoke tx: %w", err)
+	}
+	committed = true
+	// Flush the actor's cached roles once the mutation and governance are
+	// committed atomically (A3).
+	s.invalidate(userID, tenantID)
 	return nil
 }
