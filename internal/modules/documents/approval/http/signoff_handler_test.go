@@ -2,7 +2,6 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +14,7 @@ import (
 	approvalsignature "metaldocs/internal/modules/documents/approval/infrastructure/signature"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
@@ -27,7 +27,7 @@ type fakeDecisionService struct {
 	calls  int
 }
 
-func (f *fakeDecisionService) RecordSignoff(_ context.Context, _ *sql.DB, req application.SignoffRequest) (application.SignoffResult, error) {
+func (f *fakeDecisionService) RecordSignoff(_ context.Context, _ db.TxRunner, req application.SignoffRequest) (application.SignoffResult, error) {
 	f.calls++
 	f.gotReq = req
 	if f.err != nil {
@@ -280,16 +280,16 @@ type fakeReadService struct {
 	loadActiveByDocumentForMutationCalled bool
 }
 
-func (f *fakeReadService) LoadInstance(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
+func (f *fakeReadService) LoadInstance(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
 	return f.inst, f.err
 }
 
-func (f *fakeReadService) LoadActiveInstanceByDocument(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
+func (f *fakeReadService) LoadActiveInstanceByDocument(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
 	f.loadActiveByDocumentCalled = true
 	return f.inst, f.err
 }
 
-func (f *fakeReadService) LoadActiveInstanceByDocumentForMutation(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
+func (f *fakeReadService) LoadActiveInstanceByDocumentForMutation(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
 	f.loadActiveByDocumentForMutationCalled = true
 	if f.mutationInst != nil || f.mutationErr != nil {
 		return f.mutationInst, f.mutationErr
@@ -297,15 +297,15 @@ func (f *fakeReadService) LoadActiveInstanceByDocumentForMutation(_ context.Cont
 	return f.inst, f.err
 }
 
-func (f *fakeReadService) ListPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string, _, _ int) ([]domain.Instance, error) {
+func (f *fakeReadService) ListPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string, _, _ int) ([]domain.Instance, error) {
 	return nil, nil
 }
 
-func (f *fakeReadService) ListInboxItems(_ context.Context, _ *sql.DB, _, _, _ string, _, _ int) ([]application.InboxView, error) {
+func (f *fakeReadService) ListInboxItems(_ context.Context, _ db.TxRunner, _, _, _ string, _, _ int) ([]application.InboxView, error) {
 	return nil, nil
 }
 
-func (f *fakeReadService) CountPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string) (int, error) {
+func (f *fakeReadService) CountPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string) (int, error) {
 	return 0, nil
 }
 

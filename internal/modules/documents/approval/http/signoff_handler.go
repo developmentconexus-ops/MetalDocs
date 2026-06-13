@@ -80,7 +80,7 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 		replayHandle = handle
 	}
 
-	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.db, application.SignoffRequest{
+	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.runner, application.SignoffRequest{
 		TenantID:                tenantID,
 		InstanceID:              instanceID,
 		StageInstanceID:         stageID,

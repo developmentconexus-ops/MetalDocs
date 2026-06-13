@@ -201,7 +201,7 @@ func TestCancelInstance_HappyPath(t *testing.T) {
 	repo := &cancelFakeRepo{instance: buildCancelInstance()}
 	svc := &CancelService{repo: repo, emitter: emitter, clock: clock}
 
-	result, err := svc.CancelInstance(context.Background(), db, CancelInput{
+	result, err := svc.CancelInstance(context.Background(), newTxRunner(db), CancelInput{
 		TenantID:                "tenant-1",
 		InstanceID:              "inst-1",
 		ExpectedRevisionVersion: 2,
@@ -229,7 +229,7 @@ func TestCancelInstance_InstanceCompleted(t *testing.T) {
 	repo := &cancelFakeRepo{instance: inst}
 	svc := &CancelService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 
-	_, err := svc.CancelInstance(context.Background(), db, CancelInput{
+	_, err := svc.CancelInstance(context.Background(), newTxRunner(db), CancelInput{
 		TenantID: "t", InstanceID: "i", ActorUserID: "u", Reason: "reason",
 	})
 	if !errors.Is(err, repository.ErrInstanceCompleted) {
@@ -244,7 +244,7 @@ func TestCancelInstance_CapDenied(t *testing.T) {
 	repo := &cancelFakeRepo{instance: buildCancelInstance()}
 	svc := &CancelService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 
-	_, err := svc.CancelInstance(context.Background(), db, CancelInput{
+	_, err := svc.CancelInstance(context.Background(), newTxRunner(db), CancelInput{
 		TenantID: "t", InstanceID: "i", ActorUserID: "u", Reason: "reason",
 	})
 	var denied authz.ErrCapDenied
@@ -265,7 +265,7 @@ func TestSystemCancelInstance_BypassesUserCapability(t *testing.T) {
 	repo := &cancelFakeRepo{instance: buildCancelInstance()}
 	svc := &CancelService{repo: repo, emitter: emitter, clock: fixedClock{t: now}}
 
-	result, err := svc.SystemCancelInstance(authz.WithBackgroundBypass(context.Background()), db, CancelInput{
+	result, err := svc.SystemCancelInstance(authz.WithBackgroundBypass(context.Background()), newTxRunner(db), CancelInput{
 		TenantID:                "tenant-1",
 		InstanceID:              "inst-1",
 		ExpectedRevisionVersion: 2,
@@ -290,7 +290,7 @@ func TestCancelInstance_EmptyReason(t *testing.T) {
 	repo := &cancelFakeRepo{instance: buildCancelInstance()}
 	svc := &CancelService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 
-	_, err := svc.CancelInstance(context.Background(), db, CancelInput{
+	_, err := svc.CancelInstance(context.Background(), newTxRunner(db), CancelInput{
 		TenantID: "t", InstanceID: "i", ActorUserID: "u", Reason: "",
 	})
 	if !errors.Is(err, ErrReasonRequired) {

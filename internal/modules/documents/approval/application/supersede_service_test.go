@@ -215,7 +215,7 @@ func TestPublishSuperseding_HappyPath(t *testing.T) {
 		PriorRevisionVersion: 7,
 	}
 
-	result, err := svc.PublishSuperseding(context.Background(), db, req)
+	result, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("PublishSuperseding: unexpected error: %v", err)
 	}
@@ -261,7 +261,7 @@ func TestPublishSuperseding_OCC_NewConflict(t *testing.T) {
 		PriorRevisionVersion: 5,
 	}
 
-	_, err := svc.PublishSuperseding(context.Background(), db, req)
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrStaleRevision; got nil")
 	}
@@ -290,7 +290,7 @@ func TestPublishSuperseding_OCC_PriorConflict(t *testing.T) {
 		PriorRevisionVersion: 9,
 	}
 
-	_, err := svc.PublishSuperseding(context.Background(), db, req)
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrStaleRevision; got nil")
 	}
@@ -317,7 +317,7 @@ func TestPublishSuperseding_CapabilityDenied(t *testing.T) {
 		PriorRevisionVersion: 1,
 	}
 
-	_, err := svc.PublishSuperseding(context.Background(), db, req)
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrCapabilityDenied; got nil")
 	}

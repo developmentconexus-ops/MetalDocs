@@ -258,7 +258,7 @@ func TestSubmitRevisionForReview_HappyPath(t *testing.T) {
 		RevisionVersion: 1,
 	}
 
-	result, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	result, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestSubmitRevisionForReview_DefaultsRevisionTitleForFirstGovernedRevision(t
 		RevisionNumber:  0,
 	}
 
-	if _, err := svc.SubmitRevisionForReview(context.Background(), db, req); err != nil {
+	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
 		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
 	}
 	if conn.revisionTitle != defaultInitialRevisionTitle {
@@ -319,7 +319,7 @@ func TestSubmitRevisionForReview_RequiresRevisionTitleAfterFirstGovernedRevision
 		RevisionNumber:  1,
 	}
 
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, ErrRevisionTitleRequired) {
 		t.Fatalf("error = %v, want ErrRevisionTitleRequired", err)
 	}
@@ -348,7 +348,7 @@ func TestSubmitRevisionForReview_ContentHashUsesGovernedRevisionNumber(t *testin
 		RevisionNumber:  1,
 	}
 
-	if _, err := svc.SubmitRevisionForReview(context.Background(), db, req); err != nil {
+	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
 		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
 	}
 	want, err := ComputeContentHash(ContentHashInput{
@@ -433,7 +433,7 @@ func TestSubmitRevisionForReview_DuplicateSubmission(t *testing.T) {
 		RevisionVersion: 1,
 	}
 
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrDuplicateSubmission; got nil")
 	}
@@ -462,7 +462,7 @@ func TestSubmitRevisionForReview_CapabilityDenied(t *testing.T) {
 		RevisionVersion: 1,
 	}
 
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrCapabilityDenied; got nil")
 	}

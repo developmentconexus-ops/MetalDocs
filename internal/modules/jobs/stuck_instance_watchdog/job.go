@@ -31,20 +31,21 @@ type StuckInstance struct {
 }
 
 type cancelSvcInterface interface {
-	CancelInstance(ctx context.Context, db *sql.DB, in application.CancelInput) (application.CancelResult, error)
-	SystemCancelInstance(ctx context.Context, db *sql.DB, in application.CancelInput) (application.CancelResult, error)
+	CancelInstance(ctx context.Context, runner db.TxRunner, in application.CancelInput) (application.CancelResult, error)
+	SystemCancelInstance(ctx context.Context, runner db.TxRunner, in application.CancelInput) (application.CancelResult, error)
 }
 
 type governanceEmitter interface {
 	Emit(ctx context.Context, tx db.Tx, e application.GovernanceEvent) error
 }
 
-func New(db *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) scheduler.JobFunc {
+func New(database *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) scheduler.JobFunc {
+	runner := db.NewTxRunner(database)
 	return func(ctx context.Context, epoch int64) error {
 		// Background root: permit SystemCancelInstance's authz.BypassSystem
 		// (fail-closed off any HTTP path — ADR 0022 Phase 7, CWE-269).
 		ctx = authz.WithBackgroundBypass(ctx)
-		unlock, err := acquireRunLock(ctx, db)
+		unlock, err := acquireRunLock(ctx, database)
 		if err != nil {
 			slog.ErrorContext(ctx, "stuck_instance_watchdog: acquire run lock failed",
 				"job", JobName, "epoch", epoch, "error", err)
@@ -52,7 +53,7 @@ func New(db *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) sc
 		}
 		defer unlock()
 
-		stuck, err := listStuckInstances(ctx, db)
+		stuck, err := listStuckInstances(ctx, database)
 		if err != nil {
 			slog.ErrorContext(ctx, "stuck_instance_watchdog: list stuck instances failed",
 				"job", JobName, "epoch", epoch, "error", err)
@@ -66,7 +67,7 @@ func New(db *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) sc
 
 		for _, inst := range stuck {
 			if inst.DriftPolicy == "auto_cancel" {
-				_, err := cancelSvc.SystemCancelInstance(ctx, db, application.CancelInput{
+				_, err := cancelSvc.SystemCancelInstance(ctx, runner, application.CancelInput{
 					TenantID:                inst.TenantID,
 					InstanceID:              inst.ID,
 					ExpectedRevisionVersion: 0,
@@ -83,7 +84,7 @@ func New(db *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) sc
 				continue
 			}
 
-			if err := emitStuckAlert(ctx, db, emitter, inst); err != nil {
+			if err := emitStuckAlert(ctx, database, emitter, inst); err != nil {
 				slog.ErrorContext(ctx, "stuck_instance_watchdog: emit stuck alert failed",
 					"job", JobName, "epoch", epoch, "instance_id", inst.ID, "tenant_id", inst.TenantID, "error", err)
 				runErr = errors.Join(runErr, err)

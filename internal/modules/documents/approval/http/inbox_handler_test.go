@@ -2,7 +2,6 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +12,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -29,19 +29,19 @@ type fakeReadServiceInbox struct {
 	gotOffset   int
 }
 
-func (f *fakeReadServiceInbox) LoadInstance(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
+func (f *fakeReadServiceInbox) LoadInstance(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
 	return nil, nil
 }
 
-func (f *fakeReadServiceInbox) LoadActiveInstanceByDocument(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
+func (f *fakeReadServiceInbox) LoadActiveInstanceByDocument(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
 	return nil, nil
 }
 
-func (f *fakeReadServiceInbox) ListPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string, _, _ int) ([]domain.Instance, error) {
+func (f *fakeReadServiceInbox) ListPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string, _, _ int) ([]domain.Instance, error) {
 	return nil, nil
 }
 
-func (f *fakeReadServiceInbox) ListInboxItems(_ context.Context, _ *sql.DB, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, error) {
+func (f *fakeReadServiceInbox) ListInboxItems(_ context.Context, _ db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, error) {
 	f.called = true
 	f.gotTenantID = tenantID
 	f.gotActorID = actorID
@@ -54,7 +54,7 @@ func (f *fakeReadServiceInbox) ListInboxItems(_ context.Context, _ *sql.DB, tena
 	return f.views, nil
 }
 
-func (f *fakeReadServiceInbox) CountPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string) (int, error) {
+func (f *fakeReadServiceInbox) CountPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string) (int, error) {
 	if f.err != nil {
 		return 0, f.err
 	}

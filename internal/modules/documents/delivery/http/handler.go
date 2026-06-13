@@ -19,6 +19,7 @@ import (
 	"metaldocs/internal/modules/documents/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/pagination"
@@ -60,7 +61,7 @@ type Service interface {
 
 // approvalSubmitter is the subset of the approval submit service used by finalizeDocument.
 type approvalSubmitter interface {
-	SubmitRevisionForReview(ctx context.Context, db *sql.DB, req approvalapp.SubmitRequest) (approvalapp.SubmitResult, error)
+	SubmitRevisionForReview(ctx context.Context, runner db.TxRunner, req approvalapp.SubmitRequest) (approvalapp.SubmitResult, error)
 }
 
 type finalizeIdempotencyStore interface {
@@ -72,6 +73,7 @@ type finalizeIdempotencyStore interface {
 type Handler struct {
 	svc           Service
 	db            *sql.DB
+	runner        db.TxRunner
 	submitSvc     approvalSubmitter
 	idempFinalize finalizeIdempotencyStore
 	caps          application.CapabilityChecker
@@ -98,14 +100,17 @@ func NewHandler(svc Service) *Handler { return &Handler{svc: svc} }
 
 // NewHandlerWithSubmit constructs a Handler with direct DB access and approval
 // submit service — required for the finalize→submit flow.
-func NewHandlerWithSubmit(svc Service, db *sql.DB, submitSvc approvalSubmitter) *Handler {
-	return NewHandlerWithSubmitAndFinalizeStore(svc, db, submitSvc, nil)
+func NewHandlerWithSubmit(svc Service, database *sql.DB, submitSvc approvalSubmitter) *Handler {
+	return NewHandlerWithSubmitAndFinalizeStore(svc, database, submitSvc, nil)
 }
 
-func NewHandlerWithSubmitAndFinalizeStore(svc Service, db *sql.DB, submitSvc approvalSubmitter, store finalizeIdempotencyStore) *Handler {
-	h := &Handler{svc: svc, db: db, submitSvc: submitSvc, idempFinalize: store}
+func NewHandlerWithSubmitAndFinalizeStore(svc Service, database *sql.DB, submitSvc approvalSubmitter, store finalizeIdempotencyStore) *Handler {
+	h := &Handler{svc: svc, db: database, submitSvc: submitSvc, idempFinalize: store}
+	if database != nil {
+		h.runner = db.NewTxRunner(database)
+	}
 	if h.idempFinalize == nil {
-		h.idempFinalize = idempotency.New(db, "POST /api/v1/documents/{id}/finalize")
+		h.idempFinalize = idempotency.New(database, "POST /api/v1/documents/{id}/finalize")
 	}
 	return h
 }
@@ -538,7 +543,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.submitSvc.SubmitRevisionForReview(r.Context(), h.db, approvalapp.SubmitRequest{
+	result, err := h.submitSvc.SubmitRevisionForReview(r.Context(), h.runner, approvalapp.SubmitRequest{
 		TenantID:        tenantID,
 		DocumentID:      docID,
 		RouteID:         prereqs.RouteID,

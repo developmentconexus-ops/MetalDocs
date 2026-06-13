@@ -83,7 +83,7 @@ func TestListInboxItems_PopulatesTitleAndQuorumProgress(t *testing.T) {
 	mock.ExpectCommit()
 
 	svc := &ReadService{}
-	items, err := svc.ListInboxItems(context.Background(), db, "tenant-1", "actor-1", "finance", 25, 0)
+	items, err := svc.ListInboxItems(context.Background(), newTxRunner(db), "tenant-1", "actor-1", "finance", 25, 0)
 	if err != nil {
 		t.Fatalf("ListInboxItems: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestListInboxItems_FiltersByActor(t *testing.T) {
 	mock.ExpectCommit()
 
 	svc := &ReadService{}
-	if _, err := svc.ListInboxItems(context.Background(), db, "tenant-1", "actor-xyz", "", 0, 0); err != nil {
+	if _, err := svc.ListInboxItems(context.Background(), newTxRunner(db), "tenant-1", "actor-xyz", "", 0, 0); err != nil {
 		t.Fatalf("ListInboxItems: %v", err)
 	}
 
@@ -159,7 +159,7 @@ func TestCountPendingForActor_ReturnsTotal(t *testing.T) {
 	mock.ExpectCommit()
 
 	svc := &ReadService{}
-	total, err := svc.CountPendingForActor(context.Background(), db, "tenant-1", "actor-1", "")
+	total, err := svc.CountPendingForActor(context.Background(), newTxRunner(db), "tenant-1", "actor-1", "")
 	if err != nil {
 		t.Fatalf("CountPendingForActor: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestLoadActiveInstanceByDocument_RequiresDocumentViewBeforeRepoLoad(t *test
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
 	ctx = iamdomain.WithAuthContext(ctx, "actor-1", nil)
-	_, err = svc.LoadActiveInstanceByDocument(ctx, db, "tenant-1", "doc-1")
+	_, err = svc.LoadActiveInstanceByDocument(ctx, newTxRunner(db), "tenant-1", "doc-1")
 	if err == nil {
 		t.Fatal("expected authz denial")
 	}
@@ -234,7 +234,7 @@ func TestLoadActiveInstanceByDocumentForMutation_DoesNotRequireDocumentView(t *t
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
 	ctx = iamdomain.WithAuthContext(ctx, "actor-1", nil)
-	inst, err := svc.LoadActiveInstanceByDocumentForMutation(ctx, db, "tenant-1", "doc-1")
+	inst, err := svc.LoadActiveInstanceByDocumentForMutation(ctx, newTxRunner(db), "tenant-1", "doc-1")
 	if err != nil {
 		t.Fatalf("LoadActiveInstanceByDocumentForMutation: %v", err)
 	}

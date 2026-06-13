@@ -201,7 +201,7 @@ func TestMarkObsolete_FromPublished(t *testing.T) {
 		Reason:          "product line discontinued",
 	}
 
-	result, err := svc.MarkObsolete(context.Background(), db, req)
+	result, err := svc.MarkObsolete(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("MarkObsolete: unexpected error: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestMarkObsolete_FromSuperseded(t *testing.T) {
 		Reason:          "replaced by v3",
 	}
 
-	result, err := svc.MarkObsolete(context.Background(), db, req)
+	result, err := svc.MarkObsolete(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("MarkObsolete: unexpected error: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestMarkObsolete_InvalidSource(t *testing.T) {
 		Reason:          "wrong state test",
 	}
 
-	_, err := svc.MarkObsolete(context.Background(), db, req)
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrInvalidObsoleteSource; got nil")
 	}
@@ -320,7 +320,7 @@ func TestMarkObsolete_StaleRevision(t *testing.T) {
 		Reason:          "stale test",
 	}
 
-	_, err := svc.MarkObsolete(context.Background(), db, req)
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrStaleRevision; got nil")
 	}
@@ -354,7 +354,7 @@ func TestMarkObsolete_CapabilityDenied(t *testing.T) {
 		Reason:          "denied test",
 	}
 
-	_, err := svc.MarkObsolete(context.Background(), db, req)
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrCapabilityDenied; got nil")
 	}

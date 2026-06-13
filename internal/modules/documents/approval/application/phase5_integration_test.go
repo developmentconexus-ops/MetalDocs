@@ -261,7 +261,7 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 		ContentFormData: map[string]any{"title": "P5 Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
-	submitResult, err := submitSvc.SubmitRevisionForReview(ctx, submitDB, submitReq)
+	submitResult, err := submitSvc.SubmitRevisionForReview(ctx, newTxRunner(submitDB), submitReq)
 	if err != nil {
 		t.Fatalf("Submit: unexpected error: %v", err)
 	}
@@ -338,7 +338,7 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 		SignaturePayload: map[string]any{"hash": "abc"},
 		ContentFormData:  map[string]any{"title": "P5 Doc", "_content_hash": validContentHash},
 	}
-	signoffResult, err := decisionSvc.RecordSignoff(ctx, decisionDB, signoffReq)
+	signoffResult, err := decisionSvc.RecordSignoff(ctx, newTxRunner(decisionDB), signoffReq)
 	if err != nil {
 		t.Fatalf("RecordSignoff: unexpected error: %v", err)
 	}
@@ -375,7 +375,7 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 		InstanceID:  instanceID,
 		PublishedBy: actorID,
 	}
-	publishResult, err := publishSvc.PublishApproved(ctx, publishDB, publishReq)
+	publishResult, err := publishSvc.PublishApproved(ctx, newTxRunner(publishDB), publishReq)
 	if err != nil {
 		t.Fatalf("PublishApproved: unexpected error: %v", err)
 	}
@@ -486,7 +486,7 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Reject Doc v1"},
 		RevisionVersion: 1,
 	}
-	submitResult1, err := submitSvc1.SubmitRevisionForReview(ctx, db1, submitReq1)
+	submitResult1, err := submitSvc1.SubmitRevisionForReview(ctx, newTxRunner(db1), submitReq1)
 	if err != nil {
 		t.Fatalf("Submit #1: unexpected error: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 		SignaturePayload: map[string]any{"hash": "rej"},
 		ContentFormData:  map[string]any{"title": "Reject Doc v1", "_content_hash": validContentHash},
 	}
-	signoffResult, err := decisionSvc.RecordSignoff(ctx, dbDecision, signoffReq)
+	signoffResult, err := decisionSvc.RecordSignoff(ctx, newTxRunner(dbDecision), signoffReq)
 	if err != nil {
 		t.Fatalf("RecordSignoff (reject): unexpected error: %v", err)
 	}
@@ -545,7 +545,7 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Reject Doc v2"},
 		RevisionVersion: 2, // bumped revision
 	}
-	submitResult2, err := submitSvc2.SubmitRevisionForReview(ctx, db2, submitReq2)
+	submitResult2, err := submitSvc2.SubmitRevisionForReview(ctx, newTxRunner(db2), submitReq2)
 	if err != nil {
 		t.Fatalf("Submit #2: unexpected error: %v", err)
 	}

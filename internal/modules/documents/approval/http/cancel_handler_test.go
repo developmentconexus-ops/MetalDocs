@@ -2,7 +2,6 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +13,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -24,7 +24,7 @@ type fakeCancelService struct {
 	called bool
 }
 
-func (f *fakeCancelService) CancelInstance(_ context.Context, _ *sql.DB, req application.CancelInput) (application.CancelResult, error) {
+func (f *fakeCancelService) CancelInstance(_ context.Context, _ db.TxRunner, req application.CancelInput) (application.CancelResult, error) {
 	f.called = true
 	f.gotReq = req
 	if f.err != nil {

@@ -14,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -112,7 +113,7 @@ type ListRoutesResult struct {
 }
 
 // Create creates a new approval route and all route stages.
-func (s *RouteAdminService) Create(ctx context.Context, db *sql.DB, in CreateRouteInput) (CreateRouteResult, error) {
+func (s *RouteAdminService) Create(ctx context.Context, runner db.TxRunner, in CreateRouteInput) (CreateRouteResult, error) {
 	const op = "create"
 
 	var (
@@ -131,7 +132,7 @@ func (s *RouteAdminService) Create(ctx context.Context, db *sql.DB, in CreateRou
 		}
 	}
 
-	result, err := s.createTx(ctx, db, in)
+	result, err := s.createTx(ctx, runner, in)
 	if err != nil {
 		if committer != nil {
 			if ferr := committer.Fail(err); ferr != nil {
@@ -153,92 +154,86 @@ func (s *RouteAdminService) Create(ctx context.Context, db *sql.DB, in CreateRou
 	return result, nil
 }
 
-func (s *RouteAdminService) createTx(ctx context.Context, db *sql.DB, in CreateRouteInput) (CreateRouteResult, error) {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return CreateRouteResult{}, fmt.Errorf("begin tx: %w", err)
-	}
+func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in CreateRouteInput) (CreateRouteResult, error) {
+	var result CreateRouteResult
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		ctx := authz.WithCapCache(ctx)
 
-	if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
-		_ = tx.Rollback()
-		return CreateRouteResult{}, err
-	}
-	ctx = authz.WithCapCache(ctx)
-	if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
-		_ = tx.Rollback()
-		return CreateRouteResult{}, err
-	}
-
-	route := domain.Route{
-		TenantID:    in.TenantID,
-		ProfileCode: in.ProfileCode,
-		Version:     1,
-		Stages:      in.Stages,
-	}
-	if err := route.Validate(); err != nil {
-		_ = tx.Rollback()
-		return CreateRouteResult{}, err
-	}
-
-	var routeID string
-	err = tx.QueryRowContext(ctx, `
-		INSERT INTO approval_routes
-			(tenant_id, profile_code, name, version, created_by, active)
-		VALUES ($1, $2, $3, 1, $4, TRUE)
-		RETURNING id`,
-		in.TenantID, in.ProfileCode, in.Name, in.ActorUserID,
-	).Scan(&routeID)
-	if err != nil {
-		_ = tx.Rollback()
-		mapped := repository.MapPgError(err, repository.MapHints{})
-		// Only a 23503 violation of the profile FK means the profile is not
-		// registered for the tenant — map that to a validation error. Any other
-		// FK violation falls through to a wrapped error so WriteError logs it at 500.
-		if errors.Is(mapped, repository.ErrFKViolation) {
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.ConstraintName == routeProfileFKConstraint {
-				return CreateRouteResult{}, ErrRouteProfileUnknown
-			}
+		if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
+			return err
 		}
-		return CreateRouteResult{}, fmt.Errorf("insert route: %w", mapped)
-	}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
+			return err
+		}
 
-	if err := insertRouteStages(ctx, tx, routeID, in.Stages); err != nil {
-		_ = tx.Rollback()
-		return CreateRouteResult{}, err
-	}
+		route := domain.Route{
+			TenantID:    in.TenantID,
+			ProfileCode: in.ProfileCode,
+			Version:     1,
+			Stages:      in.Stages,
+		}
+		if err := route.Validate(); err != nil {
+			return err
+		}
 
-	payload, err := json.Marshal(map[string]any{
-		"route_id":      routeID,
-		"profile_code":  in.ProfileCode,
-		"stage_count":   len(in.Stages),
-		"initial_state": "active",
+		var routeID string
+		err := tx.QueryRowContext(ctx, `
+			INSERT INTO approval_routes
+				(tenant_id, profile_code, name, version, created_by, active)
+			VALUES ($1, $2, $3, 1, $4, TRUE)
+			RETURNING id`,
+			in.TenantID, in.ProfileCode, in.Name, in.ActorUserID,
+		).Scan(&routeID)
+		if err != nil {
+			mapped := repository.MapPgError(err, repository.MapHints{})
+			// Only a 23503 violation of the profile FK means the profile is not
+			// registered for the tenant — map that to a validation error. Any other
+			// FK violation falls through to a wrapped error so WriteError logs it at 500.
+			if errors.Is(mapped, repository.ErrFKViolation) {
+				var pgErr *pgconn.PgError
+				if errors.As(err, &pgErr) && pgErr.ConstraintName == routeProfileFKConstraint {
+					return ErrRouteProfileUnknown
+				}
+			}
+			return fmt.Errorf("insert route: %w", mapped)
+		}
+
+		if err := insertRouteStages(ctx, tx, routeID, in.Stages); err != nil {
+			return err
+		}
+
+		payload, err := json.Marshal(map[string]any{
+			"route_id":      routeID,
+			"profile_code":  in.ProfileCode,
+			"stage_count":   len(in.Stages),
+			"initial_state": "active",
+		})
+		if err != nil {
+			return fmt.Errorf("marshal event payload: %w", err)
+		}
+		if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
+			TenantID:     in.TenantID,
+			EventType:    EventTypeRouteConfigCreated,
+			ActorUserID:  in.ActorUserID,
+			ResourceType: "approval_route",
+			ResourceID:   routeID,
+			PayloadJSON:  payload,
+			OccurredAt:   s.clock.Now(),
+		}); err != nil {
+			return fmt.Errorf("emit event: %w", err)
+		}
+
+		result = CreateRouteResult{RouteID: routeID}
+		return nil
 	})
 	if err != nil {
-		_ = tx.Rollback()
-		return CreateRouteResult{}, fmt.Errorf("marshal event payload: %w", err)
+		return CreateRouteResult{}, err
 	}
-	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
-		TenantID:     in.TenantID,
-		EventType:    EventTypeRouteConfigCreated,
-		ActorUserID:  in.ActorUserID,
-		ResourceType: "approval_route",
-		ResourceID:   routeID,
-		PayloadJSON:  payload,
-		OccurredAt:   s.clock.Now(),
-	}); err != nil {
-		_ = tx.Rollback()
-		return CreateRouteResult{}, fmt.Errorf("emit event: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return CreateRouteResult{}, fmt.Errorf("commit: %w", err)
-	}
-	return CreateRouteResult{RouteID: routeID}, nil
+	return result, nil
 }
 
 // Update updates route metadata and replaces all route stages atomically.
-func (s *RouteAdminService) Update(ctx context.Context, db *sql.DB, in UpdateRouteInput) (UpdateRouteResult, error) {
+func (s *RouteAdminService) Update(ctx context.Context, runner db.TxRunner, in UpdateRouteInput) (UpdateRouteResult, error) {
 	const op = "update"
 
 	var (
@@ -261,7 +256,7 @@ func (s *RouteAdminService) Update(ctx context.Context, db *sql.DB, in UpdateRou
 		}
 	}
 
-	result, err := s.updateTx(ctx, db, in)
+	result, err := s.updateTx(ctx, runner, in)
 	if err != nil {
 		if committer != nil {
 			if ferr := committer.Fail(err); ferr != nil {
@@ -284,113 +279,104 @@ func (s *RouteAdminService) Update(ctx context.Context, db *sql.DB, in UpdateRou
 	return result, nil
 }
 
-func (s *RouteAdminService) updateTx(ctx context.Context, db *sql.DB, in UpdateRouteInput) (UpdateRouteResult, error) {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return UpdateRouteResult{}, fmt.Errorf("begin tx: %w", err)
-	}
+func (s *RouteAdminService) updateTx(ctx context.Context, runner db.TxRunner, in UpdateRouteInput) (UpdateRouteResult, error) {
+	var result UpdateRouteResult
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		ctx := authz.WithCapCache(ctx)
 
-	if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, err
-	}
-	ctx = authz.WithCapCache(ctx)
-	if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, err
-	}
-
-	if _, err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID); err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, err
-	}
-
-	currentStages, err := loadRouteStagesTx(ctx, tx, in.RouteID)
-	if err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, err
-	}
-	stagesChanged := !stagesEqual(currentStages, in.Stages)
-
-	route := domain.Route{
-		ID:       in.RouteID,
-		TenantID: in.TenantID,
-		Stages:   in.Stages,
-	}
-	if err := route.Validate(); err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, err
-	}
-
-	var newVersion int
-	err = tx.QueryRowContext(ctx, `
-		UPDATE approval_routes
-		   SET name = $1,
-		       version = version + 1
-		 WHERE id = $2
-		   AND tenant_id = $3
-		   AND ($4 = 0 OR version = $4)
-		RETURNING version`,
-		in.Name, in.RouteID, in.TenantID, in.ExpectedVersion,
-	).Scan(&newVersion)
-	if err != nil {
-		_ = tx.Rollback()
-		if errors.Is(err, sql.ErrNoRows) {
-			return UpdateRouteResult{}, repository.ErrStaleRevision
+		if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
+			return err
 		}
-		mapped := repository.MapPgError(err, repository.MapHints{})
-		if errors.Is(mapped, repository.ErrRouteInUse) {
-			return UpdateRouteResult{}, mapped
-		}
-		return UpdateRouteResult{}, fmt.Errorf("update route: %w", mapped)
-	}
-
-	if stagesChanged {
-		if _, err := tx.ExecContext(ctx, `
-			DELETE FROM approval_route_stages
-			WHERE route_id = $1`,
-			in.RouteID,
-		); err != nil {
-			_ = tx.Rollback()
-			return UpdateRouteResult{}, fmt.Errorf("delete stages: %w", err)
+		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
+			return err
 		}
 
-		if err := insertRouteStages(ctx, tx, in.RouteID, in.Stages); err != nil {
-			_ = tx.Rollback()
-			return UpdateRouteResult{}, err
+		if _, err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID); err != nil {
+			return err
 		}
-	}
 
-	payload, err := json.Marshal(map[string]any{
-		"route_id":    in.RouteID,
-		"new_version": newVersion,
-		"stage_count": len(in.Stages),
+		currentStages, err := loadRouteStagesTx(ctx, tx, in.RouteID)
+		if err != nil {
+			return err
+		}
+		stagesChanged := !stagesEqual(currentStages, in.Stages)
+
+		route := domain.Route{
+			ID:       in.RouteID,
+			TenantID: in.TenantID,
+			Stages:   in.Stages,
+		}
+		if err := route.Validate(); err != nil {
+			return err
+		}
+
+		var newVersion int
+		err = tx.QueryRowContext(ctx, `
+			UPDATE approval_routes
+			   SET name = $1,
+			       version = version + 1
+			 WHERE id = $2
+			   AND tenant_id = $3
+			   AND ($4 = 0 OR version = $4)
+			RETURNING version`,
+			in.Name, in.RouteID, in.TenantID, in.ExpectedVersion,
+		).Scan(&newVersion)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return repository.ErrStaleRevision
+			}
+			mapped := repository.MapPgError(err, repository.MapHints{})
+			if errors.Is(mapped, repository.ErrRouteInUse) {
+				return mapped
+			}
+			return fmt.Errorf("update route: %w", mapped)
+		}
+
+		if stagesChanged {
+			if _, err := tx.ExecContext(ctx, `
+				DELETE FROM approval_route_stages
+				WHERE route_id = $1`,
+				in.RouteID,
+			); err != nil {
+				return fmt.Errorf("delete stages: %w", err)
+			}
+
+			if err := insertRouteStages(ctx, tx, in.RouteID, in.Stages); err != nil {
+				return err
+			}
+		}
+
+		payload, err := json.Marshal(map[string]any{
+			"route_id":    in.RouteID,
+			"new_version": newVersion,
+			"stage_count": len(in.Stages),
+		})
+		if err != nil {
+			return fmt.Errorf("marshal event payload: %w", err)
+		}
+		if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
+			TenantID:     in.TenantID,
+			EventType:    EventTypeRouteConfigUpdated,
+			ActorUserID:  in.ActorUserID,
+			ResourceType: "approval_route",
+			ResourceID:   in.RouteID,
+			PayloadJSON:  payload,
+			OccurredAt:   s.clock.Now(),
+		}); err != nil {
+			return fmt.Errorf("emit event: %w", err)
+		}
+
+		result = UpdateRouteResult{RouteID: in.RouteID, NewVersion: newVersion}
+		return nil
 	})
 	if err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, fmt.Errorf("marshal event payload: %w", err)
+		return UpdateRouteResult{}, err
 	}
-	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
-		TenantID:     in.TenantID,
-		EventType:    EventTypeRouteConfigUpdated,
-		ActorUserID:  in.ActorUserID,
-		ResourceType: "approval_route",
-		ResourceID:   in.RouteID,
-		PayloadJSON:  payload,
-		OccurredAt:   s.clock.Now(),
-	}); err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, fmt.Errorf("emit event: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return UpdateRouteResult{}, fmt.Errorf("commit: %w", err)
-	}
-	return UpdateRouteResult{RouteID: in.RouteID, NewVersion: newVersion}, nil
+	return result, nil
 }
 
 // Deactivate marks a route inactive.
-func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in DeactivateRouteInput) (DeactivateRouteResult, error) {
+func (s *RouteAdminService) Deactivate(ctx context.Context, runner db.TxRunner, in DeactivateRouteInput) (DeactivateRouteResult, error) {
 	const op = "deactivate"
 
 	reason := strings.TrimSpace(in.Reason)
@@ -426,7 +412,7 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 		return DeactivateRouteResult{}, ErrRouteDeactivateReasonRequired
 	}
 
-	result, err := s.deactivateTx(ctx, db, in)
+	result, err := s.deactivateTx(ctx, runner, in)
 	if err != nil {
 		if committer != nil {
 			if ferr := committer.Fail(err); ferr != nil {
@@ -448,120 +434,112 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 	return result, nil
 }
 
-func (s *RouteAdminService) deactivateTx(ctx context.Context, db *sql.DB, in DeactivateRouteInput) (DeactivateRouteResult, error) {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return DeactivateRouteResult{}, fmt.Errorf("begin tx: %w", err)
-	}
+func (s *RouteAdminService) deactivateTx(ctx context.Context, runner db.TxRunner, in DeactivateRouteInput) (DeactivateRouteResult, error) {
+	var result DeactivateRouteResult
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		ctx := authz.WithCapCache(ctx)
 
-	if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
-		_ = tx.Rollback()
-		return DeactivateRouteResult{}, err
-	}
-	ctx = authz.WithCapCache(ctx)
-	if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
-		_ = tx.Rollback()
-		return DeactivateRouteResult{}, err
-	}
-
-	lockedRoute, err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID)
-	if err != nil {
-		_ = tx.Rollback()
-		return DeactivateRouteResult{}, err
-	}
-	if !lockedRoute.Active {
-		if in.ExpectedVersion > 0 && lockedRoute.Version != in.ExpectedVersion {
-			_ = tx.Rollback()
-			return DeactivateRouteResult{}, repository.ErrStaleRevision
+		if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
+			return err
 		}
-		_ = tx.Rollback()
-		return DeactivateRouteResult{}, ErrRouteAlreadyInactive
-	}
-
-	res, err := tx.ExecContext(ctx, `
-		UPDATE approval_routes
-		   SET active = FALSE,
-		       version = version + 1
-		 WHERE id = $1
-		   AND tenant_id = $2
-		   AND active = TRUE
-		   AND ($3 = 0 OR version = $3)`,
-		in.RouteID, in.TenantID, in.ExpectedVersion,
-	)
-	if err != nil {
-		_ = tx.Rollback()
-		mapped := repository.MapPgError(err, repository.MapHints{})
-		if errors.Is(mapped, repository.ErrRouteInUse) {
-			return DeactivateRouteResult{}, mapped
+		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
+			return err
 		}
-		return DeactivateRouteResult{}, fmt.Errorf("deactivate route: %w", mapped)
-	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		_ = tx.Rollback()
-		return DeactivateRouteResult{}, fmt.Errorf("deactivate route rows affected: %w", err)
-	}
-	if rows == 0 {
-		_ = tx.Rollback()
-		return DeactivateRouteResult{}, repository.ErrStaleRevision
-	}
 
-	payload, err := json.Marshal(map[string]any{
-		"route_id": in.RouteID,
-		"active":   false,
-		"reason":   in.Reason,
+		lockedRoute, err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID)
+		if err != nil {
+			return err
+		}
+		if !lockedRoute.Active {
+			if in.ExpectedVersion > 0 && lockedRoute.Version != in.ExpectedVersion {
+				return repository.ErrStaleRevision
+			}
+			return ErrRouteAlreadyInactive
+		}
+
+		res, err := tx.ExecContext(ctx, `
+			UPDATE approval_routes
+			   SET active = FALSE,
+			       version = version + 1
+			 WHERE id = $1
+			   AND tenant_id = $2
+			   AND active = TRUE
+			   AND ($3 = 0 OR version = $3)`,
+			in.RouteID, in.TenantID, in.ExpectedVersion,
+		)
+		if err != nil {
+			mapped := repository.MapPgError(err, repository.MapHints{})
+			if errors.Is(mapped, repository.ErrRouteInUse) {
+				return mapped
+			}
+			return fmt.Errorf("deactivate route: %w", mapped)
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("deactivate route rows affected: %w", err)
+		}
+		if rows == 0 {
+			return repository.ErrStaleRevision
+		}
+
+		payload, err := json.Marshal(map[string]any{
+			"route_id": in.RouteID,
+			"active":   false,
+			"reason":   in.Reason,
+		})
+		if err != nil {
+			return fmt.Errorf("marshal event payload: %w", err)
+		}
+		if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
+			TenantID:     in.TenantID,
+			EventType:    EventTypeRouteConfigDeactivated,
+			ActorUserID:  in.ActorUserID,
+			ResourceType: "approval_route",
+			ResourceID:   in.RouteID,
+			PayloadJSON:  payload,
+			OccurredAt:   s.clock.Now(),
+		}); err != nil {
+			return fmt.Errorf("emit event: %w", err)
+		}
+
+		result = DeactivateRouteResult{RouteID: in.RouteID}
+		return nil
 	})
 	if err != nil {
-		_ = tx.Rollback()
-		return DeactivateRouteResult{}, fmt.Errorf("marshal event payload: %w", err)
+		return DeactivateRouteResult{}, err
 	}
-	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
-		TenantID:     in.TenantID,
-		EventType:    EventTypeRouteConfigDeactivated,
-		ActorUserID:  in.ActorUserID,
-		ResourceType: "approval_route",
-		ResourceID:   in.RouteID,
-		PayloadJSON:  payload,
-		OccurredAt:   s.clock.Now(),
-	}); err != nil {
-		_ = tx.Rollback()
-		return DeactivateRouteResult{}, fmt.Errorf("emit event: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return DeactivateRouteResult{}, fmt.Errorf("commit: %w", err)
-	}
-	return DeactivateRouteResult{RouteID: in.RouteID}, nil
+	return result, nil
 }
 
 // List loads tenant-scoped routes inside a single transaction that owns the
 // tenant/actor GUCs and the route.admin authz check. This closes the TOCTOU
 // gap where the prior handler ran authz in one tx and the list query in another.
-func (s *RouteAdminService) List(ctx context.Context, db *sql.DB, tenantID, actorID string) (ListRoutesResult, error) {
+func (s *RouteAdminService) List(ctx context.Context, runner db.TxRunner, tenantID, actorID string) (ListRoutesResult, error) {
 	const op = "list"
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return ListRoutesResult{}, wrapRouteAdminErr(op, fmt.Errorf("begin tx: %w", err))
-	}
-	defer func() { _ = tx.Rollback() }()
+	var result ListRoutesResult
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		ctx := authz.WithCapCache(ctx)
 
-	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+			return err
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
+			return err
+		}
+
+		routes, err := s.repo.ListRoutesTx(ctx, tx, tenantID)
+		if err != nil {
+			return err
+		}
+
+		result = ListRoutesResult{Routes: routes}
+		return nil
+	})
+	if err != nil {
 		return ListRoutesResult{}, wrapRouteAdminErr(op, err)
 	}
-	ctx = authz.WithCapCache(ctx)
-	if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
-		return ListRoutesResult{}, err
-	}
-
-	routes, err := s.repo.ListRoutesTx(ctx, tx, tenantID)
-	if err != nil {
-		return ListRoutesResult{}, wrapRouteAdminErr(op, err)
-	}
-	if err := tx.Commit(); err != nil {
-		return ListRoutesResult{}, wrapRouteAdminErr(op, fmt.Errorf("commit: %w", err))
-	}
-	return ListRoutesResult{Routes: routes}, nil
+	return result, nil
 }
 
 // wrapRouteAdminErr standardises the error envelope. Sentinels and mapped

@@ -2,20 +2,20 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
+	"metaldocs/internal/platform/db"
 )
 
-func (h *Handler) cancelInstance(ctx context.Context, db *sql.DB, req application.CancelInput) (application.CancelResult, error) {
+func (h *Handler) cancelInstance(ctx context.Context, runner db.TxRunner, req application.CancelInput) (application.CancelResult, error) {
 	if h.cancelSvc == nil {
 		return application.CancelResult{}, errors.New("cancel service not configured")
 	}
-	return h.cancelSvc.CancelInstance(ctx, db, req)
+	return h.cancelSvc.CancelInstance(ctx, runner, req)
 }
 
 func (h *Handler) CancelHandler(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +49,7 @@ func (h *Handler) CancelHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.cancelInstance(r.Context(), h.db, application.CancelInput{
+	result, err := h.cancelInstance(r.Context(), h.runner, application.CancelInput{
 		TenantID:                tenantID,
 		InstanceID:              instanceID,
 		ExpectedRevisionVersion: expectedRevisionVersion,

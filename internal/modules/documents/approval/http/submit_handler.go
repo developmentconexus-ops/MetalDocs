@@ -44,7 +44,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := submitSvc.SubmitRevisionForReview(r.Context(), h.db, application.SubmitRequest{
+	result, err := submitSvc.SubmitRevisionForReview(r.Context(), h.runner, application.SubmitRequest{
 		TenantID:        tenantID,
 		DocumentID:      documentID,
 		RouteID:         req.RouteID,

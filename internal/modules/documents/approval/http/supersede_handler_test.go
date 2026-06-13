@@ -18,6 +18,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -27,7 +28,7 @@ type fakeSupersedeService struct {
 	err    error
 }
 
-func (f *fakeSupersedeService) PublishSuperseding(_ context.Context, _ *sql.DB, req application.SupersedeRequest) (application.SupersedeResult, error) {
+func (f *fakeSupersedeService) PublishSuperseding(_ context.Context, _ db.TxRunner, req application.SupersedeRequest) (application.SupersedeResult, error) {
 	f.gotReq = req
 	if f.err != nil {
 		return application.SupersedeResult{}, f.err

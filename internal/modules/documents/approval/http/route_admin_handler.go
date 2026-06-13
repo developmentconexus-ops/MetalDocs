@@ -41,7 +41,7 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := routeAdminSvc.Create(r.Context(), h.db, application.CreateRouteInput{
+	result, err := routeAdminSvc.Create(r.Context(), h.runner, application.CreateRouteInput{
 		TenantID:       tenantID,
 		ProfileCode:    req.ProfileCode,
 		Name:           req.Name,
@@ -94,7 +94,7 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := routeAdminSvc.Update(r.Context(), h.db, application.UpdateRouteInput{
+	result, err := routeAdminSvc.Update(r.Context(), h.runner, application.UpdateRouteInput{
 		TenantID:        tenantID,
 		RouteID:         routeID,
 		Name:            req.Name,
@@ -150,7 +150,7 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	result, err := routeAdminSvc.Deactivate(r.Context(), h.db, application.DeactivateRouteInput{
+	result, err := routeAdminSvc.Deactivate(r.Context(), h.runner, application.DeactivateRouteInput{
 		TenantID:        tenantID,
 		RouteID:         routeID,
 		ActorUserID:     actorID,
@@ -182,7 +182,7 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := routeAdminSvc.List(r.Context(), h.db, tenantID, actorID)
+	out, err := routeAdminSvc.List(r.Context(), h.runner, tenantID, actorID)
 	if err != nil {
 		WriteError(w, err)
 		return

@@ -2,7 +2,6 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +12,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -23,7 +23,7 @@ type fakeObsoleteService struct {
 	called bool
 }
 
-func (f *fakeObsoleteService) MarkObsolete(_ context.Context, _ *sql.DB, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error) {
+func (f *fakeObsoleteService) MarkObsolete(_ context.Context, _ db.TxRunner, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error) {
 	f.called = true
 	f.gotReq = req
 	if f.err != nil {

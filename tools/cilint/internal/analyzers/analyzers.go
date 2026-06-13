@@ -22,14 +22,15 @@ type Finding struct {
 // in this codebase's clean/hexagonal architecture: the data adapters
 // (infrastructure/repository), the application/service layer that orchestrates
 // cross-aggregate atomic writes (ADR 0011), shared platform transaction infra
-// (idempotency store, transactional outbox — ADR 0009), worker job runners
-// (ADR 0015), and the test seed harness. Transactions must NOT be opened in the
-// presentation layer (delivery/http, api/), so those stay flagged — that is the
-// real smell this rule guards against.
+// (the db.TxRunner port, idempotency store, transactional outbox — ADR 0009),
+// worker job runners (ADR 0015), and the test seed harness. Transactions must
+// NOT be opened in the presentation layer (delivery/http, api/), so those stay
+// flagged — that is the real smell this rule guards against.
 var allowedTxPackages = []string{
 	"/infrastructure/",
 	"/repository/",
 	"/application/",
+	"/platform/db/", // TxRunner port — canonical centralized tx lifecycle owner (H-1d)
 	"/platform/idempotency/",
 	"/platform/messaging/",
 	"/platform/worker/",

@@ -38,13 +38,13 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	views, err := h.readSvc.ListInboxItems(r.Context(), h.db, tenantID, actorID, areaCode, limit, offset)
+	views, err := h.readSvc.ListInboxItems(r.Context(), h.runner, tenantID, actorID, areaCode, limit, offset)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
 
-	total, err := h.readSvc.CountPendingForActor(r.Context(), h.db, tenantID, actorID, areaCode)
+	total, err := h.readSvc.CountPendingForActor(r.Context(), h.runner, tenantID, actorID, areaCode)
 	if err != nil {
 		WriteError(w, err)
 		return

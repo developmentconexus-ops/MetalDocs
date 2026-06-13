@@ -2,7 +2,6 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +15,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -24,23 +24,23 @@ type fakeReadServicePublish struct {
 	err  error
 }
 
-func (f *fakeReadServicePublish) LoadInstance(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
+func (f *fakeReadServicePublish) LoadInstance(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
 	return nil, nil
 }
 
-func (f *fakeReadServicePublish) LoadActiveInstanceByDocument(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
+func (f *fakeReadServicePublish) LoadActiveInstanceByDocument(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
 	return f.inst, f.err
 }
 
-func (f *fakeReadServicePublish) ListPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string, _, _ int) ([]domain.Instance, error) {
+func (f *fakeReadServicePublish) ListPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string, _, _ int) ([]domain.Instance, error) {
 	return nil, nil
 }
 
-func (f *fakeReadServicePublish) ListInboxItems(_ context.Context, _ *sql.DB, _, _, _ string, _, _ int) ([]application.InboxView, error) {
+func (f *fakeReadServicePublish) ListInboxItems(_ context.Context, _ db.TxRunner, _, _, _ string, _, _ int) ([]application.InboxView, error) {
 	return nil, nil
 }
 
-func (f *fakeReadServicePublish) CountPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string) (int, error) {
+func (f *fakeReadServicePublish) CountPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string) (int, error) {
 	return 0, nil
 }
 
@@ -91,7 +91,7 @@ func TestPublishHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var gotReq application.PublishRequest
-			publishApproved = func(_ *Handler, _ context.Context, _ *sql.DB, req application.PublishRequest) (application.PublishResult, error) {
+			publishApproved = func(_ *Handler, _ context.Context, _ db.TxRunner, req application.PublishRequest) (application.PublishResult, error) {
 				gotReq = req
 				if tt.svcErr != nil {
 					return application.PublishResult{}, tt.svcErr
@@ -167,7 +167,7 @@ func TestSchedulePublishHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var gotReq application.SchedulePublishRequest
-			schedulePublish = func(_ *Handler, _ context.Context, _ *sql.DB, req application.SchedulePublishRequest) (application.SchedulePublishResult, error) {
+			schedulePublish = func(_ *Handler, _ context.Context, _ db.TxRunner, req application.SchedulePublishRequest) (application.SchedulePublishResult, error) {
 				gotReq = req
 				if tt.svcErr != nil {
 					return application.SchedulePublishResult{}, tt.svcErr
@@ -222,7 +222,7 @@ func TestSchedulePublishHandler_ResolvesActiveInstanceFromDocument(t *testing.T)
 	})
 
 	var gotReq application.SchedulePublishRequest
-	schedulePublish = func(_ *Handler, _ context.Context, _ *sql.DB, req application.SchedulePublishRequest) (application.SchedulePublishResult, error) {
+	schedulePublish = func(_ *Handler, _ context.Context, _ db.TxRunner, req application.SchedulePublishRequest) (application.SchedulePublishResult, error) {
 		gotReq = req
 		return application.SchedulePublishResult{
 			DocumentID:    "doc-1",
@@ -259,7 +259,7 @@ func TestSchedulePublishHandler_PassesExpectedRevisionAndSupersededDocumentID(t 
 	})
 
 	var gotReq application.SchedulePublishRequest
-	schedulePublish = func(_ *Handler, _ context.Context, _ *sql.DB, req application.SchedulePublishRequest) (application.SchedulePublishResult, error) {
+	schedulePublish = func(_ *Handler, _ context.Context, _ db.TxRunner, req application.SchedulePublishRequest) (application.SchedulePublishResult, error) {
 		gotReq = req
 		return application.SchedulePublishResult{
 			DocumentID:    "doc-approved-1",

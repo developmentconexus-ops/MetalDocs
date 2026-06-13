@@ -2,7 +2,6 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -37,7 +37,7 @@ type fakeRouteAdminService struct {
 	listActor  string
 }
 
-func (f *fakeRouteAdminService) Create(_ context.Context, _ *sql.DB, in application.CreateRouteInput) (application.CreateRouteResult, error) {
+func (f *fakeRouteAdminService) Create(_ context.Context, _ db.TxRunner, in application.CreateRouteInput) (application.CreateRouteResult, error) {
 	f.createReq = in
 	if f.createErr != nil {
 		return application.CreateRouteResult{}, f.createErr
@@ -45,7 +45,7 @@ func (f *fakeRouteAdminService) Create(_ context.Context, _ *sql.DB, in applicat
 	return f.createResult, nil
 }
 
-func (f *fakeRouteAdminService) Update(_ context.Context, _ *sql.DB, in application.UpdateRouteInput) (application.UpdateRouteResult, error) {
+func (f *fakeRouteAdminService) Update(_ context.Context, _ db.TxRunner, in application.UpdateRouteInput) (application.UpdateRouteResult, error) {
 	f.updateReq = in
 	if f.updateErr != nil {
 		return application.UpdateRouteResult{}, f.updateErr
@@ -53,7 +53,7 @@ func (f *fakeRouteAdminService) Update(_ context.Context, _ *sql.DB, in applicat
 	return f.updateResult, nil
 }
 
-func (f *fakeRouteAdminService) Deactivate(_ context.Context, _ *sql.DB, in application.DeactivateRouteInput) (application.DeactivateRouteResult, error) {
+func (f *fakeRouteAdminService) Deactivate(_ context.Context, _ db.TxRunner, in application.DeactivateRouteInput) (application.DeactivateRouteResult, error) {
 	f.deactivateReq = in
 	if f.deactivateErr != nil {
 		return application.DeactivateRouteResult{}, f.deactivateErr
@@ -61,7 +61,7 @@ func (f *fakeRouteAdminService) Deactivate(_ context.Context, _ *sql.DB, in appl
 	return f.deactivateResult, nil
 }
 
-func (f *fakeRouteAdminService) List(_ context.Context, _ *sql.DB, tenantID, actorID string) (application.ListRoutesResult, error) {
+func (f *fakeRouteAdminService) List(_ context.Context, _ db.TxRunner, tenantID, actorID string) (application.ListRoutesResult, error) {
 	f.listTenant = tenantID
 	f.listActor = actorID
 	if f.listErr != nil {

@@ -2,7 +2,6 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -12,10 +11,11 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/platform/db"
 )
 
 type mutationByDocumentReadService interface {
-	LoadActiveInstanceByDocumentForMutation(ctx context.Context, db *sql.DB, tenantID, documentID string) (*domain.Instance, error)
+	LoadActiveInstanceByDocumentForMutation(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, error)
 }
 
 func (h *Handler) loadActiveInstanceByDocumentForMutation(r *http.Request, tenantID, docID string) (*domain.Instance, error) {
@@ -23,7 +23,7 @@ func (h *Handler) loadActiveInstanceByDocumentForMutation(r *http.Request, tenan
 	if !ok {
 		return nil, errors.New("mutation lookup service not configured")
 	}
-	return mutationLookup.LoadActiveInstanceByDocumentForMutation(r.Context(), h.db, tenantID, docID)
+	return mutationLookup.LoadActiveInstanceByDocumentForMutation(r.Context(), h.runner, tenantID, docID)
 }
 
 // failReplaySlot releases an in-flight idempotency slot on an error exit so it
@@ -54,7 +54,7 @@ func (h *Handler) GetInstanceByDocumentHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, docID)
+	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.runner, tenantID, docID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
 			WriteError(w, repository.ErrNoActiveInstance)
@@ -170,7 +170,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.db, application.SignoffRequest{
+	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.runner, application.SignoffRequest{
 		TenantID:                tenantID,
 		InstanceID:              inst.ID,
 		StageInstanceID:         activeStage.ID,
@@ -247,7 +247,7 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	result, err := h.cancelInstance(r.Context(), h.db, application.CancelInput{
+	result, err := h.cancelInstance(r.Context(), h.runner, application.CancelInput{
 		TenantID:                tenantID,
 		InstanceID:              inst.ID,
 		ExpectedRevisionVersion: expectedRevisionVersion,

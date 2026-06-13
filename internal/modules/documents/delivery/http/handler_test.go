@@ -20,6 +20,7 @@ import (
 	"metaldocs/internal/modules/documents/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/idempotency"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -284,7 +285,7 @@ type fakeApprovalSubmitter struct {
 	called bool
 }
 
-func (f *fakeApprovalSubmitter) SubmitRevisionForReview(_ context.Context, _ *sql.DB, _ approvalapp.SubmitRequest) (approvalapp.SubmitResult, error) {
+func (f *fakeApprovalSubmitter) SubmitRevisionForReview(_ context.Context, _ platformdb.TxRunner, _ approvalapp.SubmitRequest) (approvalapp.SubmitResult, error) {
 	f.called = true
 	return approvalapp.SubmitResult{InstanceID: "inst_1"}, nil
 }

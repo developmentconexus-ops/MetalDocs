@@ -2,20 +2,20 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
+	"metaldocs/internal/platform/db"
 )
 
-func (h *Handler) markObsolete(ctx context.Context, db *sql.DB, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error) {
+func (h *Handler) markObsolete(ctx context.Context, runner db.TxRunner, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error) {
 	if h.obsoleteSvc == nil {
 		return application.MarkObsoleteResult{}, errors.New("obsolete service not configured")
 	}
-	return h.obsoleteSvc.MarkObsolete(ctx, db, req)
+	return h.obsoleteSvc.MarkObsolete(ctx, runner, req)
 }
 
 func (h *Handler) ObsoleteHandler(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +49,7 @@ func (h *Handler) ObsoleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.markObsolete(r.Context(), h.db, application.MarkObsoleteRequest{
+	_, err = h.markObsolete(r.Context(), h.runner, application.MarkObsoleteRequest{
 		TenantID:        tenantID,
 		DocumentID:      documentID,
 		MarkedBy:        actorID,

@@ -12,6 +12,7 @@ import (
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/db"
 )
 
 // SchedulerService processes River-delivered scheduled publish jobs.
@@ -42,46 +43,51 @@ type scheduledDocumentState struct {
 	ScheduleGeneration   int64
 }
 
-func (s *SchedulerService) RunScheduledPublishJob(ctx context.Context, db *sql.DB, input ScheduledPublishJobInput) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("scheduler: begin publish tx for doc %s: %w", input.DocumentID, err)
-	}
-	defer tx.Rollback()
-	if err := authz.BypassSystem(ctx, tx); err != nil {
-		return fmt.Errorf("scheduler: bypass authz for doc %s: %w", input.DocumentID, err)
-	}
+// errScheduledPublishNoOp signals that the scheduled documents row was already
+// claimed by another runner (the OCC UPDATE affected zero rows). The runner
+// rolls the transaction back so any partial supersede work is discarded, and
+// RunScheduledPublishJob maps it to a successful no-op.
+var errScheduledPublishNoOp = errors.New("scheduler: scheduled row already published")
 
-	state, err := s.loadScheduledDocumentState(ctx, tx, input.TenantID, input.DocumentID)
-	if errors.Is(err, sql.ErrNoRows) {
-		slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "document_not_found")
+func (s *SchedulerService) RunScheduledPublishJob(ctx context.Context, runner db.TxRunner, input ScheduledPublishJobInput) error {
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.BypassSystem(ctx, tx); err != nil {
+			return fmt.Errorf("scheduler: bypass authz for doc %s: %w", input.DocumentID, err)
+		}
+
+		state, err := s.loadScheduledDocumentState(ctx, tx, input.TenantID, input.DocumentID)
+		if errors.Is(err, sql.ErrNoRows) {
+			slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "document_not_found")
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("scheduler: load scheduled state for doc %s: %w", input.DocumentID, err)
+		}
+		if !scheduledJobMatchesState(state, input) {
+			slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "stale_job")
+			return nil
+		}
+		if s.clock.Now().UTC().Before(state.EffectiveFrom.Time.UTC()) {
+			slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "pre_effective_date")
+			return nil
+		}
+
+		return s.publishScheduledDocumentTx(ctx, tx, scheduledPublishState{
+			DocumentID:           state.DocumentID,
+			TenantID:             state.TenantID,
+			ControlledDocumentID: state.ControlledDocumentID,
+			SupersededDocumentID: state.SupersededDocumentID,
+			EffectiveFrom:        state.EffectiveFrom.Time,
+			RevisionVersion:      state.RevisionVersion,
+			ScheduleGeneration:   state.ScheduleGeneration,
+		})
+	})
+	if errors.Is(err, errScheduledPublishNoOp) {
+		// Another runner already published the scheduled row; the partial
+		// supersede work (if any) was rolled back. Treat as a successful no-op.
 		return nil
 	}
-	if err != nil {
-		return fmt.Errorf("scheduler: load scheduled state for doc %s: %w", input.DocumentID, err)
-	}
-	if !scheduledJobMatchesState(state, input) {
-		slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "stale_job")
-		return nil
-	}
-	if s.clock.Now().UTC().Before(state.EffectiveFrom.Time.UTC()) {
-		slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "pre_effective_date")
-		return nil
-	}
-
-	if _, err := s.publishScheduledDocumentTx(ctx, tx, scheduledPublishState{
-		DocumentID:           state.DocumentID,
-		TenantID:             state.TenantID,
-		ControlledDocumentID: state.ControlledDocumentID,
-		SupersededDocumentID: state.SupersededDocumentID,
-		EffectiveFrom:        state.EffectiveFrom.Time,
-		RevisionVersion:      state.RevisionVersion,
-		ScheduleGeneration:   state.ScheduleGeneration,
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 type scheduledPublishState struct {
@@ -94,20 +100,22 @@ type scheduledPublishState struct {
 	ScheduleGeneration   int64
 }
 
-func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *sql.Tx, row scheduledPublishState) (bool, error) {
+// publishScheduledDocumentTx performs the supersede + publish + emit work inside
+// the caller's transaction. It does NOT own commit/rollback — the TxRunner does.
+// It returns errScheduledPublishNoOp when the OCC UPDATE affects zero rows so the
+// runner rolls back any partial supersede work; RunScheduledPublishJob maps that
+// sentinel to a successful no-op.
+func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *sql.Tx, row scheduledPublishState) error {
 	if row.SupersededDocumentID.Valid {
 		currentPublishedID, err := s.repo.LoadCurrentPublishedHead(ctx, tx, row.TenantID, row.ControlledDocumentID)
 		if err != nil {
-			_ = tx.Rollback()
-			return false, fmt.Errorf("scheduler: load current published head for doc %s: %w", row.DocumentID, err)
+			return fmt.Errorf("scheduler: load current published head for doc %s: %w", row.DocumentID, err)
 		}
 		if currentPublishedID != row.SupersededDocumentID.String {
-			_ = tx.Rollback()
-			return false, repository.ErrScheduledSupersedeConflict
+			return repository.ErrScheduledSupersedeConflict
 		}
 		if err := s.repo.MarkSuperseded(ctx, tx, row.TenantID, row.SupersededDocumentID.String); err != nil {
-			_ = tx.Rollback()
-			return false, fmt.Errorf("scheduler: supersede prior head for doc %s: %w", row.DocumentID, err)
+			return fmt.Errorf("scheduler: supersede prior head for doc %s: %w", row.DocumentID, err)
 		}
 	}
 
@@ -115,21 +123,19 @@ func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *s
 		row.DocumentID, row.TenantID, row.RevisionVersion,
 	)
 	if err != nil {
-		_ = tx.Rollback()
-		return false, fmt.Errorf("scheduler: update document %s: %w", row.DocumentID, err)
+		return fmt.Errorf("scheduler: update document %s: %w", row.DocumentID, err)
 	}
 
 	affected, err := res.RowsAffected()
 	if err != nil {
-		_ = tx.Rollback()
-		return false, fmt.Errorf("scheduler: rows affected for doc %s: %w", row.DocumentID, err)
+		return fmt.Errorf("scheduler: rows affected for doc %s: %w", row.DocumentID, err)
 	}
 
 	if affected == 0 {
-		// Another runner already won the scheduled row. Roll back so any
-		// supersede work done earlier in this transaction is not persisted.
-		_ = tx.Rollback()
-		return false, nil
+		// Another runner already won the scheduled row. Return the no-op sentinel
+		// so the runner rolls back any supersede work done earlier in this
+		// transaction instead of persisting it.
+		return errScheduledPublishNoOp
 	}
 
 	payloadMap := map[string]any{
@@ -141,7 +147,7 @@ func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *s
 	}
 	payload, err := json.Marshal(payloadMap)
 	if err != nil {
-		return false, fmt.Errorf("scheduler: marshal event payload for doc %s: %w", row.DocumentID, err)
+		return fmt.Errorf("scheduler: marshal event payload for doc %s: %w", row.DocumentID, err)
 	}
 
 	ev := GovernanceEvent{
@@ -156,15 +162,10 @@ func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *s
 	}
 
 	if err = s.emitter.Emit(ctx, tx, ev); err != nil {
-		_ = tx.Rollback()
-		return false, fmt.Errorf("scheduler: emit event for doc %s: %w", row.DocumentID, err)
+		return fmt.Errorf("scheduler: emit event for doc %s: %w", row.DocumentID, err)
 	}
 
-	if err = tx.Commit(); err != nil {
-		return false, fmt.Errorf("scheduler: commit publish tx for doc %s: %w", row.DocumentID, err)
-	}
-
-	return true, nil
+	return nil
 }
 
 func (s *SchedulerService) loadScheduledDocumentState(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (scheduledDocumentState, error) {

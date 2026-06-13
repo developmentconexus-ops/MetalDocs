@@ -27,7 +27,7 @@ func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inst, err := h.readSvc.LoadInstance(r.Context(), h.db, tenantID, instanceID)
+	inst, err := h.readSvc.LoadInstance(r.Context(), h.runner, tenantID, instanceID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
 			WriteError(w, repository.ErrNoActiveInstance)

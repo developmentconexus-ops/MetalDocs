@@ -11,42 +11,43 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
 type submitService interface {
-	SubmitRevisionForReview(ctx context.Context, db *sql.DB, req application.SubmitRequest) (application.SubmitResult, error)
+	SubmitRevisionForReview(ctx context.Context, runner db.TxRunner, req application.SubmitRequest) (application.SubmitResult, error)
 }
 
 type decisionService interface {
-	RecordSignoff(ctx context.Context, db *sql.DB, req application.SignoffRequest) (application.SignoffResult, error)
+	RecordSignoff(ctx context.Context, runner db.TxRunner, req application.SignoffRequest) (application.SignoffResult, error)
 }
 
 type readService interface {
-	LoadInstance(ctx context.Context, db *sql.DB, tenantID, instanceID string) (*domain.Instance, error)
-	LoadActiveInstanceByDocument(ctx context.Context, db *sql.DB, tenantID, documentID string) (*domain.Instance, error)
-	ListPendingForActor(ctx context.Context, db *sql.DB, tenantID, actorID string, areaCode string, limit, offset int) ([]domain.Instance, error)
-	ListInboxItems(ctx context.Context, db *sql.DB, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, error)
-	CountPendingForActor(ctx context.Context, db *sql.DB, tenantID, actorID, areaCode string) (int, error)
+	LoadInstance(ctx context.Context, runner db.TxRunner, tenantID, instanceID string) (*domain.Instance, error)
+	LoadActiveInstanceByDocument(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, error)
+	ListPendingForActor(ctx context.Context, runner db.TxRunner, tenantID, actorID string, areaCode string, limit, offset int) ([]domain.Instance, error)
+	ListInboxItems(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, error)
+	CountPendingForActor(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string) (int, error)
 }
 
 type cancelService interface {
-	CancelInstance(ctx context.Context, db *sql.DB, req application.CancelInput) (application.CancelResult, error)
+	CancelInstance(ctx context.Context, runner db.TxRunner, req application.CancelInput) (application.CancelResult, error)
 }
 
 type obsoleteService interface {
-	MarkObsolete(ctx context.Context, db *sql.DB, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error)
+	MarkObsolete(ctx context.Context, runner db.TxRunner, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error)
 }
 
 type supersedeService interface {
-	PublishSuperseding(ctx context.Context, db *sql.DB, req application.SupersedeRequest) (application.SupersedeResult, error)
+	PublishSuperseding(ctx context.Context, runner db.TxRunner, req application.SupersedeRequest) (application.SupersedeResult, error)
 }
 
 type routeAdminService interface {
-	Create(ctx context.Context, db *sql.DB, in application.CreateRouteInput) (application.CreateRouteResult, error)
-	Update(ctx context.Context, db *sql.DB, in application.UpdateRouteInput) (application.UpdateRouteResult, error)
-	Deactivate(ctx context.Context, db *sql.DB, in application.DeactivateRouteInput) (application.DeactivateRouteResult, error)
-	List(ctx context.Context, db *sql.DB, tenantID, actorID string) (application.ListRoutesResult, error)
+	Create(ctx context.Context, runner db.TxRunner, in application.CreateRouteInput) (application.CreateRouteResult, error)
+	Update(ctx context.Context, runner db.TxRunner, in application.UpdateRouteInput) (application.UpdateRouteResult, error)
+	Deactivate(ctx context.Context, runner db.TxRunner, in application.DeactivateRouteInput) (application.DeactivateRouteResult, error)
+	List(ctx context.Context, runner db.TxRunner, tenantID, actorID string) (application.ListRoutesResult, error)
 }
 
 var (
@@ -65,6 +66,7 @@ type signoffIdempStore interface {
 type Handler struct {
 	services     *application.Services
 	db           *sql.DB
+	runner       db.TxRunner
 	submitSvc    submitService
 	decisionSvc  decisionService
 	readSvc      readService
@@ -75,11 +77,14 @@ type Handler struct {
 	idempStore   signoffIdempStore
 }
 
-func NewHandler(services *application.Services, db *sql.DB, idempStore signoffIdempStore) *Handler {
+func NewHandler(services *application.Services, database *sql.DB, idempStore signoffIdempStore) *Handler {
 	h := &Handler{
 		services:   services,
-		db:         db,
+		db:         database,
 		idempStore: idempStore,
+	}
+	if database != nil {
+		h.runner = db.NewTxRunner(database)
 	}
 	if services != nil {
 		h.submitSvc = services.Submit

@@ -16,6 +16,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 )
 
 // SubmitService handles document submission for approval.
@@ -45,7 +46,7 @@ type SubmitResult struct {
 // SubmitRevisionForReview creates a new approval instance for the document revision.
 // Returns repository.ErrDuplicateSubmission (unwrapped) when a concurrent submission
 // with the same idempotency key already exists so callers can check via errors.Is.
-func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB, req SubmitRequest) (SubmitResult, error) {
+func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.TxRunner, req SubmitRequest) (SubmitResult, error) {
 	// Step 1: validate payload — no float64 values.
 	if err := ValidateEventPayload(req.ContentFormData); err != nil {
 		return SubmitResult{}, err
@@ -72,176 +73,160 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 		return SubmitResult{}, fmt.Errorf("submit: idempotency key: %w", err)
 	}
 
-	// Step 4: begin transaction.
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return SubmitResult{}, fmt.Errorf("submit: begin tx: %w", err)
-	}
+	// Step 4: run the submission as one unit of work; the runner owns
+	// begin/commit/rollback.
+	var instanceID string
+	err = runner.Do(ctx, func(tx *sql.Tx) error {
+		ctx := authz.WithCapCache(ctx)
 
-	ctx = authz.WithCapCache(ctx)
-
-	if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.SubmittedBy); err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, fmt.Errorf("submit: %w", err)
-	}
-
-	// document.submit is area-grade: pass the resolved area as-is ("" fail-closes,
-	// denying non-system actors). ADR 0022 Phase 11 (F7): shared LoadDocumentAreaCode.
-	areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, req.DocumentID)
-	if err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, fmt.Errorf("submit: load document area: %w", err)
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSubmit), areaCode); err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, err
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, err
-	}
-
-	// Step 5: load route with stages.
-	route, err := s.loadRoute(ctx, tx, req.TenantID, req.RouteID)
-	if err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, fmt.Errorf("submit: load route: %w", err)
-	}
-
-	// Step 6: validate route structural invariants.
-	if err := route.Validate(); err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, fmt.Errorf("submit: invalid route: %w", err)
-	}
-
-	revisionTitle, err := normalizeGovernedRevisionTitle(req.RevisionNumber, req.RevisionTitle)
-	if err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, err
-	}
-
-	// Step 7: create the approval instance.
-	instanceID := uuid.New().String()
-	now := s.clock.Now()
-
-	inst := domain.Instance{
-		ID:                   instanceID,
-		TenantID:             req.TenantID,
-		DocumentID:           req.DocumentID,
-		RouteID:              req.RouteID,
-		RouteVersionSnapshot: route.Version,
-		Status:               domain.InstanceInProgress,
-		SubmittedBy:          req.SubmittedBy,
-		SubmittedAt:          now,
-		ContentHashAtSubmit:  contentHash,
-		IdempotencyKey:       idempotencyKey,
-		RevisionVersion:      req.RevisionVersion,
-	}
-
-	if err := s.repo.InsertInstance(ctx, tx, inst); err != nil {
-		_ = tx.Rollback()
-		// Pass through duplicate submission sentinel unwrapped.
-		if errors.Is(err, repository.ErrDuplicateSubmission) {
-			return SubmitResult{}, err
+		if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.SubmittedBy); err != nil {
+			return fmt.Errorf("submit: %w", err)
 		}
-		return SubmitResult{}, fmt.Errorf("submit: %w", err)
-	}
 
-	// Step 8: create stage instances.
-	// First stage is active; all others start pending.
-	stageInstances := make([]domain.StageInstance, len(route.Stages))
-	for i, stage := range route.Stages {
-		status := domain.StagePending
-		var openedAt *time.Time
-		if i == 0 {
-			status = domain.StageActive
-			openedAt = &now
-		}
-		eligibleIDs, err := resolveEligibleActors(ctx, tx, req.TenantID, stage.AreaCode, stage.RequiredRole)
+		// document.submit is area-grade: pass the resolved area as-is ("" fail-closes,
+		// denying non-system actors). ADR 0022 Phase 11 (F7): shared LoadDocumentAreaCode.
+		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, req.DocumentID)
 		if err != nil {
-			_ = tx.Rollback()
-			return SubmitResult{}, fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
+			return fmt.Errorf("submit: load document area: %w", err)
 		}
-		stageInstances[i] = domain.StageInstance{
-			ID:                         uuid.New().String(),
-			ApprovalInstanceID:         instanceID,
-			StageOrder:                 stage.Order,
-			NameSnapshot:               stage.Name,
-			RequiredRoleSnapshot:       stage.RequiredRole,
-			RequiredCapabilitySnapshot: stage.RequiredCapability,
-			AreaCodeSnapshot:           stage.AreaCode,
-			QuorumSnapshot:             stage.Quorum,
-			QuorumMSnapshot:            stage.QuorumM,
-			OnEligibilityDriftSnapshot: stage.OnEligibilityDrift,
-			EligibleActorIDs:           eligibleIDs,
-			Status:                     status,
-			OpenedAt:                   openedAt,
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSubmit), areaCode); err != nil {
+			return err
 		}
-	}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+			return err
+		}
 
-	if err := s.repo.InsertStageInstances(ctx, tx, stageInstances); err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, fmt.Errorf("submit: %w", err)
-	}
+		// Step 5: load route with stages.
+		route, err := s.loadRoute(ctx, tx, req.TenantID, req.RouteID)
+		if err != nil {
+			return fmt.Errorf("submit: load route: %w", err)
+		}
 
-	// Step 8b: transition document draft → under_review.
-	res, err := tx.ExecContext(ctx, `
-		UPDATE documents
-		   SET status           = 'under_review',
-		       revision_title   = $4,
-		       revision_version = revision_version + 1
-		 WHERE id               = $1
-		   AND tenant_id        = $2
-		   AND status           = 'draft'
-		   AND revision_version = $3`,
-		req.DocumentID, req.TenantID, req.RevisionVersion, revisionTitle,
-	)
+		// Step 6: validate route structural invariants.
+		if err := route.Validate(); err != nil {
+			return fmt.Errorf("submit: invalid route: %w", err)
+		}
+
+		revisionTitle, err := normalizeGovernedRevisionTitle(req.RevisionNumber, req.RevisionTitle)
+		if err != nil {
+			return err
+		}
+
+		// Step 7: create the approval instance.
+		instanceID = uuid.New().String()
+		now := s.clock.Now()
+
+		inst := domain.Instance{
+			ID:                   instanceID,
+			TenantID:             req.TenantID,
+			DocumentID:           req.DocumentID,
+			RouteID:              req.RouteID,
+			RouteVersionSnapshot: route.Version,
+			Status:               domain.InstanceInProgress,
+			SubmittedBy:          req.SubmittedBy,
+			SubmittedAt:          now,
+			ContentHashAtSubmit:  contentHash,
+			IdempotencyKey:       idempotencyKey,
+			RevisionVersion:      req.RevisionVersion,
+		}
+
+		if err := s.repo.InsertInstance(ctx, tx, inst); err != nil {
+			// Pass through duplicate submission sentinel unwrapped.
+			if errors.Is(err, repository.ErrDuplicateSubmission) {
+				return err
+			}
+			return fmt.Errorf("submit: %w", err)
+		}
+
+		// Step 8: create stage instances.
+		// First stage is active; all others start pending.
+		stageInstances := make([]domain.StageInstance, len(route.Stages))
+		for i, stage := range route.Stages {
+			status := domain.StagePending
+			var openedAt *time.Time
+			if i == 0 {
+				status = domain.StageActive
+				openedAt = &now
+			}
+			eligibleIDs, err := resolveEligibleActors(ctx, tx, req.TenantID, stage.AreaCode, stage.RequiredRole)
+			if err != nil {
+				return fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
+			}
+			stageInstances[i] = domain.StageInstance{
+				ID:                         uuid.New().String(),
+				ApprovalInstanceID:         instanceID,
+				StageOrder:                 stage.Order,
+				NameSnapshot:               stage.Name,
+				RequiredRoleSnapshot:       stage.RequiredRole,
+				RequiredCapabilitySnapshot: stage.RequiredCapability,
+				AreaCodeSnapshot:           stage.AreaCode,
+				QuorumSnapshot:             stage.Quorum,
+				QuorumMSnapshot:            stage.QuorumM,
+				OnEligibilityDriftSnapshot: stage.OnEligibilityDrift,
+				EligibleActorIDs:           eligibleIDs,
+				Status:                     status,
+				OpenedAt:                   openedAt,
+			}
+		}
+
+		if err := s.repo.InsertStageInstances(ctx, tx, stageInstances); err != nil {
+			return fmt.Errorf("submit: %w", err)
+		}
+
+		// Step 8b: transition document draft → under_review.
+		res, err := tx.ExecContext(ctx, `
+			UPDATE documents
+			   SET status           = 'under_review',
+			       revision_title   = $4,
+			       revision_version = revision_version + 1
+			 WHERE id               = $1
+			   AND tenant_id        = $2
+			   AND status           = 'draft'
+			   AND revision_version = $3`,
+			req.DocumentID, req.TenantID, req.RevisionVersion, revisionTitle,
+		)
+		if err != nil {
+			return fmt.Errorf("submit: transition document to under_review: %w", err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("submit: rows affected: %w", err)
+		}
+		if n == 0 {
+			return repository.ErrStaleRevision
+		}
+
+		// Step 9: emit governance event.
+		payloadMap := map[string]any{
+			"instance_id":  instanceID,
+			"route_id":     req.RouteID,
+			"content_hash": contentHash,
+		}
+		payloadBytes, err := json.Marshal(payloadMap)
+		if err != nil {
+			return fmt.Errorf("submit: marshal event payload: %w", err)
+		}
+
+		event := GovernanceEvent{
+			TenantID:     req.TenantID,
+			EventType:    "approval_submitted",
+			ActorUserID:  req.SubmittedBy,
+			ResourceType: "document",
+			ResourceID:   req.DocumentID,
+			PayloadJSON:  json.RawMessage(payloadBytes),
+			OccurredAt:   now,
+		}
+		if err := s.emitter.Emit(ctx, tx, event); err != nil {
+			return fmt.Errorf("submit: emit event: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, fmt.Errorf("submit: transition document to under_review: %w", err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, fmt.Errorf("submit: rows affected: %w", err)
-	}
-	if n == 0 {
-		_ = tx.Rollback()
-		return SubmitResult{}, repository.ErrStaleRevision
+		return SubmitResult{}, err
 	}
 
-	// Step 9: emit governance event.
-	payloadMap := map[string]any{
-		"instance_id":  instanceID,
-		"route_id":     req.RouteID,
-		"content_hash": contentHash,
-	}
-	payloadBytes, err := json.Marshal(payloadMap)
-	if err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, fmt.Errorf("submit: marshal event payload: %w", err)
-	}
-
-	event := GovernanceEvent{
-		TenantID:     req.TenantID,
-		EventType:    "approval_submitted",
-		ActorUserID:  req.SubmittedBy,
-		ResourceType: "document",
-		ResourceID:   req.DocumentID,
-		PayloadJSON:  json.RawMessage(payloadBytes),
-		OccurredAt:   now,
-	}
-	if err := s.emitter.Emit(ctx, tx, event); err != nil {
-		_ = tx.Rollback()
-		return SubmitResult{}, fmt.Errorf("submit: emit event: %w", err)
-	}
-
-	// Step 10: commit.
-	if err := tx.Commit(); err != nil {
-		return SubmitResult{}, fmt.Errorf("submit: commit: %w", err)
-	}
-
-	// Step 11: return result.
+	// Step 5: return result.
 	return SubmitResult{InstanceID: instanceID}, nil
 }
 

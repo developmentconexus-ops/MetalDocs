@@ -246,7 +246,7 @@ func TestRecordSignoff_QuorumApproved_CallsFreezeAndApprovesDocument(t *testing.
 		freezeInvoker: freeze,
 	}
 
-	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,
@@ -303,7 +303,7 @@ func TestRecordSignoff_FreezeError_RollsBackTransaction(t *testing.T) {
 		freezeInvoker: freeze,
 	}
 
-	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,
@@ -367,7 +367,7 @@ func TestRecordSignoff_OutboxEnqueuedInsideTx(t *testing.T) {
 		freezeInvoker: &fakeFreezeInvoker{},
 	}).WithPDFOutbox(outbox)
 
-	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,
@@ -413,7 +413,7 @@ func TestRecordSignoff_WasReplay_DoesNotCallFreeze(t *testing.T) {
 		freezeInvoker: freeze,
 	}
 
-	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:        "tenant-1",
 		InstanceID:      instanceID,
 		StageInstanceID: stageID,
@@ -466,7 +466,7 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 		freezeInvoker: freeze,
 	}
 
-	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,
@@ -530,7 +530,7 @@ func TestRecordSignoff_PinInvoker_CallsPinNotFreeze(t *testing.T) {
 		freezeInvoker: freeze,
 	}).WithPinInvoker(pin)
 
-	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,
@@ -591,7 +591,7 @@ func TestRecordSignoff_PinInvoker_PDFOutboxNotEnqueued(t *testing.T) {
 		clock:   fixedClock{t: signedAt},
 	}).WithPinInvoker(&fakePinInvoker{}).WithPDFOutbox(pdfOutbox)
 
-	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,
@@ -645,7 +645,7 @@ func TestRecordSignoff_RejectPath_AssertsDocumentEditBeforeDocumentWrite(t *test
 		freezeInvoker: &fakeFreezeInvoker{},
 	}
 
-	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,

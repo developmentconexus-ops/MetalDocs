@@ -298,7 +298,7 @@ func TestRouteAdminCreate_HappyPath(t *testing.T) {
 		clock:   fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
 	}
 
-	out, err := svc.Create(context.Background(), db, CreateRouteInput{
+	out, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:    "tenant-1",
 		ProfileCode: "po",
 		Name:        "PO Route",
@@ -325,7 +325,7 @@ func TestRouteAdminCreate_CapDenied(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:    "tenant-1",
 		ProfileCode: "po",
 		Name:        "PO Route",
@@ -348,7 +348,7 @@ func TestRouteAdminCreate_InvalidRoute(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:    "tenant-1",
 		ProfileCode: "po",
 		Name:        "PO Route",
@@ -378,7 +378,7 @@ func TestRouteAdminCreate_ProfileFKViolation(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:    "tenant-1",
 		ProfileCode: "unknown-profile",
 		Name:        "PO Route",
@@ -406,7 +406,7 @@ func TestRouteAdminCreate_OtherFKViolation(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:    "tenant-1",
 		ProfileCode: "po",
 		Name:        "PO Route",
@@ -439,7 +439,7 @@ func TestRouteAdminUpdate_HappyPath(t *testing.T) {
 		clock:   fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
 	}
 
-	out, err := svc.Update(context.Background(), db, UpdateRouteInput{
+	out, err := svc.Update(context.Background(), newTxRunner(db), UpdateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		Name:            "PO Route v2",
@@ -477,7 +477,7 @@ func TestRouteAdminUpdate_RouteInUse(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	_, err := svc.Update(context.Background(), db, UpdateRouteInput{
+	_, err := svc.Update(context.Background(), newTxRunner(db), UpdateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		Name:            "PO Route v2",
@@ -503,7 +503,7 @@ func TestRouteAdminDeactivate_HappyPath(t *testing.T) {
 		clock:   fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
 	}
 
-	out, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+	out, err := svc.Deactivate(context.Background(), newTxRunner(db), DeactivateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
@@ -534,7 +534,7 @@ func TestRouteAdminUpdate_StaleVersion(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	_, err := svc.Update(context.Background(), db, UpdateRouteInput{
+	_, err := svc.Update(context.Background(), newTxRunner(db), UpdateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		Name:            "PO Route v2",
@@ -560,7 +560,7 @@ func TestRouteAdminDeactivate_StaleVersion(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	_, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+	_, err := svc.Deactivate(context.Background(), newTxRunner(db), DeactivateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
@@ -587,7 +587,7 @@ func TestRouteAdminDeactivate_AlreadyInactive(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	_, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+	_, err := svc.Deactivate(context.Background(), newTxRunner(db), DeactivateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
@@ -697,7 +697,7 @@ func TestRouteAdminCreate_ReplayReturnsPriorResponse(t *testing.T) {
 		Stages:         validRouteStages(),
 	}
 
-	first, err := svc.Create(context.Background(), db, in)
+	first, err := svc.Create(context.Background(), newTxRunner(db), in)
 	if err != nil {
 		t.Fatalf("first Create: %v", err)
 	}
@@ -708,7 +708,7 @@ func TestRouteAdminCreate_ReplayReturnsPriorResponse(t *testing.T) {
 		t.Fatalf("first Create: events=%d want 1", len(emitter.Events))
 	}
 
-	second, err := svc.Create(context.Background(), db, in)
+	second, err := svc.Create(context.Background(), newTxRunner(db), in)
 	if err != nil {
 		t.Fatalf("replay Create: %v", err)
 	}
@@ -730,7 +730,7 @@ func TestRouteAdminCreate_IdempotencyKeyConflict(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}).WithIdempStore(store)
 
-	if _, err := svc.Create(context.Background(), db, CreateRouteInput{
+	if _, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:       "tenant-1",
 		ProfileCode:    "po",
 		Name:           "PO Route",
@@ -741,7 +741,7 @@ func TestRouteAdminCreate_IdempotencyKeyConflict(t *testing.T) {
 		t.Fatalf("first Create: %v", err)
 	}
 
-	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:       "tenant-1",
 		ProfileCode:    "po",
 		Name:           "PO Route — different body",
@@ -763,7 +763,7 @@ func TestRouteAdminDeactivate_RejectsEmptyReason(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	_, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+	_, err := svc.Deactivate(context.Background(), newTxRunner(db), DeactivateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
@@ -785,7 +785,7 @@ func TestRouteAdminDeactivate_ReasonInGovernancePayload(t *testing.T) {
 		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
 	}
 
-	if _, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+	if _, err := svc.Deactivate(context.Background(), newTxRunner(db), DeactivateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
@@ -836,7 +836,7 @@ func TestRouteAdminList_RunsUnderTenantGUC(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	out, err := svc.List(context.Background(), db, "tenant-list", "actor-list")
+	out, err := svc.List(context.Background(), newTxRunner(db), "tenant-list", "actor-list")
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -871,7 +871,7 @@ func TestRouteAdminCreate_BatchesStageInsert(t *testing.T) {
 		{Order: 2, Name: "s2", RequiredRole: "r2", RequiredCapability: "document.signoff", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
 		{Order: 3, Name: "s3", RequiredRole: "r3", RequiredCapability: "document.signoff", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
 	}
-	if _, err := svc.Create(context.Background(), db, CreateRouteInput{
+	if _, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:    "tenant-1",
 		ProfileCode: "po",
 		Name:        "PO",
@@ -904,7 +904,7 @@ func TestRouteAdminUpdate_NoOpStages_SkipsDelete(t *testing.T) {
 		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
 	}
 
-	out, err := svc.Update(context.Background(), db, UpdateRouteInput{
+	out, err := svc.Update(context.Background(), newTxRunner(db), UpdateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		Name:            "Same Name Different Update",
@@ -947,7 +947,7 @@ func TestRouteAdminDeactivate_ReplayBeforeReasonValidation(t *testing.T) {
 		replay: &RouteAdminReplay{RouteID: "route-1"},
 	}
 
-	out, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+	out, err := svc.Deactivate(context.Background(), newTxRunner(db), DeactivateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
@@ -973,7 +973,7 @@ func TestRouteAdminDeactivate_FirstCallEmptyReason_Returns400(t *testing.T) {
 		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
 	}).WithIdempStore(store)
 
-	_, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+	_, err := svc.Deactivate(context.Background(), newTxRunner(db), DeactivateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
@@ -1023,7 +1023,7 @@ func TestRouteAdminCreate_LogsCommitterFailError(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
 	t.Cleanup(func() { slog.SetDefault(oldDefault) })
 
-	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
 		TenantID:       "tenant-1",
 		ProfileCode:    "po",
 		Name:           "PO Route",
@@ -1064,7 +1064,7 @@ func TestRouteAdminList_PassesThroughTotalFromRepo(t *testing.T) {
 		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
 	}
 
-	out, err := svc.List(context.Background(), db, "tenant-list", "actor-list")
+	out, err := svc.List(context.Background(), newTxRunner(db), "tenant-list", "actor-list")
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}

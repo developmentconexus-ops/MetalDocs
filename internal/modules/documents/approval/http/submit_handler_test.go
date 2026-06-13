@@ -2,7 +2,6 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -24,7 +24,7 @@ type fakeSubmitService struct {
 	gotReq application.SubmitRequest
 }
 
-func (f *fakeSubmitService) SubmitRevisionForReview(_ context.Context, _ *sql.DB, req application.SubmitRequest) (application.SubmitResult, error) {
+func (f *fakeSubmitService) SubmitRevisionForReview(_ context.Context, _ db.TxRunner, req application.SubmitRequest) (application.SubmitResult, error) {
 	f.gotReq = req
 	if f.err != nil {
 		return application.SubmitResult{}, f.err

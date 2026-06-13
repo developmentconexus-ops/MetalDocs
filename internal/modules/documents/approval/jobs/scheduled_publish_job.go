@@ -21,19 +21,19 @@ type ScheduledPublishWorker struct {
 	river.WorkerDefaults[ScheduledPublishArgs]
 
 	service *application.SchedulerService
-	db      *sql.DB
+	runner  db.TxRunner
 }
 
-func NewScheduledPublishWorker(service *application.SchedulerService, db *sql.DB) *ScheduledPublishWorker {
+func NewScheduledPublishWorker(service *application.SchedulerService, database *sql.DB) *ScheduledPublishWorker {
 	if service == nil {
 		panic("scheduled_publish_worker: service is nil")
 	}
-	if db == nil {
+	if database == nil {
 		panic("scheduled_publish_worker: db is nil")
 	}
 	return &ScheduledPublishWorker{
 		service: service,
-		db:      db,
+		runner:  db.NewTxRunner(database),
 	}
 }
 
@@ -44,7 +44,7 @@ func (w *ScheduledPublishWorker) Work(ctx context.Context, job *river.Job[Schedu
 	// Background root: permit RunScheduledPublishJob's authz.BypassSystem
 	// (fail-closed off any HTTP path — ADR 0022 Phase 7, CWE-269).
 	ctx = authz.WithBackgroundBypass(ctx)
-	return w.service.RunScheduledPublishJob(ctx, w.db, application.ScheduledPublishJobInput{
+	return w.service.RunScheduledPublishJob(ctx, w.runner, application.ScheduledPublishJobInput{
 		TenantID:                job.Args.TenantID,
 		DocumentID:              job.Args.DocumentID,
 		ExpectedRevisionVersion: job.Args.ExpectedRevisionVersion,

@@ -443,7 +443,7 @@ func TestSubmitRevisionForReview_FloatPayloadRejected(t *testing.T) {
 		ContentFormData: map[string]any{"bad": float64(1.5)},
 		RevisionVersion: 1,
 	}
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, ErrFloatInFormData) {
 		t.Errorf("want ErrFloatInFormData; got %v", err)
 	}
@@ -464,7 +464,7 @@ func TestSubmitRevisionForReview_RouteNotFound(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected error for route not found; got nil")
 	}
@@ -486,7 +486,7 @@ func TestSubmitRevisionForReview_StageInsertError(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, stageErr) {
 		t.Errorf("want stage insert error; got %v", err)
 	}
@@ -514,7 +514,7 @@ func TestSubmitRevisionForReview_EmitError(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected emit error; got nil")
 	}
@@ -542,7 +542,7 @@ func TestRecordSignoff_FloatInPayload(t *testing.T) {
 		SignaturePayload: map[string]any{"bad": float64(1.5)},
 		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, ErrFloatInFormData) {
 		t.Errorf("want ErrFloatInFormData; got %v", err)
 	}
@@ -563,7 +563,7 @@ func TestRecordSignoff_LoadInstanceError(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected error from LoadInstance; got nil")
 	}
@@ -583,7 +583,7 @@ func TestRecordSignoff_LoadInstanceNotFound(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, repository.ErrNoActiveInstance) {
 		t.Errorf("want ErrNoActiveInstance; got %v", err)
 	}
@@ -604,7 +604,7 @@ func TestRecordSignoff_NilInstance(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, repository.ErrNoActiveInstance) {
 		t.Errorf("want ErrNoActiveInstance for nil instance; got %v", err)
 	}
@@ -627,7 +627,7 @@ func TestRecordSignoff_InstanceAlreadyCompleted(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, repository.ErrInstanceCompleted) {
 		t.Errorf("want ErrInstanceCompleted; got %v", err)
 	}
@@ -648,7 +648,7 @@ func TestRecordSignoff_StageNotActive(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, repository.ErrStageNotActive) {
 		t.Errorf("want ErrStageNotActive; got %v", err)
 	}
@@ -661,7 +661,7 @@ func TestRecordSignoff_RequiresStageInstanceID(t *testing.T) {
 	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
-	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:        "t",
 		InstanceID:      "inst-missing-stage",
 		ActorUserID:     "actor",
@@ -693,7 +693,7 @@ func TestRecordSignoff_InsertSignoffError(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected insert signoff error; got nil")
 	}
@@ -718,7 +718,7 @@ func TestRecordSignoff_ActorAlreadySigned(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, repository.ErrActorAlreadySigned) {
 		t.Errorf("want ErrActorAlreadySigned; got %v", err)
 	}
@@ -744,7 +744,7 @@ func TestRecordSignoff_IdempotentReplay(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	result, err := svc.RecordSignoff(context.Background(), db, req)
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("unexpected error on replay: %v", err)
 	}
@@ -794,7 +794,7 @@ func TestRecordSignoff_UpdateStageStatusError(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, stageErr) {
 		t.Errorf("want stage update error; got %v", err)
 	}
@@ -839,7 +839,7 @@ func TestRecordSignoff_UpdateInstanceStatusError_Approve(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, instErr) {
 		t.Errorf("want instance update error; got %v", err)
 	}
@@ -884,7 +884,7 @@ func TestRecordSignoff_UpdateInstanceStatusError_Reject(t *testing.T) {
 		Decision:        "reject",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, instErr) {
 		t.Errorf("want instance update error on reject path; got %v", err)
 	}
@@ -930,7 +930,7 @@ func TestRecordSignoff_EmitError(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected emit error; got nil")
 	}
@@ -1014,7 +1014,7 @@ func TestRecordSignoff_ActivateNextStage(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	result, err := svc.RecordSignoff(context.Background(), db, req)
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1037,7 +1037,7 @@ func TestPublishApproved_LoadInstanceError(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newPublishTestDB(t, 1)
 
-	_, err := svc.PublishApproved(context.Background(), db, PublishRequest{
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
 		TenantID:    "t",
 		InstanceID:  "inst",
 		PublishedBy: "u",
@@ -1052,7 +1052,7 @@ func TestPublishApproved_LoadInstanceNotFound(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newPublishTestDB(t, 1)
 
-	_, err := svc.PublishApproved(context.Background(), db, PublishRequest{
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
 		TenantID:    "t",
 		InstanceID:  "inst",
 		PublishedBy: "u",
@@ -1067,7 +1067,7 @@ func TestPublishApproved_NilInstance(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newPublishTestDB(t, 1)
 
-	_, err := svc.PublishApproved(context.Background(), db, PublishRequest{
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
 		TenantID:    "t",
 		InstanceID:  "inst",
 		PublishedBy: "u",
@@ -1090,7 +1090,7 @@ func TestPublishApproved_OCC_StaleRevision(t *testing.T) {
 	// rowsAffected=0 → OCC conflict.
 	db := newPublishTestDB(t, 0)
 
-	_, err := svc.PublishApproved(context.Background(), db, PublishRequest{
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
 		TenantID:    "t",
 		InstanceID:  "inst-stale-pub",
 		PublishedBy: "u",
@@ -1113,7 +1113,7 @@ func TestPublishApproved_EmitError(t *testing.T) {
 	// rowsAffected=1 → UPDATE succeeds.
 	db := newPublishTestDB(t, 1)
 
-	_, err := svc.PublishApproved(context.Background(), db, PublishRequest{
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
 		TenantID:    "t",
 		InstanceID:  "inst-emit-pub",
 		PublishedBy: "u",
@@ -1140,7 +1140,7 @@ func TestSchedulePublish_InstanceNotApproved(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
 	db := newPublishTestDB(t, 1)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID:      "t",
 		InstanceID:    "inst-sched-na",
 		EffectiveDate: future,
@@ -1159,7 +1159,7 @@ func TestSchedulePublish_LoadError(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
 	db := newPublishTestDB(t, 1)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID:      "t",
 		InstanceID:    "inst",
 		EffectiveDate: future,
@@ -1178,7 +1178,7 @@ func TestSchedulePublish_NilInstance(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
 	db := newPublishTestDB(t, 1)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID:      "t",
 		InstanceID:    "inst",
 		EffectiveDate: future,
@@ -1204,7 +1204,7 @@ func TestSchedulePublish_OCC_StaleRevision(t *testing.T) {
 	// rowsAffected=0 → OCC conflict.
 	db := newPublishTestDB(t, 0)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID:      "t",
 		InstanceID:    "inst-sched-stale",
 		EffectiveDate: future,
@@ -1229,7 +1229,7 @@ func TestSchedulePublish_EmitError(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &errorEmitter{}, clock: fixedClock{t: now}}
 	db := newPublishTestDB(t, 1)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID:      "t",
 		InstanceID:    "inst-sched-emit",
 		EffectiveDate: future,
@@ -1261,7 +1261,7 @@ func TestPublishSuperseding_EmitError(t *testing.T) {
 		NewRevisionVersion:   1,
 		PriorRevisionVersion: 2,
 	}
-	_, err := svc.PublishSuperseding(context.Background(), db, req)
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected emit error; got nil")
 	}
@@ -1277,7 +1277,7 @@ func TestMarkObsolete_DocumentNotFound(t *testing.T) {
 	db := newObsoleteTestDB(t, conn)
 	svc := &ObsoleteService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 
-	_, err := svc.MarkObsolete(context.Background(), db, MarkObsoleteRequest{
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), MarkObsoleteRequest{
 		TenantID:        "t",
 		DocumentID:      "doc-nf",
 		MarkedBy:        "u",
@@ -1298,7 +1298,7 @@ func TestMarkObsolete_EmitError(t *testing.T) {
 	db := newObsoleteTestDB(t, conn)
 	svc := &ObsoleteService{emitter: &errorEmitter{}, clock: fixedClock{t: time.Now()}}
 
-	_, err := svc.MarkObsolete(context.Background(), db, MarkObsoleteRequest{
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), MarkObsoleteRequest{
 		TenantID:        "t",
 		DocumentID:      "doc-emit-obs",
 		MarkedBy:        "u",
@@ -1358,7 +1358,7 @@ func TestSchedulePublish_LoadInstanceNotFound(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
 	db := newPublishTestDB(t, 1)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID:      "t",
 		InstanceID:    "inst",
 		EffectiveDate: future,
@@ -1395,7 +1395,7 @@ func TestSubmitRevisionForReview_ContentHashError(t *testing.T) {
 		ContentFormData: map[string]any{"nested": map[string]any{"val": float64(1.5)}},
 		RevisionVersion: 1,
 	}
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected error for float in nested form data; got nil")
 	}
@@ -1635,7 +1635,7 @@ func TestSubmitRevisionForReview_BeginTxError(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected begin tx error; got nil")
 	}
@@ -1650,7 +1650,7 @@ func TestPublishApproved_BeginTxError(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newBeginFailDB(t)
 
-	_, err := svc.PublishApproved(context.Background(), db, PublishRequest{
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
 		TenantID: "t", InstanceID: "inst", PublishedBy: "u",
 	})
 	if err == nil {
@@ -1669,7 +1669,7 @@ func TestSchedulePublish_BeginTxError(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
 	db := newBeginFailDB(t)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID: "t", InstanceID: "inst", EffectiveDate: future, ScheduledBy: "u",
 	})
 	if err == nil {
@@ -1681,7 +1681,7 @@ func TestPublishSuperseding_BeginTxError(t *testing.T) {
 	svc := &SupersedeService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newBeginFailDB(t)
 
-	_, err := svc.PublishSuperseding(context.Background(), db, SupersedeRequest{
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), SupersedeRequest{
 		TenantID: "t", NewDocumentID: "new", PriorDocumentID: "prior",
 		SupersededBy: "u", NewRevisionVersion: 1, PriorRevisionVersion: 2,
 	})
@@ -1694,7 +1694,7 @@ func TestMarkObsolete_BeginTxError(t *testing.T) {
 	svc := &ObsoleteService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newBeginFailDB(t)
 
-	_, err := svc.MarkObsolete(context.Background(), db, MarkObsoleteRequest{
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), MarkObsoleteRequest{
 		TenantID: "t", DocumentID: "doc", MarkedBy: "u", RevisionVersion: 1,
 	})
 	if err == nil {
@@ -1716,7 +1716,7 @@ func TestRecordSignoff_BeginTxError(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected begin tx error; got nil")
 	}
@@ -1735,7 +1735,7 @@ func TestPublishApproved_ExecError(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newExecFailDB(t)
 
-	_, err := svc.PublishApproved(context.Background(), db, PublishRequest{
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
 		TenantID: "t", InstanceID: "inst-exec", PublishedBy: "u",
 	})
 	if err == nil {
@@ -1754,7 +1754,7 @@ func TestSchedulePublish_ExecError(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
 	db := newExecFailDB(t)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID: "t", InstanceID: "inst-sched-exec", EffectiveDate: future, ScheduledBy: "u",
 	})
 	if err == nil {
@@ -1766,7 +1766,7 @@ func TestPublishSuperseding_ExecError_NewDoc(t *testing.T) {
 	svc := &SupersedeService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newExecFailDB(t)
 
-	_, err := svc.PublishSuperseding(context.Background(), db, SupersedeRequest{
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), SupersedeRequest{
 		TenantID: "t", NewDocumentID: "new", PriorDocumentID: "prior",
 		SupersededBy: "u", NewRevisionVersion: 1, PriorRevisionVersion: 2,
 	})
@@ -1782,7 +1782,7 @@ func TestMarkObsolete_ExecError(t *testing.T) {
 	conn := &obsoleteExecFailConn{}
 	db := newObsoleteExecFailDB(t, conn)
 
-	_, err := svc.MarkObsolete(context.Background(), db, MarkObsoleteRequest{
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), MarkObsoleteRequest{
 		TenantID: "t", DocumentID: "doc", MarkedBy: "u", RevisionVersion: 1, Reason: "test",
 	})
 	if err == nil {
@@ -1848,7 +1848,7 @@ func TestPublishApproved_RowsAffectedError(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newRowsAffectedFailDB(t)
 
-	_, err := svc.PublishApproved(context.Background(), db, PublishRequest{
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
 		TenantID: "t", InstanceID: "inst-ra", PublishedBy: "u",
 	})
 	if err == nil {
@@ -1867,7 +1867,7 @@ func TestSchedulePublish_RowsAffectedError(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
 	db := newRowsAffectedFailDB(t)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID: "t", InstanceID: "inst-ra-sched", EffectiveDate: future, ScheduledBy: "u",
 	})
 	if err == nil {
@@ -1879,7 +1879,7 @@ func TestPublishSuperseding_RowsAffectedError_NewDoc(t *testing.T) {
 	svc := &SupersedeService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newRowsAffectedFailDB(t)
 
-	_, err := svc.PublishSuperseding(context.Background(), db, SupersedeRequest{
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), SupersedeRequest{
 		TenantID: "t", NewDocumentID: "new", PriorDocumentID: "prior",
 		SupersededBy: "u", NewRevisionVersion: 1, PriorRevisionVersion: 2,
 	})
@@ -1950,7 +1950,7 @@ func TestPublishSuperseding_RowsAffectedError_PriorDoc(t *testing.T) {
 	svc := &SupersedeService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newSupersedeRAFailDB(t)
 
-	_, err := svc.PublishSuperseding(context.Background(), db, SupersedeRequest{
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), SupersedeRequest{
 		TenantID: "t", NewDocumentID: "new-ra2", PriorDocumentID: "prior-ra2",
 		SupersededBy: "u", NewRevisionVersion: 1, PriorRevisionVersion: 2,
 	})
@@ -2018,7 +2018,7 @@ func TestPublishSuperseding_ExecError_PriorDoc(t *testing.T) {
 	svc := &SupersedeService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newSupersedePriorExecFailDB(t)
 
-	_, err := svc.PublishSuperseding(context.Background(), db, SupersedeRequest{
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), SupersedeRequest{
 		TenantID: "t", NewDocumentID: "new-pef", PriorDocumentID: "prior-pef",
 		SupersededBy: "u", NewRevisionVersion: 1, PriorRevisionVersion: 2,
 	})
@@ -2080,7 +2080,7 @@ func TestMarkObsolete_RowsAffectedError(t *testing.T) {
 	svc := &ObsoleteService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newObsoleteRAFailDB(t)
 
-	_, err := svc.MarkObsolete(context.Background(), db, MarkObsoleteRequest{
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), MarkObsoleteRequest{
 		TenantID: "t", DocumentID: "doc", MarkedBy: "u", RevisionVersion: 1, Reason: "test",
 	})
 	if err == nil {
@@ -2146,7 +2146,7 @@ func TestMarkObsolete_CancelApprovalInstanceError(t *testing.T) {
 	svc := &ObsoleteService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newObsoleteCancelExecFailDB(t)
 
-	_, err := svc.MarkObsolete(context.Background(), db, MarkObsoleteRequest{
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), MarkObsoleteRequest{
 		TenantID: "t", DocumentID: "doc", MarkedBy: "u", RevisionVersion: 1, Reason: "test",
 	})
 	if err == nil {
@@ -2173,7 +2173,7 @@ func TestSubmitRevisionForReview_CommitError(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected commit error; got nil")
 	}
@@ -2239,7 +2239,7 @@ func TestPublishApproved_CommitError(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newCommitFailPublishDB(t)
 
-	_, err := svc.PublishApproved(context.Background(), db, PublishRequest{
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
 		TenantID: "t", InstanceID: "inst-commit", PublishedBy: "u",
 	})
 	if err == nil {
@@ -2333,7 +2333,7 @@ func TestSubmitRevisionForReview_StageQueryError(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected error for stage query error; got nil")
 	}
@@ -2380,7 +2380,7 @@ func TestRecordSignoff_NoActiveStage(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, domain.ErrNoActiveStage) {
 		t.Errorf("want domain.ErrNoActiveStage; got %v", err)
 	}
@@ -2476,7 +2476,7 @@ func TestRecordSignoff_LoadPriorSignoffsError(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected loadPriorSignoffs error; got nil")
 	}
@@ -2504,7 +2504,7 @@ func TestRecordSignoff_InvalidDecision(t *testing.T) {
 		Decision:        "invalid_decision", // not "approve" or "reject"
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected error for invalid decision; got nil")
 	}
@@ -2578,7 +2578,7 @@ func TestRecordSignoff_LoadStageSignoffsError(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected loadStageSignoffs error; got nil")
 	}
@@ -2652,7 +2652,7 @@ func TestRecordSignoff_NoEligibleActors_QuorumPending(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	// With AllOf quorum and denominator=1 (fallback) and 1 approval → should complete.
-	result, err := svc.RecordSignoff(context.Background(), db, req)
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -2749,7 +2749,7 @@ func TestRecordSignoff_ReplayCommitError(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected commit error on replay; got nil")
 	}
@@ -2806,7 +2806,7 @@ func TestRecordSignoff_ActivateNextStage_UpdateError(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, nextStageErr) {
 		t.Errorf("want next stage activation error; got %v", err)
 	}
@@ -2890,7 +2890,7 @@ func TestRecordSignoff_RejectStageUpdateError(t *testing.T) {
 		Decision:        "reject",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if !errors.Is(err, rejectStageErr) {
 		t.Errorf("want reject stage update error; got %v", err)
 	}
@@ -2951,7 +2951,7 @@ func TestRecordSignoff_FinalCommitError(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
-	_, err = svc.RecordSignoff(context.Background(), db, req)
+	_, err = svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected final commit error; got nil")
 	}
@@ -3131,7 +3131,7 @@ func TestSubmitRevisionForReview_RouteValidateError(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
-	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
 	// If Route.Validate() fails for empty stages, we get an error.
 	// If it doesn't, this test passes harmlessly.
 	if err != nil {
@@ -3193,7 +3193,7 @@ func TestMarkObsolete_LoadDocumentError(t *testing.T) {
 	svc := &ObsoleteService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newObsoleteSelectErrorDB(t)
 
-	_, err := svc.MarkObsolete(context.Background(), db, MarkObsoleteRequest{
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), MarkObsoleteRequest{
 		TenantID: "t", DocumentID: "doc", MarkedBy: "u", RevisionVersion: 1, Reason: "test",
 	})
 	if err == nil {
@@ -3252,7 +3252,7 @@ func TestMarkObsolete_CommitError(t *testing.T) {
 	svc := &ObsoleteService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newObsoleteCommitFailDB(t)
 
-	_, err := svc.MarkObsolete(context.Background(), db, MarkObsoleteRequest{
+	_, err := svc.MarkObsolete(context.Background(), newTxRunner(db), MarkObsoleteRequest{
 		TenantID: "t", DocumentID: "doc", MarkedBy: "u", RevisionVersion: 1, Reason: "test",
 	})
 	if err == nil {
@@ -3310,7 +3310,7 @@ func TestPublishSuperseding_CommitError(t *testing.T) {
 	svc := &SupersedeService{emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newSupersedeCommitFailDB(t)
 
-	_, err := svc.PublishSuperseding(context.Background(), db, SupersedeRequest{
+	_, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), SupersedeRequest{
 		TenantID: "t", NewDocumentID: "new-commit", PriorDocumentID: "prior-commit",
 		SupersededBy: "u", NewRevisionVersion: 1, PriorRevisionVersion: 2,
 	})
@@ -3374,7 +3374,7 @@ func TestPublishApproved_CommitError2(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
 	db := newPublishCommitFailDB(t)
 
-	_, err := svc.PublishApproved(context.Background(), db, PublishRequest{
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), PublishRequest{
 		TenantID: "t", InstanceID: "inst-commit2", PublishedBy: "u",
 	})
 	if err == nil {

@@ -22,7 +22,7 @@ type mockCancelService struct {
 	results []error
 }
 
-func (m *mockCancelService) CancelInstance(_ context.Context, _ *sql.DB, in application.CancelInput) (application.CancelResult, error) {
+func (m *mockCancelService) CancelInstance(_ context.Context, _ db.TxRunner, in application.CancelInput) (application.CancelResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls = append(m.calls, in)
@@ -36,7 +36,7 @@ func (m *mockCancelService) CancelInstance(_ context.Context, _ *sql.DB, in appl
 	return application.CancelResult{DocumentID: "doc"}, nil
 }
 
-func (m *mockCancelService) SystemCancelInstance(_ context.Context, _ *sql.DB, in application.CancelInput) (application.CancelResult, error) {
+func (m *mockCancelService) SystemCancelInstance(_ context.Context, _ db.TxRunner, in application.CancelInput) (application.CancelResult, error) {
 	return m.CancelInstance(context.Background(), nil, in)
 }
 

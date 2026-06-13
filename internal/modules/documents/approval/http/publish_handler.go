@@ -2,7 +2,6 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
@@ -11,20 +10,21 @@ import (
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
+	"metaldocs/internal/platform/db"
 )
 
 var (
-	publishApproved = func(h *Handler, ctx context.Context, db *sql.DB, req application.PublishRequest) (application.PublishResult, error) {
+	publishApproved = func(h *Handler, ctx context.Context, runner db.TxRunner, req application.PublishRequest) (application.PublishResult, error) {
 		if h.services == nil || h.services.Publish == nil {
 			return application.PublishResult{}, errors.New("publish service not configured")
 		}
-		return h.services.Publish.PublishApproved(ctx, db, req)
+		return h.services.Publish.PublishApproved(ctx, runner, req)
 	}
-	schedulePublish = func(h *Handler, ctx context.Context, db *sql.DB, req application.SchedulePublishRequest) (application.SchedulePublishResult, error) {
+	schedulePublish = func(h *Handler, ctx context.Context, runner db.TxRunner, req application.SchedulePublishRequest) (application.SchedulePublishResult, error) {
 		if h.services == nil || h.services.Publish == nil {
 			return application.SchedulePublishResult{}, errors.New("publish service not configured")
 		}
-		return h.services.Publish.SchedulePublish(ctx, db, req)
+		return h.services.Publish.SchedulePublish(ctx, runner, req)
 	}
 )
 
@@ -53,13 +53,13 @@ func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, documentID)
+	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.runner, tenantID, documentID)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
 
-	result, err := publishApproved(h, r.Context(), h.db, application.PublishRequest{
+	result, err := publishApproved(h, r.Context(), h.runner, application.PublishRequest{
 		TenantID:                tenantID,
 		InstanceID:              inst.ID,
 		PublishedBy:             actorID,
@@ -97,7 +97,7 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, documentID)
+	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.runner, tenantID, documentID)
 	if err != nil {
 		WriteError(w, err)
 		return
@@ -119,7 +119,7 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	result, err := schedulePublish(h, r.Context(), h.db, application.SchedulePublishRequest{
+	result, err := schedulePublish(h, r.Context(), h.runner, application.SchedulePublishRequest{
 		TenantID:             tenantID,
 		InstanceID:           inst.ID,
 		ExpectedRevision:     ifMatchVersion,

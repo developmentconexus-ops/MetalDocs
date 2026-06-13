@@ -136,7 +136,7 @@ func TestRecordSignoff_Reauth_RejectsBlankToken(t *testing.T) {
 	svc := newReauthDecisionService(reg, repo, &MemoryEmitter{})
 	db := newDecisionTestDB(t, conn)
 
-	_, err := svc.RecordSignoff(context.Background(), db, reauthSignoffRequest(instanceID, stageID, actorID, ""))
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), reauthSignoffRequest(instanceID, stageID, actorID, ""))
 	if !errors.Is(err, signature.ErrInvalidCredentials) {
 		t.Fatalf("err = %v, want signature.ErrInvalidCredentials", err)
 	}
@@ -161,7 +161,7 @@ func TestRecordSignoff_Reauth_RejectsWrongPassword(t *testing.T) {
 	svc := newReauthDecisionService(reg, repo, &MemoryEmitter{})
 	db := newDecisionTestDB(t, conn)
 
-	_, err := svc.RecordSignoff(context.Background(), db, reauthSignoffRequest(instanceID, stageID, actorID, "wrong-pass"))
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), reauthSignoffRequest(instanceID, stageID, actorID, "wrong-pass"))
 	if !errors.Is(err, signature.ErrInvalidCredentials) {
 		t.Fatalf("err = %v, want signature.ErrInvalidCredentials", err)
 	}
@@ -202,7 +202,7 @@ func TestRecordSignoff_Reauth_AcceptsCorrectPassword(t *testing.T) {
 	svc := newReauthDecisionService(reg, repo, &MemoryEmitter{})
 	db := newDecisionTestDB(t, conn)
 
-	result, err := svc.RecordSignoff(context.Background(), db, reauthSignoffRequest(instanceID, stageID, actorID, "correct-pass"))
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), reauthSignoffRequest(instanceID, stageID, actorID, "correct-pass"))
 	if err != nil {
 		t.Fatalf("RecordSignoff: unexpected error: %v", err)
 	}
@@ -241,14 +241,14 @@ func TestRecordSignoff_Reauth_RateLimitTrips(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		conn := &decisionTestConn{authzGranted: true, areaCode: "QA", actorID: actorID}
 		db := newDecisionTestDB(t, conn)
-		_, err := svc.RecordSignoff(context.Background(), db, reauthSignoffRequest(instanceID, stageID, actorID, "wrong-pass"))
+		_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), reauthSignoffRequest(instanceID, stageID, actorID, "wrong-pass"))
 		if !errors.Is(err, signature.ErrInvalidCredentials) {
 			t.Fatalf("attempt %d err = %v, want signature.ErrInvalidCredentials", i, err)
 		}
 	}
 	conn := &decisionTestConn{authzGranted: true, areaCode: "QA", actorID: actorID}
 	db := newDecisionTestDB(t, conn)
-	_, err := svc.RecordSignoff(context.Background(), db, reauthSignoffRequest(instanceID, stageID, actorID, "wrong-pass"))
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), reauthSignoffRequest(instanceID, stageID, actorID, "wrong-pass"))
 	if !errors.Is(err, signature.ErrRateLimited) {
 		t.Fatalf("err = %v, want signature.ErrRateLimited after 5 failures", err)
 	}

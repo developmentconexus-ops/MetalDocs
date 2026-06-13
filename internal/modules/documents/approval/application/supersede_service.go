@@ -11,6 +11,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 )
 
 // SupersedeService marks a published document as superseded by a newer revision.
@@ -40,126 +41,112 @@ type SupersedeResult struct {
 // "published" and the prior document from "published" to "superseded".
 // Both OCC guards must pass; otherwise the transaction is rolled back and
 // repository.ErrStaleRevision is returned.
-func (s *SupersedeService) PublishSuperseding(ctx context.Context, db *sql.DB, req SupersedeRequest) (SupersedeResult, error) {
-	// Step 1: begin transaction.
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return SupersedeResult{}, fmt.Errorf("publishSuperseding: begin tx: %w", err)
-	}
+func (s *SupersedeService) PublishSuperseding(ctx context.Context, runner db.TxRunner, req SupersedeRequest) (SupersedeResult, error) {
+	var result SupersedeResult
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		ctx := authz.WithCapCache(ctx)
 
-	if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.SupersededBy); err != nil {
-		_ = tx.Rollback()
-		return SupersedeResult{}, fmt.Errorf("publishSuperseding: %w", err)
-	}
-
-	// document.supersede is area-grade: pass the resolved area as-is ("" fail-closes).
-	areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, req.NewDocumentID)
-	if err != nil {
-		_ = tx.Rollback()
-		return SupersedeResult{}, fmt.Errorf("publishSuperseding: load document area: %w", err)
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSupersede), areaCode); err != nil {
-		_ = tx.Rollback()
-		return SupersedeResult{}, err
-	}
-	// Supersede mutates public.documents twice in the same transaction, so it
-	// must also satisfy the shared documents tripwire.
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
-		_ = tx.Rollback()
-		return SupersedeResult{}, err
-	}
-
-	// Step 2: OCC UPDATE for new document (approved → published).
-	priorRevisionVersion := req.PriorRevisionVersion
-	if s.repo != nil {
-		priorRevisionVersion, err = s.repo.GetDocumentRevisionVersion(ctx, tx, req.PriorDocumentID, req.TenantID)
-		if err != nil {
-			_ = tx.Rollback()
-			return SupersedeResult{}, fmt.Errorf("publishSuperseding: load prior revision version: %w", err)
+		if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.SupersededBy); err != nil {
+			return fmt.Errorf("publishSuperseding: %w", err)
 		}
-	}
 
-	newResult, err := tx.ExecContext(ctx, `
-		UPDATE documents
-		   SET status           = 'published',
-		       revision_version = revision_version + 1
-		 WHERE id               = $1
-		   AND tenant_id        = $2
-		   AND status           = 'approved'
-		   AND revision_version = $3`,
-		req.NewDocumentID, req.TenantID, req.NewRevisionVersion,
-	)
-	if err != nil {
-		_ = tx.Rollback()
-		return SupersedeResult{}, fmt.Errorf("publishSuperseding: update new document: %w", err)
-	}
-	newAffected, err := newResult.RowsAffected()
-	if err != nil {
-		_ = tx.Rollback()
-		return SupersedeResult{}, fmt.Errorf("publishSuperseding: rows affected (new): %w", err)
-	}
-	if newAffected == 0 {
-		_ = tx.Rollback()
-		return SupersedeResult{}, repository.ErrStaleRevision
-	}
+		// document.supersede is area-grade: pass the resolved area as-is ("" fail-closes).
+		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, req.NewDocumentID)
+		if err != nil {
+			return fmt.Errorf("publishSuperseding: load document area: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSupersede), areaCode); err != nil {
+			return err
+		}
+		// Supersede mutates public.documents twice in the same transaction, so it
+		// must also satisfy the shared documents tripwire.
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+			return err
+		}
 
-	// Step 3: OCC UPDATE for prior document (published → superseded).
-	priorResult, err := tx.ExecContext(ctx, `
-		UPDATE documents
-		   SET status           = 'superseded',
-		       revision_version = revision_version + 1
-		 WHERE id               = $1
-		   AND tenant_id        = $2
-		   AND status           = 'published'
-		   AND revision_version = $3`,
-		req.PriorDocumentID, req.TenantID, priorRevisionVersion,
-	)
-	if err != nil {
-		_ = tx.Rollback()
-		return SupersedeResult{}, fmt.Errorf("publishSuperseding: update prior document: %w", err)
-	}
-	priorAffected, err := priorResult.RowsAffected()
-	if err != nil {
-		_ = tx.Rollback()
-		return SupersedeResult{}, fmt.Errorf("publishSuperseding: rows affected (prior): %w", err)
-	}
-	if priorAffected == 0 {
-		_ = tx.Rollback()
-		return SupersedeResult{}, repository.ErrStaleRevision
-	}
+		// Step 2: OCC UPDATE for new document (approved → published).
+		priorRevisionVersion := req.PriorRevisionVersion
+		if s.repo != nil {
+			priorRevisionVersion, err = s.repo.GetDocumentRevisionVersion(ctx, tx, req.PriorDocumentID, req.TenantID)
+			if err != nil {
+				return fmt.Errorf("publishSuperseding: load prior revision version: %w", err)
+			}
+		}
 
-	// Step 4: emit "document_superseded" governance event.
-	now := s.clock.Now()
-	payloadMap := map[string]any{
-		"new_document_id":   req.NewDocumentID,
-		"prior_document_id": req.PriorDocumentID,
-	}
-	payloadBytes, err := json.Marshal(payloadMap)
+		newResult, err := tx.ExecContext(ctx, `
+			UPDATE documents
+			   SET status           = 'published',
+			       revision_version = revision_version + 1
+			 WHERE id               = $1
+			   AND tenant_id        = $2
+			   AND status           = 'approved'
+			   AND revision_version = $3`,
+			req.NewDocumentID, req.TenantID, req.NewRevisionVersion,
+		)
+		if err != nil {
+			return fmt.Errorf("publishSuperseding: update new document: %w", err)
+		}
+		newAffected, err := newResult.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("publishSuperseding: rows affected (new): %w", err)
+		}
+		if newAffected == 0 {
+			return repository.ErrStaleRevision
+		}
+
+		// Step 3: OCC UPDATE for prior document (published → superseded).
+		priorResult, err := tx.ExecContext(ctx, `
+			UPDATE documents
+			   SET status           = 'superseded',
+			       revision_version = revision_version + 1
+			 WHERE id               = $1
+			   AND tenant_id        = $2
+			   AND status           = 'published'
+			   AND revision_version = $3`,
+			req.PriorDocumentID, req.TenantID, priorRevisionVersion,
+		)
+		if err != nil {
+			return fmt.Errorf("publishSuperseding: update prior document: %w", err)
+		}
+		priorAffected, err := priorResult.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("publishSuperseding: rows affected (prior): %w", err)
+		}
+		if priorAffected == 0 {
+			return repository.ErrStaleRevision
+		}
+
+		// Step 4: emit "document_superseded" governance event.
+		now := s.clock.Now()
+		payloadMap := map[string]any{
+			"new_document_id":   req.NewDocumentID,
+			"prior_document_id": req.PriorDocumentID,
+		}
+		payloadBytes, err := json.Marshal(payloadMap)
+		if err != nil {
+			return fmt.Errorf("publishSuperseding: marshal event payload: %w", err)
+		}
+		event := GovernanceEvent{
+			TenantID:     req.TenantID,
+			EventType:    "document_superseded",
+			ActorUserID:  req.SupersededBy,
+			ResourceType: "document",
+			ResourceID:   req.NewDocumentID,
+			PayloadJSON:  json.RawMessage(payloadBytes),
+			OccurredAt:   now,
+		}
+		if err := s.emitter.Emit(ctx, tx, event); err != nil {
+			return fmt.Errorf("publishSuperseding: emit event: %w", err)
+		}
+
+		result = SupersedeResult{
+			NewDocumentStatus:   string(docsdomain.DocStatusPublished),
+			PriorDocumentStatus: string(docsdomain.DocStatusSuperseded),
+		}
+		return nil
+	})
 	if err != nil {
-		_ = tx.Rollback()
-		return SupersedeResult{}, fmt.Errorf("publishSuperseding: marshal event payload: %w", err)
+		return SupersedeResult{}, err
 	}
-	event := GovernanceEvent{
-		TenantID:     req.TenantID,
-		EventType:    "document_superseded",
-		ActorUserID:  req.SupersededBy,
-		ResourceType: "document",
-		ResourceID:   req.NewDocumentID,
-		PayloadJSON:  json.RawMessage(payloadBytes),
-		OccurredAt:   now,
-	}
-	if err := s.emitter.Emit(ctx, tx, event); err != nil {
-		_ = tx.Rollback()
-		return SupersedeResult{}, fmt.Errorf("publishSuperseding: emit event: %w", err)
-	}
-
-	// Step 5: commit.
-	if err := tx.Commit(); err != nil {
-		return SupersedeResult{}, fmt.Errorf("publishSuperseding: commit: %w", err)
-	}
-
-	return SupersedeResult{
-		NewDocumentStatus:   string(docsdomain.DocStatusPublished),
-		PriorDocumentStatus: string(docsdomain.DocStatusSuperseded),
-	}, nil
+	return result, nil
 }

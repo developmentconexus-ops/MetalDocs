@@ -2,18 +2,18 @@ package http_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
-	deliveryhttp "metaldocs/internal/modules/documents/delivery/http"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
+	deliveryhttp "metaldocs/internal/modules/documents/delivery/http"
+	"metaldocs/internal/platform/db"
 )
 
 type stubApprovalSubmitter struct {
 	called bool
 }
 
-func (s *stubApprovalSubmitter) SubmitRevisionForReview(_ context.Context, _ *sql.DB, _ approvalapp.SubmitRequest) (approvalapp.SubmitResult, error) {
+func (s *stubApprovalSubmitter) SubmitRevisionForReview(_ context.Context, _ db.TxRunner, _ approvalapp.SubmitRequest) (approvalapp.SubmitResult, error) {
 	s.called = true
 	return approvalapp.SubmitResult{InstanceID: "inst-test"}, nil
 }

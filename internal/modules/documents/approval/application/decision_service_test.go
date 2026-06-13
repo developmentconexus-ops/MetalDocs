@@ -371,7 +371,7 @@ func TestRecordSignoff_ApprovePath_QuorumMet(t *testing.T) {
 		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
-	result, err := svc.RecordSignoff(context.Background(), db, req)
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("RecordSignoff: unexpected error: %v", err)
 	}
@@ -446,7 +446,7 @@ func TestRecordSignoff_ApprovePath_QuorumNotYetMet(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
-	result, err := svc.RecordSignoff(context.Background(), db, req)
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("RecordSignoff: unexpected error: %v", err)
 	}
@@ -485,7 +485,7 @@ func TestRecordSignoff_ContentHashEchoesInstanceSubmitHash(t *testing.T) {
 	}
 	db := newDecisionTestDB(t, conn)
 
-	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,
@@ -530,7 +530,7 @@ func TestRecordSignoff_ContentHashMismatchFailsBeforePersisting(t *testing.T) {
 
 	// Client echoes a hash that does NOT match instance.ContentHashAtSubmit.
 	const drifted = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,
@@ -605,7 +605,7 @@ func TestRecordSignoff_RejectPath(t *testing.T) {
 		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
-	result, err := svc.RecordSignoff(context.Background(), db, req)
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("RecordSignoff: unexpected error: %v", err)
 	}
@@ -686,7 +686,7 @@ func TestRecordSignoff_SoDViolation(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected error for SoD violation; got nil")
 	}
@@ -732,7 +732,7 @@ func TestRecordSignoff_RejectsNonEligibleActor(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrActorNotEligible; got nil")
 	}
@@ -787,7 +787,7 @@ func TestRecordSignoff_CapabilityDenied(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
-	_, err := svc.RecordSignoff(context.Background(), db, req)
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrCapabilityDenied; got nil")
 	}
@@ -849,7 +849,7 @@ func TestRecordSignoff_FinalApprovalBlockedByUnresolvedComments(t *testing.T) {
 	}
 	db := newDecisionTestDB(t, conn)
 
-	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,

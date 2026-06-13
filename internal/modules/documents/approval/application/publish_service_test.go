@@ -323,7 +323,7 @@ func TestPublishApproved_HappyPath(t *testing.T) {
 		PublishedBy: "user-1",
 	}
 
-	result, err := svc.PublishApproved(context.Background(), db, req)
+	result, err := svc.PublishApproved(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("PublishApproved: unexpected error: %v", err)
 	}
@@ -381,7 +381,7 @@ func TestPublishApproved_NotApprovedInstance(t *testing.T) {
 				PublishedBy: "user-1",
 			}
 
-			_, err := svc.PublishApproved(context.Background(), db, req)
+			_, err := svc.PublishApproved(context.Background(), newTxRunner(db), req)
 			if err == nil {
 				t.Fatal("expected ErrInstanceNotApproved; got nil")
 			}
@@ -430,7 +430,7 @@ func TestSchedulePublish_HappyPath(t *testing.T) {
 		ScheduledBy:   "user-sched-1",
 	}
 
-	result, err := svc.SchedulePublish(context.Background(), db, req)
+	result, err := svc.SchedulePublish(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("SchedulePublish: unexpected error: %v", err)
 	}
@@ -492,7 +492,7 @@ func TestSchedulePublish_PersistsSupersededDocumentID(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: emitter, clock: clock}
 	db, conn := newPublishTestHarness(t, 1, true)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID:             "tenant-uuid-1",
 		InstanceID:           "inst-sched-supersede-1",
 		ExpectedRevision:     2,
@@ -533,7 +533,7 @@ func TestSchedulePublish_RejectsSelfSupersede(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: emitter, clock: clock}
 	db := newPublishTestDB(t, 1, true)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID:             "tenant-uuid-1",
 		InstanceID:           "inst-sched-self-1",
 		ExpectedRevision:     2,
@@ -575,7 +575,7 @@ func TestSchedulePublish_ValidatesSupersedeTarget(t *testing.T) {
 	svc := &PublishService{repo: repo, emitter: emitter, clock: clock}
 	db := newPublishTestDB(t, 1, true)
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID:             "tenant-uuid-1",
 		InstanceID:           "inst-sched-validate-1",
 		ExpectedRevision:     2,
@@ -616,7 +616,7 @@ func TestSchedulePublish_PastDate(t *testing.T) {
 		ScheduledBy:   "user-sched-2",
 	}
 
-	_, err := svc.SchedulePublish(context.Background(), db, req)
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrEffectiveDateInPast; got nil")
 	}
@@ -656,7 +656,7 @@ func TestSchedulePublish_RejectsMismatchedRevisionVersion(t *testing.T) {
 		ScheduledBy:      "user-sched-mismatch-1",
 	}
 
-	_, err := svc.SchedulePublish(context.Background(), db, req)
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrStaleRevision; got nil")
 	}
@@ -694,7 +694,7 @@ func TestSchedulePublish_AllowsMissingExpectedRevision(t *testing.T) {
 		ScheduledBy:   "user-sched-no-precondition-1",
 	}
 
-	result, err := svc.SchedulePublish(context.Background(), db, req)
+	result, err := svc.SchedulePublish(context.Background(), newTxRunner(db), req)
 	if err != nil {
 		t.Fatalf("SchedulePublish: unexpected error: %v", err)
 	}
@@ -727,7 +727,7 @@ func TestSchedulePublish_AutoPersistsCurrentPublishedHeadWhenClientOmitsTarget(t
 	db, conn := newPublishTestHarness(t, 1, true)
 	conn.scheduleGeneration = 4
 
-	_, err := svc.SchedulePublish(context.Background(), db, SchedulePublishRequest{
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), SchedulePublishRequest{
 		TenantID:         "tenant-uuid-1",
 		InstanceID:       "inst-uuid-1",
 		ExpectedRevision: 9,
@@ -764,7 +764,7 @@ func TestPublishApproved_CapabilityDenied(t *testing.T) {
 		PublishedBy: "user-1",
 	}
 
-	_, err := svc.PublishApproved(context.Background(), db, req)
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), req)
 	if err == nil {
 		t.Fatal("expected ErrCapabilityDenied; got nil")
 	}

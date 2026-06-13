@@ -2,20 +2,20 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"net/http"
 	"strings"
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
+	"metaldocs/internal/platform/db"
 )
 
-func (h *Handler) publishSuperseding(ctx context.Context, db *sql.DB, req application.SupersedeRequest) (application.SupersedeResult, error) {
+func (h *Handler) publishSuperseding(ctx context.Context, runner db.TxRunner, req application.SupersedeRequest) (application.SupersedeResult, error) {
 	if h.supersedeSvc == nil {
 		return application.SupersedeResult{}, errors.New("supersede service not configured")
 	}
-	return h.supersedeSvc.PublishSuperseding(ctx, db, req)
+	return h.supersedeSvc.PublishSuperseding(ctx, runner, req)
 }
 
 func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +48,7 @@ func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.publishSuperseding(r.Context(), h.db, application.SupersedeRequest{
+	_, err = h.publishSuperseding(r.Context(), h.runner, application.SupersedeRequest{
 		TenantID:           tenantID,
 		NewDocumentID:      documentID,
 		PriorDocumentID:    body.SupersededDocumentID,

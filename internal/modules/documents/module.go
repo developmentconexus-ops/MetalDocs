@@ -11,12 +11,13 @@ import (
 	dhttp "metaldocs/internal/modules/documents/delivery/http"
 	documentshttp "metaldocs/internal/modules/documents/http"
 	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/ratelimit"
 )
 
 type approvalSubmitter interface {
-	SubmitRevisionForReview(ctx context.Context, db *sql.DB, req approvalapp.SubmitRequest) (approvalapp.SubmitResult, error)
+	SubmitRevisionForReview(ctx context.Context, runner db.TxRunner, req approvalapp.SubmitRequest) (approvalapp.SubmitResult, error)
 }
 
 type Module struct {
