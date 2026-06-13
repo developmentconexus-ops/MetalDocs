@@ -1,20 +1,20 @@
 # MetalDocs — Agent Operating Instructions
 
-> Read order for any non-trivial task: this file → `wiki/README.md` → `wiki/references/current-agent-handoff.md` → relevant skill SKILL.md.
+> Read order any non-trivial task: this file → `wiki/README.md` → `wiki/references/current-agent-handoff.md` → relevant skill SKILL.md.
 
 ## 1. Local Dev Startup (script-truth policy)
 
-**Always use the PowerShell script — never bash, never `source .env`:**
+**Always use PowerShell script — never bash, never `source .env`:**
 
 ```powershell
 .\scripts\start-api.ps1          # start API on :8081
 .\scripts\start-api.ps1 -Build   # rebuild binary first
 ```
 
-- Canonical scripts are the only supported entrypoint.
-- Scripts must rebuild or explicitly prove freshness.
-- Scripts must fail loudly on stale binary, blocked port, missing dependency, broken prerequisite.
-- Ad hoc startup commands are not authoritative.
+- Canonical scripts only supported entrypoint.
+- Scripts must rebuild or prove freshness.
+- Scripts must fail loud on stale binary, blocked port, missing dependency, broken prerequisite.
+- Ad hoc startup commands not authoritative.
 
 Login (dev): `POST /api/v1/auth/login` body `{"identifier":"admin","password":"AdminMetalDocs123!"}`.
 
@@ -22,7 +22,7 @@ Full details: [`wiki/references/local-dev-startup.md`](wiki/references/local-dev
 
 ## 2. Wiki Is Source of Truth
 
-Project knowledge lives in `wiki/`. **Always read `wiki/README.md` first** — it indexes every doc with `file:line` anchors. Do not re-grep the codebase when the wiki already says where things are.
+Project knowledge lives in `wiki/`. **Always read `wiki/README.md` first** — indexes every doc with `file:line` anchors. No re-grep codebase when wiki already says where things are.
 
 Critical entry points:
 - [`wiki/concepts/placeholders.md`](wiki/concepts/placeholders.md) — eigenpal native vs MetalDocs legacy gap (fixed 7-token catalog)
@@ -30,11 +30,11 @@ Critical entry points:
 - [`wiki/modules/editor-ui-eigenpal.md`](wiki/modules/editor-ui-eigenpal.md) — eigenpal Anti-Corruption Layer
 - [`wiki/decisions/`](wiki/decisions/) — ADRs (token migration, atomic CD create, contract-first API, etc.)
 
-**Drift policy:** when you change code referenced by a wiki doc, update its `Last verified:` stamp same change.
+**Drift policy:** change code referenced by wiki doc → update its `Last verified:` stamp same change.
 
-**After refactors / new implementations** → dispatch the `wiki-curator` agent ([`.claude/agents/wiki-curator.md`](.claude/agents/wiki-curator.md)). It refreshes Key files anchors, bumps stamps, updates `wiki/README.md` index, creates new docs when a new module/concept/workflow appears. Invoke proactively — do not let drift accumulate.
+**After refactors / new implementations** → dispatch `wiki-curator` agent ([`.claude/agents/wiki-curator.md`](.claude/agents/wiki-curator.md)). Refreshes Key files anchors, bumps stamps, updates `wiki/README.md` index, creates new docs when new module/concept/workflow appears. Invoke proactive — no drift accumulation.
 
-For full module documentation, maturity promotion, or rebuilding a module wiki trio/artifacts → [`metaldocs-module-doc`](.agents/skills/metaldocs-module-doc/SKILL.md). After implementation work touches an already-documented module → [`metaldocs-module-doc-sync`](.agents/skills/metaldocs-module-doc-sync/SKILL.md).
+Full module documentation, maturity promotion, or rebuild module wiki trio/artifacts → [`metaldocs-module-doc`](.agents/skills/metaldocs-module-doc/SKILL.md). Implementation work touches already-documented module → [`metaldocs-module-doc-sync`](.agents/skills/metaldocs-module-doc-sync/SKILL.md).
 
 ## 3. Skill Routing (mandatory)
 
@@ -55,15 +55,15 @@ Canonical structure: [`wiki/architecture/frontend-structure.md`](wiki/architectu
 - TanStack Query for server state, OpenAPI-codegen types from `lib/api-types/`
 - CSS Modules + design tokens
 - **No** `HashRouter`, string-pattern path dispatchers, legacy `src/api/`, root flat files
-- **Never reintroduce legacy paths.** If you touch a file outside the canonical layout, migrate it in the same change. No shims. No re-exports.
+- **Never reintroduce legacy paths.** Touch file outside canonical layout → migrate same change. No shims. No re-exports.
 
 ### Backend/API rules
 Canonical structure: [`wiki/architecture/backend-api-structure.md`](wiki/architecture/backend-api-structure.md). Contracts: [`api-contract.md`](wiki/architecture/api-contract.md), [`api-design-system.md`](wiki/architecture/api-design-system.md).
-- Do not change public routes, generated `api.gen.go` wiring, or OpenAPI shape from memory.
-- Build the route truth table first → compare runtime / spec / codegen / wiki → implement from the canonical module pattern.
+- No change public routes, generated `api.gen.go` wiring, or OpenAPI shape from memory.
+- Build route truth table first → compare runtime / spec / codegen / wiki → implement from canonical module pattern.
 
 ### Database rules
-Source of truth: [`wiki/database/`](wiki/database/) (schema ownership, dictionary, migration policy, reference data, bootstrap rules). Do not duplicate those rules here.
+Source of truth: [`wiki/database/`](wiki/database/) (schema ownership, dictionary, migration policy, reference data, bootstrap rules). No duplicate those rules here.
 
 ## 4. Mandatory Gates
 
@@ -90,25 +90,25 @@ Path-stable operator bridge: [`wiki/references/ai-operating-system.md`](wiki/ref
 1. Root cause written
 2. Fix scope bounded
 3. Failed checkpoint rerun and passing
-4. No hidden drift left in the repaired boundary
-5. Skill/runbook/instruction updated if the failure exposed a workflow gap
+4. No hidden drift left in repaired boundary
+5. Skill/runbook/instruction updated if failure exposed workflow gap
 
-**Hard-stop rule:** do not continue through redesign-grade issues. If the required fix implies shared API redesign, cross-module auth/authz model change, storage/provider architecture redesign, workflow semantic redesign outside the assigned boundary, or large coordinated rewrite, stop and report the architecture boundary and minimum prerequisite plan instead of symptom patching.
+**Hard-stop rule:** no continue through redesign-grade issues. If required fix implies shared API redesign, cross-module auth/authz model change, storage/provider architecture redesign, workflow semantic redesign outside assigned boundary, or large coordinated rewrite → stop, report architecture boundary and minimum prerequisite plan instead of symptom patching.
 
-**Stop rule:** do not continue feature work through a failing prerequisite boundary. If startup, auth/session, target route, or shared contract truth fails → switch to `runtime-contract-prereq`, repair the boundary, rerun the checkpoint, return to original task.
+**Stop rule:** no continue feature work through failing prerequisite boundary. If startup, auth/session, target route, or shared contract truth fails → switch to `runtime-contract-prereq`, repair boundary, rerun checkpoint, return to original task.
 
 **Default close-out loop for non-trivial work:**
-1. Implement inside the bounded task
-2. Run static and targeted verification for the touched slice
+1. Implement inside bounded task
+2. Run static and targeted verification for touched slice
 3. Run code review
-4. Run product QA using the canonical checklist for the workflow class
+4. Run product QA using canonical checklist for workflow class
 5. Classify findings by root-cause family
-6. Fix by family, not by scattered symptom patching
-7. Rerun targeted review, QA, and regression
-8. Rerun broader regression when the change crossed boundaries
+6. Fix by family, not scattered symptom patching
+7. Rerun targeted review, QA, regression
+8. Rerun broader regression when change crossed boundaries
 9. Close only with evidence and explicit bounded defers
 
-**Evidence rule:** `implemented`, `fixed`, `done`, `green`, or `looks good` are not sufficient closure by default. Record the verification commands, QA outcomes, review findings disposition, and any remaining bounded defer before claiming completion.
+**Evidence rule:** `implemented`, `fixed`, `done`, `green`, or `looks good` not sufficient closure by default. Record verification commands, QA outcomes, review findings disposition, and any remaining bounded defer before claiming completion.
 
 **Canonical QA checklists:**
 - [`wiki/quality/screen-qa-checklist.md`](wiki/quality/screen-qa-checklist.md)
@@ -118,32 +118,32 @@ Path-stable operator bridge: [`wiki/references/ai-operating-system.md`](wiki/ref
 
 ## 5. Behavioral Guidelines
 
-> Bias toward caution over speed. For trivial tasks, use judgment.
+> Bias toward caution over speed. Trivial tasks → use judgment.
 
 ### 5.1 Think before coding
-Don't assume. Don't hide confusion. Surface tradeoffs.
-- State assumptions explicitly. If uncertain, ask.
-- Multiple interpretations? Present them — don't pick silently.
+No assume. No hide confusion. Surface tradeoffs.
+- State assumptions explicit. Uncertain → ask.
+- Multiple interpretations? Present them — no silent pick.
 - Simpler approach exists? Say so. Push back when warranted.
-- Unclear? Stop. Name what's confusing. Ask.
+- Unclear? Stop. Name what confusing. Ask.
 
 ### 5.2 Simplicity first
-Minimum code that solves the problem. Nothing speculative.
-- No features beyond what was asked.
+Minimum code that solves problem. Nothing speculative.
+- No features beyond ask.
 - No abstractions for single-use code.
-- No flexibility / configurability that wasn't requested.
+- No flexibility / configurability not requested.
 - No error handling for impossible scenarios.
-- If you wrote 200 lines and it could be 50, rewrite it.
-- Senior engineer test: would they call this overcomplicated? If yes, simplify.
+- Wrote 200 lines could be 50 → rewrite.
+- Senior engineer test: would they call this overcomplicated? Yes → simplify.
 
 ### 5.3 Surgical changes
-Touch only what you must. Clean up only your own mess.
-- Don't improve adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style even if you'd do it differently.
-- Notice unrelated dead code? Mention it — don't delete it.
-- Orphans from your changes: remove them. Pre-existing dead code: leave it unless asked.
-- Test: every changed line traces directly to the user's request.
+Touch only what you must. Clean up only own mess.
+- No improve adjacent code, comments, or formatting.
+- No refactor things not broken.
+- Match existing style even if you'd do different.
+- Notice unrelated dead code? Mention it — no delete.
+- Orphans from your changes: remove. Pre-existing dead code: leave unless asked.
+- Test: every changed line traces direct to user request.
 
 ### 5.4 Goal-driven execution
 Define success criteria. Loop until verified.
@@ -151,38 +151,50 @@ Define success criteria. Loop until verified.
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - "Refactor X" → "Ensure tests pass before and after"
 
-For multi-step tasks, state a brief plan:
+Multi-step tasks → state brief plan:
 ```
 1. [Step] → verify: [check]
 2. [Step] → verify: [check]
 ```
 
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+Strong success criteria let you loop independent. Weak criteria ("make it work") require constant clarification.
 
 ---
 
-**Working signal:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, clarifying questions arrive before implementation rather than after mistakes.
+**Working signal:** fewer unnecessary changes in diffs, fewer rewrites from overcomplication, clarifying questions arrive before implementation not after mistakes.
+
+---
+
+## GitNexus usage policy (OVERRIDES the managed block below)
+
+The auto-generated `GitNexus — Code Intelligence` block below is **advisory, not mandatory**. Its "MUST run impact before every edit" / "NEVER commit without detect_changes" framing is **downgraded to opt-in** to save tokens.
+
+- GitNexus is **opt-in**, for **high-risk or large-blast changes only**: cross-module refactors, renames touching many callers, edits to shared/public symbols, unfamiliar subsystems.
+- **Routine edits** (single function, local change, well-understood code) → just use `Grep`/`Glob`/`Read`. **Do NOT** run `impact`/`detect_changes` per edit.
+- Run `impact({direction: "upstream"})` **only when blast radius is genuinely unknown** and the change is risky. Then warn on HIGH/CRITICAL.
+- `rename` (call-graph aware) over find-and-replace **still applies** for multi-file renames.
+- This override wins on regeneration: re-running `analyze` rewrites the block below but not this section.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **MetalDocs** (30916 symbols, 68804 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project indexed by GitNexus as **MetalDocs** (30916 symbols, 68804 relationships, 300 execution flows). Use GitNexus MCP tools to understand code, assess impact, navigate safe.
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+> Index stale? Run `node .gitnexus/run.cjs analyze` from project root — auto-selects available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
+- **MUST run impact analysis before editing any symbol.** Before modifying function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report blast radius (direct callers, affected processes, risk level) to user.
+- **MUST run `detect_changes()` before committing** to verify changes only affect expected symbols and execution flows. Regression review, compare against default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
+- **MUST warn user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- Exploring unfamiliar code → use `query({query: "concept"})` to find execution flows instead of grepping. Returns process-grouped results ranked by relevance.
+- Need full context on specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
 
 ## Never Do
 
-- NEVER edit a function, class, or method without first running `impact` on it.
+- NEVER edit function, class, or method without first running `impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
+- NEVER rename symbols with find-and-replace — use `rename` which understands call graph.
 - NEVER commit changes without running `detect_changes()` to check affected scope.
 
 ## Resources
