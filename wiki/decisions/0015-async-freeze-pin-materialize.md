@@ -1,6 +1,11 @@
 # ADR 0015: Async Freeze — Split into Pin (in-tx) and Materialize (outbox)
 
-**Status:** Accepted (2026-06-01)
+**Status:** Accepted (amended 2026-06-13 — optional-tx-enlistment retired by Wave Z Z-5; tx is mandatory)
+
+**Current reality (2026-06):**
+- `Pin` and `Freeze` both require a non-nil `db.Tx`; passing nil returns an explicit error.
+- The three `//cilint:allow-dualmode` directives have been removed; no autocommit path exists.
+- `Materialize` is unchanged — it has no tx parameter (runs outside any transaction).
 **Affects:** approval signoff flow, freeze service, worker, docx-renderer coupling
 
 ## Context

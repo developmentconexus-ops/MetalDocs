@@ -30,7 +30,7 @@ func TestFreezeService_Freeze_IdempotentWhenAlreadyFrozen(t *testing.T) {
 		&fakeFanoutClient{},
 	)
 
-	if err := svc.Freeze(context.Background(), nil, "tenant-1", "doc-1", ApproverContext{}); err != nil {
+	if err := svc.Freeze(context.Background(), fakeTx{}, "tenant-1", "doc-1", ApproverContext{}); err != nil {
 		t.Fatalf("Freeze() error = %v", err)
 	}
 	if valuesRead.calls != 0 {

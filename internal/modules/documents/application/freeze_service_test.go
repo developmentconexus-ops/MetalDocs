@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -12,6 +13,19 @@ import (
 	"metaldocs/internal/modules/render/resolvers"
 	tmpldom "metaldocs/internal/modules/templates/domain"
 )
+
+// fakeTx is a no-op db.Tx for unit tests that don't need real SQL execution.
+type fakeTx struct{}
+
+func (fakeTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	return nil, nil
+}
+func (fakeTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
+	return nil, nil
+}
+func (fakeTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row {
+	return nil
+}
 
 type fakeSnapshotReader struct {
 	snap           v2dom.TemplateSnapshot
@@ -153,7 +167,7 @@ func TestFreezeService_Freeze_ValidatesResolvesHashesAndFinalizes(t *testing.T) 
 	}}
 	svc := NewFreezeService(fakeSchemaReader{placeholders: schema}, writer, valuesRead, reg, finalize, ctxBuilder, snapReader, finalDocx, fanoutClient)
 
-	if err := svc.Freeze(context.Background(), nil, "t", "r", ApproverContext{}); err != nil {
+	if err := svc.Freeze(context.Background(), fakeTx{}, "t", "r", ApproverContext{}); err != nil {
 		t.Fatalf("Freeze error: %v", err)
 	}
 	if fanoutClient.calls != 1 {
@@ -223,7 +237,7 @@ func TestFreezeService_Freeze_FallsBackToIDWhenNameEmpty(t *testing.T) {
 		fanoutClient,
 	)
 
-	if err := svc.Freeze(context.Background(), nil, "t", "r", ApproverContext{}); err != nil {
+	if err := svc.Freeze(context.Background(), fakeTx{}, "t", "r", ApproverContext{}); err != nil {
 		t.Fatalf("Freeze error: %v", err)
 	}
 	if fanoutClient.req.PlaceholderValues["p_user"] != "user-value" {
@@ -248,7 +262,7 @@ func TestFreezeService_Freeze_MissingRequiredUserPlaceholder(t *testing.T) {
 		&fakeFanoutClient{},
 	)
 
-	err := svc.Freeze(context.Background(), nil, "t", "r", ApproverContext{})
+	err := svc.Freeze(context.Background(), fakeTx{}, "t", "r", ApproverContext{})
 	if !errors.Is(err, v2dom.ErrValidationFailed) {
 		t.Fatalf("expected ErrValidationFailed, got %v", err)
 	}
@@ -268,7 +282,7 @@ func TestFreezeService_Freeze_ComputedMissingResolverKey(t *testing.T) {
 		&fakeFanoutClient{},
 	)
 
-	err := svc.Freeze(context.Background(), nil, "t", "r", ApproverContext{})
+	err := svc.Freeze(context.Background(), fakeTx{}, "t", "r", ApproverContext{})
 	if !errors.Is(err, v2dom.ErrValidationFailed) {
 		t.Fatalf("expected ErrValidationFailed, got %v", err)
 	}
@@ -289,7 +303,7 @@ func TestFreezeService_Freeze_UnknownResolverKey(t *testing.T) {
 		&fakeFanoutClient{},
 	)
 
-	err := svc.Freeze(context.Background(), nil, "t", "r", ApproverContext{})
+	err := svc.Freeze(context.Background(), fakeTx{}, "t", "r", ApproverContext{})
 	if !errors.Is(err, tmpldom.ErrUnknownResolver) {
 		t.Fatalf("expected ErrUnknownResolver, got %v", err)
 	}
@@ -314,7 +328,7 @@ func TestFreezeService_Freeze_FanoutErrorSkipsFinalDocxWrite(t *testing.T) {
 		fanoutClient,
 	)
 
-	err := svc.Freeze(context.Background(), nil, "t", "r", ApproverContext{})
+	err := svc.Freeze(context.Background(), fakeTx{}, "t", "r", ApproverContext{})
 	if err == nil || !containsStr(err.Error(), "fanout") {
 		t.Fatalf("expected fanout error, got %v", err)
 	}
@@ -344,7 +358,7 @@ func TestFreezeService_Freeze_DefaultsEmptyComposition(t *testing.T) {
 		fanoutClient,
 	)
 
-	if err := svc.Freeze(context.Background(), nil, "t", "r", ApproverContext{}); err != nil {
+	if err := svc.Freeze(context.Background(), fakeTx{}, "t", "r", ApproverContext{}); err != nil {
 		t.Fatalf("Freeze: %v", err)
 	}
 	if string(fanoutClient.req.Composition) != `{}` {
@@ -352,6 +366,24 @@ func TestFreezeService_Freeze_DefaultsEmptyComposition(t *testing.T) {
 	}
 	raw := fanoutClient.req.Composition
 	_ = raw
+}
+
+func TestFreezeService_Freeze_RequiresTx(t *testing.T) {
+	svc := NewFreezeService(
+		fakeSchemaReader{},
+		&fakeFillInWriter{},
+		&fakeValuesReader{},
+		resolvers.NewRegistry(),
+		&fakeFreezeFinalizer{},
+		&fakeResolverContextBuilder{},
+		fakeSnapshotReader{},
+		&fakeFinalDocxWriter{},
+		&fakeFanoutClient{},
+	)
+	err := svc.Freeze(context.Background(), nil, "t", "r", ApproverContext{})
+	if err == nil || !containsStr(err.Error(), "tx required") {
+		t.Fatalf("expected tx-required error, got %v", err)
+	}
 }
 
 func containsStr(s, sub string) bool {

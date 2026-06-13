@@ -172,17 +172,8 @@ func (s *FreezeService) pinValidateAndHash(
 	if err != nil {
 		return nil, nil, fmt.Errorf("decode values_hash: %w", err)
 	}
-	// Optional-tx enlistment (ADR-0015 async freeze split): both branches perform
-	// the freeze write; tx is the in-tx "Pin" path, nil the standalone async path.
-	// Not a single-mode db fallback. Deferred at 2.11; in-tx-only is next-touch.
-	if tx != nil { //cilint:allow-dualmode
-		if err := s.finalize.WriteFreeze(ctx, tenantID, revisionID, hashBytes, time.Now().UTC(), tx); err != nil {
-			return nil, nil, err
-		}
-	} else {
-		if err := s.finalize.WriteFreeze(ctx, tenantID, revisionID, hashBytes, time.Now().UTC()); err != nil {
-			return nil, nil, err
-		}
+	if err := s.finalize.WriteFreeze(ctx, tenantID, revisionID, hashBytes, time.Now().UTC(), tx); err != nil {
+		return nil, nil, err
 	}
 	return valMap, schema, nil
 }
@@ -191,7 +182,11 @@ func (s *FreezeService) pinValidateAndHash(
 // It validates, resolves computed placeholders, writes values_hash + frozen_at,
 // and enqueues a materialize_dispatch_outbox row — all inside tx.
 // No network calls to docx-renderer. Fast and cheap.
+// tx is mandatory (ADR 0015 amended by Wave Z Z-5).
 func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext) error {
+	if tx == nil {
+		return fmt.Errorf("freeze_service: tx required (ADR 0015 amended by Wave Z Z-5)")
+	}
 	snap, valuesFrozenAt, err := s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, revisionID, tx)
 	if err != nil {
 		return fmt.Errorf("pin: read snapshot: %w", err)
@@ -302,20 +297,12 @@ func (s *FreezeService) Materialize(ctx context.Context, tenantID, revisionID st
 
 // Freeze is the original synchronous implementation kept for backward compatibility.
 // New code should use Pin (in-tx) + Materialize (async worker) instead.
+// tx is mandatory (ADR 0015 amended by Wave Z Z-5).
 func (s *FreezeService) Freeze(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext) error {
-	var (
-		snap           v2dom.TemplateSnapshot
-		valuesFrozenAt *time.Time
-		err            error
-	)
-	// Optional-tx enlistment (ADR-0015 async freeze split): both branches read
-	// the snapshot; tx is the in-tx "Pin" path, nil the standalone async path.
-	// Not a single-mode db fallback. Deferred at 2.11; in-tx-only is next-touch.
-	if tx != nil { //cilint:allow-dualmode
-		snap, valuesFrozenAt, err = s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, revisionID, tx)
-	} else {
-		snap, valuesFrozenAt, err = s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, revisionID)
+	if tx == nil {
+		return fmt.Errorf("freeze_service: tx required (ADR 0015 amended by Wave Z Z-5)")
 	}
+	snap, valuesFrozenAt, err := s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, revisionID, tx)
 	if err != nil {
 		return fmt.Errorf("read snapshot: %w", err)
 	}
@@ -373,11 +360,5 @@ func (s *FreezeService) Freeze(ctx context.Context, tx db.Tx, tenantID, revision
 	if err != nil {
 		return fmt.Errorf("decode content_hash: %w", err)
 	}
-	// Optional-tx enlistment (ADR-0015 async freeze split): both branches write
-	// the final docx; tx is the in-tx "Pin" path, nil the standalone async path.
-	// Not a single-mode db fallback. Deferred at 2.11; in-tx-only is next-touch.
-	if tx != nil { //cilint:allow-dualmode
-		return s.finalDocx.WriteFinalDocx(ctx, tenantID, revisionID, resp.FinalDocxS3Key, contentHashBytes, tx)
-	}
-	return s.finalDocx.WriteFinalDocx(ctx, tenantID, revisionID, resp.FinalDocxS3Key, contentHashBytes)
+	return s.finalDocx.WriteFinalDocx(ctx, tenantID, revisionID, resp.FinalDocxS3Key, contentHashBytes, tx)
 }

@@ -58,7 +58,7 @@ func TestFreezeService_Pin_NoNetworkCall(t *testing.T) {
 	svc := NewFreezeService(fakeSchemaReader{placeholders: schema}, writer, valuesRead, reg, finalize, ctxBuilder, snapReader, &fakeFinalDocxWriter{}, fanoutClient).
 		WithMaterializeOutbox(materializeOutbox)
 
-	if err := svc.Pin(context.Background(), nil, "t", "r", ApproverContext{}); err != nil {
+	if err := svc.Pin(context.Background(), fakeTx{}, "t", "r", ApproverContext{}); err != nil {
 		t.Fatalf("Pin error: %v", err)
 	}
 
@@ -102,7 +102,7 @@ func TestFreezeService_Pin_IdempotentWhenAlreadyFrozen(t *testing.T) {
 		&fakeFanoutClient{},
 	).WithMaterializeOutbox(materializeOutbox)
 
-	if err := svc.Pin(context.Background(), nil, "t", "r", ApproverContext{}); err != nil {
+	if err := svc.Pin(context.Background(), fakeTx{}, "t", "r", ApproverContext{}); err != nil {
 		t.Fatalf("Pin() error = %v", err)
 	}
 	if finalize.calls != 0 {
@@ -130,7 +130,7 @@ func TestFreezeService_Pin_FailsWithoutMaterializeOutbox(t *testing.T) {
 		&fakeFanoutClient{},
 	)
 
-	err := svc.Pin(context.Background(), nil, "t", "r", ApproverContext{})
+	err := svc.Pin(context.Background(), fakeTx{}, "t", "r", ApproverContext{})
 	if err == nil || !containsStr(err.Error(), "materialize outbox enqueuer not configured") {
 		t.Fatalf("expected materialize outbox error, got %v", err)
 	}
@@ -241,8 +241,26 @@ func TestFreezeService_Pin_OutboxEnqueueError_Returns(t *testing.T) {
 		&fakeFanoutClient{},
 	).WithMaterializeOutbox(materializeOutbox)
 
-	err := svc.Pin(context.Background(), nil, "t", "r", ApproverContext{})
+	err := svc.Pin(context.Background(), fakeTx{}, "t", "r", ApproverContext{})
 	if err == nil {
 		t.Fatal("expected error from outbox enqueue, got nil")
+	}
+}
+
+func TestFreezeService_Pin_RequiresTx(t *testing.T) {
+	svc := NewFreezeService(
+		fakeSchemaReader{},
+		&fakeFillInWriter{},
+		&fakeValuesReader{},
+		resolvers.NewRegistry(),
+		&fakeFreezeFinalizer{},
+		&fakeResolverContextBuilder{},
+		fakeSnapshotReader{},
+		&fakeFinalDocxWriter{},
+		&fakeFanoutClient{},
+	).WithMaterializeOutbox(&fakeMaterializeOutboxEnqueuer{})
+	err := svc.Pin(context.Background(), nil, "t", "r", ApproverContext{})
+	if err == nil || !containsStr(err.Error(), "tx required") {
+		t.Fatalf("expected tx-required error, got %v", err)
 	}
 }
