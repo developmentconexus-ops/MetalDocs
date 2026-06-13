@@ -1,6 +1,6 @@
 # ADR 0016 — View-Grade Capabilities for IAM, Membership, Taxonomy, Metrics
 
-> **Status:** accepted 2026-06-01 (security review HIGH downgraded to LOW after handler scope verification — see §Security Boundary Notes; grant matrix product-confirmed 2026-06-01)
+> **Status:** Accepted (security review HIGH downgraded to LOW after handler scope verification — see §Security Boundary Notes; grant matrix product-confirmed 2026-06-01)
 > **Last verified:** 2026-06-07 (Phase C dead-path prune: permissions.go line refs updated after 8 phantom rows removed)
 > **Scope:** Capability registry gap surfaced by F-001 audit; introduces four View-grade caps so Tier-1 declarative authz can split read vs write on writable prefixes.
 > **Out of scope:** Tier-1 rule rewrite itself (F-001 landed — view/write split applied); Tier-2 enforcement; Postgres tripwire; codegen-from-OpenAPI (rejected per ADR 0007).

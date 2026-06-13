@@ -1,7 +1,8 @@
 # ADR 0017 — Signoff idempotency fingerprint = client-stable inputs only
 
-**Status:** accepted
 **Date:** 2026-06-01
+
+> **Status:** Accepted
 **Supersedes the F-002 fix in:** commit `aefb23ea8` (reorder + `stageIDForHash` empty-string fallback) — that change was merged but did not work end-to-end; see "Context" below.
 **Related:** [0007-two-tier-authz.md](0007-two-tier-authz.md), `internal/platform/idempotency`, `wiki/modules/approval.md`
 

@@ -1,7 +1,8 @@
 # ADR 0014 — Rename docgen-v2 service to docx-renderer
 
 **Date:** 2026-06-01
-**Status:** Accepted
+
+> **Status:** Accepted
 
 ## Context
 

@@ -1,6 +1,6 @@
 # ADR 0019 — `CapAuditRead` (Read-naming exception) and `CapSessionManage`
 
-> **Status:** accepted 2026-06-02 (PR-2 of 12-PR IAM Admin Center rebuild)
+> **Status:** Accepted (PR-2 of 12-PR IAM Admin Center rebuild)
 > **Last verified:** 2026-06-02
 > **Scope:** Registry additions ahead of PR-6 (audit trail handlers) and PR-7 (sessions & security handlers). Caps land **dormant** — no handler consumes them in this change.
 > **Out of scope:** Tier-1 `(method,path)→cap` wiring (PR-6/PR-7); Tier-2 enforcement; Postgres tripwire attachment; FE consumers.

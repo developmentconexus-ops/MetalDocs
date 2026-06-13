@@ -1,6 +1,6 @@
 # ADR 0018 — Approval Route Lifecycle
 
-> **Status:** accepted 2026-06-01 (drafted as the architectural baseline for the PR-4 frontend rewrite of the route admin page; codifies the lifecycle, OCC, in-use guard, capability pinning, and audit semantics already shipped by Approval Route Admin PR-2)
+> **Status:** Accepted (drafted as the architectural baseline for the PR-4 frontend rewrite of the route admin page; codifies the lifecycle, OCC, in-use guard, capability pinning, and audit semantics already shipped by Approval Route Admin PR-2)
 > **Last verified:** 2026-06-02 (PR-5 structural sweep: stale STAGE_ROLES path references updated to reflect PR-4 deletion)
 > **Scope:** Per-tenant approval route catalogue at `public.approval_routes` + `public.approval_route_stages`. State machine, version OCC, in-use deactivate guard, required-capability pin per stage, reason audit, deferred Tier-1 cap split.
 > **Out of scope:** Per-instance runtime (stage instances, signoff state machine — see `wiki/modules/approval.md` §6). Eligibility drift policies — listed in stage config but enforced at instance runtime, owned by `domain/drift.go`. New `GET /api/v1/iam/roles` endpoint — proposed below, deferred to PR-4 or its own micro-PR.
