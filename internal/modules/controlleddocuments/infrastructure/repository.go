@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
 type PostgresControlledDocumentRepository struct {
@@ -723,87 +721,6 @@ func (c *PostgresTemplateVersionChecker) GetTemplateVersionState(ctx context.Con
 	return &state, profileCode.String, nil
 }
 
-type TaxonomyProfileReader struct {
-	db *sql.DB
-}
-
-func NewTaxonomyProfileReader(db *sql.DB) *TaxonomyProfileReader {
-	return &TaxonomyProfileReader{db: db}
-}
-
-func (r *TaxonomyProfileReader) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error) {
-	const q = `
-SELECT code, tenant_id, family_code, name, description, review_interval_days,
-       default_template_version_id, owner_user_id, editable_by_role, archived_at, created_at
-FROM metaldocs.document_profiles
-WHERE tenant_id = $1 AND code = $2`
-
-	var profile taxonomydomain.DocumentProfile
-	var defaultTemplateVersionID sql.NullString
-	var ownerUserID sql.NullString
-	err := r.db.QueryRowContext(ctx, q, tenantID, code).Scan(
-		&profile.Code,
-		&profile.TenantID,
-		&profile.FamilyCode,
-		&profile.Name,
-		&profile.Description,
-		&profile.ReviewIntervalDays,
-		&defaultTemplateVersionID,
-		&ownerUserID,
-		&profile.EditableByRole,
-		&profile.ArchivedAt,
-		&profile.CreatedAt,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, taxonomydomain.ErrProfileNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("get taxonomy profile by code: %w", err)
-	}
-	profile.DefaultTemplateVersionID = nullStringPtr(defaultTemplateVersionID)
-	profile.OwnerUserID = nullStringPtr(ownerUserID)
-	return &profile, nil
-}
-
-type TaxonomyAreaReader struct {
-	db *sql.DB
-}
-
-func NewTaxonomyAreaReader(db *sql.DB) *TaxonomyAreaReader { return &TaxonomyAreaReader{db: db} }
-
-func (r *TaxonomyAreaReader) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.ProcessArea, error) {
-	const q = `
-SELECT code, tenant_id, name, description, parent_code, owner_user_id, default_approver_role, archived_at, created_at
-FROM metaldocs.document_process_areas
-WHERE tenant_id = $1 AND code = $2`
-
-	var area taxonomydomain.ProcessArea
-	var parentCode sql.NullString
-	var ownerUserID sql.NullString
-	var defaultApproverRole sql.NullString
-	err := r.db.QueryRowContext(ctx, q, tenantID, code).Scan(
-		&area.Code,
-		&area.TenantID,
-		&area.Name,
-		&area.Description,
-		&parentCode,
-		&ownerUserID,
-		&defaultApproverRole,
-		&area.ArchivedAt,
-		&area.CreatedAt,
-	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, taxonomydomain.ErrAreaNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("get taxonomy area by code: %w", err)
-	}
-	setNullableStringPtrField(&area, "ParentCode", parentCode)
-	area.OwnerUserID = nullStringPtr(ownerUserID)
-	area.DefaultApproverRole = nullStringPtr(defaultApproverRole)
-	return &area, nil
-}
-
 type rowScanner interface {
 	Scan(dest ...any) error
 }
@@ -878,16 +795,4 @@ func nullStringPtr(v sql.NullString) *string {
 	}
 	value := v.String
 	return &value
-}
-
-func setNullableStringPtrField(target any, fieldName string, v sql.NullString) {
-	field := reflect.ValueOf(target).Elem().FieldByName(fieldName)
-	if !v.Valid {
-		field.Set(reflect.Zero(field.Type()))
-		return
-	}
-	elemType := field.Type().Elem()
-	value := reflect.New(elemType)
-	value.Elem().Set(reflect.ValueOf(v.String).Convert(elemType))
-	field.Set(value)
 }

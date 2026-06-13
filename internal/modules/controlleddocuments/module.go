@@ -10,6 +10,7 @@ import (
 	dhttp "metaldocs/internal/modules/controlleddocuments/delivery/http"
 	"metaldocs/internal/modules/controlleddocuments/infrastructure"
 	taxonomyapp "metaldocs/internal/modules/taxonomy/application"
+	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
 )
 
 type Module struct {
@@ -31,8 +32,12 @@ func New(deps Dependencies) *Module {
 	repo := infrastructure.NewPostgresControlledDocumentRepository(deps.DB)
 	seq := infrastructure.NewPostgresSequenceAllocator(deps.DB)
 	tplCheck := infrastructure.NewPostgresTemplateVersionChecker(deps.DB)
-	profiles := infrastructure.NewTaxonomyProfileReader(deps.DB)
-	areas := infrastructure.NewTaxonomyAreaReader(deps.DB)
+	// Read profiles/areas through the canonical taxonomy repositories so the
+	// authz GUC and CapTaxonomyView check run on every lookup (H-1b). Every role
+	// that can create a controlled document already holds taxonomy.view, so the
+	// enforced capability is one the request actor already has.
+	profiles := infrastructure.NewTaxonomyProfileReader(taxonomyinfra.NewProfileRepository(deps.DB))
+	areas := infrastructure.NewTaxonomyAreaReader(taxonomyinfra.NewAreaRepository(deps.DB))
 	govLogger := taxonomyapp.NewAuditGovernanceAdapter(deps.AuditWriter)
 	svc := application.NewControlledDocumentService(deps.DB, repo, seq, tplCheck, profiles, areas, govLogger, nil)
 	h := dhttp.NewHandler(svc, deps.DB)
