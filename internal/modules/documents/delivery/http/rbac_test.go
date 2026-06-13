@@ -1,10 +1,11 @@
-package documentshttp
+package http
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"metaldocs/internal/modules/documents/application"
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/modules/render/fanout"
@@ -24,7 +25,7 @@ func TestView_ReaderWithoutAreaGrant_Returns403(t *testing.T) {
 }
 
 func TestView_ReaderWithGrant_Returns200(t *testing.T) {
-	h := NewViewHandler(fakeViewService{result: ViewResult{SignedURL: "https://s3.example/ok"}})
+	h := NewViewHandler(fakeViewService{result: application.ViewResult{SignedURL: "https://s3.example/ok"}})
 	rec := httptest.NewRecorder()
 	h.HandleView(rec, newViewReq("doc-1"))
 	if rec.Code != http.StatusOK {

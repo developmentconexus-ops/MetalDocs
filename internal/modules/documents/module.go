@@ -5,14 +5,11 @@ import (
 	"database/sql"
 	"net/http"
 
-	documentsapi "metaldocs/internal/modules/documents/api"
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	dhttp "metaldocs/internal/modules/documents/delivery/http"
-	documentshttp "metaldocs/internal/modules/documents/http"
 	"metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/platform/db"
-	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/ratelimit"
 )
 
@@ -24,10 +21,10 @@ type Module struct {
 	Handler                   *dhttp.Handler
 	Service                   *application.Service
 	ExportHandler             *dhttp.ExportHandler
-	FillInHandler             *documentshttp.FillInHandler
-	PlaceholderOptionsHandler *documentshttp.PlaceholderOptionsHandler
-	ViewHandler               *documentshttp.ViewHandler
-	ReconstructHandler        *documentshttp.ReconstructHandler
+	FillInHandler             *dhttp.FillInHandler
+	PlaceholderOptionsHandler *dhttp.PlaceholderOptionsHandler
+	ViewHandler               *dhttp.ViewHandler
+	ReconstructHandler        *dhttp.ReconstructHandler
 	repo                      *repository.Repository
 }
 
@@ -85,23 +82,25 @@ func New(deps Dependencies) *Module {
 	fillInSvc := application.NewFillInService(db.NewTxRunner(deps.DB), application.NewSnapshotSchemaReader(deps.DB), fillInRepo).
 		WithReader(fillInRepo).
 		WithTemplateSchemaReader(application.NewTemplateVersionSchemaReader(deps.DB))
-	fillInHandler := documentshttp.NewFillInHandler(fillInSvc)
-	placeholderOptionsHandler := documentshttp.NewPlaceholderOptionsHandler(
+	fillInHandler := dhttp.NewFillInHandler(fillInSvc)
+	placeholderOptionsHandler := dhttp.NewPlaceholderOptionsHandler(
 		application.NewSnapshotSchemaReader(deps.DB),
 		newPlaceholderOptionsIAMAdapter(deps.IAMUserOptions),
 	)
 
-	var viewHandler *documentshttp.ViewHandler
+	var viewHandler *dhttp.ViewHandler
 	if deps.Presign != nil && deps.DB != nil {
 		viewSvc := application.NewViewService(db.NewTxRunner(deps.DB), deps.Presign, nil)
-		viewHandler = documentshttp.NewViewHandler(viewSvc)
+		viewHandler = dhttp.NewViewHandler(viewSvc)
 	}
 
-	var reconstructHandler *documentshttp.ReconstructHandler
+	var reconstructHandler *dhttp.ReconstructHandler
 	if deps.ReconstructRunner != nil && deps.DB != nil {
 		reconstructSvc := application.NewReconstructionService(db.NewTxRunner(deps.DB), deps.ReconstructRunner)
-		reconstructHandler = documentshttp.NewReconstructHandler(reconstructSvc)
+		reconstructHandler = dhttp.NewReconstructHandler(reconstructSvc)
 	}
+
+	h.WithSubHandlers(exportHandler, fillInHandler, placeholderOptionsHandler, viewHandler, reconstructHandler)
 
 	return &Module{
 		Handler:                   h,
@@ -116,61 +115,14 @@ func New(deps Dependencies) *Module {
 }
 
 func (m *Module) RegisterRoutes(mux *http.ServeMux) {
-	legacyMux := m.buildLegacyMux(nil, nil)
-	documentsapi.HandlerWithOptions(
-		dhttp.NewGeneratedServerAdapter(legacyMux),
-		documentsapi.StdHTTPServerOptions{
-			BaseRouter: mux,
-			BaseURL:    "/api/v1",
-			ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-				_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
-			},
-		},
-	)
+	m.Handler.RegisterRoutes(mux)
 }
 
 func (m *Module) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
-	legacyMux := m.buildLegacyMux(rl, userFn)
-	documentsapi.HandlerWithOptions(
-		dhttp.NewGeneratedServerAdapter(legacyMux),
-		documentsapi.StdHTTPServerOptions{
-			BaseRouter: mux,
-			BaseURL:    "/api/v1",
-			ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-				_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
-			},
-		},
-	)
+	m.Handler.RegisterRoutesWithRateLimit(mux, rl, userFn)
 }
 
 func (m *Module) Repo() *repository.Repository { return m.repo }
-
-func (m *Module) buildLegacyMux(rl *ratelimit.Middleware, userFn func(*http.Request) string) *http.ServeMux {
-	legacyMux := http.NewServeMux()
-	if rl == nil || userFn == nil {
-		m.Handler.RegisterRoutes(legacyMux)
-		if m.ExportHandler != nil {
-			m.ExportHandler.RegisterRoutes(legacyMux)
-		}
-	} else {
-		m.Handler.RegisterRoutesWithRateLimit(legacyMux, rl, userFn)
-		if m.ExportHandler != nil {
-			m.ExportHandler.RegisterRoutesWithRateLimit(legacyMux, rl, userFn)
-		}
-	}
-
-	m.FillInHandler.RegisterRoutes(legacyMux)
-	if m.PlaceholderOptionsHandler != nil {
-		m.PlaceholderOptionsHandler.RegisterRoutes(legacyMux)
-	}
-	if m.ViewHandler != nil {
-		m.ViewHandler.RegisterRoutes(legacyMux)
-	}
-	if m.ReconstructHandler != nil {
-		m.ReconstructHandler.RegisterRoutes(legacyMux)
-	}
-	return legacyMux
-}
 
 type placeholderOptionsIAMAdapter struct {
 	reader application.IAMUserOptionsReader
@@ -180,17 +132,17 @@ func newPlaceholderOptionsIAMAdapter(reader application.IAMUserOptionsReader) *p
 	return &placeholderOptionsIAMAdapter{reader: reader}
 }
 
-func (a *placeholderOptionsIAMAdapter) ListUserOptions(ctx context.Context, tenantID string) ([]documentshttp.UserOptionView, error) {
+func (a *placeholderOptionsIAMAdapter) ListUserOptions(ctx context.Context, tenantID string) ([]dhttp.UserOptionView, error) {
 	if a.reader == nil {
-		return []documentshttp.UserOptionView{}, nil
+		return []dhttp.UserOptionView{}, nil
 	}
 	opts, err := a.reader.ListUserOptions(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]documentshttp.UserOptionView, 0, len(opts))
+	out := make([]dhttp.UserOptionView, 0, len(opts))
 	for _, opt := range opts {
-		out = append(out, documentshttp.UserOptionView{
+		out = append(out, dhttp.UserOptionView{
 			UserID:      opt.UserID,
 			DisplayName: opt.DisplayName,
 		})

@@ -339,8 +339,8 @@ func TestGetDocument_EmbedsFormDataJSON(t *testing.T) {
 	svc := &fakeSvc{}
 	mux := newMux(t, svc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1", nil)
-	req.SetPathValue("id", "doc_1")
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/11111111-1111-4111-8111-111111111111", nil)
+	req.SetPathValue("id", "11111111-1111-4111-8111-111111111111")
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -383,8 +383,8 @@ func TestGetDocument_ReturnsCurrentRevisionArtifactMetadata(t *testing.T) {
 	}}
 	mux := newMux(t, svc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1", nil)
-	req.SetPathValue("id", "doc_1")
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/11111111-1111-4111-8111-111111111111", nil)
+	req.SetPathValue("id", "11111111-1111-4111-8111-111111111111")
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -489,7 +489,7 @@ func TestListDocuments_AdminSeesAllVsOwnScope(t *testing.T) {
 func TestAcquireSession_Happy(t *testing.T) {
 	mux := newMux(t, &fakeSvc{acquireSession: &domain.Session{ID: "sess_1"}})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/session/acquire", bytes.NewReader([]byte(`{}`)))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/session/acquire", bytes.NewReader([]byte(`{}`)))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -505,7 +505,7 @@ func TestAcquireSession_Happy(t *testing.T) {
 func TestAcquireSession_Forbidden(t *testing.T) {
 	mux := newMux(t, &fakeSvc{notOwner: true}) // fakeCaps{admin:false}, not the owner
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/session/acquire", bytes.NewReader([]byte(`{}`)))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/session/acquire", bytes.NewReader([]byte(`{}`)))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -519,7 +519,7 @@ func TestCommitAutosave_IdempotentReplay_Returns200(t *testing.T) {
 	mux := newMux(t, &fakeSvc{commitResult: &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2, AlreadyConsumed: true}})
 
 	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1}}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/autosave/commit", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -551,7 +551,7 @@ func TestCommitAutosave_AcceptsPageCountAndReturnsArtifactMetadata(t *testing.T)
 	mux := newMux(t, svc)
 
 	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1},"page_count":3}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/autosave/commit", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -582,7 +582,7 @@ func TestCommitAutosave_InvalidPageCountUsesProblemEnvelope(t *testing.T) {
 	mux := newMux(t, &fakeSvc{commitErr: domain.ErrInvalidPageCount})
 
 	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","page_count":0}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/autosave/commit", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -606,7 +606,7 @@ func TestForceReleaseSession_HandlerNoLongerRoleGates(t *testing.T) {
 	mux := newMux(t, &fakeSvc{}) // fakeCaps{admin:false} — handler does not gate
 
 	body := []byte(`{"session_id":"sess_1"}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/session/force-release", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/session/force-release", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -621,7 +621,7 @@ func TestRenameDocument_Happy(t *testing.T) {
 	mux := newMux(t, svc)
 
 	body := []byte(`{"name":"Updated Name"}`)
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/11111111-1111-4111-8111-111111111111", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -639,7 +639,7 @@ func TestRenameDocument_EmptyName_Returns400(t *testing.T) {
 	mux := newMux(t, svc)
 
 	body := []byte(`{"name":"   "}`)
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/11111111-1111-4111-8111-111111111111", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -654,7 +654,7 @@ func TestRenameDocument_NameTooLong_Returns400WithoutCallingService(t *testing.T
 	mux := newMux(t, svc)
 
 	body := []byte(`{"name":"` + strings.Repeat("a", 256) + `"}`)
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/11111111-1111-4111-8111-111111111111", bytes.NewReader(body))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -670,7 +670,7 @@ func TestRenameDocument_NameTooLong_Returns400WithoutCallingService(t *testing.T
 func TestFinalizeDocument_MissingIdempotencyKey_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", nil)
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -683,7 +683,7 @@ func TestFinalizeDocument_MissingIdempotencyKey_Returns400(t *testing.T) {
 func TestFinalizeDocument_InvalidIdempotencyKey_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", nil)
 	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "not-a-uuid")
 	rr := httptest.NewRecorder()
@@ -701,7 +701,7 @@ func TestFinalizeDocument_ProfileNotFoundUsesProblemEnvelope(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste"}`)))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste"}`)))
 	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	rr := httptest.NewRecorder()
@@ -728,7 +728,7 @@ func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
 	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", key)
 	if tid, err := tenant.FromContext(req.Context()); err != nil || tid == "" {
@@ -772,7 +772,7 @@ func TestFinalizeDocument_ContentHashQueryNoRows_ContinuesWithEmptyHash(t *testi
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
 	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	rr := httptest.NewRecorder()
@@ -808,7 +808,7 @@ func TestFinalizeDocument_ContentHashQueryError_Returns500(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
 	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	rr := httptest.NewRecorder()
@@ -825,8 +825,8 @@ func TestFinalizeDocument_ContentHashQueryError_Returns500(t *testing.T) {
 func TestDuplicateDocument_InternalError_DoesNotLeakDetail(t *testing.T) {
 	mux := newMux(t, &fakeSvc{duplicateErr: errors.New("sensitive db detail")})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/duplicate", nil)
-	req.SetPathValue("id", "doc_1")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/duplicate", nil)
+	req.SetPathValue("id", "11111111-1111-4111-8111-111111111111")
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -842,7 +842,7 @@ func TestDuplicateDocument_InternalError_DoesNotLeakDetail(t *testing.T) {
 func TestCreateCheckpoint_EmptyLabel_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/checkpoints", bytes.NewReader([]byte(`{"label":"   "}`)))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/checkpoints", bytes.NewReader([]byte(`{"label":"   "}`)))
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
@@ -882,8 +882,8 @@ func TestFinalizeDocument_SubmitPathDoesNotCallLegacyFinalize(t *testing.T) {
 func TestListRevisionHistory_ReturnsGovernedItems(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1/revision-history", nil)
-	req.SetPathValue("id", "doc_1")
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/11111111-1111-4111-8111-111111111111/revision-history", nil)
+	req.SetPathValue("id", "11111111-1111-4111-8111-111111111111")
 	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 

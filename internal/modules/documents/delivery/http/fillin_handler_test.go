@@ -1,4 +1,4 @@
-package documentshttp
+package http
 
 import (
 	"bytes"

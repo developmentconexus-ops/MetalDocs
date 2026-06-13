@@ -26,9 +26,19 @@ var errorWriterCodeArg = map[string]int{
 	"WriteError":         2, // httpresponse.WriteError(w, status, code, message)
 }
 
+// guardExcludedFiles names files inside an otherwise-guarded directory that own a
+// separate, documented dotted-code taxonomy and are exempt from the canonical-catalog
+// check. fillin_handler.go defines the documents fill-in taxonomy (not_found.revision,
+// validation.failed, internal.unknown, ...) shared by the view/reconstruct/
+// placeholder-options handlers; H-1e relocated it into documents/delivery/http but it
+// retains its own taxonomy.
+var guardExcludedFiles = map[string]bool{
+	"fillin_handler.go": true,
+}
+
 // guardedPackages are the HTTP packages whose error vocabulary Family 4
 // standardized onto the canonical catalog (codes.go). The dotted-taxonomy
-// packages (documents/http fill-in, documents/approval/http) are intentionally
+// packages (documents fill-in (see guardExcludedFiles), documents/approval/http) are intentionally
 // excluded: they own a separate, documented code taxonomy.
 var guardedPackages = []string{
 	filepath.Join("internal", "modules", "documents", "delivery", "http"),
@@ -44,7 +54,7 @@ var guardedPackages = []string{
 	filepath.Join("internal", "modules", "audit", "delivery", "http"),
 	filepath.Join("internal", "modules", "security", "delivery", "http"),
 	filepath.Join("internal", "modules", "search", "delivery", "http"),
-	"pdf_webhook", // documents/http: only the pdf-complete webhook handler
+	"pdf_webhook", // documents/delivery/http: only the pdf-complete webhook handler
 	// F-09 Wave 2.4: only handler.go is on the canonical catalog. The sibling
 	// routes.go (writeDomainError) owns a separate CD/template domain taxonomy
 	// — including dotted codes (template.artifact_missing) — that is intentionally
@@ -98,7 +108,7 @@ func canonicalCodeNames(t *testing.T, root string) map[string]bool {
 func resolvePkgFiles(t *testing.T, root, entry string) []string {
 	t.Helper()
 	if entry == "pdf_webhook" {
-		return []string{filepath.Join(root, "internal", "modules", "documents", "http", "pdf_webhook_handler.go")}
+		return []string{filepath.Join(root, "internal", "modules", "documents", "delivery", "http", "pdf_webhook_handler.go")}
 	}
 	if entry == "controlleddocuments_handler" {
 		return []string{filepath.Join(root, "internal", "modules", "controlleddocuments", "delivery", "http", "handler.go")}
@@ -112,6 +122,9 @@ func resolvePkgFiles(t *testing.T, root, entry string) []string {
 	for _, de := range dirEntries {
 		name := de.Name()
 		if de.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		if guardExcludedFiles[name] {
 			continue
 		}
 		files = append(files, filepath.Join(dir, name))

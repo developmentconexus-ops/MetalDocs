@@ -1,4 +1,4 @@
-package documentshttp
+package http
 
 import (
 	"context"
@@ -6,17 +6,13 @@ import (
 	"log/slog"
 	"net/http"
 
+	"metaldocs/internal/modules/documents/application"
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 )
 
-type ViewResult struct {
-	PDFStatus string // "pending" | "ready" | "failed"
-	SignedURL string // populated only when PDFStatus == "ready"
-}
-
 type ViewService interface {
-	GetViewURL(ctx context.Context, tenantID, actorID, docID string) (ViewResult, error)
+	GetViewURL(ctx context.Context, tenantID, actorID, docID string) (application.ViewResult, error)
 }
 
 type ViewHandler struct {

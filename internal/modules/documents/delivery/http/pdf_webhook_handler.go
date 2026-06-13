@@ -1,4 +1,4 @@
-package documentshttp
+package http
 
 import (
 	"bytes"
@@ -23,6 +23,8 @@ type PDFWriter interface {
 	ResolveTenantByDocumentID(ctx context.Context, docID string) (string, error)
 }
 
+// NOTE (H-1e): relocated from documents/http during the delivery collapse. This internal HMAC webhook is documented as a live route (wiki/modules/documents.md) but its RegisterRoutes is not called anywhere — it is currently UNWIRED. Wiring it (and the docgen completion-callback integration) is a separate, security-sensitive decision flagged for operator review; behavior is preserved (route remains unregistered) in H-1e.
+//
 // PDFWebhookHandler receives completion callbacks from docgen_v2_pdf workers.
 // Authentication is HMAC-SHA256 over the raw request body, shared secret in env.
 type PDFWebhookHandler struct {

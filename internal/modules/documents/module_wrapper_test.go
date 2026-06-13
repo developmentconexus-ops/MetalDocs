@@ -12,7 +12,6 @@ import (
 	"metaldocs/internal/modules/documents/application"
 	dhttp "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/domain"
-	documentshttp "metaldocs/internal/modules/documents/http"
 	"metaldocs/internal/modules/documents/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
@@ -122,15 +121,19 @@ func (r moduleSchemaReader) LoadPlaceholderSchema(context.Context, string, strin
 
 type moduleIAMReader struct{}
 
-func (r moduleIAMReader) ListUserOptions(context.Context, string) ([]documentshttp.UserOptionView, error) {
-	return []documentshttp.UserOptionView{{UserID: "u1", DisplayName: "User 1"}}, nil
+func (r moduleIAMReader) ListUserOptions(context.Context, string) ([]dhttp.UserOptionView, error) {
+	return []dhttp.UserOptionView{{UserID: "u1", DisplayName: "User 1"}}, nil
 }
 
 func newWrapperTestModule() *Module {
+	fillIn := dhttp.NewFillInHandler(&moduleFillInService{})
+	placeholderOpts := dhttp.NewPlaceholderOptionsHandler(moduleSchemaReader{}, moduleIAMReader{})
+	h := dhttp.NewHandler(&moduleTestService{})
+	h.WithSubHandlers(nil, fillIn, placeholderOpts, nil, nil)
 	return &Module{
-		Handler:                   dhttp.NewHandler(&moduleTestService{}),
-		FillInHandler:             documentshttp.NewFillInHandler(&moduleFillInService{}),
-		PlaceholderOptionsHandler: documentshttp.NewPlaceholderOptionsHandler(moduleSchemaReader{}, moduleIAMReader{}),
+		Handler:                   h,
+		FillInHandler:             fillIn,
+		PlaceholderOptionsHandler: placeholderOpts,
 	}
 }
 

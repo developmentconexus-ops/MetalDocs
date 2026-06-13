@@ -71,12 +71,17 @@ type finalizeIdempotencyStore interface {
 }
 
 type Handler struct {
-	svc           Service
-	db            *sql.DB
-	runner        db.TxRunner
-	submitSvc     approvalSubmitter
-	idempFinalize finalizeIdempotencyStore
-	caps          application.CapabilityChecker
+	svc             Service
+	db              *sql.DB
+	runner          db.TxRunner
+	submitSvc       approvalSubmitter
+	idempFinalize   finalizeIdempotencyStore
+	caps            application.CapabilityChecker
+	export          *ExportHandler
+	fillIn          *FillInHandler
+	placeholderOpts *PlaceholderOptionsHandler
+	view            *ViewHandler
+	reconstruct     *ReconstructHandler
 }
 
 var writeJSON = httpresponse.WriteJSON
@@ -84,6 +89,17 @@ var writeJSON = httpresponse.WriteJSON
 // WithCaps binds the tier-1 capability checker used to resolve system_admin.
 func (h *Handler) WithCaps(c application.CapabilityChecker) *Handler {
 	h.caps = c
+	return h
+}
+
+// WithSubHandlers attaches optional sub-handlers that cover routes outside the
+// core Handler. Routes for nil sub-handlers are skipped in registerRoutes.
+func (h *Handler) WithSubHandlers(export *ExportHandler, fillIn *FillInHandler, placeholderOpts *PlaceholderOptionsHandler, view *ViewHandler, reconstruct *ReconstructHandler) *Handler {
+	h.export = export
+	h.fillIn = fillIn
+	h.placeholderOpts = placeholderOpts
+	h.view = view
+	h.reconstruct = reconstruct
 	return h
 }
 
@@ -115,70 +131,84 @@ func NewHandlerWithSubmitAndFinalizeStore(svc Service, database *sql.DB, submitS
 	return h
 }
 
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/documents", h.listDocuments)
-	mux.HandleFunc("GET /api/v1/documents/stats", h.documentStats)
-
-	mux.HandleFunc("GET /api/v1/documents/{id}", h.getDocument)
-	mux.HandleFunc("PATCH /api/v1/documents/{id}", h.renameDocument)
-	mux.HandleFunc("POST /api/v1/documents/{id}/finalize", h.finalizeDocument)
-	mux.HandleFunc("POST /api/v1/documents/{id}/archive", h.archiveDocument)
-	mux.HandleFunc("POST /api/v1/documents/{id}/duplicate", h.duplicateDocument)
-
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/acquire", h.acquireSession)
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/heartbeat", h.heartbeatSession)
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/release", h.releaseSession)
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/force-release", h.forceReleaseSession)
-
-	mux.HandleFunc("POST /api/v1/documents/{id}/autosave/presign", h.presignAutosave)
-	mux.HandleFunc("POST /api/v1/documents/{id}/autosave/commit", h.commitAutosave)
-
-	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", h.listCheckpoints)
-	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", h.createCheckpoint)
-	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints/{version}/restore", h.restoreCheckpoint)
-	mux.HandleFunc("GET /api/v1/documents/{id}/revision-history", h.listRevisionHistory)
-
-	mux.HandleFunc("GET /api/v1/documents/{id}/revisions/{rid}/url", h.signedRevisionURL)
-	mux.HandleFunc("GET /api/v1/documents/{id}/comments", h.listComments)
-	mux.HandleFunc("POST /api/v1/documents/{id}/comments", h.createComment)
-	mux.HandleFunc("PATCH /api/v1/documents/{id}/comments/{library_id}", h.updateComment)
-	mux.HandleFunc("DELETE /api/v1/documents/{id}/comments/{library_id}", h.deleteComment)
-}
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) { h.registerRoutes(mux, nil, nil) }
 
 func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
-	mux.HandleFunc("GET /api/v1/documents", h.listDocuments)
-	mux.HandleFunc("GET /api/v1/documents/stats", h.documentStats)
+	h.registerRoutes(mux, rl, userFn)
+}
 
-	mux.HandleFunc("GET /api/v1/documents/{id}", h.getDocument)
-	mux.HandleFunc("PATCH /api/v1/documents/{id}", h.renameDocument)
-	mux.HandleFunc("POST /api/v1/documents/{id}/finalize", h.finalizeDocument)
-	mux.HandleFunc("POST /api/v1/documents/{id}/archive", h.archiveDocument)
-	mux.HandleFunc("POST /api/v1/documents/{id}/duplicate", h.duplicateDocument)
+func (h *Handler) registerRoutes(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
+	wrapper := documentsapi.ServerInterfaceWrapper{
+		Handler: h,
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			_ = problem.Write(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
+		},
+	}
+	rateLimited := rl != nil && userFn != nil
 
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/acquire", h.acquireSession)
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/heartbeat", h.heartbeatSession)
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/release", h.releaseSession)
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/force-release", h.forceReleaseSession)
+	// Core unconditional routes.
+	mux.HandleFunc("GET /api/v1/documents", wrapper.ListDocuments)
+	mux.HandleFunc("GET /api/v1/documents/stats", wrapper.DocumentStats)
+	mux.HandleFunc("GET /api/v1/documents/{id}", wrapper.GetDocument)
+	mux.HandleFunc("PATCH /api/v1/documents/{id}", wrapper.RenameDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/finalize", wrapper.FinalizeDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/archive", wrapper.ArchiveDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/duplicate", wrapper.DuplicateDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/acquire", wrapper.AcquireDocumentSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/heartbeat", wrapper.HeartbeatDocumentSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/release", wrapper.ReleaseDocumentSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/force-release", wrapper.ForceReleaseDocumentSession)
+	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", wrapper.ListDocumentCheckpoints)
+	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", wrapper.CreateDocumentCheckpoint)
+	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints/{version}/restore", wrapper.RestoreDocumentCheckpoint)
+	mux.HandleFunc("GET /api/v1/documents/{id}/revision-history", wrapper.GetDocumentRevisionHistory)
+	mux.HandleFunc("GET /api/v1/documents/{id}/revisions/{rid}/url", wrapper.GetDocumentRevisionUrl)
+	mux.HandleFunc("GET /api/v1/documents/{id}/comments", wrapper.ListDocumentComments)
+	mux.HandleFunc("POST /api/v1/documents/{id}/comments", wrapper.CreateDocumentComment)
+	mux.HandleFunc("PATCH /api/v1/documents/{id}/comments/{library_id}", wrapper.UpdateDocumentComment)
+	mux.HandleFunc("DELETE /api/v1/documents/{id}/comments/{library_id}", wrapper.DeleteDocumentComment)
 
-	mux.Handle(
-		"POST /api/v1/documents/{id}/autosave/presign",
-		rl.Limit(ratelimit.RouteAutosavePresign, userFn, http.HandlerFunc(h.presignAutosave)),
-	)
-	mux.Handle(
-		"POST /api/v1/documents/{id}/autosave/commit",
-		rl.Limit(ratelimit.RouteAutosaveCommit, userFn, http.HandlerFunc(h.commitAutosave)),
-	)
+	// Autosave routes — rate-limited when rl+userFn provided.
+	if rateLimited {
+		mux.Handle("POST /api/v1/documents/{id}/autosave/presign",
+			rl.Limit(ratelimit.RouteAutosavePresign, userFn, http.HandlerFunc(wrapper.PresignDocumentAutosave)))
+		mux.Handle("POST /api/v1/documents/{id}/autosave/commit",
+			rl.Limit(ratelimit.RouteAutosaveCommit, userFn, http.HandlerFunc(wrapper.CommitDocumentAutosave)))
+	} else {
+		mux.HandleFunc("POST /api/v1/documents/{id}/autosave/presign", wrapper.PresignDocumentAutosave)
+		mux.HandleFunc("POST /api/v1/documents/{id}/autosave/commit", wrapper.CommitDocumentAutosave)
+	}
 
-	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", h.listCheckpoints)
-	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", h.createCheckpoint)
-	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints/{version}/restore", h.restoreCheckpoint)
-	mux.HandleFunc("GET /api/v1/documents/{id}/revision-history", h.listRevisionHistory)
+	// Export routes — guarded: only when export sub-handler is wired.
+	if h.export != nil {
+		mux.HandleFunc("GET /api/v1/documents/{id}/export/docx-url", wrapper.GetDocumentDocxURL)
+		if rateLimited {
+			mux.Handle("POST /api/v1/documents/{id}/export/pdf",
+				rl.Limit(ratelimit.RouteExportPDF, userFn, http.HandlerFunc(wrapper.ExportDocumentPDF)))
+		} else {
+			mux.HandleFunc("POST /api/v1/documents/{id}/export/pdf", wrapper.ExportDocumentPDF)
+		}
+	}
 
-	mux.HandleFunc("GET /api/v1/documents/{id}/revisions/{rid}/url", h.signedRevisionURL)
-	mux.HandleFunc("GET /api/v1/documents/{id}/comments", h.listComments)
-	mux.HandleFunc("POST /api/v1/documents/{id}/comments", h.createComment)
-	mux.HandleFunc("PATCH /api/v1/documents/{id}/comments/{library_id}", h.updateComment)
-	mux.HandleFunc("DELETE /api/v1/documents/{id}/comments/{library_id}", h.deleteComment)
+	// Fill-in routes — unconditional: fillIn is a mandatory sub-handler (always wired at module.go).
+	mux.HandleFunc("GET /api/v1/documents/{id}/fill-in-schema", wrapper.GetDocumentFillInSchema)
+	mux.HandleFunc("GET /api/v1/documents/{id}/placeholders", wrapper.ListDocumentPlaceholderValues)
+	mux.HandleFunc("PUT /api/v1/documents/{id}/placeholders/{pid}", wrapper.PutDocumentPlaceholderValue)
+
+	// Placeholder-options route — guarded: only when placeholderOpts sub-handler is wired.
+	if h.placeholderOpts != nil {
+		mux.HandleFunc("GET /api/v1/documents/{id}/placeholder-options/{pid}", wrapper.GetDocumentPlaceholderOptions)
+	}
+
+	// View route — guarded: only when view sub-handler is wired.
+	if h.view != nil {
+		mux.HandleFunc("GET /api/v1/documents/{id}/view", wrapper.ViewDocument)
+	}
+
+	// Reconstruct route — guarded: only when reconstruct sub-handler is wired.
+	if h.reconstruct != nil {
+		mux.HandleFunc("POST /api/v1/documents/{id}/reconstruct", wrapper.ReconstructDocument)
+	}
 }
 
 func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {

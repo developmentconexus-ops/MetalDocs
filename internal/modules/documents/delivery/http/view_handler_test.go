@@ -1,4 +1,4 @@
-package documentshttp
+package http
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"metaldocs/internal/modules/documents/application"
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -14,13 +15,13 @@ import (
 )
 
 type fakeViewService struct {
-	result ViewResult
+	result application.ViewResult
 	err    error
 }
 
-func (f fakeViewService) GetViewURL(_ context.Context, _, _, _ string) (ViewResult, error) {
+func (f fakeViewService) GetViewURL(_ context.Context, _, _, _ string) (application.ViewResult, error) {
 	if f.err != nil {
-		return ViewResult{}, f.err
+		return application.ViewResult{}, f.err
 	}
 	return f.result, nil
 }
@@ -34,7 +35,7 @@ func newViewReq(docID string) *http.Request {
 }
 
 func TestViewHandler_ApprovedReturnsSignedURL(t *testing.T) {
-	h := NewViewHandler(fakeViewService{result: ViewResult{PDFStatus: "ready", SignedURL: "https://s3.example/signed?x=1"}})
+	h := NewViewHandler(fakeViewService{result: application.ViewResult{PDFStatus: "ready", SignedURL: "https://s3.example/signed?x=1"}})
 
 	rec := httptest.NewRecorder()
 	h.HandleView(rec, newViewReq("doc-1"))
@@ -56,7 +57,7 @@ func TestViewHandler_ApprovedReturnsSignedURL(t *testing.T) {
 func TestViewHandler_PublishedReturnsSignedURL(t *testing.T) {
 	// Handler does not distinguish status — service does. From handler
 	// perspective the behavior is identical to approved: success with URL.
-	h := NewViewHandler(fakeViewService{result: ViewResult{PDFStatus: "ready", SignedURL: "https://s3.example/pub"}})
+	h := NewViewHandler(fakeViewService{result: application.ViewResult{PDFStatus: "ready", SignedURL: "https://s3.example/pub"}})
 
 	rec := httptest.NewRecorder()
 	h.HandleView(rec, newViewReq("doc-pub"))
@@ -89,7 +90,7 @@ func TestViewHandler_MissingAreaGrantReturns403(t *testing.T) {
 }
 
 func TestViewHandler_PDFPendingReturns200WithStatus(t *testing.T) {
-	h := NewViewHandler(fakeViewService{result: ViewResult{PDFStatus: "pending"}})
+	h := NewViewHandler(fakeViewService{result: application.ViewResult{PDFStatus: "pending"}})
 
 	rec := httptest.NewRecorder()
 	h.HandleView(rec, newViewReq("doc-pending"))
@@ -110,7 +111,7 @@ func TestViewHandler_PDFPendingReturns200WithStatus(t *testing.T) {
 }
 
 func TestHandleView_ReadyReturnsURL(t *testing.T) {
-	h := NewViewHandler(fakeViewService{result: ViewResult{PDFStatus: "ready", SignedURL: "https://s3.example/x.pdf"}})
+	h := NewViewHandler(fakeViewService{result: application.ViewResult{PDFStatus: "ready", SignedURL: "https://s3.example/x.pdf"}})
 
 	rec := httptest.NewRecorder()
 	h.HandleView(rec, newViewReq("doc-ready"))

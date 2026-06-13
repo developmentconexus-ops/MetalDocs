@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
-	documentshttp "metaldocs/internal/modules/documents/http"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -42,9 +41,9 @@ var viewableStatuses = map[string]struct{}{
 	string(v2dom.DocStatusPublished): {},
 }
 
-func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID string) (documentshttp.ViewResult, error) {
+func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID string) (ViewResult, error) {
 	ctx = authz.WithCapCache(ctx)
-	var result documentshttp.ViewResult
+	var result ViewResult
 	if err := s.runner.DoReadOnly(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 			return err
@@ -82,7 +81,7 @@ func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID s
 			if err != nil {
 				return fmt.Errorf("view: presign: %w", err)
 			}
-			result = documentshttp.ViewResult{PDFStatus: "ready", SignedURL: url}
+			result = ViewResult{PDFStatus: "ready", SignedURL: url}
 			return nil
 		}
 
@@ -92,10 +91,10 @@ func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID s
 				pdfStatus = "failed"
 			}
 		}
-		result = documentshttp.ViewResult{PDFStatus: pdfStatus}
+		result = ViewResult{PDFStatus: pdfStatus}
 		return nil
 	}); err != nil {
-		return documentshttp.ViewResult{}, err
+		return ViewResult{}, err
 	}
 	return result, nil
 }
