@@ -153,7 +153,7 @@ The operator overrode D-1/D-3 and ordered a zero-defer finish (register-zero + o
 | A2 | 🔒 Major | LIKE wildcard injection (`opts.Q` unescaped, CWE-943) | ✅ | (this commit) | `buildDocumentFilter` now wraps `opts.Q` with `sqlescape.LikeEscape()` + `name ILIKE $N ESCAPE '\'`. New `TestBuildDocumentFilter_EscapesLikeWildcards` asserts `%a\%b\_c\\d%` + ESCAPE clause. repo tests ✓. |
 | A3 | 🔒 Major | self-service password change does not revoke sessions (CWE-613) | ✅ | (this commit) | `ChangePasswordForUser` now ends with `RevokeSessionsByUserID` (mirrors `AdminResetPassword`). New `TestChangePasswordForUser_RevokesSessions`: session resolves before, fails to resolve after. auth tests ✓. |
 | A4 | 🔒 Major | sliding idle timeout ships disabled (default 0) + absent from deploy artifacts | ✅ | (this commit) | `config.go` default `sessionIdleMinutes` 0→30 (backend-standardization param); `METALDOCS_AUTH_SESSION_IDLE_MINUTES=30` added to `.env.example` + `docker-compose.yml`. Behavior covered by existing `TestResolveSession_IdleTimeout` (30m window). |
-| A5 | 📑 Major | `PATCH /iam/users/{id}` returns ad-hoc map, spec declares `ManagedUserCore` (breaks FE codegen) | ☐ | | |
+| A5 | 📑 Major | `PATCH /iam/users/{id}` returns ad-hoc map, spec declares `ManagedUserCore` (breaks FE codegen) | ✅ | (this commit) | `handlePatch` now re-reads via new `PeopleService.Get` and returns `toManagedUserCore(updated)`. Spec already declared `ManagedUserCore` (openapi.yaml:263) → no spec/codegen change; FE types already match. iam delivery tests ✓. |
 | A6 | 📑 Major | `GET /documents` + `/documents/{id}` return domain structs / `map[string]any`, not generated types | ☐ | | |
 
 ### Tier 2 — Architecture debt (lifts the 3 C-grades)

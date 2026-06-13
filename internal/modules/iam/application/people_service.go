@@ -437,6 +437,54 @@ func hasMetadataUpdate(input PatchInput) bool {
 	return input.DisplayName != nil || input.Email != nil || input.IsActive != nil || input.MustChangePassword != nil
 }
 
+// Get returns a single tenant user enriched with the canonical tenant role and
+// active area memberships, shaped for the ManagedUserCore response. Returns
+// ErrUserNotInTenant if the user is not a member of the tenant. Unlike the
+// legacy ListFiltered read path, membership errors are propagated, not swallowed.
+func (s *PeopleService) Get(ctx context.Context, tenantID, userID string) (ListedUser, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	userID = strings.TrimSpace(userID)
+	if tenantID == "" || userID == "" {
+		return ListedUser{}, fmt.Errorf("%w: tenant and userId required", ErrPeopleValidation)
+	}
+	managed, err := s.auth.ListUsers(ctx, tenantID)
+	if err != nil {
+		return ListedUser{}, err
+	}
+	for _, m := range managed {
+		if m.UserID != userID {
+			continue
+		}
+		tenantRole := iamdomain.RoleViewer
+		if len(m.Roles) > 0 {
+			tenantRole = m.Roles[0]
+		}
+		var areas []iamdomain.UserProcessArea
+		if s.memberships != nil {
+			areas, err = s.memberships.ListActive(ctx, m.UserID, tenantID)
+			if err != nil {
+				return ListedUser{}, err
+			}
+		}
+		return ListedUser{
+			UserID:              m.UserID,
+			Username:            m.Username,
+			Email:               m.Email,
+			DisplayName:         m.DisplayName,
+			IsActive:            m.IsActive,
+			MustChangePassword:  m.MustChangePassword,
+			LastLoginAt:         m.LastLoginAt,
+			LockedUntil:         m.LockedUntil,
+			FailedLoginAttempts: m.FailedLoginAttempts,
+			CreatedAt:           m.CreatedAt,
+			UpdatedAt:           m.UpdatedAt,
+			TenantRole:          tenantRole,
+			AreaMemberships:     areas,
+		}, nil
+	}
+	return ListedUser{}, ErrUserNotInTenant
+}
+
 // BulkAction applies a per-user mutation, isolating failures so one bad userId
 // does not block the rest. force-logout is intentionally not implemented in
 // PR-4; PR-7 will provide it once the session-manage path lands.

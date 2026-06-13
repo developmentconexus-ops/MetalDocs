@@ -225,11 +225,14 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	// audit payload only sees the metadata + tenantRole changes.
 	h.recordAudit(r, userID, "iam.user.updated", changes)
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"user_id":  userID,
-		"updated": true,
-		"changes": changes,
-	})
+	// Spec (operationId patchUser) declares the 200 body as ManagedUserCore —
+	// read the user back so the wire shape matches the generated FE types (A5).
+	updated, err := h.service.Get(r.Context(), tenantID, userID)
+	if err != nil {
+		h.writePeopleError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toManagedUserCore(updated))
 }
 
 // ─── POST /iam/users/{user_id}/reset-password ──────────────────────────────

@@ -89,7 +89,7 @@ Per-finding closure. Tracker rows mirror these in [`../roadmap.md`](../roadmap.m
 | A2 | ✅ RESOLVED | (this commit) | `sqlescape.LikeEscape()` + `ESCAPE '\'` clause; regression test added. |
 | A3 | ✅ RESOLVED | (this commit) | `RevokeSessionsByUserID` on password change; regression test added. Revokes ALL sessions (matches AdminResetPassword) — FE re-auths after change. |
 | A4 | ✅ RESOLVED | (this commit) | Default idle timeout 30m; env var added to `.env.example` + docker-compose. |
-| A5 | ☐ open | | |
+| A5 | ✅ RESOLVED | (this commit) | `PATCH /iam/users/{id}` now returns `ManagedUserCore` (via `PeopleService.Get` + `toManagedUserCore`); matches spec, unblocks FE codegen types. |
 | A6 | ☐ open | | |
 | H-1 boundaries | ☐ open | | |
 | H-2 composition/obs | ☐ open | | |
