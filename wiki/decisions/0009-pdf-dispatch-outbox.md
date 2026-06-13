@@ -1,6 +1,8 @@
 # ADR 0009: PDF Dispatch Transactional Outbox
 
-**Status:** Accepted (2026-05-03)  
+> **Status:** Accepted
+> **Current reality (2026-06):** Wave Z Z-10 collapsed the per-table `PDFOutboxRepository` into the generic `StagingOutboxRepository` (parameterized by table name); both `pdf_dispatch_outbox` and `materialize_dispatch_outbox` are served by the same type — see `internal/modules/render/fanout/staging_outbox.go`.
+
 **Affects:** freeze approval flow, document finalization, background workers
 
 ## Context

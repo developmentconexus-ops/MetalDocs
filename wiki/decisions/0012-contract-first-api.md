@@ -1,5 +1,6 @@
 # ADR 0012 — Contract-First API via oapi-codegen
 
+> **Status:** Accepted
 > **Last verified:** 2026-05-11
 > **Scope:** Decision to migrate MetalDocs backend HTTP handlers to spec-generated types; root cause analysis of the `documents.name` bug; migration scope and constraints.
 > **Out of scope:** Frontend codegen (covered in `architecture/api-contract.md §6`); specific handler implementation patterns (covered in `architecture/api-contract.md §3`).

@@ -1,6 +1,6 @@
 # ADR 0008 — Soft-archive documents via archived_at timestamp
 
-> Status: accepted 2026-05-03
+> **Status:** Accepted
 
 ## Context
 
