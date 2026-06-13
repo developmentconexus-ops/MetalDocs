@@ -155,11 +155,11 @@ flowchart LR
 - **Industry standard:** Argon2/bcrypt password hashing; short-lived tokens (JWT, RFC 7519) or server-side sessions; re-auth for sensitive ops; rate-limited login.
 - **We have:** `internal/modules/auth` (login, credentials, JWT) + `platform/authn` (validation, session context) + re-auth flow (`apps/api/cmd/metaldocs-api/reauth*.go`). Two-tier model documented in [../concepts/authz-tiers.md](../concepts/authz-tiers.md).
 
-#### B2. Authorization (AuthZ / IAM) — 🟡
+#### B2. Authorization (AuthZ / IAM) — ✅
 - **Definition:** Establishing *what* an identity may do. Roles, capabilities, resource scoping.
 - **Industry standard:** Single source of truth for permission decisions; deny-by-default; resource-level scoping (not just endpoint-level); decisions auditable.
 - **We have:** `internal/modules/iam` (users, roles, capabilities, area memberships, `authz/` package), Redis-backed capability cache, Postgres tripwire ([../concepts/authz-tiers.md](../concepts/authz-tiers.md)), permission table in `apps/api/cmd/metaldocs-api/permissions*.go`.
-- **Gap:** ADR 0022 authz-coherence program — area-scoped admin semantics and single-source-of-truth consolidation in flight. This is the largest known identity gap; do not symptom-patch around it.
+- **Z-28/Z-29 (c82dadfb1, 79f946df9, 2026-06-13):** ADR 0022 authz-coherence is **fully executed** — phases 1–13 complete (capability-registry SSOT, typed scope, area-scoped admin enforcement in SQL, CI coherence guards `no-rawstring-tier1-authz`/`no-inline-capability`/`seed-registry-parity`/`wiki-capability-parity`) and Phase 6 wiki sync closed by Z-28. RF-3 closed by Z-29: the `CachedRoleProvider` carries a written cache-invalidation contract and every role/membership mutation path was verified to invalidate. Deny-by-default, area-resolution-in-SQL, and auditable in-tx governance (Z-6) are all in place — the identity model is the documented single source of truth.
 
 #### B3. Multi-tenancy — ✅
 - **Definition:** Hard isolation of tenant data through every layer.
@@ -272,7 +272,7 @@ The named external standards this backend is held to. Cite these in reviews inst
 | A1 transport, A2 CORS, A4 conventions | ✅ | — |
 | A3 contract | ✅ | Z-20: api-contract-hardening Phase-F closed 2026-06-08; 0 CRITICAL/0 HIGH; api-lint 0 blocking |
 | B1 authn, B3 tenancy | ✅ | — |
-| B2 authz | 🟡 | ADR 0022 authz-coherence — area-scoped admin semantics still in flight (qa/iam-area-membership) |
+| B2 authz | ✅ | ADR 0022 fully executed (Z-28 c82dadfb1) + RF-3 cache invalidation verified (Z-29 79f946df9) |
 | C1 modules, C2 persistence, C3 blobs, C5 search, C6 async | ✅ | — |
 | C4 caching | ✅ | Z-29 (79f946df9): cache contracts + invalidation-path verification — RF-3 closed, REQ-CACHE-1 MET |
 | D1 errors, D3 security, D4 config, D5 audit, D6 internal HTTP, D9 quality | ✅ | backend-standardization complete |
@@ -295,7 +295,7 @@ The backend-professionalization program (Waves 0–2) fixed **defects within** c
 | D2 observability | 🟡 "unowned — needs audit" | 🟡 (owned, deferred) | No grade change (OTel still absent **by design**), but the gap is now an audited, trigger-gated defer (D-1), not an unknown |
 | C4 caching, D7 flags, D8 messaging | 🟡 | 🟡 (clarified) | No code-level change; each now carries a written RF/trigger (RF-3, RF-8, RF-7) instead of an open question |
 
-**Deliberately NOT promoted (honest):** **B2 authz** stays 🟡 — Wave 2.4 closed the capability-literal correctness defect (F-11) and added the `no-rawstring-tier1-authz` lint, ADR 0022 phases 1–13 are done and Phase 6 (wiki sync) closed by Z-28, but area-scoped admin semantics remain in flight on the current branch (qa/iam-area-membership). **A3 contract** promoted to ✅ by Z-20 (api-contract-hardening Phase-F closure, 2026-06-08): 0 CRITICAL/0 HIGH; api-lint 0 blocking/0 reported.
+**B2 authz** promoted to ✅ by Z-28 + Z-29 (2026-06-13): ADR 0022 fully executed (all 13 phases incl. the Phase 6 wiki sync) and RF-3 cache-invalidation contract verified. The earlier "area-scoped admin in flight" note is retired — those semantics are ADR 0022 Phases 3–4, complete 2026-06-03; the branch name `qa/iam-area-membership` is historical, not evidence of open work. **A3 contract** promoted to ✅ by Z-20 (api-contract-hardening Phase-F closure, 2026-06-08): 0 CRITICAL/0 HIGH; api-lint 0 blocking/0 reported.
 
 ### Wave Z all-green re-score (2026-06-13)
 
@@ -309,6 +309,7 @@ All Wave Z concerns resolved. Grade deltas from Wave F → Wave Z:
 | D5 audit (dual-mode) | ✅ (with allow-dualmode) | ✅ (zero dual-mode) | Z-4 (0a578446a): audit export hard-required; Z-5 (6075c82a3): freeze tx-mandatory, ADR 0015 amended |
 | D7 feature flags | 🟡 | ✅ | Z-30 (bcab41710): feature-flag lifecycle standard, RF-8 closed |
 | D8 messaging | 🟡 | ✅ | Z-31 (bcab41710): servicebus fenced as sync Gotenberg adapter, RF-7 closed |
+| B2 authz | 🟡 | ✅ | Z-28 (c82dadfb1): ADR 0022 fully executed (Phase 6 wiki sync); Z-29 (79f946df9): RF-3 cache invalidation verified |
 | B3 tenancy / REQ-TEN-1 | ✅ (2/29 tables) | ✅ (all tables) | Z-2/Z-3 (ad70f6415): RLS on all 27 remaining tables + idempotency FK; ADR 0027 in full |
 | C6 async / REQ-ASYNC-1 | ✅ | ✅ (strengthened) | Z-6 (c7b10f3d6 + abc9afa48): membership governance in-tx; Z-10 (3367570c6): outbox generic staging |
 | ADR registry | — | ✅ | Z-27: canonical Status headers, stubs → Historical/0028, index rebuilt; Z-28 (c82dadfb1): ADR 0022 Phase 6 wiki sync |
