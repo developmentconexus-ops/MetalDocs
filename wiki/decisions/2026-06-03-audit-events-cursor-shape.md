@@ -1,7 +1,7 @@
 # ADR — Audit Events Cursor Shape Drift
 
 > **Date:** 2026-06-03
-> **Status:** **CLOSED 2026-06-08** (api-contract-hardening Phase F closing re-audit). The runtime handler now emits the canonical nested `{items, page:{next_cursor, has_more}}` CursorPage envelope matching the spec; the FE dual-shape adapter (`useAuditEventsQuery.adaptPage`) was simplified to read only the nested shape. Drift reconciled at root — no FE workaround remains. Commit `4806167ac`. (Casing drift was resolved earlier by Phase E1.)
+> **Status:** Accepted (closed 2026-06-08)
 > **Owner:** Backend audit module
 > **Scope:** `GET /audit/events` response shape
 

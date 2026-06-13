@@ -1,6 +1,6 @@
 # ADR 0026 — Unified authz is the only enforcement model (no dead ABAC path)
 
-> **Status:** Accepted 2026-06-08 (formalises anchor decision AD-3 of the API Contract Hardening Program; extends ADR [`0022`](0022-authz-capability-coherence.md). Shipped in Phase B 2026-06-05). Retroactive ADR.
+> **Status:** Accepted
 > **Last verified:** 2026-06-08
 > **Scope:** The single per-resource authorization model for documents/search; confirmation that the pre-unification `AccessPolicy`/`document_access_policies` ABAC concept is dead and is not an enforcement path anywhere.
 > **Out of scope:** The two-tier capability/area model itself (ADR 0007); authz-area spec markers (ADR 0023).
