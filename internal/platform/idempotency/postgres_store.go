@@ -18,6 +18,10 @@ var ErrConflict = errors.New("idempotency: key reused with different payload")
 // request, but the handler result was still delivered to the client.
 const maxBodyBytes = 64 * 1024
 
+// idempotencyTTL is the Postgres interval used for both the initial in-flight
+// insert and the final completed-row update. Single source of truth for key TTL.
+const idempotencyTTL = "24 hours"
+
 // Replay holds the cached response for a previously completed request.
 type Replay struct {
 	Status int
@@ -88,7 +92,7 @@ func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payload
 		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, status, expires_at)
 		VALUES
-			($1, $2, $3, $4, $5, 'in_flight', now() + interval '24 hours')
+			($1, $2, $3, $4, $5, 'in_flight', now() + interval '` + idempotencyTTL + `')
 		ON CONFLICT (tenant_id, actor_user_id, route_template, key) DO NOTHING
 		RETURNING tenant_id::text`,
 		tenantID, actorID, s.routeTemplate, key, payloadHash,
@@ -226,7 +230,7 @@ func (s *Store) CompleteReplay(handle *ReplayHandle, status int, body []byte) er
 		   SET status          = 'completed',
 		       response_status = $1,
 		       response_body   = $2,
-		       expires_at      = now() + interval '24 hours'
+		       expires_at      = now() + interval '` + idempotencyTTL + `'
 		 WHERE tenant_id      = $3
 		   AND actor_user_id  = $4
 		   AND route_template = $5
