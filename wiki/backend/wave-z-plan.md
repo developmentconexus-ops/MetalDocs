@@ -380,7 +380,7 @@ All six methods move in with `fmt.Sprintf` on the validated table name (sqlescap
 
 ### Task Z-27: ADR lifecycle audit (5 sonnet agents × ~5 ADRs each + 1 index agent)
 
-**Files:** all of `wiki/decisions/` (25 numbered + `2026-06-03-audit-events-cursor-shape.md` + `index.md` + `README.md`)
+**Files:** all of `wiki/decisions/` (25 numbered + `0028-audit-events-cursor-shape.md` + `index.md` + `README.md`)
 
 - [ ] **Step 1 (each ADR agent):** For each assigned ADR: read it; grep the code/wiki for its key claims; set the canonical header line (FIRST blockquote line):
   `> **Status:** Accepted` | `Accepted (amended YYYY-MM-DD — <what>)` | `Superseded by ADR-XXXX` | `Deprecated (<why>)` | `Historical (<context>)`.

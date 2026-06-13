@@ -107,13 +107,13 @@ Presence is a WebSocket subscription (`usePresenceStream`) that writes into a de
 | Bulk revoke partial failure | Per-session error rendered in row; successes invalidate the list | `useRevokeSessionMutation` returns `{succeeded, failed[]}` | Operator retries failed rows |
 | Audit export returns 202 | Toast "Exportação solicitada"; new `audit_export.requested` event appears at top of timeline | `useExportAuditMutation` resolves with `exportId` | Operator picks up downloaded file from audit row when status flips to `done` |
 | WebSocket presence drops | `Quem está online` shows last known snapshot with reconnect banner | `usePresenceStream` reconnect logic | Auto-retry; manual refresh as fallback |
-| `useInfiniteQuery` (Audit timeline) cursor desync | "Carregar mais" returns duplicate or empty page | Cursor pagination contract drift | See ADR [`2026-06-03-audit-events-cursor-shape.md`](../../decisions/2026-06-03-audit-events-cursor-shape.md) |
+| `useInfiniteQuery` (Audit timeline) cursor desync | "Carregar mais" returns duplicate or empty page | Cursor pagination contract drift | See ADR [`0028-audit-events-cursor-shape.md`](../../decisions/0028-audit-events-cursor-shape.md) |
 | 401 anywhere | `authBus` redirect → `/login`; admin context lost | Standard `apiFetch` / openapi-fetch error path | Re-login; returnTo restores last `/admin/*` tab |
 
 ## 10. Cross-links
 
 - Backend module: [`wiki/modules/iam.md`](../iam.md), [`wiki/modules/audit.md`](../audit.md)
 - Concept: [`wiki/concepts/authz-tiers.md`](../../concepts/authz-tiers.md)
-- ADRs: [`0019-cap-audit-read-and-session-manage.md`](../../decisions/0019-cap-audit-read-and-session-manage.md), [`0020-admin-center-six-tab-ia.md`](../../decisions/0020-admin-center-six-tab-ia.md), [`0021-tenant-vs-platform-admin-separation.md`](../../decisions/0021-tenant-vs-platform-admin-separation.md), [`2026-06-03-audit-events-cursor-shape.md`](../../decisions/2026-06-03-audit-events-cursor-shape.md)
+- ADRs: [`0019-cap-audit-read-and-session-manage.md`](../../decisions/0019-cap-audit-read-and-session-manage.md), [`0020-admin-center-six-tab-ia.md`](../../decisions/0020-admin-center-six-tab-ia.md), [`0021-tenant-vs-platform-admin-separation.md`](../../decisions/0021-tenant-vs-platform-admin-separation.md), [`0028-audit-events-cursor-shape.md`](../../decisions/0028-audit-events-cursor-shape.md)
 - Skill: [`metaldocs-frontend`](../../../.agents/skills/metaldocs-frontend/SKILL.md)
 - QA evidence: [`docs/audits/QA-evidence-admin-center-rebuild.md`](../../../docs/audits/QA-evidence-admin-center-rebuild.md)

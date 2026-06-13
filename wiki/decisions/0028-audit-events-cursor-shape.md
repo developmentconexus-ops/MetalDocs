@@ -1,4 +1,4 @@
-# ADR — Audit Events Cursor Shape Drift
+# ADR 0028 — Audit Events Cursor Shape Drift
 
 > **Date:** 2026-06-03
 > **Status:** Accepted (closed 2026-06-08)

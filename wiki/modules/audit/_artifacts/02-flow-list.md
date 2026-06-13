@@ -57,7 +57,7 @@ LIMIT $3
     - `	"items": responseItems,`
     - `	"page":  page,`
     - `})`
-  - Note: cursor envelope shape (`{items, page:{next_cursor, has_more}}`) matches every other list op (closed: ADR 2026-06-03-audit-events-cursor-shape). Previously emitted flat `next_cursor`/`has_more`.
+  - Note: cursor envelope shape (`{items, page:{next_cursor, has_more}}`) matches every other list op (closed: ADR 0028-audit-events-cursor-shape). Previously emitted flat `next_cursor`/`has_more`.
 - Error envelope: RFC 9457 `application/problem+json` via `writeProblem` / `problem.Write` at `internal/modules/audit/delivery/http/handler.go:427-430`.
 - Status codes in handler behavior:
   - `405` method not allowed plain (no JSON body write): `internal/modules/audit/delivery/http/handler.go:78-81`

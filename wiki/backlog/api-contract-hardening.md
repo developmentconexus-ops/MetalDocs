@@ -281,7 +281,7 @@ Source: 4-subagent audit, 2026-06-05. Severity from the audit. Every row maps to
 | F-FE-DUPTYPES | HIGH | `lib/types` hand-duplicates generated types | F | closed 2026-06-08 (F6: 9 zero-importer dead duplicate mirrors deleted; genuinely-unspecced shapes kept; live camelCase mock-era types' per-screen migration is a recorded bounded defer) |
 | F-FE-NOINVALIDATE | MEDIUM | approval mutations skip TanStack cache invalidation | F | closed 2026-06-08 (F7: SignoffDialog → useMutation + invalidateQueries(['approval'],['documents']); route-admin already compliant) |
 | F-GO-DEADCODE | LOW-MED | unreachable deprecated branches / dead fields / migration shims (see Phase F scope) | F | closed 2026-06-08 (F8: legacyFanout root-caused, CheckReplay/RecordReplay/RolesFromContext removed, R-2 ctx cleanup, success-code drift reconciled; GeneratedServerAdapter/DecisionService-legacy-freeze/SnapshotFromTemplate/AllowDevTenantFallback kept with documented reason — bounded, not dead) |
-| F-AUDIT-CURSOR-SHAPE | HIGH | `/audit/events` runtime flat `{next_cursor,has_more}` vs spec nested `page` CursorPage (FE dual-shape adapter masked it; tracked since 2026-06-03 ADR) | F (re-audit) | closed 2026-06-08 (reconciled runtime→spec; FE adapter simplified; ADR 2026-06-03-audit-events-cursor-shape closed) |
+| F-AUDIT-CURSOR-SHAPE | HIGH | `/audit/events` runtime flat `{next_cursor,has_more}` vs spec nested `page` CursorPage (FE dual-shape adapter masked it; tracked since 2026-06-03 ADR) | F (re-audit) | closed 2026-06-08 (reconciled runtime→spec; FE adapter simplified; ADR 0028-audit-events-cursor-shape closed) |
 
 ## Closing verification gate (mandatory — re-audit)
 

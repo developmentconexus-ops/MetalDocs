@@ -113,7 +113,7 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	// Canonical cursor envelope (matches ListAuditEventsResponse / CursorPage and
 	// every other list op): {items, page:{next_cursor, has_more}}. Previously this
 	// emitted next_cursor/has_more at the top level — a spec↔runtime drift the FE
-	// bridged with a dual-shape adapter (closed: ADR 2026-06-03-audit-events-cursor-shape).
+	// bridged with a dual-shape adapter (closed: ADR 0028-audit-events-cursor-shape).
 	// has_more now comes from the reader's limit+1 probe, so an exact-multiple last
 	// page no longer falsely advertises a next page (AIP-158).
 	page := map[string]any{"next_cursor": nil, "has_more": false}

@@ -279,14 +279,14 @@ Wiring: `iamdelivery.NewAdminHandler(..., deps.AuditWriter).WithAuditReader(deps
 
 ### 8.2 Error envelope
 - Audit now emits RFC 9457 Problem Details (`application/problem+json`) via `writeProblem` / `problem.Write` — T-002 closed Phase D/F.
-- Success body is `{“items”:[EventResponse...], “page”:{“next_cursor”:…, “has_more”:…}}` — canonical cursor envelope matching every other list op (closed: ADR 2026-06-03-audit-events-cursor-shape).
+- Success body is `{“items”:[EventResponse...], “page”:{“next_cursor”:…, “has_more”:…}}` — canonical cursor envelope matching every other list op (closed: ADR 0028-audit-events-cursor-shape).
 
 ### 8.3 Idempotency
 - **Write path:** no idempotency key. The application generates `id` as `"evt_" + uuid.NewString()` (iam handler: `admin_handler.go:404`; bypass adapter: `main.go:761`) or as a bare `uuid.NewString()` (documents adapter: `main.go:794`). UUID collision probability is negligible; however the two schemes are inconsistent across callers and neither includes a client-supplied key (T-006).
 - **Read path:** idempotent by nature.
 
 ### 8.4 Pagination
-- ListEvents supports `limit` ([1..100], default 50; MaxLimit=100 from `pagination` platform package — `application/service.go:94-99` + `handler.go:329`) plus an opaque keyset `cursor` (`occurred_at|id`, base64). Response includes `page.next_cursor` / `page.has_more`. The limit-only cursor shape is sufficient for the 25-row admin overview; full cursor navigation closes the export-paging gap (closed: ADR 2026-06-03-audit-events-cursor-shape).
+- ListEvents supports `limit` ([1..100], default 50; MaxLimit=100 from `pagination` platform package — `application/service.go:94-99` + `handler.go:329`) plus an opaque keyset `cursor` (`occurred_at|id`, base64). Response includes `page.next_cursor` / `page.has_more`. The limit-only cursor shape is sufficient for the 25-row admin overview; full cursor navigation closes the export-paging gap (closed: ADR 0028-audit-events-cursor-shape).
 
 ### 8.5 Logging & Observability
 - `trace_id` is stored per event (`port.go:16`) â€” sourced at the postgres writer from the request context / `X-Trace-Id` header; defaults to `”trace-local”`. Single-header correlation; structured logging is not used by the audit module itself.

@@ -1,29 +1,34 @@
 # Decisions
 
-> **Last verified:** 2026-06-11 (ADR 0027 added)
+> **Last verified:** 2026-06-13 (Z-27 — full table rebuild, ADR 0028 renumbered from stray dated file)
 > **Scope:** Durable ADRs and consequential technical decisions.
 
-- [0001-eigenpal-adoption.md](0001-eigenpal-adoption.md)
-- [0002-zone-purge.md](0002-zone-purge.md)
-- [0003-token-syntax-migration.md](0003-token-syntax-migration.md)
-- [0007-two-tier-authz.md](0007-two-tier-authz.md)
-- [0008-placeholder-fixed-catalog.md](0008-placeholder-fixed-catalog.md)
-- [0009-pdf-dispatch-outbox.md](0009-pdf-dispatch-outbox.md)
-- [0010-soft-archive-via-timestamp.md](0010-soft-archive-via-timestamp.md)
-- [0011-cd-atomic-create.md](0011-cd-atomic-create.md)
-- [0012-contract-first-api.md](0012-contract-first-api.md)
-- [0013-template-revision-labels.md](0013-template-revision-labels.md) — **Proposed** (awaiting ratification)
-- [0017-signoff-idempotency-fingerprint.md](0017-signoff-idempotency-fingerprint.md) — signoff idempotency fingerprint = client-stable inputs only (F-002 correction)
-- [0018-approval-route-lifecycle.md](0018-approval-route-lifecycle.md) — approval route lifecycle: terminal-on-deactivate state machine, version OCC, in-use guard, capability pin, reason audit
-- [0019-cap-audit-read-and-session-manage.md](0019-cap-audit-read-and-session-manage.md) — tier-1 caps for audit read + session manage (PR-2)
-- [0020-admin-center-six-tab-ia.md](0020-admin-center-six-tab-ia.md) — **Accepted** — Admin Center 6-tab IA, shipped at PR-12
-- [0021-tenant-vs-platform-admin-separation.md](0021-tenant-vs-platform-admin-separation.md) — **Accepted** — tenant admin vs. platform admin scope split, shipped at PR-12
-- [0022-authz-capability-coherence.md](0022-authz-capability-coherence.md) — **Accepted (in execution)** — single source of truth for capability registry, route table, seed, and spec markers; area-scoped admin coherence; 13-phase execution plan
-- [0023-authz-area-markers.md](0023-authz-area-markers.md) — **Accepted** — honest positive authz-area markers (`source: tx` derived_from / `x-authz-area-none`) replace the negative `x-authz-skip-area`; dormant `authz-call-present` lint deleted (Phase F · FD-1)
-- [0024-openapi-single-base-path.md](0024-openapi-single-base-path.md) — **Accepted** — AD-1: one `servers.url: /api/v1` + relative path keys; PATH-BASE-PREFIX gate kills the double-prefix bug class
-- [0025-error-envelope-rfc9457.md](0025-error-envelope-rfc9457.md) — **Accepted** — AD-2: RFC 9457 Problem is the only error shape; ApiErrorEnvelope retired; ENVELOPE-DRIFT blocking, zero exemptions
-- [0026-unified-authz-enforcement.md](0026-unified-authz-enforcement.md) — **Accepted** — AD-3: unified capability+area+grants is the only per-resource authz model; dead ABAC AccessPolicy path removed (extends ADR 0022)
-- [0027-rls-adoption-sequencing.md](0027-rls-adoption-sequencing.md) — **Accepted** — D-3: auth_identities tenant-global by design (T-008 closed); RLS sequencing: controlled_documents+audit_events Wave 2.3, iam_users deferred RF-6, remaining tables trigger-gated on first external tenant
-- [2026-06-03-audit-events-cursor-shape.md](2026-06-03-audit-events-cursor-shape.md) — **Closed 2026-06-08** — `/audit/events` runtime reconciled to the nested `page.{next_cursor,has_more}` CursorPage shape (Phase F re-audit); FE dual-shape adapter removed
+| # | Title | Status | Superseded by | Current relevance |
+|---|-------|--------|---------------|-------------------|
+| [0001](0001-eigenpal-adoption.md) | Adopt eigenpal as the document editor | Accepted | — | Governs editor library choice; `@eigenpal/docx-js-editor` from `vendor/eigenpal/`; T1–T8 spike verified |
+| [0002](0002-zone-purge.md) | Purge editable zones | Accepted | — | Editable zones removed end-to-end; placeholders are the sole variability mechanism |
+| [0003](0003-token-syntax-migration.md) | Token Syntax Migration | Historical (stub; superseded by ADR 0008's fixed 7-token catalog) | 0008 | Records the `{{uuid}}` → `{name}` migration intent; ADR 0008 replaced the open-ended model with the fixed catalog |
+| [0007](0007-two-tier-authz.md) | Two-Tier Authorization | Accepted (amended 2026-05-11 — tripwire extended to all regulated modules) | — | Foundation of all authz; tier-1 `CanDo` (middleware) + tier-2 `authz.Require` (in-tx area); `authz-call-present` lint deleted (see ADR 0023) |
+| [0008](0008-placeholder-fixed-catalog.md) | Replace user-fill placeholders with fixed catalog | Accepted | — | 7 computed tokens are the only placeholder type; no fill-in form panel; server-side substitution at freeze |
+| [0009](0009-pdf-dispatch-outbox.md) | PDF Dispatch Transactional Outbox | Accepted | — | At-least-once PDF delivery via `pdf_dispatch_outbox`; `PDFOutboxWorker` polling; generic `StagingOutboxRepository` (Wave Z Z-10) |
+| [0010](0010-soft-archive-via-timestamp.md) | Soft-archive documents via archived\_at timestamp | Accepted | — | Archive = `archived_at` timestamp, not status change; status field stays as lifecycle source of truth |
+| [0011](0011-cd-atomic-create.md) | Atomic CD Create + Per-Area Numbering + Idempotency-Key Adoption | Accepted | — | CD + first revision created in one tx; `cd_sequence_counters` keyed on (tenant, profile, area); shared idempotency platform |
+| [0012](0012-contract-first-api.md) | Contract-First API via oapi-codegen | Accepted | — | OpenAPI spec is the sole authoritative request/response definition; hand-written structs at HTTP boundary prohibited for migrated modules |
+| [0013](0013-template-revision-labels.md) | Template Revision Labels (REV-style, Backend-Canonical) | Accepted | — | `revision_number` persisted on `templates_template_version`; `current_revision_number` + `latest_revision_number` on TemplateDTO; chip always shows `REV{nn}` |
+| [0014](0014-rename-docgen-v2-to-docx-renderer.md) | Rename docgen-v2 service to docx-renderer | Accepted | — | Service renamed to `apps/docx-renderer/`; single responsibility = DOCX token rendering; `DOCX_RENDERER_*` env vars |
+| [0015](0015-async-freeze-pin-materialize.md) | Async Freeze — Split into Pin (in-tx) and Materialize (outbox) | Accepted (amended 2026-06-13 — optional-tx-enlistment retired by Wave Z Z-5; tx is mandatory) | — | `Pin` writes freeze marker + outbox row in signoff tx; `Materialize` runs async in worker; approval availability independent of docx-renderer |
+| [0016](0016-view-grade-capabilities.md) | View-Grade Capabilities for IAM, Membership, Taxonomy, Metrics | Accepted | — | Four View-grade caps (`metrics.view`, `membership.view`, `user.view`, `taxonomy.view`) added to registry; unblocked F-001 read/write split |
+| [0017](0017-signoff-idempotency-fingerprint.md) | Signoff idempotency fingerprint = client-stable inputs only | Accepted | — | Replay fingerprint = `sha256(docID, decision, reason, contentHash)`; server-mutable state excluded; `ErrConflict` → 409 |
+| [0018](0018-approval-route-lifecycle.md) | Approval Route Lifecycle | Accepted | — | Two-state terminal-on-deactivate machine; OCC via `If-Match`; deactivate blocked while instances in-flight; reason mandatory; `governance_events` audit trail |
+| [0019](0019-cap-audit-read-and-session-manage.md) | `CapAuditRead` (Read-naming exception) and `CapSessionManage` | Accepted | — | `*Read` suffix for read-only-by-design resources; `CapSessionManage` for force-logout; grant matrix expanded beyond system_admin |
+| [0020](0020-admin-center-six-tab-ia.md) | Admin Center 6-tab information architecture | Accepted — shipped at PR-12 | — | 6-tab IA with one route + one capability per tab; lazy loading; TanStack Query; god hook deleted; 7 tabs in practice (memberships added on `qa/iam-area-membership`) |
+| [0021](0021-tenant-vs-platform-admin-separation.md) | Tenant admin vs. platform admin separation | Accepted — shipped at PR-12 | — | `/admin/*` = tenant operator surface only; future platform admin lives under `/platform/*`; FE pivots on capabilities not role names |
+| [0022](0022-authz-capability-coherence.md) | Authz Capability Coherence (single source of truth + explicit scope + area-scoped administration) | Accepted (fully executed 2026-06-13) | — | Single typed capability registry; area-grade vs tenant-grade declared and CI-enforced; area_admin membership scoped to managed areas; all 13 phases + Wave Z Z-6 complete |
+| [0023](0023-authz-area-markers.md) | Honest authz-area markers (retire the negative escape hatch) | Accepted 2026-06-08 | — | Positive `x-authz-area: {source: tx/body/path}` markers replace negative `x-authz-skip-area`; `authz-call-present` lint deleted; `AUTHZ-DRIFT` validates shape |
+| [0024](0024-openapi-single-base-path.md) | One OpenAPI base path (`servers.url: /api/v1`, relative path keys) | Accepted 2026-06-08 | — | Exactly one base-path declaration; `PATH-BASE-PREFIX` CI gate bans re-prefixed path keys; FE `baseUrl` idempotent guard |
+| [0025](0025-error-envelope-rfc9457.md) | One error envelope: RFC 9457 Problem Details | Accepted 2026-06-08 | — | RFC 9457 `Problem` is the only error shape; `ApiErrorEnvelope` retired; `ENVELOPE-DRIFT` blocking; zero exemptions |
+| [0026](0026-unified-authz-enforcement.md) | Unified authz is the only enforcement model (no dead ABAC path) | Accepted | — | `AccessPolicy`/`document_access_policies` ABAC slice dead and dropped (migration 0232); search visibility verbatim-ports the CD list predicate |
+| [0027](0027-rls-adoption-sequencing.md) | RLS Adoption Sequencing + auth\_identities Tenant-Global by Design | Accepted (executed in full by Wave Z, 2026-06-13) | — | `auth_identities` tenant-global by design (T-008 closed); RLS live on all 29 tenant-scoped tables (migration 0237 collapsed 3-tier plan) |
+| [0028](0028-audit-events-cursor-shape.md) | Audit Events Cursor Shape Drift | Accepted (closed 2026-06-08) | — | `/audit/events` runtime reconciled to nested `page.{next_cursor,has_more}` CursorPage shape (Phase F re-audit); FE dual-shape adapter removed |
 
 Legacy ADR material in `docs/adr/` remains historical/reference content until reconciled deliberately.

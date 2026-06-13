@@ -32,7 +32,7 @@ export type AuditEventsPage = {
 // Canonical cursor envelope: { items, page:{ next_cursor, has_more } } — matches
 // the OpenAPI ListAuditEventsResponse / CursorPage and the runtime handler. (The
 // prior flat-shape fallback + drift was closed in Phase F; see
-// wiki/decisions/2026-06-03-audit-events-cursor-shape.md.)
+// wiki/decisions/0028-audit-events-cursor-shape.md.)
 function adaptPage(raw: unknown): AuditEventsPage {
   if (!raw || typeof raw !== "object") {
     return { items: [], nextCursor: null, hasMore: false };
