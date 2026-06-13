@@ -36,9 +36,9 @@ func NewViewService(db *sql.DB, presigner ViewPresigner, outbox PDFOutboxStateRe
 }
 
 var viewableStatuses = map[string]struct{}{
-	"approved":  {},
-	"scheduled": {},
-	"published": {},
+	string(v2dom.DocStatusApproved):  {},
+	string(v2dom.DocStatusScheduled): {},
+	string(v2dom.DocStatusPublished): {},
 }
 
 func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID string) (documentshttp.ViewResult, error) {

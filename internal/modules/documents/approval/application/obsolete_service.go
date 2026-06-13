@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -68,7 +69,7 @@ func (s *ObsoleteService) MarkObsolete(ctx context.Context, db *sql.DB, req Mark
 	}
 
 	// Step 3: guard — only published or superseded may transition to obsolete.
-	if priorStatus != "published" && priorStatus != "superseded" {
+	if priorStatus != string(docsdomain.DocStatusPublished) && priorStatus != string(docsdomain.DocStatusSuperseded) {
 		_ = tx.Rollback()
 		return MarkObsoleteResult{}, ErrInvalidObsoleteSource
 	}

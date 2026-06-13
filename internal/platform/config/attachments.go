@@ -105,10 +105,22 @@ func LoadAttachmentsConfig() (AttachmentsConfig, error) {
 	return cfg, nil
 }
 
-func parseBoolEnv(name string, defaultValue bool) bool {
-	raw := strings.TrimSpace(os.Getenv(name))
-	if raw == "" {
+// ParseBoolEnv reads an environment variable and interprets it as a boolean.
+// True values: "1", "true", "yes", "on" (case-insensitive).
+// False values: "0", "false", "no", "off" (case-insensitive).
+// Empty or unset returns defaultValue.
+func ParseBoolEnv(name string, defaultValue bool) bool {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
+	switch raw {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
 		return defaultValue
 	}
-	return strings.EqualFold(raw, "true") || raw == "1"
+}
+
+func parseBoolEnv(name string, defaultValue bool) bool {
+	return ParseBoolEnv(name, defaultValue)
 }

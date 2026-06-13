@@ -9,6 +9,7 @@ import (
 	"time"
 
 	docapp "metaldocs/internal/modules/documents/application"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
@@ -154,7 +155,7 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 		return PublishResult{}, fmt.Errorf("publishApproved: commit: %w", err)
 	}
 
-	return PublishResult{DocumentID: instance.DocumentID, NewStatus: "published"}, nil
+	return PublishResult{DocumentID: instance.DocumentID, NewStatus: string(docsdomain.DocStatusPublished)}, nil
 }
 
 // ErrEffectiveDateInPast is returned when SchedulePublish is called with an

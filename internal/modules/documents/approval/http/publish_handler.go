@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 )
@@ -71,7 +72,7 @@ func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 
 	WriteJSON(w, http.StatusOK, contracts.PublishResponse{
 		DocumentID: result.DocumentID,
-		NewStatus:  "published",
+		NewStatus:  string(docsdomain.DocStatusPublished),
 	})
 }
 
@@ -133,7 +134,7 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 
 	WriteJSON(w, http.StatusOK, contracts.PublishResponse{
 		DocumentID:    result.DocumentID,
-		NewStatus:     "scheduled",
+		NewStatus:     string(docsdomain.DocStatusScheduled),
 		EffectiveFrom: result.EffectiveDate.UTC().Format(time.RFC3339),
 	})
 }

@@ -10,6 +10,12 @@ type DocumentStatus string
 const (
 	DocStatusDraft       DocumentStatus = "draft"
 	DocStatusUnderReview DocumentStatus = "under_review" // migration 0142 removed draft→finalized; submit = under_review // cilint:allow-legacy (historical note)
+	DocStatusApproved    DocumentStatus = "approved"
+	DocStatusRejected    DocumentStatus = "rejected"
+	DocStatusScheduled   DocumentStatus = "scheduled"
+	DocStatusPublished   DocumentStatus = "published"
+	DocStatusSuperseded  DocumentStatus = "superseded"
+	DocStatusObsolete    DocumentStatus = "obsolete"
 	DocStatusArchived    DocumentStatus = "archived"
 )
 

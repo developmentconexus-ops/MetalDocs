@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 )
@@ -190,7 +191,7 @@ func (s *SchedulerService) loadScheduledDocumentState(ctx context.Context, tx *s
 }
 
 func scheduledJobMatchesState(state scheduledDocumentState, input ScheduledPublishJobInput) bool {
-	if state.Status != "scheduled" {
+	if state.Status != string(docsdomain.DocStatusScheduled) {
 		return false
 	}
 	if !state.EffectiveFrom.Valid {

@@ -103,7 +103,7 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 		lockMinutes = parsed
 	}
 
-	bootstrapEnabled := parseBoolEnv("METALDOCS_BOOTSTRAP_ADMIN_ENABLED", appEnv == "local")
+	bootstrapEnabled := config.ParseBoolEnv("METALDOCS_BOOTSTRAP_ADMIN_ENABLED", appEnv == "local")
 	bootstrapUserID := strings.TrimSpace(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_USER_ID"))
 	if bootstrapUserID == "" {
 		bootstrapUserID = "admin-local"
@@ -136,9 +136,9 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 		BootstrapAdminEmail:    strings.TrimSpace(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_EMAIL")),
 		BootstrapAdminPassword: authapp.Secret(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_PASSWORD")),
 		BootstrapAdminName:     bootstrapName,
-		CookieSecure:           parseBoolEnv("METALDOCS_AUTH_COOKIE_SECURE", appEnv != "local"),
+		CookieSecure:           config.ParseBoolEnv("METALDOCS_AUTH_COOKIE_SECURE", appEnv != "local"),
 		TrustedOrigins:         splitCSV(os.Getenv("METALDOCS_AUTH_TRUSTED_ORIGINS")),
-		OriginProtection:       parseBoolEnv("METALDOCS_AUTH_ORIGIN_PROTECTION_ENABLED", Enabled()),
+		OriginProtection:       config.ParseBoolEnv("METALDOCS_AUTH_ORIGIN_PROTECTION_ENABLED", Enabled()),
 		TrustedProxyCIDRs:      trustedProxyCIDRs,
 	}
 
@@ -208,15 +208,6 @@ func cloneDevRoleMap(src map[string][]iamdomain.Role) map[string][]iamdomain.Rol
 		out[userID] = append([]iamdomain.Role(nil), roles...)
 	}
 	return out
-}
-
-func parseBoolEnv(name string, defaultValue bool) bool {
-	raw := strings.TrimSpace(os.Getenv(name))
-	if raw == "" {
-		return defaultValue
-	}
-	raw = strings.ToLower(raw)
-	return raw == "1" || raw == "true" || raw == "yes" || raw == "on"
 }
 
 func splitCSV(raw string) []string {

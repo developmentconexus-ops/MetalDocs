@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	docapp "metaldocs/internal/modules/documents/application"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -158,7 +159,7 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, db *sql.DB, r
 	}
 
 	return SupersedeResult{
-		NewDocumentStatus:   "published",
-		PriorDocumentStatus: "superseded",
+		NewDocumentStatus:   string(docsdomain.DocStatusPublished),
+		PriorDocumentStatus: string(docsdomain.DocStatusSuperseded),
 	}, nil
 }
