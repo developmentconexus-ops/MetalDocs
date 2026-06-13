@@ -41,11 +41,10 @@ internal/modules/documents/repository/repository.go|DeleteExpiredPending
 internal/modules/documents/repository/repository.go|HeartbeatSession
 internal/modules/documents/repository/repository.go|RestoreCheckpoint
 internal/modules/documents/repository/repository.go|SetRevisionStorageKey
-internal/modules/render/fanout/materialize_outbox_repository.go|Enqueue
-internal/modules/render/fanout/materialize_outbox_repository.go|MarkDispatched
-internal/modules/render/fanout/materialize_outbox_repository.go|MarkFailed
-internal/modules/render/fanout/materialize_outbox_repository.go|ResetStaleClaims
-internal/modules/render/fanout/pdf_outbox_repository.go|Enqueue
-internal/modules/render/fanout/pdf_outbox_repository.go|MarkDispatched
-internal/modules/render/fanout/pdf_outbox_repository.go|MarkFailed
-internal/modules/render/fanout/pdf_outbox_repository.go|ResetStaleClaims
+# Z-10 (Wave Z): the per-table pdf/materialize outbox repositories were collapsed
+# into one generic StagingOutboxRepository (staging_outbox.go). Its mutating SQL is
+# built with fmt.Sprintf(`INSERT/UPDATE %s ...`, table) — a CallExpr, not a string
+# literal — so the single-file tripwire-pairing scan (which matches literal SQL
+# passed to ExecContext) no longer flags these methods. They therefore need NO
+# allow-list entry. The writes remain legitimate system-path outbox writes
+# (tx-enlisted, dispatched by the background relay); their safety is unchanged.
