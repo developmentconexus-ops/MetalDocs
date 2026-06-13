@@ -676,8 +676,10 @@ func main() {
 		IdleTimeout:  90 * time.Second,
 	}
 
-	log.Printf("MetalDocs API listening on %s (repository=%s auth_enabled=%t auth_cache_ttl=%s cors_enabled=%t cors_allowed_origins=%d)",
-		addr, repoMode, authn.Enabled(), authn.CacheTTL(), corsCfg.Enabled, len(corsCfg.AllowedOrigins))
+	slog.Info("MetalDocs API listening",
+		"addr", addr, "repository", repoMode, "auth_enabled", authn.Enabled(),
+		"auth_cache_ttl", authn.CacheTTL(), "cors_enabled", corsCfg.Enabled,
+		"cors_allowed_origins", len(corsCfg.AllowedOrigins))
 
 	serverErr := make(chan error, 1)
 	go func() {
@@ -884,7 +886,7 @@ func (a *documentsAuditAdapter) Write(ctx context.Context, tenantID, actorID, ac
 		TraceID:      traceIDFromContext(ctx),
 		TenantID:     tenantID,
 	}); err != nil {
-		log.Printf("documents audit write failed: %v", err)
+		slog.Error("documents audit write failed", "err", err)
 	}
 }
 

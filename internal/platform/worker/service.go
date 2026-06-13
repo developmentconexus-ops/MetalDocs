@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"metaldocs/internal/platform/config"
@@ -86,12 +86,14 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 			continue
 		}
 		processed++
-		log.Printf("worker_event event_id=%s event_type=%s attempt_count=%d result=published trace_id=%s",
-			event.EventID, event.EventType, event.AttemptCount, event.TraceID)
+		slog.Info("worker_event",
+			"event_id", event.EventID, "event_type", event.EventType,
+			"attempt_count", event.AttemptCount, "result", "published", "trace_id", event.TraceID)
 	}
 
-	log.Printf("worker_batch result=completed processed=%d failed=%d dead_lettered=%d duration_ms=%d",
-		processed, failed, deadLettered, time.Since(start).Milliseconds())
+	slog.Info("worker_batch",
+		"result", "completed", "processed", processed, "failed", failed,
+		"dead_lettered", deadLettered, "duration_ms", time.Since(start).Milliseconds())
 	return runErr
 }
 
@@ -112,13 +114,17 @@ func (s *Service) markFailure(ctx context.Context, event messaging.Event, handle
 
 	if attempt >= s.cfg.MaxAttempts {
 		failure.DeadLetteredAt = &now
-		log.Printf("worker_event event_id=%s event_type=%s attempt_count=%d result=dead_lettered trace_id=%s error=%q",
-			event.EventID, event.EventType, attempt, event.TraceID, failure.LastError)
+		slog.Error("worker_event",
+			"event_id", event.EventID, "event_type", event.EventType,
+			"attempt_count", attempt, "result", "dead_lettered",
+			"trace_id", event.TraceID, "error", failure.LastError)
 	} else {
 		nextAttempt := now.Add(backoffDuration(attempt, s.cfg.RetryBaseSeconds, s.cfg.RetryMaxSeconds))
 		failure.NextAttemptAt = &nextAttempt
-		log.Printf("worker_event event_id=%s event_type=%s attempt_count=%d result=retry_scheduled trace_id=%s next_attempt_at=%s error=%q",
-			event.EventID, event.EventType, attempt, event.TraceID, nextAttempt.Format(time.RFC3339), failure.LastError)
+		slog.Warn("worker_event",
+			"event_id", event.EventID, "event_type", event.EventType,
+			"attempt_count", attempt, "result", "retry_scheduled",
+			"trace_id", event.TraceID, "next_attempt_at", nextAttempt.Format(time.RFC3339), "error", failure.LastError)
 	}
 
 	if err := s.consumer.MarkFailed(ctx, failure); err != nil {

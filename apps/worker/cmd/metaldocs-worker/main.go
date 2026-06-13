@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -93,7 +94,7 @@ func main() {
 			deps.SQLDB,
 		)
 		workerSvc = workerSvc.WithMaterializeRunner(materializeRunner)
-		log.Printf("materialize runner active (fanout_url=%s)", deps.FanoutURL)
+		slog.Info("materialize runner active", "fanout_url", deps.FanoutURL)
 	}
 
 	if workerCfg.RunOnce {
@@ -105,8 +106,10 @@ func main() {
 
 	ticker := time.NewTicker(time.Duration(workerCfg.PollIntervalSeconds) * time.Second)
 	defer ticker.Stop()
-	log.Printf("MetalDocs Worker running (poll_interval_s=%d batch_size=%d max_attempts=%d retry_base_seconds=%d retry_max_seconds=%d)",
-		workerCfg.PollIntervalSeconds, workerCfg.BatchSize, workerCfg.MaxAttempts, workerCfg.RetryBaseSeconds, workerCfg.RetryMaxSeconds)
+	slog.Info("MetalDocs Worker running",
+		"poll_interval_s", workerCfg.PollIntervalSeconds, "batch_size", workerCfg.BatchSize,
+		"max_attempts", workerCfg.MaxAttempts, "retry_base_seconds", workerCfg.RetryBaseSeconds,
+		"retry_max_seconds", workerCfg.RetryMaxSeconds)
 
 	runWorkerLoop(ctx, workerSvc, workerCfg.BatchSize, ticker.C)
 }
@@ -118,14 +121,14 @@ func runWorkerBatch(ctx context.Context, runner workerBatchRunner, batchSize int
 		}
 		return err
 	}
-	log.Printf("worker batch completed")
+	slog.Info("worker batch completed")
 	return nil
 }
 
 func runWorkerLoop(ctx context.Context, runner workerBatchRunner, batchSize int, ticks <-chan time.Time) {
 	for {
 		if err := runWorkerBatch(ctx, runner, batchSize); err != nil {
-			log.Printf("worker run failed: %v", err)
+			slog.Error("worker run failed", "err", err)
 		}
 		select {
 		case <-ctx.Done():

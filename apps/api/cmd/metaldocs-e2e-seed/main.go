@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -92,7 +93,7 @@ func main() {
 		log.Fatalf("ensure admin role: %v", err)
 	}
 
-	log.Printf("e2e seed ready user_id=%s username=%s", seed.UserID, seed.Username)
+	slog.Info("e2e seed ready", "user_id", seed.UserID, "username", seed.Username)
 }
 
 func ensurePODefaultTemplateBinding(ctx context.Context) error {

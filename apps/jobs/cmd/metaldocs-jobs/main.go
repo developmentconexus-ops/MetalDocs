@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -28,7 +29,7 @@ func main() {
 		log.Fatalf("invalid jobs config: %v", err)
 	}
 	if !jobsCfg.Enabled {
-		log.Printf("MetalDocs Jobs disabled by configuration")
+		slog.Info("MetalDocs Jobs disabled by configuration")
 		return
 	}
 
@@ -42,7 +43,7 @@ func main() {
 	}
 	defer deps.Cleanup()
 
-	log.Printf("MetalDocs Jobs running (queues=temporal)")
+	slog.Info("MetalDocs Jobs running", "queues", "temporal")
 	if err := deps.River.Client.Start(ctx); err != nil {
 		log.Fatalf("run jobs host: %v", err)
 	}

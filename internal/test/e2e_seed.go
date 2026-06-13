@@ -13,7 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -232,7 +232,7 @@ func (h *seedHandler) reset(w http.ResponseWriter, r *http.Request) {
 			if isUndefinedTable(execErr) || isUndefinedColumn(execErr) {
 				continue
 			}
-			log.Printf("e2e reset failed: tenant=%s err=%v", tenantID, execErr)
+			slog.Error("e2e reset failed", "tenant", tenantID, "err", execErr)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "reset failed"})
 			return
 		}
@@ -713,7 +713,7 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		log.Printf("writeJSON encode error: %v", err)
+		slog.Warn("writeJSON encode error", "err", err)
 	}
 }
 
