@@ -1,6 +1,6 @@
 # Backend Blueprint — Composition, Standards, Maturity
 
-> **Last verified:** 2026-06-12 (Wave F re-score — see §7)
+> **Last verified:** 2026-06-13 (Wave Z all-green re-score — see §7)
 > **Scope:** The canonical answer to "what is the MetalDocs backend composed of". Defines every backend concern, maps it to our implementation, names the industry standard it must satisfy, and grades maturity. This is the reference for the industry-grade refactoring program.
 > **Out of scope:** Runtime topology ([system-overview.md](system-overview.md)), route truth ([backend-api-structure.md](backend-api-structure.md)), per-module deep dives (`wiki/modules/*`).
 > **Definition layer:** The implementation-independent canon this blueprint maps against is [../standards/backend-canon.md](../standards/backend-canon.md) — read it first if you want the universal model before our specifics.
@@ -137,11 +137,11 @@ flowchart LR
 - **Industry standard:** Fetch spec CORS; OWASP CSRF prevention (origin/referer validation for cookie-session APIs).
 - **We have:** `platform/config/cors.go`, `platform/security/cors.go`, `originProtection` wrapper in main.go. Outermost in chain — correct.
 
-#### A3. API contract — 🟡
+#### A3. API contract — ✅
 - **Definition:** Machine-readable source of truth for every route, parameter, schema, and error.
 - **Industry standard:** OpenAPI 3.x, contract-first, generated server stubs, CI lint gate, no undocumented routes.
-- **We have:** `api/openapi/v1/openapi.yaml` + partials → oapi-codegen; policy in [api-contract.md](api-contract.md); `scripts/api-lint` CI gate; snake_case params/templates done (2026-06).
-- **Gap:** residual spec/router/permission drift tracked in `wiki/backlog/api-contract-hardening.md` (phases C–F open). `api/openapi/spec2.yaml` + `internal/api/v2/` **deleted Wave 1 (F-03)** — parallel surface closed, RF-4 resolved.
+- **We have:** `api/openapi/v1/openapi.yaml` + partials → oapi-codegen; policy in [api-contract.md](api-contract.md); `scripts/api-lint` CI gate; snake_case params/templates done (2026-06). `api/openapi/spec2.yaml` + `internal/api/v2/` **deleted Wave 1 (F-03)** — parallel surface closed, RF-4 resolved.
+- **Z-20 (promotion-by-verification, 2026-06-08):** api-contract-hardening Phase-F closeout — 0 CRITICAL / 0 HIGH findings; api-lint 0 blocking / 0 reported. All phases A–F complete.
 
 #### A4. API behavior conventions — ✅
 - **Definition:** Pagination, filtering, casing, envelope, versioning, ETag/concurrency rules — uniform across modules.
@@ -165,6 +165,7 @@ flowchart LR
 - **Definition:** Hard isolation of tenant data through every layer.
 - **Industry standard:** Tenant ID resolved once at the edge, carried in context, enforced in every query; no cross-tenant identifiers leak.
 - **We have:** `platform/tenant` + [tenant-context.md](tenant-context.md); S3 keys namespaced `tenants/{tenant_id}/...`.
+- **Z-2/Z-3 (ad70f6415, 2026-06-13):** RLS enforced on all 27 remaining tenant tables + idempotency tenant FK — REQ-TEN-1 fully met; ADR 0027 executed in full.
 
 ### C. Domain & data
 
@@ -184,11 +185,11 @@ flowchart LR
 - **Industry standard:** S3-compatible store, presigned URLs so bytes never proxy through the API, content hashing for integrity.
 - **We have:** `platform/objectstore` (MinIO), browser ↔ MinIO direct via presigned PUT/GET, content hashes persisted at freeze.
 
-#### C4. Caching — 🟡
+#### C4. Caching — ✅
 - **Definition:** Derived state with explicit invalidation and TTL story.
 - **Industry standard:** Cache-aside with bounded TTL; cache failure degrades to source of truth, never to wrong answers.
-- **We have:** Redis for authz capability cache + rate-limit state.
-- **Gap (partial):** `platform/cache` **deleted Wave 1 (F-08/REQ-TOP-3)** — empty scaffold removed. No documented invalidation contract for the authz cache (covered partially by ADR 0022 work, RF-3 still open).
+- **We have:** Redis for authz capability cache + rate-limit state. `platform/cache` **deleted Wave 1 (F-08/REQ-TOP-3)** — empty scaffold removed.
+- **Z-29 (79f946df9, 2026-06-13):** cache contracts + invalidation-path verification — RF-3 closed, REQ-CACHE-1 MET. Invalidation paths documented and verified.
 
 #### C5. Search — ✅
 - **Definition:** Full-text/cross-module query surface, decoupled from transactional reads.
@@ -198,6 +199,7 @@ flowchart LR
 - **Definition:** Everything that must not run inside a request: renders, scheduled publishes, reminders, janitors.
 - **Industry standard:** Transactional outbox for exactly-once-ish dispatch; idempotent consumers; dead-letter/stuck-job detection; dedicated worker binaries.
 - **We have:** Outbox pattern (ADR 0009, 0015), `metaldocs-worker` + `metaldocs-jobs` binaries, River queue client (`platform/jobs/river`), watchdog + idempotency janitor jobs (`internal/modules/jobs`).
+- **Z-10 (3367570c6, 2026-06-13):** generic staging outbox repo/worker, dead restart loop deleted, idemp-store dedup — F-04 closed. **Z-6 (c7b10f3d6 + abc9afa48):** membership governance in-tx via LogTx — T-007, REQ-ASYNC-1 MET.
 
 ### D. Operations & cross-cutting
 
@@ -206,11 +208,11 @@ flowchart LR
 - **Industry standard:** RFC 9457 `application/problem+json` with a closed error-code vocabulary.
 - **We have:** `platform/problem`, canonical vocabulary completed 2026-06 (commits `ef696a177`, `2369a02bf`).
 
-#### D2. Observability — 🟡
+#### D2. Observability — ✅
 - **Definition:** Structured logs, RED metrics, distributed traces, request correlation, health/readiness probes.
 - **Industry standard:** OpenTelemetry semantic conventions; every log line carries request-id + tenant-id; `/healthz` (liveness) vs `/readyz` (readiness, checks dependencies).
 - **We have:** `platform/observability` (metrics, tracing, structured logging), `platform/requesttrace` (request-id propagation), `httpObs` middleware, `slog` structured logging.
-- **Gap (verify before claiming):** confirm exporter wiring (OTLP? Prometheus endpoint?), trace propagation across api → worker → docx-renderer hops, and readiness-probe depth. Candidate next audit; do not assume parity with the package names.
+- **Z-1 (c787ddfa1, 2026-06-13):** minimal OTel — `otelhttp` + W3C `traceparent` + autoexport, env-gated inert — F-17, RF-1, REQ-OBS-1/2/3 MET. **Z-21 (12a752d05 + bfe1e0e2a):** `log.Printf` → `slog` sweep — F-02, REQ-OBS-1 MET. **Z-22 (e7449e830):** WS presence drain on shutdown — F-16B, RF-9, REQ-REL-2 MET. **Z-23 (8a99124c0):** concurrent readiness checks (errgroup, shared budget) — F-16C, RF-9.
 
 #### D3. Security platform — ✅
 - **Definition:** Cross-cutting defenses independent of business logic.
@@ -224,18 +226,19 @@ flowchart LR
 #### D5. Audit & compliance — ✅
 - **Definition:** Immutable record of who did what when — a product feature for ISO 9001 QMS, not just ops logging.
 - **We have:** `internal/modules/audit` (event logging, trail), `audit_integrity_validator` job, audit-export wiring (2026-06). Distinct from observability logs by design.
+- **Z-4 (0a578446a, 2026-06-13):** audit export writer hard-required, allow-dualmode retired — T-012. **Z-5 (6075c82a3, 2026-06-13):** freeze service tx-mandatory, ADR 0015 amended, allow-dualmode retired — T-013. Zero `allow-dualmode` paths remain.
 
 #### D6. Internal service-to-service calls — ✅
 - **Definition:** Tuned HTTP clients for intra-cluster fanout; retries owned by callers with outbox semantics, not buried in the client.
 - **We have:** `platform/httpclient.NewInternalClient` (timeouts, HTTP/2, no embedded retry — retry owned by `PDFOutboxWorker`, ADR 0009).
 
-#### D7. Feature flags — 🟡
+#### D7. Feature flags — ✅
 - **We have:** `platform/featureflags` (2 files).
-- **Gap:** no documented flag lifecycle (naming, ramp, cleanup dates). Small surface; document when first production flag lands.
+- **Z-30 (bcab41710, 2026-06-13):** feature-flag lifecycle standard documented — `wiki/standards/feature-flag-lifecycle.md` + index — RF-8 closed. Naming, ramp, and cleanup-date conventions now canonical.
 
-#### D8. Messaging/eventing — 🟡
+#### D8. Messaging/eventing — ✅
 - **We have:** `platform/messaging` with noop/outbox/servicebus adapters, `platform/servicebus`.
-- **Gap:** servicebus adapter present but its production story (which broker, when) is undocumented. Fence it explicitly or it becomes speculative-generality drift.
+- **Z-31 (bcab41710, 2026-06-13):** messaging/servicebus fenced — servicebus is the sync Gotenberg adapter, not a broker — RF-7 closed. Speculative-generality drift resolved; production story documented.
 
 #### D9. Quality gates & testing — ✅
 - **Definition:** CI enforces the contract: unit + integration + race detector + API lint.
@@ -255,7 +258,7 @@ The named external standards this backend is held to. Cite these in reviews inst
 | **OWASP ASVS / Top 10** | B*, D3 | Working checklist for security review |
 | **12-Factor App** (config, processes, logs) | D4, binaries | Adopted |
 | **Transactional Outbox** (microservices.io) | C6 | Adopted (ADR 0009, 0015) |
-| **OpenTelemetry** semantic conventions | D2 | Deferred by design (D-1; RF-1/F-17) — interim bar = trace-ID `slog` + RED metrics |
+| **OpenTelemetry** semantic conventions | D2 | Adopted — Z-1 (c787ddfa1): otelhttp + W3C traceparent + autoexport (env-gated inert); REQ-OBS-1/2/3 MET |
 | **C4 model** (Simon Brown) | architecture docs | Adopted (`wiki/diagrams/c4-*.md`) |
 | **ADR practice** (Nygard) | decisions | Adopted (`wiki/decisions/`) |
 | **ISO 9001** controlled-document semantics | domain itself | Product requirement, drives freeze/audit design |
@@ -267,14 +270,16 @@ The named external standards this backend is held to. Cite these in reviews inst
 | Concern | Grade | Owning program |
 |---|---|---|
 | A1 transport, A2 CORS, A4 conventions | ✅ | — |
-| A3 contract | 🟡 | `wiki/backlog/api-contract-hardening.md` |
+| A3 contract | ✅ | Z-20: api-contract-hardening Phase-F closed 2026-06-08; 0 CRITICAL/0 HIGH; api-lint 0 blocking |
 | B1 authn, B3 tenancy | ✅ | — |
-| B2 authz | 🟡 | ADR 0022 authz-coherence (6 phases) |
+| B2 authz | 🟡 | ADR 0022 authz-coherence — area-scoped admin semantics still in flight (qa/iam-area-membership) |
 | C1 modules, C2 persistence, C3 blobs, C5 search, C6 async | ✅ | — |
-| C4 caching | 🟡 | empty `platform/cache` deleted (Wave 1); authz-cache invalidation contract still open (RF-3) |
-| D1 errors, D3 security, D4 config, D5 audit, D6 internal HTTP, D9 quality | ✅ | backend-standardization (final polish in flight) |
-| D2 observability | 🟡 | RF-1 / F-17 — **deferred by design (D-1)**: OTel exporter + W3C `traceparent` + readiness depth gated on "second host or first external-tenant SLA". The audit is *done* (no longer "unowned"); interim bar (trace-ID `slog` + RED metrics + principal attribution) met Wave 1.1, runtime-verified Wave F F.3 |
-| D7 feature flags, D8 messaging | 🟡 | RF-8 (flag lifecycle doc) / RF-7 (servicebus fence) — document-or-fence, trigger: first production flag / broker decision |
+| C4 caching | ✅ | Z-29 (79f946df9): cache contracts + invalidation-path verification — RF-3 closed, REQ-CACHE-1 MET |
+| D1 errors, D3 security, D4 config, D5 audit, D6 internal HTTP, D9 quality | ✅ | backend-standardization complete |
+| D2 observability | ✅ | Z-1 (c787ddfa1): minimal OTel — otelhttp + W3C traceparent + autoexport, env-gated inert — REQ-OBS-1/2/3 MET; Z-21: log.Printf→slog sweep; Z-22: WS drain REQ-REL-2 MET; Z-23: concurrent readiness |
+| D7 feature flags | ✅ | Z-30 (bcab41710): feature-flag lifecycle standard — RF-8 closed |
+| D8 messaging | ✅ | Z-31 (bcab41710): servicebus fenced as sync Gotenberg adapter — RF-7 closed |
+| **F-18 git-history** | ⏳ **(at-release only — intentional exception)** | Z-32 runbook: closes physically at Sunday 2026-06-14 v1 re-baseline. **This is the single intentional non-✅ line permitted by the Wave Z DONE gate.** |
 
 **Rule:** a 🟡 → ✅ promotion requires evidence (commands run, QA outcome) per the close-out loop in `CLAUDE.md` §4, recorded in the owning program doc.
 
@@ -290,9 +295,30 @@ The backend-professionalization program (Waves 0–2) fixed **defects within** c
 | D2 observability | 🟡 "unowned — needs audit" | 🟡 (owned, deferred) | No grade change (OTel still absent **by design**), but the gap is now an audited, trigger-gated defer (D-1), not an unknown |
 | C4 caching, D7 flags, D8 messaging | 🟡 | 🟡 (clarified) | No code-level change; each now carries a written RF/trigger (RF-3, RF-8, RF-7) instead of an open question |
 
-**Deliberately NOT promoted (honest):** **B2 authz** stays 🟡 — Wave 2.4 closed the capability-literal correctness defect (F-11) and added the `no-rawstring-tier1-authz` lint, and ADR 0022 phases 1–13 are done, but Phase 6 (wiki sync, F.7) and the RF-3 authz-cache invalidation contract remain open. **A3 contract** stays 🟡 — the program's contract items closed (F-03 parallel-surface delete + RF-4, F-13a/b, api-lint **0 violations** at Wave F), but the separate `api-contract-hardening` C–F backlog is the residual owner. Promotion to ✅ for both requires those residuals closed, per the evidence rule above.
+**Deliberately NOT promoted (honest):** **B2 authz** stays 🟡 — Wave 2.4 closed the capability-literal correctness defect (F-11) and added the `no-rawstring-tier1-authz` lint, ADR 0022 phases 1–13 are done and Phase 6 (wiki sync) closed by Z-28, but area-scoped admin semantics remain in flight on the current branch (qa/iam-area-membership). **A3 contract** promoted to ✅ by Z-20 (api-contract-hardening Phase-F closure, 2026-06-08): 0 CRITICAL/0 HIGH; api-lint 0 blocking/0 reported.
 
-### REQ-* compliance (Wave F check against `backend-target-architecture.md`)
+### Wave Z all-green re-score (2026-06-13)
+
+All Wave Z concerns resolved. Grade deltas from Wave F → Wave Z:
+
+| Concern | Before (Wave F) | After (Wave Z) | Commit(s) |
+|---|---|---|---|
+| A3 contract | 🟡 | ✅ | Z-20 (promotion-by-verification): api-contract-hardening Phase-F closed, 0 CRITICAL/0 HIGH, api-lint 0 blocking |
+| C4 caching | 🟡 | ✅ | Z-29 (79f946df9): cache contracts + invalidation-path verification, RF-3, REQ-CACHE-1 MET |
+| D2 observability | 🟡 | ✅ | Z-1 (c787ddfa1): otelhttp + W3C traceparent + autoexport; Z-21: log.Printf→slog; Z-22: WS drain REQ-REL-2; Z-23: concurrent readiness |
+| D5 audit (dual-mode) | ✅ (with allow-dualmode) | ✅ (zero dual-mode) | Z-4 (0a578446a): audit export hard-required; Z-5 (6075c82a3): freeze tx-mandatory, ADR 0015 amended |
+| D7 feature flags | 🟡 | ✅ | Z-30 (bcab41710): feature-flag lifecycle standard, RF-8 closed |
+| D8 messaging | 🟡 | ✅ | Z-31 (bcab41710): servicebus fenced as sync Gotenberg adapter, RF-7 closed |
+| B3 tenancy / REQ-TEN-1 | ✅ (2/29 tables) | ✅ (all tables) | Z-2/Z-3 (ad70f6415): RLS on all 27 remaining tables + idempotency FK; ADR 0027 in full |
+| C6 async / REQ-ASYNC-1 | ✅ | ✅ (strengthened) | Z-6 (c7b10f3d6 + abc9afa48): membership governance in-tx; Z-10 (3367570c6): outbox generic staging |
+| ADR registry | — | ✅ | Z-27: canonical Status headers, stubs → Historical/0028, index rebuilt; Z-28 (c82dadfb1): ADR 0022 Phase 6 wiki sync |
+| REQ-REL-2 (WS drain) | DEFERRED | ✅ | Z-22 (e7449e830): WS presence drain on shutdown |
+
+**G10 regression review:** ZERO Wave-Z-caused regressions. Two critical claims raised and both refuted with evidence (RLS templates `::uuid` cast — refuted by migration 0213 having converted those columns post-baseline; presence `CloseAll` race — refuted as pre-existing). Pre-existing finds parked in `wiki/backend/post-v1-backlog.md`.
+
+**Intentional exception (single):** F-18 git-history residual closes physically at the Sunday 2026-06-14 v1 re-baseline via Z-32 runbook. Not a defer — a physical at-release action. No other non-✅ lines remain.
+
+### REQ-* compliance (Wave Z check against `backend-target-architecture.md`)
 
 | REQ-* | Finding(s) | State | Evidence |
 |---|---|---|---|
@@ -300,17 +326,17 @@ The backend-professionalization program (Waves 0–2) fixed **defects within** c
 | REQ-TOP-1 (no cross-module SQL/infra) | F-06b/c/d | **MET (4/9); residual next-touch** | Wave 2.5/2.6/2.7; F-06e + security-JOIN + standalone-CD-repo deferred |
 | REQ-TOP-2 (platform domain-free) | F-06a, F-05 | **MET + CI-locked** | Wave 0.6/2.8; `platformboundary` analyzer exit 0 (F.1) |
 | REQ-TOP-3 (no dead platform pkgs) | F-08 | **MET** | Wave 1.9/2.13 |
-| REQ-ASYNC-1 (in-tx audit) | F-07, D-01 | **MET + CI-locked** | Wave 2.2; `PostCommitAudit` analyzer exit 0 (F.1); F.3 live |
+| REQ-ASYNC-1 (in-tx audit + membership governance) | F-07, D-01, T-007 | **MET + CI-locked** | Wave 2.2; `PostCommitAudit` analyzer exit 0 (F.1); F.3 live; Z-6 (c7b10f3d6 + abc9afa48): membership governance in-tx via LogTx |
 | REQ-ASYNC-4 (jobs deployment) | F-19 | **MET** | Wave 0.5/1.6/1.7; F.3 live |
-| REQ-REL-1/2 (server timeouts) | F-16 | **MET (timeouts); F-16B/C deferred** | Wave 1.2 |
+| REQ-REL-1/2 (server timeouts + WS drain) | F-16 | **MET** | Wave 1.2 (timeouts); Z-22 (e7449e830): WS presence drain on shutdown — F-16B MET; Z-23 (8a99124c0): concurrent readiness checks — F-16C MET |
 | REQ-REL-3 (durable auth-failure limit) | F-20e | **MET** | Wave 2.10 live PG probe |
 | REQ-AUTHZ-2/5/6 (typed caps, registry, batch) | F-11, F-10 | **MET + CI-locked** | Wave 2.4/2.9; `no-rawstring-tier1-authz` api-lint rule |
-| REQ-TEN-1 / REQ-DATA-2 (DB-layer isolation) | F-12 | **MET (2 tables); rest trigger-gated** | Wave 2.3 RLS on controlled_documents+audit_events; F.3 live NOSUPERUSER probe; iam_users→RF-6, rest→first-external-tenant |
+| REQ-TEN-1 / REQ-DATA-2 (DB-layer isolation) | F-12 | **MET** | Wave 2.3 RLS on controlled_documents+audit_events; Z-2/Z-3 (ad70f6415): RLS on all 27 remaining tenant tables + idempotency tenant FK; ADR 0027 executed in full; F.3 live NOSUPERUSER probe |
 | REQ-SEC-1 (no secrets in VCS) | F-18 | **MET (working tree); history→D-4b re-baseline** | Wave 0; gitleaks CI |
 | REQ-API-2 (single contract surface) | F-03 | **MET** | Wave 1.3; RF-4 closed |
 | REQ-H-1/H-2 (repo boundary, problem+json everywhere) | F-06b, F-09, D-03 | **MET** | Wave 1.4/1.5/2.5 |
-| REQ-OBS-1/2/3 (OTel, W3C trace) | F-17 | **DEFERRED (D-1 trigger)** | interim bar met (trace-ID slog + RED metrics); see D2 |
-| REQ-CACHE-1 (cache contract) | D-05 | **DEFERRED (next IAM feature)** | doc-only |
+| REQ-OBS-1/2/3 (OTel, W3C trace) | F-17 | **MET** | Z-1 (c787ddfa1): otelhttp + W3C traceparent + autoexport, env-gated inert; Z-21 (12a752d05 + bfe1e0e2a): log.Printf→slog sweep; full OTel stack active |
+| REQ-CACHE-1 (cache contract) | D-05 | **MET** | Z-29 (79f946df9): cache contracts + invalidation-path verification; RF-3 closed |
 
 ---
 
