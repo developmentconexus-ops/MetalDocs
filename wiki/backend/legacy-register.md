@@ -1,6 +1,7 @@
 # Legacy & Duplication Register
 
-> **Last verified:** 2026-06-12
+> **Last verified:** 2026-06-13
+> **CLOSED (Wave Z, 2026-06-13):** every F-\*/D-\* entry is resolved, KEEP, or at-release. Pre-existing deferred items that were never Wave Z scope live in [post-v1-backlog.md](post-v1-backlog.md).
 > **Scope:** Consolidated cross-area register of every legacy pattern, structural duplication, and correctness gap found during the Stage-1 audit of the MetalDocs backend. Entries are grouped by root-cause family, ordered by worst severity, and mapped to normative requirements from [../architecture/backend-target-architecture.md](../architecture/backend-target-architecture.md). Each family states the Stage-2 question it must answer before closure.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root; source of F-01, F-05, F-07, F-14, F-19 evidence
@@ -110,6 +111,8 @@ Auth is the highest-risk location: failed-login, session errors, and middleware 
 
 **Deferred (Wave F sweep, 2026-06-12):** low severity; not pulled into a Stage-2 master verdict (subsumed by the RF-1 observability-depth pass). The Wave 1.1 chain reorder added trace-ID-tagged structured `slog` on the request path and principal attribution across the authn boundary, so the highest-risk lines (login/middleware rejections) are now correlation-safe via `http_request` slog. Residual `log.Printf` call sites in auth/approval handlers + `platform/objectstore` are cosmetic. **Trigger:** next touch of those handlers, or the RF-1 OTel/observability-depth program (same trigger as [F-17] — "second host or first external-tenant SLA").
 
+**Resolved (Wave Z): Z-21 `12a752d05` / `bfe1e0e2a`** — `log.Printf` → `slog` sweep completed across worker/jobs/e2e mains and `platform/worker`; all residual unstructured call sites replaced (F-02, REQ-OBS-1).
+
 ---
 
 ## F-03 — Parallel Contract Surface (spec2.yaml / internal/api/v2)
@@ -173,6 +176,8 @@ A secondary defect: `startOutboxWorker` has a restart loop that is dead code —
 
 **Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict SIMPLIFY, P2 (DRY / Go generics; RF-7). No correctness defect — the duplication is structural debt, not a bug; the two-stage relay was runtime-verified working in Wave F F.3 (worker claimed a `pdf_dispatch_outbox` row and relayed it to `outbox_events`). The `F-04-dead-loop` sub-item (dead restart loop in `startOutboxWorker`, DELETE/P3) rides the same trigger. **Trigger:** next time `render/fanout` is touched — extract `StagingOutboxWorker[R]`/`StagingOutboxRepository[R]` generics and delete the dead loop then.
 
+**Resolved (Wave Z): Z-10 `3367570c6` / allowlist tail `029003c2d`** — generic staging outbox repo/worker extracted; dead restart loop deleted; idempotency-store dedup applied (F-04, RF-7).
+
 ---
 
 ## F-05 — Duplicate Rate-Limiter Implementations
@@ -234,6 +239,12 @@ The most severe instance is a REQ-TOP-2 breach: `internal/platform/observability
 **Stage-2 question:** Where must repository / service boundaries be introduced to isolate cross-module SQL writes and reads?
 
 **Resolution (PARTIALLY RESOLVED — Wave 2, 2026-06-12):** Four of nine violations resolved: (a) F-06a (platform/observability domain import) was closed in Wave 0 (see inline RESOLVED annotation above). (b) F-06b (delivery-layer raw SQL in CD `GetActiveDocument` + documents `finalizeDocument`) RESOLVED in Wave 2.5 commits `ea996da2`+`e9e6e2dc` — extracted to repository methods `GetActiveInstance`/`GetFinalizePrereqs` behind the application service; delivery layer is now SQL-free; grep-verified. (c) F-06c (auth writing to `iam_users`) RESOLVED in Wave 2.6 commit `07f914e9` — narrow `LoginContextPort` added to iam/domain; auth module delegates last-login writes via the port rather than directly touching the IAM table. (d) F-06d (iam/delivery importing auth/infrastructure) RESOLVED in Wave 2.7 commit `3c6ab235` — `SessionAdminQuery`/`SessionListItem` types promoted to auth/domain; iam delivery now imports only auth/domain. Residual (NOT in Wave 2 scope → next-touch / Wave 3): `TemplateVersionChecker` taxonomy→templates raw read; security module structural JOIN to `iam_users`; second standalone CD repository constructed in `main.go`.
+
+**Resolved (Wave Z): Z-7 `e50150506`** — F-06e (`TemplateVersionChecker` taxonomy→templates raw read) resolved: taxonomy now reads template versions via `templates/domain` port (REQ-TOP-1, F-06e).
+
+**Resolved (Wave Z): Z-8/Z-9 `730ea426b`** — security boundary accepted-note (security module structural JOIN to `iam_users` disposition recorded); CD repo exposed via module interface (second standalone CD repository in `main.go` resolved) (F-06 residuals).
+
+**Resolved (Wave Z): Z-14 `307666fd6`** — CD handler typed problem codes + guard added; F-09/F-06 delivery-layer finding closed (F-06 finding D, F-09).
 
 ---
 
@@ -334,6 +345,12 @@ Additional defects: idempotency TTL is hard-coded as a duplicate SQL string lite
 
 **Resolution (raw-codes half — Wave 1.4, 2026-06-11, `ed7890597`):** middleware raw string codes closed — `writeErrJSON` takes `problem.Code`; new catalog consts `IDEMPOTENCY_KEY_INVALID` / `REQUEST_BODY_TOO_LARGE`; conflict emits `IDEMPOTENCY_KEY_REUSED` (aligns FE); `INTERNAL`→`INTERNAL_ERROR`; catalog guard now covers `platform/idempotency`. Still open: finalize-handler inline idempotency (RF-10), TTL literal duplication, tenant_id FK (F-09d → F-12 trigger).
 
+**Closed (Wave Z): KEEP** — F-09a finalize-handler inline idempotency: retained by design (RF-10 pattern accepted; handler-level granularity intentional). No further action.
+
+**Resolved (Wave Z): Z-15 `bc502ae70`** — idempotency TTL duplicate SQL string literal consolidated to a single const (F-09c).
+
+**Resolved (Wave Z): Z-2/Z-3 `ad70f6415`** — `idempotency_keys.tenant_id` foreign key added as part of RLS-on-all-tenant-tables migration (F-09d → F-12 trigger now executed, ADR 0027 executed-in-full).
+
 ---
 
 ## F-10 — N+1 and Full-Scan Read Patterns
@@ -395,6 +412,8 @@ A secondary inconsistency: tier-1 uses `"template.approve"` while tier-2 uses `C
 
 **Resolution (Wave 2.4, 2026-06-12, `784ce561`):** All three confirmed violations closed: (a) `"template.admin"` literal (unknown cap that permanently locked `upsertApprovalConfig`) replaced with `CapTemplateEdit` — matches tier-2 authz; (b) publish-route tier-1/tier-2 mismatch aligned to `CapTemplatePublish`; all raw tier-1 capability literals in templates delivery typed to constants; (c) broken `containsRole(...,"admin")` post-publication gate fixed to canonical `system_admin`/`qms_admin` role checks. Typed `EventType` constants added for `route.config.*` events (eliminates F-11 item (2)). New api-lint rule `no-rawstring-tier1-authz` guards all delivery-layer tier-1 calls in CI. No new capability was minted (no ADR required). Residual: codegen enum `CreateManagedUserRequestRoles` still missing 3 roles (signer, area_admin, qms_admin) — separate regen trigger, not addressed in this wave.
 
+**Resolved (Wave Z): Z-16 `ca1017f0d`** — `CreateManagedUserRequestRoles` enum expanded to canonical 8 roles (adds signer, area_admin, qms_admin) and OpenAPI spec regenerated; F-11 residual closed (F-11).
+
 ---
 
 ## F-12 — Tenant Isolation Gaps
@@ -420,6 +439,10 @@ Several tables or query paths enforce tenant isolation solely via application-la
 **Stage-2 question:** Which tables are missing tenant_id or DB-layer tripwires that currently rely on query predicates alone?
 
 **Resolution (PARTIALLY RESOLVED — Wave 2.3, 2026-06-12, `de0b44c2` + ADR 0027 `81213133`):** ADR 0027 records `auth_identities` as tenant-global by design (T-008 closed by-design) and documents the RLS sequencing policy. `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + NULL-permissive `tenant_isolation` policy applied to `controlled_documents` and `audit_events` via migration 0234; active under the prod `NOSUPERUSER` constraint and runtime-verified with a `NOSUPERUSER` role. `ExportJob.TenantID` corrected from `string` to `uuid.UUID` in the Go domain type. Residual per ADR 0027 and D-3: `iam_users` RLS deferred to RF-6; all remaining tenant-scoped tables deferred to the "first external tenant" trigger.
+
+**Resolved (Wave Z): Z-2/Z-3 `ad70f6415`** — RLS applied to all 27 remaining tenant-scoped tables (including `iam_users`); idempotency `tenant_id` FK added; ADR 0027 executed-in-full (F-12, RF-6, REQ-TEN-1).
+
+**Resolved (Wave Z): Z-6 `c7b10f3d6` / regression fix `abc9afa48`** — T-007 (`MembershipGovernanceLogger` wired nil in production) resolved: membership governance now runs in-transaction via `LogTx`; grant/revoke produce governance log atomically (T-007, REQ-ASYNC-1).
 
 ---
 
@@ -447,6 +470,12 @@ The OpenAPI spec surface has several confirmed gaps between what the code emits,
 **Stage-2 question:** Which response schemas emit fields absent from the spec, and which deprecated routes lack machine-readable markers?
 
 **Resolution (F-13a/b — Wave 1.5, 2026-06-11, `2e977845b`):** `SearchDocumentResponse` aligned to the spec's `SearchDocumentItem` (subject/business_unit/classification/tags dropped from the wire); camelCase `businessUnit` param removed. Still open: F-13c/d (partials casing, `deprecated: true` marker — Wave 3 next-regen trigger), F-13e (iamapi bundle — merge-conflict trigger).
+
+**Resolved (Wave Z): Z-17 `f969af3a9`** — dead OpenAPI partial files removed; F-13c (partials casing drift) closed.
+
+**Resolved (Wave Z): Z-18 `ca1017f0d`** — `deprecated: true` added to `createManagedUser` route in OpenAPI spec; F-13d closed.
+
+**Resolved (Wave Z): Z-19 `ee4bf01fa`** — iamapi codegen bundle split into separate iam/audit/security packages; F-13e closed.
 
 ---
 
@@ -481,6 +510,8 @@ Multiple files or types are confirmed dead code — either explicitly deprecated
 
 **F-14 tail — RESOLVED (Wave 2.13, 2026-06-12, `dce4c81d`):** dead schema dropped by migration `0236_dead_schema_drop.sql` — `public.templates_template.areas/visibility/specific_areas` (the orphan columns `CreateTemplateTx` still wrote; the writes were removed in the same commit, plus `db/reference-data/0001`), `document_profiles.is_active` (superseded by `archived_at`/0122; only the e2e seed wrote it — removed same commit), and the `document_subjects` table (`DROP TABLE … CASCADE`). Live-applied + re-verified zero production refs; post-drop `POST /api/v1/templates` → 201 smoke confirms `CreateTemplateTx` works without the columns. `RepositoryMemory` resolved separately under F-08 (`75ad1298`). New residual (next-touch, not FE-5 scope): the now-orphan `metaldocs.documents.subject_code` column + its index (the `document_subjects` FK was CASCADE-dropped; the column itself is dead weight, no runtime error). `FreezeService.Freeze` and `SnapshotService` remain by design (the former carries an ADR-0015 optional-tx-enlistment pattern now annotated `//cilint:allow-dualmode`).
 
+**Resolved (Wave Z): Z-25 `62503a876` / runner fix `4d4a8495d`** — orphan `documents.subject_code` column + its index dropped via migration 0238; F-14 residual fully closed (CD T-010).
+
 ---
 
 ## F-15 — Duplicate Private Helpers Across Platform Packages
@@ -501,6 +532,10 @@ Identical private helper functions have been independently re-implemented in mul
 **Stage-2 question:** Consolidate parseBoolEnv/splitCSV into one platform/config utility?
 
 **Deferred (Wave F sweep, 2026-06-12):** split Stage-2 verdict — `parseBoolEnv` semantic-drift consolidation is SIMPLIFY/P3 (export `ParseBoolEnv` with 4-value POSIX semantics, update 2 callers); `splitCSV` duplication is **KEEP** (Go proverb "a little copying is better than a little dependency" — two identical 5-line copies, no divergence risk worth a shared dep). **Trigger (parseBoolEnv only):** next time either caller (`platform/config/attachments.go` or `platform/authn/config.go`) is touched.
+
+**Resolved (Wave Z): Z-12 `a342da46d`** — `ParseBoolEnv` consolidated to single platform/config utility; both callers updated (F-15, RF-7).
+
+**Closed (Wave Z): KEEP** — `splitCSV` duplication: two identical 5-line copies retained by design; no shared dependency warranted.
 
 ---
 
@@ -525,6 +560,10 @@ Two related gaps: the readiness probe runs dependency checks sequentially under 
 **Stage-2 question:** Which timeout fields are absent; does SIGTERM drain correctly?
 
 **Resolution (timeouts half — Wave 1.2, 2026-06-11, `1b3f0d11d`):** `ReadTimeout 30s / WriteTimeout 60s / IdleTimeout 90s` added to the API `http.Server`. Still open: readiness sequential checks (F-16C — Wave 3 trigger: second dependency), unconditional signing-secret requirement, WS drain (F-16B — deferred per D-1).
+
+**Resolved (Wave Z): Z-22 `e7449e830`** — WebSocket presence drain on shutdown implemented; F-16B closed (RF-9, REQ-REL-2).
+
+**Resolved (Wave Z): Z-23 `8a99124c0`** — readiness checks converted to concurrent errgroup with shared budget; F-16C closed (RF-9).
 
 ---
 
@@ -552,6 +591,8 @@ A secondary defect: `normalizeRoute` only covers 5 path patterns; all other rout
 
 **Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict REFACTOR, P2 — but **trigger-gated by design (D-1)**: a full OTel/OTLP pipeline today would be over-engineering for the single-server Docker-Compose deployment. The interim bar (structured logs + propagated request IDs) is met by Wave 1.1 (trace-ID-tagged `slog`, principal attribution, RED metrics at `/api/v1/metrics` — all runtime-verified in Wave F F.3). **Trigger:** "second host or first external-tenant SLA" (D-1) / an infrastructure decision on an OTLP backend. Then: `otelhttp.NewHandler` auto-instrumentation, W3C `traceparent` replacing `X-Trace-Id`, `autoexport` OTLP. This is the headline Wave 3 item (RF-1).
 
+**Resolved (Wave Z): Z-1 `c787ddfa1`** — minimal OTel wiring added: `otelhttp` middleware, W3C `traceparent` propagation, `autoexport` OTLP (env-gated, inert when unset); REQ-OBS-1/2/3 met at v1 bar (F-17, RF-1).
+
 ---
 
 ## F-18 — Hard-Coded Credentials and Stale Binaries in VCS
@@ -576,6 +617,10 @@ Additionally, pre-built Windows binaries of indeterminate provenance are committ
 **Stage-2 action (pre-prerequisite, not a deferral):** Assess whether the credential in `cmd/seed-test-document/main.go:25-30` has been rotated since commit c4a7d9a93. Scrub DSN and binary artifacts. Confirm .gitignore coverage end-to-end.
 
 **Resolution (Wave 0, 2026-06-11):** items 0.1 (`58cbf9943` — deletion + redaction + gitignore + api-lint rebuild), 0.2 (`3402a8bbd` — gitleaks CI + D-4a rule), 0.4 (history rewrite — see roadmap tracker for status). Rotation (0.3): owner declined to change the `.env` value; risk explicitly accepted by owner in the Wave 0 session.
+
+**Resolved (Wave Z): Z-26 `26c446164`** — gitleaks full-history scanning added with triaged allowlist; all historical secret references accounted for (1.11, F-18 round-2).
+
+**Closed (Wave Z): at-release via Z-32 runbook** — git-history residual closes physically at the Sunday v1 re-baseline (`aba87b673` Z-32 runbook committed); no further action required on this branch.
 
 ---
 
@@ -633,6 +678,10 @@ Several confirmed SQL patterns produce unnecessary query load. All are currently
 
 **Resolution (F-20e — Wave 2.10, 2026-06-12, `9921b323`+`6e2bf39d`):** `InMemoryAuthFailureRateLimiter` replaced by `PostgresAuthFailureRateLimiter` backed by the new `auth_failure_counters` table (migration 0235). Semantics are identical to the in-memory implementation: fixed 60-second window, 5-failure threshold, `actorID`-keyed, reset-on-success via DELETE; wired in `reauth.go` when `db != nil`. Critical follow-up fix `6e2bf39d`: the original `timestamptz + duration` binding errored at runtime under pgx (duration coerced to bigint); fixed to a precomputed-timestamp comparison. A live integration probe (`-tags integration`) verifies all 5 state transitions against a real DB. No Redis added (D-1 upheld). Other F-20 sub-items (correlated COUNT, `JSONB ILIKE` without GIN index — note F-20e's `ILIKE` overlap with F-10e is now resolved via F-10 wave) remain low-priority Wave 3.
 
+**Resolved (Wave Z): Z-24 `46b7582e0`** — `pg_trgm` GIN index added for CD search `ILIKE` patterns; F-20b closed (F-20b).
+
+**Closed (Wave Z): KEEP** — F-20f sequential security rule evaluation (4 independent SQL queries, no early exit): accepted as-is; sequential evaluation is intentional for auditability at current scale.
+
 ---
 
 ## Cross-Area Duplications (not visible to individual module mappers)
@@ -652,6 +701,8 @@ Each of `buildMinioClients:158-178` (internal + public presigning clients) and `
 **Location:** `internal/platform/bootstrap/api.go:85-103, 158-178`
 
 **Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict SIMPLIFY, P2. No correctness defect — `minio-go` v7 clients are goroutine-safe; three clients from the same credentials is wasteful, not wrong. **Trigger:** next time bootstrap wiring is touched — change `miniostore.NewStore` to accept a `*minio.Client` and pass the internal client from `buildMinioClients` (3 → 2).
+
+**Resolved (Wave Z): Z-11 `819816a7e`** — single MinIO byte-IO client reused from bootstrap; redundant client instances eliminated (D-02).
 
 ### D-03: 405 Method Not Allowed returned as bare status with no RFC 9457 body in two modules
 
@@ -675,6 +726,8 @@ Both the search module (`internal/modules/search/delivery/http/handler.go:55-57`
 
 **Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict REFACTOR, P2 — doc-only (REQ-CACHE-1). The empty `platform/cache` scaffold was deleted in Wave 1.9; the only production cache (`CachedRoleProvider`, in-process `sync.Map` TTL) works correctly but lacks a written contract (TTL, invalidation, staleness bound, failure behavior). No code change — a `// CacheContract:` doc block. **Trigger:** before the next IAM-module feature touch.
 
+**Resolved (Wave Z): Z-29 `bcab41710`** — cache contracts written and invalidation-path verification completed; `CachedRoleProvider` contract documented; REQ-CACHE-1 met (D-05, RF-3).
+
 ### D-06: `cmd/` root vs `apps/*/cmd/` — two binary entrypoint conventions
 
 `cmd/seed-test-document/` lives at the repository root under `cmd/`, while all active binaries live under `apps/<name>/cmd/<binary>/`. `go build ./...` traverses both locations. The `cmd/` root convention is a Go standard-library holdover; the `apps/` convention is MetalDocs-canonical. The only inhabitant of the root `cmd/` is the dead seed binary flagged in F-18.
@@ -688,6 +741,8 @@ Both the search module (`internal/modules/search/delivery/http/handler.go:55-57`
 `internal/modules/documents/domain/model.go:8-13` defines only 3 of 8 live `DocumentStatus` values; the remaining 5 (approved, published, superseded, obsolete, scheduled, rejected) exist only in `api.gen.go`. In the taxonomy module, `document_profiles.is_active` was superseded by `archived_at` (migration 0122) but the orphaned column and default remain. Both patterns represent the same root cause: incremental migration with no cleanup of the original type surface.
 
 **Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict SIMPLIFY, P2. The `DocumentStatus` enum gap is cosmetic — the full status set is enforced at the DB via the `public.documents.status` CHECK constraint (verified live in Wave F F.3: `draft/finalized/archived/under_review/approved/rejected/scheduled/published/superseded/obsolete`), so the 6 missing Go constants are a type-surface convenience, not a correctness gap. The `document_profiles.is_active` half was resolved by migration 0236 (Wave 2.13, F-14 tail). **Trigger:** next documents-domain touch — add the 6 `DocumentStatus` constants to `documents/domain/model.go` and convert string-literal callsites.
+
+**Resolved (Wave Z): Z-13 `a342da46d`** — `DocumentStatus` enum completed in `documents/domain/model.go`; all 8 status constants declared; string-literal callsites converted (D-07).
 
 ---
 
@@ -724,6 +779,13 @@ This document is itself the legacy register. Wave 0–2 resolutions are marked i
 - **Partially resolved (residual + trigger):** F-06 (4 of 9; F-06e + security-JOIN + standalone-CD-repo → next-touch/Wave 3), F-09 (finalize-inline KEEP / TTL P3 / tenant_id-FK→F-12), F-12 (CD+audit_events done; iam_users→RF-6; rest→first-external-tenant), F-13 (c/d→next regen, e→merge-conflict).
 - **Deferred (Wave 3 / next-touch, trigger written this sweep):** F-02 (RF-1/handler-touch), F-04 (render/fanout touch), F-15 (parseBoolEnv next-caller-touch; splitCSV KEEP), F-17 (D-1 "second host or first external-tenant SLA"), F-20 sub-items (F-20b >50k rows/p95>200ms; F-20f KEEP); D-02 (bootstrap-touch), D-05 (next IAM feature), D-07 (next documents-domain touch).
 - **Informational appendix flags** (no family ID) are out of the F-*/D-* sweep scope by definition and remain advisory.
+
+**Wave Z close-out (2026-06-13) — REGISTER CLOSED. Every F-\*/D-\* entry is now resolved (commit cited), KEEP, or at-release.** Disposition tally for Wave Z additions:
+- **Resolved (Wave Z commit cited):** F-02 (Z-21), F-04 (Z-10), F-06 residuals (Z-7 F-06e; Z-8/Z-9 security-JOIN+standalone-CD; Z-14 CD handler codes), F-09c TTL (Z-15), F-09d tenant FK (Z-2/Z-3), F-11 codegen enum (Z-16), F-12 iam_users RLS (Z-2/Z-3), F-12 T-007 membership governance (Z-6), F-13c (Z-17), F-13d (Z-18), F-13e (Z-19), F-14 subject_code drop (Z-25), F-15 parseBoolEnv (Z-12), F-16B WS drain (Z-22), F-16C concurrent readiness (Z-23), F-17 OTel (Z-1), F-18 gitleaks scan (Z-26), F-20b GIN index (Z-24); D-02 MinIO (Z-11), D-05 cache contract (Z-29), D-07 DocumentStatus (Z-13).
+- **KEEP (Wave Z):** F-09a finalize-inline idempotency; F-15 splitCSV; F-20f sequential security queries.
+- **At-release (Wave Z):** F-18 git-history residual (closes via Z-32 runbook `aba87b673` at Sunday v1 re-baseline).
+- **Informational appendix flags** remain advisory; no family ID, no Wave Z action required.
+- Pre-existing post-v1 items (never Wave Z scope) live in [post-v1-backlog.md](post-v1-backlog.md).
 
 See [../architecture/backend-blueprint.md](../architecture/backend-blueprint.md) for the maturity scoreboard that this register feeds into, and [../architecture/backend-target-architecture.md](../architecture/backend-target-architecture.md) for the normative requirements each family must satisfy before closure.
 
