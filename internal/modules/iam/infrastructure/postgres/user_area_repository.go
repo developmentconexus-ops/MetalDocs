@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/lib/pq"
+
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
@@ -48,6 +50,42 @@ ORDER BY area_code ASC, effective_from DESC
 		return nil, fmt.Errorf("iterate active user process areas: %w", err)
 	}
 	return result, nil
+}
+
+// ListActiveForUsers loads active memberships for a set of userIDs in a
+// single query. Returns a map of userID → []UserProcessArea. An empty
+// userIDs slice returns an empty map without hitting the database (H-5.3 D2).
+func (r *UserAreaRepository) ListActiveForUsers(ctx context.Context, tenantID string, userIDs []string, now time.Time) (map[string][]iamdomain.UserProcessArea, error) {
+	if len(userIDs) == 0 {
+		return map[string][]iamdomain.UserProcessArea{}, nil
+	}
+	const q = `
+SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
+FROM public.user_process_areas
+WHERE tenant_id = $1::uuid
+  AND user_id = ANY($2)
+  AND effective_from <= $3
+  AND (effective_to IS NULL OR effective_to > $3)
+ORDER BY user_id ASC, area_code ASC, effective_from DESC
+`
+	rows, err := r.db.QueryContext(ctx, q, tenantID, pq.Array(userIDs), now)
+	if err != nil {
+		return nil, fmt.Errorf("batch query active user process areas: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[string][]iamdomain.UserProcessArea, len(userIDs))
+	for rows.Next() {
+		item, err := scanUserProcessArea(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[item.UserID] = append(out[item.UserID], item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate batch active user process areas: %w", err)
+	}
+	return out, nil
 }
 
 // ListByTenant returns active memberships across the whole tenant, with

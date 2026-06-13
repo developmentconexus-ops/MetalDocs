@@ -94,6 +94,26 @@ func (r *memAreaRepo) ListActive(_ context.Context, userID, tenantID string, _ t
 	return out, nil
 }
 
+func (r *memAreaRepo) ListActiveForUsers(_ context.Context, tenantID string, userIDs []string, _ time.Time) (map[string][]iamdomain.UserProcessArea, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	want := make(map[string]struct{}, len(userIDs))
+	for _, uid := range userIDs {
+		want[uid] = struct{}{}
+	}
+	out := make(map[string][]iamdomain.UserProcessArea, len(userIDs))
+	for _, m := range r.active {
+		if m.TenantID != tenantID {
+			continue
+		}
+		if _, ok := want[m.UserID]; !ok {
+			continue
+		}
+		out[m.UserID] = append(out[m.UserID], m)
+	}
+	return out, nil
+}
+
 func (r *memAreaRepo) ListByTenant(_ context.Context, tenantID, userID, areaCode, role string, _ time.Time) ([]iamdomain.UserProcessArea, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

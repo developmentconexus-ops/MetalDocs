@@ -79,6 +79,10 @@ func (f fakeUserAreaWriteRepository) GrantAtomicTx(_ context.Context, _ iamdomai
 	return nil
 }
 
+func (f fakeUserAreaWriteRepository) ListActiveForUsers(_ context.Context, _ string, _ []string, _ time.Time) (map[string][]iamdomain.UserProcessArea, error) {
+	return map[string][]iamdomain.UserProcessArea{}, nil
+}
+
 // passThroughVerifier accepts every (tenant, user) combination so the handler
 // reaches the service layer in unit tests. Cross-tenant 404 enforcement lives
 // in tests/integration/iam where the real PeopleService is exercised.

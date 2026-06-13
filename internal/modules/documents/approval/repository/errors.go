@@ -22,6 +22,10 @@ var (
 	ErrUnknownDB             = errors.New("approval: unknown database error")
 	ErrRouteInUse            = errors.New("approval: route is referenced by one or more instances and cannot be modified")
 	ErrDuplicateRouteProfile = errors.New("approval: a route already exists for this tenant+profile combination")
+	// ErrNoActiveContentHash is returned by LoadActiveDocumentContentHash when
+	// the document has no content hash (missing document or null hash). The
+	// application layer maps this to ErrContentHashMismatch.
+	ErrNoActiveContentHash = errors.New("approval: no active document content hash")
 )
 
 // MapHints carries constraint-name hints for SQLSTATE 23505 disambiguation.

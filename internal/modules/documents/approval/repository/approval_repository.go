@@ -78,4 +78,16 @@ type ApprovalRepository interface {
 	MarkSuperseded(ctx context.Context, tx db.Tx, tenantID, documentID string) error
 	UpdateStageStatus(ctx context.Context, tx db.Tx, tenantID, stageID string, newStatus, expectedOldStatus domain.StageStatus) error
 	UpdateInstanceStatus(ctx context.Context, tx db.Tx, tenantID, instID string, newStatus domain.InstanceStatus, expectedStatus domain.InstanceStatus, completedAt *time.Time) error
+
+	// Read helpers relocated from application layer (H-5.1).
+	// All run inside the caller's transaction so the atomic boundary is preserved.
+	LoadPriorSignoffs(ctx context.Context, tx db.Tx, tenantID, instanceID, activeStageID string) ([]domain.Signoff, error)
+	LoadStageSignoffs(ctx context.Context, tx db.Tx, tenantID, stageInstanceID string) ([]domain.Signoff, error)
+	HasUnresolvedComments(ctx context.Context, tx db.Tx, tenantID, documentID string) (bool, error)
+	// LoadActiveDocumentContentHash returns ErrNoActiveContentHash when the
+	// document is missing or has no content hash. The application layer maps
+	// this to ErrContentHashMismatch.
+	LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error)
+	ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error)
+	LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID string) (domain.Route, error)
 }

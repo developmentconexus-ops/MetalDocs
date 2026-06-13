@@ -303,6 +303,9 @@ func (noopAreaRepo) CloseActiveTx(context.Context, iamdomain.MembershipTx, strin
 func (noopAreaRepo) GrantAtomicTx(context.Context, iamdomain.MembershipTx, iamdomain.UserProcessArea, iamdomain.UserProcessArea) error {
 	return nil
 }
+func (noopAreaRepo) ListActiveForUsers(_ context.Context, _ string, _ []string, _ time.Time) (map[string][]iamdomain.UserProcessArea, error) {
+	return map[string][]iamdomain.UserProcessArea{}, nil
+}
 
 // noopPeopleTx satisfies iamdomain.MembershipTx for the noop repo.
 type noopPeopleTx struct{}

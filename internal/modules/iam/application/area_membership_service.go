@@ -23,6 +23,10 @@ var (
 
 type UserAreaWriteRepository interface {
 	ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error)
+	// ListActiveForUsers loads active memberships for a set of userIDs in a
+	// single query, keyed by userID. Used by PeopleService.ListFiltered to
+	// eliminate the per-user N+1 query (H-5.3 D2).
+	ListActiveForUsers(ctx context.Context, tenantID string, userIDs []string, now time.Time) (map[string][]domain.UserProcessArea, error)
 	ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string, now time.Time) ([]domain.UserProcessArea, error)
 	// MembershipDirectoryScope reports the actor's directory visibility (ADR 0022
 	// Phase 4). tenantWide=true → full tenant directory (system_admin inheritance
@@ -94,6 +98,13 @@ func (s *AreaMembershipService) invalidate(userID, tenantID string) {
 
 func (s *AreaMembershipService) ListActive(ctx context.Context, userID, tenantID string) ([]domain.UserProcessArea, error) {
 	return s.repo.ListActive(ctx, userID, tenantID, s.nowFn())
+}
+
+// ListActiveBatch loads active memberships for a set of users in a single
+// query. Returns a map of userID → []UserProcessArea. Used by
+// PeopleService.ListFiltered to eliminate the per-user N+1 (H-5.3 D2).
+func (s *AreaMembershipService) ListActiveBatch(ctx context.Context, tenantID string, userIDs []string) (map[string][]domain.UserProcessArea, error) {
+	return s.repo.ListActiveForUsers(ctx, tenantID, userIDs, s.nowFn())
 }
 
 // ListByTenant returns active memberships across the tenant with optional

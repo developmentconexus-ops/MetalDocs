@@ -97,7 +97,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 		}
 
 		// Step 5: load route with stages.
-		route, err := s.loadRoute(ctx, tx, req.TenantID, req.RouteID)
+		route, err := s.repo.LoadRoute(ctx, tx, req.TenantID, req.RouteID)
 		if err != nil {
 			return fmt.Errorf("submit: load route: %w", err)
 		}
@@ -148,7 +148,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 				status = domain.StageActive
 				openedAt = &now
 			}
-			eligibleIDs, err := resolveEligibleActors(ctx, tx, req.TenantID, stage.AreaCode, stage.RequiredRole)
+			eligibleIDs, err := s.repo.ResolveEligibleActors(ctx, tx, req.TenantID, stage.AreaCode, stage.RequiredRole)
 			if err != nil {
 				return fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
 			}
@@ -245,94 +245,3 @@ func normalizeGovernedRevisionTitle(revisionNumber int, title string) (string, e
 	return "", ErrRevisionTitleRequired
 }
 
-// loadRoute fetches an approval route and its stages from the database within the
-// caller's transaction. This is intentionally not part of ApprovalRepository
-// because route configuration is read-only catalogue data separate from the
-// instance lifecycle that ApprovalRepository manages.
-func (s *SubmitService) loadRoute(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (domain.Route, error) {
-	var route domain.Route
-	err := tx.QueryRowContext(ctx, `
-		SELECT id, tenant_id, profile_code, version
-		FROM approval_routes
-		WHERE id = $1 AND tenant_id = $2 AND active = TRUE`,
-		routeID, tenantID,
-	).Scan(&route.ID, &route.TenantID, &route.ProfileCode, &route.Version)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return domain.Route{}, fmt.Errorf("route %s not found for tenant %s", routeID, tenantID)
-		}
-		return domain.Route{}, err
-	}
-
-	rows, err := tx.QueryContext(ctx, `
-		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,
-		       ars.area_code, ars.quorum, ars.quorum_m, ars.on_eligibility_drift
-		  FROM approval_route_stages ars
-		  JOIN approval_routes ar
-		    ON ar.id = ars.route_id
-		   AND ar.tenant_id = $2
-		 WHERE ars.route_id = $1
-		 ORDER BY ars.stage_order ASC`,
-		routeID, tenantID,
-	)
-	if err != nil {
-		return domain.Route{}, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var stage domain.Stage
-		var quorumM sql.NullInt32
-		if err := rows.Scan(
-			&stage.Order, &stage.Name, &stage.RequiredRole, &stage.RequiredCapability,
-			&stage.AreaCode, &stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
-		); err != nil {
-			return domain.Route{}, err
-		}
-		if quorumM.Valid {
-			v := int(quorumM.Int32)
-			stage.QuorumM = &v
-		}
-		route.Stages = append(route.Stages, stage)
-	}
-	if err := rows.Err(); err != nil {
-		return domain.Route{}, err
-	}
-
-	return route, nil
-}
-
-// resolveEligibleActors returns the user_ids of all users who hold required_role
-// in area_code for the given tenant as of now. Returns empty slice (never nil).
-func resolveEligibleActors(ctx context.Context, tx *sql.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
-	rows, err := tx.QueryContext(ctx,
-		`SELECT user_id
-		   FROM metaldocs.user_process_areas
-		  WHERE tenant_id = $1::uuid
-		    AND area_code = $2
-		    AND role      = $3
-		    AND effective_from <= now()
-		    AND (effective_to IS NULL OR effective_to > now())`,
-		tenantID, areaCode, requiredRole,
-	)
-	if err != nil {
-		return []string{}, fmt.Errorf("resolveEligibleActors: %w", err)
-	}
-	defer rows.Close()
-
-	var ids []string
-	for rows.Next() {
-		var uid string
-		if err := rows.Scan(&uid); err != nil {
-			return []string{}, fmt.Errorf("resolveEligibleActors: scan: %w", err)
-		}
-		ids = append(ids, uid)
-	}
-	if ids == nil {
-		ids = []string{}
-	}
-	if err := rows.Err(); err != nil {
-		return []string{}, fmt.Errorf("resolveEligibleActors: rows: %w", err)
-	}
-	return ids, nil
-}

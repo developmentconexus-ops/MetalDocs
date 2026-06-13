@@ -2847,6 +2847,125 @@ func (r *fakeDecisionRepoWithCounter) UpdateInstanceStatus(_ context.Context, _ 
 	return r.updateInstanceErr
 }
 
+// The 6 new interface methods for fakeDecisionRepoWithCounter delegate to
+// fakeDecisionRepo via scanDecisionSignoffRows so the decisionTestConn driver serves them.
+
+func (r *fakeDecisionRepoWithCounter) LoadPriorSignoffs(ctx context.Context, tx db.Tx, tenantID, instanceID, activeStageID string) ([]domain.Signoff, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, approval_instance_id, stage_instance_id,
+		       actor_user_id, actor_tenant_id, decision,
+		       comment, signed_at, signature_method, signature_payload, content_hash
+		FROM approval_signoffs
+		WHERE approval_instance_id = $1
+		  AND stage_instance_id != $2
+		  AND actor_tenant_id = $3
+		ORDER BY signed_at ASC`,
+		instanceID, activeStageID, tenantID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanDecisionSignoffRows(rows)
+}
+
+func (r *fakeDecisionRepoWithCounter) LoadStageSignoffs(ctx context.Context, tx db.Tx, tenantID, stageInstanceID string) ([]domain.Signoff, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT s.id, s.approval_instance_id, s.stage_instance_id,
+		       s.actor_user_id, s.actor_tenant_id, s.decision,
+		       s.comment, s.signed_at, s.signature_method, s.signature_payload, s.content_hash
+		  FROM approval_signoffs s
+		  JOIN approval_stage_instances asi
+		    ON asi.id = s.stage_instance_id
+		  JOIN approval_instances ai
+		    ON ai.id = asi.approval_instance_id
+		   AND ai.id = s.approval_instance_id
+		 WHERE s.stage_instance_id = $1
+		   AND ai.tenant_id = $2::uuid
+		   AND s.actor_tenant_id = ai.tenant_id
+		 ORDER BY s.signed_at ASC`,
+		stageInstanceID, tenantID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanDecisionSignoffRows(rows)
+}
+
+func (r *fakeDecisionRepoWithCounter) HasUnresolvedComments(ctx context.Context, tx db.Tx, tenantID, documentID string) (bool, error) {
+	var unresolvedCount int
+	err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		  FROM document_comments
+		 WHERE tenant_id = $1
+		   AND document_id = $2
+		   AND resolved_at IS NULL`,
+		tenantID, documentID,
+	).Scan(&unresolvedCount)
+	if err != nil {
+		return false, err
+	}
+	return unresolvedCount > 0, nil
+}
+
+func (r *fakeDecisionRepoWithCounter) LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
+	var hash sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(d.content_hash_at_submit,
+		                (SELECT r.content_hash FROM document_revisions r
+		                  WHERE r.document_id = d.id
+		                  ORDER BY r.created_at DESC LIMIT 1))
+		  FROM documents d
+		 WHERE d.id = $1
+		   AND d.tenant_id = $2`,
+		documentID, tenantID,
+	).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", repository.ErrNoActiveContentHash
+	}
+	if err != nil {
+		return "", err
+	}
+	if !hash.Valid {
+		return "", repository.ErrNoActiveContentHash
+	}
+	return hash.String, nil
+}
+
+func (r *fakeDecisionRepoWithCounter) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT user_id
+		   FROM metaldocs.user_process_areas
+		  WHERE tenant_id = $1::uuid
+		    AND area_code = $2
+		    AND role      = $3
+		    AND effective_from <= now()
+		    AND (effective_to IS NULL OR effective_to > now())`,
+		tenantID, areaCode, requiredRole,
+	)
+	if err != nil {
+		return []string{}, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var uid string
+		if err := rows.Scan(&uid); err != nil {
+			return []string{}, err
+		}
+		ids = append(ids, uid)
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	return ids, rows.Err()
+}
+
+func (r *fakeDecisionRepoWithCounter) LoadRoute(_ context.Context, _ db.Tx, _, _ string) (domain.Route, error) {
+	panic("fakeDecisionRepoWithCounter.LoadRoute: not expected to be called in decision tests")
+}
+
 // ============================================================
 // RecordSignoff — UpdateStageStatus reject stage error
 // ============================================================

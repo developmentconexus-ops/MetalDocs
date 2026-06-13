@@ -15,6 +15,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -74,6 +75,172 @@ func (r *phase5Repo) UpdateStageStatus(_ context.Context, _ db.Tx, _, _ string, 
 
 func (r *phase5Repo) UpdateInstanceStatus(_ context.Context, _ db.Tx, _, _ string, _ domain.InstanceStatus, _ domain.InstanceStatus, _ *time.Time) error {
 	return r.updateInstanceErr
+}
+
+// The 6 new interface methods for phase5Repo. LoadRoute and ResolveEligibleActors
+// are called during Submit; the others during Decision. All delegate to tx so
+// the phase5Conn driver handles the queries.
+
+func (r *phase5Repo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID string) (domain.Route, error) {
+	var route domain.Route
+	err := tx.QueryRowContext(ctx, `
+		SELECT id, tenant_id, profile_code, version
+		FROM approval_routes
+		WHERE id = $1 AND tenant_id = $2 AND active = TRUE`,
+		routeID, tenantID,
+	).Scan(&route.ID, &route.TenantID, &route.ProfileCode, &route.Version)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Route{}, fmt.Errorf("route %s not found for tenant %s", routeID, tenantID)
+		}
+		return domain.Route{}, err
+	}
+	rows, err := tx.QueryContext(ctx, `
+		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,
+		       ars.area_code, ars.quorum, ars.quorum_m, ars.on_eligibility_drift
+		  FROM approval_route_stages ars
+		  JOIN approval_routes ar
+		    ON ar.id = ars.route_id
+		   AND ar.tenant_id = $2
+		 WHERE ars.route_id = $1
+		 ORDER BY ars.stage_order ASC`,
+		routeID, tenantID,
+	)
+	if err != nil {
+		return domain.Route{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var stage domain.Stage
+		var quorumM sql.NullInt32
+		if err := rows.Scan(
+			&stage.Order, &stage.Name, &stage.RequiredRole, &stage.RequiredCapability,
+			&stage.AreaCode, &stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
+		); err != nil {
+			return domain.Route{}, err
+		}
+		if quorumM.Valid {
+			v := int(quorumM.Int32)
+			stage.QuorumM = &v
+		}
+		route.Stages = append(route.Stages, stage)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.Route{}, err
+	}
+	return route, nil
+}
+
+func (r *phase5Repo) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT user_id
+		   FROM metaldocs.user_process_areas
+		  WHERE tenant_id = $1::uuid
+		    AND area_code = $2
+		    AND role      = $3
+		    AND effective_from <= now()
+		    AND (effective_to IS NULL OR effective_to > now())`,
+		tenantID, areaCode, requiredRole,
+	)
+	if err != nil {
+		return []string{}, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var uid string
+		if err := rows.Scan(&uid); err != nil {
+			return []string{}, err
+		}
+		ids = append(ids, uid)
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	return ids, rows.Err()
+}
+
+func (r *phase5Repo) LoadPriorSignoffs(ctx context.Context, tx db.Tx, tenantID, instanceID, activeStageID string) ([]domain.Signoff, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, approval_instance_id, stage_instance_id,
+		       actor_user_id, actor_tenant_id, decision,
+		       comment, signed_at, signature_method, signature_payload, content_hash
+		FROM approval_signoffs
+		WHERE approval_instance_id = $1
+		  AND stage_instance_id != $2
+		  AND actor_tenant_id = $3
+		ORDER BY signed_at ASC`,
+		instanceID, activeStageID, tenantID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanDecisionSignoffRows(rows)
+}
+
+func (r *phase5Repo) LoadStageSignoffs(ctx context.Context, tx db.Tx, tenantID, stageInstanceID string) ([]domain.Signoff, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT s.id, s.approval_instance_id, s.stage_instance_id,
+		       s.actor_user_id, s.actor_tenant_id, s.decision,
+		       s.comment, s.signed_at, s.signature_method, s.signature_payload, s.content_hash
+		  FROM approval_signoffs s
+		  JOIN approval_stage_instances asi
+		    ON asi.id = s.stage_instance_id
+		  JOIN approval_instances ai
+		    ON ai.id = asi.approval_instance_id
+		   AND ai.id = s.approval_instance_id
+		 WHERE s.stage_instance_id = $1
+		   AND ai.tenant_id = $2::uuid
+		   AND s.actor_tenant_id = ai.tenant_id
+		 ORDER BY s.signed_at ASC`,
+		stageInstanceID, tenantID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanDecisionSignoffRows(rows)
+}
+
+func (r *phase5Repo) HasUnresolvedComments(ctx context.Context, tx db.Tx, tenantID, documentID string) (bool, error) {
+	var count int
+	err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		  FROM document_comments
+		 WHERE tenant_id = $1
+		   AND document_id = $2
+		   AND resolved_at IS NULL`,
+		tenantID, documentID,
+	).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *phase5Repo) LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
+	var hash sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(d.content_hash_at_submit,
+		                (SELECT rev.content_hash FROM document_revisions rev
+		                  WHERE rev.document_id = d.id
+		                  ORDER BY rev.created_at DESC LIMIT 1))
+		  FROM documents d
+		 WHERE d.id = $1
+		   AND d.tenant_id = $2`,
+		documentID, tenantID,
+	).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", repository.ErrNoActiveContentHash
+	}
+	if err != nil {
+		return "", err
+	}
+	if !hash.Valid {
+		return "", repository.ErrNoActiveContentHash
+	}
+	return hash.String, nil
 }
 
 // ---------------------------------------------------------------------------

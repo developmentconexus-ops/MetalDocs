@@ -28,33 +28,58 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-type Service interface {
+// documentReader covers read/list/stats/ownership queries.
+type documentReader interface {
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
-	DuplicateDocument(ctx context.Context, tenantID, userID, docID string) (*application.CreateDocumentResult, error)
-	RenameDocument(ctx context.Context, tenantID, userID, docID, newName string) error
-	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
-	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
 	ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts application.ListOptions) ([]*domain.Document, int64, bool, error)
 	DocumentStats(ctx context.Context, tenantID, userID string, opts application.ListOptions) (*application.DocumentStats, error)
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
-	AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, bool, error)
-	HeartbeatSession(ctx context.Context, sessionID, userID string) error
-	ReleaseSession(ctx context.Context, tenantID, sessionID, userID, docID string) error
-	ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID, docID string) error
-	PresignAutosave(ctx context.Context, cmd application.PresignAutosaveCmd) (*application.PresignAutosaveResult, error)
-	CommitAutosave(ctx context.Context, cmd application.CommitAutosaveCmd) (*application.CommitResult, error)
-	SyncArtifactMetadata(ctx context.Context, cmd application.SyncArtifactMetadataCmd) (*application.CommitResult, error)
+}
+
+// documentLifecycle covers mutation operations on a document's lifecycle.
+type documentLifecycle interface {
+	DuplicateDocument(ctx context.Context, tenantID, userID, docID string) (*application.CreateDocumentResult, error)
+	RenameDocument(ctx context.Context, tenantID, userID, docID, newName string) error
+	Archive(ctx context.Context, tenantID, docID, actorID string) error
 	CreateCheckpoint(ctx context.Context, tenantID, docID, actorID, label string) (*domain.Checkpoint, error)
 	ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error)
 	ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error)
 	RestoreCheckpoint(ctx context.Context, tenantID, docID, actorID string, versionNum int) (*application.RestoreResult, error)
-	Archive(ctx context.Context, tenantID, docID, actorID string) error
 	SignedRevisionURL(ctx context.Context, tenantID, docID, revID string) (string, error)
+	GetFinalizePrereqs(ctx context.Context, tenantID, docID string) (*domain.FinalizePrereqs, error)
+}
+
+// editingSessions covers real-time editing session management.
+type editingSessions interface {
+	AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, bool, error)
+	HeartbeatSession(ctx context.Context, sessionID, userID string) error
+	ReleaseSession(ctx context.Context, tenantID, sessionID, userID, docID string) error
+	ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID, docID string) error
+}
+
+// autosaveArtifacts covers autosave presign/commit operations.
+type autosaveArtifacts interface {
+	PresignAutosave(ctx context.Context, cmd application.PresignAutosaveCmd) (*application.PresignAutosaveResult, error)
+	CommitAutosave(ctx context.Context, cmd application.CommitAutosaveCmd) (*application.CommitResult, error)
+}
+
+// documentComments covers comment CRUD on a document.
+type documentComments interface {
 	ListDocumentComments(ctx context.Context, tenantID, userID, documentID string) ([]domain.Comment, error)
 	AddDocumentComment(ctx context.Context, tenantID, userID, authorDisplay, documentID string, in domain.CommentCreateInput) (*domain.Comment, error)
 	UpdateDocumentComment(ctx context.Context, tenantID, userID, documentID string, libraryID int, in domain.CommentUpdateInput) (*domain.Comment, error)
 	DeleteDocumentComment(ctx context.Context, tenantID, userID, documentID string, libraryID int) error
-	GetFinalizePrereqs(ctx context.Context, tenantID, docID string) (*domain.FinalizePrereqs, error)
+}
+
+// Service is the application boundary consumed by Handler. It composes
+// cohesive sub-interfaces so each responsibility group can be mocked or
+// swapped independently.
+type Service interface {
+	documentReader
+	documentLifecycle
+	editingSessions
+	autosaveArtifacts
+	documentComments
 }
 
 // approvalSubmitter is the subset of the approval submit service used by finalizeDocument.

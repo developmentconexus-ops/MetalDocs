@@ -19,6 +19,9 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// Ensure fakeSubmitRepo satisfies ApprovalRepository at compile time.
+var _ repository.ApprovalRepository = (*fakeSubmitRepo)(nil)
+
 // ---------------------------------------------------------------------------
 // Fake repo — only implements the methods called by SubmitRevisionForReview.
 // ---------------------------------------------------------------------------
@@ -38,6 +41,108 @@ func (r *fakeSubmitRepo) InsertInstance(_ context.Context, _ db.Tx, inst domain.
 
 func (r *fakeSubmitRepo) InsertStageInstances(_ context.Context, _ db.Tx, _ []domain.StageInstance) error {
 	return r.insertStageInstancesErr
+}
+
+// LoadRoute and ResolveEligibleActors are called by SubmitRevisionForReview;
+// they use the tx so the in-memory test driver serves their queries.
+
+func (r *fakeSubmitRepo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID string) (domain.Route, error) {
+	var route domain.Route
+	err := tx.QueryRowContext(ctx, `
+		SELECT id, tenant_id, profile_code, version
+		FROM approval_routes
+		WHERE id = $1 AND tenant_id = $2 AND active = TRUE`,
+		routeID, tenantID,
+	).Scan(&route.ID, &route.TenantID, &route.ProfileCode, &route.Version)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Route{}, fmt.Errorf("route %s not found for tenant %s", routeID, tenantID)
+		}
+		return domain.Route{}, err
+	}
+	rows, err := tx.QueryContext(ctx, `
+		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,
+		       ars.area_code, ars.quorum, ars.quorum_m, ars.on_eligibility_drift
+		  FROM approval_route_stages ars
+		  JOIN approval_routes ar
+		    ON ar.id = ars.route_id
+		   AND ar.tenant_id = $2
+		 WHERE ars.route_id = $1
+		 ORDER BY ars.stage_order ASC`,
+		routeID, tenantID,
+	)
+	if err != nil {
+		return domain.Route{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var stage domain.Stage
+		var quorumM sql.NullInt32
+		if err := rows.Scan(
+			&stage.Order, &stage.Name, &stage.RequiredRole, &stage.RequiredCapability,
+			&stage.AreaCode, &stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
+		); err != nil {
+			return domain.Route{}, err
+		}
+		if quorumM.Valid {
+			v := int(quorumM.Int32)
+			stage.QuorumM = &v
+		}
+		route.Stages = append(route.Stages, stage)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.Route{}, err
+	}
+	return route, nil
+}
+
+func (r *fakeSubmitRepo) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT user_id
+		   FROM metaldocs.user_process_areas
+		  WHERE tenant_id = $1::uuid
+		    AND area_code = $2
+		    AND role      = $3
+		    AND effective_from <= now()
+		    AND (effective_to IS NULL OR effective_to > now())`,
+		tenantID, areaCode, requiredRole,
+	)
+	if err != nil {
+		return []string{}, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var uid string
+		if err := rows.Scan(&uid); err != nil {
+			return []string{}, err
+		}
+		ids = append(ids, uid)
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	return ids, rows.Err()
+}
+
+// The remaining 4 new interface methods are not called by SubmitRevisionForReview.
+// The embedded repository.ApprovalRepository is nil, so these must be explicitly
+// implemented to avoid a nil-pointer panic if the compiler checks the interface.
+
+func (r *fakeSubmitRepo) LoadPriorSignoffs(_ context.Context, _ db.Tx, _, _, _ string) ([]domain.Signoff, error) {
+	panic("fakeSubmitRepo.LoadPriorSignoffs: not expected to be called in submit tests")
+}
+
+func (r *fakeSubmitRepo) LoadStageSignoffs(_ context.Context, _ db.Tx, _, _ string) ([]domain.Signoff, error) {
+	panic("fakeSubmitRepo.LoadStageSignoffs: not expected to be called in submit tests")
+}
+
+func (r *fakeSubmitRepo) HasUnresolvedComments(_ context.Context, _ db.Tx, _, _ string) (bool, error) {
+	panic("fakeSubmitRepo.HasUnresolvedComments: not expected to be called in submit tests")
+}
+
+func (r *fakeSubmitRepo) LoadActiveDocumentContentHash(_ context.Context, _ db.Tx, _, _ string) (string, error) {
+	panic("fakeSubmitRepo.LoadActiveDocumentContentHash: not expected to be called in submit tests")
 }
 
 // ---------------------------------------------------------------------------
@@ -388,11 +493,18 @@ func TestSubmitRevisionForReview_AssertsDocumentEditBeforeDocumentsUpdate(t *tes
 	if start == -1 {
 		t.Fatal("SubmitRevisionForReview not found")
 	}
-	end := strings.Index(body[start:], "func (s *SubmitService) loadRoute")
+	// End anchor: next top-level func after SubmitRevisionForReview.
+	// loadRoute was relocated to the repository layer (H-5.1); use the next
+	// "\nfunc " boundary so the tripwire is robust regardless of what follows.
+	rest := body[start+len("func (s *SubmitService) SubmitRevisionForReview"):]
+	end := strings.Index(rest, "\nfunc ")
+	var submit string
 	if end == -1 {
-		t.Fatal("loadRoute not found")
+		// SubmitRevisionForReview is the last func in the file — use the whole tail.
+		submit = body[start:]
+	} else {
+		submit = body[start : start+len("func (s *SubmitService) SubmitRevisionForReview")+end]
 	}
-	submit := body[start : start+end]
 
 	submitRequire := strings.Index(submit, "CapDocumentSubmit")
 	if submitRequire == -1 {

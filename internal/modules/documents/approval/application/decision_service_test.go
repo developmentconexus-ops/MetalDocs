@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,9 @@ import (
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
+
+// Ensure fakeDecisionRepo satisfies ApprovalRepository at compile time.
+var _ repository.ApprovalRepository = (*fakeDecisionRepo)(nil)
 
 // ---------------------------------------------------------------------------
 // Fake repo — only the methods called by RecordSignoff.
@@ -54,6 +58,159 @@ func (r *fakeDecisionRepo) UpdateInstanceStatus(_ context.Context, _ db.Tx, _, _
 	r.instanceStatusTo = to
 	r.instanceStatusFrom = from
 	return r.updateInstanceErr
+}
+
+// The 6 new interface methods delegate to the tx so the in-memory decisionTestConn
+// driver handles their queries — preserving existing test logic without changes.
+
+func (r *fakeDecisionRepo) LoadPriorSignoffs(ctx context.Context, tx db.Tx, tenantID, instanceID, activeStageID string) ([]domain.Signoff, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, approval_instance_id, stage_instance_id,
+		       actor_user_id, actor_tenant_id, decision,
+		       comment, signed_at, signature_method, signature_payload, content_hash
+		FROM approval_signoffs
+		WHERE approval_instance_id = $1
+		  AND stage_instance_id != $2
+		  AND actor_tenant_id = $3
+		ORDER BY signed_at ASC`,
+		instanceID, activeStageID, tenantID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanDecisionSignoffRows(rows)
+}
+
+func (r *fakeDecisionRepo) LoadStageSignoffs(ctx context.Context, tx db.Tx, tenantID, stageInstanceID string) ([]domain.Signoff, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT s.id, s.approval_instance_id, s.stage_instance_id,
+		       s.actor_user_id, s.actor_tenant_id, s.decision,
+		       s.comment, s.signed_at, s.signature_method, s.signature_payload, s.content_hash
+		  FROM approval_signoffs s
+		  JOIN approval_stage_instances asi
+		    ON asi.id = s.stage_instance_id
+		  JOIN approval_instances ai
+		    ON ai.id = asi.approval_instance_id
+		   AND ai.id = s.approval_instance_id
+		 WHERE s.stage_instance_id = $1
+		   AND ai.tenant_id = $2::uuid
+		   AND s.actor_tenant_id = ai.tenant_id
+		 ORDER BY s.signed_at ASC`,
+		stageInstanceID, tenantID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanDecisionSignoffRows(rows)
+}
+
+func scanDecisionSignoffRows(rows *sql.Rows) ([]domain.Signoff, error) {
+	var signoffs []domain.Signoff
+	for rows.Next() {
+		var (
+			id, instanceID, stageID, actorUserID, actorTenantID string
+			decision, comment, signatureMethod, contentHash     string
+			signedAt                                            time.Time
+			sigPayload                                          []byte
+		)
+		if err := rows.Scan(&id, &instanceID, &stageID, &actorUserID, &actorTenantID,
+			&decision, &comment, &signedAt, &signatureMethod, &sigPayload, &contentHash); err != nil {
+			return nil, err
+		}
+		s, err := domain.NewSignoff(domain.SignoffParams{
+			ID:                 id,
+			ApprovalInstanceID: instanceID,
+			StageInstanceID:    stageID,
+			ActorUserID:        actorUserID,
+			ActorTenantID:      actorTenantID,
+			Decision:           domain.Decision(decision),
+			Comment:            comment,
+			SignedAt:           signedAt,
+			SignatureMethod:    signatureMethod,
+			SignaturePayload:   json.RawMessage(sigPayload),
+			ContentHash:        contentHash,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("scan signoff %s: %w", id, err)
+		}
+		signoffs = append(signoffs, *s)
+	}
+	return signoffs, rows.Err()
+}
+
+func (r *fakeDecisionRepo) HasUnresolvedComments(ctx context.Context, tx db.Tx, tenantID, documentID string) (bool, error) {
+	var unresolvedCount int
+	err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		  FROM document_comments
+		 WHERE tenant_id = $1
+		   AND document_id = $2
+		   AND resolved_at IS NULL`,
+		tenantID, documentID,
+	).Scan(&unresolvedCount)
+	if err != nil {
+		return false, err
+	}
+	return unresolvedCount > 0, nil
+}
+
+func (r *fakeDecisionRepo) LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
+	var hash sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(d.content_hash_at_submit,
+		                (SELECT r.content_hash FROM document_revisions r
+		                  WHERE r.document_id = d.id
+		                  ORDER BY r.created_at DESC LIMIT 1))
+		  FROM documents d
+		 WHERE d.id = $1
+		   AND d.tenant_id = $2`,
+		documentID, tenantID,
+	).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", repository.ErrNoActiveContentHash
+	}
+	if err != nil {
+		return "", err
+	}
+	if !hash.Valid {
+		return "", repository.ErrNoActiveContentHash
+	}
+	return hash.String, nil
+}
+
+func (r *fakeDecisionRepo) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT user_id
+		   FROM metaldocs.user_process_areas
+		  WHERE tenant_id = $1::uuid
+		    AND area_code = $2
+		    AND role      = $3
+		    AND effective_from <= now()
+		    AND (effective_to IS NULL OR effective_to > now())`,
+		tenantID, areaCode, requiredRole,
+	)
+	if err != nil {
+		return []string{}, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var uid string
+		if err := rows.Scan(&uid); err != nil {
+			return []string{}, err
+		}
+		ids = append(ids, uid)
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	return ids, rows.Err()
+}
+
+func (r *fakeDecisionRepo) LoadRoute(_ context.Context, _ db.Tx, _, _ string) (domain.Route, error) {
+	panic("fakeDecisionRepo.LoadRoute: not expected to be called in decision tests")
 }
 
 // ---------------------------------------------------------------------------

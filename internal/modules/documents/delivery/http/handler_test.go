@@ -25,10 +25,6 @@ import (
 )
 
 type fakeSvc struct {
-	listDocs           []domain.Document
-	listForUser        []domain.Document
-	listErr            error
-	listForUserErr     error
 	finalizePrereqsErr error
 
 	acquireSession *domain.Session
@@ -38,9 +34,6 @@ type fakeSvc struct {
 	commitResult *application.CommitResult
 	commitErr    error
 	commitCmd    application.CommitAutosaveCmd
-	syncResult   *application.CommitResult
-	syncErr      error
-	syncCmd      application.SyncArtifactMetadataCmd
 
 	renameErr    error
 	renameName   string
@@ -97,26 +90,6 @@ func (f *fakeSvc) GetDocument(_ context.Context, _, _ string) (*domain.Document,
 func (f *fakeSvc) RenameDocument(_ context.Context, _, _, _, newName string) error {
 	f.renameName = newName
 	return f.renameErr
-}
-
-func (f *fakeSvc) ListDocuments(_ context.Context, _ string) ([]domain.Document, error) {
-	if f.listErr != nil {
-		return nil, f.listErr
-	}
-	if f.listDocs == nil {
-		return []domain.Document{{ID: "doc_1"}}, nil
-	}
-	return f.listDocs, nil
-}
-
-func (f *fakeSvc) ListDocumentsForUser(_ context.Context, _, _ string) ([]domain.Document, error) {
-	if f.listForUserErr != nil {
-		return nil, f.listForUserErr
-	}
-	if f.listForUser == nil {
-		return []domain.Document{{ID: "doc_1"}}, nil
-	}
-	return f.listForUser, nil
 }
 
 func (f *fakeSvc) ListDocumentsPaginated(_ context.Context, _, userID string, opts application.ListOptions) ([]*domain.Document, int64, bool, error) {
@@ -177,25 +150,6 @@ func (f *fakeSvc) CommitAutosave(_ context.Context, cmd application.CommitAutosa
 		return &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2}, nil
 	}
 	return f.commitResult, nil
-}
-
-func (f *fakeSvc) SyncArtifactMetadata(_ context.Context, cmd application.SyncArtifactMetadataCmd) (*application.CommitResult, error) {
-	f.syncCmd = cmd
-	if f.syncErr != nil {
-		return nil, f.syncErr
-	}
-	if f.syncResult == nil {
-		fileSizeBytes := int64(1304)
-		pageCount := 3
-		pageCountSource := "eigenpal_client"
-		f.syncResult = &application.CommitResult{
-			RevisionID:      "rev_1",
-			FileSizeBytes:   &fileSizeBytes,
-			PageCount:       &pageCount,
-			PageCountSource: &pageCountSource,
-		}
-	}
-	return f.syncResult, nil
 }
 
 func (f *fakeSvc) CreateCheckpoint(_ context.Context, _, _, _, _ string) (*domain.Checkpoint, error) {

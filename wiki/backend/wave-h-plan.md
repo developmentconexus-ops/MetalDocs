@@ -187,7 +187,8 @@ Delete the `GeneratedServerAdapter` 29-method param-discard shim (`documents/del
 3. **`PeopleService.ListFiltered`** (`iam/application/people_service.go:511-581`) — rewrite to **filter + paginate in SQL**, killing the load-all-users + N+1 membership query + the swallowed error.
 
 **Verify:** build/vet + `go test -p 2 ./internal/modules/documents/... ./internal/modules/iam/...`.
-**Commit:** `refactor(quality): RecordSignoff SQL→repo, split documents Service interface, SQL-paginate PeopleService.ListFiltered (H-5)`
+**Commit:** `refactor(quality): approval SQL→repo, split documents Service interface, batch+propagate PeopleService.ListFiltered (H-5)`
+**Status:** ✅ DONE (this commit, NOT merged) — H-5.1 (SQL→repo, atomic tx preserved) ✅ · H-5.2 (interface split, 3 unused dropped) ✅ · H-5.3 D2 (N+1→batch) + D3 (propagate error) ✅ · **D1 (full SQL filter+paginate) DEFERRED** — cross-module (filters read AUTH-owned `auth_identities`); trigger: AUTH `FilteredListUsers` port OR `iam_users` extended with username/email/must_change_password/failed_login_attempts/locked_until. Adversarial review 0 Critical / 2 Minor (test-harness, accepted). Gates green; runtime People-list verified (batch memberships + area filter + no-500).
 
 ---
 

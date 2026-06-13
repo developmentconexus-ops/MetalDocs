@@ -75,6 +75,10 @@ func (s *userAreaWriteRepoStub) ListActive(ctx context.Context, userID, tenantID
 	return append([]domain.UserProcessArea(nil), s.activeList...), nil
 }
 
+func (s *userAreaWriteRepoStub) ListActiveForUsers(_ context.Context, _ string, _ []string, _ time.Time) (map[string][]domain.UserProcessArea, error) {
+	return map[string][]domain.UserProcessArea{}, nil
+}
+
 func (s *userAreaWriteRepoStub) ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string, now time.Time) ([]domain.UserProcessArea, error) {
 	s.tenantFilter = [4]string{tenantID, userID, areaCode, role}
 	return append([]domain.UserProcessArea(nil), s.activeList...), nil

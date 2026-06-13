@@ -15,6 +15,9 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// Ensure the postgres implementation satisfies the full interface at compile time.
+var _ ApprovalRepository = (*postgresApprovalRepository)(nil)
+
 type postgresApprovalRepository struct {
 	db *sql.DB
 }
@@ -970,4 +973,233 @@ func (r *postgresApprovalRepository) UpdateInstanceStatus(ctx context.Context, t
 		return ErrInstanceCompleted
 	}
 	return nil
+}
+
+// ── H-5.1 relocated read helpers ─────────────────────────────────────────────
+
+// LoadPriorSignoffs fetches all signoffs for the instance EXCEPT the active stage,
+// used for SoD checking (actor must not have signed in any prior stage).
+func (r *postgresApprovalRepository) LoadPriorSignoffs(ctx context.Context, tx db.Tx, tenantID, instanceID, activeStageID string) ([]domain.Signoff, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, approval_instance_id, stage_instance_id,
+		       actor_user_id, actor_tenant_id, decision,
+		       comment, signed_at, signature_method, signature_payload, content_hash
+		FROM approval_signoffs
+		WHERE approval_instance_id = $1
+		  AND stage_instance_id != $2
+		  AND actor_tenant_id = $3
+		ORDER BY signed_at ASC`,
+		instanceID, activeStageID, tenantID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanSignoffsRows(rows)
+}
+
+// LoadStageSignoffs fetches all signoffs for a single stage instance.
+func (r *postgresApprovalRepository) LoadStageSignoffs(ctx context.Context, tx db.Tx, tenantID, stageInstanceID string) ([]domain.Signoff, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT s.id, s.approval_instance_id, s.stage_instance_id,
+		       s.actor_user_id, s.actor_tenant_id, s.decision,
+		       s.comment, s.signed_at, s.signature_method, s.signature_payload, s.content_hash
+		  FROM approval_signoffs s
+		  JOIN approval_stage_instances asi
+		    ON asi.id = s.stage_instance_id
+		  JOIN approval_instances ai
+		    ON ai.id = asi.approval_instance_id
+		   AND ai.id = s.approval_instance_id
+		 WHERE s.stage_instance_id = $1
+		   AND ai.tenant_id = $2::uuid
+		   AND s.actor_tenant_id = ai.tenant_id
+		 ORDER BY s.signed_at ASC`,
+		stageInstanceID, tenantID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanSignoffsRows(rows)
+}
+
+// scanSignoffsRows reads *sql.Rows into a domain.Signoff slice.
+func scanSignoffsRows(rows *sql.Rows) ([]domain.Signoff, error) {
+	var signoffs []domain.Signoff
+	for rows.Next() {
+		var (
+			id                 string
+			approvalInstanceID string
+			stageInstanceID    string
+			actorUserID        string
+			actorTenantID      string
+			decision           string
+			comment            string
+			signedAt           time.Time
+			signatureMethod    string
+			signaturePayload   []byte
+			contentHash        string
+		)
+		if err := rows.Scan(
+			&id, &approvalInstanceID, &stageInstanceID,
+			&actorUserID, &actorTenantID, &decision,
+			&comment, &signedAt, &signatureMethod, &signaturePayload, &contentHash,
+		); err != nil {
+			return nil, err
+		}
+		s, err := domain.NewSignoff(domain.SignoffParams{
+			ID:                 id,
+			ApprovalInstanceID: approvalInstanceID,
+			StageInstanceID:    stageInstanceID,
+			ActorUserID:        actorUserID,
+			ActorTenantID:      actorTenantID,
+			Decision:           domain.Decision(decision),
+			Comment:            comment,
+			SignedAt:           signedAt,
+			SignatureMethod:    signatureMethod,
+			SignaturePayload:   json.RawMessage(signaturePayload),
+			ContentHash:        contentHash,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("scan signoff %s: %w", id, err)
+		}
+		signoffs = append(signoffs, *s)
+	}
+	return signoffs, rows.Err()
+}
+
+// HasUnresolvedComments returns true when the document has one or more
+// unresolved comments.
+func (r *postgresApprovalRepository) HasUnresolvedComments(ctx context.Context, tx db.Tx, tenantID, documentID string) (bool, error) {
+	var unresolvedCount int
+	err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		  FROM document_comments
+		 WHERE tenant_id = $1
+		   AND document_id = $2
+		   AND resolved_at IS NULL`,
+		tenantID, documentID,
+	).Scan(&unresolvedCount)
+	if err != nil {
+		return false, err
+	}
+	return unresolvedCount > 0, nil
+}
+
+// LoadActiveDocumentContentHash mirrors the COALESCE used by the
+// /api/v1/controlled-documents/{cd}/active-document endpoint so the value
+// compared on signoff matches what the FE received when it loaded the doc.
+// Returns ErrNoActiveContentHash on sql.ErrNoRows or null hash.
+func (r *postgresApprovalRepository) LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
+	var hash sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(d.content_hash_at_submit,
+		                (SELECT r.content_hash FROM document_revisions r
+		                  WHERE r.document_id = d.id
+		                  ORDER BY r.created_at DESC LIMIT 1))
+		  FROM documents d
+		 WHERE d.id = $1
+		   AND d.tenant_id = $2`,
+		documentID, tenantID,
+	).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNoActiveContentHash
+	}
+	if err != nil {
+		return "", err
+	}
+	if !hash.Valid {
+		return "", ErrNoActiveContentHash
+	}
+	return hash.String, nil
+}
+
+// ResolveEligibleActors returns the user_ids of all users who hold required_role
+// in area_code for the given tenant as of now. Returns empty slice (never nil).
+func (r *postgresApprovalRepository) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT user_id
+		   FROM metaldocs.user_process_areas
+		  WHERE tenant_id = $1::uuid
+		    AND area_code = $2
+		    AND role      = $3
+		    AND effective_from <= now()
+		    AND (effective_to IS NULL OR effective_to > now())`,
+		tenantID, areaCode, requiredRole,
+	)
+	if err != nil {
+		return []string{}, fmt.Errorf("resolveEligibleActors: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var uid string
+		if err := rows.Scan(&uid); err != nil {
+			return []string{}, fmt.Errorf("resolveEligibleActors: scan: %w", err)
+		}
+		ids = append(ids, uid)
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	if err := rows.Err(); err != nil {
+		return []string{}, fmt.Errorf("resolveEligibleActors: rows: %w", err)
+	}
+	return ids, nil
+}
+
+// LoadRoute fetches an approval route and its stages from the database within
+// the caller's transaction.
+func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID string) (domain.Route, error) {
+	var route domain.Route
+	err := tx.QueryRowContext(ctx, `
+		SELECT id, tenant_id, profile_code, version
+		FROM approval_routes
+		WHERE id = $1 AND tenant_id = $2 AND active = TRUE`,
+		routeID, tenantID,
+	).Scan(&route.ID, &route.TenantID, &route.ProfileCode, &route.Version)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Route{}, fmt.Errorf("route %s not found for tenant %s", routeID, tenantID)
+		}
+		return domain.Route{}, err
+	}
+
+	rows, err := tx.QueryContext(ctx, `
+		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,
+		       ars.area_code, ars.quorum, ars.quorum_m, ars.on_eligibility_drift
+		  FROM approval_route_stages ars
+		  JOIN approval_routes ar
+		    ON ar.id = ars.route_id
+		   AND ar.tenant_id = $2
+		 WHERE ars.route_id = $1
+		 ORDER BY ars.stage_order ASC`,
+		routeID, tenantID,
+	)
+	if err != nil {
+		return domain.Route{}, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var stage domain.Stage
+		var quorumM sql.NullInt32
+		if err := rows.Scan(
+			&stage.Order, &stage.Name, &stage.RequiredRole, &stage.RequiredCapability,
+			&stage.AreaCode, &stage.Quorum, &quorumM, &stage.OnEligibilityDrift,
+		); err != nil {
+			return domain.Route{}, err
+		}
+		if quorumM.Valid {
+			v := int(quorumM.Int32)
+			stage.QuorumM = &v
+		}
+		route.Stages = append(route.Stages, stage)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.Route{}, err
+	}
+
+	return route, nil
 }

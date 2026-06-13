@@ -179,6 +179,9 @@ type peopleRoleProvider interface {
 type peopleMembershipService interface {
 	Grant(ctx context.Context, userID, tenantID, areaCode string, role iamdomain.Role, grantedBy string) error
 	ListActive(ctx context.Context, userID, tenantID string) ([]iamdomain.UserProcessArea, error)
+	// ListActiveBatch loads active memberships for a set of users in one query
+	// (H-5.3 D2 — eliminates per-user N+1 in ListFiltered).
+	ListActiveBatch(ctx context.Context, tenantID string, userIDs []string) (map[string][]iamdomain.UserProcessArea, error)
 }
 
 // PeopleService is the People-tab orchestrator (PR-4).
@@ -680,11 +683,16 @@ func bulkErrorCode(err error) string {
 	return "INTERNAL_ERROR"
 }
 
-// ListFiltered returns paginated users for the People table. The current
-// implementation reads via auth.ListUsers (which already joins the tenant
-// role) and applies filters + cursor pagination in Go. This is acceptable for
-// PR-4 because the dev/QA dataset is small; PR-5 or PR-11 may push the filter
-// into a dedicated SQL projection if the dataset grows.
+// ListFiltered returns paginated users for the People table. Reads all tenant
+// users via auth.ListUsers (load-all + in-Go filter — D1 deferred; see note
+// below), then applies filters + cursor pagination in Go.
+//
+// D1 defer: pushing filters into SQL requires IAM to join auth_identities
+// (AUTH-owned table) or an AUTH-module API that returns filtered+paginated
+// users. That is a cross-module API redesign out of scope for H-5.3. Trigger:
+// implement when AUTH exposes a FilteredListUsers port or when iam_users is
+// extended to carry the columns currently only in auth_identities (username,
+// email, must_change_password, lock state).
 func (s *PeopleService) ListFiltered(ctx context.Context, tenantID string, filters ListFilters) (ListResult, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
@@ -698,15 +706,34 @@ func (s *PeopleService) ListFiltered(ctx context.Context, tenantID string, filte
 	if err != nil {
 		return ListResult{}, err
 	}
+
+	// Batch-load active memberships for all users in one query (H-5.3 D2).
+	// memberships is nil in test/memory mode; the nil guard produces an empty
+	// map so the rest of the function behaves identically.
+	var membershipMap map[string][]iamdomain.UserProcessArea
+	if s.memberships != nil && len(managed) > 0 {
+		userIDs := make([]string, len(managed))
+		for i := range managed {
+			userIDs[i] = managed[i].UserID
+		}
+		membershipMap, err = s.memberships.ListActiveBatch(ctx, tenantID, userIDs)
+		if err != nil {
+			return ListResult{}, fmt.Errorf("batch load memberships: %w", err)
+		}
+	}
+	if membershipMap == nil {
+		membershipMap = map[string][]iamdomain.UserProcessArea{}
+	}
+
 	listed := make([]ListedUser, 0, len(managed))
 	for _, m := range managed {
 		tenantRole := iamdomain.RoleViewer
 		if len(m.Roles) > 0 {
 			tenantRole = m.Roles[0]
 		}
-		var areas []iamdomain.UserProcessArea
-		if s.memberships != nil {
-			areas, _ = s.memberships.ListActive(ctx, m.UserID, tenantID)
+		areas := membershipMap[m.UserID]
+		if areas == nil {
+			areas = []iamdomain.UserProcessArea{}
 		}
 		listed = append(listed, ListedUser{
 			UserID:              m.UserID,

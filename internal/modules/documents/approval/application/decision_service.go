@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 
@@ -209,8 +208,11 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		// the canonicalization. The approval_instance's content_hash_at_submit is not
 		// the right source — submit canonicalizes over the client-provided hash, which
 		// is irreproducible at signoff time.
-		contentHash, err := loadActiveDocumentContentHash(ctx, tx, req.TenantID, instance.DocumentID)
+		contentHash, err := s.repo.LoadActiveDocumentContentHash(ctx, tx, req.TenantID, instance.DocumentID)
 		if err != nil {
+			if errors.Is(err, repository.ErrNoActiveContentHash) {
+				return ErrContentHashMismatch
+			}
 			return fmt.Errorf("recordSignoff: load active document content hash: %w", err)
 		}
 		// Content pin is mandatory: an unauthenticated or programmatic caller must not
@@ -250,7 +252,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		}
 
 		// Step 6: SoD check — author cannot sign, actor cannot sign twice in same instance.
-		priorSignoffs, err := s.loadPriorSignoffs(ctx, tx, req.TenantID, req.InstanceID, activeStage.ID)
+		priorSignoffs, err := s.repo.LoadPriorSignoffs(ctx, tx, req.TenantID, req.InstanceID, activeStage.ID)
 		if err != nil {
 			return fmt.Errorf("recordSignoff: load prior signoffs: %w", err)
 		}
@@ -305,7 +307,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		}
 
 		// Step 9: collect all signoffs for the active stage to evaluate quorum.
-		allStageSignoffs, err := s.loadStageSignoffs(ctx, tx, req.TenantID, activeStage.ID)
+		allStageSignoffs, err := s.repo.LoadStageSignoffs(ctx, tx, req.TenantID, activeStage.ID)
 		if err != nil {
 			return fmt.Errorf("recordSignoff: load stage signoffs: %w", err)
 		}
@@ -314,7 +316,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		approvals, rejections := splitSignoffs(allStageSignoffs)
 		currentEligible := activeStage.EligibleActorIDs
 		if activeStage.OnEligibilityDriftSnapshot != domain.DriftKeepSnapshot {
-			currentEligible, err = resolveEligibleActors(ctx, tx, req.TenantID, activeStage.AreaCodeSnapshot, activeStage.RequiredRoleSnapshot)
+			currentEligible, err = s.repo.ResolveEligibleActors(ctx, tx, req.TenantID, activeStage.AreaCodeSnapshot, activeStage.RequiredRoleSnapshot)
 			if err != nil {
 				return fmt.Errorf("recordSignoff: resolve current eligible actors: %w", err)
 			}
@@ -347,7 +349,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 			}
 
 			if instance.Status == domain.InstanceApproved {
-				blocked, err := hasUnresolvedComments(ctx, tx, req.TenantID, instance.DocumentID)
+				blocked, err := s.repo.HasUnresolvedComments(ctx, tx, req.TenantID, instance.DocumentID)
 				if err != nil {
 					return fmt.Errorf("recordSignoff: check unresolved comments: %w", err)
 				}
@@ -521,97 +523,6 @@ func (s *DecisionService) emitEligibilityRejection(ctx context.Context, runner d
 		}
 		return nil
 	})
-}
-
-// loadPriorSignoffs fetches all signoffs for the instance EXCEPT the active stage,
-// used for SoD checking (actor must not have signed in any prior stage).
-func (s *DecisionService) loadPriorSignoffs(ctx context.Context, tx *sql.Tx, tenantID, instanceID, activeStageID string) ([]domain.Signoff, error) {
-	rows, err := tx.QueryContext(ctx, `
-		SELECT id, approval_instance_id, stage_instance_id,
-		       actor_user_id, actor_tenant_id, decision,
-		       comment, signed_at, signature_method, signature_payload, content_hash
-		FROM approval_signoffs
-		WHERE approval_instance_id = $1
-		  AND stage_instance_id != $2
-		  AND actor_tenant_id = $3
-		ORDER BY signed_at ASC`,
-		instanceID, activeStageID, tenantID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanSignoffs(rows)
-}
-
-// loadStageSignoffs fetches all signoffs for a single stage instance.
-func (s *DecisionService) loadStageSignoffs(ctx context.Context, tx *sql.Tx, tenantID, stageInstanceID string) ([]domain.Signoff, error) {
-	rows, err := tx.QueryContext(ctx, `
-		SELECT s.id, s.approval_instance_id, s.stage_instance_id,
-		       s.actor_user_id, s.actor_tenant_id, s.decision,
-		       s.comment, s.signed_at, s.signature_method, s.signature_payload, s.content_hash
-		  FROM approval_signoffs s
-		  JOIN approval_stage_instances asi
-		    ON asi.id = s.stage_instance_id
-		  JOIN approval_instances ai
-		    ON ai.id = asi.approval_instance_id
-		   AND ai.id = s.approval_instance_id
-		 WHERE s.stage_instance_id = $1
-		   AND ai.tenant_id = $2::uuid
-		   AND s.actor_tenant_id = ai.tenant_id
-		 ORDER BY s.signed_at ASC`,
-		stageInstanceID, tenantID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanSignoffs(rows)
-}
-
-// scanSignoffs reads rows into domain.Signoff slice.
-func scanSignoffs(rows *sql.Rows) ([]domain.Signoff, error) {
-	var signoffs []domain.Signoff
-	for rows.Next() {
-		var (
-			id                 string
-			approvalInstanceID string
-			stageInstanceID    string
-			actorUserID        string
-			actorTenantID      string
-			decision           string
-			comment            string
-			signedAt           time.Time
-			signatureMethod    string
-			signaturePayload   []byte
-			contentHash        string
-		)
-		if err := rows.Scan(
-			&id, &approvalInstanceID, &stageInstanceID,
-			&actorUserID, &actorTenantID, &decision,
-			&comment, &signedAt, &signatureMethod, &signaturePayload, &contentHash,
-		); err != nil {
-			return nil, err
-		}
-		s, err := domain.NewSignoff(domain.SignoffParams{
-			ID:                 id,
-			ApprovalInstanceID: approvalInstanceID,
-			StageInstanceID:    stageInstanceID,
-			ActorUserID:        actorUserID,
-			ActorTenantID:      actorTenantID,
-			Decision:           domain.Decision(decision),
-			Comment:            comment,
-			SignedAt:           signedAt,
-			SignatureMethod:    signatureMethod,
-			SignaturePayload:   json.RawMessage(signaturePayload),
-			ContentHash:        contentHash,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("scan signoff %s: %w", id, err)
-		}
-		signoffs = append(signoffs, *s)
-	}
-	return signoffs, rows.Err()
 }
 
 // splitSignoffs partitions a slice of Signoff into approvals and rejections.

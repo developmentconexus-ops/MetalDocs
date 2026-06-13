@@ -30,12 +30,6 @@ func (s *moduleTestService) DuplicateDocument(context.Context, string, string, s
 func (s *moduleTestService) RenameDocument(context.Context, string, string, string, string) error {
 	return nil
 }
-func (s *moduleTestService) ListDocuments(context.Context, string) ([]domain.Document, error) {
-	return nil, nil
-}
-func (s *moduleTestService) ListDocumentsForUser(context.Context, string, string) ([]domain.Document, error) {
-	return nil, nil
-}
 func (s *moduleTestService) ListDocumentsPaginated(context.Context, string, string, application.ListOptions) ([]*domain.Document, int64, bool, error) {
 	return []*domain.Document{{ID: "doc_1"}}, 1, false, nil
 }
@@ -59,9 +53,6 @@ func (s *moduleTestService) PresignAutosave(context.Context, application.Presign
 	return &application.PresignAutosaveResult{UploadURL: "https://example/upload", PendingUploadID: "pending_1", ExpiresAt: time.Now().Add(time.Minute)}, nil
 }
 func (s *moduleTestService) CommitAutosave(context.Context, application.CommitAutosaveCmd) (*application.CommitResult, error) {
-	return &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2}, nil
-}
-func (s *moduleTestService) SyncArtifactMetadata(context.Context, application.SyncArtifactMetadataCmd) (*application.CommitResult, error) {
 	return &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2}, nil
 }
 func (s *moduleTestService) CreateCheckpoint(context.Context, string, string, string, string) (*domain.Checkpoint, error) {
