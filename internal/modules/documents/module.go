@@ -63,7 +63,7 @@ func New(deps Dependencies) *Module {
 	} else {
 		svc = application.NewService(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ControlledDocumentReader, deps.Caps, deps.ProfileDefaults)
 	}
-	svc.WithDB(deps.DB)
+	svc.WithRunner(db.NewTxRunner(deps.DB))
 	svc.WithControlledDocumentDuplicator(deps.ControlledDocumentDuplicator)
 	h := dhttp.NewHandlerWithSubmit(svc, deps.DB, deps.SubmitSvc).WithCaps(deps.Caps)
 
@@ -82,7 +82,7 @@ func New(deps Dependencies) *Module {
 	}
 
 	fillInRepo := repository.NewFillInRepository(deps.DB)
-	fillInSvc := application.NewFillInService(deps.DB, application.NewSnapshotSchemaReader(deps.DB), fillInRepo).
+	fillInSvc := application.NewFillInService(db.NewTxRunner(deps.DB), application.NewSnapshotSchemaReader(deps.DB), fillInRepo).
 		WithReader(fillInRepo).
 		WithTemplateSchemaReader(application.NewTemplateVersionSchemaReader(deps.DB))
 	fillInHandler := documentshttp.NewFillInHandler(fillInSvc)
@@ -93,13 +93,13 @@ func New(deps Dependencies) *Module {
 
 	var viewHandler *documentshttp.ViewHandler
 	if deps.Presign != nil && deps.DB != nil {
-		viewSvc := application.NewViewService(deps.DB, deps.Presign, nil)
+		viewSvc := application.NewViewService(db.NewTxRunner(deps.DB), deps.Presign, nil)
 		viewHandler = documentshttp.NewViewHandler(viewSvc)
 	}
 
 	var reconstructHandler *documentshttp.ReconstructHandler
 	if deps.ReconstructRunner != nil && deps.DB != nil {
-		reconstructSvc := application.NewReconstructionService(deps.DB, deps.ReconstructRunner)
+		reconstructSvc := application.NewReconstructionService(db.NewTxRunner(deps.DB), deps.ReconstructRunner)
 		reconstructHandler = documentshttp.NewReconstructHandler(reconstructSvc)
 	}
 

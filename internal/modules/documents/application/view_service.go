@@ -10,6 +10,7 @@ import (
 	documentshttp "metaldocs/internal/modules/documents/http"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 )
 
 // ViewPresigner is implemented by objectstore helpers that presign a GET URL.
@@ -26,13 +27,13 @@ type PDFOutboxStateReader interface {
 // ViewService serves viewer requests by checking area-scoped RBAC, validating
 // the revision's lifecycle state, and returning a presigned PDF URL.
 type ViewService struct {
-	db        *sql.DB
+	runner    db.TxRunner
 	presigner ViewPresigner
 	outbox    PDFOutboxStateReader // optional; nil → assume pending
 }
 
-func NewViewService(db *sql.DB, presigner ViewPresigner, outbox PDFOutboxStateReader) *ViewService {
-	return &ViewService{db: db, presigner: presigner, outbox: outbox}
+func NewViewService(runner db.TxRunner, presigner ViewPresigner, outbox PDFOutboxStateReader) *ViewService {
+	return &ViewService{runner: runner, presigner: presigner, outbox: outbox}
 }
 
 var viewableStatuses = map[string]struct{}{
@@ -42,57 +43,59 @@ var viewableStatuses = map[string]struct{}{
 }
 
 func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID string) (documentshttp.ViewResult, error) {
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
-	if err != nil {
-		return documentshttp.ViewResult{}, fmt.Errorf("view: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
 	ctx = authz.WithCapCache(ctx)
-	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-		return documentshttp.ViewResult{}, err
-	}
-
-	var status string
-	var pdfKey sql.NullString
-	err = tx.QueryRowContext(ctx, `
-		SELECT status, final_pdf_s3_key
-		  FROM documents
-		 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
-		tenantID, docID,
-	).Scan(&status, &pdfKey)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return documentshttp.ViewResult{}, v2dom.ErrNotFound
+	var result documentshttp.ViewResult
+	if err := s.runner.DoReadOnly(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+			return err
 		}
-		return documentshttp.ViewResult{}, fmt.Errorf("view: load document: %w", err)
-	}
 
-	// document.view is tenant-grade (a *.view read) — pass the "tenant" sentinel
-	// so the area filter is intentionally OFF (ADR 0022 Phase 8). ADR 0022 Phase 10
-	// (F2): the redundant doc.view_published cap was merged into the canonical
-	// CapDocumentView — identical grant set, same tenant-grade read.
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
-		return documentshttp.ViewResult{}, err
-	}
-
-	if _, ok := viewableStatuses[status]; !ok {
-		return documentshttp.ViewResult{}, v2dom.ErrNotFound
-	}
-
-	if pdfKey.Valid && pdfKey.String != "" {
-		url, err := s.presigner.PresignObjectGET(ctx, pdfKey.String)
+		var status string
+		var pdfKey sql.NullString
+		err := tx.QueryRowContext(ctx, `
+			SELECT status, final_pdf_s3_key
+			  FROM documents
+			 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
+			tenantID, docID,
+		).Scan(&status, &pdfKey)
 		if err != nil {
-			return documentshttp.ViewResult{}, fmt.Errorf("view: presign: %w", err)
+			if errors.Is(err, sql.ErrNoRows) {
+				return v2dom.ErrNotFound
+			}
+			return fmt.Errorf("view: load document: %w", err)
 		}
-		return documentshttp.ViewResult{PDFStatus: "ready", SignedURL: url}, nil
-	}
 
-	pdfStatus := "pending"
-	if s.outbox != nil {
-		if state, err := s.outbox.ReadState(ctx, tenantID, docID); err == nil && state == "failed" {
-			pdfStatus = "failed"
+		// document.view is tenant-grade (a *.view read) — pass the "tenant" sentinel
+		// so the area filter is intentionally OFF (ADR 0022 Phase 8). ADR 0022 Phase 10
+		// (F2): the redundant doc.view_published cap was merged into the canonical
+		// CapDocumentView — identical grant set, same tenant-grade read.
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+			return err
 		}
+
+		if _, ok := viewableStatuses[status]; !ok {
+			return v2dom.ErrNotFound
+		}
+
+		if pdfKey.Valid && pdfKey.String != "" {
+			url, err := s.presigner.PresignObjectGET(ctx, pdfKey.String)
+			if err != nil {
+				return fmt.Errorf("view: presign: %w", err)
+			}
+			result = documentshttp.ViewResult{PDFStatus: "ready", SignedURL: url}
+			return nil
+		}
+
+		pdfStatus := "pending"
+		if s.outbox != nil {
+			if state, err := s.outbox.ReadState(ctx, tenantID, docID); err == nil && state == "failed" {
+				pdfStatus = "failed"
+			}
+		}
+		result = documentshttp.ViewResult{PDFStatus: pdfStatus}
+		return nil
+	}); err != nil {
+		return documentshttp.ViewResult{}, err
 	}
-	return documentshttp.ViewResult{PDFStatus: pdfStatus}, nil
+	return result, nil
 }

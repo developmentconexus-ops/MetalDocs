@@ -20,6 +20,11 @@ import (
 // longer leak a transaction or forget to commit.
 type TxRunner interface {
 	Do(ctx context.Context, fn func(tx *sql.Tx) error) error
+	// DoReadOnly begins a READ ONLY transaction for authz-gated read paths.
+	// SeedTxIdentity's SET LOCAL GUCs and authz.Require run correctly under
+	// READ ONLY; the flag is a write-guard that documents intent and prevents
+	// accidental DML inside what should be a pure read path.
+	DoReadOnly(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
 // sqlTxRunner is the production TxRunner backed by *sql.DB.
@@ -36,11 +41,10 @@ func NewTxRunner(database *sql.DB) TxRunner {
 	return &sqlTxRunner{db: database}
 }
 
-// Do begins a transaction, runs fn, and finalizes it. A non-nil fn error rolls
-// back and is returned unwrapped so callers retain errors.Is/As on domain
-// sentinels. A panic inside fn rolls back and re-panics.
-func (r *sqlTxRunner) Do(ctx context.Context, fn func(tx *sql.Tx) error) (err error) {
-	tx, beginErr := r.db.BeginTx(ctx, nil)
+// do is the shared implementation for Do and DoReadOnly. opts is passed directly
+// to BeginTx; nil opts produce a default (read-write) transaction.
+func (r *sqlTxRunner) do(ctx context.Context, opts *sql.TxOptions, fn func(tx *sql.Tx) error) (err error) {
+	tx, beginErr := r.db.BeginTx(ctx, opts)
 	if beginErr != nil {
 		return fmt.Errorf("db: begin tx: %w", beginErr)
 	}
@@ -58,4 +62,18 @@ func (r *sqlTxRunner) Do(ctx context.Context, fn func(tx *sql.Tx) error) (err er
 		return fmt.Errorf("db: commit tx: %w", err)
 	}
 	return nil
+}
+
+// Do begins a transaction, runs fn, and finalizes it. A non-nil fn error rolls
+// back and is returned unwrapped so callers retain errors.Is/As on domain
+// sentinels. A panic inside fn rolls back and re-panics.
+func (r *sqlTxRunner) Do(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	return r.do(ctx, nil, fn)
+}
+
+// DoReadOnly begins a READ ONLY transaction, runs fn, and finalizes it. A non-nil
+// fn error rolls back and is returned unwrapped so callers retain errors.Is/As on
+// domain sentinels. A panic inside fn rolls back and re-panics.
+func (r *sqlTxRunner) DoReadOnly(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	return r.do(ctx, &sql.TxOptions{ReadOnly: true}, fn)
 }

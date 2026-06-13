@@ -115,11 +115,11 @@ type Service struct {
 	caps                         CapabilityChecker
 	profileTemplates             ProfileDefaultTemplateReader
 	snapshotSvc                  *SnapshotService
-	db                           *sql.DB
+	runner                       db.TxRunner
 }
 
-func (s *Service) WithDB(db *sql.DB) *Service {
-	s.db = db
+func (s *Service) WithRunner(runner db.TxRunner) *Service {
+	s.runner = runner
 	return s
 }
 
@@ -571,18 +571,15 @@ func (s *Service) RenameDocument(ctx context.Context, tenantID, userID, docID, n
 	if doc.Status != domain.DocStatusDraft {
 		return domain.ErrInvalidStateTransition
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("rename document: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := s.repo.UpdateDocumentNameTx(ctx, tx, tenantID, userID, docID, name); err != nil {
-		return err
-	}
-	if err := s.audit.WriteTx(ctx, tx, tenantID, userID, "document.renamed", docID, map[string]any{"name": name}); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := s.repo.UpdateDocumentNameTx(ctx, tx, tenantID, userID, docID, name); err != nil {
+			return err
+		}
+		if err := s.audit.WriteTx(ctx, tx, tenantID, userID, "document.renamed", docID, map[string]any{"name": name}); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 func (s *Service) IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error) {
@@ -800,18 +797,15 @@ func (s *Service) ReleaseSession(ctx context.Context, tenantID, sessionID, userI
 }
 
 func (s *Service) ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID, docID string) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("documents: begin force-release session tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := s.repo.ForceReleaseSessionTx(ctx, tx, tenantID, adminID, sessionID); err != nil {
-		return err
-	}
-	if err := s.audit.WriteTx(ctx, tx, tenantID, adminID, "session.force_released", docID, map[string]any{"session_id": sessionID}); err != nil {
-		return fmt.Errorf("documents: audit force-release session: %w", err)
-	}
-	return tx.Commit()
+	return s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := s.repo.ForceReleaseSessionTx(ctx, tx, tenantID, adminID, sessionID); err != nil {
+			return err
+		}
+		if err := s.audit.WriteTx(ctx, tx, tenantID, adminID, "session.force_released", docID, map[string]any{"session_id": sessionID}); err != nil {
+			return fmt.Errorf("documents: audit force-release session: %w", err)
+		}
+		return nil
+	})
 }
 
 func (s *Service) CreateCheckpoint(ctx context.Context, tenantID, docID, actorID, label string) (*domain.Checkpoint, error) {
@@ -847,18 +841,15 @@ func (s *Service) RestoreCheckpoint(ctx context.Context, tenantID, docID, actorI
 }
 
 func (s *Service) Archive(ctx context.Context, tenantID, docID, actorID string) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("documents: begin archive tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := s.repo.MarkArchivedTx(ctx, tx, tenantID, docID, actorID); err != nil {
-		return err
-	}
-	if err := s.audit.WriteTx(ctx, tx, tenantID, actorID, "document.archived", docID, nil); err != nil {
-		return fmt.Errorf("documents: audit archive: %w", err)
-	}
-	return tx.Commit()
+	return s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := s.repo.MarkArchivedTx(ctx, tx, tenantID, docID, actorID); err != nil {
+			return err
+		}
+		if err := s.audit.WriteTx(ctx, tx, tenantID, actorID, "document.archived", docID, nil); err != nil {
+			return fmt.Errorf("documents: audit archive: %w", err)
+		}
+		return nil
+	})
 }
 
 func (s *Service) SignedRevisionURL(ctx context.Context, tenantID, docID, revID string) (string, error) {

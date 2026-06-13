@@ -34,6 +34,7 @@ type runnerFakeConn struct {
 	commitErr  error
 	committed  bool
 	rolledBack bool
+	readOnly   bool
 }
 
 func (c *runnerFakeConn) Prepare(string) (driver.Stmt, error) { return nil, io.EOF }
@@ -42,6 +43,18 @@ func (c *runnerFakeConn) Begin() (driver.Tx, error) {
 	if c.beginErr != nil {
 		return nil, c.beginErr
 	}
+	return &runnerFakeTx{conn: c}, nil
+}
+
+// BeginTx satisfies driver.ConnBeginTx so database/sql routes BeginTx calls
+// through here rather than falling back to Begin. This allows DoReadOnly's
+// ReadOnly flag to be observed and prevents the "driver does not support
+// read-only transactions" error that would otherwise occur.
+func (c *runnerFakeConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	if c.beginErr != nil {
+		return nil, c.beginErr
+	}
+	c.readOnly = opts.ReadOnly
 	return &runnerFakeTx{conn: c}, nil
 }
 
@@ -128,6 +141,27 @@ func TestDoRePanicsAndRollsBack(t *testing.T) {
 	_ = runner.Do(context.Background(), func(*sql.Tx) error { panic("boom") })
 }
 
+func TestDoReadOnlyRePanicsAndRollsBack(t *testing.T) {
+	conn := &runnerFakeConn{}
+	runner := db.NewTxRunner(openRunnerFakeDB(t, conn))
+
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected re-panic")
+		}
+		if !conn.rolledBack {
+			t.Fatal("expected rollback on panic")
+		}
+		if conn.committed {
+			t.Fatal("unexpected commit on panic")
+		}
+		if !conn.readOnly {
+			t.Fatal("expected read-only begin")
+		}
+	}()
+	_ = runner.DoReadOnly(context.Background(), func(*sql.Tx) error { panic("boom") })
+}
+
 func TestDoWrapsBeginError(t *testing.T) {
 	beginErr := errors.New("begin failed")
 	conn := &runnerFakeConn{beginErr: beginErr}
@@ -157,5 +191,41 @@ func TestDoWrapsCommitError(t *testing.T) {
 	}
 	if !conn.committed {
 		t.Fatal("expected commit attempt")
+	}
+}
+
+func TestDoReadOnlyCommitsOnSuccessAndSetsReadOnly(t *testing.T) {
+	conn := &runnerFakeConn{}
+	runner := db.NewTxRunner(openRunnerFakeDB(t, conn))
+
+	err := runner.DoReadOnly(context.Background(), func(*sql.Tx) error { return nil })
+	if err != nil {
+		t.Fatalf("DoReadOnly returned error: %v", err)
+	}
+	if !conn.committed {
+		t.Fatal("expected commit")
+	}
+	if conn.rolledBack {
+		t.Fatal("unexpected rollback on success")
+	}
+	if !conn.readOnly {
+		t.Fatal("expected ReadOnly=true on the transaction options")
+	}
+}
+
+func TestDoReadOnlyRollsBackAndReturnsErrUnwrapped(t *testing.T) {
+	conn := &runnerFakeConn{}
+	runner := db.NewTxRunner(openRunnerFakeDB(t, conn))
+
+	sentinel := errors.New("read-only domain failure")
+	err := runner.DoReadOnly(context.Background(), func(*sql.Tx) error { return sentinel })
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("expected sentinel returned unwrapped, got %v", err)
+	}
+	if !conn.rolledBack {
+		t.Fatal("expected rollback on fn error")
+	}
+	if conn.committed {
+		t.Fatal("unexpected commit on fn error")
 	}
 }

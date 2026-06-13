@@ -75,7 +75,7 @@ func newPermissiveFillInDB(t *testing.T) *sql.DB {
 func TestFillInService_ValueRejectedIfFailsRegex(t *testing.T) {
 	re := "^[A-Z]{3}$"
 	schema := []templatesdomain.Placeholder{{ID: "p1", Type: templatesdomain.PHText, Regex: &re}}
-	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{})
+	svc := NewFillInService(newTxRunner(newPermissiveFillInDB(t)), fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{})
 	err := svc.SetPlaceholderValue(context.Background(), "tenant", "actor", "rev", "p1", "abc")
 	if !errors.Is(err, v2domain.ErrValidationFailed) {
 		t.Fatalf("got %v", err)
@@ -86,7 +86,7 @@ func TestFillInService_ValueAcceptedIfMatches(t *testing.T) {
 	re := "^[A-Z]{3}$"
 	schema := []templatesdomain.Placeholder{{ID: "p1", Type: templatesdomain.PHText, Regex: &re}}
 	writer := &fakeFillInWriter{}
-	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{placeholders: schema}, writer)
+	svc := NewFillInService(newTxRunner(newPermissiveFillInDB(t)), fakeSchemaReader{placeholders: schema}, writer)
 	if err := svc.SetPlaceholderValue(context.Background(), "tenant", "actor", "rev", "p1", "ABC"); err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestFillInService_SetPlaceholderValue_ValidationMatrix(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			writer := &fakeFillInWriter{}
-			svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{placeholders: schema}, writer)
+			svc := NewFillInService(newTxRunner(newPermissiveFillInDB(t)), fakeSchemaReader{placeholders: schema}, writer)
 			err := svc.SetPlaceholderValue(context.Background(), "tenant", "actor", "rev", tc.placeholderID, tc.value)
 			if tc.wantErr {
 				if !errors.Is(err, v2domain.ErrValidationFailed) {
@@ -166,7 +166,7 @@ func TestFillInService_UserPlaceholder_KnownUser_Accepted(t *testing.T) {
 	iam := &fakeIAMOptionsReader{opts: []UserOption{
 		{UserID: "u1", DisplayName: "Alice"},
 	}}
-	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{}).
+	svc := NewFillInService(newTxRunner(newPermissiveFillInDB(t)), fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{}).
 		WithIAMReader(iam)
 
 	if err := svc.SetPlaceholderValue(context.Background(), "t", "actor", "r", "p-user", "u1"); err != nil {
@@ -179,7 +179,7 @@ func TestFillInService_UserPlaceholder_UnknownUser_Returns422(t *testing.T) {
 	iam := &fakeIAMOptionsReader{opts: []UserOption{
 		{UserID: "u1", DisplayName: "Alice"},
 	}}
-	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{}).
+	svc := NewFillInService(newTxRunner(newPermissiveFillInDB(t)), fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{}).
 		WithIAMReader(iam)
 
 	err := svc.SetPlaceholderValue(context.Background(), "t", "actor", "r", "p-user", "unknown-uid")
@@ -189,7 +189,7 @@ func TestFillInService_UserPlaceholder_UnknownUser_Returns422(t *testing.T) {
 }
 
 func TestFillInService_GetPlaceholderValues_RequiresReader(t *testing.T) {
-	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{}, &fakeFillInWriter{})
+	svc := NewFillInService(newTxRunner(newPermissiveFillInDB(t)), fakeSchemaReader{}, &fakeFillInWriter{})
 
 	_, err := svc.GetPlaceholderValues(context.Background(), "tenant", "doc")
 	if err == nil {
@@ -198,7 +198,7 @@ func TestFillInService_GetPlaceholderValues_RequiresReader(t *testing.T) {
 }
 
 func TestFillInService_GetFillInSchema_RequiresSchemaReader(t *testing.T) {
-	svc := NewFillInService(newPermissiveFillInDB(t), fakeSchemaReader{}, &fakeFillInWriter{})
+	svc := NewFillInService(newTxRunner(newPermissiveFillInDB(t)), fakeSchemaReader{}, &fakeFillInWriter{})
 
 	_, err := svc.GetFillInSchema(context.Background(), "tenant", "doc")
 	if err == nil {

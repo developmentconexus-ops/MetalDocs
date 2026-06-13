@@ -13,6 +13,7 @@ import (
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/db"
 )
 
 type SchemaReader interface {
@@ -24,7 +25,7 @@ type FillInWriter interface {
 }
 
 type FillInService struct {
-	db            *sql.DB
+	runner        db.TxRunner
 	schemas       SchemaReader
 	writer        FillInWriter
 	reader        FillInReader
@@ -32,11 +33,11 @@ type FillInService struct {
 	iam           IAMUserOptionsReader
 }
 
-// NewFillInService wires the service with a DB handle for authz enforcement.
+// NewFillInService wires the service with a TxRunner for authz enforcement.
 // Production callers MUST use this constructor — it enforces the document.edit
 // capability (ADR 0022 Phase 10 merged the redundant doc.edit_draft cap into it).
-func NewFillInService(db *sql.DB, s SchemaReader, w FillInWriter) *FillInService {
-	return &FillInService{db: db, schemas: s, writer: w}
+func NewFillInService(runner db.TxRunner, s SchemaReader, w FillInWriter) *FillInService {
+	return &FillInService{runner: runner, schemas: s, writer: w}
 }
 
 // WithIAMReader attaches an IAMUserOptionsReader for validating user-typed placeholders.
@@ -91,7 +92,7 @@ func parsePlaceholderSchema(raw []byte) ([]templatesdomain.Placeholder, error) {
 }
 
 func (s *FillInService) SetPlaceholderValue(ctx context.Context, tenantID, actorID, revisionID, placeholderID, raw string) error {
-	if err := requireDocEditDraft(ctx, s.db, tenantID, actorID, revisionID); err != nil {
+	if err := requireDocEditDraft(ctx, s.runner, tenantID, actorID, revisionID); err != nil {
 		return err
 	}
 	schema, err := s.schemas.LoadPlaceholderSchema(ctx, tenantID, revisionID)

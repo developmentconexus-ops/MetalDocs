@@ -524,7 +524,7 @@ func TestCreateCheckpoint_OK(t *testing.T) {
 func TestRenameDocument_OK(t *testing.T) {
 	repo := &fakeRepo{docReturn: &domain.Document{ID: "doc_1", TenantID: "tenant_1", Status: domain.DocStatusDraft}}
 	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{}).
-		WithDB(newPermissiveMockDB(t))
+		WithRunner(db.NewTxRunner(newPermissiveMockDB(t)))
 
 	err := svc.RenameDocument(context.Background(), "tenant_1", "user_1", "doc_1", "  New Name  ")
 	if err != nil {
