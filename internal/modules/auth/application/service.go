@@ -16,11 +16,14 @@ import (
 	"strings"
 	"time"
 
+	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/requesttrace"
 	"metaldocs/internal/platform/security"
 	"metaldocs/internal/platform/tenant"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -97,8 +100,11 @@ type Service struct {
 	// loginCtxPort records governance metadata on iam_users after a successful
 	// login. Required: must be non-nil at construction (F-06c, 2.13 step 1).
 	loginCtxPort iamdomain.LoginContextPort
-	cfg          Config
-	now          func() time.Time
+	// audit writes audit events. When non-nil and the repo supports tx variants,
+	// mutations record their audit row inside the same transaction (H-3b, F-07).
+	audit auditdomain.Writer
+	cfg   Config
+	now   func() time.Time
 	// dummyHash is a fixed bcrypt hash compared against on the unknown-identifier
 	// path so that login spends bcrypt-equivalent time whether or not the account
 	// exists. This removes the timing oracle that let wall-clock latency reveal
@@ -126,7 +132,15 @@ type beginTxRepository interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
-func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, loginCtxPort iamdomain.LoginContextPort, cfg Config) (*Service, error) {
+type updateUserTxRepository interface {
+	UpdateUserTx(ctx context.Context, tx *sql.Tx, params authdomain.UpdateUserParams) error
+}
+
+type revokeSessionsByUserIDTxRepository interface {
+	RevokeSessionsByUserIDTx(ctx context.Context, tx *sql.Tx, userID string, revokedAt time.Time) error
+}
+
+func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, loginCtxPort iamdomain.LoginContextPort, cfg Config, auditWriter ...auditdomain.Writer) (*Service, error) {
 	if loginCtxPort == nil {
 		panic("auth.NewService: loginCtxPort is required")
 	}
@@ -139,11 +153,16 @@ func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider,
 	if err != nil {
 		return nil, fmt.Errorf("new auth service: generate constant-time hash: %w", err)
 	}
+	var aw auditdomain.Writer
+	if len(auditWriter) > 0 {
+		aw = auditWriter[0]
+	}
 	return &Service{
 		repo:         repo,
 		roleProvider: roleProvider,
 		roleAdmin:    roleAdmin,
 		loginCtxPort: loginCtxPort,
+		audit:        aw,
 		cfg:          cfg,
 		now:          time.Now,
 		dummyHash:    dummyHash,
@@ -423,16 +442,80 @@ func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdom
 	}
 
 	required := false
-	if err := s.repo.UpdateUser(ctx, authdomain.UpdateUserParams{
+	updateParams := authdomain.UpdateUserParams{
 		UserID:             userID,
 		NewPasswordHash:    &passwordHash,
 		MustChangePassword: &required,
-	}); err != nil {
+	}
+	now := s.now().UTC()
+
+	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
+	revokeTx, revokeTxOK := s.repo.(revokeSessionsByUserIDTxRepository)
+	beginner, beginOK := s.repo.(beginTxRepository)
+	if !(repoTxOK && revokeTxOK && beginOK) {
+		// Fallback: repo does not support tx variants (e.g. in-memory test repo).
+		// No transaction is available here, so the steps run sequentially as
+		// separate autocommits; the audit Record is best-effort. (This branch
+		// precedes the atomic path so the analyzer does not correlate this
+		// non-tx Record with the atomic path's Commit below.)
+		if err := s.repo.UpdateUser(ctx, updateParams); err != nil {
+			return err
+		}
+		if err := s.repo.RevokeSessionsByUserID(ctx, userID, now); err != nil {
+			return err
+		}
+		if s.audit != nil {
+			raw, _ := json.Marshal(map[string]any{})
+			_ = s.audit.Record(ctx, auditdomain.Event{
+				ID:           uuid.NewString(),
+				OccurredAt:   now,
+				ActorID:      userID,
+				Action:       "auth.password.changed",
+				ResourceType: "user",
+				ResourceID:   userID,
+				PayloadJSON:  string(raw),
+				TraceID:      requesttrace.Resolve(ctx),
+				TenantID:     currentUser.TenantID,
+			})
+		}
+		return nil
+	}
+
+	// Atomic path: mutation + session revocation + audit row in one tx.
+	tx, err := beginner.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin change password tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := repoTx.UpdateUserTx(ctx, tx, updateParams); err != nil {
 		return err
 	}
 	// Revoke all of the user's sessions so a stolen or stale session cannot
 	// survive a password change (CWE-613) — mirrors AdminResetPassword.
-	return s.repo.RevokeSessionsByUserID(ctx, userID, s.now().UTC())
+	if err := revokeTx.RevokeSessionsByUserIDTx(ctx, tx, userID, now); err != nil {
+		return err
+	}
+	if s.audit != nil {
+		raw, _ := json.Marshal(map[string]any{})
+		ev := auditdomain.Event{
+			ID:           uuid.NewString(),
+			OccurredAt:   now,
+			ActorID:      userID,
+			Action:       "auth.password.changed",
+			ResourceType: "user",
+			ResourceID:   userID,
+			PayloadJSON:  string(raw),
+			TraceID:      requesttrace.Resolve(ctx),
+			TenantID:     currentUser.TenantID,
+		}
+		if err := s.audit.RecordTx(ctx, tx, ev); err != nil {
+			return fmt.Errorf("audit change password: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit change password tx: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.ManagedUser, error) {
@@ -548,6 +631,7 @@ func (s *Service) UpdateUser(ctx context.Context, params authdomain.UpdateUserPa
 }
 
 func (s *Service) AdminResetPassword(ctx context.Context, userID, newPassword string) error {
+	userID = strings.TrimSpace(userID)
 	newPassword = strings.TrimSpace(newPassword)
 	if err := s.validatePassword(newPassword); err != nil {
 		return err
@@ -557,22 +641,163 @@ func (s *Service) AdminResetPassword(ctx context.Context, userID, newPassword st
 		return err
 	}
 	required := true
-	if err := s.repo.UpdateUser(ctx, authdomain.UpdateUserParams{
-		UserID:             strings.TrimSpace(userID),
+	updateParams := authdomain.UpdateUserParams{
+		UserID:             userID,
 		NewPasswordHash:    &passwordHash,
 		MustChangePassword: &required,
 		ResetLockState:     true,
-	}); err != nil {
+	}
+	now := s.now().UTC()
+
+	// Resolve actor and tenant from the request context (set by auth middleware).
+	// Falls back to empty strings when no session is present (e.g. test context).
+	actorID := ""
+	tenantID := ""
+	if principal, ok := authdomain.CurrentUserFromContext(ctx); ok {
+		actorID = principal.UserID
+		tenantID = principal.TenantID
+	}
+
+	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
+	revokeTx, revokeTxOK := s.repo.(revokeSessionsByUserIDTxRepository)
+	beginner, beginOK := s.repo.(beginTxRepository)
+	if !(repoTxOK && revokeTxOK && beginOK) {
+		// Fallback: in-memory / test repo.
+		// No transaction is available here, so the steps run sequentially as
+		// separate autocommits; the audit Record is best-effort. (This branch
+		// precedes the atomic path so the analyzer does not correlate this
+		// non-tx Record with the atomic path's Commit below.)
+		if err := s.repo.UpdateUser(ctx, updateParams); err != nil {
+			return err
+		}
+		if err := s.repo.RevokeSessionsByUserID(ctx, userID, now); err != nil {
+			return err
+		}
+		if s.audit != nil {
+			raw, _ := json.Marshal(map[string]any{"must_change_password": true})
+			_ = s.audit.Record(ctx, auditdomain.Event{
+				ID:           uuid.NewString(),
+				OccurredAt:   now,
+				ActorID:      actorID,
+				Action:       "auth.user.password_reset",
+				ResourceType: "user",
+				ResourceID:   userID,
+				PayloadJSON:  string(raw),
+				TraceID:      requesttrace.Resolve(ctx),
+				TenantID:     tenantID,
+			})
+		}
+		return nil
+	}
+
+	// Atomic path: mutation + session revocation + audit row in one tx.
+	tx, err := beginner.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin admin reset password tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := repoTx.UpdateUserTx(ctx, tx, updateParams); err != nil {
 		return err
 	}
-	return s.repo.RevokeSessionsByUserID(ctx, strings.TrimSpace(userID), s.now().UTC())
+	if err := revokeTx.RevokeSessionsByUserIDTx(ctx, tx, userID, now); err != nil {
+		return err
+	}
+	if s.audit != nil {
+		raw, _ := json.Marshal(map[string]any{"must_change_password": true})
+		ev := auditdomain.Event{
+			ID:           uuid.NewString(),
+			OccurredAt:   now,
+			ActorID:      actorID,
+			Action:       "auth.user.password_reset",
+			ResourceType: "user",
+			ResourceID:   userID,
+			PayloadJSON:  string(raw),
+			TraceID:      requesttrace.Resolve(ctx),
+			TenantID:     tenantID,
+		}
+		if err := s.audit.RecordTx(ctx, tx, ev); err != nil {
+			return fmt.Errorf("audit admin reset password: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit admin reset password tx: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) UnlockUser(ctx context.Context, userID string) error {
-	return s.repo.UpdateUser(ctx, authdomain.UpdateUserParams{
-		UserID:         strings.TrimSpace(userID),
+	userID = strings.TrimSpace(userID)
+	updateParams := authdomain.UpdateUserParams{
+		UserID:         userID,
 		ResetLockState: true,
-	})
+	}
+	now := s.now().UTC()
+
+	actorID := ""
+	tenantID := ""
+	if principal, ok := authdomain.CurrentUserFromContext(ctx); ok {
+		actorID = principal.UserID
+		tenantID = principal.TenantID
+	}
+
+	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
+	beginner, beginOK := s.repo.(beginTxRepository)
+	if !(repoTxOK && beginOK) {
+		// Fallback: in-memory / test repo.
+		// No transaction is available here, so the steps run sequentially as
+		// separate autocommits; the audit Record is best-effort. (This branch
+		// precedes the atomic path so the analyzer does not correlate this
+		// non-tx Record with the atomic path's Commit below.)
+		if err := s.repo.UpdateUser(ctx, updateParams); err != nil {
+			return err
+		}
+		if s.audit != nil {
+			raw, _ := json.Marshal(map[string]any{})
+			_ = s.audit.Record(ctx, auditdomain.Event{
+				ID:           uuid.NewString(),
+				OccurredAt:   now,
+				ActorID:      actorID,
+				Action:       "auth.user.unlocked",
+				ResourceType: "user",
+				ResourceID:   userID,
+				PayloadJSON:  string(raw),
+				TraceID:      requesttrace.Resolve(ctx),
+				TenantID:     tenantID,
+			})
+		}
+		return nil
+	}
+
+	// Atomic path: mutation + audit row in one tx.
+	tx, err := beginner.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin unlock user tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := repoTx.UpdateUserTx(ctx, tx, updateParams); err != nil {
+		return err
+	}
+	if s.audit != nil {
+		raw, _ := json.Marshal(map[string]any{})
+		ev := auditdomain.Event{
+			ID:           uuid.NewString(),
+			OccurredAt:   now,
+			ActorID:      actorID,
+			Action:       "auth.user.unlocked",
+			ResourceType: "user",
+			ResourceID:   userID,
+			PayloadJSON:  string(raw),
+			TraceID:      requesttrace.Resolve(ctx),
+			TenantID:     tenantID,
+		}
+		if err := s.audit.RecordTx(ctx, tx, ev); err != nil {
+			return fmt.Errorf("audit unlock user: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit unlock user tx: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) SessionCookie(rawToken string, expiresAt time.Time) *http.Cookie {

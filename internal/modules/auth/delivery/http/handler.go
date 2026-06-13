@@ -159,7 +159,7 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		"changed": true,
 		"user":    currentUser,
 	})
-	h.recordAudit(r, user.UserID, "auth.password.changed", user.UserID, map[string]any{})
+	// Audit for auth.password.changed is now emitted inside the service tx (H-3b, F-07).
 }
 
 func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
@@ -197,7 +197,7 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 	if sess, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
 		tenantID = sess.TenantID
 	}
-	if err := h.audit.Record(r.Context(), auditdomain.Event{
+	if err := h.audit.Record(r.Context(), auditdomain.Event{ //cilint:allow-post-commit-audit auth login/logout best-effort: login.failed has no business tx to attach to (H-3b bounded defer)
 		ID:           uuid.NewString(),
 		OccurredAt:   h.now().UTC(),
 		ActorID:      actorID,

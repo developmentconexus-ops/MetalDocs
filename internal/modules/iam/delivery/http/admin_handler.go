@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
@@ -57,7 +56,6 @@ type PresenceReader interface {
 type AdminHandler struct {
 	service     *iamapp.AdminService
 	authService UserAdminService
-	audit       auditdomain.Writer
 	auditEvents AuditEventLister
 	kpi         KpiReader
 	presence    PresenceReader
@@ -75,12 +73,11 @@ type ReplaceUserRolesRequest struct {
 	AssignedBy  string   `json:"assigned_by,omitempty"`
 }
 
-func NewAdminHandler(service *iamapp.AdminService, authService UserAdminService, auditWriter ...auditdomain.Writer) *AdminHandler {
-	var writer auditdomain.Writer
-	if len(auditWriter) > 0 {
-		writer = auditWriter[0]
-	}
-	return &AdminHandler{service: service, authService: authService, audit: writer}
+func NewAdminHandler(service *iamapp.AdminService, authService UserAdminService, _ ...auditdomain.Writer) *AdminHandler {
+	// auditWriter variadic is kept for call-site compatibility during the H-3b
+	// migration; audit is now emitted in-tx by AdminService and is no longer
+	// needed at the handler layer.
+	return &AdminHandler{service: service, authService: authService}
 }
 
 // WithAuditEventLister wires the audit-events reader used by the composed
@@ -316,9 +313,14 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// actorID is the authenticated principal performing the action and becomes the
+	// audit ActorID — it must never be client-controllable. assignedBy is the
+	// domain "assigned_by" field, which may be overridden via the request body and
+	// falls back to the actor when omitted (H-3b M2).
+	actorID := authenticatedActor(r)
 	assignedBy := strings.TrimSpace(req.AssignedBy)
 	if assignedBy == "" {
-		assignedBy = authenticatedActor(r)
+		assignedBy = actorID
 	}
 	upsertTenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
@@ -326,7 +328,7 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := h.service.UpsertUserAndAssignRole(r.Context(), userID, req.DisplayName, upsertTenantID, role, assignedBy); err != nil {
+	if err := h.service.UpsertUserAndAssignRole(r.Context(), userID, req.DisplayName, upsertTenantID, role, assignedBy, actorID); err != nil {
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to upsert user role"))
 		return
 	}
@@ -336,10 +338,7 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 		"role":        string(role),
 		"display_name": strings.TrimSpace(req.DisplayName),
 	})
-	h.recordAudit(r, userID, "iam.user.role.upserted", map[string]any{
-		"role":       string(role),
-		"assigned_by": assignedBy,
-	})
+	// Audit is now emitted in-tx by AdminService.UpsertUserAndAssignRole (H-3b).
 }
 
 func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Request, userID string) {
@@ -355,9 +354,10 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	actorID := authenticatedActor(r)
 	assignedBy := strings.TrimSpace(req.AssignedBy)
 	if assignedBy == "" {
-		assignedBy = authenticatedActor(r)
+		assignedBy = actorID
 	}
 	replaceTenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
@@ -365,7 +365,7 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, replaceTenantID, role, assignedBy); err != nil {
+	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, replaceTenantID, role, assignedBy, actorID); err != nil {
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to replace user roles"))
 		return
 	}
@@ -375,9 +375,7 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 		"display_name": strings.TrimSpace(req.DisplayName),
 		"roles":       []string{string(role)},
 	})
-	h.recordAudit(r, userID, "iam.user.roles.replaced", map[string]any{
-		"roles": []string{string(role)},
-	})
+	// Audit is now emitted in-tx by AdminService.ReplaceUserRoles (H-3b).
 }
 
 func (h *AdminHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
@@ -386,33 +384,6 @@ func (h *AdminHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
 	}
 }
 
-func (h *AdminHandler) recordAudit(r *http.Request, userID, action string, payload map[string]any) {
-	if h.audit == nil {
-		return
-	}
-	tenantID, err := tenant.FromContext(r.Context())
-	if err != nil {
-		return
-	}
-	payloadJSON, err := json.Marshal(payload)
-	if err != nil {
-		return
-	}
-	now := time.Now().UTC()
-	if err := h.audit.Record(r.Context(), auditdomain.Event{
-		ID:           "evt_" + uuid.NewString(),
-		OccurredAt:   now,
-		ActorID:      authenticatedActor(r),
-		Action:       action,
-		ResourceType: "user",
-		ResourceID:   userID,
-		PayloadJSON:  string(payloadJSON),
-		TraceID:      r.Header.Get("X-Trace-Id"),
-		TenantID:     tenantID,
-	}); err != nil {
-		slog.Warn("audit: failed to record", "action", action, "user_id", userID, "err", err)
-	}
-}
 
 func parseRoles(items []string) ([]iamdomain.Role, bool) {
 	out := make([]iamdomain.Role, 0, len(items))

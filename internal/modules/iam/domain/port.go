@@ -1,6 +1,8 @@
 package domain
 
-import "context"
+import (
+	"context"
+)
 
 // RoleProvider resolves effective roles for a given user identity within a tenant.
 type RoleProvider interface {
@@ -21,7 +23,7 @@ type RoleProvider interface {
 type RoleAdminRepository interface {
 	// Bootstrap operations.
 	HasAnyRole(ctx context.Context, role Role, tenantID string) (bool, error)
-	// Lifecycle operations.
+	// Lifecycle operations — autocommit wrappers (begin own tx).
 	UpsertUserAndAssignRole(ctx context.Context, userID, displayName, tenantID string, role Role, assignedBy string) error
 	ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, role Role, assignedBy string) error
 }

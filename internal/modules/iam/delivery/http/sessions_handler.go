@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
+	iamapp "metaldocs/internal/modules/iam/application"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 	"metaldocs/internal/platform/useragent"
@@ -33,17 +33,28 @@ type SessionAdmin interface {
 }
 
 type SessionsHandler struct {
-	sessions SessionAdmin
-	audit    auditdomain.Writer
-	now      func() time.Time
+	sessions       SessionAdmin
+	sessionService *iamapp.SessionService
+	now            func() time.Time
 }
 
-func NewSessionsHandler(sessions SessionAdmin, auditWriter auditdomain.Writer) *SessionsHandler {
+func NewSessionsHandler(sessions SessionAdmin, _ ...auditdomain.Writer) *SessionsHandler {
+	// The second variadic arg (legacy auditdomain.Writer) is intentionally
+	// discarded: audit is now emitted in-tx by SessionService (H-3b Site 1).
+	// Call sites that pass deps.AuditWriter continue to compile without change.
 	return &SessionsHandler{
 		sessions: sessions,
-		audit:    auditWriter,
 		now:      func() time.Time { return time.Now().UTC() },
 	}
+}
+
+// WithSessionService wires the application-layer service that performs the
+// atomic revoke + audit write (H-3b Site 1). When nil the revoke path is
+// unavailable; this keeps unit tests that construct the handler without a
+// full DB stack from breaking.
+func (h *SessionsHandler) WithSessionService(svc *iamapp.SessionService) *SessionsHandler {
+	h.sessionService = svc
+	return h
 }
 
 func (h *SessionsHandler) RegisterRoutes(mux *http.ServeMux) {
@@ -180,50 +191,44 @@ func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	now := h.now()
-	if err := h.sessions.RevokeSession(r.Context(), sessionID, now); err != nil {
-		if errors.Is(err, authdomain.ErrSessionNotFound) {
-			h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Session not found"))
+	// Use SessionService when wired (atomic revoke + audit in one tx, H-3b).
+	// Falls back to the bare RevokeSession path in test environments where no
+	// real DB / SessionService is available.
+	if h.sessionService != nil {
+		actor := ""
+		if userID, ok := authn.UserIDFromContext(r.Context()); ok {
+			actor = userID
+		}
+		err := h.sessionService.RevokeSession(r.Context(), iamapp.RevokeSessionInfo{
+			SessionID: session.SessionID,
+			UserID:    session.UserID,
+			TenantID:  session.TenantID,
+			Reason:    reason,
+		}, actor)
+		if err != nil {
+			if errors.Is(err, authdomain.ErrSessionNotFound) {
+				h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Session not found"))
+				return
+			}
+			slog.Error("iam sessions: revoke failed", "err", err)
+			h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to revoke session"))
 			return
 		}
-		slog.Error("iam sessions: revoke failed", "err", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to revoke session"))
-		return
+	} else {
+		now := h.now()
+		if err := h.sessions.RevokeSession(r.Context(), sessionID, now); err != nil {
+			if errors.Is(err, authdomain.ErrSessionNotFound) {
+				h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Session not found"))
+				return
+			}
+			slog.Error("iam sessions: revoke failed", "err", err)
+			h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to revoke session"))
+			return
+		}
 	}
-
-	h.emitRevokeAudit(r, session, reason)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *SessionsHandler) emitRevokeAudit(r *http.Request, session authdomain.Session, reason string) {
-	if h.audit == nil {
-		return
-	}
-	payload := map[string]any{
-		"session_id":    session.SessionID,
-		"targetUserId": session.UserID,
-	}
-	if reason != "" {
-		payload["reason"] = reason
-	}
-	payloadJSON, err := json.Marshal(payload)
-	if err != nil {
-		return
-	}
-	if err := h.audit.Record(r.Context(), auditdomain.Event{
-		ID:           "evt_" + uuid.NewString(),
-		OccurredAt:   h.now(),
-		ActorID:      authenticatedActor(r),
-		Action:       "auth.session.revoked",
-		ResourceType: "session",
-		ResourceID:   session.SessionID,
-		PayloadJSON:  string(payloadJSON),
-		TraceID:      r.Header.Get("X-Trace-Id"),
-		TenantID:     session.TenantID,
-	}); err != nil {
-		slog.Warn("iam sessions: audit emit failed", "err", err)
-	}
-}
 
 func (h *SessionsHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
 	if err := problem.Write(w, p); err != nil {

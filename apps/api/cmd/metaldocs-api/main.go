@@ -232,7 +232,7 @@ func main() {
 		}
 	}
 
-	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, iampg.NewLoginContextRepository(deps.SQLDB), authCfg)
+	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, iampg.NewLoginContextRepository(deps.SQLDB), authCfg, deps.AuditWriter)
 	if err != nil {
 		log.Fatalf("new auth service: %v", err)
 	}
@@ -281,14 +281,22 @@ func main() {
 		TrustedProxyCIDRs: authCfg.TrustedProxyCIDRs,
 	})
 
-	iamAdminService := iamapp.NewAdminService(deps.RoleAdminRepo, cachedProvider)
+	// H-3b: TxRunner for IAM atomic audit writes (Site 2, 3, 4).
+	var iamTxRunner db.TxRunner
+	if deps.SQLDB != nil {
+		iamTxRunner = db.NewTxRunner(deps.SQLDB)
+	}
+	iamAdminService := iamapp.NewAdminService(deps.RoleAdminRepo, cachedProvider, iamTxRunner, deps.AuditWriter)
 	iamAdminHandler := iamdelivery.NewAdminHandler(iamAdminService, authService, deps.AuditWriter).
 		WithAuditEventLister(auditService)
 
 	// PR-7 Sessions & Security tab.
 	var sessionsHandler *iamdelivery.SessionsHandler
 	if sqlDB := deps.SQLDB; sqlDB != nil {
-		sessionsHandler = iamdelivery.NewSessionsHandler(authpg.NewRepository(sqlDB), deps.AuditWriter)
+		authRepo := authpg.NewRepository(sqlDB)
+		sessionSvc := iamapp.NewSessionService(db.NewTxRunner(sqlDB), deps.AuditWriter, authRepo)
+		sessionsHandler = iamdelivery.NewSessionsHandler(authRepo, deps.AuditWriter).
+			WithSessionService(sessionSvc)
 	}
 	var securityService *securityapp.Service
 	var securityHandler *securitydelivery.Handler
@@ -415,6 +423,11 @@ func main() {
 		areaCatalog = iampg.NewProcessAreaCatalog(deps.SQLDB)
 	}
 	peopleService := iamapp.NewPeopleService(authService, cachedProvider, deps.RoleAdminRepo, membershipService, areaCatalog, cachedProvider)
+	// H-3b Site 3: wire atomic PatchAtomic (UpdateUserTx + ReplaceUserRolesTx + RecordTx).
+	// authpg.Repository satisfies the userUpdaterTx port (UpdateUserTx method).
+	if deps.SQLDB != nil {
+		peopleService.WithTxAudit(db.NewTxRunner(deps.SQLDB), deps.AuditWriter, authpg.NewRepository(deps.SQLDB))
+	}
 	iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter).RegisterRoutes(mux)
 
 	// PR-1 (area-memberships rebuild): MembershipHandler now takes a

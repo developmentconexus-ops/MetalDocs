@@ -3,6 +3,7 @@ package memory
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"sync"
 	"time"
@@ -519,6 +520,18 @@ func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ 
 	identity.UpdatedAt = time.Now().UTC()
 	r.users[userID] = identity
 	return nil
+}
+
+// UpsertUserAndAssignRoleTx is the tx-aware variant. In the memory repo
+// (test fixture only) the *sql.Tx is ignored.
+func (r *Repository) UpsertUserAndAssignRoleTx(ctx context.Context, _ *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
+	return r.UpsertUserAndAssignRole(ctx, userID, displayName, tenantID, role, assignedBy)
+}
+
+// ReplaceUserRolesTx is the tx-aware variant. In the memory repo
+// (test fixture only) the *sql.Tx is ignored.
+func (r *Repository) ReplaceUserRolesTx(ctx context.Context, _ *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
+	return r.ReplaceUserRoles(ctx, userID, displayName, tenantID, role, assignedBy)
 }
 
 // SeedUserTenants sets the tenant list for a user. Used in tests only.

@@ -40,6 +40,16 @@ func (r *RoleAdminRepository) UpsertUserAndAssignRole(ctx context.Context, userI
 		return fmt.Errorf("begin iam tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := r.UpsertUserAndAssignRoleTx(ctx, tx, userID, displayName, tenantID, role, assignedBy); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit iam tx: %w", err)
+	}
+	return nil
+}
+
+func (r *RoleAdminRepository) UpsertUserAndAssignRoleTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, assignedBy); err != nil {
 		return fmt.Errorf("seed iam user.manage authorization: %w", err)
@@ -70,10 +80,6 @@ INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at
 VALUES ($1, $2::uuid, $3, NOW(), $4)
 `, userID, tenantID, string(role), assignedBy); err != nil {
 		return fmt.Errorf("insert iam role: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit iam tx: %w", err)
 	}
 	return nil
 }

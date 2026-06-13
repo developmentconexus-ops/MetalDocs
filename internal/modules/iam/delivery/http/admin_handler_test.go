@@ -3,6 +3,7 @@ package httpdelivery
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -27,6 +28,14 @@ func (stubRoleAdminRepository) UpsertUserAndAssignRole(context.Context, string, 
 }
 
 func (stubRoleAdminRepository) ReplaceUserRoles(context.Context, string, string, string, iamdomain.Role, string) error {
+	return nil
+}
+
+func (stubRoleAdminRepository) UpsertUserAndAssignRoleTx(_ context.Context, _ *sql.Tx, _, _, _ string, _ iamdomain.Role, _ string) error {
+	return nil
+}
+
+func (stubRoleAdminRepository) ReplaceUserRolesTx(_ context.Context, _ *sql.Tx, _, _, _ string, _ iamdomain.Role, _ string) error {
 	return nil
 }
 
@@ -60,7 +69,7 @@ func (s *stubUserAdminService) UnlockUser(context.Context, string) error {
 }
 
 func TestHandleReplaceUserRoles_RejectsMultipleRoles(t *testing.T) {
-	handler := NewAdminHandler(iamapp.NewAdminService(stubRoleAdminRepository{}, nil), nil)
+	handler := NewAdminHandler(iamapp.NewAdminService(stubRoleAdminRepository{}, nil, nil, nil), nil)
 
 	body := bytes.NewBufferString(`{"displayName":"Alice","roles":["editor","viewer"]}`)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/iam/users/alice/roles", body)

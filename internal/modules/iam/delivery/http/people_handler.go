@@ -31,9 +31,10 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-// PeopleHandler owns the People-tab REST surface introduced in PR-4. It sits
-// next to AdminHandler in the same package so the existing recordAudit /
-// writeProblem helpers stay reusable without exporting them.
+// PeopleHandler owns the People-tab REST surface introduced in PR-4.
+// Audit rows for Patch, Invite, Reset, and Unlock are now emitted by the
+// application layer (H-3b Stage 2). The audit field is retained for the
+// bulk-action path, which is not yet moved to the application layer.
 type PeopleHandler struct {
 	service *iamapp.PeopleService
 	authSvc UserAdminService
@@ -156,20 +157,7 @@ func (h *PeopleHandler) handleInvite(w http.ResponseWriter, r *http.Request) {
 		h.writePeopleError(w, err)
 		return
 	}
-
-	// CRITICAL: tempPassword is returned to the operator one time only. The
-	// audit payload deliberately excludes it; only username/email/tenantRole
-	// and area count are journalled. Do NOT log tempPassword anywhere.
-	areaCount := 0
-	if input.AreaMemberships != nil {
-		areaCount = len(input.AreaMemberships)
-	}
-	h.recordAudit(r, result.UserID, "iam.user.invited", map[string]any{
-		"username":   input.Username,
-		"email":      input.Email,
-		"tenant_role": string(input.TenantRole),
-		"areaCount":  areaCount,
-	})
+	// Audit is now emitted by PeopleService.Invite at the application layer (H-3b).
 
 	writeJSON(w, http.StatusCreated, iamapi.UserInviteResponse{
 		UserId:       result.UserID,
@@ -215,15 +203,11 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := authenticatedActor(r)
-	changes, err := h.service.PatchAtomic(r.Context(), tenantID, actor, userID, input)
-	if err != nil {
+	if _, err := h.service.PatchAtomic(r.Context(), tenantID, actor, userID, input); err != nil {
 		h.writePeopleError(w, err)
 		return
 	}
-	// Audit deliberately omits password material — UpdateManagedUserRequest's
-	// NewPassword (if present) is not forwarded through PatchAtomic, so the
-	// audit payload only sees the metadata + tenantRole changes.
-	h.recordAudit(r, userID, "iam.user.updated", changes)
+	// Audit is now emitted in-tx by PeopleService.PatchAtomic (H-3b).
 
 	// Spec (operationId patchUser) declares the 200 body as ManagedUserCore —
 	// read the user back so the wire shape matches the generated FE types (A5).
@@ -259,7 +243,7 @@ func (h *PeopleHandler) handleResetPassword(w http.ResponseWriter, r *http.Reque
 		h.writeAuthError(w, err)
 		return
 	}
-	h.recordAudit(r, userID, "auth.user.password_reset", map[string]any{"must_change_password": true})
+	// Audit is now emitted in-tx by auth.Service.AdminResetPassword (H-3b Stage 1).
 	writeJSON(w, http.StatusOK, iamapi.ResetManagedUserPasswordResponse{
 		UserId:             userID,
 		Reset:              true,
@@ -286,7 +270,7 @@ func (h *PeopleHandler) handleUnlock(w http.ResponseWriter, r *http.Request) {
 		h.writeAuthError(w, err)
 		return
 	}
-	h.recordAudit(r, userID, "auth.user.unlocked", map[string]any{})
+	// Audit is now emitted in-tx by auth.Service.UnlockUser (H-3b Stage 1).
 	writeJSON(w, http.StatusOK, iamapi.UnlockManagedUserResponse{UserId: userID, Unlocked: true})
 }
 
@@ -464,6 +448,9 @@ func (h *PeopleHandler) writeAuthError(w http.ResponseWriter, err error) {
 	}
 }
 
+// recordAudit emits a best-effort (non-tx) audit event from the handler.
+// Retained for the bulk-action path; Patch/Invite/Reset/Unlock now emit
+// audit at the application layer (H-3b Stage 2).
 func (h *PeopleHandler) recordAudit(r *http.Request, userID, action string, payload map[string]any) {
 	if h.audit == nil {
 		return
@@ -477,7 +464,7 @@ func (h *PeopleHandler) recordAudit(r *http.Request, userID, action string, payl
 		return
 	}
 	now := time.Now().UTC()
-	if err := h.audit.Record(r.Context(), auditdomain.Event{
+	if err := h.audit.Record(r.Context(), auditdomain.Event{ //cilint:allow-post-commit-audit bulk-action envelope; per-item mutations already audited in-app (H-3b bounded defer)
 		ID:           "evt_" + uuid.NewString(),
 		OccurredAt:   now,
 		ActorID:      authenticatedActor(r),

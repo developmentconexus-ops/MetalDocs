@@ -165,13 +165,13 @@ WHERE session_id = $1
 	return nil
 }
 
-func (r *Repository) RevokeSession(ctx context.Context, sessionID string, revokedAt time.Time) error {
+func (r *Repository) RevokeSessionTx(ctx context.Context, tx *sql.Tx, sessionID string, revokedAt time.Time) error {
 	const q = `
 UPDATE metaldocs.auth_sessions
 SET revoked_at = $2
 WHERE session_id = $1
 `
-	res, err := r.db.ExecContext(ctx, q, sessionID, revokedAt)
+	res, err := tx.ExecContext(ctx, q, sessionID, revokedAt)
 	if err != nil {
 		return fmt.Errorf("revoke auth session: %w", err)
 	}
@@ -185,16 +185,46 @@ WHERE session_id = $1
 	return nil
 }
 
-func (r *Repository) RevokeSessionsByUserID(ctx context.Context, userID string, revokedAt time.Time) error {
+func (r *Repository) RevokeSession(ctx context.Context, sessionID string, revokedAt time.Time) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin revoke session tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := r.RevokeSessionTx(ctx, tx, sessionID, revokedAt); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit revoke session tx: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) RevokeSessionsByUserIDTx(ctx context.Context, tx *sql.Tx, userID string, revokedAt time.Time) error {
 	const q = `
 UPDATE metaldocs.auth_sessions
 SET revoked_at = $2
 WHERE user_id = $1
   AND revoked_at IS NULL
 `
-	_, err := r.db.ExecContext(ctx, q, userID, revokedAt)
+	_, err := tx.ExecContext(ctx, q, userID, revokedAt)
 	if err != nil {
 		return fmt.Errorf("revoke auth sessions by user: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) RevokeSessionsByUserID(ctx context.Context, userID string, revokedAt time.Time) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin revoke sessions tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := r.RevokeSessionsByUserIDTx(ctx, tx, userID, revokedAt); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit revoke sessions tx: %w", err)
 	}
 	return nil
 }
@@ -441,18 +471,11 @@ ORDER BY MAX(s.last_seen_at) DESC
 	return items, nil
 }
 
-func (r *Repository) UpdateUser(ctx context.Context, params authdomain.UpdateUserParams) error {
+func (r *Repository) UpdateUserTx(ctx context.Context, tx *sql.Tx, params authdomain.UpdateUserParams) error {
 	if !hasMutableUserUpdates(params) {
-		return r.ensureIdentityExists(ctx, params.UserID)
+		// No writes to do; existence is guaranteed by the surrounding service tx.
+		return nil
 	}
-
-	// Keep profile and credential updates in one transaction so mixed update
-	// requests stay atomic even though each branch may issue its own statement.
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin update user tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
 	updated := false
 
 	if params.DisplayName != nil || params.IsActive != nil {
@@ -498,6 +521,25 @@ WHERE user_id = $1
 
 	if !updated {
 		return authdomain.ErrIdentityNotFound
+	}
+	return nil
+}
+
+func (r *Repository) UpdateUser(ctx context.Context, params authdomain.UpdateUserParams) error {
+	if !hasMutableUserUpdates(params) {
+		return r.ensureIdentityExists(ctx, params.UserID)
+	}
+
+	// Keep profile and credential updates in one transaction so mixed update
+	// requests stay atomic even though each branch may issue its own statement.
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin update user tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := r.UpdateUserTx(ctx, tx, params); err != nil {
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {

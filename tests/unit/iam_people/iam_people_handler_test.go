@@ -211,6 +211,29 @@ func (f *fakeAuditWriter) snapshot() []auditdomain.Event {
 	return out
 }
 
+// fakeTxRunner satisfies db.TxRunner for unit tests: it runs fn(nil) directly
+// with no real database. Repo methods that accept *sql.Tx ignore the nil in
+// test fakes, so the closure behaves like an in-process synchronous call.
+type fakeTxRunner struct{}
+
+func (fakeTxRunner) Do(_ context.Context, fn func(tx *sql.Tx) error) error {
+	return fn(nil)
+}
+
+func (fakeTxRunner) DoReadOnly(_ context.Context, fn func(tx *sql.Tx) error) error {
+	return fn(nil)
+}
+
+// fakeUserUpdaterTx satisfies the userUpdaterTx port (unexported in iamapp)
+// by delegating to fakeAuthService.UpdateUser (ignores the nil *sql.Tx).
+type fakeUserUpdaterTx struct {
+	auth *fakeAuthService
+}
+
+func (f *fakeUserUpdaterTx) UpdateUserTx(_ context.Context, _ *sql.Tx, params authdomain.UpdateUserParams) error {
+	return f.auth.UpdateUser(context.Background(), params, "")
+}
+
 type peopleServiceTestBuilder struct {
 	auth        *fakeAuthService
 	roleAdmin   *iammemory.RoleAdminRepository
@@ -333,6 +356,10 @@ func newHandlerForTest(t *testing.T) (*http.ServeMux, *peopleServiceTestBuilder,
 	t.Helper()
 	svc, builder := newPeopleServiceForTest(t)
 	auditWriter := &fakeAuditWriter{}
+	// Wire audit into the service so Invite (non-tx) and PatchAtomic (tx path)
+	// emit events to auditWriter. fakeTxRunner runs closures with nil *sql.Tx;
+	// fakeUserUpdaterTx delegates to the in-memory fakeAuthService.
+	svc.WithTxAudit(fakeTxRunner{}, auditWriter, &fakeUserUpdaterTx{auth: builder.auth})
 	authAdmin := &fakeAuthAdminService{inner: builder.auth}
 	handler := iamdelivery.NewPeopleHandler(svc, authAdmin, auditWriter)
 	mux := http.NewServeMux()

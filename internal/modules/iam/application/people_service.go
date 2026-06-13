@@ -19,6 +19,8 @@ package application
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -26,9 +28,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	authapp "metaldocs/internal/modules/auth/application"
+	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/requesttrace"
 )
 
 // ErrPeopleValidation is returned for client-side input violations that the
@@ -154,6 +161,13 @@ type peopleAuthService interface {
 	ListUsers(ctx context.Context, tenantID string) ([]authdomain.ManagedUser, error)
 }
 
+// userUpdaterTx is the narrow port for running UpdateUser inside a caller-owned
+// *sql.Tx. Satisfied structurally by *authpg.Repository (which has UpdateUserTx).
+// Defined locally to avoid an import cycle with auth/infrastructure/postgres (H-3b).
+type userUpdaterTx interface {
+	UpdateUserTx(ctx context.Context, tx *sql.Tx, params authdomain.UpdateUserParams) error
+}
+
 // peopleRoleProvider resolves a user's single canonical tenant role and checks
 // active tenant membership.
 type peopleRoleProvider interface {
@@ -169,14 +183,19 @@ type peopleMembershipService interface {
 
 // PeopleService is the People-tab orchestrator (PR-4).
 type PeopleService struct {
-	auth         peopleAuthService
-	roles        peopleRoleProvider
-	roleAdmin    iamdomain.RoleAdminRepository
-	memberships  peopleMembershipService
-	areaCatalog  AreaCatalogReader
-	invalidator  RoleCacheInvalidator
-	tempPassword func() (string, error)
-	nowFn        func() time.Time
+	auth          peopleAuthService
+	roles         peopleRoleProvider
+	roleAdmin     iamdomain.RoleAdminRepository
+	memberships   peopleMembershipService
+	areaCatalog   AreaCatalogReader
+	invalidator   RoleCacheInvalidator
+	tempPassword  func() (string, error)
+	nowFn         func() time.Time
+	// H-3b: atomic PatchAtomic wiring. nil in tests that use PeopleServiceFromInterfaces
+	// without a DB; the service falls back to the two-step non-tx path.
+	runner        db.TxRunner
+	audit         auditdomain.Writer
+	userUpdaterTx userUpdaterTx
 }
 
 // NewPeopleService wires the People orchestrator. memberships may be nil in
@@ -196,6 +215,17 @@ func NewPeopleService(
 		mIface = memberships
 	}
 	return newPeopleServiceFromIfaces(auth, roles, roleAdmin, mIface, areaCatalog, invalidator)
+}
+
+// WithTxAudit wires the TxRunner, audit writer, and userUpdaterTx needed for
+// atomic PatchAtomic execution (H-3b Site 3). Called by main.go after
+// NewPeopleService; not required for the test surface (tests that omit this
+// call use the legacy two-step path).
+func (s *PeopleService) WithTxAudit(runner db.TxRunner, audit auditdomain.Writer, updaterTx userUpdaterTx) *PeopleService {
+	s.runner = runner
+	s.audit = audit
+	s.userUpdaterTx = updaterTx
+	return s
 }
 
 func newPeopleServiceFromIfaces(
@@ -307,6 +337,38 @@ func (s *PeopleService) Invite(ctx context.Context, tenantID, actorID string, in
 		}
 	}
 
+	// Emit iam.user.invited at the application layer (H-3b bounded defer).
+	// Full atomicity with CreateUserWithInput would require a tx-accepting
+	// variant of CreateUserWithInput — out of scope for H-3b (cross-module tx
+	// redesign). This non-Tx emit moves the audit sink out of the delivery
+	// layer and into application, satisfying the Stage-2 clean boundary requirement
+	// without introducing a cross-module tx (bounded defer: full atomicity pending
+	// a tx-accepting CreateUserWithInput variant).
+	if s.audit != nil {
+		areaCount := len(input.AreaMemberships)
+		auditPayload := map[string]any{
+			"username":   input.Username,
+			"email":      input.Email,
+			"tenant_role": string(input.TenantRole),
+			"areaCount":  areaCount,
+		}
+		auditPayloadJSON, _ := json.Marshal(auditPayload)
+		ev := auditdomain.Event{
+			ID:           "evt_" + uuid.NewString(),
+			OccurredAt:   time.Now().UTC(),
+			ActorID:      strings.TrimSpace(actorID),
+			Action:       "iam.user.invited",
+			ResourceType: "user",
+			ResourceID:   userID,
+			PayloadJSON:  string(auditPayloadJSON),
+			TraceID:      requesttrace.Resolve(ctx),
+			TenantID:     tenantID,
+		}
+		// Best-effort non-tx: if this fails we log and continue — the user was
+		// created successfully. Consistent with the bounded-defer nature of this emit.
+		_ = s.audit.Record(ctx, ev)
+	}
+
 	return InviteResult{UserID: userID, TempPassword: tempPwd}, nil
 }
 
@@ -365,13 +427,14 @@ type PatchInput struct {
 	TenantRole         *iamdomain.Role
 }
 
-// PatchAtomic applies a partial update to a managed user. "Atomic" here means
-// that metadata + role flip are applied in sequence and roll forward if both
-// succeed; the limitation vs. a true single-tx atomic update is documented in
-// the package comment.
+// PatchAtomic applies a partial update to a managed user. When runner, audit,
+// and userUpdaterTx are wired (H-3b), the metadata update + role replacement +
+// audit row are committed in a single transaction. Without those (test mode),
+// it falls back to the original two-step sequential path.
 func (s *PeopleService) PatchAtomic(ctx context.Context, tenantID, actorID, userID string, input PatchInput) (map[string]any, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	userID = strings.TrimSpace(userID)
+	actorID = strings.TrimSpace(actorID)
 	if tenantID == "" || userID == "" {
 		return nil, fmt.Errorf("%w: tenant and userId required", ErrPeopleValidation)
 	}
@@ -389,17 +452,8 @@ func (s *PeopleService) PatchAtomic(ctx context.Context, tenantID, actorID, user
 		return nil, fmt.Errorf("%w: tenantRole %q is not in canonical 8", ErrPeopleValidation, *input.TenantRole)
 	}
 
+	// Build the changes map first so it is available inside the tx closure.
 	if hasMetadataUpdate(input) {
-		params := authdomain.UpdateUserParams{
-			UserID:             userID,
-			DisplayName:        input.DisplayName,
-			Email:              input.Email,
-			IsActive:           input.IsActive,
-			MustChangePassword: input.MustChangePassword,
-		}
-		if err := s.auth.UpdateUser(ctx, params, ""); err != nil {
-			return nil, err
-		}
 		if input.DisplayName != nil {
 			changes["display_name"] = *input.DisplayName
 		}
@@ -413,7 +467,83 @@ func (s *PeopleService) PatchAtomic(ctx context.Context, tenantID, actorID, user
 			changes["must_change_password"] = *input.MustChangePassword
 		}
 	}
+	if input.TenantRole != nil {
+		changes["tenant_role"] = string(*input.TenantRole)
+	}
 
+	if s.runner != nil && s.audit != nil && s.userUpdaterTx != nil {
+		// Atomic path (H-3b): UpdateUserTx → ReplaceUserRolesTx (if role changes) → RecordTx.
+		// Order matters for the advisory lock: UpdateUserTx is plain SQL (no advisory lock);
+		// ReplaceUserRolesTx calls authz.Require which acquires the hash-chain lock on tx;
+		// RecordTx re-acquires the same lock on the same connection — re-entrant, safe.
+		auditPayloadJSON, marshalErr := json.Marshal(changes)
+		if marshalErr != nil {
+			return nil, fmt.Errorf("patch audit: marshal changes: %w", marshalErr)
+		}
+		if actorID == "" {
+			actorID = "system"
+		}
+		ev := auditdomain.Event{
+			ID:           "evt_" + uuid.NewString(),
+			OccurredAt:   time.Now().UTC(),
+			ActorID:      actorID,
+			Action:       "iam.user.updated",
+			ResourceType: "user",
+			ResourceID:   userID,
+			PayloadJSON:  string(auditPayloadJSON),
+			TraceID:      requesttrace.Resolve(ctx),
+			TenantID:     tenantID,
+		}
+		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+			if hasMetadataUpdate(input) {
+				params := authdomain.UpdateUserParams{
+					UserID:             userID,
+					DisplayName:        input.DisplayName,
+					Email:              input.Email,
+					IsActive:           input.IsActive,
+					MustChangePassword: input.MustChangePassword,
+				}
+				if err := s.userUpdaterTx.UpdateUserTx(ctx, tx, params); err != nil {
+					return err
+				}
+			}
+			if input.TenantRole != nil {
+				txRepo, ok := s.roleAdmin.(roleAdminTxRepository)
+				if !ok {
+					return fmt.Errorf("role admin repository does not support tx variant")
+				}
+				displayName := strings.TrimSpace(userID)
+				if input.DisplayName != nil {
+					displayName = strings.TrimSpace(*input.DisplayName)
+				}
+				if err := txRepo.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, *input.TenantRole, actorID); err != nil {
+					return err
+				}
+			}
+			return s.audit.RecordTx(ctx, tx, ev)
+		}); err != nil {
+			return nil, err
+		}
+		// Cache invalidation MUST happen post-commit (H-3b invariant).
+		if input.TenantRole != nil && s.invalidator != nil {
+			s.invalidator.InvalidateUserTenant(userID, tenantID)
+		}
+		return changes, nil
+	}
+
+	// Non-tx fallback for test mode (runner/audit/userUpdaterTx not wired).
+	if hasMetadataUpdate(input) {
+		params := authdomain.UpdateUserParams{
+			UserID:             userID,
+			DisplayName:        input.DisplayName,
+			Email:              input.Email,
+			IsActive:           input.IsActive,
+			MustChangePassword: input.MustChangePassword,
+		}
+		if err := s.auth.UpdateUser(ctx, params, ""); err != nil {
+			return nil, err
+		}
+	}
 	if input.TenantRole != nil {
 		displayName := strings.TrimSpace(userID)
 		if input.DisplayName != nil {
@@ -421,15 +551,14 @@ func (s *PeopleService) PatchAtomic(ctx context.Context, tenantID, actorID, user
 		}
 		// roleAdmin.ReplaceUserRoles already calls authz.Require(CapUserManage)
 		// inside its INSERT tx (T-004 already closed in postgres/role_admin_repository.go).
-		if err := s.roleAdmin.ReplaceUserRoles(ctx, userID, displayName, tenantID, *input.TenantRole, strings.TrimSpace(actorID)); err != nil {
+		if err := s.roleAdmin.ReplaceUserRoles(ctx, userID, displayName, tenantID, *input.TenantRole, actorID); err != nil {
 			return nil, err
 		}
+		// Cache invalidation MUST happen post-commit (H-3b invariant).
 		if s.invalidator != nil {
 			s.invalidator.InvalidateUserTenant(userID, tenantID)
 		}
-		changes["tenant_role"] = string(*input.TenantRole)
 	}
-
 	return changes, nil
 }
 

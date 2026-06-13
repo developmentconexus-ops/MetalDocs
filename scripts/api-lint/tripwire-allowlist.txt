@@ -27,7 +27,7 @@
 # total is dominated by those spec rules, not by tripwire.
 
 internal/modules/auth/infrastructure/postgres/repository.go|BootstrapAdmin
-internal/modules/auth/infrastructure/postgres/repository.go|UpdateUser
+internal/modules/auth/infrastructure/postgres/repository.go|UpdateUserTx
 internal/modules/controlleddocuments/infrastructure/repository.go|UpdateStatus
 internal/modules/controlleddocuments/infrastructure/repository.go|UpdateStatusTx
 internal/modules/controlleddocuments/infrastructure/repository.go|createVisibilityGrants

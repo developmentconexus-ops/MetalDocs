@@ -62,6 +62,98 @@ func PostCommitAudit(files []string) []Finding {
 	return out
 }
 
+// deliveryAuditFields names struct fields / identifiers that hold an audit or
+// governance event writer. Pairing a sink method (Record/Write/Log/AppendAudit)
+// with one of these receiver names is what distinguishes a real audit write
+// (h.audit.Record(...)) from the pervasive non-audit .Write/.Log calls in the
+// delivery layer: problem.Write(w, p), w.Write(b), mac.Write(b), slog.Log(...).
+var deliveryAuditFields = map[string]bool{
+	"audit":       true,
+	"auditWriter": true,
+	"auditor":     true,
+	"govLogger":   true,
+}
+
+// DeliveryAuditSink flags any non-Tx audit/governance write performed directly
+// in the delivery layer (internal/modules/<m>/delivery/**). Audit for a business
+// mutation must be emitted in the application/service layer inside the same tx
+// that performs the mutation (H-3b, REQ-ASYNC-1, F-07): a delivery-layer
+// audit.Record runs outside any business tx, so a crash between the committed
+// mutation and the write silently drops the record. The existing intra-function
+// PostCommitAudit rule cannot see this case because the delivery handler has no
+// Commit() of its own — the commit happened in a different function (the service).
+//
+// Detection is name-based and single-file (no call graph): a CallExpr whose
+// method name is in postCommitAuditSinks AND whose receiver's trailing identifier
+// is an audit-writer field name (deliveryAuditFields). Tx-safe variants
+// (RecordTx, WriteTx, ...) never match because the method-name set holds only the
+// non-Tx names.
+//
+// Legitimately best-effort sinks — authentication events that have no business tx
+// to attach to (e.g. auth.login.failed), and bulk-action envelopes whose per-item
+// mutations are already atomically audited at the application layer — are
+// suppressed with //cilint:allow-post-commit-audit on the call line.
+func DeliveryAuditSink(files []string) []Finding {
+	var out []Finding
+	fset := token.NewFileSet()
+
+	for _, path := range files {
+		slashed := strings.ReplaceAll(path, "\\", "/")
+		if !strings.Contains(slashed, "internal/modules/") || !strings.Contains(slashed, "/delivery/") {
+			continue
+		}
+		_, raw := parseFile(fset, path)
+		if raw == nil {
+			continue
+		}
+		f := raw.(*ast.File)
+		src := readSource(path)
+
+		ast.Inspect(f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			if !postCommitAuditSinks[sel.Sel.Name] {
+				return true
+			}
+			if !isAuditReceiver(sel.X) {
+				return true
+			}
+			pos := fset.Position(call.Pos())
+			line := getLine(src, pos.Line)
+			if strings.Contains(line, postCommitAuditAllowComment) {
+				return true
+			}
+			out = append(out, Finding{
+				Analyzer: "postcommitaudit",
+				File:     path,
+				Line:     pos.Line,
+				Message:  "non-Tx audit/governance write (" + sel.Sel.Name + ") in the delivery layer; emit audit in the application/service layer inside the business tx (use the *Tx variant), or suppress with //cilint:allow-post-commit-audit for a legitimately best-effort event (H-3b, REQ-ASYNC-1, F-07)",
+			})
+			return true
+		})
+	}
+	return out
+}
+
+// isAuditReceiver reports whether the receiver expression of a sink call resolves
+// to an audit-writer field/identifier: bare `audit.Record(...)` (Ident) or
+// `h.audit.Record(...)` (SelectorExpr whose trailing field is audit-named).
+func isAuditReceiver(recv ast.Expr) bool {
+	switch r := recv.(type) {
+	case *ast.Ident:
+		return deliveryAuditFields[r.Name]
+	case *ast.SelectorExpr:
+		return deliveryAuditFields[r.Sel.Name]
+	}
+	return false
+}
+
 // checkFuncBody scans a single function body for the post-commit-audit pattern.
 func checkFuncBody(fset *token.FileSet, body *ast.BlockStmt, path, src string, out *[]Finding) {
 	// Pass 1: find the minimum line of any Commit() call in this function.

@@ -61,7 +61,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("new auth service: %v", err)
 	}
-	iamAdmin := iamapp.NewAdminService(deps.RoleAdminRepo, nil)
+	iamAdmin := iamapp.NewAdminService(deps.RoleAdminRepo, nil, nil, nil)
 	seed := loadSeedConfig()
 
 	exists, err := userExists(ctx, authService, seed.UserID)
@@ -89,7 +89,7 @@ func main() {
 		}
 	}
 
-	if err := iamAdmin.UpsertUserAndAssignRole(ctx, seed.UserID, seed.DisplayName, tenant.DevTenantID, iamdomain.RoleSystemAdmin, "e2e-seed"); err != nil {
+	if err := iamAdmin.UpsertUserAndAssignRole(ctx, seed.UserID, seed.DisplayName, tenant.DevTenantID, iamdomain.RoleSystemAdmin, "e2e-seed", "e2e-seed"); err != nil {
 		log.Fatalf("ensure admin role: %v", err)
 	}
 

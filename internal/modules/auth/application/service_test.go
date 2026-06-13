@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -98,6 +99,18 @@ func (m *mockRoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, use
 }
 
 func (m *mockRoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
+	key := userID + ":" + tenantID
+	m.roles[key] = []iamdomain.Role{role}
+	return nil
+}
+
+func (m *mockRoleAdminRepository) UpsertUserAndAssignRoleTx(_ context.Context, _ *sql.Tx, userID, _, tenantID string, role iamdomain.Role, _ string) error {
+	key := userID + ":" + tenantID
+	m.roles[key] = append(m.roles[key], role)
+	return nil
+}
+
+func (m *mockRoleAdminRepository) ReplaceUserRolesTx(_ context.Context, _ *sql.Tx, userID, _, tenantID string, role iamdomain.Role, _ string) error {
 	key := userID + ":" + tenantID
 	m.roles[key] = []iamdomain.Role{role}
 	return nil

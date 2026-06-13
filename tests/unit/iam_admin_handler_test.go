@@ -81,7 +81,7 @@ func (f *fakeInvalidator) InvalidateUserTenant(userID, _ string) {
 func TestIAMAdminHandlerUpsertRole(t *testing.T) {
 	repo := iammemory.NewRoleAdminRepository()
 	inv := &fakeInvalidator{}
-	service := iamapp.NewAdminService(repo, inv)
+	service := iamapp.NewAdminService(repo, inv, nil, nil)
 	handler := iamdelivery.NewAdminHandler(service, nil)
 
 	mux := http.NewServeMux()
@@ -105,7 +105,7 @@ func TestIAMAdminHandlerUpsertRole(t *testing.T) {
 func TestIAMAdminHandlerReplaceRoles(t *testing.T) {
 	repo := iammemory.NewRoleAdminRepository()
 	inv := &fakeInvalidator{}
-	service := iamapp.NewAdminService(repo, inv)
+	service := iamapp.NewAdminService(repo, inv, nil, nil)
 	handler := iamdelivery.NewAdminHandler(service, nil)
 
 	mux := http.NewServeMux()

@@ -368,6 +368,117 @@ func (s *Svc) Submit(ctx interface{}) error {
 	}
 }
 
+// ─── DeliveryAuditSink ───────────────────────────────────────────────────────
+
+// deliveryAuditFixture writes a Go source file inside internal/modules/<m>/delivery/http
+// so DeliveryAuditSink picks it up.
+func deliveryAuditFixture(t *testing.T, src string) string {
+	t.Helper()
+	dir := t.TempDir()
+	pkgDir := dir + "/internal/modules/foo/delivery/http"
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	path := pkgDir + "/handler.go"
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	return path
+}
+
+func TestDeliveryAuditSink_Positive_FieldRecord(t *testing.T) {
+	src := `package http
+func (h *Handler) emit(r interface{}) { h.audit.Record(r, nil) }
+`
+	path := deliveryAuditFixture(t, src)
+	findings := analyzers.DeliveryAuditSink([]string{path})
+	if len(findings) == 0 {
+		t.Fatal("expected finding for h.audit.Record in delivery layer")
+	}
+}
+
+func TestDeliveryAuditSink_Positive_BareRecord(t *testing.T) {
+	src := `package http
+func emit(ctx interface{}) { audit.Record(ctx, nil) }
+`
+	path := deliveryAuditFixture(t, src)
+	findings := analyzers.DeliveryAuditSink([]string{path})
+	if len(findings) == 0 {
+		t.Fatal("expected finding for bare audit.Record in delivery layer")
+	}
+}
+
+func TestDeliveryAuditSink_Negative_ProblemWrite(t *testing.T) {
+	src := `package http
+func (h *Handler) fail(w interface{}) { problem.Write(w, nil) }
+`
+	path := deliveryAuditFixture(t, src)
+	findings := analyzers.DeliveryAuditSink([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings for problem.Write, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestDeliveryAuditSink_Negative_ResponseWriterWrite(t *testing.T) {
+	src := `package http
+func (h *Handler) ok(w interface{}) { w.Write(nil) }
+`
+	path := deliveryAuditFixture(t, src)
+	findings := analyzers.DeliveryAuditSink([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings for w.Write, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestDeliveryAuditSink_Negative_HmacWrite(t *testing.T) {
+	src := `package http
+func sign(mac interface{}) { mac.Write(nil) }
+`
+	path := deliveryAuditFixture(t, src)
+	findings := analyzers.DeliveryAuditSink([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings for mac.Write, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestDeliveryAuditSink_Negative_RecordTxVariant(t *testing.T) {
+	src := `package http
+func (h *Handler) emit(ctx, tx interface{}) { h.audit.RecordTx(ctx, tx, nil) }
+`
+	path := deliveryAuditFixture(t, src)
+	findings := analyzers.DeliveryAuditSink([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings for RecordTx variant, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestDeliveryAuditSink_Negative_AllowDirective(t *testing.T) {
+	src := `package http
+func (h *Handler) emit(r interface{}) { h.audit.Record(r, nil) //cilint:allow-post-commit-audit best-effort
+}
+`
+	path := deliveryAuditFixture(t, src)
+	findings := analyzers.DeliveryAuditSink([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings with allow directive, got %d: %+v", len(findings), findings)
+	}
+}
+
+func TestDeliveryAuditSink_Negative_NonDeliveryPath(t *testing.T) {
+	src := `package application
+func (h *Handler) emit(r interface{}) { h.audit.Record(r, nil) }
+`
+	dir := t.TempDir()
+	pkgDir := dir + "/internal/modules/foo/application"
+	_ = os.MkdirAll(pkgDir, 0o755)
+	path := pkgDir + "/svc.go"
+	_ = os.WriteFile(path, []byte(src), 0o644)
+	findings := analyzers.DeliveryAuditSink([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings outside delivery path, got %d: %+v", len(findings), findings)
+	}
+}
+
 func TestOutboxPair_Positive_MutationWithoutEmit(t *testing.T) {
 	src := `package application
 type Svc struct{}
