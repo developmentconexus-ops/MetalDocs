@@ -118,7 +118,7 @@ Stage-2 verdicts and file anchors live in `wiki/backend/legacy-register.md` and 
 
 ## 4. Execution protocol
 
-- **Fresh session.** Reads: `CLAUDE.md` → `wiki/references/current-agent-handoff.md` → THIS SPEC → the implementation plan (`docs/superpowers/plans/2026-06-12-wave-z-sealed-closeout.md`).
+- **Fresh session.** Reads: `CLAUDE.md` → `wiki/references/current-agent-handoff.md` → THIS SPEC → the implementation plan (`wiki/backend/wave-z-plan.md` — in the wiki because `docs/superpowers/plans/` is gitignored-ephemeral).
 - **Branch:** `qa/iam-area-membership` (same integration branch; user merges after sign-off).
 - **Workflows (ultracode), HARD LIMITS:** worker agents are **sonnet** for implement/review and **haiku** for mechanical verification — **NEVER fable** for execution agents. **Max 15 concurrent agents** at any moment; size `parallel()`/`pipeline()` batches accordingly. Prefer fewer, better-briefed agents over wide fan-out.
 - **One commit per manifest ID** (tightly-related XS items may pair), message cites `Z-N` + finding ID + REQ IDs.

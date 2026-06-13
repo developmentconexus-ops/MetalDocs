@@ -204,6 +204,15 @@ Independent audit (one sonnet reviewer per item + a protocol auditor) vs the cit
 
 **NOT merged to any integration branch — awaiting the user's final sign-off before merge (per directive). Environment:** `.gitnexus/` still breaks `git add -A` (staged explicitly all session); C: SSD memory pressure → tests run `-p 2`.
 
+### NEXT SESSION: Wave Z — sealed-scope final close-out (planned 2026-06-12, NOT yet executed)
+
+The operator overrode D-1/D-3 and ordered a zero-defer finish (register-zero + ops-ready) before the v1 release (target Sunday 2026-06-14, operator performs the release re-baseline personally). Binding documents, read in order:
+
+1. **Spec:** [`docs/superpowers/specs/2026-06-12-wave-z-sealed-closeout-design.md`](../../docs/superpowers/specs/2026-06-12-wave-z-sealed-closeout-design.md) — sealed manifest Z-1..Z-33, the **anti-circle rule**, machine-checkable DONE gate G1–G11.
+2. **Plan:** [`wiki/backend/wave-z-plan.md`](../backend/wave-z-plan.md) — phases P0–P6, per-task files/steps/verify/commit. (Lives in the wiki because `docs/superpowers/plans/` is gitignored-ephemeral; this plan is durable program record, same precedent as the roadmap.)
+
+Hard constraints: ultracode workflows with **sonnet** implement/review + **haiku** mechanical agents (**never fable workers**), **max 15 concurrent agents**, G1–G4 gates between phases, one commit per Z-task, anti-circle rule on every discovery (pre-existing finds → `wiki/backend/post-v1-backlog.md`, never block). Do NOT merge; present the DONE-gate evidence for user sign-off.
+
 ## Recovered agent memory (wiped by the reinstall — re-create if a memory system returns)
 
 These facts lived in the agent's persistent memory and are NOT derivable from the repo:
