@@ -1,7 +1,9 @@
 # ADR 0027 — RLS Adoption Sequencing + auth_identities Tenant-Global by Design
 
-> **Status:** Accepted 2026-06-11 (binding decision D-3 of the backend professionalization design spec; records decisions already made). Required before executing the Wave 2.3 RLS migration.
-> **Last verified:** 2026-06-11
+> **Status:** Accepted (executed in full by Wave Z, 2026-06-13) — originally Accepted 2026-06-11 (binding decision D-3 of the backend professionalization design spec). The three-tier *sequencing* below is now historical: Wave Z Z-2 (operator override of D-3) collapsed all three tiers into a single migration (`db/migrations/0237_rls_all_tenant_tables.sql`), enabling ENABLE+FORCE RLS + the NULL-permissive `tenant_isolation` policy on **all 27 remaining tenant-scoped tables** at once (Tier 2 iam_users + Tier 3 external-tenant tables included). The by-design `auth_identities` decision is unchanged.
+> **Last verified:** 2026-06-13
+>
+> **Current reality (2026-06):** RLS is live on every tenant-scoped table (29 total = 2 from 0234 + 27 from 0237). The "first external tenant" / RF-6 triggers below never fired — Wave Z executed the full program ahead of them. `metaldocs.user_process_areas` is a VIEW over `public.user_process_areas` (the base table IS covered); views cannot carry RLS, so the census of 28 `tenant_id`-bearing relations minus that view = 27 base tables in 0237. NOSUPERUSER probe (Wave Z): GUC-unset→all rows, GUC=A→only A, GUC=B→only B, verified live on `iam_users` + `documents`.
 > **Scope:** Two related decisions: (1) `auth_identities` has no `tenant_id` by deliberate design; (2) the sequencing and rationale for Row-Level Security adoption across the MetalDocs schema. Closes tech-debt item T-008 as by-design. Documents the partial-coverage RLS model and its trigger conditions.
 > **Out of scope:** The two-tier authz model itself (ADR 0007); capability coherence (ADR 0022); the specific SQL for the Wave 2.3 migration (executed in item 2.3 using the `current_setting('metaldocs.tenant_id', true)` GUC pattern verified here).
 > **Key files:**
@@ -61,6 +63,8 @@ The Stage-2 evaluation (`wiki/backend/stage2-evaluation.md` F-12 row) rates `con
 `auth_identities` does not have and will not receive a `tenant_id` column. Identity (credential) is a global concept; tenant association flows from `iam_users.tenant_id` via JOIN. T-008 is **closed as by-design**, not as a defect. No migration or schema change is required for T-008.
 
 ### 2. RLS rollout sequencing
+
+> **EXECUTED IN FULL (Wave Z Z-2, 2026-06-13):** the operator overrode the D-3 trigger-gated limit and ordered every tenant-scoped table covered before the v1 release. Migration `0237_rls_all_tenant_tables.sql` applied ENABLE+FORCE RLS + the NULL-permissive `tenant_isolation` policy to all 27 remaining base tables in one pass — Tier 2 (`iam_users`) and Tier 3 (all remaining) included. The three-tier *plan* below is retained as the historical record of how the rollout was originally sequenced; it no longer describes future work.
 
 RLS adoption follows three tiers, justified by risk and the D-3 trigger-gated principle.
 
