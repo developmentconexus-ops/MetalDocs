@@ -7,6 +7,7 @@ import (
 
 	"metaldocs/internal/modules/audit/application"
 	"metaldocs/internal/modules/audit/domain"
+	"metaldocs/internal/modules/audit/infrastructure/memory"
 )
 
 type captureReader struct {
@@ -83,24 +84,47 @@ func TestListEventsPreservesTenantIDDuringNormalization(t *testing.T) {
 	}
 }
 
-// fakeExportRepo just satisfies the ExportJobRepository surface; only Get is
-// invoked by GetExportStatus.
-type fakeExportRepo struct{}
-
-func (fakeExportRepo) Save(context.Context, domain.ExportJob) error { return nil }
-func (fakeExportRepo) Get(context.Context, string, string) (domain.ExportJob, error) {
-	return domain.ExportJob{}, domain.ErrExportJobNotFound
-}
-func (fakeExportRepo) GetByDownloadToken(context.Context, string, string) (domain.ExportJob, error) {
-	return domain.ExportJob{}, domain.ErrExportJobNotFound
-}
-
 func TestGetExportStatus_RequiresActorID(t *testing.T) {
 	t.Parallel()
 
-	svc := application.NewService(&captureReader{}).WithExports(nil, fakeExportRepo{}, nil, nil)
+	w := memory.NewWriter()
+	exports := memory.NewExportJobRepository()
+	svc := application.NewService(&captureReader{}).WithExports(w, exports, w, func(domain.ExportJob) string { return "" })
 	_, err := svc.GetExportStatus(context.Background(), "tenant-a", "   ", "export-1")
 	if !errors.Is(err, application.ErrActorRequired) {
 		t.Fatalf("expected ErrActorRequired for empty actorID, got %v", err)
+	}
+}
+
+func TestWithExportsPanicsOnNilDependency(t *testing.T) {
+	t.Parallel()
+
+	w := memory.NewWriter()
+	exports := memory.NewExportJobRepository()
+	urlBuilder := func(domain.ExportJob) string { return "" }
+
+	cases := []struct {
+		name      string
+		counter   domain.Counter
+		repo      domain.ExportJobRepository
+		writer    domain.Writer
+		urlBld    application.SignedURLBuilder
+	}{
+		{"nil counter", nil, exports, w, urlBuilder},
+		{"nil repo", w, nil, w, urlBuilder},
+		{"nil writer", w, exports, nil, urlBuilder},
+		{"nil urlBuilder", w, exports, w, nil},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			defer func() {
+				if r := recover(); r == nil {
+					t.Fatalf("expected panic for %s", tc.name)
+				}
+			}()
+			application.NewService(&captureReader{}).WithExports(tc.counter, tc.repo, tc.writer, tc.urlBld)
+		})
 	}
 }

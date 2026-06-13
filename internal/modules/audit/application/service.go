@@ -25,6 +25,7 @@ var (
 	ErrExportRepoMissing   = errors.New("audit: export job repository not configured")
 	ErrCounterMissing      = errors.New("audit: counter not configured for export sizing")
 	ErrExportTokenMismatch = errors.New("audit: invalid export download token")
+	ErrExportsDisabled     = errors.New("audit: export pipeline not configured")
 )
 
 // SyncExportRowLimit is the threshold above which an export request is
@@ -54,8 +55,12 @@ func NewService(reader domain.Reader) *Service {
 	return &Service{reader: reader, now: func() time.Time { return time.Now().UTC() }}
 }
 
-// WithExports wires the export pipeline.
+// WithExports wires the export pipeline. All four dependencies are required;
+// passing nil for any of them panics.
 func (s *Service) WithExports(counter domain.Counter, repo domain.ExportJobRepository, writer domain.Writer, urlBuilder SignedURLBuilder) *Service {
+	if counter == nil || repo == nil || writer == nil || urlBuilder == nil {
+		panic("audit.WithExports: all export dependencies are required")
+	}
 	s.counter = counter
 	s.exportRepo = repo
 	s.writer = writer
@@ -102,10 +107,14 @@ func normalizeQuery(query domain.ListEventsQuery) (domain.ListEventsQuery, error
 }
 
 // ExportEvents runs the export inline. Refuses with ErrExportTooLarge when row
-// count exceeds SyncExportRowLimit.
+// count exceeds SyncExportRowLimit. Returns ErrExportsDisabled when the export
+// pipeline has not been wired via WithExports.
 func (s *Service) ExportEvents(ctx context.Context, actorID string, format domain.ExportFormat, filter domain.ListEventsQuery) (domain.ExportJob, error) {
 	if s == nil {
 		return domain.ExportJob{}, ErrReaderRequired
+	}
+	if s.writer == nil {
+		return domain.ExportJob{}, ErrExportsDisabled
 	}
 	if s.exportRepo == nil {
 		return domain.ExportJob{}, ErrExportRepoMissing
@@ -176,24 +185,18 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 		return domain.ExportJob{}, fmt.Errorf("audit: persist export job: %w", err)
 	}
 
-	// Export-requested governance event. s.writer is nil only when the audit
-	// export feature is disabled (WithExports not called) — a feature gate, not
-	// a single-mode db fallback. Making writer a hard ctor requirement (and
-	// gating the feature elsewhere) is a next-touch refactor of WithExports.
-	if s.writer != nil { //cilint:allow-dualmode
-		summary := map[string]any{
-			"format":        string(format),
-			"filterSummary": filterSummary(filter),
-			"estimatedRows": estimatedRows,
-			"actualRows":    job.ActualRows,
-			"export_id":      job.ID,
-		}
-		if event, evErr := domain.NewEvent(job.TenantID.String(), "audit_export", job.ID, actorID, "audit.export.requested", summary); evErr == nil {
-			// Best-effort governance event (the export job is already persisted), but a
-			// silent drop would lose an audit-trail record with no trace — log it.
-			if recErr := s.writer.Record(ctx, event); recErr != nil {
-				slog.Warn("audit export governance event dropped", "export_id", job.ID, "err", recErr)
-			}
+	summary := map[string]any{
+		"format":        string(format),
+		"filterSummary": filterSummary(filter),
+		"estimatedRows": estimatedRows,
+		"actualRows":    job.ActualRows,
+		"export_id":     job.ID,
+	}
+	if event, evErr := domain.NewEvent(job.TenantID.String(), "audit_export", job.ID, actorID, "audit.export.requested", summary); evErr == nil {
+		// Best-effort governance event (the export job is already persisted), but a
+		// silent drop would lose an audit-trail record with no trace — log it.
+		if recErr := s.writer.Record(ctx, event); recErr != nil {
+			slog.Warn("audit export governance event dropped", "export_id", job.ID, "err", recErr)
 		}
 	}
 
