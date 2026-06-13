@@ -13,6 +13,27 @@ type cacheEntry struct {
 	expiresAt time.Time
 }
 
+// CacheContract (REQ-CACHE-1, RF-3):
+//
+//	Source of truth: postgres RoleProvider. Cache-aside, per (user,tenant) key.
+//	TTL: 30 seconds (default in NewCachedRoleProvider; callers may pass a shorter
+//	  value). Staleness bound: max(TTL) — a grant/revoke is visible no later than
+//	  30 s even if an explicit invalidation is missed.
+//	Invalidation: InvalidateUserTenant, called by:
+//	  - AdminService.UpsertUserAndAssignRole (admin_service.go)
+//	  - AdminService.ReplaceUserRoles (admin_service.go)
+//	  - AreaMembershipService.Grant — insert path (area_membership_service.go)
+//	  - AreaMembershipService.Grant — atomic role-change path (area_membership_service.go)
+//	  - AreaMembershipService.Revoke (area_membership_service.go)
+//	  - PeopleService.Invite — defensive post-create flush (people_service.go)
+//	  - PeopleService.PatchAtomic — on TenantRole field change (people_service.go)
+//	Failure mode: cache errors are not possible (in-memory map); source errors fall
+//	  through to the caller. Tenant isolation is enforced by key: roleCacheKey embeds
+//	  both userID and tenantID, so a cache hit can never serve data from a foreign tenant.
+//	Eviction: background ticker goroutine (period = TTL) sweeps expired entries.
+//	  TTL-based expiry also evicts on the read path before returning a stale hit.
+//	Redis: no Redis cache for this provider — all caching is in-process.
+//
 // CachedRoleProvider wraps a RoleProvider with TTL cache and explicit invalidation.
 type CachedRoleProvider struct {
 	base domain.RoleProvider
