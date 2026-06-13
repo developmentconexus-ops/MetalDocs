@@ -468,5 +468,75 @@ func waitForBumpAt(repo *fakeRepo, userID string, at time.Time, within time.Dura
 	return false
 }
 
+// --- hub.CloseAll -----------------------------------------------------------
+
+// TestCloseAll_DrainConns verifies that CloseAll closes every Conn's Out
+// channel and removes it from its room. The test subscribes two conns
+// across two tenants, calls CloseAll, then asserts both Out channels are
+// closed (range returns immediately) and the rooms are empty.
+func TestCloseAll_DrainConns(t *testing.T) {
+	repo := newFakeRepo()
+	hub := NewHub(repo, nil)
+
+	// Subscribe two conns across different tenants.
+	c1 := hub.Subscribe("tenant-a", nil)
+	c2 := hub.Subscribe("tenant-b", nil)
+
+	// Neither should be closed yet.
+	select {
+	case _, ok := <-c1.Out():
+		if !ok {
+			t.Fatal("c1.Out closed before CloseAll")
+		}
+	default:
+		// nothing queued — correct
+	}
+
+	hub.CloseAll(context.Background())
+
+	// Both Out channels must be closed.
+	drainClosed := func(t *testing.T, name string, ch <-chan Event) {
+		t.Helper()
+		timer := time.NewTimer(time.Second)
+		defer timer.Stop()
+		for {
+			select {
+			case _, ok := <-ch:
+				if !ok {
+					return // channel closed — expected
+				}
+				// drain any queued events and keep waiting
+			case <-timer.C:
+				t.Fatalf("%s: Out channel not closed within 1s", name)
+			}
+		}
+	}
+	drainClosed(t, "c1", c1.Out())
+	drainClosed(t, "c2", c2.Out())
+
+	// Both rooms should be empty (conns removed by Conn.Close → room.removeConn).
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+	for tid, r := range hub.rooms {
+		r.mu.Lock()
+		n := len(r.conns)
+		r.mu.Unlock()
+		if n != 0 {
+			t.Errorf("room %q still has %d conns after CloseAll", tid, n)
+		}
+	}
+}
+
+// TestCloseAll_Idempotent verifies that calling CloseAll twice on the
+// same hub does not panic.
+func TestCloseAll_Idempotent(t *testing.T) {
+	repo := newFakeRepo()
+	hub := NewHub(repo, nil)
+	_ = hub.Subscribe("tenant-a", nil)
+
+	hub.CloseAll(context.Background())
+	hub.CloseAll(context.Background()) // must not panic
+}
+
 // ensure errors.Is on context cancel doesn't trip a vet warning when imported.
 var _ = errors.Is

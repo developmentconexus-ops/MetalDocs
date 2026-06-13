@@ -355,9 +355,10 @@ func main() {
 	// the outer chain below so authenticated requests refresh the
 	// caller's last_seen_at (debounced 60s per user).
 	var presenceBump *iampresence.BumpMiddleware
+	var presenceHub *iampresence.Hub // captured for shutdown drain (Z-22, REQ-REL-2)
 	if sqlDB := deps.SQLDB; sqlDB != nil {
 		presenceRepo := iampresence.NewPostgresRepository(sqlDB)
-		presenceHub := iampresence.NewHub(presenceRepo, slog.Default())
+		presenceHub = iampresence.NewHub(presenceRepo, slog.Default())
 		go presenceHub.Run(ctx)
 		go presenceHub.RunHeartbeat(ctx)
 		iampresence.NewHandler(presenceHub, presenceRepo, slog.Default()).RegisterRoutes(mux)
@@ -708,6 +709,18 @@ func main() {
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 60 * time.Second,
 		IdleTimeout:  90 * time.Second,
+	}
+
+	// Z-22 / REQ-REL-2: drain live WS presence connections before the
+	// HTTP server stops accepting. RegisterOnShutdown runs synchronously
+	// inside server.Shutdown after the listener is closed but before
+	// Shutdown returns, so the shutdown context (15s) covers the drain.
+	if presenceHub != nil {
+		server.RegisterOnShutdown(func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			presenceHub.CloseAll(shutdownCtx)
+		})
 	}
 
 	slog.Info("MetalDocs API listening",

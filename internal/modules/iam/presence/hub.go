@@ -231,6 +231,37 @@ func (h *Hub) Heartbeat() {
 	}
 }
 
+// CloseAll closes every live Conn across all rooms. It is intended to
+// be called once during graceful server shutdown so that in-flight
+// WebSocket connections receive a GoingAway close frame before the
+// process exits. ctx is currently unused but is accepted for
+// consistency with the shutdown plumbing.
+//
+// The handler goroutine for each connection detects the closed Conn.Out
+// channel and calls c.Close(websocket.StatusNormalClosure, "") before
+// returning, which sends the close frame on the wire.
+func (h *Hub) CloseAll(_ context.Context) {
+	h.mu.Lock()
+	rooms := make([]*room, 0, len(h.rooms))
+	for _, r := range h.rooms {
+		rooms = append(rooms, r)
+	}
+	h.mu.Unlock()
+
+	for _, r := range rooms {
+		r.mu.Lock()
+		conns := make([]*Conn, 0, len(r.conns))
+		for c := range r.conns {
+			conns = append(conns, c)
+		}
+		r.mu.Unlock()
+
+		for _, c := range conns {
+			c.Close()
+		}
+	}
+}
+
 // RunHeartbeat blocks until ctx is cancelled, emitting Heartbeat()
 // every HeartbeatInterval. Intended to run as its own goroutine
 // alongside Run.
