@@ -1,6 +1,6 @@
 # Authz Tiers
 
-> **Last verified:** 2026-06-11 (adversarial-fix: tripwire anchor corrected to db/migrations/0231; View-cap enumeration corrected 4→6, added CapDocumentView + CapTemplateView) | **Prior:** 2026-06-10 (Stage-1 backend audit drift patch: capability count 27→29, line anchor :15→:88)
+> **Last verified:** 2026-06-13 (Z-28 ADR 0022 Phase 6 wiki sync — capability model fully executed: typed const registry enforced by CI lint (`no-rawstring-capability`, `no-rolestring-in-delivery`, `authz-area-scope-binding`, `seed-registry-parity`, `wiki-capability-parity`); runtime scope binding complete (area-grade caps pass real areaCode, `"tenant"` sentinel banned for area-grade by AST guard); area_membership governance now in-tx via `LogTx` (Z-6, T-007 closed); registry at 29 caps (ADR 0022 Phase 10 minimization); `BypassSystem` fail-closed background-only bridge (CWE-269); Phase 13 CI net revived — blocking gate `0 blocking, 397 reported` on clean tree) | **Prior:** 2026-06-11 (adversarial-fix: tripwire anchor corrected to db/migrations/0231; View-cap enumeration corrected 4→6, added CapDocumentView + CapTemplateView) | **Prior:** 2026-06-10 (Stage-1 backend audit drift patch: capability count 27→29, line anchor :15→:88)
 > **Scope:** Two authorization tiers in MetalDocs — HTTP middleware (tier 1) vs in-transaction area check (tier 2).
 > **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam.md`.
 > **Key files:**
@@ -27,8 +27,9 @@ MetalDocs has **two authorization tiers**.
 - **Service:** `authz.Require(ctx, tx, capability, areaCode)`
 - **Tables:** `user_process_areas` JOIN `role_capabilities`
 - **Use:** "Can user X sign for area QA-01?"
-- **Special:** pass `areaCode = "tenant"` to skip area filter
-- **Bypass:** `system_admin` role for the user
+- **Special:** pass `areaCode = "tenant"` to skip area filter (only valid for tenant-grade caps; area-grade caps are banned from passing `"tenant"` by the `authz-area-scope-binding` CI guard)
+- **Bypass:** `system_admin` role for the user (R1 — tenant-wide inheritance, no per-area row required; every bypass is audit-logged via `BypassAuditSink`)
+- **Background bypass:** `BypassSystem` (background-only, fail-closed — returns `ErrBypassNotBackground` if the context lacks `WithBackgroundBypass`; HTTP request contexts can never reach it — CWE-269)
 
 ## When to use which
 
@@ -36,16 +37,24 @@ MetalDocs has **two authorization tiers**.
 - **Signoff, approval, area-scoped writes** (inside DB tx): tier 2
 - **Both required** for area-scoped actions: middleware passes tier 1, then service layer enforces tier 2
 
-## Modules with tier-2 coverage (as of Plan 5)
+## Capability scope classification (ADR 0022 Phases 2 + 7 + 8 + 12)
+
+Each of the 29 registry capabilities is classified **tenant-grade** (`ScopeTenant`) or **area-grade** (`ScopeArea`) in `internal/modules/iam/domain/capability_scope.go`. This classification is CI-enforced: the `authz-area-scope-binding` AST guard (`scripts/api-lint`) bans `authz.Require(<areaGradeCap>, "tenant")` — any area-grade cap passed with the `"tenant"` literal is a red build. The `no-rawstring-capability` guard bans raw-string cap arguments to `authz.Require`; only typed consts are permitted.
+
+**Area-grade (11):** `document.create`, `document.edit`, `document.submit`, `document.signoff`, `document.publish`, `document.obsolete`, `document.supersede`, `controlled_documents.create`, `controlled_documents.obsolete`, `controlled_documents.supersede`, `cap:membership.manage`.
+
+**Tenant-grade (18):** all `*.view` caps, `template.*` lifecycle caps, `taxonomy.manage`, `user.manage`, `route.manage`, `metrics.view`, `audit.read`, `session.manage`.
+
+## Modules with tier-2 coverage
 
 | Module | tier-2 call sites | tripwire tables |
 |---|---|---|
-| documents | `CreateDocumentTx`, `UpdateDocumentName`, `UpdateDocumentStatus`, `MarkArchived`, `Unarchive` | `public.documents` (INSERT + UPDATE) |
-| approval | `submit_service` (doc.submit), `signoff_service` (doc.signoff) | `approval_instances`, `approval_signoffs` |
-| controlled-documents | `Create`, `CreateTx` (`controlled_documents.create`); `changeStatus` (`controlled_documents.obsolete`\|`controlled_documents.supersede`) | `controlled_documents`, `cd_sequence_counters` |
+| documents | `CreateDocumentTx` (`cap:document.create`); `UpdateDocumentName`, `UpdateDocumentStatus`, `MarkArchived`, `Unarchive` (`cap:document.edit`); `LoadDocumentAreaCode` is the shared DB-derived area helper (one source of truth — `documents/application/document_area.go`) | `public.documents` (INSERT + UPDATE) |
+| approval | `submit_service` (`cap:document.submit`), `signoff_service` (`cap:document.signoff`), `publish_service` (`cap:document.publish`), `obsolete_service` (`cap:document.obsolete`) | `approval_instances`, `approval_signoffs` |
+| controlled-documents | `Create`, `CreateTx` (`cap:controlled_documents.create`); `changeStatus` (`cap:controlled_documents.obsolete`\|`cap:controlled_documents.supersede`) — area loaded from DB row before the check | `controlled_documents`, `cd_sequence_counters` |
 | taxonomy | `FamilyRepository.Create/Update`, `ProfileRepository.Create/Update`, `AreaRepository.Create/Update` | `document_profiles`, `document_process_areas`, `document_families` |
-| templates | `CreateTemplate`, `SubmitForReview`, `Review`, `Approve`, `PublishTemplateVersion`, `ArchiveTemplate` | `templates_template`, `templates_template_version` |
-| iam | `UpsertUserAndAssignRole`, `ReplaceUserRoles` (`cap:user.manage`); `Insert`, `CloseActive`, `GrantAtomic` (`cap:membership.manage`) | `iam_user_roles`, `user_process_areas` |
+| templates | `CreateTemplate`, `SubmitForReview`, `Review`, `Approve`, `PublishTemplateVersion`, `ArchiveTemplate` — all tenant-grade | `templates_template`, `templates_template_version` |
+| iam | `UpsertUserAndAssignRole`, `ReplaceUserRoles` (`cap:user.manage`); `InsertTx`, `CloseActiveTx`, `GrantAtomicTx` (`cap:membership.manage`) — membership governance writes via `LogTx` in the same tx (Z-6, T-007 closed) | `iam_user_roles`, `user_process_areas` |
 
 > **Capability reference convention (ADR 0022 Phase 5):** an enforcement claim —
 > a statement that a capability is actually checked — is written `` `cap:<name>` ``
