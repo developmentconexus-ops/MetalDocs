@@ -213,6 +213,7 @@ paths:
       summary: Cria usuario interno com credencial local inicial (legacy; prefer POST /iam/users/invite)
       tags: [iam]
       operationId: createManagedUser
+      deprecated: true
       requestBody:
         required: true
         content:
@@ -4106,7 +4107,7 @@ components:
           maxItems: 1
           items:
             type: string
-            enum: [system_admin, approver, author, editor, viewer]
+            enum: [system_admin, approver, author, editor, viewer, signer, area_admin, qms_admin]
     CreateManagedUserResponse:
       type: object
       required: [user_id]

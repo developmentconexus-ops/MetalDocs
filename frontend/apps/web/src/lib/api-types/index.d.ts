@@ -133,7 +133,10 @@ export interface paths {
         /** List tenant users (cursor-paginated, filterable) */
         get: operations["listUsers"];
         put?: never;
-        /** Cria usuario interno com credencial local inicial (legacy; prefer POST /iam/users/invite) */
+        /**
+         * Cria usuario interno com credencial local inicial (legacy; prefer POST /iam/users/invite)
+         * @deprecated
+         */
         post: operations["createManagedUser"];
         delete?: never;
         options?: never;
@@ -2134,7 +2137,7 @@ export interface components {
             email?: string;
             display_name: string;
             password: string;
-            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
+            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer" | "signer" | "area_admin" | "qms_admin")[];
         };
         CreateManagedUserResponse: {
             user_id: string;
