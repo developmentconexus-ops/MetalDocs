@@ -15,6 +15,7 @@ import (
 type Module struct {
 	Handler *dhttp.Handler
 	svc     *application.ControlledDocumentService
+	repo    *infrastructure.PostgresControlledDocumentRepository
 }
 
 type Dependencies struct {
@@ -41,7 +42,7 @@ func New(deps Dependencies) *Module {
 	if h == nil {
 		panic("controlled_documents: handler construction returned nil")
 	}
-	return &Module{Handler: h, svc: svc}
+	return &Module{Handler: h, svc: svc, repo: repo}
 }
 
 func (m *Module) RegisterRoutes(mux *http.ServeMux) {
@@ -49,3 +50,7 @@ func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (m *Module) Service() *application.ControlledDocumentService { return m.svc }
+
+// Repo returns the module's controlled-document repository so the composition
+// root can wire it into other modules without constructing a second instance.
+func (m *Module) Repo() *infrastructure.PostgresControlledDocumentRepository { return m.repo }

@@ -47,7 +47,6 @@ import (
 	controlleddocuments "metaldocs/internal/modules/controlleddocuments"
 	controlleddocumentsapp "metaldocs/internal/modules/controlleddocuments/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	controlleddocumentsinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
@@ -393,7 +392,7 @@ func main() {
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
 	docPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
-	controlledDocumentsRepo := controlleddocumentsinfra.NewPostgresControlledDocumentRepository(deps.SQLDB)
+	controlledDocumentsRepo := controlledDocumentsModule.Repo()
 	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
 
 	// Fanout/eigenpal client — enabled when METALDOCS_FANOUT_URL is set.
