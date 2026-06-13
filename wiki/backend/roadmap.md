@@ -1,7 +1,7 @@
 # Backend Professionalization — Execution Roadmap (LIVING TRACKER)
 
-> **Status:** ✅ **COMPLETE (2026-06-12)** — Waves 0–2 + Wave F all closed with evidence; frozen as the historical record. Awaiting the user's final sign-off before integration merge (not merged by the agent, per directive).
-> **Last updated:** 2026-06-12 (Wave F CLOSED — CI guards green, static pass, runtime QA incl. live doc→PDF render, legacy-register sweep, blueprint re-score, full-program review, wiki coherence, closing report)
+> **Status:** ✅ **COMPLETE (2026-06-12) + WAVE Z SEALED CLOSE-OUT (2026-06-13)** — Waves 0–2 + Wave F + Wave Z all closed with evidence; frozen as the historical record. Wave Z (sealed-scope zero-defer finish, see addendum below) emptied the legacy register, executed the two deferred architecture items (OTel, full-table RLS), and passed the machine-checkable DONE gate G1–G11. Awaiting the operator's final sign-off before integration merge + Sunday v1 release (not merged by the agent, per directive).
+> **Last updated:** 2026-06-13 (Wave Z CLOSED — DONE gate G1–G11 green, register zero, blueprint all-green, ADR index trustworthy, regression-only review clean)
 > **NOTE:** the 0.4 history rewrite (2026-06-11) changed every commit hash in the repo. Hashes below are the REWRITTEN ones. Any other clone of this repo must be re-cloned.
 > **Contract:** [`docs/superpowers/specs/2026-06-11-backend-professionalization-design.md`](../../docs/superpowers/specs/2026-06-11-backend-professionalization-design.md) (decisions D-1..D-5, protocol)
 > **Verdicts:** [`stage2-evaluation.md`](stage2-evaluation.md) · **Evidence:** [`legacy-register.md`](legacy-register.md)
@@ -96,3 +96,43 @@ The user-mandated gate: prove the backend is solid before declaring the program 
 | F.8 | Closing report in handoff: every wave's evidence, all defers with triggers, ADR links, program sign-off | ✅ | 2026-06-12. Closing report appended to [`current-agent-handoff.md`](../references/current-agent-handoff.md) (### Wave F closing report — PROGRAM COMPLETE): per-wave evidence summary (0/1/2/2.12-2.13/F), all defers with written triggers (Wave 3 + next-touch + owner-waived), ADR links (0009/0015/0022/0026/0027; 0028 N/A — no new cap), and the program sign-off statement against design-spec §10. Program-map Wave F row + Status header flipped to COMPLETE. |
 
 **Program DONE = all F-rows ✅ — REACHED 2026-06-12.** F.1–F.8 all ✅. Evolution now goes through the normal REQ/ADR process; this roadmap is frozen as the historical record. Final integration merge awaits the user's sign-off (agent did not merge, per directive).
+
+---
+
+## Wave Z — SEALED-SCOPE ZERO-DEFER CLOSE-OUT (fresh session, 2026-06-13) — FROZEN ADDENDUM
+
+The operator overrode D-1/D-3 and ordered a zero-defer finish (register-zero + ops-ready) before the v1 release. Executed per [`docs/superpowers/specs/2026-06-12-wave-z-sealed-closeout-design.md`](../../docs/superpowers/specs/2026-06-12-wave-z-sealed-closeout-design.md) + [`wave-z-plan.md`](wave-z-plan.md). Anti-circle rule honored: scope = the sealed manifest only; pre-existing mid-wave finds parked in [`post-v1-backlog.md`](post-v1-backlog.md). One commit per task.
+
+| Z-ID | Item | Commit | Finding / REQ |
+|---|------|--------|----------------|
+| Z-1 | Minimal OTel (otelhttp + W3C traceparent + autoexport, env-gated inert) | `c787ddfa1` | F-17, RF-1, REQ-OBS-1/2/3 |
+| Z-2/Z-3 | RLS on all 27 remaining tenant tables + idempotency tenant FK | `ad70f6415` (+`4d4a8495d`) | F-12 tail, RF-6, REQ-TEN-1, F-09d, ADR 0027 executed-in-full |
+| Z-4 | Audit export writer hard-required (allow-dualmode retired) | `0a578446a` | T-012 |
+| Z-5 | Freeze service tx-mandatory (ADR 0015 amended, allow-dualmode retired) | `6075c82a3` | T-013 |
+| Z-6 | Membership governance in-tx via LogTx | `c7b10f3d6` (+`abc9afa48`) | T-007, REQ-ASYNC-1 |
+| Z-7 | Taxonomy reads template versions via templates/domain port | `e50150506` | F-06e, REQ-TOP-1 |
+| Z-8/Z-9 | Security boundary accepted-note + CD repo via module | `730ea426b` | F-06 residuals |
+| Z-10 | Generic staging outbox repo/worker, dead loop deleted, idemp dedup | `3367570c6` (+`029003c2d`) | F-04 |
+| Z-11 | Single MinIO byte-IO client reused from bootstrap | `819816a7e` | D-02 |
+| Z-12/Z-13 | ParseBoolEnv consolidation + DocumentStatus enum completion | `a342da46d` | F-15, D-07 |
+| Z-14 | CD handler typed problem codes + guard (pre-wave spawned task) | `307666fd6` | F.6-D, F-09 |
+| Z-15 | Idempotency TTL single const | `bc502ae70` | F-09c |
+| Z-16/Z-18 | CreateManagedUserRequest roles enum → canonical 8 + deprecated:true + regen | `ca1017f0d` | F-11 residual, F-13d |
+| Z-17 | Dead openapi partials removed | `f969af3a9` | F-13c |
+| Z-19 | Split iam/audit/security codegen packages | `ee4bf01fa` | F-13e |
+| Z-21 | log.Printf → slog sweep (13 files + mains/worker) | `12a752d05` (+`bfe1e0e2a`) | F-02, REQ-OBS-1 |
+| Z-22 | WS presence drain on shutdown | `e7449e830` | F-16B, RF-9, REQ-REL-2 |
+| Z-23 | Concurrent readiness checks (errgroup, shared budget) | `8a99124c0` | F-16C, RF-9 |
+| Z-24 | pg_trgm GIN index for CD search ILIKE | `46b7582e0` | F-20b |
+| Z-25 | Drop orphan documents.subject_code (migration 0238) | `62503a876` (+`4d4a8495d`) | CD T-010 |
+| Z-26 | gitleaks full-history scanning + triaged allowlist (0 leaks over 4917 commits) | `26c446164` | 1.11, F-18 round-2 |
+| Z-27 | ADR lifecycle audit (canonical Status headers, stub 0003→Historical, stray→0028, index rebuilt) | `4990095d0`·`3be2f9270`·`a5b26c477`·`6e92ee28e`·`c50bb9123`·`ccd888de5` | operator ask |
+| Z-28 | ADR 0022 Phase 6 wiki sync (program fully executed) | `c82dadfb1` | ADR 0022 |
+| Z-29 | Cache contracts + invalidation-path verification | `79f946df9` | RF-3, D-05, REQ-CACHE-1 |
+| Z-30/Z-31 | Feature-flag lifecycle standard + messaging/servicebus fence | `bcab41710` ⚠ (commit message mislabeled "Z-27 group 3"; files are correct) | RF-8, RF-7 |
+| Z-32 | v1 release re-baseline runbook | `aba87b673` | D-4b, F-18 closure |
+| Z-33 | DONE gate G1–G11 + close-out docs | (final) | G5–G8, G11 |
+
+**Excluded forever (KEEP / at-release — written rationale, NOT defers):** F-09a finalize inline idempotency (KEEP), F-20f sequential security queries (KEEP), `splitCSV` duplication (KEEP), F-18 git-history residual (closes physically at the Sunday re-baseline via the Z-32 runbook).
+
+**DONE gate (spec §2) — all green 2026-06-13:** G1 build+vet 0 · G2 `go test -p 2 ./...` 87 ok/0 FAIL · G3 api-lint 0 · G4 cilint 0 **+ zero allow-dualmode** · G5 manifest empty · G6 register closed · G7 blueprint all-green · G8 ADR index trustworthy · G9 runtime smoke (inert+console OTel, RLS NOSUPERUSER, in-tx governance, 429+403, panic→500) · **G10 regression-only review: ZERO Wave-Z-caused defects** (2 critical claims raised + both refuted with evidence) · G11 deliverables (post-v1-backlog, Z-32 runbook, handoff close-out). **NOT merged — awaiting operator sign-off + Sunday v1 release via Z-32 runbook.**

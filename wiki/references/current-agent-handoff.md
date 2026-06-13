@@ -213,6 +213,32 @@ The operator overrode D-1/D-3 and ordered a zero-defer finish (register-zero + o
 
 Hard constraints: ultracode workflows with **sonnet** implement/review + **haiku** mechanical agents (**never fable workers**), **max 15 concurrent agents**, G1–G4 gates between phases, one commit per Z-task, anti-circle rule on every discovery (pre-existing finds → `wiki/backend/post-v1-backlog.md`, never block). Do NOT merge; present the DONE-gate evidence for user sign-off.
 
+### Wave Z closing report — BACKEND CLOSED (2026-06-13, fresh session)
+
+Wave Z is EXECUTED and the DONE gate is GREEN. The MetalDocs backend is closed for feature work — the only backend work left in this repository is feature work. Frozen Wave Z addendum table (Z-ID → commit → finding) lives in [`wiki/backend/roadmap.md`](../backend/roadmap.md); per-task plan in [`wave-z-plan.md`](../backend/wave-z-plan.md).
+
+**Phases P0–P6 all executed** (ultracode workflows: sonnet implement/review + haiku verify, ≤15 concurrent, never fable; G1–G4 between phases; one commit per Z-task; explicit-path staging — `.gitnexus/` breaks `git add -A`; tests `-p 2` on the C: SSD):
+- **P0** preflight: baseline G1–G4 green, Docker up, RLS census re-run (30 tenant_id cols → 27 base tables after excluding the 2 already-covered + 1 view), `post-v1-backlog.md` created (`836d57264`).
+- **P1** (8 groups, fan-out): Z-4, Z-6, Z-7, Z-8/9, Z-11, Z-12/13, Z-15, Z-21, Z-23, Z-25, Z-17. One regression caught + fixed in-wave: the P1 Z-6 agent put `MembershipTx` in `iam/application` and made the postgres repo import it → test-binary import cycle; fixed by moving `MembershipTx` to `iam/domain` (`abc9afa48`).
+- **P2** big two (sequential, runtime-proofed): **Z-2/Z-3** full-table RLS migration `0237` (all 27 remaining tenant tables, NULL-permissive tripwire policy = 0234 pattern; idempotency tenant FK; ADR 0027 amended executed-in-full) — NOSUPERUSER probe live (GUC-unset→all, GUC=A→only A, GUC=B→only B on iam_users + documents); GUC-less system paths preserved. **Z-1** minimal OTel (`otelhttp` + W3C `traceparent` + `autoexport`, env-gated INERT by default) — proved both inert boot (zero overhead, byte-identical) and console-exporter span (inbound traceparent TraceID bridged into access log + bounded span name).
+- **P3** contract/codegen (serialized): Z-16 roles enum → canonical 8 + Z-18 deprecated flag + regen (Go + FE types, tsc clean); Z-19 split iam/audit/security codegen packages; Z-24 pg_trgm GIN index (EXPLAIN-proven); Z-26 gitleaks full-history (0 leaks over 4917 commits).
+- **P4** structural M-items: Z-5 freeze tx-mandatory (ADR 0015 amended), Z-10 generic staging outbox + dead-loop delete + idemp dedup, Z-22 WS presence drain. After P4 the **last 3 `//cilint:allow-dualmode` directives are gone → repo-wide count 0** (Z-4 + Z-5). Z-10 left a stale `tripwire-allowlist.txt` (deleted files) → fixed in-wave (`029003c2d`).
+- **P5** docs/governance (9 agents + index): Z-27 ADR lifecycle audit (every ADR now carries a canonical `Status:` header; stub 0003 → Historical; stray dated ADR → `0028`; `index.md` rebuilt as a status table; `README` gained the status vocabulary), Z-28 ADR 0022 Phase 6 wiki sync (status → "fully executed"), Z-29 cache contract + invalidation-path verification (all 7 invalidation callers traced, no missing path), Z-30 flag-lifecycle standard, Z-31 messaging/servicebus fence, Z-32 v1 re-baseline runbook.
+- **P6 DONE gate (spec §2) — ALL GREEN 2026-06-13:**
+  - **G1** `go build ./...` 0 · `go vet ./...` 0.
+  - **G2** `go test -p 2 ./...` → **87 ok / 0 FAIL**.
+  - **G3** `go run ./scripts/api-lint/ -strict …` → **0 violations**.
+  - **G4** `go run ./tools/cilint/... ./...` → **exit 0** AND `git grep -c "cilint:allow-dualmode" -- internal/` → **0**.
+  - **G5** manifest empty — every Z-1..Z-33 row has a commit (table above).
+  - **G6** register CLOSED — every legacy-register entry resolved-with-Z-commit or KEEP/at-release (no defer-with-trigger remains).
+  - **G7** blueprint all-green — scoreboard ✅ with the single documented F-18 "at-release" line; REQ-OBS/TEN/CACHE/REL/ASYNC flipped MET.
+  - **G8** ADR index trustworthy — zero status-less ADR files; `index.md` rebuilt with status column.
+  - **G9** runtime smoke (Docker up, clean restart): inert-OTel boot (no noise) · login 200 · authed GET 200 · in-tx `family.created` governance row · 401→403 lockout→429 rate-limit · RLS NOSUPERUSER on iam_users (unset=6/wrong=0/real≥1) · panic→500 problem+json + process alive · console-exporter span with bridged traceparent (cited from Z-1).
+  - **G10** regression-only review (7 sonnet slices + adversarial verify, scoped strictly to "did Wave Z break what Wave F verified"): **ZERO Wave-Z-caused defects.** Two critical claims were raised and BOTH refuted with evidence — (1) "RLS `::uuid` cast breaks text-typed templates tenant_id" refuted by migration `0213` having converted those columns to uuid post-baseline (live information_schema confirms uuid; RLS evaluates clean under GUC); (2) "Z-22 CloseAll send-on-closed-channel race" refuted as pre-existing (the same `conn.Close()` path races with `broadcast` on client disconnect already; Z-22 did not introduce it). Both parked in `post-v1-backlog.md`.
+  - **G11** deliverables exist: `post-v1-backlog.md` (12 parked pre-existing finds), `wiki/runbooks/v1-release-rebaseline.md` (Z-32), this close-out block.
+
+**NOT merged to any integration branch — awaiting the operator's final sign-off, then the Sunday 2026-06-14 v1 release re-baseline (operator executes [`wiki/runbooks/v1-release-rebaseline.md`](../runbooks/v1-release-rebaseline.md) personally; that physical re-baseline closes the F-18 git-history residual permanently).** Environment notes unchanged: `.gitnexus/` cache breaks `git add -A` (staged explicit paths all session); C: SSD degraded writes → `go test -p 2`; vendored OTel deps added (`go.opentelemetry.io/otel@v1.44.0`, contrib `v0.69.0`) and committed under `vendor/`.
+
 ## Recovered agent memory (wiped by the reinstall — re-create if a memory system returns)
 
 These facts lived in the agent's persistent memory and are NOT derivable from the repo:
