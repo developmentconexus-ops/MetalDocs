@@ -32,7 +32,7 @@ Current curated-baseline table owned by `documents`. See the owning module wiki 
 | `document_profile_code` | `text` | no | Baseline column. |
 | `document_family_code` | `text` | no | Baseline column. |
 | `process_area_code` | `text` | yes | Baseline column. |
-| `subject_code` | `text` | yes | Baseline column. |
+| `subject_code` | `text` | yes | **Dropped by migration 0238** (orphan — FK `fk_documents_subject_code` was CASCADE-dropped by 0236 when `document_subjects` table was removed; column itself had no runtime readers/writers). |
 | `profile_schema_version` | `integer` | no | Baseline column. |
 | `document_sequence` | `integer` | no | Baseline column. |
 | `document_code` | `text` | no | Baseline column. |
