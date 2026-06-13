@@ -64,10 +64,10 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 		sessionTTLHours = parsed
 	}
 
-	// Sliding idle timeout (A2). Default 0 = disabled so dev/test behaviour is
-	// unchanged; set METALDOCS_AUTH_SESSION_IDLE_MINUTES (e.g. 30) to enable in
-	// production. A value of 0 explicitly disables idle expiry.
-	sessionIdleMinutes := 0
+	// Sliding idle timeout. Defaults to 30 minutes (ISO 27001 path / backend
+	// standardization parameters); override with METALDOCS_AUTH_SESSION_IDLE_MINUTES.
+	// A value of 0 explicitly disables idle expiry (12h absolute TTL still applies).
+	sessionIdleMinutes := 30
 	if raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_SESSION_IDLE_MINUTES")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 0 {
