@@ -102,7 +102,7 @@ Twenty-eight cross-cutting platform packages live under `internal/platform/`. Do
 | Identity & security | `authn`, `tenant`, `security`, `ratelimit`, `sqlescape` | Token validation, tenant context injection, rate limiting, SQL injection escape |
 | Data layer | `db/postgres`, `migrate`, `bootstrap`, `objectstore`, `storage/minio`, `messaging` | DB pool, migration, MinIO I/O, outbox messaging |
 | Observability & config | `config`, `observability`, `featureflags` | Env config, structured HTTP logging, feature flags |
-| Async | `worker`, `servicebus`, `jobs/river` | Outbox worker, Azure Service Bus (wired but `[runtime-unverified]`), River job host |
+| Async | `worker`, `servicebus`, `jobs/river` | Outbox worker, Gotenberg PDF HTTP adapter (see §7.8), River job host |
 | Rendering | `docgenv2`, `render/gotenberg` | DOCX template reader, Gotenberg HTTP client |
 | Middleware | `middleware/` | `Recovery` — outermost panic-recovery middleware (Wave 1, REQ-MW-1) |
 | ~~Cache~~ | ~~`cache/`~~ | **DELETED Wave 1 (F-08/REQ-TOP-3)** — empty scaffold removed |
@@ -508,6 +508,21 @@ There is no OpenTelemetry instrumentation in the Go codebase: no OTLP exporter, 
 ### 7.7 Hard-coded credentials committed to VCS
 
 `cmd/seed-test-document/main.go:25-30` contains a plaintext DSN password and MinIO credentials. This is the highest-severity finding in the legacy register. Classified as F-18 (critical). See [legacy-register.md](legacy-register.md) for the pre-Stage-2 prerequisite action.
+
+### 7.8 Messaging/servicebus package fence (RF-7)
+
+**`platform/servicebus` is NOT a message broker.** Despite its name, it is the synchronous Gotenberg PDF HTTP adapter. `GotenbergPDFClient` reads a DOCX from MinIO, calls Gotenberg (LibreOffice route) over HTTP, and writes the resulting PDF back to MinIO — all synchronously within a single function call (`internal/platform/servicebus/gotenberg_pdf.go`). There is no Azure Service Bus, no AMQP client, no queue polling, and no broker connection in this package. The name predates the current implementation; the misleading "Azure Service Bus" label in earlier wiki passes has been corrected here.
+
+**`platform/messaging` is outbox + noop only.** It provides:
+- `messaging.Event` envelope, `Publisher` and `Consumer` interfaces (`events.go`, `consumer.go`)
+- `messaging/outbox/postgres` — Postgres-backed `Consumer` / `Publisher` against `metaldocs.outbox_events`
+- `messaging/noop` — no-op `Publisher` for test/in-memory contexts
+
+There is no broker client, no AMQP/Kafka/Service Bus SDK, and no network call in `platform/messaging`. All async dispatch is local-Postgres-outbox only.
+
+**Future broker rule:** any real message broker (AMQP, Kafka, Azure Service Bus, etc.) requires a new ADR before introduction. The outbox pattern is the current and only sanctioned async delivery mechanism at v1.
+
+Sources: `internal/platform/servicebus/gotenberg_pdf.go`; `internal/platform/messaging/events.go`; `internal/platform/messaging/noop/publisher.go`; `platform/async-messaging.md §2.1, §2.6`
 
 ---
 
