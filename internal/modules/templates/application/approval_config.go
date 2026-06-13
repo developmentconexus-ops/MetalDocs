@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"metaldocs/internal/modules/iam/authz"
@@ -69,24 +70,21 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 		return nil, err
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("templates approval config: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-		return nil, fmt.Errorf("templates approval config: setAuthzGUC: %w", err)
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
-		return nil, fmt.Errorf("templates approval config: authz: %w", err)
-	}
-	if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &config); err != nil {
-		return nil, wrapAppErr("templates approval config: upsert", err)
-	}
-	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-		return nil, wrapAppErr("templates approval config: append audit", err)
-	}
-	if err := tx.Commit(); err != nil {
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return fmt.Errorf("templates approval config: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+			return fmt.Errorf("templates approval config: authz: %w", err)
+		}
+		if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &config); err != nil {
+			return wrapAppErr("templates approval config: upsert", err)
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return wrapAppErr("templates approval config: append audit", err)
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 

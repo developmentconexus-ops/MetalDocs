@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -122,27 +123,21 @@ func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCm
 	if err != nil {
 		return err
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("templates save draft: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-		return fmt.Errorf("templates save draft: set authz context: %w", err)
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
-		return fmt.Errorf("templates save draft: authz: %w", err)
-	}
-	if err := s.repo.UpdateVersionDraftCASTx(ctx, tx, cmd.TenantID, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
-		return wrapAppErr("templates save draft: update draft", err)
-	}
-	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-		return wrapAppErr("templates save draft: append audit", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("templates save draft: commit tx: %w", err)
-	}
-	return nil
+	return s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return fmt.Errorf("templates save draft: set authz context: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+			return fmt.Errorf("templates save draft: authz: %w", err)
+		}
+		if err := s.repo.UpdateVersionDraftCASTx(ctx, tx, cmd.TenantID, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
+			return wrapAppErr("templates save draft: update draft", err)
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return wrapAppErr("templates save draft: append audit", err)
+		}
+		return nil
+	})
 }
 
 func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*domain.TemplateVersion, error) {
@@ -177,25 +172,22 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 	if err != nil {
 		return nil, err
 	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("templates commit autosave: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-		return nil, fmt.Errorf("templates commit autosave: set authz context: %w", err)
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
-		return nil, fmt.Errorf("templates commit autosave: authz: %w", err)
-	}
-	if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
-		return nil, wrapAppErr("templates commit autosave: update version", err)
-	}
-	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-		return nil, wrapAppErr("templates commit autosave: append audit", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("templates commit autosave: commit tx: %w", err)
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return fmt.Errorf("templates commit autosave: set authz context: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+			return fmt.Errorf("templates commit autosave: authz: %w", err)
+		}
+		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+			return wrapAppErr("templates commit autosave: update version", err)
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return wrapAppErr("templates commit autosave: append audit", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	return version, nil
 }

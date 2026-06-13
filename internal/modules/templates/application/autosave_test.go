@@ -130,7 +130,7 @@ func TestCommitAutosave_Happy(t *testing.T) {
 		DocxStorageKey: "templates/tpl-1/versions/7.docx",
 	}
 	presigner := &fakePresigner{HeadResult: "hash_abc"}
-	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
+	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
 
 	got, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
 		TenantID:            "tenant-a",
@@ -183,7 +183,7 @@ func TestCommitAutosave_WithDBSetsTemplateEditAuthz(t *testing.T) {
 		Status:         domain.VersionStatusDraft,
 		DocxStorageKey: "templates/tpl-1/versions/7.docx",
 	}
-	svc := application.New(repo, &fakePresigner{HeadResult: "hash_abc"}, fakeClock{}, &fakeUUID{}).WithDB(db)
+	svc := application.New(repo, &fakePresigner{HeadResult: "hash_abc"}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
 
 	mock.ExpectBegin()
 	expectTemplateEditAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")
@@ -309,7 +309,7 @@ func TestSaveTemplateDraft_StaleLockVersion(t *testing.T) {
 		DocxStorageKey: "templates/tpl-1/versions/1.docx",
 	}
 	repo.lockVersions["ver-1"] = 2
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
 
 	err := svc.SaveTemplateDraft(context.Background(), application.SaveTemplateDraftCmd{
 		TenantID:            "tenant-a",
@@ -346,7 +346,7 @@ func TestSaveTemplateDraft_WithDBSetsTemplateEditAuthz(t *testing.T) {
 		Status:         domain.VersionStatusDraft,
 		DocxStorageKey: "templates/tpl-1/versions/1.docx",
 	}
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
 
 	mock.ExpectBegin()
 	expectTemplateEditAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")

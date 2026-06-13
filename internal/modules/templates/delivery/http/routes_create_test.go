@@ -344,8 +344,9 @@ func (fakePresigner) Delete(_ context.Context, _ string) error { return nil }
 
 func newMux(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo) *http.ServeMux {
 	t.Helper()
-	svc := application.New(repo, fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
-	h := tmplhttp.New(svc, authz)
+	db := newPermissiveMockDB(t)
+	svc := application.New(repo, fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
+	h := tmplhttp.New(svc, authz, db)
 	mux := http.NewServeMux()
 	h.Register(mux)
 	return mux
@@ -357,7 +358,7 @@ func TestNew_PanicsWithoutAuthz(t *testing.T) {
 			t.Fatal("expected New to panic when authz is nil")
 		}
 	}()
-	_ = tmplhttp.New(application.New(newFakeRepo(), fakePresigner{}, fakeClock{}, &fakeUUID{}), nil)
+	_ = tmplhttp.New(application.New(newFakeRepo(), fakePresigner{}, fakeClock{}, &fakeUUID{}), nil, nil)
 }
 
 func createBody(key string) []byte {

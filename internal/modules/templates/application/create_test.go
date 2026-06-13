@@ -16,7 +16,7 @@ import (
 
 func TestCreateTemplate_Happy(t *testing.T) {
 	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
 
 	cmd := application.CreateTemplateCmd{
 		TenantID:     "tenant-a",
@@ -130,7 +130,7 @@ func TestCreateTemplate_WithDBSetsAuthzContext(t *testing.T) {
 	defer db.Close()
 
 	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
 
 	mock.ExpectBegin()
 	expectTemplateCreateAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")
@@ -171,7 +171,7 @@ func TestCreateNextVersion_FromPublished(t *testing.T) {
 	}
 	repo.templates[template.ID] = template
 	repo.versions[v1.ID] = v1
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
 
 	got, err := svc.CreateNextVersion(context.Background(), application.CreateVersionCmd{
 		TenantID:    "tenant-a",
@@ -213,7 +213,7 @@ func TestCreateNextVersion_NoPublished_ClonesLatest(t *testing.T) {
 	}
 	repo.templates[template.ID] = template
 	repo.versions[v1.ID] = v1
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
 
 	got, err := svc.CreateNextVersion(context.Background(), application.CreateVersionCmd{
 		TenantID:    "tenant-a",
@@ -268,7 +268,7 @@ func TestCreateNextVersion_WithDB_UsesTransaction(t *testing.T) {
 	v1 := &domain.TemplateVersion{ID: "v1", TemplateID: template.ID, VersionNumber: 1, Status: domain.VersionStatusDraft}
 	repo.templates[template.ID] = template
 	repo.versions[v1.ID] = v1
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
 
 	mock.ExpectBegin()
 	expectTemplateAuthz(mock, "user-b", "tenant-a", "template.edit")

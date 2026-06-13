@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -22,13 +23,14 @@ type AuthzFunc func(r *http.Request, tenantID, area string, action string) error
 type Handler struct {
 	svc   *application.Service
 	authz AuthzFunc
+	db    *sql.DB
 }
 
-func New(svc *application.Service, authz AuthzFunc) *Handler {
+func New(svc *application.Service, authz AuthzFunc, database *sql.DB) *Handler {
 	if authz == nil {
 		panic("templates http: authz function is required")
 	}
-	return &Handler{svc: svc, authz: authz}
+	return &Handler{svc: svc, authz: authz, db: database}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -66,7 +68,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 
 func (h *Handler) idempotent(routeTemplate string, next http.HandlerFunc) http.Handler {
-	store := idempotency.New(h.svc.DB(), routeTemplate)
+	store := idempotency.New(h.db, routeTemplate)
 	return idempotency.Require(store, func(ctx context.Context) (string, string) {
 		tenantID, _ := tenant.FromContext(ctx)
 		return tenantID, iamdomain.UserIDFromContext(ctx)

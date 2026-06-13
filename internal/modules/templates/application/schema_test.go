@@ -25,7 +25,7 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	seedSchemaVersion(repo, domain.VersionStatusDraft, "hash-1")
 
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
 	got, err := svc.UpdateSchemas(context.Background(), application.UpdateSchemasCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "user-a",
@@ -86,7 +86,7 @@ func TestUpdateSchemas_StaleLockVersion(t *testing.T) {
 	repo := newFakeRepo()
 	seedSchemaVersion(repo, domain.VersionStatusDraft, "hash-1")
 	repo.lockVersions["v1"] = 3
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(newPermissiveMockDB(t))
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
 
 	_, err := svc.UpdateSchemas(context.Background(), application.UpdateSchemasCmd{
 		TenantID:            "tenant-a",

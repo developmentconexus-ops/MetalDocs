@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"regexp"
 	"time"
@@ -71,24 +72,21 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 		return nil, err
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("templates update schemas: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-		return nil, fmt.Errorf("templates update schemas: setAuthzGUC: %w", err)
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
-		return nil, fmt.Errorf("templates update schemas: authz: %w", err)
-	}
-	if err := s.repo.UpdateVersionSchemaCASTx(ctx, tx, cmd.TenantID, version, cmd.ExpectedLockVersion); err != nil {
-		return nil, wrapAppErr("templates update schemas: update version", err)
-	}
-	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-		return nil, wrapAppErr("templates update schemas: append audit", err)
-	}
-	if err := tx.Commit(); err != nil {
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return fmt.Errorf("templates update schemas: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+			return fmt.Errorf("templates update schemas: authz: %w", err)
+		}
+		if err := s.repo.UpdateVersionSchemaCASTx(ctx, tx, cmd.TenantID, version, cmd.ExpectedLockVersion); err != nil {
+			return wrapAppErr("templates update schemas: update version", err)
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return wrapAppErr("templates update schemas: append audit", err)
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 

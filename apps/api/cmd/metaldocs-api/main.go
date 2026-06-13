@@ -809,12 +809,12 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 		return nil, errors.New("templates capability service is required")
 	}
 	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
-	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
+	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, realClock{}, realUUIDGen{}).WithRunner(db.NewTxRunner(deps.SQLDB))
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())
 		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
 	}
-	return templateshttp.New(templatesSvc, templatesAuthzFn), nil
+	return templateshttp.New(templatesSvc, templatesAuthzFn, deps.SQLDB), nil
 }
 
 type realClock struct{}

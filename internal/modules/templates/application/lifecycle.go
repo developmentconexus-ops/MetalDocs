@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 
@@ -68,24 +69,21 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 
 	// Validation reads above still happen before the write transaction; this tx
 	// only serializes the state update itself in the current implementation.
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("templates submit: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-		return nil, fmt.Errorf("templates submit: setAuthzGUC: %w", err)
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateSubmit), "tenant"); err != nil {
-		return nil, fmt.Errorf("templates submit: authz: %w", err)
-	}
-	if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
-		return nil, err
-	}
-	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-		return nil, wrapAppErr("templates submit: append audit", err)
-	}
-	if err := tx.Commit(); err != nil {
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return fmt.Errorf("templates submit: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateSubmit), "tenant"); err != nil {
+			return fmt.Errorf("templates submit: authz: %w", err)
+		}
+		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+			return err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return wrapAppErr("templates submit: append audit", err)
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
@@ -252,37 +250,34 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 		next := s.buildNextDraftVersion(cmd.TemplateID, cmd.ActorUserID, nextNum, version)
 		template.LatestVersion = nextNum
 
-		tx, err := s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, fmt.Errorf("templates approve: begin tx: %w", err)
-		}
-		defer func() { _ = tx.Rollback() }()
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return nil, fmt.Errorf("templates approve: setAuthzGUC: %w", err)
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateApprove), "tenant"); err != nil {
-			return nil, fmt.Errorf("templates approve: authz: %w", err)
-		}
-		if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TemplateID, version.ID); err != nil {
-			return nil, err
-		}
-		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
-			return nil, err
-		}
-		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
-			return nil, err
-		}
-		if err := s.repo.CreateVersionTx(ctx, tx, next); err != nil {
-			return nil, err
-		}
 		audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, nil, s.clock.Now())
 		if err != nil {
 			return nil, err
 		}
-		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-			return nil, wrapAppErr("templates approve: append audit", err)
-		}
-		if err := tx.Commit(); err != nil {
+		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+			if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+				return fmt.Errorf("templates approve: setAuthzGUC: %w", err)
+			}
+			if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateApprove), "tenant"); err != nil {
+				return fmt.Errorf("templates approve: authz: %w", err)
+			}
+			if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TemplateID, version.ID); err != nil {
+				return err
+			}
+			if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
+				return err
+			}
+			if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+				return err
+			}
+			if err := s.repo.CreateVersionTx(ctx, tx, next); err != nil {
+				return err
+			}
+			if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+				return wrapAppErr("templates approve: append audit", err)
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
 		return &ApproveResult{Version: version, NextDraft: next}, nil
@@ -400,43 +395,40 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	publishedRev := version.RevisionNumber
 	template.CurrentRevisionNumber = &publishedRev
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("templates publish: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-		return nil, fmt.Errorf("templates publish: setAuthzGUC: %w", err)
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplatePublish), "tenant"); err != nil {
-		return nil, fmt.Errorf("templates publish: authz: %w", err)
-	}
-	if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TemplateID, version.ID); err != nil {
-		return nil, err
-	}
-	if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
-		return nil, err
-	}
-	if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
-		return nil, err
-	}
 	nextNum := template.LatestVersion + 1
 	next := s.buildNextDraftVersion(cmd.TemplateID, cmd.ActorUserID, nextNum, version)
-	if err := s.repo.CreateVersionTx(ctx, tx, next); err != nil {
-		return nil, err
-	}
-	template.LatestVersion = nextNum
-	if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
-		return nil, err
-	}
 	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{"schema_key": cmd.SchemaKey}, now)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-		return nil, wrapAppErr("templates publish: append audit", err)
-	}
-	if err := tx.Commit(); err != nil {
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return fmt.Errorf("templates publish: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplatePublish), "tenant"); err != nil {
+			return fmt.Errorf("templates publish: authz: %w", err)
+		}
+		if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TemplateID, version.ID); err != nil {
+			return err
+		}
+		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
+			return err
+		}
+		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+			return err
+		}
+		if err := s.repo.CreateVersionTx(ctx, tx, next); err != nil {
+			return err
+		}
+		template.LatestVersion = nextNum
+		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
+			return err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return wrapAppErr("templates publish: append audit", err)
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 	return &PublishTemplateVersionResult{PublishedVersion: version, NextDraft: next}, nil
@@ -475,24 +467,21 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 		return nil, err
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("templates archive: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-		return nil, fmt.Errorf("templates archive: setAuthzGUC: %w", err)
-	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateArchive), "tenant"); err != nil {
-		return nil, fmt.Errorf("templates archive: authz: %w", err)
-	}
-	if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
-		return nil, err
-	}
-	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-		return nil, wrapAppErr("templates archive: append audit", err)
-	}
-	if err := tx.Commit(); err != nil {
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return fmt.Errorf("templates archive: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateArchive), "tenant"); err != nil {
+			return fmt.Errorf("templates archive: authz: %w", err)
+		}
+		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
+			return err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return wrapAppErr("templates archive: append audit", err)
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
@@ -502,24 +491,21 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 // updateVersionWithAuthzAndAudit runs the authz check and the version update
 // inside a single transaction, then appends the audit event atomically (F-07 / REQ-ASYNC-1).
 func (s *Service) updateVersionWithAuthzAndAudit(ctx context.Context, tenantID, actorID string, version *domain.TemplateVersion, cap string, audit *domain.AuditEvent) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("templates update version: begin tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-		return fmt.Errorf("templates update version: setAuthzGUC: %w", err)
-	}
-	if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
-		return fmt.Errorf("templates update version: authz: %w", err)
-	}
-	if err := s.repo.UpdateVersionTx(ctx, tx, tenantID, version); err != nil {
-		return err
-	}
-	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-		return wrapAppErr("templates update version: append audit", err)
-	}
-	return tx.Commit()
+	return s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+			return fmt.Errorf("templates update version: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
+			return fmt.Errorf("templates update version: authz: %w", err)
+		}
+		if err := s.repo.UpdateVersionTx(ctx, tx, tenantID, version); err != nil {
+			return err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return wrapAppErr("templates update version: append audit", err)
+		}
+		return nil
+	})
 }
 
 func containsRole(roles []string, role string) bool {

@@ -1,6 +1,6 @@
 package application
 
-import "database/sql"
+import "metaldocs/internal/platform/db"
 
 type Service struct {
 	repo      Repository
@@ -8,7 +8,7 @@ type Service struct {
 	clock     Clock
 	uuid      UUIDGen
 	resolvers ResolverRegistryReader
-	db        *sql.DB
+	runner    db.TxRunner
 }
 
 func New(repo Repository, presign Presigner, clock Clock, uuid UUIDGen, resolvers ...ResolverRegistryReader) *Service {
@@ -19,11 +19,11 @@ func New(repo Repository, presign Presigner, clock Clock, uuid UUIDGen, resolver
 	return &Service{repo: repo, presign: presign, clock: clock, uuid: uuid, resolvers: registry}
 }
 
-func (s *Service) WithDB(db *sql.DB) *Service {
-	s.db = db
+// WithRunner injects the transaction runner the service uses to own its
+// write transactions (H-1d′). The application layer depends on the
+// db.TxRunner port, not the concrete *sql.DB pool — the pool is wrapped into
+// the port at the composition root.
+func (s *Service) WithRunner(runner db.TxRunner) *Service {
+	s.runner = runner
 	return s
-}
-
-func (s *Service) DB() *sql.DB {
-	return s.db
 }

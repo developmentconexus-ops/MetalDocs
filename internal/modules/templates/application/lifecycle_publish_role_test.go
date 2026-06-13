@@ -108,7 +108,7 @@ func TestPublishTemplateVersion_RoleBinding(t *testing.T) {
 			repo.templates[template.ID] = template
 			repo.versions[version.ID] = version
 
-			svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
+			svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
 
 			if tc.setup.expectTx {
 				mock.ExpectBegin()
