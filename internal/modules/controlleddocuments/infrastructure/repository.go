@@ -126,7 +126,7 @@ WHERE tenant_id = $1`
 		idx++
 	}
 	if filter.Query != nil && strings.TrimSpace(*filter.Query) != "" {
-		// TODO(phase11): replace leading-wildcard ILIKE search with full-text search so this filter can use an index.
+		// GIN trigram indexes idx_controlled_documents_code_trgm / _title_trgm (migration 0239) accelerate this ILIKE.
 		q += fmt.Sprintf(" AND (code ILIKE $%d OR title ILIKE $%d)", idx, idx)
 		args = append(args, "%"+strings.TrimSpace(*filter.Query)+"%")
 		idx++
