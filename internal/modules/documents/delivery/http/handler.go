@@ -206,19 +206,22 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nextCursor := ""
+	page := documentsapi.CursorPage{HasMore: hasMore}
 	if hasMore && len(items) > 0 {
 		last := items[len(items)-1]
-		nextCursor = pagination.EncodeCursor(last.UpdatedAt.UTC().Format(time.RFC3339Nano), last.ID)
+		nextCursor := pagination.EncodeCursor(last.UpdatedAt.UTC().Format(time.RFC3339Nano), last.ID)
+		page.NextCursor = &nextCursor
 	}
 
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"items": items,
-		"page": map[string]any{
-			"next_cursor": nextCursor,
-			"has_more":    hasMore,
-		},
-		"total": total,
+	summaries := make([]documentsapi.DocumentSummary, 0, len(items))
+	for _, d := range items {
+		summaries = append(summaries, toDocumentSummary(*d))
+	}
+
+	httpresponse.WriteJSON(w, http.StatusOK, documentsapi.DocumentListResponse{
+		Items: summaries,
+		Page:  page,
+		Total: total,
 	})
 }
 
@@ -336,65 +339,81 @@ func (h *Handler) getDocument(w http.ResponseWriter, r *http.Request) {
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }
 
-type documentDetailResponse struct {
-	ID                             string                `json:"id"`
-	TenantID                       string                `json:"tenant_id"`
-	TemplateVersionID              string                `json:"template_version_id"`
-	Name                           string                `json:"name"`
-	Status                         domain.DocumentStatus `json:"status"`
-	FormDataJSON                   json.RawMessage       `json:"form_data_json"`
-	CurrentRevisionID              string                `json:"current_revision_id"`
-	RevisionVersion                int64                 `json:"revision_version"`
-	ActiveSessionID                string                `json:"active_session_id"`
-	ValuesFrozenAt                 *time.Time            `json:"values_frozen_at"`
-	ArchivedAt                     *time.Time            `json:"archived_at"`
-	CreatedAt                      time.Time             `json:"created_at"`
-	UpdatedAt                      time.Time             `json:"updated_at"`
-	CreatedBy                      string                `json:"created_by"`
-	RevisionNumber                 int64                 `json:"revision_number"`
-	ControlledDocumentID           *string               `json:"controlled_document_id"`
-	RevisionTitle                  *string               `json:"revision_title"`
-	ProfileCodeSnapshot            *string               `json:"profile_code_snapshot"`
-	ProcessAreaCodeSnapshot        *string               `json:"process_area_code_snapshot"`
-	Code                           string                `json:"code"`
-	CurrentRevisionFileSizeBytes   *int64                `json:"current_revision_file_size_bytes,omitempty"`
-	CurrentRevisionPageCount       *int                  `json:"current_revision_page_count,omitempty"`
-	CurrentRevisionPageCountSource *string               `json:"current_revision_page_count_source,omitempty"`
+// toDocumentSummary maps a domain document to the generated DocumentSummary
+// response type (A6 — the list endpoint must emit generated types, not raw
+// domain structs, so FE codegen stays in sync).
+func toDocumentSummary(doc domain.Document) documentsapi.DocumentSummary {
+	form := doc.FormDataJSON
+	if len(form) == 0 {
+		form = []byte(`{}`)
+	}
+	return documentsapi.DocumentSummary{
+		ActiveSessionId:         doc.ActiveSessionID,
+		ArchivedAt:              doc.ArchivedAt,
+		Code:                    doc.Code,
+		ControlledDocumentId:    doc.ControlledDocumentID,
+		CreatedAt:               doc.CreatedAt,
+		CreatedBy:               doc.CreatedBy,
+		CurrentRevisionId:       doc.CurrentRevisionID,
+		FormDataJson:            form,
+		Id:                      doc.ID,
+		Name:                    doc.Name,
+		ProcessAreaCodeSnapshot: doc.ProcessAreaCodeSnapshot,
+		ProfileCodeSnapshot:     doc.ProfileCodeSnapshot,
+		RevisionNumber:          doc.RevisionNumber,
+		RevisionTitle:           doc.RevisionTitle,
+		RevisionVersion:         doc.RevisionVersion,
+		Status:                  documentsapi.DocumentSummaryStatus(doc.Status),
+		TemplateVersionId:       doc.TemplateVersionID,
+		TenantId:                doc.TenantID,
+		UpdatedAt:               doc.UpdatedAt,
+		ValuesFrozenAt:          doc.ValuesFrozenAt,
+	}
 }
 
-func toDocumentDetailResponse(doc domain.Document) (*documentDetailResponse, error) {
-	formData := json.RawMessage(doc.FormDataJSON)
+// toDocumentDetailResponse maps a domain document to the generated
+// DocumentDetailResponse type (A6). form_data_json is parsed into the object
+// the generated contract declares (map[string]interface{}).
+func toDocumentDetailResponse(doc domain.Document) (*documentsapi.DocumentDetailResponse, error) {
+	formData := doc.FormDataJSON
 	if len(formData) == 0 {
-		formData = json.RawMessage(`{}`)
+		formData = []byte(`{}`)
 	}
-	if !json.Valid(formData) {
-		return nil, fmt.Errorf("invalid document form_data_json for document %s", doc.ID)
+	var formMap map[string]interface{}
+	if err := json.Unmarshal(formData, &formMap); err != nil {
+		return nil, fmt.Errorf("invalid document form_data_json for document %s: %w", doc.ID, err)
 	}
 
-	return &documentDetailResponse{
-		ID:                             doc.ID,
-		TenantID:                       doc.TenantID,
-		TemplateVersionID:              doc.TemplateVersionID,
-		Name:                           doc.Name,
-		Status:                         doc.Status,
-		FormDataJSON:                   formData,
-		CurrentRevisionID:              doc.CurrentRevisionID,
-		RevisionVersion:                doc.RevisionVersion,
-		ActiveSessionID:                doc.ActiveSessionID,
-		ValuesFrozenAt:                 doc.ValuesFrozenAt,
+	var pageCountSource *documentsapi.DocumentDetailResponseCurrentRevisionPageCountSource
+	if doc.CurrentRevisionPageCountSource != nil {
+		v := documentsapi.DocumentDetailResponseCurrentRevisionPageCountSource(*doc.CurrentRevisionPageCountSource)
+		pageCountSource = &v
+	}
+
+	return &documentsapi.DocumentDetailResponse{
+		ActiveSessionId:                doc.ActiveSessionID,
 		ArchivedAt:                     doc.ArchivedAt,
-		CreatedAt:                      doc.CreatedAt,
-		UpdatedAt:                      doc.UpdatedAt,
-		CreatedBy:                      doc.CreatedBy,
-		RevisionNumber:                 doc.RevisionNumber,
-		ControlledDocumentID:           doc.ControlledDocumentID,
-		RevisionTitle:                  doc.RevisionTitle,
-		ProfileCodeSnapshot:            doc.ProfileCodeSnapshot,
-		ProcessAreaCodeSnapshot:        doc.ProcessAreaCodeSnapshot,
 		Code:                           doc.Code,
+		ControlledDocumentId:           doc.ControlledDocumentID,
+		CreatedAt:                      doc.CreatedAt,
+		CreatedBy:                      doc.CreatedBy,
 		CurrentRevisionFileSizeBytes:   doc.CurrentRevisionFileSizeBytes,
+		CurrentRevisionId:              doc.CurrentRevisionID,
 		CurrentRevisionPageCount:       doc.CurrentRevisionPageCount,
-		CurrentRevisionPageCountSource: doc.CurrentRevisionPageCountSource,
+		CurrentRevisionPageCountSource: pageCountSource,
+		FormDataJson:                   formMap,
+		Id:                             doc.ID,
+		Name:                           doc.Name,
+		ProcessAreaCodeSnapshot:        doc.ProcessAreaCodeSnapshot,
+		ProfileCodeSnapshot:            doc.ProfileCodeSnapshot,
+		RevisionNumber:                 doc.RevisionNumber,
+		RevisionTitle:                  doc.RevisionTitle,
+		RevisionVersion:                doc.RevisionVersion,
+		Status:                         string(doc.Status),
+		TemplateVersionId:              doc.TemplateVersionID,
+		TenantId:                       doc.TenantID,
+		UpdatedAt:                      doc.UpdatedAt,
+		ValuesFrozenAt:                 doc.ValuesFrozenAt,
 	}, nil
 }
 
