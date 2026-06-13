@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -74,6 +75,7 @@ import (
 	"metaldocs/internal/platform/formval"
 	"metaldocs/internal/platform/httpclient"
 	riverjobs "metaldocs/internal/platform/jobs/river"
+	"metaldocs/internal/platform/messaging"
 	"metaldocs/internal/platform/migrate"
 	platformmw "metaldocs/internal/platform/middleware"
 	"metaldocs/internal/platform/objectstore"
@@ -509,38 +511,46 @@ func main() {
 	// Wire materialize outbox into the freeze service so Pin can enqueue async jobs.
 	fanoutCfg.freezeService.WithMaterializeOutbox(materializeOutboxRepo)
 
+	// StagingOutboxWorker.Run() only returns nil (context cancellation); no restart loop needed.
 	var workerWG sync.WaitGroup
-	startOutboxWorker := func(name string, run func(context.Context) error) {
+	startOutboxWorker := func(w *fanout.StagingOutboxWorker) {
 		workerWG.Add(1)
 		go func() {
 			defer workerWG.Done()
-			backoff := time.Second
-			for ctx.Err() == nil {
-				err := run(ctx)
-				if err == nil {
-					return
-				}
-				slog.Error(name+" exited; restarting", "err", err, "backoff", backoff)
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(backoff):
-				}
-				if backoff < time.Minute {
-					backoff *= 2
-					if backoff > time.Minute {
-						backoff = time.Minute
-					}
-				}
-			}
+			_ = w.Run(ctx)
 		}()
 	}
 
-	pdfOutboxWorker := fanout.NewPDFOutboxWorker(pdfOutboxRepo, deps.Publisher, slog.Default())
-	startOutboxWorker("pdf outbox worker", pdfOutboxWorker.Run)
+	pdfOutboxWorker := fanout.NewStagingOutboxWorker(pdfOutboxRepo, deps.Publisher, func(r fanout.OutboxRow) messaging.Event {
+		return messaging.Event{
+			EventID:        messaging.EventID(uuid.NewString()),
+			EventType:      messaging.EventTypePDFConvert,
+			AggregateType:  messaging.AggregateType("document_revision"),
+			AggregateID:    messaging.AggregateID(r.RevisionID),
+			IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + r.TenantID + ":" + r.RevisionID),
+			Payload: messaging.PDFConvertPayload{
+				TenantID:    r.TenantID,
+				RevisionID:  r.RevisionID,
+				ContentHash: hex.EncodeToString(r.ContentHash),
+			},
+		}
+	}, slog.Default())
+	startOutboxWorker(pdfOutboxWorker)
 
-	materializeOutboxWorker := fanout.NewMaterializeOutboxWorker(materializeOutboxRepo, deps.Publisher, slog.Default())
-	startOutboxWorker("materialize outbox worker", materializeOutboxWorker.Run)
+	materializeOutboxWorker := fanout.NewStagingOutboxWorker(materializeOutboxRepo, deps.Publisher, func(r fanout.OutboxRow) messaging.Event {
+		return messaging.Event{
+			EventID:        messaging.EventID(uuid.NewString()),
+			EventType:      messaging.EventTypeMaterializeFanout,
+			AggregateType:  messaging.AggregateType("document_revision"),
+			AggregateID:    messaging.AggregateID(r.RevisionID),
+			IdempotencyKey: messaging.IdempotencyKey("materialize_fanout:" + r.TenantID + ":" + r.RevisionID),
+			Payload: messaging.MaterializeFanoutPayload{
+				TenantID:   r.TenantID,
+				RevisionID: r.RevisionID,
+			},
+		}
+	}, slog.Default())
+	startOutboxWorker(materializeOutboxWorker)
 
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService,

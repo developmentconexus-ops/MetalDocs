@@ -76,12 +76,9 @@ func (s *PostgresSignoffIdempStore) BeginStageReplay(ctx context.Context, tenant
 }
 
 func (s *PostgresSignoffIdempStore) beginReplay(ctx context.Context, store *idempotency.Store, tenantID, actorID, idempKey, payloadHash string) (SignoffReplayCommitter, *SignoffReplay, error) {
-	if store == nil {
-		return nil, nil, errors.New("idempotency store database not configured")
-	}
-	handle, replay, err := store.BeginReplay(ctx, tenantID, actorID, idempKey, payloadHash)
+	handle, replay, err := beginReplayRaw(ctx, store, tenantID, actorID, idempKey, payloadHash)
 	if err != nil || replay == nil {
-		if err != nil || handle == nil {
+		if handle == nil {
 			return nil, nil, err
 		}
 		return &SignoffReplayHandle{store: store, handle: handle}, nil, nil

@@ -78,12 +78,9 @@ func (s *PostgresRouteAdminIdempStore) BeginDeactivateReplay(ctx context.Context
 }
 
 func (s *PostgresRouteAdminIdempStore) beginReplay(ctx context.Context, store *idempotency.Store, tenantID, actorID, idempKey, payloadHash string) (application.RouteAdminReplayCommitter, *application.RouteAdminReplay, error) {
-	if store == nil {
-		return nil, nil, errors.New("idempotency store database not configured")
-	}
-	handle, replay, err := store.BeginReplay(ctx, tenantID, actorID, idempKey, payloadHash)
+	handle, replay, err := beginReplayRaw(ctx, store, tenantID, actorID, idempKey, payloadHash)
 	if err != nil || replay == nil {
-		if err != nil || handle == nil {
+		if handle == nil {
 			return nil, nil, err
 		}
 		return &routeAdminReplayHandle{store: store, handle: handle}, nil, nil

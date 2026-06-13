@@ -63,6 +63,18 @@ func TestPDFOutboxRepository_Enqueue_Idempotent(t *testing.T) {
 	}
 }
 
+func TestMaterializeOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+	repo := NewMaterializeOutboxRepository(db)
+	if err := repo.Enqueue(context.Background(), nil, "t1", "r1", []byte("hash")); err == nil {
+		t.Fatal("expected error on nil tx, got nil")
+	}
+}
+
 func TestPDFOutboxRepository_MarkDispatched(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

@@ -2,15 +2,18 @@ package fanout
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"metaldocs/internal/platform/messaging"
 )
 
-// fakeOutboxRepo implements outboxRepoAPI for testing.
+// fakeOutboxRepo implements stagingOutboxRepoAPI for testing.
 type fakeOutboxRepo struct {
 	rows          []OutboxRow
 	dispatchedIDs []string
@@ -50,10 +53,41 @@ func (p *fakeWorkerPublisher) Publish(_ context.Context, e messaging.Event) erro
 	return nil
 }
 
+// buildPDFEvent is the canonical PDF buildEvent closure (mirrors main.go wiring).
+func buildPDFEvent(r OutboxRow) messaging.Event {
+	return messaging.Event{
+		EventID:        messaging.EventID(uuid.NewString()),
+		EventType:      messaging.EventTypePDFConvert,
+		AggregateType:  messaging.AggregateType("document_revision"),
+		AggregateID:    messaging.AggregateID(r.RevisionID),
+		IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + r.TenantID + ":" + r.RevisionID),
+		Payload: messaging.PDFConvertPayload{
+			TenantID:    r.TenantID,
+			RevisionID:  r.RevisionID,
+			ContentHash: hex.EncodeToString(r.ContentHash),
+		},
+	}
+}
+
+// buildMaterializeEvent is the canonical materialize buildEvent closure (mirrors main.go wiring).
+func buildMaterializeEvent(r OutboxRow) messaging.Event {
+	return messaging.Event{
+		EventID:        messaging.EventID(uuid.NewString()),
+		EventType:      messaging.EventTypeMaterializeFanout,
+		AggregateType:  messaging.AggregateType("document_revision"),
+		AggregateID:    messaging.AggregateID(r.RevisionID),
+		IdempotencyKey: messaging.IdempotencyKey("materialize_fanout:" + r.TenantID + ":" + r.RevisionID),
+		Payload: messaging.MaterializeFanoutPayload{
+			TenantID:   r.TenantID,
+			RevisionID: r.RevisionID,
+		},
+	}
+}
+
 func TestPDFOutboxWorker_PublishSuccessMarksDispatched(t *testing.T) {
 	repo := &fakeOutboxRepo{rows: []OutboxRow{{ID: "id-1", TenantID: "t1", RevisionID: "r1"}}}
 	pub := &fakeWorkerPublisher{err: nil}
-	w := NewPDFOutboxWorker(repo, pub, slog.Default())
+	w := NewStagingOutboxWorker(repo, pub, buildPDFEvent, slog.Default())
 	w.tick(context.Background())
 	if len(repo.dispatchedIDs) != 1 || repo.dispatchedIDs[0] != "id-1" {
 		t.Fatalf("want id-1 dispatched, got %v", repo.dispatchedIDs)
@@ -66,7 +100,7 @@ func TestPDFOutboxWorker_PublishSuccessMarksDispatched(t *testing.T) {
 func TestPDFOutboxWorker_PublishFailIncrementsAttempts(t *testing.T) {
 	repo := &fakeOutboxRepo{rows: []OutboxRow{{ID: "id-2", TenantID: "t1", RevisionID: "r1", Attempts: 0}}}
 	pub := &fakeWorkerPublisher{err: errors.New("bus down")}
-	w := NewPDFOutboxWorker(repo, pub, slog.Default())
+	w := NewStagingOutboxWorker(repo, pub, buildPDFEvent, slog.Default())
 	w.tick(context.Background())
 	if len(repo.failedIDs) != 1 {
 		t.Fatalf("want failure recorded, got %v", repo.failedIDs)
@@ -79,7 +113,7 @@ func TestPDFOutboxWorker_PublishFailIncrementsAttempts(t *testing.T) {
 func TestPDFOutboxWorker_MaxAttemptsMarksFinal(t *testing.T) {
 	repo := &fakeOutboxRepo{rows: []OutboxRow{{ID: "id-3", TenantID: "t1", RevisionID: "r1", Attempts: 4}}}
 	pub := &fakeWorkerPublisher{err: errors.New("bus down")}
-	w := NewPDFOutboxWorker(repo, pub, slog.Default())
+	w := NewStagingOutboxWorker(repo, pub, buildPDFEvent, slog.Default())
 	w.tick(context.Background())
 	if len(repo.finalizedIDs) != 1 || repo.finalizedIDs[0] != "id-3" {
 		t.Fatalf("want id-3 finalized, got %v", repo.finalizedIDs)
@@ -89,7 +123,7 @@ func TestPDFOutboxWorker_MaxAttemptsMarksFinal(t *testing.T) {
 func TestPDFOutboxWorker_StopOnContext(t *testing.T) {
 	repo := &fakeOutboxRepo{}
 	pub := &fakeWorkerPublisher{}
-	w := NewPDFOutboxWorker(repo, pub, slog.Default())
+	w := NewStagingOutboxWorker(repo, pub, buildPDFEvent, slog.Default())
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- w.Run(ctx) }()
@@ -101,5 +135,30 @@ func TestPDFOutboxWorker_StopOnContext(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Run did not stop after context cancel")
+	}
+}
+
+func TestMaterializeOutboxWorker_PublishSuccessMarksDispatched(t *testing.T) {
+	repo := &fakeOutboxRepo{rows: []OutboxRow{{ID: "id-m1", TenantID: "t1", RevisionID: "r1"}}}
+	pub := &fakeWorkerPublisher{err: nil}
+	w := NewStagingOutboxWorker(repo, pub, buildMaterializeEvent, slog.Default())
+	w.tick(context.Background())
+	if len(repo.dispatchedIDs) != 1 || repo.dispatchedIDs[0] != "id-m1" {
+		t.Fatalf("want id-m1 dispatched, got %v", repo.dispatchedIDs)
+	}
+	if got, want := pub.events[0].IdempotencyKey, messaging.IdempotencyKey("materialize_fanout:t1:r1"); got != want {
+		t.Fatalf("IdempotencyKey = %q, want %q", got, want)
+	}
+}
+
+func TestStagingOutboxWorker_RunNeverReturnsError(t *testing.T) {
+	// Run() only returns nil; the restart loop in main.go was dead and has been removed.
+	repo := &fakeOutboxRepo{}
+	pub := &fakeWorkerPublisher{}
+	w := NewStagingOutboxWorker(repo, pub, buildPDFEvent, slog.Default())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := w.Run(ctx); err != nil {
+		t.Fatalf("Run must return nil, got %v", err)
 	}
 }
