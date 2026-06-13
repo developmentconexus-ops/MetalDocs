@@ -143,6 +143,7 @@ The operator overrode D-1/D-3 and ordered a zero-defer finish (register-zero + o
 
 > **Trigger:** independent 39-agent architecture audit ([`_artifacts/architecture-audit-2026-06-13.md`](_artifacts/architecture-audit-2026-06-13.md)) graded the backend **B** (7×B, 3×C) and surfaced ~23 NEW, mostly *structural* defects the Wave 0–Z register never catalogued. Goal: lift the 3 C-grade dimensions (module boundaries, contract layer, composition/observability) to A, fix the 6 MUST-FIX defects, close the program.
 > **Branch:** `qa/iam-area-membership`. One commit per defect family, tracker + audit disposition updated same-commit. Do NOT merge — operator review gate.
+> **Detailed drift-proof execution plan (per-task files/steps/verify/commit):** [`wave-h-plan.md`](wave-h-plan.md) — read it before executing any row.
 > **Skeptic dispositions (NOT re-raised):** oapi `NewStrictHandler` text/plain (REFUTED, dead code) · `tenantIDFromContext` DevTenantID fallback (REFUTED, idempotency-only) · CD/taxonomy infra importing `iam/authz` (intentional, ADR 0007) · role-name check / GeneratedServerAdapter / `authn` live os.Getenv (DOWNGRADED Minor).
 
 ### Tier 1 — MUST-FIX (block frontend / security)

@@ -1,0 +1,165 @@
+# Wave H — Detailed Execution Plan (drift-proof)
+
+> **Status:** ▶ in progress (2026-06-13). **Branch:** `qa/iam-area-membership`. **Do NOT merge** — operator review gate.
+> **Source of truth:** [`_artifacts/architecture-audit-2026-06-13.md`](_artifacts/architecture-audit-2026-06-13.md) (the 23-defect audit) + the **7-plane global-optimum assessment** (synthesis in [`roadmap.md`](roadmap.md) §"Global-optimum assessment"). This file is the durable per-task spec so a fresh session executes without re-deriving — same precedent as [`wave-z-plan.md`](wave-z-plan.md).
+> **Read order for a fresh session:** `CLAUDE.md` → `wiki/README.md` → `wiki/references/current-agent-handoff.md` → the audit → `roadmap.md` §Wave H → this file → the row you are executing.
+
+## Anti-drift rules (read every session)
+
+1. **One commit per sub-family.** Tracker row in [`roadmap.md`](roadmap.md) §Wave H **and** the audit disposition table updated **in the same commit**.
+2. **Stage explicit paths** — `git add <path>`, never `git add -A` (the untracked `.gitnexus/` cache breaks it with an mmap error). The `D .agents/skills/*` deletions in `git status` are pre-existing, NOT ours — never stage them.
+3. **Tests run `-p 2`** (C: SSD has degraded writes; `go test -p 2 ./...`).
+4. **Per-commit verify gate (minimum):** `go build ./...` · `go vet ./...` · targeted `go test -p 2 ./internal/modules/<touched>/...`. **Family-close gate:** add `go run ./scripts/api-lint/ -strict api/openapi/v1/openapi.yaml .` (if contract touched) + `go run ./tools/cilint/... ./...`.
+5. **Models:** Opus orchestrates; **sonnet** implements/reviews; **haiku** mechanical only; **never fable** workers; ≤15 concurrent agents.
+6. **Evidence rule:** no `done`/`green` without the command + output recorded in the tracker row.
+7. **Hard-stop rule:** if a fix balloons into one of the 5 deferred boundaries below (shared-API / authz-internal / storage-provider / workflow-semantic redesign), STOP, record the trigger, do NOT symptom-patch.
+8. **Semantics-preserving:** every Wave H change is a structural/quality refactor. Behavior identical; existing tests are the regression net. Where a test asserts the OLD structure (not behavior), update it and say so.
+
+## Execution order (conflict-minimized) + why
+
+`H-6 → H-3 → H-4 → H-1(a→b→c→d→e) → H-5 → H-2`
+
+- **H-6 first** — deletes dead code in `documents/application` → shrinks the surface H-1e/H-5 later touch.
+- **H-3, H-4** — medium, mostly delivery-layer; get them in before the big H-1 restructure churns the same files.
+- **H-1** — the big structural redesign (decision_service, CD repo, approval, documents delivery). Sub-ordered a→e so the mechanical/low-risk parts (setAuthzGUC, CD port, approval import) land before the TxRunner refactor (d) and the documents-delivery redesign (e).
+- **H-5 after H-1** — RecordSignoff SQL-extraction works on the TxRunner-shaped service (d); the documents `Service` interface split works on the migrated handler (e).
+- **H-2 LAST** — `main.go` extraction captures all prior wiring changes (CD→taxonomy port wiring, TxRunner wiring) in one final pass.
+
+---
+
+## Tier 1 — MUST-FIX (A1–A6): ✅ committed `1c31ffd70`(A1)…`ed1cf8376`(A6)
+
+Only residual: **A1 runtime WS-upgrade proof** (`statusWriter.Unwrap()` confirmed at `internal/platform/observability/http.go:328`) — execute at Wave H runtime-QA close: `.\scripts\start-api.ps1 -Build`, open `/api/v1/iam/presence/stream`, confirm 101 Switching Protocols (not 501).
+
+---
+
+## Tier 2 — Architecture debt (the work)
+
+### H-6 — Dead-code  ·  audit: Legacy/dead-code (B)  ·  assessor: n/a (pure deletion)
+
+**Goal:** delete proven-dead code; collapse the legacy non-atomic document-create chain into the atomic path.
+
+**Steps:**
+1. **`SnapshotFromTemplate`** — `internal/modules/documents/application/snapshot_service.go:45-68`. Audit: zero prod callers, no backfill binary exists, `// Deprecated` rationale unsupported. **Confirm** `grep -rn "SnapshotFromTemplate"` → only def + tests. Delete the method + its interface entry + dead tests + now-unused helpers/imports.
+2. **Legacy `CreateDocument` / `DuplicateDocument` chain** — `internal/modules/documents/application/service.go:226-229` (TODO-keyed, interface-bloating). The atomic create path exists (ADR — atomic CD create; find `CreateDocumentTx` / atomic constructor). **Migrate `DuplicateDocument` to call the atomic path**, then **delete** the legacy non-atomic `CreateDocument` chain + its `Service`/`Repository` interface methods once `grep` proves the only remaining callers are gone.
+
+**What NOT to do:** do not delete anything still referenced by a live route or worker. Grep is the source of truth (GitNexus stale).
+
+**Verify:** `go build ./...` · `go vet ./...` · `go test -p 2 ./internal/modules/documents/...` · grep proof of zero callers recorded in tracker.
+**Commit:** `refactor(documents): delete dead SnapshotFromTemplate + collapse legacy CreateDocument chain into atomic path (H-6)`
+
+---
+
+### H-3 — Persistence  ·  audit: Persistence (B)  ·  assessor: persistence-tx B− PATCH
+
+**Goal:** close torn-write windows (post-commit audit → in-tx) and the nil-tx autocommit trap.
+
+**Steps:**
+1. **Post-commit `audit.Record` → in-tx `audit.RecordTx`** in 5 delivery handlers. `RecordTx(db.Tx)` already exists. Move the audit emission **out of delivery, into the owning application service method**, inside the business tx:
+   - `internal/modules/iam/delivery/http/sessions_handler.go:213`
+   - `internal/modules/iam/delivery/http/routes_memberships.go:361`
+   - `internal/modules/iam/delivery/http/people_handler.go:480`
+   - `internal/modules/iam/delivery/http/admin_handler.go:402`
+   - `internal/modules/auth/delivery/http/handler.go:200`
+2. **Extend the `postcommitaudit` cilint analyzer** (`tools/cilint/...`) to catch the **cross-function** case the current one misses: business `Commit()` in the service layer + `audit.Record` (non-Tx) in the delivery layer. Add unit tests.
+3. **Reject nil-tx in `PostgresSequenceAllocator.NextAndIncrement`** — `internal/modules/controlleddocuments/infrastructure/repository.go:656-686`. Remove the `var exec db.Tx = a.db` autocommit fallback; nil tx → explicit error (no silent autocommit). The `nosqltxindomain`/`nodualmode` analyzers don't cover `infrastructure/` — this is a latent trap, currently unreachable in prod.
+
+**What NOT to do:** do not change audit semantics or add new audit events — only move the existing call site in-tx. Do not touch the authz path.
+
+**Verify:** `go build` · `go vet` · `go test -p 2 ./internal/modules/iam/... ./internal/modules/auth/... ./internal/modules/controlleddocuments/... ./tools/cilint/...` · `go run ./tools/cilint/... ./...` exit 0.
+**Commit:** `refactor(persistence): in-tx audit in 5 IAM/auth handlers + nil-tx reject in sequence allocator + analyzer (H-3)`
+
+---
+
+### H-4 — Contract  ·  audit: Contract (C)  ·  assessor: contract-api C PATCH
+
+**Goal:** close the typed `problem.Code` catalog over all delivery packages; kill raw error-code string literals.
+
+**Steps:**
+1. **Add the 2 off-catalog codes** to `internal/platform/problem/codes.go`: `CURSOR_EXPIRED` (domain pagination signal) and `NOT_IMPLEMENTED` (→ `CodeNotImplemented`). Off-catalog sites: `iam/.../people_handler.go:93` (CURSOR_EXPIRED), `people_handler.go:321` + `audit/.../handler.go:142,195,207,229` (NOT_IMPLEMENTED).
+2. **Replace raw error-code string literals with typed `problem.Code` consts** across the ~163 sites in **auth, iam, audit, security, search** delivery handlers (iam ~115, audit ~25, auth ~17, security ~4).
+3. **Extend the catalog CI guard** `internal/platform/problem/codes_catalog_guard_test.go:33-43` `guardedPackages` to cover `iam, audit, auth, search, security` (was 5 packages, now ~11).
+4. **FE regen (criteria #4)** — route through **`metaldocs-tanstack-query`** skill: regenerate the FE error-code catalog (`dump-error-codes.go`), add PT-BR messages for the 2 new codes, run FE coverage test green.
+
+**What NOT to do:** do not migrate IAM/auth/search raw-mux routing to ServerInterface here — that is **deferred boundary #3** (needs spec-prefix normalization). H-4 is codes-only.
+
+**Verify:** `go build` · `go vet` · `go test -p 2 ./internal/platform/problem/... ./internal/modules/{auth,iam,audit,security,search}/...` · FE: `cd frontend/apps/web; pnpm gen:api; npx tsc --noEmit` + FE coverage test.
+**Commit:** `refactor(contract): typed problem.Code across auth/iam/audit/security/search + catalog guard + 2 codes + FE regen (H-4)`
+
+---
+
+### H-1 — Module boundaries  ·  audit: Module boundaries (C)  ·  assessor: macro-topology B− REDESIGN (documents cluster)
+
+5 sub-commits. **H-1a → H-1b → H-1c → H-1d → H-1e.**
+
+#### H-1a — `setAuthzGUC` ×4 dedup → `authz.SeedTxIdentity`
+Delete the 4 copies, replace all call sites (19 in approval) with the canonical `authz.SeedTxIdentity` (`internal/modules/iam/authz/context.go:48` — has the empty-string guard the copies skip; batches both GUCs in one query):
+- `internal/modules/documents/approval/application/authz_guc.go:11`
+- `internal/modules/templates/application/authz_guc.go:9`
+- `internal/modules/taxonomy/infrastructure/authz_guc.go:14`
+- `internal/modules/controlleddocuments/application/service.go` (inline `setAuthzGUC` ~:377)
+**Verify:** build/vet + `go test -p 2 ./internal/modules/{documents/approval,templates,taxonomy,controlleddocuments}/...`. **Commit:** `refactor(authz): dedup setAuthzGUC x4 to authz.SeedTxIdentity (H-1a)`
+
+#### H-1b — CD → taxonomy read port (closes authz-skip + stale-column drift)
+Delete `controlleddocuments/infrastructure` `TaxonomyProfileReader` / `TaxonomyAreaReader` (`repository.go:720-799`) — they re-implement taxonomy `GetByCode` **without** the authz GUC + `CapTaxonomyView` check and **omit the `alias` column** the canonical reader has (`taxonomy/infrastructure/repository.go:103-126`). Define a **taxonomy read port** (interface in `taxonomy/domain` or a shared read-port package) that CD consumes via `controlleddocuments/module.go:34-35` wiring; CD calls taxonomy through a background-bypass context so the authz GUC + cap check + alias column are honored. **Regression-test the CD creation flow** (the missing-alias divergence is a real schema risk).
+**Verify:** build/vet + `go test -p 2 ./internal/modules/controlleddocuments/... ./internal/modules/taxonomy/...`. **Commit:** `refactor(controlleddocuments): consume taxonomy read port, delete duplicate readers (H-1b)`
+
+#### H-1c — approval delivery ↛ infrastructure
+`approval/http/handler.go:13` imports `approvalinfra` for `SignoffReplayCommitter` + `SignoffReplay` — delivery importing infrastructure (hexagonal inversion). **Move those interfaces up** to approval application/domain; delivery imports application only; the postgres impl stays in infrastructure and satisfies the application-layer interface.
+**Verify:** build/vet + `go test -p 2 ./internal/modules/documents/approval/...` + grep `approval/infrastructure` from `approval/http/` → 0. **Commit:** `refactor(approval): move SignoffReplay interfaces to application, delivery stops importing infrastructure (H-1c)`
+
+#### H-1d — `*sql.DB` → `TxRunner` port (the hexagonal root fix)
+Define `TxRunner` (`type TxRunner interface { Do(context.Context, func(db.Tx) error) error }`) + a postgres adapter wrapping `*sql.DB.BeginTx`. Replace the `*sql.DB` parameter in all approval (and CD/templates) **application** public methods with the runner so the application layer no longer receives the concrete DB type:
+`decision_service.go:152, submit_service.go:48, publish_service.go:49, cancel_service.go:44, obsolete_service.go:44, supersede_service.go:43, scheduler_service.go:45, route_admin_service.go:115/241/393/540, read_service.go:44`.
+**Boundary discipline:** keep `authz.Require` taking `*sql.Tx`; inside the runner callback, assert `db.Tx`→`*sql.Tx` at the authz call (existing `mustSQLTx` pattern). **Do NOT** lift `authz.Require`/`SeedTxIdentity` to `db.Tx` or re-key the capCache — that is **deferred boundary #4** (strongest area, risky). Update `main.go` wiring + test fakes (the custom `database/sql/driver` fakes in `coverage_boost_test.go` simplify to a synchronous runner fake).
+**Verify:** build/vet + `go test -p 2 ./internal/modules/documents/approval/... ./internal/modules/controlleddocuments/... ./internal/modules/templates/... ./apps/api/...`. **Commit:** `refactor(approval): TxRunner port replaces *sql.DB in application signatures (H-1d)`
+
+#### H-1e — documents delivery redesign (the one true REDESIGN trap)
+Delete the `GeneratedServerAdapter` 29-method param-discard shim (`documents/delivery/http/generated_adapter.go`) + the `buildLegacyMux` wiring (`documents/module.go:118-173`). **Migrate `documents/delivery/http/Handler` to implement `documentsapi.ServerInterface` directly** (consume typed params; `handler.go:113-141`). **Collapse the second delivery subtree** `documents/http/` (fillin, placeholder_options, view, reconstruct, pdf webhook — ~5-6 files) into `delivery/http/` as sub-handlers behind the generated interface, with shared error helpers. **Route-truth-table before & after** (use **`metaldocs-backend-api`** skill — runtime registrations vs spec vs generated `ServerInterface`).
+**What NOT to do:** leave `approval/http` (it's closest to target — `ServerInterfaceWrapper` + generated types; optional `HandlerWithOptions` upgrade is low-priority, not this commit). Do NOT change the public contract shape (no spec/regen unless a route is genuinely missing).
+**Verify:** build/vet + `go test -p 2 ./internal/modules/documents/...` + `go run ./scripts/api-lint/ -strict api/openapi/v1/openapi.yaml .` 0 + runtime route smoke. **Commit:** `refactor(documents): delete GeneratedServerAdapter, migrate Handler to ServerInterface, unify delivery (H-1e)`
+
+---
+
+### H-5 — Code quality  ·  audit: Code quality (B)  ·  assessor: async-workflow B− PATCH
+
+**Steps:**
+1. **`RecordSignoff` (407 lines, `decision_service.go:152-558`)** — **do NOT fragment the atomic transaction** (async assessor: the length is genuine indivisible approval-transaction complexity; splitting breaks atomicity). Instead **move the raw SQL helpers into `ApprovalRepository` methods**: `loadPriorSignoffs, loadStageSignoffs, loadActiveDocumentContentHash, hasUnresolvedComments, resolveEligibleActors, loadRoute` (`decision_service.go:582-741`, `submit_service.go:267-353`) → `ApprovalRepository` interface (`repository/approval_repository.go:59-81`) + postgres impl. After H-1d the BeginTx/Rollback boilerplate is already a callback, so this is the remaining work.
+2. **Documents `Handler.Service` 28-method fat interface** (`delivery/http/handler.go:30-59`) — split into cohesive sub-interfaces; **drop the 4 unused methods**. After H-1e.
+3. **`PeopleService.ListFiltered`** (`iam/application/people_service.go:511-581`) — rewrite to **filter + paginate in SQL**, killing the load-all-users + N+1 membership query + the swallowed error.
+
+**Verify:** build/vet + `go test -p 2 ./internal/modules/documents/... ./internal/modules/iam/...`.
+**Commit:** `refactor(quality): RecordSignoff SQL→repo, split documents Service interface, SQL-paginate PeopleService.ListFiltered (H-5)`
+
+---
+
+### H-2 — Composition / observability  ·  audit: Composition/obs (C)  ·  assessor: composition C PATCH ("C→A, no redesign") + observability C+ PATCH
+
+**Steps (LAST — captures all prior main.go wiring changes):**
+1. **Extract 13 inline adapters** from `apps/api/cmd/metaldocs-api/main.go` (lines 89, 93, 822, 833, 841, 882, 958, 972, 992, 1007, 1021, 1065, 1086) into `apps/api/internal/wiring/` files (`audit_adapters.go`, `documents_adapters.go`, `search_adapters.go`, `taxonomy_adapters.go`, `clock.go`) — ~300 lines out, beside the existing `wiring/documents.go`. Pure move; watch for import cycles (`go build` after each).
+2. **Typed config loaders** in `internal/platform/config/`: `LoadFanoutConfig` (METALDOCS_FANOUT_URL + METALDOCS_DOCX_RENDERER_SERVICE_TOKEN), `LoadServerConfig` (APP_PORT), `LoadMigrationConfig` (METALDOCS_SKIP_STARTUP_MIGRATIONS + METALDOCS_MIGRATIONS_DIR), `LoadRetentionConfig` (AUDIT_RETENTION_DAYS). Delete the 9 bare `os.Getenv` in `main.go` (141, 171, 204, 205, 420, 424, 644, 694, 945) + 2 in `bootstrap/worker.go:50-51`. (METALDOCS_E2E gate may stay or become `LoadE2EConfig` — minor.)
+3. **Decompose `main()`** (153-745) via extract-function (extend the existing `buildTaxonomyModule` pattern at 793-820): `buildApprovalPipeline`, `buildFanoutComponents`, `buildJobScheduler`, `buildPresenceSubsystem`, `buildDocumentModule`, `buildMux`, `buildServer` → `main()` ~100 lines.
+4. **`slog.SetDefault(JSON)` per binary** (api/worker/jobs) before first log; **remove the private logger** at `observability/http.go:62` (use `slog.Default()`); replace every `log.Fatalf` → `slog.Error(...)` + `os.Exit(1)` in all 3 mains.
+5. **Worker graceful drain** (`apps/worker/.../main.go` — drain the in-flight batch on signal before exit). **Jobs `Cleanup` on exit**: `apps/jobs/.../main.go:57` `log.Fatalf` skips `defer deps.Cleanup()` (os.Exit bypasses defers) → restructure so Cleanup always runs. **Per-binary OTel `service.name`**: worker/jobs call `SetupOTel` with `OTEL_SERVICE_NAME=metaldocs-worker` / `metaldocs-jobs`; `otel.go:50` hardcoded `"metaldocs-api"` → read from `OTEL_SERVICE_NAME` via `resource.Default()`.
+
+**What NOT to do:** do NOT replace the bespoke `/api/v1/metrics` ring-buffer — that is **deferred boundary #1**. No DI framework (Wire/Fx) — manual wiring is correct.
+
+**Verify:** build/vet + `go test -p 2 ./apps/... ./internal/platform/config/... ./internal/platform/observability/...` + runtime boot (`.\scripts\start-api.ps1 -Build`, login 200, structured JSON logs). **Commit:** `refactor(composition): extract main.go adapters+builders to wiring, typed config, slog/OTel/drain per binary (H-2)`
+
+---
+
+## Deferred boundaries (5) — bigger than Wave H; written triggers, NOT silent patches
+
+| # | Boundary | Why deferred | Trigger |
+|---|----------|--------------|---------|
+| D-H1 | Bespoke `/api/v1/metrics` ring-buffer → OTel-metrics / Prometheus scrape (`observability/http.go:20-48,196-216,332-367`) | Introduces an ops/deploy dependency (collector); not OTel/Prometheus-scrapeable today. OTel SDK already vendored (Z-1) → path is clear. | Operator stands up a metrics collector / first SLO-alerting need. |
+| D-H2 | Promote `documents/approval/` → peer module `internal/modules/approval/` (109 files) | Coupling to documents is already the canonical FK-based anti-corruption pattern → relocation is organizational, high churn / low correctness gain. A 109-file rename belongs in its own reviewed PR. | Next major approval feature / when the documents facade is otherwise refactored. |
+| D-H3 | IAM/auth/search raw-mux → generated `ServerInterface` (`iam/.../people_handler.go:1-60`; auth/search have no `api/` package) | Needs spec-prefix normalization (`/iam` vs `/api/v1/iam`) + regen + 3-handler migration; FE-facing. A5 already fixed the one breaking endpoint. | Next IAM/auth contract change. |
+| D-H4 | Lift `authz.Require`/`SeedTxIdentity` `*sql.Tx`→`db.Tx` + re-key capCache off `*sql.Tx` pointer identity (`iam/authz/authz.go:76`, `context.go:48`) | Strongest area; capCache pointer-keyed map (`assertedByTxPtr`) re-key is a real correctness risk. Operator directive: don't touch authz internals. H-1d keeps authz untouched via `mustSQLTx`. | Explicit authz-layer work. |
+| D-H5 | Tier-1 `CanDo` per-request 4-union DB query → per-(user,tenant,cap) TTL cache (`iam/application/capability_service.go:40`) | Perf/load gap (uncached SELECT on every authenticated request). Touches the authz path. The "Redis authz cache" in the target diagram is aspirational — no Redis wired. | RF-3 / tenant-scale p95 regression (hundreds concurrent users). |
+
+---
+
+## Wave H DONE gate
+
+All Tier-1 + Tier-2 rows ✅-or-deferred-with-trigger · static gates green (`go build` · `go vet` · `go test -p 2 ./...` · `api-lint -strict` 0 · `cilint` exit 0) · runtime QA (A1 WS upgrade 101, in-tx audit row, RLS NOSUPERUSER, 429/lockout, panic→500) · FE types regen + coverage green · audit dispositions + `roadmap.md` Wave H + `current-agent-handoff.md` close-out updated. **NOT merged — present evidence for operator review.**
