@@ -3,7 +3,10 @@ package observability
 import (
 	"context"
 	"database/sql"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type RuntimeStatusProvider interface {
@@ -282,36 +285,68 @@ func (p *StaticRuntimeStatusProvider) applyDependencyChecks(ctx context.Context,
 	if len(p.checks) == 0 {
 		return checks
 	}
+
 	// status/code are optional out-params so Ready can reuse this helper without
 	// allocating a result wrapper for the common static-provider fast path.
-	for _, check := range p.checks {
-		if check.Check == nil {
-			continue
-		}
-		readyCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		result, err := check.Check(readyCtx)
-		cancel()
+	//
+	// All dependency checks share a single 5s budget via errgroup so the probe
+	// latency is bounded by the slowest single check, not their sum.
+	type checkEntry struct {
+		index int
+		entry map[string]any
+	}
 
-		entry := map[string]any{
-			"name":   check.Name,
-			"status": "up",
+	active := make([]DependencyCheck, 0, len(p.checks))
+	for _, c := range p.checks {
+		if c.Check != nil {
+			active = append(active, c)
 		}
-		if result.Status != "" {
-			entry["status"] = result.Status
-		}
-		if result.Detail != "" {
-			entry["detail"] = result.Detail
-		}
-		for key, value := range result.Meta {
-			entry[key] = value
-		}
-		if err != nil {
-			entry["status"] = "down"
-			entry["detail"] = truncateReadinessError(err)
-		}
-		checks = append(checks, entry)
+	}
+	if len(active) == 0 {
+		return checks
+	}
 
-		state := entry["status"]
+	budgetCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	results := make([]checkEntry, len(active))
+	var mu sync.Mutex
+
+	g, gCtx := errgroup.WithContext(budgetCtx)
+	for i, check := range active {
+		i, check := i, check
+		g.Go(func() error {
+			result, err := check.Check(gCtx)
+			entry := map[string]any{
+				"name":   check.Name,
+				"status": "up",
+			}
+			if result.Status != "" {
+				entry["status"] = result.Status
+			}
+			if result.Detail != "" {
+				entry["detail"] = result.Detail
+			}
+			for key, value := range result.Meta {
+				entry[key] = value
+			}
+			if err != nil {
+				entry["status"] = "down"
+				entry["detail"] = truncateReadinessError(err)
+			}
+			mu.Lock()
+			results[i] = checkEntry{index: i, entry: entry}
+			mu.Unlock()
+			return nil
+		})
+	}
+	// errgroup.Go callbacks never return a non-nil error here; wait only for
+	// completion.
+	_ = g.Wait()
+
+	for _, r := range results {
+		checks = append(checks, r.entry)
+		state := r.entry["status"]
 		if state != "up" && state != "skipped" {
 			if status != nil {
 				*status = "degraded"
