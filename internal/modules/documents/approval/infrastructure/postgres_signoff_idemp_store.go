@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/platform/idempotency"
 )
 
@@ -14,19 +15,6 @@ const (
 	documentSignoffRouteTemplate = "POST /api/v1/documents/{id}/signoff"
 	stageSignoffRouteTemplate    = "POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs"
 )
-
-type SignoffReplay struct {
-	Outcome string `json:"outcome"`
-}
-
-// SignoffReplayCommitter is the slot handle a winning caller must resolve with
-// exactly one of Complete or Fail. It is returned as an interface so HTTP
-// handlers depend on the behaviour, not the Postgres-bound concrete type, which
-// keeps the replay seam unit-testable with an in-memory double.
-type SignoffReplayCommitter interface {
-	Complete(outcome string) error
-	Fail(cause error) error
-}
 
 type SignoffReplayHandle struct {
 	store  *idempotency.Store
@@ -37,7 +25,7 @@ func (h *SignoffReplayHandle) Complete(outcome string) error {
 	if h == nil || h.store == nil || h.handle == nil {
 		return errors.New("idempotency store not configured")
 	}
-	body, err := json.Marshal(SignoffReplay{Outcome: outcome})
+	body, err := json.Marshal(application.SignoffReplay{Outcome: outcome})
 	if err != nil {
 		return fmt.Errorf("signoff idempotency: marshal replay response: %w", err)
 	}
@@ -67,15 +55,15 @@ func NewPostgresSignoffIdempStore(db *sql.DB) *PostgresSignoffIdempStore {
 	}
 }
 
-func (s *PostgresSignoffIdempStore) BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (SignoffReplayCommitter, *SignoffReplay, error) {
+func (s *PostgresSignoffIdempStore) BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {
 	return s.beginReplay(ctx, s.document, tenantID, actorID, idempKey, payloadHash)
 }
 
-func (s *PostgresSignoffIdempStore) BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (SignoffReplayCommitter, *SignoffReplay, error) {
+func (s *PostgresSignoffIdempStore) BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {
 	return s.beginReplay(ctx, s.stage, tenantID, actorID, idempKey, payloadHash)
 }
 
-func (s *PostgresSignoffIdempStore) beginReplay(ctx context.Context, store *idempotency.Store, tenantID, actorID, idempKey, payloadHash string) (SignoffReplayCommitter, *SignoffReplay, error) {
+func (s *PostgresSignoffIdempStore) beginReplay(ctx context.Context, store *idempotency.Store, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {
 	handle, replay, err := beginReplayRaw(ctx, store, tenantID, actorID, idempKey, payloadHash)
 	if err != nil || replay == nil {
 		if handle == nil {
@@ -83,7 +71,7 @@ func (s *PostgresSignoffIdempStore) beginReplay(ctx context.Context, store *idem
 		}
 		return &SignoffReplayHandle{store: store, handle: handle}, nil, nil
 	}
-	var envelope SignoffReplay
+	var envelope application.SignoffReplay
 	if err := json.Unmarshal(replay.Body, &envelope); err != nil {
 		return nil, nil, err
 	}

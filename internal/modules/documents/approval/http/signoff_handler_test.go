@@ -12,7 +12,6 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	approvalinfra "metaldocs/internal/modules/documents/approval/infrastructure"
 	approvalsignature "metaldocs/internal/modules/documents/approval/infrastructure/signature"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -337,12 +336,12 @@ type fakeIdempStore struct {
 	failed    bool
 }
 
-func (f *fakeIdempStore) begin(kind, tenantID, actorID, key, payloadHash string) (approvalinfra.SignoffReplayCommitter, *approvalinfra.SignoffReplay, error) {
+func (f *fakeIdempStore) begin(kind, tenantID, actorID, key, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {
 	f.gotHash = payloadHash
 	k := kind + ":" + tenantID + ":" + actorID + ":" + key
 	if v, ok := f.entries[k]; ok {
 		f.completed = true
-		return nil, &approvalinfra.SignoffReplay{Outcome: v}, nil
+		return nil, &application.SignoffReplay{Outcome: v}, nil
 	}
 	if f.slots == nil {
 		f.slots = map[string]*idempSlot{}
@@ -353,7 +352,7 @@ func (f *fakeIdempStore) begin(kind, tenantID, actorID, key, payloadHash string)
 		}
 		if s.completed {
 			f.completed = true
-			return nil, &approvalinfra.SignoffReplay{Outcome: s.outcome}, nil
+			return nil, &application.SignoffReplay{Outcome: s.outcome}, nil
 		}
 	}
 	s := &idempSlot{hash: payloadHash}
@@ -361,11 +360,11 @@ func (f *fakeIdempStore) begin(kind, tenantID, actorID, key, payloadHash string)
 	return &fakeReplayHandle{store: f, key: k, slot: s}, nil, nil
 }
 
-func (f *fakeIdempStore) BeginDocumentReplay(_ context.Context, tenantID, actorID, key, payloadHash string) (approvalinfra.SignoffReplayCommitter, *approvalinfra.SignoffReplay, error) {
+func (f *fakeIdempStore) BeginDocumentReplay(_ context.Context, tenantID, actorID, key, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {
 	return f.begin("document", tenantID, actorID, key, payloadHash)
 }
 
-func (f *fakeIdempStore) BeginStageReplay(_ context.Context, tenantID, actorID, key, payloadHash string) (approvalinfra.SignoffReplayCommitter, *approvalinfra.SignoffReplay, error) {
+func (f *fakeIdempStore) BeginStageReplay(_ context.Context, tenantID, actorID, key, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {
 	return f.begin("stage", tenantID, actorID, key, payloadHash)
 }
 

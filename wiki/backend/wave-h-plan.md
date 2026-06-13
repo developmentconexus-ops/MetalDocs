@@ -129,9 +129,17 @@ Delete `controlleddocuments/infrastructure` `TaxonomyProfileReader` / `TaxonomyA
 
 **Gates (all green):** `go build ./...` 0 · `go vet ./...` 0 · `go test -p 2 ./...` 0 failures · `api-lint -strict` 0 violations · `cilint` exit 0. Contract-neutral (internal read wiring only — no OpenAPI/route change).
 
-#### H-1c — approval delivery ↛ infrastructure
+#### H-1c — approval delivery ↛ infrastructure  ·  ✅ DONE (this commit)
 `approval/http/handler.go:13` imports `approvalinfra` for `SignoffReplayCommitter` + `SignoffReplay` — delivery importing infrastructure (hexagonal inversion). **Move those interfaces up** to approval application/domain; delivery imports application only; the postgres impl stays in infrastructure and satisfies the application-layer interface.
 **Verify:** build/vet + `go test -p 2 ./internal/modules/documents/approval/...` + grep `approval/infrastructure` from `approval/http/` → 0. **Commit:** `refactor(approval): move SignoffReplay interfaces to application, delivery stops importing infrastructure (H-1c)`
+
+**Execution (2026-06-13):**
+- New `approval/application/signoff_idemp.go` holds `SignoffReplay` (struct) + `SignoffReplayCommitter` (interface) — mirrors the **existing** `route_admin_idemp.go` precedent (`RouteAdminReplay`/`RouteAdminReplayCommitter` already live in application; `PostgresRouteAdminIdempStore` returns them). Signoff was the lone holdout with the types in infra.
+- `infrastructure/postgres_signoff_idemp_store.go` deletes its local type defs and now references `application.SignoffReplay`/`SignoffReplayCommitter` (infra→application is the established direction — root infra already imports application in `postgres_route_admin_idemp_store.go`, no cycle). `SignoffReplayHandle`/`PostgresSignoffIdempStore` concretes unchanged, still satisfy the application interface.
+- Delivery (`handler.go`, `doc_approval_handler.go`, `signoff_handler_test.go`) now references `application.*`; the `approvalinfra` (root infrastructure) import is removed from all three. The consumer-defined `signoffIdempStore` port stays in delivery (legitimate — delivery may define the narrow port it needs; the inversion was only the infra *type* reference). CD's existing fakes unchanged.
+- **Verify:** root-infra import from `approval/http/` (prod) → **0**; build/vet/`test -p 2 ./...`/api-lint -strict 0/cilint 0. Contract-neutral (no route/spec/codegen change).
+
+**Bounded defer (recorded, not in H-1c scope):** `approval/http/errors.go:16` still imports `infrastructure/signature` to **map** its sentinel errors (`ErrInvalidCredentials`, `ErrRateLimited`, `ErrUnknownSignatureMethod`, `ErrRateLimiterConfig`) to HTTP codes. This is the standard edge error-mapping idiom (not type-coupling), and `application` already depends on `infrastructure/signature`. Relocating those sentinels to domain/application would touch `decision_service.go` + the signature sub-domain — a separate refactor. **Trigger to action:** when H-1d/H-1e or a future signature-verifier change reopens that sub-domain, lift the four sentinels to `approval/domain` (authn outcomes are domain-semantic) and have both delivery and the signature impl reference the domain errors.
 
 #### H-1d — `*sql.DB` → `TxRunner` port (the hexagonal root fix)
 Define `TxRunner` (`type TxRunner interface { Do(context.Context, func(db.Tx) error) error }`) + a postgres adapter wrapping `*sql.DB.BeginTx`. Replace the `*sql.DB` parameter in all approval (and CD/templates) **application** public methods with the runner so the application layer no longer receives the concrete DB type:

@@ -11,7 +11,6 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	approvalinfra "metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/documents/approval/repository"
 )
 
@@ -31,7 +30,7 @@ func (h *Handler) loadActiveInstanceByDocumentForMutation(r *http.Request, tenan
 // is not orphaned until expiry. A non-nil release error is logged (not fatal):
 // the primary error is already being returned to the client, and the platform
 // store reclaims expired orphans on its own.
-func failReplaySlot(handle approvalinfra.SignoffReplayCommitter, cause error) {
+func failReplaySlot(handle application.SignoffReplayCommitter, cause error) {
 	if handle == nil {
 		return
 	}
@@ -134,7 +133,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	// carries no document ID, so docID is also what isolates distinct documents
 	// under a reused key.
 	payloadHash := signoffPayloadHash(docID, "", "", decision, contractReq.Reason, contractReq.ContentHash)
-	var replayHandle approvalinfra.SignoffReplayCommitter
+	var replayHandle application.SignoffReplayCommitter
 	if h.idempStore != nil {
 		handle, replay, err := h.idempStore.BeginDocumentReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
 		if err != nil {

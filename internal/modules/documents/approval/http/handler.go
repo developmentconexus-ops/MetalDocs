@@ -10,7 +10,6 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
-	approvalinfra "metaldocs/internal/modules/documents/approval/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/tenant"
 )
@@ -59,8 +58,8 @@ var (
 // keyed by (tenantID, actorID, route template, idempotency key); payloadHash is a
 // misuse guard that must be derived only from client-stable request inputs.
 type signoffIdempStore interface {
-	BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (approvalinfra.SignoffReplayCommitter, *approvalinfra.SignoffReplay, error)
-	BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (approvalinfra.SignoffReplayCommitter, *approvalinfra.SignoffReplay, error)
+	BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error)
+	BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error)
 }
 
 type Handler struct {
