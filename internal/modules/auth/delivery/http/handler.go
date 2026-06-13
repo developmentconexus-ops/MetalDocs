@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -78,7 +78,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		// is PII and an account-enumeration aid. The full identifier survives only
 		// in the structured audit record below.
 		identifierHash := hashIdentifier(req.Identifier)
-		log.Printf("auth login failed for sha256=%s: %v", identifierHash, err)
+		slog.Warn("auth login failed", "sha256", identifierHash, "err", err)
 		http.SetCookie(w, h.service.ExpiredSessionCookie())
 		h.recordAudit(r, "", "auth.login.failed", identifierHash, map[string]any{
 			"identifier_sha256": identifierHash,
@@ -103,7 +103,7 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	if cookie, err := r.Cookie(h.service.SessionCookieName()); err == nil {
 		if err := h.service.Logout(r.Context(), cookie.Value); err != nil {
-			log.Printf("auth logout failed: %v", err)
+			slog.Error("auth logout failed", "err", err)
 			http.SetCookie(w, h.service.ExpiredSessionCookie())
 			h.writeAuthError(w, err)
 			return
@@ -146,7 +146,7 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.service.ChangePasswordForUser(r.Context(), user, req.CurrentPassword, req.NewPassword); err != nil {
-		log.Printf("auth change password failed for %q: %v", strings.TrimSpace(user.UserID), err)
+		slog.Warn("auth change password failed", "user_id", strings.TrimSpace(user.UserID), "err", err)
 		h.writeAuthError(w, err)
 		return
 	}
@@ -189,7 +189,7 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 	}
 	raw, marshalErr := json.Marshal(payload)
 	if marshalErr != nil {
-		log.Printf("auth audit payload marshal failed action=%s actor=%s: %v", action, actorID, marshalErr)
+		slog.Warn("auth audit payload marshal failed", "action", action, "actor", actorID, "err", marshalErr)
 		return
 	}
 	traceID := requesttrace.Resolve(r.Context())
@@ -208,13 +208,13 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 		TraceID:      traceID,
 		TenantID:     tenantID,
 	}); err != nil {
-		log.Printf("auth audit write failed action=%s actor=%s: %v", action, actorID, err)
+		slog.Warn("auth audit write failed", "action", action, "actor", actorID, "err", err)
 	}
 }
 
 func (h *Handler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
 	if err := problem.Write(w, p); err != nil {
-		log.Printf("auth problem write failed: %v", err)
+		slog.Warn("auth problem write failed", "err", err)
 	}
 }
 

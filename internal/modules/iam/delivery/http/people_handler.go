@@ -14,7 +14,7 @@ package httpdelivery
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -93,7 +93,7 @@ func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) 
 			h.writeProblem(w, problem.New(http.StatusGone, "CURSOR_EXPIRED", "The pagination cursor refers to an item that is no longer available. Restart from the first page."))
 			return
 		}
-		log.Printf("iam people: list users failed: %v", err)
+		slog.Error("iam people: list users failed", "err", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users"))
 		return
 	}
@@ -322,7 +322,7 @@ func (h *PeopleHandler) handleBulk(w http.ResponseWriter, r *http.Request) {
 			h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
 			return
 		}
-		log.Printf("iam people: bulk action failed: %v", err)
+		slog.Error("iam people: bulk action failed", "err", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Bulk action failed"))
 		return
 	}
@@ -415,7 +415,7 @@ func (h *PeopleHandler) guardUserInTenant(w http.ResponseWriter, r *http.Request
 			h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
 			return false
 		}
-		log.Printf("iam people: verify user-in-tenant failed: %v", err)
+		slog.Error("iam people: verify user-in-tenant failed", "err", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to verify user"))
 		return false
 	}
@@ -424,7 +424,7 @@ func (h *PeopleHandler) guardUserInTenant(w http.ResponseWriter, r *http.Request
 
 func (h *PeopleHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
 	if werr := problem.Write(w, p); werr != nil {
-		log.Printf("iam people: write response failed: %v", werr)
+		slog.Warn("iam people: write response failed", "err", werr)
 	}
 }
 
@@ -445,7 +445,7 @@ func (h *PeopleHandler) writePeopleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, iamdomain.ErrInvalidRole):
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid role"))
 	default:
-		log.Printf("iam people: handler error: %v", err)
+		slog.Error("iam people: handler error", "err", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to process people request"))
 	}
 }
@@ -485,7 +485,7 @@ func (h *PeopleHandler) recordAudit(r *http.Request, userID, action string, payl
 		TraceID:      r.Header.Get("X-Trace-Id"),
 		TenantID:     tenantID,
 	}); err != nil {
-		log.Printf("audit: failed to record %s for user %s: %v", action, userID, err)
+		slog.Warn("audit: failed to record", "action", action, "user_id", userID, "err", err)
 	}
 }
 

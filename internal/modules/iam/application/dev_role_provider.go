@@ -2,7 +2,7 @@ package application
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strings"
 
 	"metaldocs/internal/modules/iam/domain"
@@ -19,7 +19,7 @@ func NewDevRoleProvider(rolesByUser map[string][]domain.Role, allowedTenantID st
 		rolesByUser = map[string][]domain.Role{}
 	}
 	allowedTenantID = strings.TrimSpace(allowedTenantID)
-	log.Printf("iam: using dev role provider; restrict access to tenant %q", allowedTenantID)
+	slog.Info("iam: using dev role provider", "allowed_tenant_id", allowedTenantID)
 	return &DevRoleProvider{rolesByUser: rolesByUser, allowedTenantID: allowedTenantID}
 }
 

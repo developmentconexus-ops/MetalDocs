@@ -2,7 +2,7 @@ package jobs
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"metaldocs/internal/modules/documents/repository"
@@ -25,11 +25,11 @@ func StartOrphanPendingSweeper(ctx context.Context, r *repository.Repository, in
 				cutoff := time.Now().UTC().Add(-maxAge)
 				n, err := r.DeleteExpiredPending(ctx, cutoff)
 				if err != nil {
-					log.Printf("orphan_pending_sweeper error: %v", err)
+					slog.Warn("orphan_pending_sweeper error", "err", err)
 					continue
 				}
 				if n > 0 {
-					log.Printf("orphan_pending_sweeper deleted=%d", n)
+					slog.Info("orphan_pending_sweeper deleted", "deleted", n)
 				}
 			}
 		}

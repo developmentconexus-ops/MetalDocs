@@ -2,7 +2,7 @@ package approvalhttp
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -103,7 +103,7 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 	outcome := signoffOutcome(result)
 	if replayHandle != nil {
 		if err := replayHandle.Complete(outcome); err != nil {
-			log.Printf("WARN signoff idempotency record failed (non-fatal): %v", err)
+			slog.Warn("signoff idempotency record failed (non-fatal)", "err", err)
 		}
 	}
 

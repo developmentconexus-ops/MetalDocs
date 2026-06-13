@@ -3,7 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -384,7 +384,7 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 		// so the actor sees a stable 403 forbidden_role response. A failed
 		// audit append is best-effort observability and logged separately.
 		if appendErr := s.repo.AppendAudit(ctx, denied); appendErr != nil {
-			log.Printf("templates publish: append denied audit failed: %v", appendErr)
+			slog.Warn("templates publish: append denied audit failed", "err", appendErr)
 		}
 		return nil, domain.ErrForbiddenRole
 	}

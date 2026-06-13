@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -36,7 +36,7 @@ func failReplaySlot(handle approvalinfra.SignoffReplayCommitter, cause error) {
 		return
 	}
 	if err := handle.Fail(cause); err != nil {
-		log.Printf("WARN signoff idempotency slot release failed (non-fatal): %v", err)
+		slog.Warn("signoff idempotency slot release failed (non-fatal)", "err", err)
 	}
 }
 
@@ -192,7 +192,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	outcome := signoffOutcome(result)
 	if replayHandle != nil {
 		if err := replayHandle.Complete(outcome); err != nil {
-			log.Printf("WARN signoff idempotency record failed (non-fatal): %v", err)
+			slog.Warn("signoff idempotency record failed (non-fatal)", "err", err)
 		}
 	}
 	WriteJSON(w, http.StatusOK, contracts.SignoffResponse{

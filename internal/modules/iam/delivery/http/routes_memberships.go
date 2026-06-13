@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -127,7 +127,7 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 	}
 	tenantWide, hasManagedAreas, err := h.svc.DirectoryScope(r.Context(), tenantID, actor, string(iamdomain.CapMembershipManage))
 	if err != nil {
-		log.Printf("iam memberships: resolve directory scope failed: %v", err)
+		slog.Error("iam memberships: resolve directory scope failed", "err", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list memberships"))
 		return
 	}
@@ -158,7 +158,7 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 		items, err = h.svc.ListByTenant(r.Context(), tenantID, userID, areaCode, role)
 	}
 	if err != nil {
-		log.Printf("iam memberships: list failed: %v", err)
+		slog.Error("iam memberships: list failed", "err", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list memberships"))
 		return
 	}
@@ -297,7 +297,7 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 
 func (h *MembershipHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
 	if werr := problem.Write(w, p); werr != nil {
-		log.Printf("iam memberships: write response failed: %v", werr)
+		slog.Warn("iam memberships: write response failed", "err", werr)
 	}
 }
 
@@ -315,7 +315,7 @@ func (h *MembershipHandler) writeMembershipError(w http.ResponseWriter, err erro
 	case errors.Is(err, iamapp.ErrUnknownRole):
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "UNKNOWN_ROLE", "Unknown role"))
 	default:
-		log.Printf("iam memberships: handler error: %v", err)
+		slog.Error("iam memberships: handler error", "err", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", defaultMessage))
 	}
 }
@@ -334,7 +334,7 @@ func (h *MembershipHandler) guardMembershipUserInTenant(w http.ResponseWriter, r
 			h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
 			return false
 		}
-		log.Printf("iam memberships: verify user-in-tenant failed: %v", err)
+		slog.Error("iam memberships: verify user-in-tenant failed", "err", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to verify user"))
 		return false
 	}
@@ -349,12 +349,12 @@ func (h *MembershipHandler) recordMembershipAudit(r *http.Request, userID, actio
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		log.Printf("audit: skip %s for user %s — tenant missing from context: %v", action, userID, err)
+		slog.Warn("audit: skip — tenant missing from context", "action", action, "user_id", userID, "err", err)
 		return
 	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("audit: skip %s for user %s — payload marshal failed: %v", action, userID, err)
+		slog.Warn("audit: skip — payload marshal failed", "action", action, "user_id", userID, "err", err)
 		return
 	}
 	now := time.Now().UTC()
@@ -369,7 +369,7 @@ func (h *MembershipHandler) recordMembershipAudit(r *http.Request, userID, actio
 		TraceID:      r.Header.Get("X-Trace-Id"),
 		TenantID:     tenantID,
 	}); err != nil {
-		log.Printf("audit: failed to record %s for user %s: %v", action, userID, err)
+		slog.Warn("audit: failed to record", "action", action, "user_id", userID, "err", err)
 	}
 }
 

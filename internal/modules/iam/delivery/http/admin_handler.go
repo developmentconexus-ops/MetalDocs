@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -219,7 +218,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	})
 
 	if err := g.Wait(); err != nil {
-		log.Printf("iam admin: overview composition failed: %v", err)
+		slog.Error("iam admin: overview composition failed", "err", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load admin overview"))
 		return
 	}
@@ -411,7 +410,7 @@ func (h *AdminHandler) recordAudit(r *http.Request, userID, action string, paylo
 		TraceID:      r.Header.Get("X-Trace-Id"),
 		TenantID:     tenantID,
 	}); err != nil {
-		log.Printf("audit: failed to record %s for user %s: %v", action, userID, err)
+		slog.Warn("audit: failed to record", "action", action, "user_id", userID, "err", err)
 	}
 }
 

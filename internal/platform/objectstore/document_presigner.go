@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -77,7 +77,7 @@ func (p *DocumentPresigner) AdoptTempObject(ctx context.Context, tmpKey, finalKe
 		return fmt.Errorf("presign: %w", err)
 	}
 	if err := p.client.RemoveObject(ctx, p.bucket, tmpKey, minio.RemoveObjectOptions{}); err != nil && !isNoSuchKeyErr(err) {
-		log.Printf("objectstore: adopt tmp cleanup failed for key=%s: %v", tmpKey, err)
+		slog.Warn("objectstore: adopt tmp cleanup failed", "key", tmpKey, "err", err)
 	}
 	return nil
 }

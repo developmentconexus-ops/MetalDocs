@@ -2,7 +2,7 @@ package jobs
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"metaldocs/internal/modules/documents/repository"
@@ -24,11 +24,11 @@ func StartSessionSweeper(ctx context.Context, r *repository.Repository, interval
 			case <-ticker.C:
 				n, err := r.ExpireStaleSessions(ctx, time.Now())
 				if err != nil {
-					log.Printf("session_sweeper error: %v", err)
+					slog.Warn("session_sweeper error", "err", err)
 					continue
 				}
 				if n > 0 {
-					log.Printf("session_sweeper expired=%d", n)
+					slog.Info("session_sweeper expired", "expired", n)
 				}
 			}
 		}

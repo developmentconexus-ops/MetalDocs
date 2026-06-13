@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -190,7 +190,7 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 	}
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
-		log.Printf("documents listDocuments invalid query params: %v", err)
+		slog.Warn("documents listDocuments invalid query params", "err", err)
 		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
@@ -236,7 +236,7 @@ func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
 	}
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
-		log.Printf("documents documentStats invalid query params: %v", err)
+		slog.Warn("documents documentStats invalid query params", "err", err)
 		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
 		return
 	}
@@ -475,7 +475,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			log.Printf("documents finalize idempotency begin error: %v", err)
+			slog.Error("documents finalize idempotency begin error", "err", err)
 			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 			return
 		}
@@ -490,7 +490,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if idempHandle != nil && !idempReleased {
 				if rerr := idempStore.FailReplay(idempHandle, nil); rerr != nil {
-					log.Printf("documents finalize idempotency fail-release error: %v", rerr)
+					slog.Warn("documents finalize idempotency fail-release error", "err", rerr)
 				}
 			}
 		}()
@@ -513,7 +513,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, domain.ErrApprovalRouteMissing):
 			httpErrDetail(w, http.StatusConflict, problem.CodeApprovalRouteMissing, "no active approval route for this profile")
 		default:
-			log.Printf("documents finalize prereqs error: doc_id=%s tenant_id=%s err=%v", docID, tenantID, err)
+			slog.Error("documents finalize prereqs error", "doc_id", docID, "tenant_id", tenantID, "err", err)
 			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		}
 		return
@@ -542,7 +542,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := idempStore.CompleteReplay(idempHandle, http.StatusCreated, body); err != nil {
-			log.Printf("documents finalize idempotency complete error: %v", err)
+			slog.Warn("documents finalize idempotency complete error", "err", err)
 		}
 		idempReleased = true
 	}
@@ -577,7 +577,7 @@ func (h *Handler) duplicateDocument(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status, msg := mapErr(err)
 		if status == http.StatusInternalServerError {
-			log.Printf("documents duplicate failed: doc_id=%s tenant_id=%s actor_id=%s err=%v", docID, tenantID, userID, err)
+			slog.Error("documents duplicate failed", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "err", err)
 			httpErr(w, status, msg)
 			return
 		}
@@ -763,8 +763,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		PageCount:        req.PageCount,
 	})
 	if err != nil {
-		log.Printf("documents.commit_autosave failed: doc_id=%s tenant_id=%s actor_id=%s session_id=%s pending_upload_id=%s err=%v",
-			docID, tenantID, userID, redactID(req.SessionID), redactID(req.PendingUploadID), err)
+		slog.Error("documents.commit_autosave failed", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "session_id", redactID(req.SessionID), "pending_upload_id", redactID(req.PendingUploadID), "err", err)
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
