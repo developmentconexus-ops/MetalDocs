@@ -61,10 +61,10 @@ type userAreaWriteRepoStub struct {
 	grantAtomicErr   error
 	tenantFilter     [4]string
 	// tx returned by BeginTx; defaults to noopMembershipTx{} when nil.
-	tx MembershipTx
+	tx domain.MembershipTx
 }
 
-func (s *userAreaWriteRepoStub) beginTx() MembershipTx {
+func (s *userAreaWriteRepoStub) beginTx() domain.MembershipTx {
 	if s.tx != nil {
 		return s.tx
 	}
@@ -95,11 +95,11 @@ func (s *userAreaWriteRepoStub) GetActiveByUserAndArea(ctx context.Context, user
 	return s.active, nil
 }
 
-func (s *userAreaWriteRepoStub) BeginTx(_ context.Context) (MembershipTx, error) {
+func (s *userAreaWriteRepoStub) BeginTx(_ context.Context) (domain.MembershipTx, error) {
 	return s.beginTx(), nil
 }
 
-func (s *userAreaWriteRepoStub) InsertTx(_ context.Context, _ MembershipTx, membership domain.UserProcessArea) error {
+func (s *userAreaWriteRepoStub) InsertTx(_ context.Context, _ domain.MembershipTx, membership domain.UserProcessArea) error {
 	if s.insertErr != nil {
 		return s.insertErr
 	}
@@ -108,7 +108,7 @@ func (s *userAreaWriteRepoStub) InsertTx(_ context.Context, _ MembershipTx, memb
 	return nil
 }
 
-func (s *userAreaWriteRepoStub) CloseActiveTx(_ context.Context, _ MembershipTx, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
+func (s *userAreaWriteRepoStub) CloseActiveTx(_ context.Context, _ domain.MembershipTx, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
 	if s.closeActiveErr != nil {
 		return s.closeActiveErr
 	}
@@ -118,7 +118,7 @@ func (s *userAreaWriteRepoStub) CloseActiveTx(_ context.Context, _ MembershipTx,
 	return nil
 }
 
-func (s *userAreaWriteRepoStub) GrantAtomicTx(_ context.Context, _ MembershipTx, oldMembership, newMembership domain.UserProcessArea) error {
+func (s *userAreaWriteRepoStub) GrantAtomicTx(_ context.Context, _ domain.MembershipTx, oldMembership, newMembership domain.UserProcessArea) error {
 	if s.grantAtomicErr != nil {
 		return s.grantAtomicErr
 	}

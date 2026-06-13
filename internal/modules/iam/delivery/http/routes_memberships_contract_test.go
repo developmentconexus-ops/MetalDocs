@@ -26,7 +26,7 @@ func (noopMembershipLogger) LogTx(_ context.Context, _ db.Tx, _ string, _ iamdom
 	return nil
 }
 
-// noopMembershipTx satisfies iamapp.MembershipTx for contract test repos.
+// noopMembershipTx satisfies iamdomain.MembershipTx for contract test repos.
 type noopMembershipTx struct{}
 
 func (noopMembershipTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
@@ -63,19 +63,19 @@ func (f fakeUserAreaWriteRepository) GetActiveByUserAndArea(ctx context.Context,
 	return nil, nil
 }
 
-func (f fakeUserAreaWriteRepository) BeginTx(_ context.Context) (iamapp.MembershipTx, error) {
+func (f fakeUserAreaWriteRepository) BeginTx(_ context.Context) (iamdomain.MembershipTx, error) {
 	return noopMembershipTx{}, nil
 }
 
-func (f fakeUserAreaWriteRepository) InsertTx(_ context.Context, _ iamapp.MembershipTx, _ iamdomain.UserProcessArea) error {
+func (f fakeUserAreaWriteRepository) InsertTx(_ context.Context, _ iamdomain.MembershipTx, _ iamdomain.UserProcessArea) error {
 	return nil
 }
 
-func (f fakeUserAreaWriteRepository) CloseActiveTx(_ context.Context, _ iamapp.MembershipTx, _, _, _ string, _ time.Time, _ string) error {
+func (f fakeUserAreaWriteRepository) CloseActiveTx(_ context.Context, _ iamdomain.MembershipTx, _, _, _ string, _ time.Time, _ string) error {
 	return nil
 }
 
-func (f fakeUserAreaWriteRepository) GrantAtomicTx(_ context.Context, _ iamapp.MembershipTx, _, _ iamdomain.UserProcessArea) error {
+func (f fakeUserAreaWriteRepository) GrantAtomicTx(_ context.Context, _ iamdomain.MembershipTx, _, _ iamdomain.UserProcessArea) error {
 	return nil
 }
 
@@ -105,7 +105,7 @@ func (capDeniedAreaRepo) GetActiveByUserAndArea(ctx context.Context, userID, ten
 	}, nil
 }
 
-func (capDeniedAreaRepo) CloseActiveTx(_ context.Context, _ iamapp.MembershipTx, userID, tenantID, areaCode string, _ time.Time, actorID string) error {
+func (capDeniedAreaRepo) CloseActiveTx(_ context.Context, _ iamdomain.MembershipTx, userID, tenantID, areaCode string, _ time.Time, actorID string) error {
 	// Returns the bare ErrCapDenied value. The real repository wraps it once in
 	// fmt.Errorf("...: %w", err); writeMembershipError uses errors.As, which
 	// resolves both forms, so the unwrapped value is sufficient for this contract.

@@ -10,16 +10,6 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
-// MembershipTx is the transaction handle services receive from the repository
-// for in-tx mutation + governance writes (REQ-ASYNC-1). It embeds db.Tx so the
-// governance logger can write audit rows inside the same database transaction.
-// *sql.Tx satisfies this interface without an adapter.
-type MembershipTx interface {
-	db.Tx
-	Commit() error
-	Rollback() error
-}
-
 var (
 	ErrMembershipNotFound = errors.New("membership_not_found")
 	ErrUnknownRole        = errors.New("unknown_role")
@@ -46,14 +36,14 @@ type UserAreaWriteRepository interface {
 	GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*domain.UserProcessArea, error)
 	// BeginTx opens a database transaction for in-tx mutation + governance writes
 	// (REQ-ASYNC-1). The caller owns Commit/Rollback.
-	BeginTx(ctx context.Context) (MembershipTx, error)
+	BeginTx(ctx context.Context) (domain.MembershipTx, error)
 	// InsertTx writes a new membership row inside an open transaction.
-	InsertTx(ctx context.Context, tx MembershipTx, membership domain.UserProcessArea) error
+	InsertTx(ctx context.Context, tx domain.MembershipTx, membership domain.UserProcessArea) error
 	// CloseActiveTx sets effective_to on the active row inside an open transaction.
-	CloseActiveTx(ctx context.Context, tx MembershipTx, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error
+	CloseActiveTx(ctx context.Context, tx domain.MembershipTx, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error
 	// GrantAtomicTx closes the old membership and inserts the new one inside an
 	// open transaction (role-change path).
-	GrantAtomicTx(ctx context.Context, tx MembershipTx, oldMembership, newMembership domain.UserProcessArea) error
+	GrantAtomicTx(ctx context.Context, tx domain.MembershipTx, oldMembership, newMembership domain.UserProcessArea) error
 }
 
 type MembershipGovernanceLogger interface {

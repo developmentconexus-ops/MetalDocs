@@ -15,6 +15,7 @@ package iammembershipstest
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -49,9 +50,22 @@ const (
 // service-layer governance log.
 type noopMembershipLogger struct{}
 
-func (noopMembershipLogger) Log(_ context.Context, _ string, _ iamdomain.UserProcessArea) error {
+func (noopMembershipLogger) LogTx(_ context.Context, _ db.Tx, _ string, _ iamdomain.UserProcessArea) error {
 	return nil
 }
+
+// noopMemTx satisfies iamdomain.MembershipTx for the in-memory repo.
+type noopMemTx struct{}
+
+func (noopMemTx) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	return nil, nil
+}
+func (noopMemTx) QueryContext(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
+	return nil, nil
+}
+func (noopMemTx) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row { return nil }
+func (noopMemTx) Commit() error                                                  { return nil }
+func (noopMemTx) Rollback() error                                                { return nil }
 
 // memAreaRepo is an in-memory UserAreaWriteRepository. Tracks active rows
 // keyed by (userID, tenantID, areaCode); revoked rows are dropped (the
@@ -167,6 +181,22 @@ func (r *memAreaRepo) GrantAtomic(_ context.Context, oldM, newM iamdomain.UserPr
 	delete(r.active, memKey(oldM.UserID, oldM.TenantID, oldM.AreaCode))
 	r.active[memKey(newM.UserID, newM.TenantID, newM.AreaCode)] = newM
 	return nil
+}
+
+func (r *memAreaRepo) BeginTx(_ context.Context) (iamdomain.MembershipTx, error) {
+	return noopMemTx{}, nil
+}
+
+func (r *memAreaRepo) InsertTx(ctx context.Context, _ iamdomain.MembershipTx, m iamdomain.UserProcessArea) error {
+	return r.Insert(ctx, m)
+}
+
+func (r *memAreaRepo) CloseActiveTx(ctx context.Context, _ iamdomain.MembershipTx, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
+	return r.CloseActive(ctx, userID, tenantID, areaCode, effectiveTo, actorID)
+}
+
+func (r *memAreaRepo) GrantAtomicTx(ctx context.Context, _ iamdomain.MembershipTx, oldM, newM iamdomain.UserProcessArea) error {
+	return r.GrantAtomic(ctx, oldM, newM)
 }
 
 func (r *memAreaRepo) GetActiveByUserAndArea(_ context.Context, userID, tenantID, areaCode string, _ time.Time) (*iamdomain.UserProcessArea, error) {

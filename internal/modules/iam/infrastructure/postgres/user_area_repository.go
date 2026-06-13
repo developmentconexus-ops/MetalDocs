@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/iam/authz"
-	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
@@ -176,7 +175,7 @@ ORDER BY user_id ASC, area_code ASC, effective_from DESC
 }
 
 // BeginTx opens a database transaction. The caller owns Commit/Rollback.
-func (r *UserAreaRepository) BeginTx(ctx context.Context) (iamapp.MembershipTx, error) {
+func (r *UserAreaRepository) BeginTx(ctx context.Context) (iamdomain.MembershipTx, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin membership tx: %w", err)
@@ -186,7 +185,7 @@ func (r *UserAreaRepository) BeginTx(ctx context.Context) (iamapp.MembershipTx, 
 
 // InsertTx writes a new membership row inside the provided open transaction.
 // The caller is responsible for Commit/Rollback.
-func (r *UserAreaRepository) InsertTx(ctx context.Context, tx iamapp.MembershipTx, membership iamdomain.UserProcessArea) error {
+func (r *UserAreaRepository) InsertTx(ctx context.Context, tx iamdomain.MembershipTx, membership iamdomain.UserProcessArea) error {
 	rawTx, ok := tx.(*sql.Tx)
 	if !ok {
 		return fmt.Errorf("iam: InsertTx: unexpected tx type %T", tx)
@@ -292,7 +291,7 @@ VALUES
 
 // CloseActiveTx closes the active membership row inside the provided open
 // transaction. The caller is responsible for Commit/Rollback.
-func (r *UserAreaRepository) CloseActiveTx(ctx context.Context, tx iamapp.MembershipTx, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
+func (r *UserAreaRepository) CloseActiveTx(ctx context.Context, tx iamdomain.MembershipTx, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
 	rawTx, ok := tx.(*sql.Tx)
 	if !ok {
 		return fmt.Errorf("iam: CloseActiveTx: unexpected tx type %T", tx)
@@ -381,7 +380,7 @@ WHERE user_id = $1
 // GrantAtomicTx closes oldMembership and inserts newMembership inside the
 // provided open transaction (role-change path). The caller is responsible for
 // Commit/Rollback.
-func (r *UserAreaRepository) GrantAtomicTx(ctx context.Context, tx iamapp.MembershipTx, oldMembership, newMembership iamdomain.UserProcessArea) error {
+func (r *UserAreaRepository) GrantAtomicTx(ctx context.Context, tx iamdomain.MembershipTx, oldMembership, newMembership iamdomain.UserProcessArea) error {
 	rawTx, ok := tx.(*sql.Tx)
 	if !ok {
 		return fmt.Errorf("iam: GrantAtomicTx: unexpected tx type %T", tx)

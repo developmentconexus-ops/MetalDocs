@@ -13,6 +13,7 @@ package iampeopletest
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -264,21 +265,39 @@ func (noopAreaRepo) ListByTenantInManagedAreas(context.Context, string, string, 
 func (noopAreaRepo) MembershipDirectoryScope(context.Context, string, string, string, time.Time) (bool, bool, error) {
 	return false, false, nil
 }
-func (noopAreaRepo) Insert(context.Context, iamdomain.UserProcessArea) error { return nil }
-func (noopAreaRepo) CloseActive(context.Context, string, string, string, time.Time, string) error {
-	return nil
-}
-func (noopAreaRepo) GrantAtomic(context.Context, iamdomain.UserProcessArea, iamdomain.UserProcessArea) error {
-	return nil
-}
 func (noopAreaRepo) GetActiveByUserAndArea(context.Context, string, string, string, time.Time) (*iamdomain.UserProcessArea, error) {
 	return nil, nil
 }
+func (noopAreaRepo) BeginTx(context.Context) (iamdomain.MembershipTx, error) {
+	return noopPeopleTx{}, nil
+}
+func (noopAreaRepo) InsertTx(context.Context, iamdomain.MembershipTx, iamdomain.UserProcessArea) error {
+	return nil
+}
+func (noopAreaRepo) CloseActiveTx(context.Context, iamdomain.MembershipTx, string, string, string, time.Time, string) error {
+	return nil
+}
+func (noopAreaRepo) GrantAtomicTx(context.Context, iamdomain.MembershipTx, iamdomain.UserProcessArea, iamdomain.UserProcessArea) error {
+	return nil
+}
+
+// noopPeopleTx satisfies iamdomain.MembershipTx for the noop repo.
+type noopPeopleTx struct{}
+
+func (noopPeopleTx) ExecContext(context.Context, string, ...any) (sql.Result, error) {
+	return nil, nil
+}
+func (noopPeopleTx) QueryContext(context.Context, string, ...any) (*sql.Rows, error) {
+	return nil, nil
+}
+func (noopPeopleTx) QueryRowContext(context.Context, string, ...any) *sql.Row { return nil }
+func (noopPeopleTx) Commit() error                                            { return nil }
+func (noopPeopleTx) Rollback() error                                          { return nil }
 
 // noopMembershipLogger satisfies iamapp.MembershipGovernanceLogger with a no-op.
 type noopMembershipLogger struct{}
 
-func (noopMembershipLogger) Log(_ context.Context, _ string, _ iamdomain.UserProcessArea) error {
+func (noopMembershipLogger) LogTx(_ context.Context, _ db.Tx, _ string, _ iamdomain.UserProcessArea) error {
 	return nil
 }
 
