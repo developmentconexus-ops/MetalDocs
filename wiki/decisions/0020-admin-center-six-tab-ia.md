@@ -1,6 +1,7 @@
 # ADR 0020 — Admin Center 6-tab information architecture
 
 > **Status:** Accepted — shipped at PR-12 (`feat/admin-center-rebuild-pr12`, 2026-06-03).
+> **Current reality (2026-06):** The IA now has 7 tabs — a `memberships` tab was added (branch `qa/iam-area-membership`) using the openapi-fetch typed client (`api.GET/POST/DELETE`); the deferred `apiFetch` note in the body no longer applies.
 > **Last verified:** 2026-06-03
 
 ## Context

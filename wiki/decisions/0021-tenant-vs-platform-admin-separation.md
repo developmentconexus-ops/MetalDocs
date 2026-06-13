@@ -1,6 +1,7 @@
 # ADR 0021 — Tenant admin vs. platform admin separation
 
 > **Status:** Accepted — shipped at PR-12 (`feat/admin-center-rebuild-pr12`, 2026-06-03).
+> **Current reality (2026-06):** The stale `admin` and `reviewer` literals mentioned in Costs were removed in PR-12b; `UserRole` in `lib/types/index.ts` now carries the canonical 8-role enum only.
 > **Last verified:** 2026-06-03
 
 ## Context
