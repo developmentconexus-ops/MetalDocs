@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-func TestNewTemplateVersionChecker_PanicsWhenDBNil(t *testing.T) {
+func TestNewTemplateVersionReader_PanicsWhenDBNil(t *testing.T) {
 	defer func() {
 		if recover() == nil {
 			t.Fatal("expected panic")
 		}
 	}()
-	_ = NewTemplateVersionChecker(nil)
+	_ = NewTemplateVersionReader(nil)
 }
 
 func TestTemplateVersionQueryUsesDocumentTypeCode(t *testing.T) {

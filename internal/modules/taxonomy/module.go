@@ -25,7 +25,7 @@ func New(deps Dependencies) *Module {
 	areaRepo := infrastructure.NewAreaRepository(deps.DB)
 	tplChecker := deps.TplChecker
 	if tplChecker == nil {
-		tplChecker = infrastructure.NewTemplateVersionChecker(deps.DB)
+		panic("taxonomy.module: TplChecker is required; wire templates/infrastructure.NewTemplateVersionReader at the composition root")
 	}
 	if deps.AuditWriter == nil {
 		panic("taxonomy.module: AuditWriter is required; nil fallback to DBGovernanceLogger was removed (FE / Wave 2.12)")

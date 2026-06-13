@@ -65,6 +65,7 @@ import (
 	"metaldocs/internal/modules/taxonomy"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
+	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
@@ -744,7 +745,7 @@ func requirePostgresRepositoryMode(repoMode string) error {
 func buildTaxonomyModule(deps bootstrap.APIDependencies) *taxonomy.Module {
 	return taxonomy.New(taxonomy.Dependencies{
 		DB:          deps.SQLDB,
-		TplChecker:  taxonomyinfra.NewTemplateVersionChecker(deps.SQLDB),
+		TplChecker:  templatesinfra.NewTemplateVersionReader(deps.SQLDB),
 		AuditWriter: deps.AuditWriter,
 	})
 }

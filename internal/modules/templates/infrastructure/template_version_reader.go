@@ -8,10 +8,6 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-type TemplateVersionChecker struct {
-	db *sql.DB
-}
-
 const templateVersionQuery = `
 	SELECT v.status, t.doc_type_code
 	FROM templates_template_version v
@@ -20,21 +16,25 @@ const templateVersionQuery = `
 	  AND t.tenant_id = $2::uuid
 `
 
-func NewTemplateVersionChecker(db *sql.DB) *TemplateVersionChecker {
-	if db == nil {
-		panic("taxonomy: template version checker db must not be nil")
-	}
-	return &TemplateVersionChecker{db: db}
+type TemplateVersionReader struct {
+	db *sql.DB
 }
 
-func (c *TemplateVersionChecker) IsPublished(ctx context.Context, versionID string) (bool, string, error) {
+func NewTemplateVersionReader(db *sql.DB) *TemplateVersionReader {
+	if db == nil {
+		panic("templates: template version reader db must not be nil")
+	}
+	return &TemplateVersionReader{db: db}
+}
+
+func (r *TemplateVersionReader) IsPublished(ctx context.Context, versionID string) (bool, string, error) {
 	tenantID, err := tenant.FromContext(ctx)
 	if err != nil {
 		return false, "", err
 	}
 	var status sql.NullString
 	var profileCode sql.NullString
-	err = c.db.QueryRowContext(ctx, templateVersionQuery, versionID, tenantID).Scan(&status, &profileCode)
+	err = r.db.QueryRowContext(ctx, templateVersionQuery, versionID, tenantID).Scan(&status, &profileCode)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, "", nil
 	}
