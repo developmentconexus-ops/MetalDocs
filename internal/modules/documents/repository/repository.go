@@ -94,45 +94,15 @@ func docAreaSnapshot(s *string) string {
 	return *s
 }
 
-// CreateDocument inserts document + initial session + initial revision in one
-// CreateDocument is the legacy (non-tx) wrapper. Only DuplicateDocument uses it.
-// Atomic flow uses CreateDocumentTx directly with a caller-owned tx.
-func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
-	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-	if err != nil {
-		return "", "", "", err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-	docID, revID, sessionID, err = r.CreateDocumentTx(ctx, tx, d, initialContentHash, "", requiredPlaceholders)
-	if err != nil {
-		return "", "", "", err
-	}
-	if err = tx.Commit(); err != nil {
-		return "", "", "", err
-	}
-	return docID, revID, sessionID, nil
-}
-
-// CreateDocumentTx performs the DB-only portion of CreateDocument inside the
-// caller-owned tx: inserts document + initial editor_session + initial
-// revision, seeds template snapshot columns and required placeholder rows.
+// CreateDocumentTx inserts document + initial editor_session + initial
+// revision, seeds template snapshot columns and required placeholder rows,
+// all inside the caller-owned tx.
 //
-// initialStorageKey:
-//   - "" for the legacy CreateDocument flow, where the caller must finalize
-//     storage_key after S3 AdoptTempObject (the rendered docx key is content-
-//     addressed and only known post-render).
-//   - the template's published docx key for the registry atomic-create flow,
-//     which uses template-passthrough — no render side-effect, safe to write
-//     atomically with the document/revision insert so the editor opens
-//     immediately on first GET.
+// initialStorageKey is the template's published docx key (template-passthrough):
+// storage_key is written atomically with the insert so the editor opens
+// immediately on first GET.
 //
-// It does NOT touch S3. Callers that need S3 finalization (overwriting
-// storage_key with a rendered key) must do so after tx.Commit() via
-// SetRevisionStorageKey.
+// It does NOT touch S3.
 func (r *Repository) CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.SeedTxIdentity(ctx, mustSQLTx(tx), d.TenantID, d.CreatedBy); err != nil {
@@ -252,23 +222,6 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.D
 	}
 
 	return docID, revID, sessionID, nil
-}
-
-// SetRevisionStorageKey finalizes storage_key after S3 AdoptTempObject.
-// Legacy pattern — only used by Service.CreateDocument (via DuplicateDocument).
-// Atomic flow sets storage_key in CreateDocumentTx; this method is bypassed.
-func (r *Repository) SetRevisionStorageKey(ctx context.Context, revID, storageKey string) error {
-	res, err := r.db.ExecContext(ctx,
-		`UPDATE document_revisions SET storage_key = $1 WHERE id = $2 AND storage_key = ''`,
-		storageKey, revID)
-	if err != nil {
-		return err
-	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("revision %s already has storage_key set", revID)
-	}
-	return nil
 }
 
 func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error) {

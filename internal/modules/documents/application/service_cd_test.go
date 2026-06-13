@@ -2,226 +2,68 @@ package application_test
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"testing"
 
-	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
-	"metaldocs/internal/modules/documents/domain"
-	iamapp "metaldocs/internal/modules/iam/application"
-	iamdomain "metaldocs/internal/modules/iam/domain"
-	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
-
-type fakeControlledDocumentReader struct {
-	cd  *controlleddocumentsdomain.ControlledDocument
-	err error
-}
-
-func (f *fakeControlledDocumentReader) GetByID(_ context.Context, _, _ string) (*controlleddocumentsdomain.ControlledDocument, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
-	return f.cd, nil
-}
-
-type fakeAuthzChecker struct {
-	err error
-}
-
-func (f *fakeAuthzChecker) CanDo(_ context.Context, _, _ string, _ iamdomain.Capability) error {
-	return f.err
-}
-
-func (f *fakeAuthzChecker) IsSystemAdmin(_ context.Context, _, _ string) (bool, error) {
-	return false, nil
-}
 
 type fakeProfileDefaultTemplateReader struct {
 	id     *string
 	status *string
 	err    error
+	calls  int
 }
 
 func (f *fakeProfileDefaultTemplateReader) GetDefaultTemplateVersionID(_ context.Context, _, _ string) (*string, *string, error) {
+	f.calls++
 	return f.id, f.status, f.err
-}
-
-type captureRepo struct {
-	*fakeRepo
-	createdDoc  *domain.Document
-	initialHash string
-}
-
-func (r *captureRepo) CreateDocument(_ context.Context, d *domain.Document, initialContentHash string, phs []templatesdomain.Placeholder) (string, string, string, error) {
-	r.createdDoc = d
-	r.initialHash = initialContentHash
-	return r.fakeRepo.CreateDocument(context.Background(), d, initialContentHash, phs)
 }
 
 func strptr(v string) *string { return &v }
 
-func TestCreate_FromControlledDocument_Happy(t *testing.T) {
-	repo := &captureRepo{fakeRepo: &fakeRepo{createDocIDs: [3]string{"doc_1", "rev_1", "sess_1"}}}
-	cd := &controlleddocumentsdomain.ControlledDocument{
-		ID:              "cd_1",
-		TenantID:        "tenant_1",
-		ProfileCode:     "PROC",
-		ProcessAreaCode: "AREA-01",
-		Status:          controlleddocumentsdomain.CDStatusActive,
-	}
-	svc := application.NewService(
-		repo,
-		&fakePresigner{hashReturn: "h_initial"},
-		fakeTplReader{},
-		fakeFormVal{valid: true},
-		&noopAudit{},
-		&fakeControlledDocumentReader{cd: cd},
-		&fakeAuthzChecker{},
-		&fakeProfileDefaultTemplateReader{id: strptr("tpl_ver_default"), status: strptr("published")},
-	)
+// TestResolveTemplateVersionID_ShortCircuit proves that when a concrete override
+// id is supplied the default-template reader is NOT called (short-circuit), and
+// when no override is supplied it IS called. This is the key property that
+// prevents the atomic CD-create self-deadlock: the in-tx clone never issues an
+// authz-recording GetByCode taxonomy read while holding the advisory lock.
+func TestResolveTemplateVersionID_ShortCircuit(t *testing.T) {
+	defaultID := "00000000-0000-0000-0000-000000000001"
+	defaultStatus := "published"
 
-	res, err := svc.CreateDocument(context.Background(), application.CreateDocumentInput{
-		TenantID:             "tenant_1",
-		ActorUserID:          "user_1",
-		ControlledDocumentID: "cd_1",
-		Name:                 "Contract",
-		FormData:             json.RawMessage(`{"a":1}`),
+	t.Run("with concrete override: default NOT fetched", func(t *testing.T) {
+		reader := &fakeProfileDefaultTemplateReader{
+			id:     &defaultID,
+			status: &defaultStatus,
+		}
+		overrideID := "00000000-0000-0000-0000-000000000099"
+		svc := application.NewServiceForTest(reader)
+		got, err := svc.ExportedResolveTemplateVersionID(context.Background(), "tenant-a", "ISO", &overrideID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != overrideID {
+			t.Errorf("expected override id %q, got %q", overrideID, got)
+		}
+		if reader.calls != 0 {
+			t.Errorf("GetDefaultTemplateVersionID should NOT be called when override is supplied; got %d call(s)", reader.calls)
+		}
 	})
-	if err != nil {
-		t.Fatalf("CreateDocument() error = %v", err)
-	}
-	if res.DocumentID != "doc_1" {
-		t.Fatalf("expected doc_1, got %q", res.DocumentID)
-	}
-	if repo.createdDoc == nil {
-		t.Fatalf("expected repo.CreateDocument to receive document")
-	}
-	if repo.createdDoc.ControlledDocumentID == nil || *repo.createdDoc.ControlledDocumentID != "cd_1" {
-		t.Fatalf("expected ControlledDocumentID snapshot")
-	}
-	if repo.createdDoc.ProfileCodeSnapshot == nil || *repo.createdDoc.ProfileCodeSnapshot != "PROC" {
-		t.Fatalf("expected ProfileCodeSnapshot snapshot")
-	}
-	if repo.createdDoc.ProcessAreaCodeSnapshot == nil || *repo.createdDoc.ProcessAreaCodeSnapshot != "AREA-01" {
-		t.Fatalf("expected ProcessAreaCodeSnapshot snapshot")
-	}
-	if repo.createdDoc.TemplateVersionID != "tpl_ver_default" {
-		t.Fatalf("expected resolved template version, got %q", repo.createdDoc.TemplateVersionID)
-	}
-}
 
-func TestCreate_CD_NotActive(t *testing.T) {
-	repo := &captureRepo{fakeRepo: &fakeRepo{}}
-	svc := application.NewService(
-		repo,
-		&fakePresigner{},
-		fakeTplReader{},
-		fakeFormVal{valid: true},
-		&noopAudit{},
-		&fakeControlledDocumentReader{cd: &controlleddocumentsdomain.ControlledDocument{
-			ID:              "cd_1",
-			ProfileCode:     "PROC",
-			ProcessAreaCode: "AREA-01",
-			Status:          controlleddocumentsdomain.CDStatusObsolete,
-		}},
-		&fakeAuthzChecker{},
-		&fakeProfileDefaultTemplateReader{},
-	)
-
-	_, err := svc.CreateDocument(context.Background(), application.CreateDocumentInput{
-		TenantID:             "tenant_1",
-		ActorUserID:          "user_1",
-		ControlledDocumentID: "cd_1",
-		Name:                 "Contract",
-		FormData:             json.RawMessage(`{"a":1}`),
+	t.Run("without override: default IS fetched", func(t *testing.T) {
+		reader := &fakeProfileDefaultTemplateReader{
+			id:     &defaultID,
+			status: &defaultStatus,
+		}
+		svc := application.NewServiceForTest(reader)
+		got, err := svc.ExportedResolveTemplateVersionID(context.Background(), "tenant-a", "ISO", nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != defaultID {
+			t.Errorf("expected default id %q, got %q", defaultID, got)
+		}
+		if reader.calls != 1 {
+			t.Errorf("GetDefaultTemplateVersionID should be called exactly once when no override; got %d call(s)", reader.calls)
+		}
 	})
-	if !errors.Is(err, controlleddocumentsdomain.ErrCDNotActive) {
-		t.Fatalf("expected ErrCDNotActive, got %v", err)
-	}
-}
-
-func TestCreate_NoDefaultTemplate(t *testing.T) {
-	repo := &captureRepo{fakeRepo: &fakeRepo{}}
-	svc := application.NewService(
-		repo,
-		&fakePresigner{},
-		fakeTplReader{},
-		fakeFormVal{valid: true},
-		&noopAudit{},
-		&fakeControlledDocumentReader{cd: &controlleddocumentsdomain.ControlledDocument{
-			ID:              "cd_1",
-			ProfileCode:     "PROC",
-			ProcessAreaCode: "AREA-01",
-			Status:          controlleddocumentsdomain.CDStatusActive,
-		}},
-		&fakeAuthzChecker{},
-		&fakeProfileDefaultTemplateReader{},
-	)
-
-	_, err := svc.CreateDocument(context.Background(), application.CreateDocumentInput{
-		TenantID:             "tenant_1",
-		ActorUserID:          "user_1",
-		ControlledDocumentID: "cd_1",
-		Name:                 "Contract",
-		FormData:             json.RawMessage(`{"a":1}`),
-	})
-	if !errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate) {
-		t.Fatalf("expected ErrProfileHasNoDefaultTemplate, got %v", err)
-	}
-}
-
-func TestCreate_AuthzFail(t *testing.T) {
-	repo := &captureRepo{fakeRepo: &fakeRepo{}}
-	svc := application.NewService(
-		repo,
-		&fakePresigner{},
-		fakeTplReader{},
-		fakeFormVal{valid: true},
-		&noopAudit{},
-		&fakeControlledDocumentReader{cd: &controlleddocumentsdomain.ControlledDocument{
-			ID:              "cd_1",
-			ProfileCode:     "PROC",
-			ProcessAreaCode: "AREA-01",
-			Status:          controlleddocumentsdomain.CDStatusActive,
-		}},
-		&fakeAuthzChecker{err: iamapp.ErrCapabilityDenied},
-		&fakeProfileDefaultTemplateReader{id: strptr("tpl_ver_default"), status: strptr("published")},
-	)
-
-	_, err := svc.CreateDocument(context.Background(), application.CreateDocumentInput{
-		TenantID:             "tenant_1",
-		ActorUserID:          "user_1",
-		ControlledDocumentID: "cd_1",
-		Name:                 "Contract",
-		FormData:             json.RawMessage(`{"a":1}`),
-	})
-	if !errors.Is(err, iamapp.ErrCapabilityDenied) {
-		t.Fatalf("expected ErrCapabilityDenied, got %v", err)
-	}
-}
-
-func TestCreate_NoControlledDocID(t *testing.T) {
-	repo := &captureRepo{fakeRepo: &fakeRepo{}}
-	svc := application.NewService(
-		repo,
-		&fakePresigner{},
-		fakeTplReader{},
-		fakeFormVal{valid: true},
-		&noopAudit{},
-		&fakeControlledDocumentReader{},
-		&fakeAuthzChecker{},
-		&fakeProfileDefaultTemplateReader{},
-	)
-
-	_, err := svc.CreateDocument(context.Background(), application.CreateDocumentInput{
-		TenantID:    "tenant_1",
-		ActorUserID: "user_1",
-		Name:        "Contract",
-		FormData:    json.RawMessage(`{"a":1}`),
-	})
-	if !errors.Is(err, application.ErrControlledDocumentRequired) {
-		t.Fatalf("expected ErrControlledDocumentRequired, got %v", err)
-	}
 }

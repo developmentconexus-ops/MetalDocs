@@ -52,6 +52,12 @@ func (r CloneTemplateRequest) FormData() map[string]any { return r.formData }
 type DocumentRef struct {
 	ID          string `json:"id"`
 	ContentHash string `json:"content_hash"`
+	// RevisionID and SessionID carry the seeded document's initial revision and
+	// editor session back to internal callers (documents.DuplicateDocument).
+	// json:"-" keeps them OUT of the CD atomic-create JSON response so that
+	// contract is unchanged.
+	RevisionID string `json:"-"`
+	SessionID  string `json:"-"`
 }
 
 // DocumentInitializer is the controlled-documents-owned port that the documents module
@@ -63,4 +69,10 @@ type DocumentInitializer interface {
 	CloneTemplate(ctx context.Context, tx db.Tx, cd *ControlledDocument, req CloneTemplateRequest) (*DocumentRef, error)
 	ResolveTemplateStorageKey(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error)
 	Exists(ctx context.Context, storageKey string) (bool, error)
+	// ResolveTemplateVersionID resolves the effective template version id for the
+	// (profile, optional override) OFF-TX, before the caller opens its atomic tx.
+	// Callers thread the returned concrete id back into CloneTemplate so the in-tx
+	// clone performs no authz-recording taxonomy read (which would deadlock against
+	// the audit hash-chain advisory lock held by the atomic tx).
+	ResolveTemplateVersionID(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error)
 }

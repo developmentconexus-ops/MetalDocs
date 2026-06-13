@@ -6,43 +6,6 @@ import (
 	"testing"
 )
 
-func TestCreateDocumentInsertIncludesBridgeSnapshots(t *testing.T) {
-	src, err := os.ReadFile("repository.go")
-	if err != nil {
-		t.Fatalf("read repository.go: %v", err)
-	}
-
-	body := string(src)
-	start := strings.Index(body, "func (r *Repository) CreateDocument")
-	if start == -1 {
-		t.Fatal("CreateDocument not found")
-	}
-	end := strings.Index(body[start:], "func (r *Repository) SetRevisionStorageKey")
-	if end == -1 {
-		t.Fatal("SetRevisionStorageKey not found")
-	}
-	createDocument := body[start : start+end]
-
-	tests := []struct {
-		name string
-		want string
-	}{
-		{name: "profile column", want: "profile_code_snapshot"},
-		{name: "process area column", want: "process_area_code_snapshot"},
-		{name: "profile arg", want: "d.ProfileCodeSnapshot"},
-		{name: "process area arg", want: "d.ProcessAreaCodeSnapshot"},
-		{name: "revision number column", want: "revision_number"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if !strings.Contains(createDocument, tt.want) {
-				t.Fatalf("CreateDocument missing %s", tt.want)
-			}
-		})
-	}
-}
-
 func TestCreateDocumentTx_AssertsEditBeforeDocumentUpdates(t *testing.T) {
 	src, err := os.ReadFile("repository.go")
 	if err != nil {
@@ -54,9 +17,9 @@ func TestCreateDocumentTx_AssertsEditBeforeDocumentUpdates(t *testing.T) {
 	if start == -1 {
 		t.Fatal("CreateDocumentTx not found")
 	}
-	end := strings.Index(body[start:], "func (r *Repository) SetRevisionStorageKey")
+	end := strings.Index(body[start:], "func (r *Repository) GetDocument")
 	if end == -1 {
-		t.Fatal("SetRevisionStorageKey not found")
+		t.Fatal("GetDocument boundary not found")
 	}
 	createDocumentTx := body[start : start+end]
 
@@ -84,13 +47,50 @@ func TestCreateDocumentTx_AllocatesZeroBasedGovernedRevisionNumbers(t *testing.T
 	if start == -1 {
 		t.Fatal("CreateDocumentTx not found")
 	}
-	end := strings.Index(body[start:], "func (r *Repository) SetRevisionStorageKey")
+	end := strings.Index(body[start:], "func (r *Repository) GetDocument")
 	if end == -1 {
-		t.Fatal("SetRevisionStorageKey not found")
+		t.Fatal("GetDocument boundary not found")
 	}
 	createDocumentTx := body[start : start+end]
 
 	if !strings.Contains(createDocumentTx, "COALESCE((SELECT MAX(d2.revision_number) + 1 FROM documents d2 WHERE d2.controlled_document_id = $6), 0)") {
 		t.Fatal("CreateDocumentTx must allocate first governed revision_number as 0 and increment later revisions from persisted max")
+	}
+}
+
+func TestCreateDocumentTx_IncludesBridgeSnapshots(t *testing.T) {
+	src, err := os.ReadFile("repository.go")
+	if err != nil {
+		t.Fatalf("read repository.go: %v", err)
+	}
+
+	body := string(src)
+	start := strings.Index(body, "func (r *Repository) CreateDocumentTx")
+	if start == -1 {
+		t.Fatal("CreateDocumentTx not found")
+	}
+	end := strings.Index(body[start:], "func (r *Repository) GetDocument")
+	if end == -1 {
+		t.Fatal("GetDocument boundary not found")
+	}
+	createDocumentTx := body[start : start+end]
+
+	tests := []struct {
+		name string
+		want string
+	}{
+		{name: "profile column", want: "profile_code_snapshot"},
+		{name: "process area column", want: "process_area_code_snapshot"},
+		{name: "profile arg", want: "d.ProfileCodeSnapshot"},
+		{name: "process area arg", want: "d.ProcessAreaCodeSnapshot"},
+		{name: "revision number column", want: "revision_number"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !strings.Contains(createDocumentTx, tt.want) {
+				t.Fatalf("CreateDocumentTx missing %s", tt.want)
+			}
+		})
 	}
 }

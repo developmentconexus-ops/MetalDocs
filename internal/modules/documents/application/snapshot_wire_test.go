@@ -1,17 +1,19 @@
 package application_test
 
 // snapshot_wire_test.go — unit test asserting SnapshotService.ResolveTemplate
-// is called inside CreateDocument when wired via NewServiceWithSnapshot, and
-// that the resolved snapshot is set on the document before repo.CreateDocument.
+// is called inside cloneIntoTx when wired via NewServiceWithSnapshot, and
+// that the resolved snapshot is set on the document before repo.CreateDocumentTx.
 
 import (
 	"context"
-	"encoding/json"
+	"database/sql"
 	"testing"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -26,17 +28,32 @@ func (r *trackingSnapshotReader) LoadForSnapshot(_ context.Context, _, _ string)
 	return r.snap, nil
 }
 
-func TestCreateDocument_SnapshotPopulated(t *testing.T) {
+// captureTxRepo wraps fakeRepo and captures the document passed to CreateDocumentTx.
+type captureTxRepo struct {
+	*fakeRepo
+	createdDoc  *domain.Document
+	initialHash string
+}
+
+func (r *captureTxRepo) CreateDocumentTx(_ context.Context, _ db.Tx, d *domain.Document, initialContentHash, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
+	r.createdDoc = d
+	r.initialHash = initialContentHash
+	return r.fakeRepo.CreateDocumentTx(context.Background(), (*sql.Tx)(nil), d, initialContentHash, "", nil)
+}
+
+func TestCloneIntoTx_SnapshotPopulated(t *testing.T) {
 	const tenantID = tenant.DevTenantID
 
 	innerRepo := &fakeRepo{createDocIDs: [3]string{"doc-snap-1", "rev-snap-1", "sess-snap-1"}}
-	repo := &captureRepo{fakeRepo: innerRepo}
+	repo := &captureTxRepo{fakeRepo: innerRepo}
 
 	cd := &controlleddocumentsdomain.ControlledDocument{
 		ID:              "cd-snap-1",
 		TenantID:        tenantID,
 		ProfileCode:     "PROC",
 		ProcessAreaCode: "AREA-01",
+		Code:            "PROC-001",
+		OwnerUserID:     "user-1",
 		Status:          controlleddocumentsdomain.CDStatusActive,
 	}
 
@@ -55,28 +72,25 @@ func TestCreateDocument_SnapshotPopulated(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeControlledDocumentReader{cd: cd},
-		&fakeAuthzChecker{},
 		&fakeProfileDefaultTemplateReader{id: strptr("tv-snap-1"), status: strptr("published")},
 		snapSvc,
 	)
+	initializer := application.NewCDDocumentInitializer(svc)
 
-	_, err := svc.CreateDocument(context.Background(), application.CreateDocumentInput{
-		TenantID:             tenantID,
-		ActorUserID:          "user-1",
-		ControlledDocumentID: "cd-snap-1",
-		TemplateVersionID:    "tv-snap-1",
-		Name:                 "Test Doc",
-		FormData:             json.RawMessage(`{}`),
-	})
+	req, err := controlleddocumentsdomain.NewCloneTemplateRequest(nil, "Test Doc", nil)
 	if err != nil {
-		t.Fatalf("CreateDocument: %v", err)
+		t.Fatalf("NewCloneTemplateRequest: %v", err)
+	}
+
+	_, err = initializer.CloneTemplate(context.Background(), (*sql.Tx)(nil), cd, req)
+	if err != nil {
+		t.Fatalf("CloneTemplate: %v", err)
 	}
 	if !reader.called {
 		t.Fatal("expected SnapshotService.ResolveTemplate to call LoadForSnapshot")
 	}
 	if repo.createdDoc == nil {
-		t.Fatal("captureRepo did not capture document")
+		t.Fatal("captureTxRepo did not capture document")
 	}
 	if string(repo.createdDoc.TemplateSnapshot.PlaceholderSchemaJSON) != string(reader.snap.PlaceholderSchemaJSON) {
 		t.Fatalf("doc.TemplateSnapshot not populated: got %q", repo.createdDoc.TemplateSnapshot.PlaceholderSchemaJSON)

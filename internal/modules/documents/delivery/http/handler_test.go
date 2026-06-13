@@ -77,10 +77,6 @@ func (f fakeCaps) IsSystemAdmin(_ context.Context, _, _ string) (bool, error) {
 	return f.admin, nil
 }
 
-func (f *fakeSvc) CreateDocument(_ context.Context, _ application.CreateDocumentInput) (*application.CreateDocumentResult, error) {
-	return &application.CreateDocumentResult{DocumentID: "doc_1", InitialRevisionID: "rev_1", SessionID: "sess_1"}, nil
-}
-
 func (f *fakeSvc) GetDocument(_ context.Context, _, _ string) (*domain.Document, error) {
 	if f.getDocumentResult != nil {
 		return f.getDocumentResult, nil

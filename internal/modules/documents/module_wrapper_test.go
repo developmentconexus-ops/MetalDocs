@@ -21,9 +21,6 @@ import (
 
 type moduleTestService struct{}
 
-func (s *moduleTestService) CreateDocument(context.Context, application.CreateDocumentInput) (*application.CreateDocumentResult, error) {
-	return &application.CreateDocumentResult{DocumentID: "doc_1", InitialRevisionID: "rev_1", SessionID: "sess_1"}, nil
-}
 func (s *moduleTestService) GetDocument(context.Context, string, string) (*domain.Document, error) {
 	return &domain.Document{ID: "doc_1", Name: "Doc", Status: domain.DocStatusDraft, FormDataJSON: []byte(`{}`), Code: "DOC-1"}, nil
 }

@@ -262,4 +262,15 @@ These facts lived in the agent's persistent memory and are NOT derivable from th
 1. Read `CLAUDE.md` → `wiki/README.md` → this file → the three-doc stack.
 2. `git status --short`; confirm branch; commit the doc stack if still uncommitted.
 3. Pick up at "Next steps" item 2 (ADR 0022 Phase 6) unless the user redirects.
+
+### Wave H — H-6b + H-PRE-1 close-out (2026-06-13)
+
+- H-6b ✅: `DuplicateDocument` migrated to the atomic CD-create path; legacy `CreateDocument` chain deleted (`Service.CreateDocument`/`Repository.CreateDocument`/`Repository.SetRevisionStorageKey` + dead `ControlledDocumentReader`/`caps` + `service_caps_test.go`). `cloneIntoTx` is the sole seeding path. Net −406 LOC, contract-neutral.
+- H-PRE-1 ✅ (distinct prereq, found during H-6b runtime-verify): system_admin CD-create self-deadlock on the audit hash-chain advisory lock `pg_advisory_xact_lock(90120260513004)`. The lock-holding atomic tx made a nested off-tx authz-recording taxonomy read (`GetByCode`) that re-grabbed the same lock on another connection. Fixed by hoisting `ensureTemplateArtifact` + template-version resolve off-tx before `runner.Do` (CD-create auto path + `CreateRevision`); `resolveTemplateVersionID` short-circuits on a concrete override. No authz/audit-model change.
+- **Architectural rule learned:** never call an authz-recording read (one that records a system_admin bypass via `authz.Require`, which writes the audit hash-chain row under `pg_advisory_xact_lock(90120260513004)`) from inside a lock-holding atomic tx on a separate connection — it self-deadlocks undetectably. Keep such reads off-tx and pre-resolve their results.
+- Runtime: 409 `template.artifact_missing` in 83ms (was 60–90s hang→500), 0 advisory locks before/after.
+- Gates: build/vet/`test -p 2 ./...`/api-lint -strict 0/cilint 0. Review: sonnet APPROVE-with-nits (fixed).
+- Defers (triggers in audit §H-PRE-1): happy-path clone runtime-exercise (seed gap); 409-before-403 ordering (ADR 0022 Phase 8); redundant bypass-audit (pre-existing cap-cache reset).
+- One combined commit (H-6b titled, H-PRE-1 in body). NOT merged — operator review gate.
+- Next Wave-H: **H-3b** → H-5 → H-2.
 4. Do not re-execute anything from prior session summaries without verifying against the working tree — most of it is already done.

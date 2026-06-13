@@ -6,7 +6,6 @@ package application_test
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -20,7 +19,7 @@ import (
 
 const createSnapshotTenantID = tenant.DevTenantID
 
-func TestCreateDocument_PopulatesAllSnapshotColumns(t *testing.T) {
+func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 	ctx := context.Background()
 	db, schema := testdb.Open(t)
 	db.SetMaxOpenConns(1)
@@ -57,21 +56,28 @@ func TestCreateDocument_PopulatesAllSnapshotColumns(t *testing.T) {
 		docgenv2.NewTemplatesTemplateReader(db),
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeControlledDocumentReader{cd: cd},
-		&fakeAuthzChecker{},
 		&fakeProfileDefaultTemplateReader{id: strptr(templateVersionID), status: strptr("published")},
 		snapshotSvc,
 	)
+	initializer := application.NewCDDocumentInitializer(svc)
 
-	res, err := svc.CreateDocument(ctx, application.CreateDocumentInput{
-		TenantID:             tenantID,
-		ActorUserID:          actorID,
-		ControlledDocumentID: controlledDocumentID,
-		Name:                 "Snapshot Integration Test",
-		FormData:             json.RawMessage(`{}`),
-	})
+	req, err := controlleddocumentsdomain.NewCloneTemplateRequest(nil, "Snapshot Integration Test", nil)
 	if err != nil {
-		t.Fatalf("CreateDocument: %v", err)
+		t.Fatalf("NewCloneTemplateRequest: %v", err)
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	ref, err := initializer.CloneTemplate(ctx, tx, cd, req)
+	if err != nil {
+		t.Fatalf("CloneTemplate: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
 	}
 
 	var (
@@ -95,7 +101,7 @@ func TestCreateDocument_PopulatesAllSnapshotColumns(t *testing.T) {
 		       process_area_code_snapshot
 		  FROM documents
 		 WHERE id = $1::uuid`,
-		res.DocumentID,
+		ref.ID,
 	).Scan(
 		&placeholderSchemaSnapshot,
 		&placeholderSchemaHash,

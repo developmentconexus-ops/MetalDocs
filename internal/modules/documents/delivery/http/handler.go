@@ -29,8 +29,6 @@ import (
 )
 
 type Service interface {
-	// Unused by HTTP handlers (no route). Kept for DuplicateDocument internal use.
-	CreateDocument(ctx context.Context, cmd application.CreateDocumentInput) (*application.CreateDocumentResult, error)
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
 	DuplicateDocument(ctx context.Context, tenantID, userID, docID string) (*application.CreateDocumentResult, error)
 	RenameDocument(ctx context.Context, tenantID, userID, docID, newName string) error

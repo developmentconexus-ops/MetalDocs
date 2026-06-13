@@ -86,7 +86,7 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 		}
 	})
 
-	t.Run("EmptyStorageKey_LegacyPath", func(t *testing.T) {
+	t.Run("EmptyStorageKey", func(t *testing.T) {
 		// Publish first doc so the sequence advances and the second insert succeeds.
 		if _, err := db.ExecContext(ctx, `UPDATE documents SET status='published' WHERE controlled_document_id = $1::uuid`, controlledDocumentID); err != nil {
 			t.Fatalf("publish first: %v", err)
@@ -116,9 +116,9 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 	})
 }
 
-// TestCreateDocument_RevisionNumberIncrementsForSameCD verifies that two documents
+// TestCreateDocumentTx_RevisionNumberIncrementsForSameCD verifies that two documents
 // created for the same controlled_document_id get revision_number 0 and 1.
-func TestCreateDocument_RevisionNumberIncrementsForSameCD(t *testing.T) {
+func TestCreateDocumentTx_RevisionNumberIncrementsForSameCD(t *testing.T) {
 	ctx := context.Background()
 	db, schema := testdb.Open(t)
 	db.SetMaxOpenConns(1)
@@ -161,18 +161,32 @@ func TestCreateDocument_RevisionNumberIncrementsForSameCD(t *testing.T) {
 		}
 	}
 
-	firstDocID, _, _, err := repo.CreateDocument(ctx, newDocument("Revision 1", "PO-REV-001"), "hash-1", nil)
+	tx1, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		t.Fatalf("CreateDocument first: %v", err)
+		t.Fatalf("begin tx1: %v", err)
+	}
+	firstDocID, _, _, err := repo.CreateDocumentTx(ctx, tx1, newDocument("Revision 1", "PO-REV-001"), "hash-1", "", nil)
+	if err != nil {
+		t.Fatalf("CreateDocumentTx first: %v", err)
+	}
+	if err := tx1.Commit(); err != nil {
+		t.Fatalf("commit tx1: %v", err)
 	}
 
 	if _, err := db.ExecContext(ctx, `UPDATE documents SET status='published' WHERE id=$1::uuid`, firstDocID); err != nil {
 		t.Fatalf("publish first document: %v", err)
 	}
 
-	secondDocID, _, _, err := repo.CreateDocument(ctx, newDocument("Revision 2", "PO-REV-002"), "hash-2", nil)
+	tx2, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		t.Fatalf("CreateDocument second: %v", err)
+		t.Fatalf("begin tx2: %v", err)
+	}
+	secondDocID, _, _, err := repo.CreateDocumentTx(ctx, tx2, newDocument("Revision 2", "PO-REV-002"), "hash-2", "", nil)
+	if err != nil {
+		t.Fatalf("CreateDocumentTx second: %v", err)
+	}
+	if err := tx2.Commit(); err != nil {
+		t.Fatalf("commit tx2: %v", err)
 	}
 
 	var firstRevision, secondRevision int
@@ -191,9 +205,9 @@ func TestCreateDocument_RevisionNumberIncrementsForSameCD(t *testing.T) {
 	}
 }
 
-// TestCreateDocument_RejectsEmptyName verifies the documents_name_not_empty
+// TestCreateDocumentTx_RejectsEmptyName verifies the documents_name_not_empty
 // CHECK constraint blocks rows with empty/whitespace-only name values.
-func TestCreateDocument_RejectsEmptyName(t *testing.T) {
+func TestCreateDocumentTx_RejectsEmptyName(t *testing.T) {
 	ctx := context.Background()
 	db, schema := testdb.Open(t)
 	db.SetMaxOpenConns(1)
@@ -235,7 +249,13 @@ func TestCreateDocument_RejectsEmptyName(t *testing.T) {
 		Code:                    "PO-EMPTY-CHECK",
 	}
 
-	_, _, _, err := repo.CreateDocument(ctx, doc, "hash", nil)
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	_, _, _, err = repo.CreateDocumentTx(ctx, tx, doc, "hash", "", nil)
 	if err == nil || !strings.Contains(err.Error(), "documents_name_not_empty") {
 		t.Fatalf("expected CHECK violation documents_name_not_empty, got: %v", err)
 	}
@@ -282,9 +302,18 @@ func TestGetDocument_ReturnsSnapshotMetadata(t *testing.T) {
 		Code:                    "POP-GENERAL-001",
 	}
 
-	docID, _, _, err := repo.CreateDocument(ctx, doc, "hash-snapshot", nil)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		t.Fatalf("CreateDocument: %v", err)
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	docID, _, _, err := repo.CreateDocumentTx(ctx, tx, doc, "hash-snapshot", "", nil)
+	if err != nil {
+		t.Fatalf("CreateDocumentTx: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
 	}
 
 	got, err := repo.GetDocument(ctx, tenantID, docID)

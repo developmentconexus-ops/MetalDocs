@@ -10,7 +10,6 @@ import (
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
-	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
@@ -40,10 +39,9 @@ func newPermissiveMockDB(t *testing.T) *sql.DB {
 }
 
 type fakeRepo struct {
-	createDocErr     error
-	createDocIDs     [3]string
-	setStorageKeyErr error
-	updateStatusErr  error
+	createDocErr    error
+	createDocIDs    [3]string
+	updateStatusErr error
 	acquireSess      *domain.Session
 	acquireErr       error
 	pendingMeta      *application.PendingCommitMeta
@@ -60,9 +58,6 @@ type fakeRepo struct {
 	docReturn   *domain.Document
 	listReturn  []domain.Document
 	checkpoints []domain.Checkpoint
-
-	setStorageRevID string
-	setStorageKey   string
 
 	statusCalls int
 	statusCur   domain.DocumentStatus
@@ -98,24 +93,11 @@ type fakeRepo struct {
 
 var _ application.Repository = (*fakeRepo)(nil)
 
-func (f *fakeRepo) CreateDocument(_ context.Context, _ *domain.Document, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
-	if f.createDocErr != nil {
-		return "", "", "", f.createDocErr
-	}
-	return f.createDocIDs[0], f.createDocIDs[1], f.createDocIDs[2], nil
-}
-
 func (f *fakeRepo) CreateDocumentTx(_ context.Context, _ db.Tx, _ *domain.Document, _, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
 	if f.createDocErr != nil {
 		return "", "", "", f.createDocErr
 	}
 	return f.createDocIDs[0], f.createDocIDs[1], f.createDocIDs[2], nil
-}
-
-func (f *fakeRepo) SetRevisionStorageKey(_ context.Context, revID, storageKey string) error {
-	f.setStorageRevID = revID
-	f.setStorageKey = storageKey
-	return f.setStorageKeyErr
 }
 
 func (f *fakeRepo) GetDocument(_ context.Context, _, _ string) (*domain.Document, error) {
@@ -398,75 +380,6 @@ func (n *noopAudit) WriteTx(_ context.Context, _ db.Tx, _, _, action, _ string, 
 	n.calls++
 	n.lastAction = action
 	return nil
-}
-
-func TestCreateDocument_OK(t *testing.T) {
-	repo := &fakeRepo{createDocIDs: [3]string{"doc_1", "rev_1", "sess_1"}}
-	audit := &noopAudit{}
-	svc := application.NewService(
-		repo,
-		&fakePresigner{hashReturn: "h_initial"},
-		fakeTplReader{},
-		fakeFormVal{valid: true},
-		audit,
-		&fakeControlledDocumentReader{cd: &controlleddocumentsdomain.ControlledDocument{
-			ID:              "cd_1",
-			ProfileCode:     "PROC",
-			ProcessAreaCode: "AREA-01",
-			Status:          controlleddocumentsdomain.CDStatusActive,
-		}},
-		&fakeAuthzChecker{},
-		&fakeProfileDefaultTemplateReader{id: strptr("tpl_ver_1"), status: strptr("published")},
-	)
-
-	res, err := svc.CreateDocument(context.Background(), application.CreateDocumentCmd{
-		TenantID:             "tenant_1",
-		ActorUserID:          "user_1",
-		ControlledDocumentID: "cd_1",
-		TemplateVersionID:    "tpl_ver_1",
-		Name:                 "Contract",
-		FormData:             []byte(`{"a":1}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateDocument() error = %v", err)
-	}
-	if res.DocumentID != "doc_1" || res.InitialRevisionID != "rev_1" || res.SessionID != "sess_1" {
-		t.Fatalf("unexpected ids: %+v", res)
-	}
-	if repo.setStorageRevID != "rev_1" {
-		t.Fatalf("expected storage key to be set for rev_1, got %q", repo.setStorageRevID)
-	}
-}
-
-func TestCreateDocument_InvalidFormData_Rejects(t *testing.T) {
-	repo := &fakeRepo{createDocIDs: [3]string{"doc_1", "rev_1", "sess_1"}}
-	svc := application.NewService(
-		repo,
-		&fakePresigner{},
-		fakeTplReader{},
-		fakeFormVal{valid: false, errs: []string{"invalid"}},
-		&noopAudit{},
-		&fakeControlledDocumentReader{cd: &controlleddocumentsdomain.ControlledDocument{
-			ID:              "cd_1",
-			ProfileCode:     "PROC",
-			ProcessAreaCode: "AREA-01",
-			Status:          controlleddocumentsdomain.CDStatusActive,
-		}},
-		&fakeAuthzChecker{},
-		&fakeProfileDefaultTemplateReader{id: strptr("tpl_ver_1"), status: strptr("published")},
-	)
-
-	_, err := svc.CreateDocument(context.Background(), application.CreateDocumentCmd{
-		TenantID:             "tenant_1",
-		ActorUserID:          "user_1",
-		ControlledDocumentID: "cd_1",
-		TemplateVersionID:    "tpl_ver_1",
-		Name:                 "Contract",
-		FormData:             []byte(`{"a":1}`),
-	})
-	if err == nil {
-		t.Fatalf("expected validation error")
-	}
 }
 
 func TestAcquireSession_Readonly_WhenTaken(t *testing.T) {

@@ -498,6 +498,7 @@ type fakeDocumentInitializer struct {
 	gotResolveTemplateStorageKeyCalls int
 	gotExistsCalls                    int
 	gotExistsStorageKey               string
+	gotResolveTemplateVersionIDCalls  int
 }
 
 func (f *fakeDocumentInitializer) CloneTemplate(_ context.Context, _ db.Tx, cd *controlleddocumentsdomain.ControlledDocument, req controlleddocumentsdomain.CloneTemplateRequest) (*controlleddocumentsdomain.DocumentRef, error) {
@@ -525,6 +526,14 @@ func (f *fakeDocumentInitializer) Exists(_ context.Context, storageKey string) (
 		return false, f.existsErr
 	}
 	return f.exists, nil
+}
+
+func (f *fakeDocumentInitializer) ResolveTemplateVersionID(_ context.Context, _, _ string, templateVersionID *string) (string, error) {
+	f.gotResolveTemplateVersionIDCalls++
+	if templateVersionID != nil && *templateVersionID != "" {
+		return *templateVersionID, nil
+	}
+	return "00000000-0000-0000-0000-000000000102", nil
 }
 
 func TestControlledDocumentService_Create_AtomicWithDocument(t *testing.T) {
@@ -711,22 +720,16 @@ func TestControlledDocumentService_Create_ManualCodeReasonWinsBeforeArtifactChec
 	}
 }
 
-func TestControlledDocumentService_Create_AutoTemplateArtifactMissing_AfterAuthzBeforeSequence(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("sqlmock.New: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	mock.ExpectBegin()
-	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
-	mock.ExpectRollback()
-
+func TestControlledDocumentService_Create_AutoTemplateArtifactMissing_BeforeTx(t *testing.T) {
+	// Template artifact check now runs OFF-TX (pre-flight) before the atomic tx
+	// opens. No database transaction is started when the artifact is missing —
+	// the runner is never called — so no sqlmock expectations are needed.
 	repo := newFakeControlledDocumentRepository()
 	seq := &fakeSequenceAllocator{next: 9}
 	docInit := &fakeDocumentInitializer{storageKey: "system/templates/blank.docx", exists: false}
-	svc := NewControlledDocumentService(newTxRunner(db), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
+	svc := NewControlledDocumentService(newTxRunner(newPermissiveMockDB(t)), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
-	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
+	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "dc",
 		ProcessAreaCode: "rh",
@@ -739,20 +742,21 @@ func TestControlledDocumentService_Create_AutoTemplateArtifactMissing_AfterAuthz
 		t.Fatalf("expected ErrTemplateArtifactMissing, got %v", err)
 	}
 	if docInit.gotResolveTemplateStorageKeyCalls != 1 {
-		t.Fatalf("expected template artifact resolution after authz, got %d calls", docInit.gotResolveTemplateStorageKeyCalls)
+		t.Fatalf("expected template artifact resolution before tx, got %d calls", docInit.gotResolveTemplateStorageKeyCalls)
 	}
 	if seq.next != 9 {
 		t.Fatalf("expected sequence allocation to remain unused, got next=%d", seq.next)
 	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("sqlmock expectations: %v", err)
-	}
 }
 
-func TestControlledDocumentService_Create_OverrideTemplateValidationWinsBeforeArtifactCheck(t *testing.T) {
+func TestControlledDocumentService_Create_OverrideTemplateValidationWinsBeforeSequence(t *testing.T) {
+	// Artifact check now runs off-tx (pre-flight) before the atomic tx opens.
+	// Override template validation still runs inside the tx. The artifact must
+	// exist for the pre-flight to pass so that we reach override validation — the
+	// mismatch (qa != dc) is still caught before sequence allocation.
 	repo := newFakeControlledDocumentRepository()
 	seq := &fakeSequenceAllocator{next: 10}
-	docInit := &fakeDocumentInitializer{storageKey: "system/templates/blank.docx", exists: false}
+	docInit := &fakeDocumentInitializer{storageKey: "system/templates/blank.docx", exists: true}
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "qa"},
 	}}
@@ -771,12 +775,6 @@ func TestControlledDocumentService_Create_OverrideTemplateValidationWinsBeforeAr
 	})
 	if !errors.Is(err, controlleddocumentsdomain.ErrTemplateProfileMismatch) {
 		t.Fatalf("expected ErrTemplateProfileMismatch, got %v", err)
-	}
-	if docInit.gotResolveTemplateStorageKeyCalls != 0 {
-		t.Fatalf("expected no template artifact resolution for invalid override request, got %d", docInit.gotResolveTemplateStorageKeyCalls)
-	}
-	if docInit.gotExistsCalls != 0 {
-		t.Fatalf("expected no template artifact existence checks for invalid override request, got %d", docInit.gotExistsCalls)
 	}
 	if seq.next != 10 {
 		t.Fatalf("expected sequence allocation to remain unused, got next=%d", seq.next)

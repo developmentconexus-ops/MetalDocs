@@ -15,7 +15,7 @@ func TestSessionQueriesIncludeTenantScope(t *testing.T) {
 		nextFn string
 		want   string
 	}{
-		{name: "CreateDocumentTx", fn: "CreateDocumentTx", nextFn: "SetRevisionStorageKey", want: "INSERT INTO editor_sessions (tenant_id"},
+		{name: "CreateDocumentTx", fn: "CreateDocumentTx", nextFn: "GetDocument", want: "INSERT INTO editor_sessions (tenant_id"},
 		{name: "AcquireSession", fn: "AcquireSession", nextFn: "HeartbeatSession", want: "tenant_id=$1::uuid"},
 		{name: "HeartbeatSession", fn: "HeartbeatSession", nextFn: "ReleaseSession", want: "AND tenant_id=$2::uuid"},
 		{name: "ReleaseSession", fn: "ReleaseSession", nextFn: "ForceReleaseSession", want: "AND tenant_id=$2::uuid"},

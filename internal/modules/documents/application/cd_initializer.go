@@ -34,6 +34,15 @@ func (i *CDDocumentInitializer) Exists(ctx context.Context, storageKey string) (
 	return i.svc.templateArtifactExists(ctx, storageKey)
 }
 
+// ResolveTemplateVersionID resolves the effective template version id off-tx so
+// the controlled-document atomic flow can pre-resolve before opening its tx.
+func (i *CDDocumentInitializer) ResolveTemplateVersionID(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error) {
+	if i == nil || i.svc == nil {
+		return "", errors.New("documents service not configured")
+	}
+	return i.svc.resolveTemplateVersionID(ctx, tenantID, profileCode, templateVersionID)
+}
+
 // CloneTemplate threads the caller's tx into Service.cloneIntoTx so the
 // document, initial revision, editor session, snapshot columns and required
 // placeholder rows commit atomically with the CD row.
@@ -47,7 +56,7 @@ func (i *CDDocumentInitializer) CloneTemplate(ctx context.Context, tx db.Tx, cd 
 		formData = raw
 	}
 
-	docID, contentHash, err := i.svc.cloneIntoTx(ctx, tx, cloneIntoTxInput{
+	docID, revID, sessionID, contentHash, err := i.svc.cloneIntoTx(ctx, tx, cloneIntoTxInput{
 		TenantID:                  cd.TenantID,
 		ControlledDocumentID:      cd.ID,
 		ProfileCode:               cd.ProfileCode,
@@ -61,5 +70,5 @@ func (i *CDDocumentInitializer) CloneTemplate(ctx context.Context, tx db.Tx, cd 
 	if err != nil {
 		return nil, err
 	}
-	return &controlleddocumentsdomain.DocumentRef{ID: docID, ContentHash: contentHash}, nil
+	return &controlleddocumentsdomain.DocumentRef{ID: docID, ContentHash: contentHash, RevisionID: revID, SessionID: sessionID}, nil
 }

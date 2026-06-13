@@ -275,6 +275,19 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			return nil, fmt.Errorf("controlled_documents: create controlled document: %w", err)
 		}
 	} else {
+		// Pre-flight OFF-TX: validate the template artifact and resolve the
+		// effective template version id BEFORE opening the atomic tx. Both touch
+		// an authz-recording taxonomy read (GetByCode); running them inside the tx
+		// — which holds the audit hash-chain advisory lock once authz.Require
+		// records the system_admin bypass — self-deadlocks. Pre-resolving keeps the
+		// tx free of off-tx authz reads.
+		if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
+			return nil, fmt.Errorf("controlled_documents: ensure template artifact: %w", err)
+		}
+		resolvedTemplateVersionID, err := s.docInit.ResolveTemplateVersionID(ctx, cmd.TenantID, cmd.ProfileCode, cmd.TemplateVersionID)
+		if err != nil {
+			return nil, fmt.Errorf("controlled_documents: resolve initial template version: %w", err)
+		}
 		// Auto path: sequence allocation, authz, and persistence run atomically.
 		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 			if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
@@ -308,10 +321,6 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 					return fmt.Errorf("controlled_documents: resolve template version: %w", err)
 				}
 				overrideID = cmd.OverrideTemplateVersionID
-			}
-
-			if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
-				return fmt.Errorf("controlled_documents: ensure template artifact: %w", err)
 			}
 
 			next, err := s.seq.NextAndIncrement(ctx, tx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
@@ -380,7 +389,7 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 				return fmt.Errorf("controlled_documents: create controlled document in tx: %w", err)
 			}
 			if s.docInit != nil {
-				cloneReq, err := controlleddocumentsdomain.NewCloneTemplateRequest(cmd.TemplateVersionID, cmd.DocumentName, cmd.FormData)
+				cloneReq, err := controlleddocumentsdomain.NewCloneTemplateRequest(&resolvedTemplateVersionID, cmd.DocumentName, cmd.FormData)
 				if err != nil {
 					return fmt.Errorf("controlled_documents: build clone template request: %w", err)
 				}
@@ -664,6 +673,14 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 		return nil, errors.New("controlled_documents: document initializer not configured")
 	}
 
+	// Pre-resolve the effective template version id OFF-TX so the in-tx clone does
+	// not issue an authz-recording taxonomy read while holding the audit advisory
+	// lock (self-deadlock). See ResolveTemplateVersionID on the port.
+	resolvedTemplateVersionID, err := s.docInit.ResolveTemplateVersionID(ctx, cmd.TenantID, cd.ProfileCode, cmd.TemplateVersionID)
+	if err != nil {
+		return nil, fmt.Errorf("controlled_documents: resolve revision template version: %w", err)
+	}
+
 	var ref *controlleddocumentsdomain.DocumentRef
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, actorUserID); err != nil {
@@ -675,7 +692,7 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 			return fmt.Errorf("controlled_documents: authz check create revision: %w", err)
 		}
 
-		cloneReq, err := controlleddocumentsdomain.NewCloneTemplateRequest(cmd.TemplateVersionID, cmd.Name, cmd.FormData)
+		cloneReq, err := controlleddocumentsdomain.NewCloneTemplateRequest(&resolvedTemplateVersionID, cmd.Name, cmd.FormData)
 		if err != nil {
 			return fmt.Errorf("controlled_documents: build revision clone template request: %w", err)
 		}

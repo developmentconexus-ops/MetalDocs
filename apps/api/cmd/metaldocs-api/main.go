@@ -76,8 +76,8 @@ import (
 	"metaldocs/internal/platform/httpclient"
 	riverjobs "metaldocs/internal/platform/jobs/river"
 	"metaldocs/internal/platform/messaging"
-	"metaldocs/internal/platform/migrate"
 	platformmw "metaldocs/internal/platform/middleware"
+	"metaldocs/internal/platform/migrate"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/ratelimit"
@@ -102,34 +102,55 @@ func newControlledDocumentDuplicatorAdapter(svc *controlleddocumentsapp.Controll
 	return &controlledDocumentDuplicatorAdapter{svc: svc}
 }
 
-func (a controlledDocumentDuplicatorAdapter) DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*controlleddocumentsdomain.ControlledDocument, error) {
+func (a controlledDocumentDuplicatorAdapter) DuplicateControlledDocument(ctx context.Context, in docapp.DuplicateControlledDocumentInput) (*docapp.CreateDocumentResult, error) {
 	if a.svc == nil {
-		return nil, fmt.Errorf("duplicate controlled document %s: service not configured", controlledDocumentID)
+		return nil, fmt.Errorf("duplicate controlled document %s: service not configured", in.ControlledDocumentID)
 	}
-	source, err := a.svc.Get(ctx, tenantID, controlledDocumentID)
+	source, err := a.svc.Get(ctx, in.TenantID, in.ControlledDocumentID)
 	if err != nil {
-		return nil, fmt.Errorf("duplicate controlled document %s: load source: %w", controlledDocumentID, err)
+		return nil, fmt.Errorf("duplicate controlled document %s: load source: %w", in.ControlledDocumentID, err)
 	}
 	var overrideReason *string
 	if source.OverrideTemplateVersionID != nil {
 		reason := "Duplicated from existing controlled document"
 		overrideReason = &reason
 	}
+	var formData map[string]any
+	if len(in.FormData) > 0 {
+		if err := json.Unmarshal(in.FormData, &formData); err != nil {
+			return nil, fmt.Errorf("duplicate controlled document %s: unmarshal form data: %w", in.ControlledDocumentID, err)
+		}
+	}
 	res, err := a.svc.Create(ctx, controlleddocumentsapp.CreateControlledDocumentCmd{
-		TenantID:                  tenantID,
+		TenantID:                  in.TenantID,
 		ProfileCode:               source.ProfileCode,
 		ProcessAreaCode:           source.ProcessAreaCode,
 		DepartmentCode:            source.DepartmentCode,
 		Title:                     source.Title,
 		OwnerUserID:               source.OwnerUserID,
-		ActorUserID:               actorUserID,
+		ActorUserID:               in.ActorUserID,
 		OverrideTemplateVersionID: source.OverrideTemplateVersionID,
 		OverrideTemplateReason:    overrideReason,
+		DocumentName:              in.DocumentName,
+		FormData:                  formData,
+		// TemplateVersionID threads the source's override into the off-tx clone
+		// resolver so the duplicate clones the source's override version (not the
+		// profile default); OverrideTemplateVersionID above drives in-tx override
+		// validation + persistence. Both are nil when the source has no override,
+		// so the duplicate falls back to the profile's current default template.
+		TemplateVersionID: source.OverrideTemplateVersionID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("duplicate controlled document %s: create duplicate: %w", controlledDocumentID, err)
+		return nil, fmt.Errorf("duplicate controlled document %s: create duplicate: %w", in.ControlledDocumentID, err)
 	}
-	return res.ControlledDocument, nil
+	if res.DocumentRef == nil {
+		return nil, fmt.Errorf("duplicate controlled document: create returned no document ref")
+	}
+	return &docapp.CreateDocumentResult{
+		DocumentID:        res.DocumentRef.ID,
+		InitialRevisionID: res.DocumentRef.RevisionID,
+		SessionID:         res.DocumentRef.SessionID,
+	}, nil
 }
 
 // e2eHandlersEnabled gates the test-only seed/reset/governance endpoints
@@ -459,7 +480,6 @@ func main() {
 		FormVal:                      formval.NewGojsonschema(),
 		Audit:                        newDocumentsAuditAdapter(deps.AuditWriter),
 		ExportPresign:                docPresigner,
-		ControlledDocumentReader:     controlledDocumentsRepo,
 		ControlledDocumentDuplicator: controlledDocumentDuplicator,
 		Caps:                         wiring.NewCapabilityChecker(capabilityService),
 		ProfileDefaults:              &profileDefaultsAdapter{profileRepo: profileRepo},

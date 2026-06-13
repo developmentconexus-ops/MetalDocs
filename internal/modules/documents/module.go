@@ -34,7 +34,6 @@ type Dependencies struct {
 	TplRead                      application.TemplateReader
 	FormVal                      application.FormValidator
 	Audit                        application.Audit
-	ControlledDocumentReader     application.ControlledDocumentReader
 	ControlledDocumentDuplicator application.ControlledDocumentDuplicator
 	Caps                         application.CapabilityChecker
 	ProfileDefaults              application.ProfileDefaultTemplateReader
@@ -56,9 +55,9 @@ func New(deps Dependencies) *Module {
 	var svc *application.Service
 	if deps.SnapshotReader != nil {
 		snapSvc := application.NewSnapshotService(deps.SnapshotReader)
-		svc = application.NewServiceWithSnapshot(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ControlledDocumentReader, deps.Caps, deps.ProfileDefaults, snapSvc)
+		svc = application.NewServiceWithSnapshot(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ProfileDefaults, snapSvc)
 	} else {
-		svc = application.NewService(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ControlledDocumentReader, deps.Caps, deps.ProfileDefaults)
+		svc = application.NewService(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ProfileDefaults)
 	}
 	svc.WithRunner(db.NewTxRunner(deps.DB))
 	svc.WithControlledDocumentDuplicator(deps.ControlledDocumentDuplicator)

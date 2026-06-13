@@ -40,7 +40,6 @@ internal/modules/documents/repository/repository.go|DeleteComment
 internal/modules/documents/repository/repository.go|DeleteExpiredPending
 internal/modules/documents/repository/repository.go|HeartbeatSession
 internal/modules/documents/repository/repository.go|RestoreCheckpoint
-internal/modules/documents/repository/repository.go|SetRevisionStorageKey
 # Z-10 (Wave Z): the per-table pdf/materialize outbox repositories were collapsed
 # into one generic StagingOutboxRepository (staging_outbox.go). Its mutating SQL is
 # built with fmt.Sprintf(`INSERT/UPDATE %s ...`, table) — a CallExpr, not a string
