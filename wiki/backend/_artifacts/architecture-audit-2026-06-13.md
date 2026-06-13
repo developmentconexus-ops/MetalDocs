@@ -86,7 +86,7 @@ Per-finding closure. Tracker rows mirror these in [`../roadmap.md`](../roadmap.m
 | # | Disposition | Commit | Evidence |
 |---|-------------|--------|----------|
 | A1 | ✅ RESOLVED | (this commit) | `Unwrap()` added to `statusWriter`; coder/websocket hijacker follows the Unwrap chain. Runtime proof at close. |
-| A2 | ☐ open | | |
+| A2 | ✅ RESOLVED | (this commit) | `sqlescape.LikeEscape()` + `ESCAPE '\'` clause; regression test added. |
 | A3 | ☐ open | | |
 | A4 | ☐ open | | |
 | A5 | ☐ open | | |

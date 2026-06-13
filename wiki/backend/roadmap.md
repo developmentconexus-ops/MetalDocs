@@ -150,7 +150,7 @@ The operator overrode D-1/D-3 and ordered a zero-defer finish (register-zero + o
 | # | Sev | Defect | Status | Commit | Evidence |
 |---|-----|--------|--------|--------|----------|
 | A1 | 🔴 CRITICAL | `statusWriter` lacks `Unwrap()` → WS upgrade 501 in prod; `/iam/presence/stream` dead | ✅ | (this commit) | Added `func (w *statusWriter) Unwrap() http.ResponseWriter`. Verified `vendor/github.com/coder/websocket/hijack.go:22-28` walks the `Unwrap()` chain (mirrors `http.ResponseController`), so the upgrade now reaches the real Hijacker. `go build ./internal/platform/observability/...` ✓ · obs tests ✓. **Runtime WS-upgrade proof at Wave H close.** |
-| A2 | 🔒 Major | LIKE wildcard injection (`opts.Q` unescaped, CWE-943) | ☐ | | |
+| A2 | 🔒 Major | LIKE wildcard injection (`opts.Q` unescaped, CWE-943) | ✅ | (this commit) | `buildDocumentFilter` now wraps `opts.Q` with `sqlescape.LikeEscape()` + `name ILIKE $N ESCAPE '\'`. New `TestBuildDocumentFilter_EscapesLikeWildcards` asserts `%a\%b\_c\\d%` + ESCAPE clause. repo tests ✓. |
 | A3 | 🔒 Major | self-service password change does not revoke sessions (CWE-613) | ☐ | | |
 | A4 | 🔒 Major | sliding idle timeout ships disabled (default 0) + absent from deploy artifacts | ☐ | | |
 | A5 | 📑 Major | `PATCH /iam/users/{id}` returns ad-hoc map, spec declares `ManagedUserCore` (breaks FE codegen) | ☐ | | |

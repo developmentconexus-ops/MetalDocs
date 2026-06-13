@@ -19,6 +19,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/pagination"
+	"metaldocs/internal/platform/sqlescape"
 )
 
 // isInvalidUUID returns true when err is a Postgres error with SQLSTATE 22P02
@@ -461,8 +462,11 @@ func buildDocumentFilter(tenantID string, opts ListOptions) (whereClause string,
 		conds = append(conds, fmt.Sprintf("profile_code_snapshot = $%d", len(args)))
 	}
 	if opts.Q != "" {
-		args = append(args, "%"+opts.Q+"%")
-		conds = append(conds, fmt.Sprintf("name ILIKE $%d", len(args)))
+		// Escape LIKE metacharacters (%, _, \) so user input cannot inject
+		// wildcards (CWE-943: info-inference + CPU-exhaustion). Requires the
+		// matching ESCAPE clause below.
+		args = append(args, "%"+sqlescape.LikeEscape(opts.Q)+"%")
+		conds = append(conds, fmt.Sprintf("name ILIKE $%d ESCAPE '\\'", len(args)))
 	}
 
 	return strings.Join(conds, " AND "), args
