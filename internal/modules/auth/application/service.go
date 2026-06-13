@@ -430,7 +430,9 @@ func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdom
 	}); err != nil {
 		return err
 	}
-	return nil
+	// Revoke all of the user's sessions so a stolen or stale session cannot
+	// survive a password change (CWE-613) — mirrors AdminResetPassword.
+	return s.repo.RevokeSessionsByUserID(ctx, userID, s.now().UTC())
 }
 
 func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.ManagedUser, error) {

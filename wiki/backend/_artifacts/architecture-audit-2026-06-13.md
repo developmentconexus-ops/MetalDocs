@@ -87,7 +87,7 @@ Per-finding closure. Tracker rows mirror these in [`../roadmap.md`](../roadmap.m
 |---|-------------|--------|----------|
 | A1 | ✅ RESOLVED | (this commit) | `Unwrap()` added to `statusWriter`; coder/websocket hijacker follows the Unwrap chain. Runtime proof at close. |
 | A2 | ✅ RESOLVED | (this commit) | `sqlescape.LikeEscape()` + `ESCAPE '\'` clause; regression test added. |
-| A3 | ☐ open | | |
+| A3 | ✅ RESOLVED | (this commit) | `RevokeSessionsByUserID` on password change; regression test added. Revokes ALL sessions (matches AdminResetPassword) — FE re-auths after change. |
 | A4 | ☐ open | | |
 | A5 | ☐ open | | |
 | A6 | ☐ open | | |

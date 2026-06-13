@@ -1024,3 +1024,59 @@ func TestLogout_EmptyAndMalformedTokenReturnError(t *testing.T) {
 		t.Fatalf("Logout(malformed) error = %v, want ErrSessionNotFound", err)
 	}
 }
+
+// TestChangePasswordForUser_RevokesSessions guards A3 (CWE-613): a self-service
+// password change must revoke the user's existing sessions so a stolen or stale
+// session cannot survive the change.
+func TestChangePasswordForUser_RevokesSessions(t *testing.T) {
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	ctx := context.Background()
+
+	userID := "pw-change-user"
+	password := "TestPassword123!"
+	hash := mustHashPassword(t, password)
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:       userID,
+		Username:     userID,
+		Email:        "pwchange@example.com",
+		DisplayName:  "PW Change User",
+		PasswordHash: hash,
+		PasswordAlgo: "bcrypt",
+		IsActive:     true,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
+
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          testSessionSecret,
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		AllowDevTenantFallback: true,
+		CookieSecure:           false,
+	})
+
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+	authSession, err := svc.Authenticate(ctx, userID, password, req)
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+	// Sanity: the freshly minted session resolves.
+	if _, err := svc.ResolveSession(ctx, authSession.RawToken); err != nil {
+		t.Fatalf("ResolveSession before change: %v", err)
+	}
+
+	if err := svc.ChangePasswordForUser(ctx, authSession.CurrentUser, password, "NewPassword456!"); err != nil {
+		t.Fatalf("ChangePasswordForUser: %v", err)
+	}
+
+	// The pre-change session must no longer resolve (revoked).
+	if _, err := svc.ResolveSession(ctx, authSession.RawToken); err == nil {
+		t.Fatalf("expected session to be revoked after password change, but ResolveSession succeeded")
+	}
+}
