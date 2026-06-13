@@ -7,7 +7,6 @@ import (
 	"io"
 
 	miniogo "github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"metaldocs/internal/platform/config"
 )
@@ -18,20 +17,14 @@ type Store struct {
 	autoCreateBucket bool
 }
 
-func NewStore(cfg config.AttachmentsConfig) (*Store, error) {
-	client, err := miniogo.New(cfg.MinIOEndpoint, &miniogo.Options{
-		Creds:  credentials.NewStaticV4(cfg.MinIOAccessKey, cfg.MinIOSecretKey, ""),
-		Secure: cfg.MinIOUseSSL,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create minio client: %w", err)
-	}
-
+// NewStore creates a Store using an already-initialised MinIO client.
+// The caller is responsible for constructing the client (credentials, endpoint, TLS).
+func NewStore(client *miniogo.Client, cfg config.AttachmentsConfig) *Store {
 	return &Store{
 		client:           client,
 		bucket:           cfg.MinIOBucket,
 		autoCreateBucket: cfg.MinIOAutoCreateBucket,
-	}, nil
+	}
 }
 
 func (s *Store) EnsureBucket(ctx context.Context) error {

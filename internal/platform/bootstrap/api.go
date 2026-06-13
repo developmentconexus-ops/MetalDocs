@@ -90,11 +90,7 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 				return APIDependencies{}, err
 			}
 			if gotenbergClient != nil {
-				store, err := miniostore.NewStore(attachmentsCfg)
-				if err != nil {
-					_ = closeDB(db)
-					return APIDependencies{}, fmt.Errorf("build minio store: %w", err)
-				}
+				store := miniostore.NewStore(minioClient, attachmentsCfg)
 				pdfConverter = servicebus.NewGotenbergPDFClient(store, gotenbergClient)
 			}
 		}

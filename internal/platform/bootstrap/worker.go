@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 
+	miniogo "github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+
 	"metaldocs/internal/platform/config"
 	pgdb "metaldocs/internal/platform/db/postgres"
 	"metaldocs/internal/platform/messaging"
@@ -76,10 +79,15 @@ func buildWorkerPDFConverter() (*servicebus.GotenbergPDFClient, error) {
 	if attachmentsCfg.Provider != config.StorageProviderMinIO {
 		return nil, nil
 	}
-	store, err := miniostore.NewStore(attachmentsCfg)
+	minioClient, err := miniogo.New(attachmentsCfg.MinIOEndpoint, &miniogo.Options{
+		Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
+		Secure: attachmentsCfg.MinIOUseSSL,
+		Region: "us-east-1",
+	})
 	if err != nil {
-		return nil, fmt.Errorf("build minio store: %w", err)
+		return nil, fmt.Errorf("init minio client: %w", err)
 	}
+	store := miniostore.NewStore(minioClient, attachmentsCfg)
 	gotenbergClient, err := gotenberg.NewClient(gotenbergCfg.URL)
 	if err != nil {
 		return nil, fmt.Errorf("build gotenberg client: %w", err)
