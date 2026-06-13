@@ -11,6 +11,7 @@ import (
 	"metaldocs/internal/modules/controlleddocuments/infrastructure"
 	taxonomyapp "metaldocs/internal/modules/taxonomy/application"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
+	platformdb "metaldocs/internal/platform/db"
 )
 
 type Module struct {
@@ -39,7 +40,7 @@ func New(deps Dependencies) *Module {
 	profiles := infrastructure.NewTaxonomyProfileReader(taxonomyinfra.NewProfileRepository(deps.DB))
 	areas := infrastructure.NewTaxonomyAreaReader(taxonomyinfra.NewAreaRepository(deps.DB))
 	govLogger := taxonomyapp.NewAuditGovernanceAdapter(deps.AuditWriter)
-	svc := application.NewControlledDocumentService(deps.DB, repo, seq, tplCheck, profiles, areas, govLogger, nil)
+	svc := application.NewControlledDocumentService(platformdb.NewTxRunner(deps.DB), repo, seq, tplCheck, profiles, areas, govLogger, nil)
 	h := dhttp.NewHandler(svc, deps.DB)
 	if svc == nil {
 		panic("controlled_documents: service construction returned nil")

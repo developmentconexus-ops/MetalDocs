@@ -228,9 +228,9 @@ func (s *spyControlledDocumentService) PeekSeq(ctx context.Context, tenantID, pr
 
 // helpers
 
-func newTestHandler(db *sql.DB) *Handler {
+func newTestHandler(rawDB *sql.DB) *Handler {
 	svc := application.NewControlledDocumentService(
-		db,
+		newTxRunner(rawDB),
 		fakeRegistryDocs{},
 		fakeSequenceAllocator{},
 		fakeTemplateChecker{},
@@ -239,7 +239,7 @@ func newTestHandler(db *sql.DB) *Handler {
 		fakeGovernanceLogger{},
 		nil,
 	)
-	return NewHandler(svc, db)
+	return NewHandler(svc, rawDB)
 }
 
 // newSpyHandler builds a Handler backed by a configurable spy service.

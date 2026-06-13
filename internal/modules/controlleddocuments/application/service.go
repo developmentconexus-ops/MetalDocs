@@ -18,6 +18,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
+	platformdb "metaldocs/internal/platform/db"
 )
 
 type TemplateVersionChecker interface {
@@ -37,7 +38,7 @@ type CDFilter = controlleddocumentsdomain.CDFilter
 
 type ControlledDocumentService struct {
 	// Core dependencies.
-	db        *sql.DB
+	runner    platformdb.TxRunner
 	docs      controlleddocumentsdomain.ControlledDocumentRepository
 	seq       controlleddocumentsdomain.SequenceAllocator
 	tplCheck  TemplateVersionChecker
@@ -87,7 +88,7 @@ var ErrTemplateArtifactInvariantUnconfigured = errors.New("controlled_documents:
 var ErrActorMissing = errors.New("controlled_documents: actor user id missing in context")
 
 func NewControlledDocumentService(
-	db *sql.DB,
+	runner platformdb.TxRunner,
 	docs controlleddocumentsdomain.ControlledDocumentRepository,
 	seq controlleddocumentsdomain.SequenceAllocator,
 	tplCheck TemplateVersionChecker,
@@ -115,7 +116,7 @@ func NewControlledDocumentService(
 		panic("controlled_documents: governance logger must not be nil")
 	}
 	svc := &ControlledDocumentService{
-		db:        db,
+		runner:    runner,
 		docs:      docs,
 		seq:       seq,
 		tplCheck:  tplCheck,
@@ -161,14 +162,20 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 	}
 
 	var (
-		code       string
-		sequence   *int
-		events     []taxonomydomain.GovernanceEvent
+		code     string
+		sequence *int
+		events   []taxonomydomain.GovernanceEvent
 		overrideID *string
-		createTx   *sql.Tx
+		doc        *controlleddocumentsdomain.ControlledDocument
+		docRef     *controlleddocumentsdomain.DocumentRef
 	)
 
 	if cmd.ManualCode != nil {
+		// PRE-EXISTING, DELIBERATELY-PRESERVED asymmetry: manual-code creation
+		// bypasses the tier-2 authz.Require that auto-code enforces. This is not
+		// introduced by this refactor (H-1d′-CD); it pre-dates the TxRunner port.
+		// The manual path has no SeedTxIdentity, no authz.Require, and no
+		// transaction. Flagged here for operator review — do NOT "fix" silently.
 		if !isReasonValid(cmd.ManualCodeReason) {
 			return nil, controlleddocumentsdomain.ErrManualCodeReasonRequired
 		}
@@ -193,138 +200,199 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			Reason:       strings.TrimSpace(*cmd.ManualCodeReason),
 			PayloadJSON:  payload,
 		})
-	} else {
-		tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-		if err != nil {
-			return nil, fmt.Errorf("controlled_documents: begin create tx: %w", err)
-		}
-		defer func() {
-			if createTx != nil {
-				_ = tx.Rollback()
+
+		// Override-template validation (manual path).
+		if cmd.OverrideTemplateVersionID != nil {
+			if !isReasonValid(cmd.OverrideTemplateReason) {
+				return nil, controlleddocumentsdomain.ErrOverrideReasonRequired
 			}
-		}()
-		createTx = tx
-		if err := authz.SeedTxIdentity(ctx, createTx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return nil, fmt.Errorf("controlled_documents: set authz context: %w", err)
+			status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, cmd.TenantID, *cmd.OverrideTemplateVersionID)
+			if err != nil {
+				return nil, fmt.Errorf("controlled_documents: get override template version state: %w", err)
+			}
+			_, err = controlleddocumentsdomain.Resolve(controlleddocumentsdomain.TemplateResolutionInput{
+				ProfileCode: cmd.ProfileCode,
+				OverrideTemplate: &controlleddocumentsdomain.TemplateVersionCandidate{
+					ID:          *cmd.OverrideTemplateVersionID,
+					ProfileCode: profileCode,
+					Status:      status,
+				},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("controlled_documents: resolve template version: %w", err)
+			}
+			overrideID = cmd.OverrideTemplateVersionID
 		}
-		// ADR 0022 Phase 7: area-scoped tier-2 — a CD is created INTO a process
-		// area, so authorize against that area (least-privilege; system_admin
-		// still bypasses). cmd.ProcessAreaCode validated active above.
-		if err := authz.Require(ctx, createTx, string(iamdomain.CapControlledDocumentCreate), cmd.ProcessAreaCode); err != nil {
-			return nil, fmt.Errorf("controlled_documents: authz check sequence allocation: %w", err)
+		if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
+			return nil, fmt.Errorf("controlled_documents: ensure template artifact: %w", err)
 		}
-	}
-	if cmd.OverrideTemplateVersionID != nil {
-		if !isReasonValid(cmd.OverrideTemplateReason) {
-			return nil, controlleddocumentsdomain.ErrOverrideReasonRequired
+
+		if overrideID != nil {
+			payload, err := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
+			if err != nil {
+				return nil, fmt.Errorf("controlled_documents: marshal template override payload: %w", err)
+			}
+			events = append(events, taxonomydomain.GovernanceEvent{
+				TenantID:     cmd.TenantID,
+				EventType:    "template.override",
+				ActorUserID:  cmd.ActorUserID,
+				ResourceType: "controlled_document",
+				ResourceID:   code,
+				Reason:       strings.TrimSpace(*cmd.OverrideTemplateReason),
+				PayloadJSON:  payload,
+			})
 		}
-		status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, cmd.TenantID, *cmd.OverrideTemplateVersionID)
+
+		now := s.now().UTC()
+		visibility, err := controlleddocumentsdomain.NewVisibility(
+			cmd.VisibilityScope,
+			cmd.VisibilityAreaCodes,
+			cmd.VisibilityUserIDs,
+			cmd.ProcessAreaCode,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("controlled_documents: get override template version state: %w", err)
+			return nil, fmt.Errorf("controlled_documents: build visibility: %w", err)
 		}
-		_, err = controlleddocumentsdomain.Resolve(controlleddocumentsdomain.TemplateResolutionInput{
-			ProfileCode: cmd.ProfileCode,
-			OverrideTemplate: &controlleddocumentsdomain.TemplateVersionCandidate{
-				ID:          *cmd.OverrideTemplateVersionID,
-				ProfileCode: profileCode,
-				Status:      status,
-			},
+		doc, err = controlleddocumentsdomain.NewControlledDocument(controlleddocumentsdomain.ControlledDocument{
+			TenantID:                  cmd.TenantID,
+			ProfileCode:               cmd.ProfileCode,
+			ProcessAreaCode:           cmd.ProcessAreaCode,
+			DepartmentCode:            cmd.DepartmentCode,
+			Code:                      code,
+			SequenceNum:               sequence,
+			Title:                     cmd.Title,
+			OwnerUserID:               cmd.OwnerUserID,
+			OverrideTemplateVersionID: overrideID,
+			Visibility:                visibility,
+			Status:                    controlleddocumentsdomain.CDStatusActive,
+			CreatedAt:                 now,
+			UpdatedAt:                 now,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("controlled_documents: resolve template version: %w", err)
+			return nil, fmt.Errorf("controlled_documents: build controlled document: %w", err)
 		}
-		overrideID = cmd.OverrideTemplateVersionID
-	}
-	if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
-		return nil, fmt.Errorf("controlled_documents: ensure template artifact: %w", err)
-	}
-
-	if cmd.ManualCode == nil {
-		// createTx is non-nil here: the ManualCode==nil branch above is exactly
-		// the one that opens it (an authz failure there returns early, never
-		// reaching this point). The allocator now rejects a nil tx outright.
-		next, err := s.seq.NextAndIncrement(ctx, createTx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
-		if err != nil {
-			return nil, fmt.Errorf("controlled_documents: allocate sequence: %w", err)
-		}
-		code = controlleddocumentsdomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
-		sequence = &next
-		taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
-		if err != nil {
-			return nil, fmt.Errorf("controlled_documents: check auto code availability: %w", err)
-		}
-		if taken {
-			return nil, controlleddocumentsdomain.ErrCDCodeTaken
-		}
-	}
-
-	if overrideID != nil {
-		payload, err := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
-		if err != nil {
-			return nil, fmt.Errorf("controlled_documents: marshal template override payload: %w", err)
-		}
-		events = append(events, taxonomydomain.GovernanceEvent{
-			TenantID:     cmd.TenantID,
-			EventType:    "template.override",
-			ActorUserID:  cmd.ActorUserID,
-			ResourceType: "controlled_document",
-			ResourceID:   code,
-			Reason:       strings.TrimSpace(*cmd.OverrideTemplateReason),
-			PayloadJSON:  payload,
-		})
-	}
-
-	now := s.now().UTC()
-	visibility, err := controlleddocumentsdomain.NewVisibility(
-		cmd.VisibilityScope,
-		cmd.VisibilityAreaCodes,
-		cmd.VisibilityUserIDs,
-		cmd.ProcessAreaCode,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("controlled_documents: build visibility: %w", err)
-	}
-	doc, err := controlleddocumentsdomain.NewControlledDocument(controlleddocumentsdomain.ControlledDocument{
-		TenantID:                  cmd.TenantID,
-		ProfileCode:               cmd.ProfileCode,
-		ProcessAreaCode:           cmd.ProcessAreaCode,
-		DepartmentCode:            cmd.DepartmentCode,
-		Code:                      code,
-		SequenceNum:               sequence,
-		Title:                     cmd.Title,
-		OwnerUserID:               cmd.OwnerUserID,
-		OverrideTemplateVersionID: overrideID,
-		Visibility:                visibility,
-		Status:                    controlleddocumentsdomain.CDStatusActive,
-		CreatedAt:                 now,
-		UpdatedAt:                 now,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("controlled_documents: build controlled document: %w", err)
-	}
-	var docRef *controlleddocumentsdomain.DocumentRef
-	if createTx != nil {
-		if err := s.docs.CreateTx(ctx, createTx, doc); err != nil {
-			return nil, fmt.Errorf("controlled_documents: create controlled document in tx: %w", err)
-		}
-		if s.docInit != nil {
-			cloneReq, err := controlleddocumentsdomain.NewCloneTemplateRequest(cmd.TemplateVersionID, cmd.DocumentName, cmd.FormData)
-			if err != nil {
-				return nil, fmt.Errorf("controlled_documents: build clone template request: %w", err)
-			}
-			ref, err := s.docInit.CloneTemplate(ctx, createTx, doc, cloneReq)
-			if err != nil {
-				return nil, fmt.Errorf("controlled_documents: clone template for initial revision: %w", err)
-			}
-			docRef = ref
-		}
-		if err := createTx.Commit(); err != nil {
-			return nil, fmt.Errorf("controlled_documents: commit create tx: %w", err)
-		}
-		createTx = nil
-	} else {
 		if err := s.docs.Create(ctx, doc); err != nil {
 			return nil, fmt.Errorf("controlled_documents: create controlled document: %w", err)
+		}
+	} else {
+		// Auto path: sequence allocation, authz, and persistence run atomically.
+		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+			if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+				return fmt.Errorf("controlled_documents: set authz context: %w", err)
+			}
+			// ADR 0022 Phase 7: area-scoped tier-2 — a CD is created INTO a process
+			// area, so authorize against that area (least-privilege; system_admin
+			// still bypasses). cmd.ProcessAreaCode validated active above.
+			if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), cmd.ProcessAreaCode); err != nil {
+				return fmt.Errorf("controlled_documents: authz check sequence allocation: %w", err)
+			}
+
+			// Override-template validation (auto path).
+			if cmd.OverrideTemplateVersionID != nil {
+				if !isReasonValid(cmd.OverrideTemplateReason) {
+					return controlleddocumentsdomain.ErrOverrideReasonRequired
+				}
+				status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, cmd.TenantID, *cmd.OverrideTemplateVersionID)
+				if err != nil {
+					return fmt.Errorf("controlled_documents: get override template version state: %w", err)
+				}
+				_, err = controlleddocumentsdomain.Resolve(controlleddocumentsdomain.TemplateResolutionInput{
+					ProfileCode: cmd.ProfileCode,
+					OverrideTemplate: &controlleddocumentsdomain.TemplateVersionCandidate{
+						ID:          *cmd.OverrideTemplateVersionID,
+						ProfileCode: profileCode,
+						Status:      status,
+					},
+				})
+				if err != nil {
+					return fmt.Errorf("controlled_documents: resolve template version: %w", err)
+				}
+				overrideID = cmd.OverrideTemplateVersionID
+			}
+
+			if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
+				return fmt.Errorf("controlled_documents: ensure template artifact: %w", err)
+			}
+
+			next, err := s.seq.NextAndIncrement(ctx, tx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
+			if err != nil {
+				return fmt.Errorf("controlled_documents: allocate sequence: %w", err)
+			}
+			autoCode := controlleddocumentsdomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
+			taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, autoCode)
+			if err != nil {
+				return fmt.Errorf("controlled_documents: check auto code availability: %w", err)
+			}
+			if taken {
+				return controlleddocumentsdomain.ErrCDCodeTaken
+			}
+			code = autoCode
+			n := next
+			sequence = &n
+
+			if overrideID != nil {
+				payload, err := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
+				if err != nil {
+					return fmt.Errorf("controlled_documents: marshal template override payload: %w", err)
+				}
+				events = append(events, taxonomydomain.GovernanceEvent{
+					TenantID:     cmd.TenantID,
+					EventType:    "template.override",
+					ActorUserID:  cmd.ActorUserID,
+					ResourceType: "controlled_document",
+					ResourceID:   code,
+					Reason:       strings.TrimSpace(*cmd.OverrideTemplateReason),
+					PayloadJSON:  payload,
+				})
+			}
+
+			now := s.now().UTC()
+			visibility, err := controlleddocumentsdomain.NewVisibility(
+				cmd.VisibilityScope,
+				cmd.VisibilityAreaCodes,
+				cmd.VisibilityUserIDs,
+				cmd.ProcessAreaCode,
+			)
+			if err != nil {
+				return fmt.Errorf("controlled_documents: build visibility: %w", err)
+			}
+			built, err := controlleddocumentsdomain.NewControlledDocument(controlleddocumentsdomain.ControlledDocument{
+				TenantID:                  cmd.TenantID,
+				ProfileCode:               cmd.ProfileCode,
+				ProcessAreaCode:           cmd.ProcessAreaCode,
+				DepartmentCode:            cmd.DepartmentCode,
+				Code:                      code,
+				SequenceNum:               sequence,
+				Title:                     cmd.Title,
+				OwnerUserID:               cmd.OwnerUserID,
+				OverrideTemplateVersionID: overrideID,
+				Visibility:                visibility,
+				Status:                    controlleddocumentsdomain.CDStatusActive,
+				CreatedAt:                 now,
+				UpdatedAt:                 now,
+			})
+			if err != nil {
+				return fmt.Errorf("controlled_documents: build controlled document: %w", err)
+			}
+			doc = built
+
+			if err := s.docs.CreateTx(ctx, tx, doc); err != nil {
+				return fmt.Errorf("controlled_documents: create controlled document in tx: %w", err)
+			}
+			if s.docInit != nil {
+				cloneReq, err := controlleddocumentsdomain.NewCloneTemplateRequest(cmd.TemplateVersionID, cmd.DocumentName, cmd.FormData)
+				if err != nil {
+					return fmt.Errorf("controlled_documents: build clone template request: %w", err)
+				}
+				ref, err := s.docInit.CloneTemplate(ctx, tx, doc, cloneReq)
+				if err != nil {
+					return fmt.Errorf("controlled_documents: clone template for initial revision: %w", err)
+				}
+				docRef = ref
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
 	}
 
@@ -382,26 +450,27 @@ func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profi
 		return 0, ErrActorMissing
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("controlled_documents: begin preview code tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
+	var n int
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
+			return fmt.Errorf("controlled_documents: set authz context preview code: %w", err)
+		}
+		// ADR 0022 Phase 7: preview-code allocation is part of CD create — authorize
+		// against the target area, not tenant-wide.
+		if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), areaCode); err != nil {
+			return fmt.Errorf("controlled_documents: authz check preview code: %w", err)
+		}
 
-	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
-		return 0, fmt.Errorf("controlled_documents: set authz context preview code: %w", err)
+		v, err := s.seq.Peek(ctx, tenantID, profileCode, areaCode)
+		if err != nil {
+			return fmt.Errorf("controlled_documents: peek sequence for preview code: %w", err)
+		}
+		n = v
+		return nil
+	}); err != nil {
+		return 0, err
 	}
-	// ADR 0022 Phase 7: preview-code allocation is part of CD create — authorize
-	// against the target area, not tenant-wide.
-	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), areaCode); err != nil {
-		return 0, fmt.Errorf("controlled_documents: authz check preview code: %w", err)
-	}
-
-	next, err := s.seq.Peek(ctx, tenantID, profileCode, areaCode)
-	if err != nil {
-		return 0, fmt.Errorf("controlled_documents: peek sequence for preview code: %w", err)
-	}
-	return next, nil
+	return n, nil
 }
 
 func (s *ControlledDocumentService) validateSequenceSeries(ctx context.Context, tenantID, profileCode, areaCode string) error {
@@ -498,74 +567,67 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 		return controlleddocumentsdomain.ErrCDNotFound
 	}
 
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin changeStatus tx: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
+	return s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
+			return fmt.Errorf("controlled_documents: set authz context changeStatus: %w", err)
+		}
 
-	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
-		return fmt.Errorf("controlled_documents: set authz context changeStatus: %w", err)
-	}
-
-	// ADR 0022 Phase 7: load the CD's process area (FOR UPDATE — read, not a
-	// mutation) BEFORE the tier-2 check so obsolete/supersede are authorized
-	// against the CD's real area, not tenant-wide. authz.Require still precedes
-	// the UpdateStatusTx mutation, so the tripwire pairing holds.
-	var (
-		currentStatus controlleddocumentsdomain.CDStatus
-		areaCode      string
-	)
-	if err := tx.QueryRowContext(ctx, `
+		// ADR 0022 Phase 7: load the CD's process area (FOR UPDATE — read, not a
+		// mutation) BEFORE the tier-2 check so obsolete/supersede are authorized
+		// against the CD's real area, not tenant-wide. authz.Require still precedes
+		// the UpdateStatusTx mutation, so the tripwire pairing holds.
+		var (
+			currentStatus controlleddocumentsdomain.CDStatus
+			areaCode      string
+		)
+		if err := tx.QueryRowContext(ctx, `
 SELECT status, process_area_code
   FROM controlled_documents
  WHERE tenant_id = $1
    AND id = $2
  FOR UPDATE`, tenantID, controlledDocumentID).Scan(&currentStatus, &areaCode); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return controlleddocumentsdomain.ErrCDNotFound
+			if errors.Is(err, sql.ErrNoRows) {
+				return controlleddocumentsdomain.ErrCDNotFound
+			}
+			return fmt.Errorf("controlled_documents: lock controlled document for status change: %w", err)
 		}
-		return fmt.Errorf("controlled_documents: lock controlled document for status change: %w", err)
-	}
 
-	if err := authz.Require(ctx, tx, cap, areaCode); err != nil {
-		return fmt.Errorf("controlled_documents: authz check changeStatus: %w", err)
-	}
+		if err := authz.Require(ctx, tx, cap, areaCode); err != nil {
+			return fmt.Errorf("controlled_documents: authz check changeStatus: %w", err)
+		}
 
-	if currentStatus != controlleddocumentsdomain.CDStatusActive {
-		return controlleddocumentsdomain.ErrCDNotActive
-	}
+		if currentStatus != controlleddocumentsdomain.CDStatusActive {
+			return controlleddocumentsdomain.ErrCDNotActive
+		}
 
-	if err := s.docs.UpdateStatusTx(ctx, tx, tenantID, controlledDocumentID, next, s.now().UTC()); err != nil {
-		return fmt.Errorf("controlled_documents: update controlled document status: %w", err)
-	}
+		if err := s.docs.UpdateStatusTx(ctx, tx, tenantID, controlledDocumentID, next, s.now().UTC()); err != nil {
+			return fmt.Errorf("controlled_documents: update controlled document status: %w", err)
+		}
 
-	eventType := "controlled_documents.cd.obsoleted"
-	if next == controlleddocumentsdomain.CDStatusSuperseded {
-		eventType = "controlled_documents.cd.superseded"
-	}
-	payload, err := json.Marshal(map[string]string{"status": string(next)})
-	if err != nil {
-		return fmt.Errorf("controlled_documents: marshal changeStatus payload: %w", err)
-	}
-	actorID := ""
-	if u, ok := authdomain.CurrentUserFromContext(ctx); ok {
-		actorID = u.UserID
-	}
-	if err := s.govLogger.LogTx(ctx, tx, taxonomydomain.GovernanceEvent{
-		TenantID:     tenantID,
-		EventType:    taxonomydomain.GovernanceEventType(eventType),
-		ActorUserID:  actorID,
-		ResourceType: "controlled_document",
-		ResourceID:   controlledDocumentID,
-		PayloadJSON:  payload,
-	}); err != nil {
-		return fmt.Errorf("controlled_documents: governance event for status change: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("controlled_documents: commit status change tx: %w", err)
-	}
-	return nil
+		eventType := "controlled_documents.cd.obsoleted"
+		if next == controlleddocumentsdomain.CDStatusSuperseded {
+			eventType = "controlled_documents.cd.superseded"
+		}
+		payload, err := json.Marshal(map[string]string{"status": string(next)})
+		if err != nil {
+			return fmt.Errorf("controlled_documents: marshal changeStatus payload: %w", err)
+		}
+		actorID := ""
+		if u, ok := authdomain.CurrentUserFromContext(ctx); ok {
+			actorID = u.UserID
+		}
+		if err := s.govLogger.LogTx(ctx, tx, taxonomydomain.GovernanceEvent{
+			TenantID:     tenantID,
+			EventType:    taxonomydomain.GovernanceEventType(eventType),
+			ActorUserID:  actorID,
+			ResourceType: "controlled_document",
+			ResourceID:   controlledDocumentID,
+			PayloadJSON:  payload,
+		}); err != nil {
+			return fmt.Errorf("controlled_documents: governance event for status change: %w", err)
+		}
+		return nil
+	})
 }
 
 type CreateRevisionCmd struct {
@@ -602,36 +664,29 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 		return nil, errors.New("controlled_documents: document initializer not configured")
 	}
 
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-	if err != nil {
-		return nil, fmt.Errorf("controlled_documents: begin create revision tx: %w", err)
-	}
-	var txErr error
-	defer func() {
-		if txErr != nil {
-			_ = tx.Rollback()
+	var ref *controlleddocumentsdomain.DocumentRef
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, actorUserID); err != nil {
+			return fmt.Errorf("controlled_documents: set authz guc for create revision: %w", err)
 		}
-	}()
-	if txErr = authz.SeedTxIdentity(ctx, tx, cmd.TenantID, actorUserID); txErr != nil {
-		return nil, fmt.Errorf("controlled_documents: set authz guc for create revision: %w", txErr)
-	}
-	// ADR 0022 Phase 7: a revision is created within the CD's own process area —
-	// authorize against cd.ProcessAreaCode (loaded above), not tenant-wide.
-	if txErr = authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), cd.ProcessAreaCode); txErr != nil {
-		return nil, fmt.Errorf("controlled_documents: authz check create revision: %w", txErr)
-	}
+		// ADR 0022 Phase 7: a revision is created within the CD's own process area —
+		// authorize against cd.ProcessAreaCode (loaded above), not tenant-wide.
+		if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), cd.ProcessAreaCode); err != nil {
+			return fmt.Errorf("controlled_documents: authz check create revision: %w", err)
+		}
 
-	cloneReq, txErr := controlleddocumentsdomain.NewCloneTemplateRequest(cmd.TemplateVersionID, cmd.Name, cmd.FormData)
-	if txErr != nil {
-		return nil, fmt.Errorf("controlled_documents: build revision clone template request: %w", txErr)
-	}
-	ref, txErr := s.docInit.CloneTemplate(ctx, tx, cd, cloneReq)
-	if txErr != nil {
-		return nil, fmt.Errorf("controlled_documents: clone template for revision: %w", mapCreateRevisionError(txErr))
-	}
-	txErr = tx.Commit()
-	if txErr != nil {
-		return nil, fmt.Errorf("controlled_documents: commit create revision tx: %w", txErr)
+		cloneReq, err := controlleddocumentsdomain.NewCloneTemplateRequest(cmd.TemplateVersionID, cmd.Name, cmd.FormData)
+		if err != nil {
+			return fmt.Errorf("controlled_documents: build revision clone template request: %w", err)
+		}
+		r, err := s.docInit.CloneTemplate(ctx, tx, cd, cloneReq)
+		if err != nil {
+			return fmt.Errorf("controlled_documents: clone template for revision: %w", mapCreateRevisionError(err))
+		}
+		ref = r
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	return ref, nil
 }

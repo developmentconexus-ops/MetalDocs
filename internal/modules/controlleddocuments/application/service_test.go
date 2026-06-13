@@ -68,7 +68,7 @@ func TestCreate_AutoCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	seq := &fakeSequenceAllocator{next: 1}
-	svc := NewControlledDocumentService(mockDB, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
+	svc := NewControlledDocumentService(newTxRunner(mockDB), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
 	svc.now = func() time.Time { return time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC) }
 
 	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
@@ -179,7 +179,7 @@ func TestCreate_UsesControlledDocumentConstructorValidation(t *testing.T) {
 	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
 	mock.ExpectRollback()
 
-	svc := NewControlledDocumentService(mockDB, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
+	svc := NewControlledDocumentService(newTxRunner(mockDB), newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
 	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "po",
@@ -229,7 +229,7 @@ func TestCreate_OverrideTemplate_GovernanceEvent(t *testing.T) {
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "po"},
 	}}
-	svc := NewControlledDocumentService(mockDB, repo, &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
+	svc := NewControlledDocumentService(newTxRunner(mockDB), repo, &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
 
 	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
@@ -254,7 +254,7 @@ func TestCreate_OverrideTemplate_MissingReason(t *testing.T) {
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "po"},
 	}}
-	svc := NewControlledDocumentService(newPermissiveMockDB(t), newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
+	svc := NewControlledDocumentService(newTxRunner(newPermissiveMockDB(t)), newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
@@ -545,7 +545,7 @@ func TestControlledDocumentService_Create_AtomicWithDocument(t *testing.T) {
 		exists: true,
 	}
 
-	svc := NewControlledDocumentService(db, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
+	svc := NewControlledDocumentService(newTxRunner(db), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
 
 	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
@@ -588,7 +588,7 @@ func TestControlledDocumentService_Create_InitializerError_RollsBack(t *testing.
 
 	repo := newFakeControlledDocumentRepository()
 	docInit := &fakeDocumentInitializer{err: errors.New("clone failed"), exists: true}
-	svc := NewControlledDocumentService(db, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
+	svc := NewControlledDocumentService(newTxRunner(db), repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
 	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
@@ -616,7 +616,7 @@ func TestControlledDocumentService_Create_AtomicTemplateArtifactMissing_FailsClo
 		storageKey: "system/templates/blank.docx",
 		exists:     false,
 	}
-	svc := NewControlledDocumentService(newPermissiveMockDB(t), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
+	svc := NewControlledDocumentService(newTxRunner(newPermissiveMockDB(t)), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
 
 	templateVersionID := "00000000-0000-0000-0000-000000000102"
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
@@ -655,7 +655,7 @@ func TestControlledDocumentService_Create_AtomicTemplateArtifactMissing_FailsClo
 func TestControlledDocumentService_Create_TemplateArtifactInvariantUnconfigured_FailsClosed(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	seq := &fakeSequenceAllocator{next: 5}
-	svc := NewControlledDocumentService(newPermissiveMockDB(t), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+	svc := NewControlledDocumentService(newTxRunner(newPermissiveMockDB(t)), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
 
 	templateVersionID := "00000000-0000-0000-0000-000000000102"
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
@@ -724,7 +724,7 @@ func TestControlledDocumentService_Create_AutoTemplateArtifactMissing_AfterAuthz
 	repo := newFakeControlledDocumentRepository()
 	seq := &fakeSequenceAllocator{next: 9}
 	docInit := &fakeDocumentInitializer{storageKey: "system/templates/blank.docx", exists: false}
-	svc := NewControlledDocumentService(db, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
+	svc := NewControlledDocumentService(newTxRunner(db), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
 	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
@@ -756,7 +756,7 @@ func TestControlledDocumentService_Create_OverrideTemplateValidationWinsBeforeAr
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "qa"},
 	}}
-	svc := NewControlledDocumentService(newPermissiveMockDB(t), repo, seq, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
+	svc := NewControlledDocumentService(newTxRunner(newPermissiveMockDB(t)), repo, seq, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
@@ -872,7 +872,7 @@ func TestCreateRevision_MissingActorContextReturnsErrActorMissing(t *testing.T) 
 		Status:          controlleddocumentsdomain.CDStatusActive,
 		OwnerUserID:     "owner-1",
 	}
-	svc := NewControlledDocumentService(db, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, &fakeDocumentInitializer{})
+	svc := NewControlledDocumentService(newTxRunner(db), repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, &fakeDocumentInitializer{})
 
 	_, err = svc.CreateRevision(context.Background(), CreateRevisionCmd{
 		TenantID:          "tenant-a",
@@ -936,7 +936,7 @@ func TestCreateRevision_SetsAuthzContextBeforeClone(t *testing.T) {
 	docInit := &fakeDocumentInitializer{
 		ref: &controlleddocumentsdomain.DocumentRef{ID: "doc-rev-2", ContentHash: "hash-2"},
 	}
-	svc := NewControlledDocumentService(db, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
+	svc := NewControlledDocumentService(newTxRunner(db), repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
 	ctx := iamdomain.WithAuthContext(context.Background(), "actor-1", []iamdomain.Role{"system_admin"})
 	ref, err := svc.CreateRevision(ctx, CreateRevisionCmd{
@@ -984,7 +984,7 @@ func TestCreateRevision_MapsActiveSiblingUniqueViolationToDomainConflict(t *test
 			ConstraintName: "ux_documents_cd_active",
 		}),
 	}
-	svc := NewControlledDocumentService(db, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
+	svc := NewControlledDocumentService(newTxRunner(db), repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
 	ctx := iamdomain.WithAuthContext(context.Background(), "actor-1", []iamdomain.Role{"system_admin"})
 	_, err = svc.CreateRevision(ctx, CreateRevisionCmd{
