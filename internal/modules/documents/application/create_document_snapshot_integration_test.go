@@ -50,7 +50,6 @@ func TestCreateDocument_PopulatesAllSnapshotColumns(t *testing.T) {
 
 	snapshotSvc := application.NewSnapshotService(
 		docgenv2.NewTemplatesSnapshotReader(db),
-		docrepo.NewSnapshotRepository(db),
 	)
 	svc := application.NewServiceWithSnapshot(
 		docrepo.New(db),

@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-
-	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
 // FillInRepository manages document_placeholder_values rows.
@@ -43,34 +41,6 @@ func (r *FillInRepository) table(name string) string {
 		return name
 	}
 	return fmt.Sprintf("%q.%q", r.schema, name)
-}
-
-// SeedDefaults inserts one row per Required placeholder with source='default'.
-// Uses ON CONFLICT DO NOTHING so the call is idempotent.
-func (r *FillInRepository) SeedDefaults(ctx context.Context, tenantID, revisionID string, phs []templatesdomain.Placeholder) error {
-	if len(phs) == 0 {
-		return nil
-	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	for _, p := range phs {
-		if !p.Required {
-			continue
-		}
-		if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
-			INSERT INTO %s (tenant_id, revision_id, placeholder_id, source, created_at, updated_at)
-			VALUES ($1::uuid, $2::uuid, $3, 'default', NOW(), NOW())
-			ON CONFLICT DO NOTHING`, r.table("document_placeholder_values")),
-			tenantID, revisionID, p.ID,
-		); err != nil {
-			return fmt.Errorf("seed placeholder %q: %w", p.ID, err)
-		}
-	}
-	return tx.Commit()
 }
 
 func (r *FillInRepository) UpsertValue(ctx context.Context, v PlaceholderValue, q ...DBTX) error {

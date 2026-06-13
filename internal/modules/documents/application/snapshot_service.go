@@ -13,58 +13,14 @@ type SnapshotTemplateReader interface {
 	LoadForSnapshot(ctx context.Context, tenantID, templateID string) (domain.TemplateSnapshot, error)
 }
 
-// SnapshotWriter persists snapshot columns on a document.
-type SnapshotWriter interface {
-	WriteSnapshot(ctx context.Context, tenantID, docID string, s domain.TemplateSnapshot) error
-}
-
-// PlaceholderValueSeeder seeds default placeholder value rows for a revision.
-type PlaceholderValueSeeder interface {
-	SeedDefaults(ctx context.Context, tenantID, revisionID string, phs []templatesdomain.Placeholder) error
-}
-
-// SnapshotService copies template artifacts onto a document at creation time
-// and optionally seeds default placeholder value rows.
+// SnapshotService resolves template artifacts for use at document creation time.
 type SnapshotService struct {
 	templates SnapshotTemplateReader
-	writer    SnapshotWriter
-	seeder    PlaceholderValueSeeder // optional
 }
 
-// NewSnapshotService constructs a SnapshotService without a seeder.
-func NewSnapshotService(t SnapshotTemplateReader, w SnapshotWriter) *SnapshotService {
-	return &SnapshotService{templates: t, writer: w}
-}
-
-// NewSnapshotServiceWithSeeder constructs a SnapshotService with a seeder
-// that inserts default placeholder value rows after the snapshot is written.
-func NewSnapshotServiceWithSeeder(t SnapshotTemplateReader, w SnapshotWriter, s PlaceholderValueSeeder) *SnapshotService {
-	return &SnapshotService{templates: t, writer: w, seeder: s}
-}
-
-// Deprecated: SnapshotFromTemplate writes snapshot post-commit, breaking
-// atomicity guarantees (see audit C2/C4). Use ResolveTemplate + pass payload
-// to Repository.CreateDocument instead. Retained only for backfill scripts.
-func (s *SnapshotService) SnapshotFromTemplate(ctx context.Context, tenantID, docID, revisionID, templateID string) error {
-	snap, err := s.templates.LoadForSnapshot(ctx, tenantID, templateID)
-	if err != nil {
-		return err
-	}
-	if err := s.writer.WriteSnapshot(ctx, tenantID, docID, snap); err != nil {
-		return err
-	}
-	if s.seeder == nil {
-		return nil
-	}
-	// Parse required placeholders from the snapshot JSON.
-	phs, err := parseRequiredPlaceholders(snap.PlaceholderSchemaJSON)
-	if err != nil {
-		return fmt.Errorf("parse placeholder schema: %w", err)
-	}
-	if len(phs) == 0 {
-		return nil
-	}
-	return s.seeder.SeedDefaults(ctx, tenantID, revisionID, phs)
+// NewSnapshotService constructs a SnapshotService.
+func NewSnapshotService(t SnapshotTemplateReader) *SnapshotService {
+	return &SnapshotService{templates: t}
 }
 
 // ResolveTemplate loads the template snapshot and required-placeholder list

@@ -17,7 +17,7 @@
 
 ## Execution order (conflict-minimized) + why
 
-`H-6 → H-3 → H-4 → H-1(a→b→c→d→e) → H-5 → H-2`
+`H-6a → H-3 → H-4 → H-1(a→b→c→d→e) → H-6b → H-5 → H-2`  (H-6b resequenced after H-1d — see H-6 discovery note)
 
 - **H-6 first** — deletes dead code in `documents/application` → shrinks the surface H-1e/H-5 later touch.
 - **H-3, H-4** — medium, mostly delivery-layer; get them in before the big H-1 restructure churns the same files.
@@ -35,18 +35,20 @@ Only residual: **A1 runtime WS-upgrade proof** (`statusWriter.Unwrap()` confirme
 
 ## Tier 2 — Architecture debt (the work)
 
-### H-6 — Dead-code  ·  audit: Legacy/dead-code (B)  ·  assessor: n/a (pure deletion)
+### H-6 — Dead-code  ·  audit: Legacy/dead-code (B)  ·  **split: H-6a (now) + H-6b (resequenced after H-1d)**
 
-**Goal:** delete proven-dead code; collapse the legacy non-atomic document-create chain into the atomic path.
+**Discovery (2026-06-13, during execution):** the legacy `Service.CreateDocument` doc-comment ("renders via docx-renderer, uploads to S3") is **stale** — the code does template-passthrough (`service.go:331` `finalKey := docxKey`, no render). And `repo.CreateDocument` (`repository.go:100-118`) is already **DB-tx-atomic** (BeginTx→CreateDocumentTx→Commit). The genuine non-atomicity is **cross-operation**: `DuplicateDocument` (`service.go:485`) commits the CD duplication (`controlledDocumentDuplicator.DuplicateControlledDocument`) in one tx, then creates the document in a *separate* tx via legacy `CreateDocument` → a duplicated CD can orphan with no document. The atomic create path is `cd_initializer.CloneTemplate(ctx, tx, …)` → `svc.cloneIntoTx` (`service.go:368`), which **requires a caller-owned tx** the documents `Service` does not currently hold. ⇒ **H-6b is coupled to the TxRunner seam (H-1d), not pure dead-code** — resequenced to run after H-1d.
 
-**Steps:**
-1. **`SnapshotFromTemplate`** — `internal/modules/documents/application/snapshot_service.go:45-68`. Audit: zero prod callers, no backfill binary exists, `// Deprecated` rationale unsupported. **Confirm** `grep -rn "SnapshotFromTemplate"` → only def + tests. Delete the method + its interface entry + dead tests + now-unused helpers/imports.
-2. **Legacy `CreateDocument` / `DuplicateDocument` chain** — `internal/modules/documents/application/service.go:226-229` (TODO-keyed, interface-bloating). The atomic create path exists (ADR — atomic CD create; find `CreateDocumentTx` / atomic constructor). **Migrate `DuplicateDocument` to call the atomic path**, then **delete** the legacy non-atomic `CreateDocument` chain + its `Service`/`Repository` interface methods once `grep` proves the only remaining callers are gone.
+#### H-6a — delete dead `SnapshotFromTemplate` + cascade  ·  ✅ DONE (this commit)
+**Done:** deleted `SnapshotFromTemplate`, `SnapshotWriter`/`PlaceholderValueSeeder` interfaces, `NewSnapshotServiceWithSeeder`, the `writer`/`seeder` fields + `w` param, and — completing the cascade to the repo layer exactly as specced below — the orphaned-by-deletion `SnapshotRepository.WriteSnapshot`/`ReadSnapshot` + `FillInRepository.SeedDefaults` (all grep-proven zero prod callers; only `ReadSnapshotWithFreezeAt` stays live). Kept `ResolveTemplate`/`parseRequiredPlaceholders` + all live snapshot/fillin methods. Removed dead-method test cases only (no live-method coverage lost — `ReadSnapshotWithFreezeAt` had no integration test either way). Gates: `go build ./...`=0 · `go vet ./...`=0 · `go vet -tags integration ./internal/modules/documents/...`=0 · `go test -p 2 ./internal/modules/documents/...`=ok · cilint=0.
+`SnapshotFromTemplate` (`snapshot_service.go:48`) has only 2 test callers (no prod; GitNexus + grep agree). It is the **only** user of the `SnapshotService.writer`/`seeder` apparatus — `ResolveTemplate` (the live method) uses only the reader. So cascade-delete IF grep proves unused in prod: `SnapshotWriter` + `WriteSnapshot` impls, `PlaceholderValueSeeder` + `SeedDefaults` impls, `NewSnapshotServiceWithSeeder`, the `writer`/`seeder` fields (+ the `w` param of `NewSnapshotService` if no live caller passes a real writer). **KEEP** `ResolveTemplate` + `parseRequiredPlaceholders` (still used). Delete `snapshot_seeder_test.go` + the `SnapshotFromTemplate` integration test. Verify each symbol's prod callers via grep before deleting.
+**Verify:** `go build ./...` · `go vet ./...` (+ `-tags integration` vet on the documents application pkg) · `go test -p 2 ./internal/modules/documents/...` + grep proof recorded.
+**Commit:** `refactor(documents): delete dead SnapshotFromTemplate + collapsed snapshot writer/seeder apparatus (H-6a)`
 
-**What NOT to do:** do not delete anything still referenced by a live route or worker. Grep is the source of truth (GitNexus stale).
-
-**Verify:** `go build ./...` · `go vet ./...` · `go test -p 2 ./internal/modules/documents/...` · grep proof of zero callers recorded in tracker.
-**Commit:** `refactor(documents): delete dead SnapshotFromTemplate + collapse legacy CreateDocument chain into atomic path (H-6)`
+#### H-6b — `DuplicateDocument` cross-operation atomicity (AFTER H-1d)
+Once the TxRunner seam exists (H-1d), compose CD-duplicate + document-create in **one tx** via the `cd_initializer.CloneTemplate` pattern (mirror the atomic-create flow). Then delete the legacy `Service.CreateDocument` + `repo.CreateDocument` + `SetRevisionStorageKey` + their interface entries (`service.go:29`, `delivery/http/handler.go:32`) + the test fakes. Grep-prove zero remaining callers first.
+**Verify:** build/vet + `go test -p 2 ./internal/modules/documents/... ./internal/modules/controlleddocuments/...` + runtime duplicate-document smoke.
+**Commit:** `refactor(documents): atomic DuplicateDocument, delete legacy CreateDocument chain (H-6b)`
 
 ---
 

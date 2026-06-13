@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-
-	"metaldocs/internal/modules/documents/domain"
 )
 
 func TestSnapshotRepository_WriteMethodsNoRowsReturnError(t *testing.T) {
@@ -16,16 +14,6 @@ func TestSnapshotRepository_WriteMethodsNoRowsReturnError(t *testing.T) {
 		name string
 		run  func(context.Context, *SnapshotRepository) error
 	}{
-		{
-			name: "WriteSnapshot",
-			run: func(ctx context.Context, repo *SnapshotRepository) error {
-				return repo.WriteSnapshot(ctx, "tenant-1", "doc-1", domain.TemplateSnapshot{
-					PlaceholderSchemaJSON: []byte(`{}`),
-					CompositionJSON:       []byte(`{}`),
-					BodyDocxS3Key:         "snapshots/doc.docx",
-				})
-			},
-		},
 		{
 			name: "WriteFreeze",
 			run: func(ctx context.Context, repo *SnapshotRepository) error {

@@ -166,7 +166,7 @@ The operator overrode D-1/D-3 and ordered a zero-defer finish (register-zero + o
 | H-3 | Persistence: post-commit audit→in-tx `RecordTx`/`LogTx` (5 handlers) + extend `postcommitaudit` analyzer; reject nil-tx in `PostgresSequenceAllocator.NextAndIncrement` | ☐ | | |
 | H-4 | Contract: expand codes-catalog guard to auth/iam/audit/security/search, typed `problem.Code` constants, add `CURSOR_EXPIRED`/`NOT_IMPLEMENTED` to catalog | ☐ | | |
 | H-5 | Code quality: decompose `RecordSignoff` (407 lines), split documents `Handler.Service` 28-method interface (drop 4 unused), rewrite `PeopleService.ListFiltered` to SQL filter+paginate | ☐ | | |
-| H-6 | Dead-code: delete `SnapshotFromTemplate`; migrate `DuplicateDocument` to atomic path then delete legacy `CreateDocument` chain | ☐ | | |
+| H-6 | Dead-code: **H-6a** delete `SnapshotFromTemplate` + collapsed writer/seeder apparatus; **H-6b** migrate `DuplicateDocument` to atomic path then delete legacy `CreateDocument` chain (after H-1d) | ◑ H-6a ✅ / H-6b ☐ | H-6a: this commit | H-6a: deleted `SnapshotFromTemplate`, `SnapshotWriter`/`PlaceholderValueSeeder` interfaces, + the orphaned-by-deletion `SnapshotRepository.WriteSnapshot`/`ReadSnapshot` + `FillInRepository.SeedDefaults` (all zero prod callers). Gates green: build/vet/vet-int/test -p2/cilint. H-6b pending H-1d TxRunner seam. |
 
 **Wave H DONE gate:** all Tier-1 + Tier-2 rows ✅-or-deferred-with-trigger · static gates green (build/vet/test -p2/api-lint -strict/cilint) · runtime QA (A1 WS upgrade, in-tx audit, RLS, 429/lockout, panic→500) · FE types regen + coverage green · audit dispositions + this tracker + handoff close-out updated. **NOT merged.**
 

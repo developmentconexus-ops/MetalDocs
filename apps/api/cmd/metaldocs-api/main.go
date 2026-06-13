@@ -449,7 +449,6 @@ func main() {
 	}
 
 	docSnapshotReader := docgenv2.NewTemplatesSnapshotReader(deps.SQLDB)
-	docSnapshotWriter := docrepo.NewSnapshotRepository(deps.SQLDB)
 	docDeps := documents.Dependencies{
 		DB:      deps.SQLDB,
 		Presign: docPresigner,
@@ -465,7 +464,6 @@ func main() {
 		Caps:                         wiring.NewCapabilityChecker(capabilityService),
 		ProfileDefaults:              &profileDefaultsAdapter{profileRepo: profileRepo},
 		SnapshotReader:               docSnapshotReader,
-		SnapshotWriter:               docSnapshotWriter,
 	}
 	if deps.PDFConverter != nil {
 		docDeps.ExportDocgen = deps.PDFConverter

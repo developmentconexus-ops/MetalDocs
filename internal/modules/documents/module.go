@@ -41,7 +41,6 @@ type Dependencies struct {
 	Caps                         application.CapabilityChecker
 	ProfileDefaults              application.ProfileDefaultTemplateReader
 	SnapshotReader               application.SnapshotTemplateReader
-	SnapshotWriter               application.SnapshotWriter
 	ExportPresign                application.ExportPresigner
 	ExportDocgen                 application.DocgenPDFClient
 	DocgenVer                    string
@@ -57,8 +56,8 @@ func New(deps Dependencies) *Module {
 	}
 	repo := repository.New(deps.DB)
 	var svc *application.Service
-	if deps.SnapshotReader != nil && deps.SnapshotWriter != nil {
-		snapSvc := application.NewSnapshotService(deps.SnapshotReader, deps.SnapshotWriter)
+	if deps.SnapshotReader != nil {
+		snapSvc := application.NewSnapshotService(deps.SnapshotReader)
 		svc = application.NewServiceWithSnapshot(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ControlledDocumentReader, deps.Caps, deps.ProfileDefaults, snapSvc)
 	} else {
 		svc = application.NewService(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ControlledDocumentReader, deps.Caps, deps.ProfileDefaults)

@@ -96,4 +96,4 @@ Per-finding closure. Tracker rows mirror these in [`../roadmap.md`](../roadmap.m
 | H-3 persistence | ☐ open | | |
 | H-4 contract | ☐ open | | |
 | H-5 code quality | ☐ open | | |
-| H-6 dead-code | ☐ open | | |
+| H-6 dead-code | ◑ H-6a resolved | (this commit) | `SnapshotFromTemplate` + collapsed snapshot writer/seeder apparatus + orphaned-by-deletion `SnapshotRepository.WriteSnapshot`/`ReadSnapshot` + `FillInRepository.SeedDefaults` deleted (zero prod callers). H-6b (`DuplicateDocument` atomic) resequenced after H-1d TxRunner. |

@@ -51,35 +51,6 @@ func requireRowsAffected(result sql.Result, action string) error {
 	return nil
 }
 
-// WriteSnapshot updates the snapshot columns for a document.
-func (r *SnapshotRepository) WriteSnapshot(ctx context.Context, tenantID, docID string, s domain.TemplateSnapshot) error {
-	h := s.Hashes()
-	result, err := r.db.ExecContext(ctx, fmt.Sprintf(`
-		UPDATE %s
-		   SET placeholder_schema_snapshot    = $1,
-		       placeholder_schema_hash        = $2,
-		       composition_config_snapshot    = $3,
-		       composition_config_hash        = $4,
-		       body_docx_snapshot_s3_key      = $5,
-		       body_docx_hash                 = $6
-		 WHERE tenant_id = $7::uuid AND id = $8::uuid`, r.table("documents")),
-		s.PlaceholderSchemaJSON, h.PlaceholderSchemaHash,
-		s.CompositionJSON, h.CompositionHash,
-		s.BodyDocxS3Key, h.BodyDocxHash,
-		tenantID, docID,
-	)
-	if err != nil {
-		return fmt.Errorf("write snapshot: %w", err)
-	}
-	return requireRowsAffected(result, "write snapshot")
-}
-
-// ReadSnapshot reads the snapshot columns for a document.
-func (r *SnapshotRepository) ReadSnapshot(ctx context.Context, tenantID, docID string) (domain.TemplateSnapshot, error) {
-	s, _, err := r.readSnapshot(ctx, r.db, tenantID, docID)
-	return s, err
-}
-
 // ReadSnapshotWithFreezeAt reads snapshot columns and values_frozen_at for idempotency checks.
 func (r *SnapshotRepository) ReadSnapshotWithFreezeAt(ctx context.Context, tenantID, docID string, q ...DBTX) (domain.TemplateSnapshot, *time.Time, error) {
 	exec := DBTX(r.db)

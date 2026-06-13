@@ -47,8 +47,7 @@ func TestCreateDocument_SnapshotPopulated(t *testing.T) {
 			BodyDocxS3Key:         "s3://t/k",
 		},
 	}
-	// writer is nil — ResolveTemplate does not use it
-	snapSvc := application.NewSnapshotService(reader, nil)
+	snapSvc := application.NewSnapshotService(reader)
 
 	svc := application.NewServiceWithSnapshot(
 		repo,

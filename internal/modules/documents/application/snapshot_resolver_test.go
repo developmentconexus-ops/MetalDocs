@@ -21,7 +21,7 @@ func TestResolveTemplate_ReturnsSnapshotAndPlaceholders(t *testing.T) {
 	want := domain.TemplateSnapshot{
 		PlaceholderSchemaJSON: []byte(`[{"id":"author","required":true}]`),
 	}
-	svc := NewSnapshotService(stubTemplateReader{snap: want}, nil)
+	svc := NewSnapshotService(stubTemplateReader{snap: want})
 
 	got, phs, err := svc.ResolveTemplate(context.Background(), "tenant-1", "tmpl-1")
 	if err != nil {
@@ -36,7 +36,7 @@ func TestResolveTemplate_ReturnsSnapshotAndPlaceholders(t *testing.T) {
 }
 
 func TestResolveTemplate_ReaderError(t *testing.T) {
-	svc := NewSnapshotService(stubTemplateReader{err: errors.New("boom")}, nil)
+	svc := NewSnapshotService(stubTemplateReader{err: errors.New("boom")})
 	if _, _, err := svc.ResolveTemplate(context.Background(), "t", "x"); err == nil {
 		t.Fatal("expected error")
 	}
