@@ -11,7 +11,10 @@
 //     elsewhere" from "does not exist").
 //   - duplicate-grant 409 via iamapp.ErrMembershipExists (same role on active
 //     row → revoke first).
-//   - audit emission on every grant + revoke success path.
+//
+// Audit: grant/revoke governance events are written in-tx by
+// AreaMembershipService (AuditMembershipLogger), not here — a post-commit
+// emission would duplicate that row (H-3a).
 package httpdelivery
 
 import (
@@ -23,9 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
-	auditdomain "metaldocs/internal/modules/audit/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -45,7 +45,6 @@ type MembershipUserTenantVerifier interface {
 type MembershipHandler struct {
 	svc      *iamapp.AreaMembershipService
 	verifier MembershipUserTenantVerifier
-	audit    auditdomain.Writer
 }
 
 type grantMembershipRequest struct {
@@ -80,8 +79,8 @@ func toMembershipDTO(m iamdomain.UserProcessArea) membershipDTO {
 	return dto
 }
 
-func NewMembershipHandler(svc *iamapp.AreaMembershipService, verifier MembershipUserTenantVerifier, audit auditdomain.Writer) *MembershipHandler {
-	return &MembershipHandler{svc: svc, verifier: verifier, audit: audit}
+func NewMembershipHandler(svc *iamapp.AreaMembershipService, verifier MembershipUserTenantVerifier) *MembershipHandler {
+	return &MembershipHandler{svc: svc, verifier: verifier}
 }
 
 func (h *MembershipHandler) RegisterRoutes(mux *http.ServeMux) {
@@ -230,12 +229,8 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	h.recordMembershipAudit(r, userID, "iam.area_membership.granted", map[string]any{
-		"user_id":   userID,
-		"tenant_id": tenantID,
-		"area_code": areaCode,
-		"role":     role,
-	})
+	// Audit is written in-tx by AreaMembershipService.Grant (AuditMembershipLogger);
+	// no post-commit emission here (would be a duplicate row — H-3a).
 
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"user_id":   userID,
@@ -284,11 +279,8 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	h.recordMembershipAudit(r, userID, "iam.area_membership.revoked", map[string]any{
-		"user_id":   userID,
-		"tenant_id": tenantID,
-		"area_code": areaCode,
-	})
+	// Audit is written in-tx by AreaMembershipService.Revoke (AuditMembershipLogger);
+	// no post-commit emission here (would be a duplicate row — H-3a).
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -339,38 +331,6 @@ func (h *MembershipHandler) guardMembershipUserInTenant(w http.ResponseWriter, r
 		return false
 	}
 	return true
-}
-
-// recordMembershipAudit is log-and-continue — audit failures must never fail
-// the mutating request once the write has been committed.
-func (h *MembershipHandler) recordMembershipAudit(r *http.Request, userID, action string, payload map[string]any) {
-	if h.audit == nil {
-		return
-	}
-	tenantID, err := tenant.FromContext(r.Context())
-	if err != nil {
-		slog.Warn("audit: skip — tenant missing from context", "action", action, "user_id", userID, "err", err)
-		return
-	}
-	payloadJSON, err := json.Marshal(payload)
-	if err != nil {
-		slog.Warn("audit: skip — payload marshal failed", "action", action, "user_id", userID, "err", err)
-		return
-	}
-	now := time.Now().UTC()
-	if err := h.audit.Record(r.Context(), auditdomain.Event{
-		ID:           "evt_" + uuid.NewString(),
-		OccurredAt:   now,
-		ActorID:      authenticatedActor(r),
-		Action:       action,
-		ResourceType: "area_membership",
-		ResourceID:   userID,
-		PayloadJSON:  string(payloadJSON),
-		TraceID:      r.Header.Get("X-Trace-Id"),
-		TenantID:     tenantID,
-	}); err != nil {
-		slog.Warn("audit: failed to record", "action", action, "user_id", userID, "err", err)
-	}
 }
 
 func tenantIDFromRequest(r *http.Request) (string, error) {

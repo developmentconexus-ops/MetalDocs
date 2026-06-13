@@ -93,7 +93,7 @@ Per-finding closure. Tracker rows mirror these in [`../roadmap.md`](../roadmap.m
 | A6 | ✅ RESOLVED | (this commit) | `GET /documents` returns `DocumentListResponse`; `GET /documents/{id}` returns `DocumentDetailResponse` (generated types via `toDocumentSummary`/`toDocumentDetailResponse`). Spec already declared both → no regen needed. |
 | H-1 boundaries | ☐ open | | |
 | H-2 composition/obs | ☐ open | | |
-| H-3 persistence | ☐ open | | |
+| H-3 persistence | ◑ H-3a resolved | (this commit) | Membership grant/revoke audit deduped to a single in-tx write (the post-commit handler write was a true duplicate of the existing `LogTx`; `requesttrace.Resolve(ctx)` now threads TraceID into the in-tx event so deletion loses no data). `membershipGovernanceLogger` extracted from `main.go` → `iam/application.AuditMembershipLogger` (mirrors taxonomy `AuditGovernanceAdapter`), unit-tested. Handler audit dependency removed. CD sequence allocator now rejects nil-tx (no autocommit fallback) + dead `else` branch deleted; concurrency test wraps each increment in its own committed tx. H-3b (service-owned tx + in-tx audit for sessions/people/admin/auth sites 1/3/4/5 + cross-function `postcommitaudit` analyzer) resequenced after H-1d TxRunner. |
 | H-4 contract | ☐ open | | |
 | H-5 code quality | ☐ open | | |
 | H-6 dead-code | ◑ H-6a resolved | (this commit) | `SnapshotFromTemplate` + collapsed snapshot writer/seeder apparatus + orphaned-by-deletion `SnapshotRepository.WriteSnapshot`/`ReadSnapshot` + `FillInRepository.SeedDefaults` deleted (zero prod callers). H-6b (`DuplicateDocument` atomic) resequenced after H-1d TxRunner. |

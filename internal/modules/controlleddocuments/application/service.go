@@ -240,34 +240,21 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 	}
 
 	if cmd.ManualCode == nil {
-		if createTx != nil {
-			next, err := s.seq.NextAndIncrement(ctx, createTx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
-			if err != nil {
-				return nil, fmt.Errorf("controlled_documents: allocate sequence: %w", err)
-			}
-			code = controlleddocumentsdomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
-			sequence = &next
-			taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
-			if err != nil {
-				return nil, fmt.Errorf("controlled_documents: check auto code availability: %w", err)
-			}
-			if taken {
-				return nil, controlleddocumentsdomain.ErrCDCodeTaken
-			}
-		} else {
-			next, err := s.seq.NextAndIncrement(ctx, nil, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
-			if err != nil {
-				return nil, fmt.Errorf("controlled_documents: allocate sequence: %w", err)
-			}
-			code = controlleddocumentsdomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
-			sequence = &next
-			taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
-			if err != nil {
-				return nil, fmt.Errorf("controlled_documents: check auto code availability: %w", err)
-			}
-			if taken {
-				return nil, controlleddocumentsdomain.ErrCDCodeTaken
-			}
+		// createTx is non-nil here: the ManualCode==nil branch above is exactly
+		// the one that opens it (an authz failure there returns early, never
+		// reaching this point). The allocator now rejects a nil tx outright.
+		next, err := s.seq.NextAndIncrement(ctx, createTx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
+		if err != nil {
+			return nil, fmt.Errorf("controlled_documents: allocate sequence: %w", err)
+		}
+		code = controlleddocumentsdomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
+		sequence = &next
+		taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
+		if err != nil {
+			return nil, fmt.Errorf("controlled_documents: check auto code availability: %w", err)
+		}
+		if taken {
+			return nil, controlleddocumentsdomain.ErrCDCodeTaken
 		}
 	}
 

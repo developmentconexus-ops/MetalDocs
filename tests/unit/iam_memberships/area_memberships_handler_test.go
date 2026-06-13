@@ -44,16 +44,6 @@ const (
 
 // ─── fakes ───────────────────────────────────────────────────────────────
 
-// noopMembershipLogger satisfies iamapp.MembershipGovernanceLogger with a no-op.
-// Tests that need to assert governance log calls should use a recording variant;
-// this harness focuses on the HTTP-layer audit (recordingAudit), not the
-// service-layer governance log.
-type noopMembershipLogger struct{}
-
-func (noopMembershipLogger) LogTx(_ context.Context, _ db.Tx, _ string, _ iamdomain.UserProcessArea) error {
-	return nil
-}
-
 // noopMemTx satisfies iamdomain.MembershipTx for the in-memory repo.
 type noopMemTx struct{}
 
@@ -272,8 +262,11 @@ func newHarness(t *testing.T) *harness {
 	repo.tenantWide[adminID] = true
 	verifier := newTenantScopedVerifier()
 	audit := &recordingAudit{}
-	svc := iamapp.NewAreaMembershipService(repo, noopMembershipLogger{})
-	h := iamdelivery.NewMembershipHandler(svc, verifier, audit)
+	// Audit is now written in-tx by the service's AuditMembershipLogger (H-3a);
+	// the handler no longer emits a post-commit row. recordingAudit.RecordTx
+	// appends to the same events slice, so the assertions below are unchanged.
+	svc := iamapp.NewAreaMembershipService(repo, iamapp.NewAuditMembershipLogger(audit))
+	h := iamdelivery.NewMembershipHandler(svc, verifier)
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	return &harness{mux: mux, repo: repo, verifier: verifier, audit: audit}

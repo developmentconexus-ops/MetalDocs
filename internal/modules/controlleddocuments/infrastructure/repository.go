@@ -653,11 +653,17 @@ func (a *PostgresSequenceAllocator) Peek(ctx context.Context, tenantID, profileC
 }
 
 // NextAndIncrement atomically increments and returns the next sequence number.
+// tx must be non-nil: the FOR UPDATE row lock only serializes concurrent
+// allocations when the SELECT…UPDATE run in the SAME transaction as the caller's
+// insert. A nil tx would silently autocommit each statement, dropping the lock
+// the instant this method returns and reopening the duplicate-sequence race the
+// lock exists to close (db.Tx contract; the nodualmode linter doesn't reach
+// infrastructure/).
 func (a *PostgresSequenceAllocator) NextAndIncrement(ctx context.Context, tx db.Tx, tenantID, profileCode, areaCode string) (int, error) {
-	var exec db.Tx = a.db
-	if tx != nil {
-		exec = tx
+	if tx == nil {
+		return 0, fmt.Errorf("controlled_documents: NextAndIncrement requires a non-nil tx (no autocommit fallback)")
 	}
+	exec := tx
 
 	if err := a.ensureCounterViaExec(ctx, exec, tenantID, profileCode, areaCode); err != nil {
 		return 0, fmt.Errorf("prepare controlled document sequence counter: %w", err)

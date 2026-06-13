@@ -118,7 +118,7 @@ func (capDeniedAreaRepo) CloseActiveTx(_ context.Context, _ iamdomain.Membership
 // now ErrCapDenied bubbling from the repository, mapped to 403 AUTH_FORBIDDEN.
 func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 	svc := iamapp.NewAreaMembershipService(capDeniedAreaRepo{}, noopMembershipLogger{})
-	handler := NewMembershipHandler(svc, passThroughVerifier{}, nil)
+	handler := NewMembershipHandler(svc, passThroughVerifier{})
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
@@ -147,7 +147,7 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 
 func TestMembershipsHandler_SystemAdminCanTargetOtherUser(t *testing.T) {
 	svc := iamapp.NewAreaMembershipService(fakeUserAreaWriteRepository{}, noopMembershipLogger{})
-	handler := NewMembershipHandler(svc, passThroughVerifier{}, nil)
+	handler := NewMembershipHandler(svc, passThroughVerifier{})
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 

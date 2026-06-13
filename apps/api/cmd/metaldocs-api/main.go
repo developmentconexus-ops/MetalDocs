@@ -380,7 +380,7 @@ func main() {
 		// changed area membership stops authorizing immediately, not after the TTL (A3).
 		membershipService = iamapp.NewAreaMembershipService(
 			iampg.NewUserAreaRepository(deps.SQLDB),
-			newMembershipGovernanceLogger(deps.AuditWriter),
+			iamapp.NewAuditMembershipLogger(deps.AuditWriter),
 		).WithRoleCacheInvalidator(cachedProvider)
 	}
 
@@ -397,10 +397,10 @@ func main() {
 	iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter).RegisterRoutes(mux)
 
 	// PR-1 (area-memberships rebuild): MembershipHandler now takes a
-	// cross-tenant verifier (PeopleService.VerifyUserInTenant) and the audit
-	// writer so grant/revoke emit iam.area_membership.granted / .revoked rows
-	// and cross-tenant probes return 404.
-	iamdelivery.NewMembershipHandler(membershipService, peopleService, deps.AuditWriter).RegisterRoutes(mux)
+	// cross-tenant verifier (PeopleService.VerifyUserInTenant) so cross-tenant
+	// probes return 404. Grant/revoke audit rows are written in-tx by the
+	// service's AuditMembershipLogger (wired above), not by the handler (H-3a).
+	iamdelivery.NewMembershipHandler(membershipService, peopleService).RegisterRoutes(mux)
 
 	// PR-5: IAM Admin Center "Roles & Capabilities" tab: read-only matrix.
 	var roleCapsReader iamdelivery.RoleCapabilitiesReader
@@ -1010,53 +1010,6 @@ type searchDocumentReaderAdapter struct {
 
 func (a searchDocumentReaderAdapter) GetDocumentTitle(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (string, error) {
 	return a.reader.GetDocumentTitle(ctx, string(tenantID), string(revisionID))
-}
-
-// membershipGovernanceLogger adapts the audit Writer to the
-// iamapp.MembershipGovernanceLogger port so grant/revoke write governance events
-// into the canonical audit_events sink (closes T-007). Identical pattern to
-// bypassAuditAdapter and documentsAuditAdapter.
-type membershipGovernanceLogger struct {
-	writer auditdomain.Writer
-}
-
-func newMembershipGovernanceLogger(writer auditdomain.Writer) *membershipGovernanceLogger {
-	if writer == nil {
-		panic("membershipGovernanceLogger: audit writer is required")
-	}
-	return &membershipGovernanceLogger{writer: writer}
-}
-
-func (l *membershipGovernanceLogger) buildEvent(action string, membership iamdomain.UserProcessArea) auditdomain.Event {
-	payload, err := json.Marshal(map[string]any{
-		"area_code": membership.AreaCode,
-		"role":      string(membership.Role),
-	})
-	if err != nil {
-		payload = []byte("{}")
-	}
-	grantedBy := ""
-	if membership.GrantedBy != nil {
-		grantedBy = *membership.GrantedBy
-	}
-	eventAction := "iam.area_membership.granted"
-	if action == "role.revoke" {
-		eventAction = "iam.area_membership.revoked"
-	}
-	return auditdomain.Event{
-		ID:           uuid.NewString(),
-		OccurredAt:   time.Now().UTC(),
-		ActorID:      grantedBy,
-		Action:       eventAction,
-		ResourceType: "area_membership",
-		ResourceID:   membership.UserID,
-		PayloadJSON:  string(payload),
-		TenantID:     membership.TenantID,
-	}
-}
-
-func (l *membershipGovernanceLogger) LogTx(ctx context.Context, tx db.Tx, action string, membership iamdomain.UserProcessArea) error {
-	return l.writer.RecordTx(ctx, tx, l.buildEvent(action, membership))
 }
 
 // profileDefaultsAdapter bridges taxonomy ProfileRepository → documents module ProfileDefaultTemplateReader.

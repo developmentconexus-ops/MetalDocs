@@ -77,9 +77,23 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
-			next, err := allocator.NextAndIncrement(context.Background(), nil, tenantID, profileCode, areaCode)
+			// Each allocation runs in its own committed tx — the production shape.
+			// The FOR UPDATE lock is held until Commit, serializing the 50
+			// concurrent workers into a gap-free 1..50 (the allocator now rejects
+			// a nil tx, so autocommit is no longer an option).
+			tx, err := db.BeginTx(context.Background(), nil)
 			if err != nil {
+				t.Errorf("begin tx: %v", err)
+				return
+			}
+			next, err := allocator.NextAndIncrement(context.Background(), tx, tenantID, profileCode, areaCode)
+			if err != nil {
+				_ = tx.Rollback()
 				t.Errorf("next and increment: %v", err)
+				return
+			}
+			if err := tx.Commit(); err != nil {
+				t.Errorf("commit: %v", err)
 				return
 			}
 			mu.Lock()

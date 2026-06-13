@@ -17,10 +17,10 @@
 
 ## Execution order (conflict-minimized) + why
 
-`H-6a → H-3 → H-4 → H-1(a→b→c→d→e) → H-6b → H-5 → H-2`  (H-6b resequenced after H-1d — see H-6 discovery note)
+`H-6a → H-3a → H-4 → H-1(a→b→c→d→e) → [H-3b, H-6b] → H-5 → H-2`  (H-3 split + H-6b resequenced after H-1d — see H-3/H-6 discovery notes)
 
 - **H-6 first** — deletes dead code in `documents/application` → shrinks the surface H-1e/H-5 later touch.
-- **H-3, H-4** — medium, mostly delivery-layer; get them in before the big H-1 restructure churns the same files.
+- **H-3a, H-4** — medium, mostly delivery-layer; get them in before the big H-1 restructure churns the same files. (H-3b — the 4 sites that need *new* service-owned tx boundaries — resequenced after H-1d's TxRunner seam.)
 - **H-1** — the big structural redesign (decision_service, CD repo, approval, documents delivery). Sub-ordered a→e so the mechanical/low-risk parts (setAuthzGUC, CD port, approval import) land before the TxRunner refactor (d) and the documents-delivery redesign (e).
 - **H-5 after H-1** — RecordSignoff SQL-extraction works on the TxRunner-shaped service (d); the documents `Service` interface split works on the migrated handler (e).
 - **H-2 LAST** — `main.go` extraction captures all prior wiring changes (CD→taxonomy port wiring, TxRunner wiring) in one final pass.
@@ -52,24 +52,28 @@ Once the TxRunner seam exists (H-1d), compose CD-duplicate + document-create in 
 
 ---
 
-### H-3 — Persistence  ·  audit: Persistence (B)  ·  assessor: persistence-tx B− PATCH
+### H-3 — Persistence  ·  audit: Persistence (B)  ·  assessor: persistence-tx B− PATCH  ·  **split: H-3a (now) + H-3b (resequenced after H-1d)**
 
-**Goal:** close torn-write windows (post-commit audit → in-tx) and the nil-tx autocommit trap.
+**Discovery (2026-06-13, during execution):** the plan's premise — "*move* 5 post-commit `audit.Record` calls in-tx" — is **false for 4 of the 5 sites**. Verified per-site:
+- **Site 2** (`routes_memberships.go:361`, membership grant/revoke) — in-tx audit **already exists**: `AreaMembershipService.Grant/Revoke` call `logger.LogTx → RecordTx` inside the mutation tx before `Commit` (Z-6, `area_membership_service.go:152/178/237`), and the prod `membershipGovernanceLogger.buildEvent` (`main.go:1030`) maps `role.grant`→`iam.area_membership.granted` — the **same `Action`/`ResourceType`/`ResourceID`** the handler's post-commit `recordMembershipAudit` writes. ⇒ the handler call is a **duplicate audit row** (torn-write window + double-write), not a missing in-tx write. The only datum the post-commit row carries that the in-tx one lacks is `TraceID` (from the `X-Trace-Id` header) — and the `Recovery` middleware (`internal/platform/middleware/recovery.go:20-26`, outermost, REQ-MW-1) already seeds that trace into `ctx`, so the in-tx path can recover it via `requesttrace.Resolve(ctx)` (the auth-handler pattern, `auth/.../handler.go:195`). **Zero data loss on deletion.**
+- **Sites 1/3/4/5** (`sessions_handler.go:213` RevokeSession · `people_handler.go:480` Patch/Reset/Unlock/Invite · `admin_handler.go:402` UpsertUserAndAssignRole/ReplaceUserRoles · `auth/.../handler.go:200` ChangePasswordForUser) — **have no service-owned tx**: each is one-or-more autocommit ops, or the only tx is repo-internal (`role_admin_repository.go` BeginTx/Commit, no handle exposed up). Making their audit in-tx requires **introducing a new service-owned transaction** wrapping the mutation + `RecordTx` — exactly the seam H-1d's `TxRunner` builds. Hand-rolling `BeginTx/Commit` in 4 services now = boilerplate H-1d deletes. ⇒ **resequenced after H-1d** (same rationale as the H-6b resequencing).
 
-**Steps:**
-1. **Post-commit `audit.Record` → in-tx `audit.RecordTx`** in 5 delivery handlers. `RecordTx(db.Tx)` already exists. Move the audit emission **out of delivery, into the owning application service method**, inside the business tx:
-   - `internal/modules/iam/delivery/http/sessions_handler.go:213`
-   - `internal/modules/iam/delivery/http/routes_memberships.go:361`
-   - `internal/modules/iam/delivery/http/people_handler.go:480`
-   - `internal/modules/iam/delivery/http/admin_handler.go:402`
-   - `internal/modules/auth/delivery/http/handler.go:200`
-2. **Extend the `postcommitaudit` cilint analyzer** (`tools/cilint/...`) to catch the **cross-function** case the current one misses: business `Commit()` in the service layer + `audit.Record` (non-Tx) in the delivery layer. Add unit tests.
-3. **Reject nil-tx in `PostgresSequenceAllocator.NextAndIncrement`** — `internal/modules/controlleddocuments/infrastructure/repository.go:656-686`. Remove the `var exec db.Tx = a.db` autocommit fallback; nil tx → explicit error (no silent autocommit). The `nosqltxindomain`/`nodualmode` analyzers don't cover `infrastructure/` — this is a latent trap, currently unreachable in prod.
+Also: the nil-tx allocator trap's only `nil`-passing caller (`controlleddocuments/application/service.go:258`) is an **unreachable dead `else` branch** (`createTx` is provably non-nil inside `if cmd.ManualCode == nil` — it's the very branch that opened `createTx`). So the allocator reject + dead-branch delete is clean now (the one real integration caller, `domain/sequence_test.go:80`, wraps each increment in its own `*sql.Tx`).
 
-**What NOT to do:** do not change audit semantics or add new audit events — only move the existing call site in-tx. Do not touch the authz path.
+#### H-3a — site-2 duplicate-audit delete + allocator nil-tx reject  ·  **now**
+1. **Extract `membershipGovernanceLogger` out of `main.go`** (`main.go:1015-1060`) into `internal/modules/iam/application/membership_governance_logger.go`, mirroring taxonomy's `AuditGovernanceAdapter` (`taxonomy/application/audit_governance_adapter.go`) — the iam equivalent sits untested in the composition root; this makes the `role.grant`→`iam.area_membership.granted` mapping unit-testable and removes one inline adapter from `main.go` (chips at H-2). Thread `TraceID` via `requesttrace.Resolve(ctx)`. Add a unit test for the mapping + trace.
+2. **Delete the handler's duplicate** `recordMembershipAudit` calls (`routes_memberships.go:233` grant, `:287` revoke) + the now-unused helper (`:346`). Single in-tx audit row remains.
+3. **Rewire the iam_memberships handler test** (`tests/unit/iam_memberships/area_memberships_handler_test.go`) to wire the **real** extracted adapter → the recording audit (the existing `EmitsAudit`/duplicate/areaadmin assertions now exercise the in-tx path); drop the unused `noopMembershipLogger`.
+4. **Reject nil-tx in `PostgresSequenceAllocator.NextAndIncrement`** (`infrastructure/repository.go:656-687`): remove the `var exec db.Tx = a.db` fallback; nil tx → explicit error. **Delete the dead `else` branch** at `application/service.go:257-271` (+ redundant `if createTx != nil` guard). Update `domain/sequence_test.go` to open a per-goroutine `*sql.Tx`.
 
-**Verify:** `go build` · `go vet` · `go test -p 2 ./internal/modules/iam/... ./internal/modules/auth/... ./internal/modules/controlleddocuments/... ./tools/cilint/...` · `go run ./tools/cilint/... ./...` exit 0.
-**Commit:** `refactor(persistence): in-tx audit in 5 IAM/auth handlers + nil-tx reject in sequence allocator + analyzer (H-3)`
+**What NOT to do (H-3a):** do not change audit semantics or add new audit events (the in-tx event is the survivor; it only *gains back* the `TraceID` the deleted duplicate carried). Do not touch the authz path. The `postcommitaudit` analyzer extension is **deferred to H-3b** — extending it now would false-flag the legitimately-deferred sites 1/3/4/5 (forcing `//cilint:allow` litter); after H-3b converts them it enforces cleanly.
+**Verify:** `go build` · `go vet` · `go vet -tags integration ./internal/modules/controlleddocuments/...` · `go test -p 2 ./internal/modules/iam/... ./internal/modules/controlleddocuments/... ./tests/unit/iam_memberships/... ./apps/api/...` · `go run ./tools/cilint/... ./...` exit 0.
+**Commit:** `refactor(persistence): dedupe membership audit to single in-tx write + extract governance logger + reject nil-tx in sequence allocator (H-3a)`
+
+#### H-3b — service-owned tx + in-tx audit for sites 1/3/4/5 + analyzer (AFTER H-1d)
+Once the `TxRunner` seam exists (H-1d), wrap each of `RevokeSession`, `people_handler` mutations (Patch/Reset/Unlock/Invite), `admin_handler` role ops, and `ChangePasswordForUser` in a service-owned tx and move their `audit.Record` → `RecordTx` inside it. Then **extend the `postcommitaudit` cilint analyzer** to catch the cross-function case (business `Commit()` in service + non-Tx `audit.Record` in delivery) + unit tests — now enforceable without allow-directives.
+**Verify:** build/vet + `go test -p 2 ./internal/modules/iam/... ./internal/modules/auth/... ./tools/cilint/...` + `go run ./tools/cilint/... ./...` exit 0 + runtime audit-row smoke (one row per mutation, in-tx).
+**Commit:** `refactor(persistence): service-owned tx + in-tx audit for 4 IAM/auth handlers + cross-function analyzer (H-3b)`
 
 ---
 
