@@ -150,6 +150,8 @@ const (
 
 ### Task Z-14 + Z-15 [group: cd-http+idempotency]: typed codes + guard · TTL const
 
+> **Z-14 ALREADY DONE** (commit `307666fd6`, 2026-06-12, spawned-task pre-wave): the three literals are typed `problem.Code` consts; `httpresponse.WriteError` already took `problem.Code` (no signature change needed); handler.go enrolled in the guard (`errorWriterCodeArg` + `controlleddocuments_handler` entry). Verified green. **Execute only Z-15** (skip Steps 1–2).
+
 **Files:**
 - Modify: `internal/modules/controlleddocuments/delivery/http/handler.go:54,106,109`
 - Modify: `internal/platform/problem/codes.go` (only if a const is missing)
