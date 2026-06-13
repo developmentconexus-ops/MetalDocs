@@ -16,7 +16,7 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-func TestPasswordChangePreservesSessionAndClearsMustChangePassword(t *testing.T) {
+func TestPasswordChangeRevokesSessionAndClearsMustChangePassword(t *testing.T) {
 	repo := authmemory.NewRepository()
 	cfg := authapp.Config{
 		SessionCookieName:      "metaldocs_session",
@@ -62,9 +62,13 @@ func TestPasswordChangePreservesSessionAndClearsMustChangePassword(t *testing.T)
 		t.Fatalf("expected must_change_password=false after password change, got %#v", rotatedUser["must_change_password"])
 	}
 
+	// A3 (commit 371e2fcea): self-service password change revokes ALL of the
+	// user's sessions, including the current one (CWE-613). The cookie that was
+	// valid before the change must now be rejected; the client re-authenticates
+	// with the new credential.
 	meResp := performJSONRequest(t, handler, http.MethodGet, "/api/v1/auth/me", "", sessionCookie)
-	if meResp.Code != http.StatusOK {
-		t.Fatalf("expected existing session to remain authorized, got %d body=%s", meResp.Code, meResp.Body.String())
+	if meResp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected existing session to be revoked after password change, got %d body=%s", meResp.Code, meResp.Body.String())
 	}
 
 	oldLoginResp := performJSONRequest(t, handler, http.MethodPost, "/api/v1/auth/login", `{"identifier":"flow.user","password":"abc12345"}`, nil)
