@@ -152,6 +152,23 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// OpenTelemetry: inert unless an exporter is configured (Z-1, REQ-OBS-3).
+	// otelShutdown is a no-op when disabled; otelEnabled gates the chain link.
+	otelShutdown, otelEnabled, err := observability.SetupOTel(ctx)
+	if err != nil {
+		log.Fatalf("setup otel: %v", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := otelShutdown(shutdownCtx); err != nil {
+			slog.Warn("otel shutdown", "err", err)
+		}
+	}()
+	if otelEnabled {
+		slog.Info("OpenTelemetry tracing enabled", "exporter", os.Getenv("OTEL_TRACES_EXPORTER"))
+	}
+
 	repoMode, err := config.RepositoryMode()
 	if err != nil {
 		log.Fatalf("invalid repository mode: %v", err)
@@ -643,8 +660,15 @@ func main() {
 	if presenceBump != nil {
 		presenceWrap = presenceBump.Wrap
 	}
+	// otel link is nil (skipped by buildChain) unless an exporter is configured;
+	// recovery stays outermost, otel wraps everything else (Z-1, REQ-OBS-1).
+	var otelWrap func(http.Handler) http.Handler
+	if otelEnabled {
+		otelWrap = observability.OTelMiddleware()
+	}
 	handler := buildChain(mux, apiChain(
 		platformmw.Recovery,
+		otelWrap,
 		httpObs.Wrap,
 		cors.Wrap,
 		originProtection.Wrap,

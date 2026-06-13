@@ -16,12 +16,16 @@ type chainLink struct {
 
 // apiChain returns the canonical middleware chain, outermost first, per
 // wiki/architecture/backend-target-architecture.md §2.1 (REQ-MW-1..5).
-// A nil wrap is skipped (e.g. presence when no SQL DB is wired).
-// chain_test.go asserts both the declared order and the composed execution
-// order; reorder here and the build breaks, not production.
-func apiChain(recovery, httpObs, cors, origin, preAuthLoginLimit, authn, iamAuthz, presence, rateLimit func(http.Handler) http.Handler) []chainLink {
+// A nil wrap is skipped (e.g. presence when no SQL DB is wired, or otel when no
+// exporter is configured — Z-1, REQ-OBS-3). The otel link sits directly inside
+// panic_recovery: recovery must stay outermost so a panicked span never kills
+// the process, but otel wraps everything else so httpObs sees the active span
+// for trace-id correlation. chain_test.go asserts both the declared order and
+// the composed execution order; reorder here and the build breaks, not production.
+func apiChain(recovery, otel, httpObs, cors, origin, preAuthLoginLimit, authn, iamAuthz, presence, rateLimit func(http.Handler) http.Handler) []chainLink {
 	return []chainLink{
 		{"panic_recovery", recovery},
+		{"otel", otel},
 		{"http_obs", httpObs},
 		{"cors", cors},
 		{"origin_protection", origin},

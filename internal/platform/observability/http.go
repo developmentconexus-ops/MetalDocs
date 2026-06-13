@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"metaldocs/internal/platform/requesttrace"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 type routeMetrics struct {
@@ -66,9 +68,21 @@ func NewHTTPObservability(userIDResolver func(*http.Request) string, runtimeProv
 
 func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		traceID, ok := requesttrace.Normalize(r.Header.Get("X-Trace-Id"))
-		if !ok {
-			traceID = requesttrace.Resolve(r.Context())
+		// Trace-id resolution order (REQ-OBS-2): an active OTel span (created by
+		// the otelhttp link when OTel is configured, seeded from an inbound W3C
+		// traceparent if present) wins, so logs/metrics correlate with exported
+		// spans. Otherwise fall back to the X-Trace-Id header, then requesttrace.
+		// When OTel is off SpanContext is invalid and behaviour is unchanged.
+		traceID := ""
+		if sc := trace.SpanContextFromContext(r.Context()); sc.IsValid() {
+			traceID = sc.TraceID().String()
+		}
+		if traceID == "" {
+			var ok bool
+			traceID, ok = requesttrace.Normalize(r.Header.Get("X-Trace-Id"))
+			if !ok {
+				traceID = requesttrace.Resolve(r.Context())
+			}
 		}
 		r = r.WithContext(withPrincipalSlot(requesttrace.WithTraceID(r.Context(), traceID)))
 
@@ -85,7 +99,7 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 			}
 
 			path := strings.ReplaceAll(r.URL.Path, "\n", "")
-			route := normalizeRoute(path)
+			route := routeLabel(r, path)
 			method := r.Method
 			elapsedMs := time.Since(start).Milliseconds()
 			if elapsedMs < 0 {
@@ -199,6 +213,24 @@ func (o *HTTPObservability) getMetric(route, method string) *routeMetrics {
 	created := &routeMetrics{samples: make([]uint64, 0, 200)}
 	o.byKey[key] = created
 	return created
+}
+
+// routeLabel returns the low-cardinality route key for metrics/logs. Go 1.22's
+// ServeMux sets r.Pattern to the matched method+pattern (e.g.
+// "GET /api/v1/iam/users/{user_id}/roles") after dispatch; this defer runs after
+// next.ServeHTTP, so when the request reached the mux unmodified the pattern is
+// available and collapses every path variable for free (F-17 cardinality fix).
+// When an intermediate middleware replaced the request (so Pattern did not
+// propagate back) it is empty, and we fall back to the hand-maintained
+// normalizeRoute — identical to the pre-OTel behaviour.
+func routeLabel(r *http.Request, path string) string {
+	if r.Pattern != "" {
+		if _, p, ok := strings.Cut(r.Pattern, " "); ok && p != "" {
+			return p
+		}
+		return r.Pattern
+	}
+	return normalizeRoute(path)
 }
 
 func normalizeRoute(path string) string {

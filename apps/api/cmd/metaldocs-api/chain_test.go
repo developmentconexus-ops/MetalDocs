@@ -12,6 +12,7 @@ import (
 // normativeChainOrder is the §2.1 target order, outermost first (REQ-MW-7).
 var normativeChainOrder = []string{
 	"panic_recovery",
+	"otel",
 	"http_obs",
 	"cors",
 	"origin_protection",
@@ -38,6 +39,7 @@ func TestAPIChainOrder_REQMW7(t *testing.T) {
 
 	links := apiChain(
 		probe("panic_recovery"),
+		probe("otel"),
 		probe("http_obs"),
 		probe("cors"),
 		probe("origin_protection"),
