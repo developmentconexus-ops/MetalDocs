@@ -168,3 +168,20 @@ The operator overrode D-1/D-3 and ordered a zero-defer finish (register-zero + o
 | H-6 | Dead-code: delete `SnapshotFromTemplate`; migrate `DuplicateDocument` to atomic path then delete legacy `CreateDocument` chain | ☐ | | |
 
 **Wave H DONE gate:** all Tier-1 + Tier-2 rows ✅-or-deferred-with-trigger · static gates green (build/vet/test -p2/api-lint -strict/cilint) · runtime QA (A1 WS upgrade, in-tx audit, RLS, 429/lockout, panic→500) · FE types regen + coverage green · audit dispositions + this tracker + handoff close-out updated. **NOT merged.**
+
+### Global-optimum assessment (2026-06-13) — synthesis & refined plan
+
+Before executing, an independent **7-plane adversarial assessment** (7 sonnet principal-engineer agents, 663k tokens, each told to recommend REDESIGN where the shape is a *local maximum*, willing to disagree with the audit in either direction) re-derived the right target from first principles. Operator concern being answered: "are we polishing a fundamentally wrong design (local max), or is it genuinely the right shape?"
+
+**Finding: the design is RIGHT; the local-maximum rot is LOCALIZED.** All 7 macro choices correct (modular monolith + hexagonal + Postgres + OpenAPI-first + capability authz). 7/11 modules clean. NO assessor recommended a rewrite. Per-plane: macro-topology B− REDESIGN (documents cluster only); contract-api C PATCH (+ documents-delivery redesign); composition-config C PATCH ("C→A, no redesign"); persistence-tx B− PATCH; authz-security B+ PATCH (strongest area, independently confirmed); async-workflow B− PATCH (domain model good; do NOT split RecordSignoff — atomic); observability C+ PATCH (+ metrics-backend local-max).
+
+**Two genuine REDESIGN traps (executed as delete+rebuild, not patch):** (1) documents `GeneratedServerAdapter` 29-method param-discard shim + 3 delivery subtrees → delete adapter, migrate Handler to implement `documentsapi.ServerInterface` directly (H-1e). (2) `*sql.DB` in application-service signatures → `TxRunner` port (H-1d); the "RecordSignoff god-function" is a symptom of this, not a separate defect — TxRunner shrinks it ~30% organically (H-5 then only extracts remaining SQL→repo, keeping the atomic tx as one method).
+
+**5 deferred boundaries (bigger than Wave H / operator-direction or strongest-area-risk — written triggers, NOT silent patches):**
+1. Bespoke `/api/v1/metrics` ring-buffer → OTel-metrics/Prometheus. Trigger: operator stands up a metrics collector / first SLO alerting. (OTel SDK already vendored from Z-1; path is clear.)
+2. Promote `documents/approval/` → peer module `internal/modules/approval/`. Trigger: next major approval feature. (Coupling already clean FK-ACL → relocation is organizational, high churn / low correctness gain.)
+3. IAM/auth/search raw-mux → generated `ServerInterface`. Trigger: next IAM/auth contract change. (Needs spec-prefix normalization; A5 already fixed the one breaking endpoint.)
+4. Lift `authz.Require`/`SeedTxIdentity` `*sql.Tx`→`db.Tx` + re-key capCache off `*sql.Tx` pointer identity. Trigger: explicit authz-layer work. (Strongest area; capCache re-key is risky; operator directive: don't touch authz internals.)
+5. Tier-1 `CanDo` per-request DB query → TTL cache. Trigger: RF-3 / tenant-scale p95 regression. (Perf; touches authz path.)
+
+**Refined execution order** (conflict-minimized; each family = its own commit(s), tracker + audit disposition same-commit): **H-6 → H-3 → H-4 → H-1(a setAuthzGUC dedup · b CD→taxonomy port · c approval delivery↛infra · d *sql.DB→TxRunner · e documents delivery redesign) → H-5 → H-2.**
