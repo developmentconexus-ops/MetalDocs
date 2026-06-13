@@ -1,6 +1,7 @@
 # ADR 0007 — Two-Tier Authorization
 
-> **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected); amended 2026-05-11 Plan 5 (tier-2 + tier-3 tripwire extended to all regulated modules: IAM, documents, registry, taxonomy, templates)
+> **Status:** Accepted (amended 2026-05-11 — tripwire extended to all regulated modules)
+> **Current reality (2026-06):** Foundational two-tier model still in force; extended by ADR 0022 (capability coherence + authz-area-scope-binding guard) and ADR 0026 (unified authz enforcement). FD-1 amendment (2026-06-08) deleted `authz-call-present` lint rule; see ADR 0023 for area-marker replacement.
 > **Last verified:** 2026-06-08 (Phase F FD-1 amendment already embedded above — no anchor changes needed)
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
 > **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam.md`.

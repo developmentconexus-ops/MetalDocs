@@ -1,7 +1,7 @@
 # ADR 0002: Purge editable zones
 
+> **Status:** Accepted
 > **Last verified:** 2026-04-25
-> **Status:** Accepted, executed (PR #7)
 > **Date:** 2026-04-25
 > **Scope:** Removal of "editable zones" from frontend, backend, DB.
 

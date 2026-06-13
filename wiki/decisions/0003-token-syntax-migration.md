@@ -1,7 +1,7 @@
 # ADR-0003: Token Syntax Migration
 
+> **Status:** Historical (stub; superseded by ADR 0008's fixed 7-token catalog)
 > **Last verified:** 2026-05-01
-> **Status:** Stub. Expand with current migration state + remaining work when prioritized.
 > **Date:** TBD
 > **Decision status:** In progress — see [decisions/0008-placeholder-fixed-catalog.md](0008-placeholder-fixed-catalog.md) which superseded most of the original motivation.
 

@@ -1,7 +1,7 @@
 # ADR 0008 — Replace user-fill placeholders with fixed catalog
 
-> **Last verified:** 2026-04-26
 > **Status:** Accepted
+> **Last verified:** 2026-04-26
 > **Date:** 2026-04-26
 > **Scope:** Replacing user-fill placeholder types with a fixed catalog of 7 computed tokens.
 
