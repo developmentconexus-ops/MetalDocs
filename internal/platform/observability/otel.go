@@ -30,10 +30,13 @@ import (
 // active span's TraceID when one is present (see Wrap), and falls back to
 // requesttrace otherwise.
 //
+// serviceName sets the resource service.name attribute; if the OTEL_SERVICE_NAME
+// environment variable is set (trimmed, non-empty) it overrides serviceName.
+//
 // Returns a shutdown func (always non-nil — a no-op when disabled) and whether
 // the SDK was installed. autoexport reads OTEL_TRACES_EXPORTER (otlp|console|
 // none); "console" writes spans to stdout.
-func SetupOTel(ctx context.Context) (shutdown func(context.Context) error, enabled bool, err error) {
+func SetupOTel(ctx context.Context, serviceName string) (shutdown func(context.Context) error, enabled bool, err error) {
 	noop := func(context.Context) error { return nil }
 
 	if os.Getenv("OTEL_TRACES_EXPORTER") == "" && os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
@@ -45,9 +48,12 @@ func SetupOTel(ctx context.Context) (shutdown func(context.Context) error, enabl
 		return noop, false, err
 	}
 
+	if envName := strings.TrimSpace(os.Getenv("OTEL_SERVICE_NAME")); envName != "" {
+		serviceName = envName
+	}
 	res, err := resource.Merge(
 		resource.Default(),
-		resource.NewWithAttributes("", attribute.String("service.name", "metaldocs-api")),
+		resource.NewWithAttributes("", attribute.String("service.name", serviceName)),
 	)
 	if err != nil && !errors.Is(err, resource.ErrSchemaURLConflict) {
 		return noop, false, err

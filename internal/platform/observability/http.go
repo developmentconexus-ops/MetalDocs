@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,7 +26,6 @@ type routeMetrics struct {
 }
 
 type HTTPObservability struct {
-	logger          *slog.Logger
 	runtimeProvider RuntimeStatusProvider
 	userIDResolver  func(*http.Request) string
 	mu              sync.RWMutex
@@ -59,7 +57,6 @@ func NewHTTPObservability(userIDResolver func(*http.Request) string, runtimeProv
 		provider = runtimeProvider[0]
 	}
 	return &HTTPObservability{
-		logger:          slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{})),
 		runtimeProvider: provider,
 		userIDResolver:  userIDResolver,
 		byKey:           make(map[string]*routeMetrics),
@@ -129,7 +126,7 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 			}
 			documentID, profileCode := extractRouteContext(path)
 
-			o.logger.Info("http_request",
+			slog.Info("http_request",
 				"trace_id", traceID,
 				"user_id", userID,
 				"method", method,

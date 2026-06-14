@@ -14,7 +14,7 @@ func TestSetupOTel_InertWhenUnconfigured(t *testing.T) {
 	t.Setenv("OTEL_TRACES_EXPORTER", "")
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
-	shutdown, enabled, err := SetupOTel(context.Background())
+	shutdown, enabled, err := SetupOTel(context.Background(), "test-service")
 	if err != nil {
 		t.Fatalf("SetupOTel unconfigured returned error: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestSetupOTel_InertWhenUnconfigured(t *testing.T) {
 func TestSetupOTel_EnabledWithConsoleExporter(t *testing.T) {
 	t.Setenv("OTEL_TRACES_EXPORTER", "console")
 
-	shutdown, enabled, err := SetupOTel(context.Background())
+	shutdown, enabled, err := SetupOTel(context.Background(), "test-service")
 	if err != nil {
 		t.Fatalf("SetupOTel console returned error: %v", err)
 	}

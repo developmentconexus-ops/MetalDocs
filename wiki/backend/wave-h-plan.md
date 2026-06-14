@@ -205,6 +205,8 @@ Delete the `GeneratedServerAdapter` 29-method param-discard shim (`documents/del
 
 **Verify:** build/vet + `go test -p 2 ./apps/... ./internal/platform/config/... ./internal/platform/observability/...` + runtime boot (`.\scripts\start-api.ps1 -Build`, login 200, structured JSON logs). **Commit:** `refactor(composition): extract main.go adapters+builders to wiring, typed config, slog/OTel/drain per binary (H-2)`
 
+**Status:** ✅ DONE (this wave, NOT merged) — pass-1 (13 adapters → `wiring/` 5 files; 9 `os.Getenv` → 4 typed config loaders `server`/`migration`/`fanout`/`retention`; `slog.SetDefault(JSON)` per binary; worker detached-30s drain; jobs `Cleanup`-on-exit; per-binary OTel `service.name`) + pass-2 (5 main() subroutines `startPresence`/`buildFanoutComponents`/`startOutboxWorkers`/`registerScheduledJobs`/`startAuditRetention`, body 647→515, file 1099→897). **Deviation:** step-1's `taxonomy_adapters.go` realized as `iam_adapters.go` (the taxonomy governance adapter already lived in wiring; inline residue was IAM-membership + clock). Gates green (build/vet/`test -p 2 ./...` 0 FAIL/api-lint -strict 0/cilint 0); adversarial review faithful 0-Critical; runtime all-3-binaries boot + login 200 + structured JSON + WS 101. Contract-neutral. Deferred per step-4 NOT-to-do: D-H1 metrics ring-buffer untouched, no DI framework.
+
 ---
 
 ## Deferred boundaries (5) — bigger than Wave H; written triggers, NOT silent patches

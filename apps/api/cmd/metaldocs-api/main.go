@@ -2,17 +2,13 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -46,8 +42,6 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	controlleddocuments "metaldocs/internal/modules/controlleddocuments"
-	controlleddocumentsapp "metaldocs/internal/modules/controlleddocuments/application"
-	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
@@ -63,7 +57,6 @@ import (
 	securitydelivery "metaldocs/internal/modules/security/delivery/http"
 	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
 	"metaldocs/internal/modules/taxonomy"
-	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
 	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
 	"metaldocs/internal/platform/authn"
@@ -81,76 +74,13 @@ import (
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/ratelimit"
-	"metaldocs/internal/platform/requesttrace"
 	"metaldocs/internal/platform/security"
 	e2etest "metaldocs/internal/test"
 )
 
-type controlledDocumentDuplicatorAdapter struct {
-	svc *controlleddocumentsapp.ControlledDocumentService
-}
-
 type fanoutComponents struct {
 	client        *fanout.Client
 	freezeService *docapp.FreezeService
-}
-
-func newControlledDocumentDuplicatorAdapter(svc *controlleddocumentsapp.ControlledDocumentService) *controlledDocumentDuplicatorAdapter {
-	if svc == nil {
-		panic("controlled document duplicator service is nil")
-	}
-	return &controlledDocumentDuplicatorAdapter{svc: svc}
-}
-
-func (a controlledDocumentDuplicatorAdapter) DuplicateControlledDocument(ctx context.Context, in docapp.DuplicateControlledDocumentInput) (*docapp.CreateDocumentResult, error) {
-	if a.svc == nil {
-		return nil, fmt.Errorf("duplicate controlled document %s: service not configured", in.ControlledDocumentID)
-	}
-	source, err := a.svc.Get(ctx, in.TenantID, in.ControlledDocumentID)
-	if err != nil {
-		return nil, fmt.Errorf("duplicate controlled document %s: load source: %w", in.ControlledDocumentID, err)
-	}
-	var overrideReason *string
-	if source.OverrideTemplateVersionID != nil {
-		reason := "Duplicated from existing controlled document"
-		overrideReason = &reason
-	}
-	var formData map[string]any
-	if len(in.FormData) > 0 {
-		if err := json.Unmarshal(in.FormData, &formData); err != nil {
-			return nil, fmt.Errorf("duplicate controlled document %s: unmarshal form data: %w", in.ControlledDocumentID, err)
-		}
-	}
-	res, err := a.svc.Create(ctx, controlleddocumentsapp.CreateControlledDocumentCmd{
-		TenantID:                  in.TenantID,
-		ProfileCode:               source.ProfileCode,
-		ProcessAreaCode:           source.ProcessAreaCode,
-		DepartmentCode:            source.DepartmentCode,
-		Title:                     source.Title,
-		OwnerUserID:               source.OwnerUserID,
-		ActorUserID:               in.ActorUserID,
-		OverrideTemplateVersionID: source.OverrideTemplateVersionID,
-		OverrideTemplateReason:    overrideReason,
-		DocumentName:              in.DocumentName,
-		FormData:                  formData,
-		// TemplateVersionID threads the source's override into the off-tx clone
-		// resolver so the duplicate clones the source's override version (not the
-		// profile default); OverrideTemplateVersionID above drives in-tx override
-		// validation + persistence. Both are nil when the source has no override,
-		// so the duplicate falls back to the profile's current default template.
-		TemplateVersionID: source.OverrideTemplateVersionID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("duplicate controlled document %s: create duplicate: %w", in.ControlledDocumentID, err)
-	}
-	if res.DocumentRef == nil {
-		return nil, fmt.Errorf("duplicate controlled document: create returned no document ref")
-	}
-	return &docapp.CreateDocumentResult{
-		DocumentID:        res.DocumentRef.ID,
-		InitialRevisionID: res.DocumentRef.RevisionID,
-		SessionID:         res.DocumentRef.SessionID,
-	}, nil
 }
 
 // e2eHandlersEnabled gates the test-only seed/reset/governance endpoints
@@ -172,14 +102,17 @@ func mountE2EHandlersIfEnabled(mux *http.ServeMux, register func(*http.ServeMux)
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	// OpenTelemetry: inert unless an exporter is configured (Z-1, REQ-OBS-3).
 	// otelShutdown is a no-op when disabled; otelEnabled gates the chain link.
-	otelShutdown, otelEnabled, err := observability.SetupOTel(ctx)
+	otelShutdown, otelEnabled, err := observability.SetupOTel(ctx, "metaldocs-api")
 	if err != nil {
-		log.Fatalf("setup otel: %v", err)
+		slog.Error("setup otel", "err", err)
+		os.Exit(1)
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -194,50 +127,65 @@ func main() {
 
 	repoMode, err := config.RepositoryMode()
 	if err != nil {
-		log.Fatalf("invalid repository mode: %v", err)
+		slog.Error("invalid repository mode", "err", err)
+		os.Exit(1)
 	}
 	if err := requirePostgresRepositoryMode(repoMode); err != nil {
-		log.Fatal(err)
+		slog.Error("unsupported repository mode", "err", err)
+		os.Exit(1)
 	}
 	corsCfg, err := config.LoadCORSConfig()
 	if err != nil {
-		log.Fatalf("invalid cors config: %v", err)
+		slog.Error("invalid cors config", "err", err)
+		os.Exit(1)
 	}
 	attachmentsCfg, err := config.LoadAttachmentsConfig()
 	if err != nil {
-		log.Fatalf("invalid attachments config: %v", err)
+		slog.Error("invalid attachments config", "err", err)
+		os.Exit(1)
 	}
 	authCfg, err := authn.LoadRuntimeConfig()
 	if err != nil {
-		log.Fatalf("invalid auth config: %v", err)
+		slog.Error("invalid auth config", "err", err)
+		os.Exit(1)
 	}
 	featureFlagsCfg, err := config.LoadFeatureFlagsConfig()
 	if err != nil {
-		log.Fatalf("invalid feature flags config: %v", err)
+		slog.Error("invalid feature flags config", "err", err)
+		os.Exit(1)
 	}
 
 	deps, err := bootstrap.BuildAPIDependencies(ctx, repoMode, attachmentsCfg)
 	if err != nil {
-		log.Fatalf("build api dependencies: %v", err)
+		slog.Error("build api dependencies", "err", err)
+		os.Exit(1)
 	}
 	defer deps.Cleanup()
 
-	if deps.SQLDB != nil && !strings.EqualFold(strings.TrimSpace(os.Getenv("METALDOCS_SKIP_STARTUP_MIGRATIONS")), "true") {
-		migrationsDir := strings.TrimSpace(os.Getenv("METALDOCS_MIGRATIONS_DIR"))
-		if migrationsDir == "" {
-			migrationsDir = "db/migrations"
-		}
-		if err := migrate.Apply(ctx, deps.SQLDB, migrationsDir, slog.Default()); err != nil {
-			log.Fatalf("apply startup migrations: %v", err)
+	migrationCfg, err := config.LoadMigrationConfig()
+	if err != nil {
+		slog.Error("invalid migration config", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
+	}
+	if deps.SQLDB != nil && !migrationCfg.Skip {
+		if err := migrate.Apply(ctx, deps.SQLDB, migrationCfg.Dir, slog.Default()); err != nil {
+			slog.Error("apply startup migrations", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
 		}
 	}
 
 	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, iampg.NewLoginContextRepository(deps.SQLDB), authCfg, deps.AuditWriter)
 	if err != nil {
-		log.Fatalf("new auth service: %v", err)
+		slog.Error("new auth service", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
 	}
 	if err := authService.BootstrapLocalAdmin(ctx); err != nil {
-		log.Fatalf("bootstrap local admin: %v", err)
+		slog.Error("bootstrap local admin", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
 	}
 
 	auditService := auditapp.NewService(deps.AuditReader)
@@ -254,7 +202,7 @@ func main() {
 	// ADR 0022 Phase 11 (F8): wire the tier-2 bypass audit sink so every
 	// system_admin short-circuit and every background BypassSystem invocation is
 	// recorded into the same audit pipe (audit.read surface). Set once, before serving.
-	authz.SetBypassAuditSink(newBypassAuditAdapter(deps.AuditWriter))
+	authz.SetBypassAuditSink(wiring.NewBypassAuditSink(deps.AuditWriter))
 	searchService := searchapp.NewService(searchdocs.NewReader(deps.SQLDB))
 	searchHandler := searchdelivery.NewHandler(searchService)
 	authHandler := authdelivery.NewHandler(authService).WithAudit(deps.AuditWriter)
@@ -311,7 +259,7 @@ func main() {
 	var observabilityHandler *iamdelivery.ObservabilityHandler
 	if sqlDB := deps.SQLDB; sqlDB != nil {
 		observabilityRepo := iampg.NewObservabilityRepository(sqlDB)
-		observabilityService := iamapp.NewObservabilityService(observabilityRepo, mfaCoveragePctAdapter{svc: securityService})
+		observabilityService := iamapp.NewObservabilityService(observabilityRepo, wiring.NewMfaCoveragePctReader(securityService))
 		observabilityHandler = iamdelivery.NewObservabilityHandler(observabilityService)
 		iamAdminHandler = iamAdminHandler.WithObservabilityService(observabilityService)
 	}
@@ -332,7 +280,9 @@ func main() {
 	// per IP — brute force is additionally bounded by account lockout.
 	loginRateCfg, err := ratelimit.NewConfig(map[ratelimit.RouteKey]int{ratelimit.RouteAuthLogin: 10})
 	if err != nil {
-		log.Fatalf("login rate limit config: %v", err)
+		slog.Error("login rate limit config", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
 	}
 	loginRateCfg.TrustedProxyCIDRs = authCfg.TrustedProxyCIDRs
 	preAuthLimiter := ratelimit.New(ctx, loginRateCfg)
@@ -377,31 +327,14 @@ func main() {
 		observabilityHandler.RegisterRoutes(mux)
 	}
 
-	// PR-9: presence hub + WebSocket stream + HTTP snapshot fallback.
-	// Backed by metaldocs.iam_users.last_seen_at (migration 0220). The
-	// hub.Run + hub.RunHeartbeat goroutines tick every 15s / 30s; they
-	// exit when ctx is cancelled. The bump middleware is wrapped into
-	// the outer chain below so authenticated requests refresh the
-	// caller's last_seen_at (debounced 60s per user).
-	var presenceBump *iampresence.BumpMiddleware
-	var presenceHub *iampresence.Hub // captured for shutdown drain (Z-22, REQ-REL-2)
-	if sqlDB := deps.SQLDB; sqlDB != nil {
-		presenceRepo := iampresence.NewPostgresRepository(sqlDB)
-		presenceHub = iampresence.NewHub(presenceRepo, slog.Default())
-		go presenceHub.Run(ctx)
-		go presenceHub.RunHeartbeat(ctx)
-		iampresence.NewHandler(presenceHub, presenceRepo, slog.Default()).RegisterRoutes(mux)
-		presenceBump = iampresence.NewBumpMiddleware(presenceRepo, slog.Default())
-		presenceBump.StartCleanup(ctx)
-		iamAdminHandler.WithPresenceReader(presenceRepo)
-	}
+	presenceBump, presenceHub := startPresence(ctx, deps, mux, iamAdminHandler)
 
 	taxonomyModule := buildTaxonomyModule(deps)
 	taxonomyModule.RegisterRoutes(mux)
 
 	controlledDocumentsModule := buildControlledDocumentsModule(deps)
 	controlledDocumentsModule.RegisterRoutes(mux)
-	controlledDocumentDuplicator := newControlledDocumentDuplicatorAdapter(controlledDocumentsModule.Service())
+	controlledDocumentDuplicator := wiring.NewControlledDocumentDuplicator(controlledDocumentsModule.Service())
 
 	var membershipService *iamapp.AreaMembershipService
 	if deps.SQLDB != nil {
@@ -446,41 +379,21 @@ func main() {
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
 	docPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
-	controlledDocumentsRepo := controlledDocumentsModule.Repo()
 	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
 
 	// Fanout/eigenpal client — enabled when METALDOCS_FANOUT_URL is set.
-	fanoutCfg := fanoutComponents{}
-	fanoutURL := strings.TrimSpace(os.Getenv("METALDOCS_FANOUT_URL"))
-	if err := requireApprovalRuntimeSupport(fanoutURL); err != nil {
-		log.Fatal(err)
+	fanoutClientCfg, err := config.LoadFanoutConfig()
+	if err != nil {
+		slog.Error("invalid fanout config", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
 	}
-	serviceToken := strings.TrimSpace(os.Getenv("METALDOCS_DOCX_RENDERER_SERVICE_TOKEN"))
-	if fanoutURL != "" && serviceToken == "" {
-		log.Fatalf("METALDOCS_DOCX_RENDERER_SERVICE_TOKEN is required when METALDOCS_FANOUT_URL is set")
+	if err := requireApprovalRuntimeSupport(fanoutClientCfg.URL); err != nil {
+		slog.Error("approval runtime unavailable", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
 	}
-	if fanoutURL != "" && deps.SQLDB != nil {
-		fanoutCfg.client = fanout.NewClient(fanoutURL, serviceToken, httpclient.NewInternalClient())
-		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
-		fillInRepo := docrepo.NewFillInRepository(deps.SQLDB)
-		schemaReader := docapp.NewSnapshotSchemaReader(deps.SQLDB)
-		revReader := docrepo.NewRevisionReader(deps.SQLDB)
-		wfReader := docrepo.NewWorkflowReader(deps.SQLDB)
-		ctxBuilder := docapp.NewDocumentContextBuilder(
-			deps.SQLDB,
-			searchRevisionReaderAdapter{reader: revReader},
-			searchWorkflowReaderAdapter{reader: wfReader},
-			controlledDocumentsReaderAdapter{repo: controlledDocumentsRepo},
-			searchDocumentReaderAdapter{reader: revReader},
-		)
-		resolverReg := resolvers.NewRegistry()
-		resolvers.RegisterBuiltins(resolverReg)
-		fanoutCfg.freezeService = docapp.NewFreezeService(
-			schemaReader, fillInRepo, fillInRepo,
-			resolverReg, snapRepo, ctxBuilder,
-			snapRepo, snapRepo, fanoutCfg.client,
-		)
-	}
+	fanoutCfg := buildFanoutComponents(deps, fanoutClientCfg, controlledDocumentsModule)
 
 	docSnapshotReader := docgenv2.NewTemplatesSnapshotReader(deps.SQLDB)
 	docDeps := documents.Dependencies{
@@ -491,11 +404,11 @@ func main() {
 			docgenv2.NewTemplatesTemplateReader(deps.SQLDB),
 		),
 		FormVal:                      formval.NewGojsonschema(),
-		Audit:                        newDocumentsAuditAdapter(deps.AuditWriter),
+		Audit:                        wiring.NewDocumentsAuditSink(deps.AuditWriter),
 		ExportPresign:                docPresigner,
 		ControlledDocumentDuplicator: controlledDocumentDuplicator,
 		Caps:                         wiring.NewCapabilityChecker(capabilityService),
-		ProfileDefaults:              &profileDefaultsAdapter{profileRepo: profileRepo},
+		ProfileDefaults:              wiring.NewProfileDefaults(profileRepo),
 		SnapshotReader:               docSnapshotReader,
 	}
 	if deps.PDFConverter != nil {
@@ -518,11 +431,15 @@ func main() {
 	approvalServices := approvalapp.NewServices(approvalRepo, approvalEmitter, approvalapp.RealClock{})
 	jobsCfg, err := config.LoadJobsConfig()
 	if err != nil {
-		log.Fatalf("invalid jobs config: %v", err)
+		slog.Error("invalid jobs config", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
 	}
 	if deps.SQLDB != nil {
 		if err := bootstrap.MigrateRiverSchema(ctx, deps.SQLDB, jobsCfg.RiverSchema); err != nil {
-			log.Fatalf("migrate river schema: %v", err)
+			slog.Error("migrate river schema", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
 		}
 		riverBundle, err := riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
 			Queues:              jobsCfg.Queues,
@@ -530,12 +447,16 @@ func main() {
 			SkipUnknownJobCheck: true,
 		}, nil)
 		if err != nil {
-			log.Fatalf("build scheduled publish enqueuer client: %v", err)
+			slog.Error("build scheduled publish enqueuer client", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
 		}
 		approvalServices.WithScheduledPublishEnqueuer(approvaljobs.NewScheduledPublishEnqueuer(riverBundle.Client))
 	}
 	if fanoutCfg.freezeService == nil {
-		log.Fatal("approval runtime requires configured freeze service")
+		slog.Error("approval runtime requires configured freeze service")
+		deps.Cleanup()
+		os.Exit(1)
 	}
 	pdfOutboxRepo := fanout.NewPDFOutboxRepository(deps.SQLDB)
 	materializeOutboxRepo := fanout.NewMaterializeOutboxRepository(deps.SQLDB)
@@ -545,44 +466,7 @@ func main() {
 
 	// StagingOutboxWorker.Run() only returns nil (context cancellation); no restart loop needed.
 	var workerWG sync.WaitGroup
-	startOutboxWorker := func(w *fanout.StagingOutboxWorker) {
-		workerWG.Add(1)
-		go func() {
-			defer workerWG.Done()
-			_ = w.Run(ctx)
-		}()
-	}
-
-	pdfOutboxWorker := fanout.NewStagingOutboxWorker(pdfOutboxRepo, deps.Publisher, func(r fanout.OutboxRow) messaging.Event {
-		return messaging.Event{
-			EventID:        messaging.EventID(uuid.NewString()),
-			EventType:      messaging.EventTypePDFConvert,
-			AggregateType:  messaging.AggregateType("document_revision"),
-			AggregateID:    messaging.AggregateID(r.RevisionID),
-			IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + r.TenantID + ":" + r.RevisionID),
-			Payload: messaging.PDFConvertPayload{
-				TenantID:    r.TenantID,
-				RevisionID:  r.RevisionID,
-				ContentHash: hex.EncodeToString(r.ContentHash),
-			},
-		}
-	}, slog.Default())
-	startOutboxWorker(pdfOutboxWorker)
-
-	materializeOutboxWorker := fanout.NewStagingOutboxWorker(materializeOutboxRepo, deps.Publisher, func(r fanout.OutboxRow) messaging.Event {
-		return messaging.Event{
-			EventID:        messaging.EventID(uuid.NewString()),
-			EventType:      messaging.EventTypeMaterializeFanout,
-			AggregateType:  messaging.AggregateType("document_revision"),
-			AggregateID:    messaging.AggregateID(r.RevisionID),
-			IdempotencyKey: messaging.IdempotencyKey("materialize_fanout:" + r.TenantID + ":" + r.RevisionID),
-			Payload: messaging.MaterializeFanoutPayload{
-				TenantID:   r.TenantID,
-				RevisionID: r.RevisionID,
-			},
-		}
-	}, slog.Default())
-	startOutboxWorker(materializeOutboxWorker)
+	startOutboxWorkers(ctx, &workerWG, deps.Publisher, pdfOutboxRepo, materializeOutboxRepo)
 
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService,
@@ -601,7 +485,9 @@ func main() {
 
 	templatesModule, err := buildTemplatesModule(deps, capabilityService)
 	if err != nil {
-		log.Fatalf("build templates module: %v", err)
+		slog.Error("build templates module", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
 	}
 	templatesModule.Register(mux)
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
@@ -623,40 +509,11 @@ func main() {
 	leaderID := schedulerLeaderID()
 	s, err := jobscheduler.New(deps.SQLDB, leaderID)
 	if err != nil {
-		log.Fatalf("jobs scheduler configuration failed: %v", err)
+		slog.Error("jobs scheduler configuration failed", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
 	}
-	if jobEnabled("ENABLE_JOB_STUCK_INSTANCE_WATCHDOG") {
-		s.Register(jobscheduler.JobConfig{
-			Name:     "stuck-instance-watchdog",
-			Interval: 5 * time.Minute,
-			Fn:       stuck_instance_watchdog.New(deps.SQLDB, approvalServices.Cancel, approvalEmitter),
-			Policy:   jobscheduler.SkipOnPressure,
-		})
-	}
-	if jobEnabled("ENABLE_JOB_IDEMPOTENCY_JANITOR") {
-		s.Register(jobscheduler.JobConfig{
-			Name:     "idempotency-janitor",
-			Interval: 15 * time.Minute,
-			Fn:       idempotency_janitor.New(deps.SQLDB),
-			Policy:   jobscheduler.SkipOnPressure,
-		})
-	}
-	if jobEnabled("ENABLE_JOB_AUDIT_INTEGRITY_VALIDATOR") && deps.AuditValidator != nil {
-		s.Register(jobscheduler.JobConfig{
-			Name:     "audit-integrity-validator",
-			Interval: time.Hour,
-			Fn:       audit_integrity_validator.New(deps.AuditValidator),
-			Policy:   jobscheduler.SkipOnPressure,
-		})
-	}
-	if jobEnabled("ENABLE_JOB_LEASE_REAPER") {
-		s.Register(jobscheduler.JobConfig{
-			Name:     "lease-reaper",
-			Interval: 10 * time.Minute,
-			Fn:       jobscheduler.RunLeaseReaper(deps.SQLDB),
-			Policy:   jobscheduler.SkipOnPressure,
-		})
-	}
+	registerScheduledJobs(s, deps, approvalServices.Cancel, approvalEmitter)
 
 	var schedulerWG sync.WaitGroup
 	schedulerWG.Add(1)
@@ -672,25 +529,13 @@ func main() {
 	mux.Handle("/api/v1/metrics", httpObs.MetricsHandler())
 
 	// Audit retention - AUDIT_RETENTION_DAYS=0 disables (default disabled).
-	if retentionDays, _ := strconv.Atoi(strings.TrimSpace(os.Getenv("AUDIT_RETENTION_DAYS"))); retentionDays > 0 && deps.SQLDB != nil {
-		go func() {
-			ticker := time.NewTicker(24 * time.Hour)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
-					if _, err := deps.SQLDB.ExecContext(ctx,
-						`DELETE FROM metaldocs.audit_events WHERE occurred_at < $1`, cutoff,
-					); err != nil {
-						slog.Warn("audit retention purge failed", "error", err)
-					}
-				}
-			}
-		}()
+	retentionCfg, err := config.LoadRetentionConfig()
+	if err != nil {
+		slog.Error("invalid retention config", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
 	}
+	startAuditRetention(ctx, deps, retentionCfg.Days)
 
 	// Canonical chain per backend-target-architecture.md §2.1 (F-01 fix,
 	// REQ-MW-1/2/4/5): panic recovery + trace context outermost, access
@@ -721,17 +566,15 @@ func main() {
 		func(next http.Handler) http.Handler { return globalLimiter.GlobalEnvelopeWrap(userIDExtractor, next) },
 	))
 
-	addr := ":8080"
-	if appPort := os.Getenv("APP_PORT"); appPort != "" {
-		port, convErr := strconv.Atoi(strings.TrimSpace(appPort))
-		if convErr != nil || port < 1 || port > 65535 {
-			log.Fatalf("invalid APP_PORT value")
-		}
-		addr = ":" + strconv.Itoa(port)
+	serverCfg, err := config.LoadServerConfig()
+	if err != nil {
+		slog.Error("invalid server config", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
 	}
 
 	server := &http.Server{
-		Addr:              addr,
+		Addr:              serverCfg.Addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		// REQ-REL-1/2 (F-16): bound slow-read/slow-write clients so they
@@ -755,7 +598,7 @@ func main() {
 	}
 
 	slog.Info("MetalDocs API listening",
-		"addr", addr, "repository", repoMode, "auth_enabled", authn.Enabled(),
+		"addr", serverCfg.Addr, "repository", repoMode, "auth_enabled", authn.Enabled(),
 		"auth_cache_ttl", authn.CacheTTL(), "cors_enabled", corsCfg.Enabled,
 		"cors_allowed_origins", len(corsCfg.AllowedOrigins))
 
@@ -842,7 +685,7 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 		return nil, errors.New("templates capability service is required")
 	}
 	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
-	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, realClock{}, realUUIDGen{}).WithRunner(db.NewTxRunner(deps.SQLDB))
+	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, wiring.Clock{}, wiring.UUIDGen{}).WithRunner(db.NewTxRunner(deps.SQLDB))
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())
 		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
@@ -850,126 +693,11 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 	return templateshttp.New(templatesSvc, templatesAuthzFn, deps.SQLDB), nil
 }
 
-type realClock struct{}
-
-func (realClock) Now() time.Time { return time.Now().UTC() }
-
 func requireApprovalRuntimeSupport(fanoutURL string) error {
 	if strings.TrimSpace(fanoutURL) == "" {
 		return errors.New("approval runtime requires METALDOCS_FANOUT_URL; startup without freeze support is not allowed")
 	}
 	return nil
-}
-
-type realUUIDGen struct{}
-
-func (realUUIDGen) New() string { return uuid.NewString() }
-
-// bypassAuditAdapter adapts the audit Writer to authz.BypassAuditSink so the
-// low-level authz package can record tier-2 bypasses without importing the audit
-// module (ADR 0022 Phase 11, F8). It writes in the caller's tx (RecordTx) at the
-// same fidelity/atomicity as the in-tx normal-grant audit.
-type bypassAuditAdapter struct {
-	writer auditdomain.Writer
-}
-
-func newBypassAuditAdapter(writer auditdomain.Writer) *bypassAuditAdapter {
-	if writer == nil {
-		panic("bypass audit writer is nil")
-	}
-	return &bypassAuditAdapter{writer: writer}
-}
-
-func (a *bypassAuditAdapter) RecordBypass(ctx context.Context, tx *sql.Tx, ev authz.BypassEvent) error {
-	payload, err := json.Marshal(map[string]any{
-		"kind":       string(ev.Kind),
-		"capability": ev.Capability,
-		"area_code":  ev.AreaCode,
-	})
-	if err != nil {
-		payload = []byte("{}")
-	}
-	actor := ev.ActorID
-	if actor == "" {
-		actor = "system"
-	}
-	resourceID := ev.Capability
-	if resourceID == "" {
-		resourceID = string(ev.Kind)
-	}
-	return a.writer.RecordTx(ctx, tx, auditdomain.Event{
-		ID:           "evt_" + uuid.NewString(),
-		OccurredAt:   time.Now().UTC(),
-		ActorID:      actor,
-		Action:       "authz.bypass." + string(ev.Kind),
-		ResourceType: "authz_bypass",
-		ResourceID:   resourceID,
-		PayloadJSON:  string(payload),
-		TraceID:      traceIDFromContext(ctx),
-		TenantID:     ev.TenantID, // "" allowed for cross-tenant background sweeps
-	})
-}
-
-type documentsAuditAdapter struct {
-	writer auditdomain.Writer
-}
-
-func newDocumentsAuditAdapter(writer auditdomain.Writer) *documentsAuditAdapter {
-	if writer == nil {
-		panic("documents audit writer is nil")
-	}
-	return &documentsAuditAdapter{writer: writer}
-}
-
-func (a *documentsAuditAdapter) WriteTx(ctx context.Context, tx db.Tx, tenantID, actorID, action, docID string, meta any) error {
-	payload := map[string]any{"tenant_id": tenantID}
-	if meta != nil {
-		payload["meta"] = meta
-	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		raw = []byte("{}")
-	}
-	return a.writer.RecordTx(ctx, tx, auditdomain.Event{
-		ID:           uuid.NewString(),
-		OccurredAt:   time.Now().UTC(),
-		ActorID:      actorID,
-		Action:       action,
-		ResourceType: "document",
-		ResourceID:   docID,
-		PayloadJSON:  string(raw),
-		TraceID:      traceIDFromContext(ctx),
-		TenantID:     tenantID,
-	})
-}
-
-func (a *documentsAuditAdapter) Write(ctx context.Context, tenantID, actorID, action, docID string, meta any) {
-	payload := map[string]any{"tenant_id": tenantID}
-	if meta != nil {
-		payload["meta"] = meta
-	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		raw = []byte("{}")
-	}
-
-	if err := a.writer.Record(ctx, auditdomain.Event{
-		ID:           uuid.NewString(),
-		OccurredAt:   time.Now().UTC(),
-		ActorID:      actorID,
-		Action:       action,
-		ResourceType: "document",
-		ResourceID:   docID,
-		PayloadJSON:  string(raw),
-		TraceID:      traceIDFromContext(ctx),
-		TenantID:     tenantID,
-	}); err != nil {
-		slog.Error("documents audit write failed", "err", err)
-	}
-}
-
-func traceIDFromContext(ctx context.Context) string {
-	return requesttrace.Resolve(ctx)
 }
 
 func jobEnabled(envName string) bool {
@@ -984,100 +712,186 @@ func schedulerLeaderID() string {
 	return fmt.Sprintf("%s:%d", hostname, os.Getpid())
 }
 
-// controlledDocumentsReaderAdapter bridges the controlled-document repository
-// to resolvers.RegistryReader.
-type controlledDocumentsReaderAdapter struct {
-	repo interface {
-		GetByID(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error)
+// startPresence initialises the PR-9 presence subsystem: hub goroutines, WebSocket
+// handler, HTTP snapshot fallback, bump middleware with cleanup, and wires the
+// presence reader into iamAdminHandler. Returns (nil, nil) when deps.SQLDB is nil
+// (in-memory mode). The returned Hub is captured by main for shutdown drain
+// (Z-22, REQ-REL-2); the BumpMiddleware is wrapped into the outer request chain
+// so authenticated requests refresh last_seen_at (debounced 60s per user, PR-9).
+func startPresence(
+	ctx context.Context,
+	deps bootstrap.APIDependencies,
+	mux *http.ServeMux,
+	iamAdminHandler *iamdelivery.AdminHandler,
+) (*iampresence.BumpMiddleware, *iampresence.Hub) {
+	if deps.SQLDB == nil {
+		return nil, nil
+	}
+	presenceRepo := iampresence.NewPostgresRepository(deps.SQLDB)
+	presenceHub := iampresence.NewHub(presenceRepo, slog.Default())
+	go presenceHub.Run(ctx)
+	go presenceHub.RunHeartbeat(ctx)
+	iampresence.NewHandler(presenceHub, presenceRepo, slog.Default()).RegisterRoutes(mux)
+	presenceBump := iampresence.NewBumpMiddleware(presenceRepo, slog.Default())
+	presenceBump.StartCleanup(ctx)
+	iamAdminHandler.WithPresenceReader(presenceRepo)
+	return presenceBump, presenceHub
+}
+
+// buildFanoutComponents constructs the fanout client and freeze service when
+// METALDOCS_FANOUT_URL is set and a database connection is available. Returns
+// an empty fanoutComponents when either condition is not met. The materialize
+// outbox is NOT wired here — the caller does that via
+// fanoutCfg.freezeService.WithMaterializeOutbox after pdfOutboxRepo /
+// materializeOutboxRepo are created.
+func buildFanoutComponents(
+	deps bootstrap.APIDependencies,
+	cfg config.FanoutConfig,
+	ctlDocs *controlleddocuments.Module,
+) fanoutComponents {
+	if cfg.URL == "" || deps.SQLDB == nil {
+		return fanoutComponents{}
+	}
+	client := fanout.NewClient(cfg.URL, cfg.ServiceToken, httpclient.NewInternalClient())
+	snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
+	fillInRepo := docrepo.NewFillInRepository(deps.SQLDB)
+	schemaReader := docapp.NewSnapshotSchemaReader(deps.SQLDB)
+	revReader := docrepo.NewRevisionReader(deps.SQLDB)
+	wfReader := docrepo.NewWorkflowReader(deps.SQLDB)
+	ctxBuilder := docapp.NewDocumentContextBuilder(
+		deps.SQLDB,
+		wiring.NewSearchRevisionReader(revReader),
+		wiring.NewSearchWorkflowReader(wfReader),
+		wiring.NewControlledDocumentsReader(ctlDocs.Repo()),
+		wiring.NewSearchDocumentReader(revReader),
+	)
+	resolverReg := resolvers.NewRegistry()
+	resolvers.RegisterBuiltins(resolverReg)
+	freezeService := docapp.NewFreezeService(
+		schemaReader, fillInRepo, fillInRepo,
+		resolverReg, snapRepo, ctxBuilder,
+		snapRepo, snapRepo, client,
+	)
+	return fanoutComponents{client: client, freezeService: freezeService}
+}
+
+// startOutboxWorkers builds and starts the PDF and materialize staging outbox
+// workers. Each worker polls its outbox table and publishes events via publisher;
+// goroutine lifetimes are tracked in wg so shutdownServer can join them cleanly.
+// StagingOutboxWorker.Run() returns only on ctx cancellation (nil error);
+// no restart loop is needed.
+func startOutboxWorkers(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	publisher messaging.Publisher,
+	pdfOutboxRepo, materializeOutboxRepo *fanout.StagingOutboxRepository,
+) {
+	start := func(w *fanout.StagingOutboxWorker) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = w.Run(ctx)
+		}()
+	}
+
+	pdfOutboxWorker := fanout.NewStagingOutboxWorker(pdfOutboxRepo, publisher, func(r fanout.OutboxRow) messaging.Event {
+		return messaging.Event{
+			EventID:        messaging.EventID(uuid.NewString()),
+			EventType:      messaging.EventTypePDFConvert,
+			AggregateType:  messaging.AggregateType("document_revision"),
+			AggregateID:    messaging.AggregateID(r.RevisionID),
+			IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + r.TenantID + ":" + r.RevisionID),
+			Payload: messaging.PDFConvertPayload{
+				TenantID:    r.TenantID,
+				RevisionID:  r.RevisionID,
+				ContentHash: hex.EncodeToString(r.ContentHash),
+			},
+		}
+	}, slog.Default())
+	start(pdfOutboxWorker)
+
+	materializeOutboxWorker := fanout.NewStagingOutboxWorker(materializeOutboxRepo, publisher, func(r fanout.OutboxRow) messaging.Event {
+		return messaging.Event{
+			EventID:        messaging.EventID(uuid.NewString()),
+			EventType:      messaging.EventTypeMaterializeFanout,
+			AggregateType:  messaging.AggregateType("document_revision"),
+			AggregateID:    messaging.AggregateID(r.RevisionID),
+			IdempotencyKey: messaging.IdempotencyKey("materialize_fanout:" + r.TenantID + ":" + r.RevisionID),
+			Payload: messaging.MaterializeFanoutPayload{
+				TenantID:   r.TenantID,
+				RevisionID: r.RevisionID,
+			},
+		}
+	}, slog.Default())
+	start(materializeOutboxWorker)
+}
+
+// registerScheduledJobs registers the four optional background jobs with the
+// scheduler. Each job is gated on its ENABLE_JOB_* env var (default enabled).
+// The audit-integrity job additionally requires deps.AuditValidator to be non-nil.
+// Scheduler startup and the schedulerWG goroutine remain in main.
+func registerScheduledJobs(
+	s *jobscheduler.Scheduler,
+	deps bootstrap.APIDependencies,
+	cancelSvc *approvalapp.CancelService,
+	emitter approvalapp.EventEmitter,
+) {
+	if jobEnabled("ENABLE_JOB_STUCK_INSTANCE_WATCHDOG") {
+		s.Register(jobscheduler.JobConfig{
+			Name:     "stuck-instance-watchdog",
+			Interval: 5 * time.Minute,
+			Fn:       stuck_instance_watchdog.New(deps.SQLDB, cancelSvc, emitter),
+			Policy:   jobscheduler.SkipOnPressure,
+		})
+	}
+	if jobEnabled("ENABLE_JOB_IDEMPOTENCY_JANITOR") {
+		s.Register(jobscheduler.JobConfig{
+			Name:     "idempotency-janitor",
+			Interval: 15 * time.Minute,
+			Fn:       idempotency_janitor.New(deps.SQLDB),
+			Policy:   jobscheduler.SkipOnPressure,
+		})
+	}
+	if jobEnabled("ENABLE_JOB_AUDIT_INTEGRITY_VALIDATOR") && deps.AuditValidator != nil {
+		s.Register(jobscheduler.JobConfig{
+			Name:     "audit-integrity-validator",
+			Interval: time.Hour,
+			Fn:       audit_integrity_validator.New(deps.AuditValidator),
+			Policy:   jobscheduler.SkipOnPressure,
+		})
+	}
+	if jobEnabled("ENABLE_JOB_LEASE_REAPER") {
+		s.Register(jobscheduler.JobConfig{
+			Name:     "lease-reaper",
+			Interval: 10 * time.Minute,
+			Fn:       jobscheduler.RunLeaseReaper(deps.SQLDB),
+			Policy:   jobscheduler.SkipOnPressure,
+		})
 	}
 }
 
-func (a controlledDocumentsReaderAdapter) GetControlledDocument(ctx context.Context, tenantID resolvers.TenantID, controlledDocumentID resolvers.ControlledDocumentID) (resolvers.ControlledDocumentInfo, error) {
-	cd, err := a.repo.GetByID(ctx, string(tenantID), string(controlledDocumentID))
-	if err != nil {
-		return resolvers.ControlledDocumentInfo{}, err
+// startAuditRetention launches a background goroutine that purges audit_events
+// older than `days` days on a 24-hour tick. Skips when days <= 0 or
+// deps.SQLDB is nil (AUDIT_RETENTION_DAYS=0 disables, default disabled).
+func startAuditRetention(ctx context.Context, deps bootstrap.APIDependencies, days int) {
+	if days <= 0 || deps.SQLDB == nil {
+		return
 	}
-	return resolvers.ControlledDocumentInfo{DocCode: cd.Code}, nil
-}
-
-type searchRevisionReaderAdapter struct {
-	reader interface {
-		GetRevisionNumber(ctx context.Context, tenantID, revisionID string) (int64, error)
-		GetEffectiveFrom(ctx context.Context, tenantID, revisionID string) (time.Time, error)
-		GetAuthor(ctx context.Context, tenantID, revisionID string) (resolvers.AuthorInfo, error)
-	}
-}
-
-func (a searchRevisionReaderAdapter) GetRevisionNumber(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (int64, error) {
-	return a.reader.GetRevisionNumber(ctx, string(tenantID), string(revisionID))
-}
-
-func (a searchRevisionReaderAdapter) GetEffectiveFrom(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (time.Time, error) {
-	return a.reader.GetEffectiveFrom(ctx, string(tenantID), string(revisionID))
-}
-
-func (a searchRevisionReaderAdapter) GetAuthor(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (resolvers.AuthorInfo, error) {
-	return a.reader.GetAuthor(ctx, string(tenantID), string(revisionID))
-}
-
-type searchWorkflowReaderAdapter struct {
-	reader interface {
-		GetApprovers(ctx context.Context, tenantID, revisionID, approvalInstanceID string) ([]resolvers.ApproverInfo, error)
-		GetFinalApprovalDate(ctx context.Context, tenantID, revisionID string) (time.Time, error)
-	}
-}
-
-func (a searchWorkflowReaderAdapter) GetApprovers(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID, approvalInstanceID resolvers.ApprovalInstanceID) ([]resolvers.ApproverInfo, error) {
-	return a.reader.GetApprovers(ctx, string(tenantID), string(revisionID), string(approvalInstanceID))
-}
-
-func (a searchWorkflowReaderAdapter) GetFinalApprovalDate(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (time.Time, error) {
-	return a.reader.GetFinalApprovalDate(ctx, string(tenantID), string(revisionID))
-}
-
-type searchDocumentReaderAdapter struct {
-	reader interface {
-		GetDocumentTitle(ctx context.Context, tenantID, revisionID string) (string, error)
-	}
-}
-
-func (a searchDocumentReaderAdapter) GetDocumentTitle(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (string, error) {
-	return a.reader.GetDocumentTitle(ctx, string(tenantID), string(revisionID))
-}
-
-// profileDefaultsAdapter bridges taxonomy ProfileRepository → documents module ProfileDefaultTemplateReader.
-type profileDefaultsAdapter struct {
-	profileRepo interface {
-		GetByCode(ctx context.Context, tenantID string, code taxonomydomain.ProfileCode) (*taxonomydomain.DocumentProfile, error)
-	}
-}
-
-func (a *profileDefaultsAdapter) GetDefaultTemplateVersionID(ctx context.Context, tenantID, profileCode string) (*string, *string, error) {
-	profile, err := a.profileRepo.GetByCode(ctx, tenantID, taxonomydomain.ProfileCode(profileCode))
-	if err != nil {
-		return nil, nil, err
-	}
-	if profile.DefaultTemplateVersionID == nil {
-		return nil, nil, nil
-	}
-	status := "published"
-	return profile.DefaultTemplateVersionID, &status, nil
-}
-
-// mfaCoveragePctAdapter narrows securityapp.Service to the
-// MfaCoveragePctReader port consumed by iamapp.ObservabilityService.
-// Returns 0 when the security service is nil (in-memory / dev mode).
-type mfaCoveragePctAdapter struct {
-	svc *securityapp.Service
-}
-
-func (a mfaCoveragePctAdapter) MfaCoveragePct(ctx context.Context, tenantID string) (float32, error) {
-	if a.svc == nil {
-		return 0, nil
-	}
-	cov, err := a.svc.MfaCoverage(ctx, tenantID)
-	if err != nil {
-		return 0, err
-	}
-	return cov.MfaEnabledPct, nil
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				cutoff := time.Now().UTC().AddDate(0, 0, -days)
+				if _, err := deps.SQLDB.ExecContext(ctx,
+					`DELETE FROM metaldocs.audit_events WHERE occurred_at < $1`, cutoff,
+				); err != nil {
+					slog.Warn("audit retention purge failed", "error", err)
+				}
+			}
+		}
+	}()
 }

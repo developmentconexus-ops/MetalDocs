@@ -74,7 +74,13 @@ func TestRunWorkerLoopStopsAfterCancellation(t *testing.T) {
 	if runner.calls != 1 {
 		t.Fatalf("calls = %d, want 1", runner.calls)
 	}
-	if runner.ctxs[0] != ctx {
-		t.Fatal("runner did not receive the caller context")
+	// Graceful drain: the in-flight batch runs under a detached, bounded
+	// context (not the cancellable caller ctx) so a mid-batch signal does not
+	// abort it. The loop still exits after the batch via the post-batch select.
+	if runner.ctxs[0] == ctx {
+		t.Fatal("batch should run under a detached drain context, not the caller ctx")
+	}
+	if _, ok := runner.ctxs[0].Deadline(); !ok {
+		t.Fatal("batch context should carry a bounded drain deadline")
 	}
 }

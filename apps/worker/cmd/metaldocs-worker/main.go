@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -17,6 +16,7 @@ import (
 	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/httpclient"
+	"metaldocs/internal/platform/observability"
 	workerapp "metaldocs/internal/platform/worker"
 )
 
@@ -50,16 +50,38 @@ func (a snapshotFinalDocxAdapter) WriteFinalDocxInTx(ctx context.Context, tx db.
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// OpenTelemetry: inert unless an exporter is configured (Z-1, REQ-OBS-3).
+	// otelShutdown is a no-op when disabled; otelEnabled gates the chain link.
+	otelShutdown, otelEnabled, err := observability.SetupOTel(ctx, "metaldocs-worker")
+	if err != nil {
+		slog.Error("setup otel", "err", err)
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := otelShutdown(shutdownCtx); err != nil {
+			slog.Warn("otel shutdown", "err", err)
+		}
+	}()
+	if otelEnabled {
+		slog.Info("OpenTelemetry tracing enabled", "exporter", os.Getenv("OTEL_TRACES_EXPORTER"))
+	}
+
 	workerCfg, err := config.LoadWorkerConfig()
 	if err != nil {
-		log.Fatalf("invalid worker config: %v", err)
+		slog.Error("invalid worker config", "err", err)
+		os.Exit(1)
 	}
 	deps, err := bootstrap.BuildWorkerDependencies(ctx, workerCfg)
 	if err != nil {
-		log.Fatalf("build worker dependencies: %v", err)
+		slog.Error("build worker dependencies", "err", err)
+		os.Exit(1)
 	}
 	defer deps.Cleanup()
 
@@ -99,7 +121,9 @@ func main() {
 
 	if workerCfg.RunOnce {
 		if err := runWorkerBatch(ctx, workerSvc, workerCfg.BatchSize); err != nil {
-			log.Fatalf("worker run failed: %v", err)
+			slog.Error("worker run failed", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
 		}
 		return
 	}
@@ -125,11 +149,24 @@ func runWorkerBatch(ctx context.Context, runner workerBatchRunner, batchSize int
 	return nil
 }
 
+// runWorkerLoop polls on ticks and runs a batch each iteration.
+// Graceful drain: when the signal arrives (ctx cancelled), any in-flight batch
+// is allowed to finish using a detached context with a 30 s deadline before the
+// loop exits. This prevents mid-batch abandonment while keeping the drain
+// bounded so the process does not hang indefinitely on a slow job.
 func runWorkerLoop(ctx context.Context, runner workerBatchRunner, batchSize int, ticks <-chan time.Time) {
 	for {
-		if err := runWorkerBatch(ctx, runner, batchSize); err != nil {
+		// Use a detached context for the batch so that a signal arriving
+		// mid-batch does not abort it; the outer loop's post-batch select
+		// will detect ctx.Done() and exit cleanly after the batch finishes.
+		batchCtx, batchCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		err := runner.RunOnce(batchCtx, batchSize)
+		batchCancel()
+
+		if err != nil {
 			slog.Error("worker run failed", "err", err)
 		}
+
 		select {
 		case <-ctx.Done():
 			return
