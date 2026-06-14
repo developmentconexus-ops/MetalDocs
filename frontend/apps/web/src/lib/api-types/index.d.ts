@@ -365,6 +365,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/iam/presence/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Online presence live stream (WebSocket upgrade)
+         * @description Upgrades to a WebSocket (HTTP 101) and streams presence frames: an initial `snapshot`, then `join`/`leave`/`online`/`idle` deltas and periodic `heartbeat`. Each frame conforms to PresenceStreamEvent. Not a request/response operation — excluded from server codegen (exclude-operation-ids: streamPresence); the hand-written upgrade handler is authoritative. HTTP fallback: /iam/presence/snapshot.
+         */
+        get: operations["streamPresence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit/events/export": {
         parameters: {
             query?: never;
@@ -2123,6 +2143,28 @@ export interface components {
             /** Format: date-time */
             last_seen_at: string;
         };
+        PresenceStreamItem: {
+            user_id: string;
+            username: string;
+            display_name: string;
+            /** Format: date-time */
+            last_seen_at: string;
+            /** @enum {string} */
+            status: "online" | "idle";
+        };
+        /** @description One frame on the presence WebSocket, discriminated by `type`. The `snapshot` frame carries the full `presence` array; delta frames (`join`/`leave`/`online`/`idle`) carry the changed user's `user_id`, `username`, `display_name`, `last_seen_at`, `status`; the `heartbeat` frame carries only `type`. */
+        PresenceStreamEvent: {
+            /** @enum {string} */
+            type: "snapshot" | "join" | "leave" | "online" | "idle" | "heartbeat";
+            user_id?: string;
+            username?: string;
+            display_name?: string;
+            /** Format: date-time */
+            last_seen_at?: string;
+            /** @enum {string} */
+            status?: "online" | "idle";
+            presence?: components["schemas"]["PresenceStreamItem"][];
+        };
         PresenceSnapshotResponse: {
             items: components["schemas"]["OnlinePresenceItem"][];
         };
@@ -3583,6 +3625,27 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PresenceSnapshotResponse"];
                 };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    streamPresence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Switching Protocols — WebSocket established; server streams PresenceStreamEvent frames. */
+            101: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
