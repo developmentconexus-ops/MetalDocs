@@ -2537,6 +2537,9 @@ export interface components {
             errors: number;
             duration_total_ms: number;
             avg_duration_ms: number;
+            p50_duration_ms: number;
+            p95_duration_ms: number;
+            p99_duration_ms: number;
         };
         MetricsResponse: {
             items: components["schemas"]["MetricItem"][];

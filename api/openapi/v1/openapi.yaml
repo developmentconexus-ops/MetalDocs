@@ -4830,7 +4830,7 @@ components:
             $ref: '#/components/schemas/SearchDocumentItem'
     MetricItem:
       type: object
-      required: [route, method, requests, errors, duration_total_ms, avg_duration_ms]
+      required: [route, method, requests, errors, duration_total_ms, avg_duration_ms, p50_duration_ms, p95_duration_ms, p99_duration_ms]
       properties:
         route:
           type: string
@@ -4843,6 +4843,12 @@ components:
         duration_total_ms:
           type: integer
         avg_duration_ms:
+          type: integer
+        p50_duration_ms:
+          type: integer
+        p95_duration_ms:
+          type: integer
+        p99_duration_ms:
           type: integer
     MetricsResponse:
       type: object
