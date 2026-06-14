@@ -10,10 +10,17 @@ import (
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
+// controlledDocumentDuplicatorService is the narrow interface of *ControlledDocumentService
+// the duplicator adapter needs; the interface seam keeps the adapter unit-testable.
+type controlledDocumentDuplicatorService interface {
+	Get(ctx context.Context, tenantID, id string) (*controlleddocumentsapp.ControlledDocument, error)
+	Create(ctx context.Context, cmd controlleddocumentsapp.CreateControlledDocumentCmd) (*controlleddocumentsapp.CreateResult, error)
+}
+
 // controlledDocumentDuplicatorAdapter bridges *controlleddocumentsapp.ControlledDocumentService
 // to docapp.ControlledDocumentDuplicator.
 type controlledDocumentDuplicatorAdapter struct {
-	svc *controlleddocumentsapp.ControlledDocumentService
+	svc controlledDocumentDuplicatorService
 }
 
 // NewControlledDocumentDuplicator returns a docapp.ControlledDocumentDuplicator backed
@@ -56,6 +63,9 @@ func (a controlledDocumentDuplicatorAdapter) DuplicateControlledDocument(ctx con
 		OverrideTemplateReason:    overrideReason,
 		DocumentName:              in.DocumentName,
 		FormData:                  formData,
+		VisibilityScope:           string(source.Visibility.Scope),
+		VisibilityAreaCodes:       source.Visibility.AreaCodes,
+		VisibilityUserIDs:         source.Visibility.UserIDs,
 		// TemplateVersionID threads the source's override into the off-tx clone
 		// resolver so the duplicate clones the source's override version (not the
 		// profile default); OverrideTemplateVersionID above drives in-tx override
@@ -103,4 +113,3 @@ func (a *profileDefaultsAdapter) GetDefaultTemplateVersionID(ctx context.Context
 	status := "published"
 	return profile.DefaultTemplateVersionID, &status, nil
 }
-
