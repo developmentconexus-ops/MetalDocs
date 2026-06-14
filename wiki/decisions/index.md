@@ -1,11 +1,11 @@
 # Decisions
 
-> **Last verified:** 2026-06-13 (Z-27 — full table rebuild, ADR 0028 renumbered from stray dated file)
+> **Last verified:** 2026-06-14 (M0/F0.1 — decision-vs-code re-audit; docs/adr stale ref removed; RLS table count reconciled)
 > **Scope:** Durable ADRs and consequential technical decisions.
 
 | # | Title | Status | Superseded by | Current relevance |
 |---|-------|--------|---------------|-------------------|
-| [0001](0001-eigenpal-adoption.md) | Adopt eigenpal as the document editor | Accepted | — | Governs editor library choice; `@eigenpal/docx-js-editor` from `vendor/eigenpal/`; T1–T8 spike verified |
+| [0001](0001-eigenpal-adoption.md) | Adopt eigenpal as the document editor | Accepted | — | Governs editor library choice; `@eigenpal/docx-js-editor` artifact at `apps/docx-renderer/vendor/eigenpal/`; T1–T8 spike verified; FE `file:` reference path drift deferred as HS-2 (code boundary) |
 | [0002](0002-zone-purge.md) | Purge editable zones | Accepted | — | Editable zones removed end-to-end; placeholders are the sole variability mechanism |
 | [0003](0003-token-syntax-migration.md) | Token Syntax Migration | Historical (stub; superseded by ADR 0008's fixed 7-token catalog) | 0008 | Records the `{{uuid}}` → `{name}` migration intent; ADR 0008 replaced the open-ended model with the fixed catalog |
 | [0007](0007-two-tier-authz.md) | Two-Tier Authorization | Accepted (amended 2026-05-11 — tripwire extended to all regulated modules) | — | Foundation of all authz; tier-1 `CanDo` (middleware) + tier-2 `authz.Require` (in-tx area); `authz-call-present` lint deleted (see ADR 0023) |
@@ -31,4 +31,4 @@
 | [0027](0027-rls-adoption-sequencing.md) | RLS Adoption Sequencing + auth\_identities Tenant-Global by Design | Accepted (executed in full by Wave Z, 2026-06-13) | — | `auth_identities` tenant-global by design (T-008 closed); RLS live on all 29 tenant-scoped tables (migration 0237 collapsed 3-tier plan) |
 | [0028](0028-audit-events-cursor-shape.md) | Audit Events Cursor Shape Drift | Accepted (closed 2026-06-08) | — | `/audit/events` runtime reconciled to nested `page.{next_cursor,has_more}` CursorPage shape (Phase F re-audit); FE dual-shape adapter removed |
 
-Legacy ADR material in `docs/adr/` remains historical/reference content until reconciled deliberately.
+The legacy `docs/adr/` tree was removed from this branch. Where its content maps to canonical `wiki/decisions/` entries is tracked by the governance migration map (to be finalized in F0.5).
