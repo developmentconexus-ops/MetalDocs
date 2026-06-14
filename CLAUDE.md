@@ -48,7 +48,7 @@ Full module documentation, maturity promotion, or rebuild module wiki trio/artif
 | DB migrations / bootstrap / curated baseline / seeds / dictionary / extensions / grants / triggers | [`metaldocs-database`](.agents/skills/metaldocs-database/SKILL.md) |
 | Runtime/auth/route/contract drift, prerequisite repair | [`runtime-contract-prereq`](.agents/skills/runtime-contract-prereq/SKILL.md) |
 | Module wiki rebuild / sync | `metaldocs-module-doc` / `-sync` |
-| Organize a large program into Milestones → Features with per-milestone QA/validation gates + human-in-loop hard-stops (spec-up-front per milestone, evidence-based close-out) | [`milestone`](.claude/skills/milestone/SKILL.md) |
+| Organize a large program into Milestones → Features with consumer-contract-first per-feature spec gates, an independent `milestone-validator` close gate (separation of powers, binding C1–C7), human-in-loop hard-stops, spec-up-front per milestone, evidence-based close-out | [`milestone`](.claude/skills/milestone/SKILL.md) |
 
 ### Frontend rules (non-negotiable)
 Canonical structure: [`wiki/architecture/frontend-structure.md`](wiki/architecture/frontend-structure.md).

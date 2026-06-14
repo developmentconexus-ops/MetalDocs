@@ -30,9 +30,13 @@ runtime behavior observed. Avoid "works" / "looks right".
 
 ## Milestone validation definition
 
-What `qa/milestone-qa.md` will check at the end (this is the contract the gate enforces):
+The close gate is run by the **`milestone-validator` subagent** (separation of powers — it judges and
+writes `qa/milestone-qa.md`; the main session flips status only on its PASS), following the binding
+C1–C7 checklist in `.claude/skills/milestone/references/milestone-end-validation.md`. What that gate
+enforces for this milestone:
 
-1. **Per-feature acceptance** — every feature above meets its declared "what to validate".
+1. **Per-feature acceptance** — every feature above meets its declared "what to validate", and each
+   feature's **consumer contract** (`spec.md`) was honored (producer matches consumer).
 2. **Workflow-class QA checklist** — <name the canonical checklist(s) for this milestone's
    work, e.g. backend-api / screen / workflow-async / release close-out>.
 3. **Regression** — previously-completed milestones still pass their gates.

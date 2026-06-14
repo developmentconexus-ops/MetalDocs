@@ -17,7 +17,8 @@ named bar).
 | … | | | | |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) /
-`blocked` (hard-stop open).
+`blocked` (hard-stop open). The **Gate result** column links the milestone-validator's
+verdict (`qa/milestone-qa.md`); `passed` requires a validator **PASS** *and* operator HS-1 approval.
 
 ## Hard-stops raised
 

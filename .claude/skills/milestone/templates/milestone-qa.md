@@ -1,49 +1,73 @@
-# Milestone <n> — QA & Verification
+# Milestone <n> — Validation Verdict (C1–C7)
 
-> **Validates against:** `../milestone.md` (the up-front milestone spec)
-> **Run:** <date>  ·  **Verdict:** PASS | FAIL (→ hard-stop)
-> Run only after every feature in the milestone is closed (each has a complete `evidence.md`).
+> **Written by:** the `milestone-validator` subagent — *not* the main session (separation of powers).
+> **Validates against:** `../milestone.md` (the up-front spec) + each feature's `spec.md`.
+> **Binding procedure:** `.claude/skills/milestone/references/milestone-end-validation.md`.
+> **Run:** <date>  ·  **Verdict:** see C7.
+> Run only after every feature is closed (each has a complete `evidence.md`). The validator judges and
+> writes this file; the **main session flips status only on a PASS**. The validator never edits code,
+> fixes findings, or flips status.
 
-## 1. Per-feature acceptance
+## C1 — Spec & plan conformance (per feature)
 
-Every feature meets the "what to validate" its milestone-spec row declared.
+Each feature's evidence acceptance matches its `spec.md` Validation Gate; the **consumer contract was
+honored** (producer matches consumer, not reverse); non-goals respected.
 
-| Feature | Acceptance criteria | Pass? | Evidence (cmd / observed) |
-|---------|---------------------|-------|---------------------------|
-| F<n>.1 | <from milestone.md> | ✅/❌ | |
-| F<n>.2 | | | |
+| Feature | Consumer contract honored? | Acceptance met? | Non-goals respected? | Evidence |
+|---------|----------------------------|-----------------|----------------------|----------|
+| F<n>.1 | ✅/❌ | ✅/❌ | ✅/❌ | <link / note> |
 
-## 2. Workflow-class QA checklist
+## C2 — Gates re-run, isolated
 
-Run the canonical checklist(s) named in `milestone.md` (backend-api / screen /
-workflow-async / release close-out). Record outcome, not just "ran".
+Each feature's named tests + proof commands **re-run by the validator from clean state** (not trusted
+from the evidence transcript).
 
-| Checklist | Outcome | Notes |
-|-----------|---------|-------|
-| <name> | pass / pass-with-defers | |
+| Feature | Command re-run | Real output | Pass? |
+|---------|----------------|-------------|-------|
+| F<n>.1 | `<cmd>` | <key line> | ✅/❌ |
 
-## 3. Regression (previously-completed milestones)
+## C3 — Senior review of the aggregate milestone diff
 
-| Prior milestone | Re-checked how | Still passing? |
-|-----------------|----------------|----------------|
-| M<k> | <cmd / smoke> | ✅/❌ |
+Whole-milestone diff reviewed as one unit. Duplication / split-brain / dead code / one feature
+breaking another / guessed contract.
 
-## 4. Quality-bar / root-cause check (if applicable)
+- Findings: <none, or list with file:line>
+- Staff-engineer bar met? ✅/❌
 
-The bar this milestone claimed to move, re-measured. Confirm **root cause fixed, not
-symptom-patched** — name the class/instance and show the closing evidence.
+## C4 — Workflow-class QA + regression
+
+| Check | Outcome | Notes |
+|-------|---------|-------|
+| Canonical checklist (<name>) | pass / pass-with-defers / fail | |
+| Regression vs prior milestones | <all still pass / which broke> | |
+
+## C5 — Quality-bar re-measure + retrospective
 
 | Bar / class | Before | After | Root-cause-fixed evidence |
 |-------------|--------|-------|---------------------------|
-| <e.g. defect class F1> | open | closed | <focused audit slice link> |
+| <bar> | <state> | <state> | <focused proof — not symptom-patch> |
 
-## 5. Scope integrity
+- Could it be built better? <retrospective note → defer / next-milestone input, or "no">
 
-- [ ] No unplanned scope (anything beyond `milestone.md` is recorded with rationale).
-- [ ] Every bounded defer has a written trigger and owner.
+## C6 — Forbidden-list (any hit = FAIL)
 
-## Verdict & next step
+- [ ] Suite-green reported as a pass without per-feature acceptance mapped to evidence
+- [ ] Fixture/mock passed off as real-provider proof
+- [ ] Consumer contract guessed rather than read from the consumer
+- [ ] Split-brain (one fact, two sources of truth)
+- [ ] Self-judged close / validator edited or fixed code
+- [ ] Scope drift (work beyond the spec, no rationale)
+- [ ] Symptom-patch (bar "moved" by masking, root cause intact)
 
-- **Verdict:** PASS → present at HS-1 operator gate. / FAIL → raise HS-4 (replan feature)
-  or HS-6 (replan milestone); do not proceed.
-- **Operator gate (HS-1):** <pending / approved by … on …>
+(All unchecked = clean.)
+
+## C7 — Verdict
+
+- **VERDICT: PASS | FAIL**
+- On **FAIL** — failed check(s): <Cx …>; minimum **fix feature** to open: `f<n>.x-<slug>` — <what it
+  must do>. Milestone stays **active**; main session does not advance.
+- On **PASS** — handed back to the main session to flip status and present the HS-1 operator gate.
+
+> **Main-session actions (post-verdict, NOT the validator's):**
+> - Operator gate (HS-1): <pending / approved by … on …>
+> - Status flipped in `README.md`: <yes/no — only on PASS>
