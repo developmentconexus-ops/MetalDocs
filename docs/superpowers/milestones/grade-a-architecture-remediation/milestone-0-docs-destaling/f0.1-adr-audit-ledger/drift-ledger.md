@@ -50,12 +50,12 @@
 
 | Verdict | Count | ADRs |
 |---------|-------|------|
-| MATCH | 25 | 0002, 0003, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025, 0026, 0028 + partial in 0001/0027 |
+| MATCH | 23 | 0002, 0003, 0007, 0008, 0009, 0010, 0011, 0012, 0013, 0014, 0015, 0016, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025, 0026, 0028 |
 | STATUS-DRIFT | 2 | 0001 (vendor path reference stale), 0027 (table count phrasing ambiguous) |
-| LEDGER-DRIFT | 1 | `index.md:34` — references deleted `docs/adr/` tree |
+| LEDGER-DRIFT | 1 | `index.md:34` — references deleted `docs/adr/` tree (cross-cutting note, not an ADR row) |
 | DECISION-DRIFT | 0 | — |
 
-**No DECISION-DRIFT found. All 27 decisions still hold in code.**
+**Total ADR rows = 25** (23 MATCH + 2 STATUS-DRIFT). **No DECISION-DRIFT found. All 25 decisions still hold in code.**
 
 ### Resolved: ADR 0027 RLS table count
 

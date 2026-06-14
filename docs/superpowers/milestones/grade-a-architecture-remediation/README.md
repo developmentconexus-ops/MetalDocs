@@ -1,0 +1,42 @@
+# Program: Grade-A Architecture Remediation
+
+> **Governing spec:** `docs/superpowers/specs/2026-06-14-grade-a-architecture-remediation-design.md`
+> **Status:** In progress (Milestone 0)
+> **Owner / operator:** leandrotca.work (operator) + backend agent (Opus 4.8)
+
+Take the backend's three formerly-C audit dimensions (module-boundaries/DDD, contract/API,
+composition/observability) to **Grade A−/A**, and fully close the **H-D class** (handler/contract
+field drift; tri-source route drift) and the **H-G class** (cross-module reach-without-a-port +
+hardcoded domain state) — not just the instances. Every fix carries evidence; symptom-patching is a
+hard-stop. **Terminal acceptance:** the M5 independent multi-agent re-audit passes the §6 pass bar
+(3 dimensions ≥ A−, 0 new Critical/Major, H-D and H-G classes at 0) and the operator signs off Grade A.
+
+## Milestones
+
+| # | Milestone | Objective (one line) | Status | Gate result |
+|---|-----------|----------------------|--------|-------------|
+| 0 | `milestone-0-docs-destaling` | One unambiguous progression surface; stale docs stop polluting agent context | in-progress | `qa/milestone-qa.md` |
+| 1 | `milestone-1-reach-a-blockers` | Close all 4 Grade-A blockers + the error-contract (bare-405) tail | planned | — |
+| 2 | `milestone-2-contract-tail` | Eliminate handler-emits-undeclared-field drift (H-D), one FE regen | planned | — |
+| 3 | `milestone-3-mechanical-quality` | Harden code-quality + persistence; dead-surface deletes, tx-hazard hoist | planned | — |
+| 4 | `milestone-4-systemic-ports` | Close H-G class via shared ports (UserDisplayNameReader, TemplateVersionStateReader) | planned | — |
+| 5 | `milestone-5-independent-re-audit` | Prove Grade A by independent fresh multi-agent re-audit (authoritative) | planned | — |
+
+Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
+
+## Hard-stops raised
+
+| When | HS id | What | Resolution |
+|------|-------|------|------------|
+| | | | |
+
+## Program close-out / reconciliation
+
+Fill in only when the last milestone has passed:
+
+- [ ] Every planned feature (M0–M4) has a complete evidence row.
+- [ ] Zero unplanned scope merged; anything added is recorded with rationale.
+- [ ] Every bounded defer has a written trigger and an owner.
+- [ ] M5 re-audit passed the §6 pass bar — link the evidence.
+- [ ] Forward roadmap (F0.3) reflects the executed program and any deferred triggers.
+- [ ] Operator sign-off: <date / name>
