@@ -157,7 +157,7 @@
 /* --- Eigenpal coupling pin ---------------------------------------------
    The :global(.ep-root ...) overrides below target eigenpal data-testid
    attributes and SVG fills as shipped by
-     vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz
+     third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz
    On any eigenpal version bump:
      1. Re-run the manual smoke checklist in
         wiki/references/eigenpal-controlled-package.md

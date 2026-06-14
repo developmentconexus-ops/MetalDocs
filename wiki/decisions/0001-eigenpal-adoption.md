@@ -1,7 +1,7 @@
 # ADR 0001: Adopt eigenpal as the document editor
 
 > **Status:** Accepted
-> **Last verified:** 2026-05-11
+> **Last verified:** 2026-06-14
 > **Date:** ~2026-04 (verify from git log)
 > **Scope:** Editor library choice for MetalDocs WYSIWYG.
 
@@ -16,9 +16,9 @@ We needed a DOCX-native WYSIWYG editor in the browser. Candidates:
 
 **Adopt `@eigenpal/docx-js-editor` as the MetalDocs DOCX editor.**
 
-As of 2026-05-01, MetalDocs consumes a controlled EigenPal package artifact from `apps/docx-renderer/vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. This keeps the application dependency deterministic while EigenPal fixes are maintained in the fork and prepared for upstream/published-package consolidation.
+As of 2026-05-01, MetalDocs consumes a controlled EigenPal package artifact from `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. This keeps the application dependency deterministic while EigenPal fixes are maintained in the fork and prepared for upstream/published-package consolidation.
 
-> **Path note (2026-06-14):** `frontend/apps/web/package.json` references `file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`, which resolves relative to the web app as `<repo-root>/vendor/eigenpal/...`. That root-level path **does not exist** — the tgz lives only under `apps/docx-renderer/vendor/eigenpal/`. The package is present in `node_modules` only from a prior install; a fresh `pnpm install` on this branch would fail. This is a code-boundary issue (package.json + lockfile + possible symlink/copy step missing) deferred as HS-2 — see bounded defer in ADR 0001 close-out notes.
+> **Resolution (2026-06-14):** The tarball now lives at the canonical, app-neutral, Go-safe home `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. All three consumers (`apps/docx-renderer`, `packages/editor-ui`, `frontend/apps/web`) reference it via `file:` and both lockfiles were regenerated. A fresh checkout installs cleanly. HS-2 closed. See `docs/superpowers/specs/2026-06-14-eigenpal-vendor-path-design.md`.
 
 ## Reasoning
 
@@ -40,7 +40,7 @@ As of 2026-05-01, MetalDocs consumes a controlled EigenPal package artifact from
 
 - All editor-related code consolidates in `packages/editor-ui/`
 - EigenPal implementation details stay in the EigenPal fork; MetalDocs only documents the integration contract.
-- Dependency refreshes must update `apps/docx-renderer/vendor/eigenpal/`, package manifests, and lockfiles together (and align the FE `file:` reference path — see path note above).
+- Dependency refreshes must update `third_party/eigenpal/`, package manifests, and both lockfiles together.
 - CKEditor + BlockNote deps removed (purge plan: see `decisions/0002-zone-purge.md` companion notes)
 - Future work: leverage native eigenpal capabilities instead of reinventing
 - ProseMirror DOM access patterns documented for tests/debugging

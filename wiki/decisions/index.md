@@ -5,7 +5,7 @@
 
 | # | Title | Status | Superseded by | Current relevance |
 |---|-------|--------|---------------|-------------------|
-| [0001](0001-eigenpal-adoption.md) | Adopt eigenpal as the document editor | Accepted | — | Governs editor library choice; `@eigenpal/docx-js-editor` artifact at `apps/docx-renderer/vendor/eigenpal/`; T1–T8 spike verified; FE `file:` reference path drift deferred as HS-2 (code boundary) |
+| [0001](0001-eigenpal-adoption.md) | Adopt eigenpal as the document editor | Accepted | — | Governs editor library choice; `@eigenpal/docx-js-editor` artifact at `third_party/eigenpal/`; T1–T8 spike verified; vendor-path drift resolved 2026-06-14 (HS-2 closed) |
 | [0002](0002-zone-purge.md) | Purge editable zones | Accepted | — | Editable zones removed end-to-end; placeholders are the sole variability mechanism |
 | [0003](0003-token-syntax-migration.md) | Token Syntax Migration | Historical (stub; superseded by ADR 0008's fixed 7-token catalog) | 0008 | Records the `{{uuid}}` → `{name}` migration intent; ADR 0008 replaced the open-ended model with the fixed catalog |
 | [0007](0007-two-tier-authz.md) | Two-Tier Authorization | Accepted (amended 2026-05-11 — tripwire extended to all regulated modules) | — | Foundation of all authz; tier-1 `CanDo` (middleware) + tier-2 `authz.Require` (in-tx area); `authz-call-present` lint deleted (see ADR 0023) |
