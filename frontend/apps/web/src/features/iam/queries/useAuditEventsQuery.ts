@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../../../lib/api/client";
 import { QK } from "../../../lib/queryKeys";
-import type { operations } from "../../../lib/api-types";
+import type { components, operations } from "../../../lib/api-types";
 
 const STALE_30S = 30_000;
 
@@ -12,16 +12,7 @@ export type AuditEventsQueryParams = NonNullable<
   operations["listAuditEvents"]["parameters"]["query"]
 >;
 
-export type AuditEventItem = {
-  id: string;
-  occurredAt: string;
-  actorId: string;
-  action: string;
-  resourceType: string;
-  resourceId: string;
-  payload: Record<string, unknown>;
-  traceId?: string;
-};
+export type AuditEventItem = components["schemas"]["AuditEventItem"];
 
 export type AuditEventsPage = {
   items: ReadonlyArray<AuditEventItem>;

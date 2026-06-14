@@ -279,13 +279,13 @@ function ActivityPanel({ userId }: { userId: string }) {
         <li key={ev.id} className={styles.activityItem}>
           <span className={styles.activityAction}>{ev.action}</span>
           <span className={styles.activityMeta}>
-            {ev.resourceType}
-            {ev.resourceId ? ` · ${ev.resourceId}` : ""} ·{" "}
+            {ev.resource_type}
+            {ev.resource_id ? ` · ${ev.resource_id}` : ""} ·{" "}
             <time
-              dateTime={ev.occurredAt}
-              title={titleFormatter.format(new Date(ev.occurredAt))}
+              dateTime={ev.occurred_at}
+              title={titleFormatter.format(new Date(ev.occurred_at))}
             >
-              {getRelativeTime(ev.occurredAt)}
+              {getRelativeTime(ev.occurred_at)}
             </time>
           </span>
         </li>

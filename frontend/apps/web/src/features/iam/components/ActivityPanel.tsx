@@ -64,7 +64,7 @@ export default function ActivityPanel() {
         <ul className={styles.list} role="list">
           {events.map((ev, i) => {
             const prev = events[i - 1];
-            const groupedWithPrev = !!prev && prev.actorId === ev.actorId;
+            const groupedWithPrev = !!prev && prev.actor_id === ev.actor_id;
             return (
               <ActivityEventRow
                 key={ev.id}

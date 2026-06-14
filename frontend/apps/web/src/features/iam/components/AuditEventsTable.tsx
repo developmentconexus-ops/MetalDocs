@@ -31,8 +31,8 @@ const SEVERITY_CLASS: Readonly<Record<AuditEventSeverity, string>> = {
 
 const SKELETON_ROWS = 8;
 
-function initials(actorId: string): string {
-  const trimmed = actorId.trim();
+function initials(actor_id: string): string {
+  const trimmed = actor_id.trim();
   if (!trimmed) return "?";
   const compact = trimmed.replace(/[-_]/g, " ").split(/\s+/);
   if (compact.length >= 2) {
@@ -41,11 +41,11 @@ function initials(actorId: string): string {
   return trimmed.slice(0, 2).toUpperCase();
 }
 
-function shortResource(resourceType: string, resourceId: string): string {
-  if (!resourceType && !resourceId) return "—";
-  if (!resourceId) return resourceType;
-  const id = resourceId.length > 12 ? `${resourceId.slice(0, 8)}…` : resourceId;
-  return `${resourceType || "?"}/${id}`;
+function shortResource(resource_type: string, resource_id: string): string {
+  if (!resource_type && !resource_id) return "—";
+  if (!resource_id) return resource_type;
+  const id = resource_id.length > 12 ? `${resource_id.slice(0, 8)}…` : resource_id;
+  return `${resource_type || "?"}/${id}`;
 }
 
 function isProblemPayload(
@@ -122,12 +122,12 @@ export default function AuditEventsTable({
         <ul className={styles.list} role="list">
           {events.map((ev, i) => {
             const prev = events[i - 1];
-            const grouped = !!prev && prev.actorId === ev.actorId;
+            const grouped = !!prev && prev.actor_id === ev.actor_id;
             const severity = getAuditEventSeverity(ev.action);
             const label = getAuditEventLabel(ev.action);
             const expanded = expandedId === ev.id;
             const absolute = SP_DATE_TIME_FORMATTER.format(
-              new Date(ev.occurredAt),
+              new Date(ev.occurred_at),
             );
             return (
               <li key={ev.id}>
@@ -143,10 +143,10 @@ export default function AuditEventsTable({
                   />
                   <time
                     className={styles.time}
-                    dateTime={ev.occurredAt}
+                    dateTime={ev.occurred_at}
                     title={absolute}
                   >
-                    {getRelativeTime(ev.occurredAt)}
+                    {getRelativeTime(ev.occurred_at)}
                   </time>
                   <div className={styles.body}>
                     <span className={styles.label}>{label}</span>
@@ -158,19 +158,19 @@ export default function AuditEventsTable({
                     ) : (
                       <>
                         <span className={styles.avatar} aria-hidden="true">
-                          {initials(ev.actorId)}
+                          {initials(ev.actor_id)}
                         </span>
-                        <span className={styles.actorName} title={ev.actorId}>
-                          {ev.actorId || "—"}
+                        <span className={styles.actorName} title={ev.actor_id}>
+                          {ev.actor_id || "—"}
                         </span>
                       </>
                     )}
                   </div>
                   <span
                     className={styles.resource}
-                    title={`${ev.resourceType}/${ev.resourceId}`}
+                    title={`${ev.resource_type}/${ev.resource_id}`}
                   >
-                    {shortResource(ev.resourceType, ev.resourceId)}
+                    {shortResource(ev.resource_type, ev.resource_id)}
                   </span>
                   <button
                     type="button"
@@ -224,10 +224,10 @@ export default function AuditEventsTable({
                         <span className={styles.payloadKey}>Ocorrido em:</span>{" "}
                         {absolute}
                       </span>
-                      {ev.traceId ? (
+                      {ev.trace_id ? (
                         <span>
                           <span className={styles.payloadKey}>Trace:</span>{" "}
-                          {ev.traceId}
+                          {ev.trace_id}
                         </span>
                       ) : null}
                     </div>

@@ -3,19 +3,11 @@ import {
   getAuditEventSeverity,
 } from "../presenters/audit-event-presenter";
 import { getRelativeTime } from "../presenters/relative-time-presenter";
+import type { AuditEventItem } from "../queries/useAuditEventsQuery";
 import styles from "./ActivityEventRow.module.css";
 
-type AuditEvent = {
-  id: string;
-  occurredAt: string;
-  actorId: string;
-  action: string;
-  resourceType: string;
-  resourceId: string;
-};
-
 interface ActivityEventRowProps {
-  event: AuditEvent;
+  event: AuditEventItem;
   groupedWithPrev?: boolean;
 }
 
@@ -38,7 +30,7 @@ export default function ActivityEventRow({
 }: ActivityEventRowProps) {
   const label = getAuditEventLabel(event.action);
   const severity = getAuditEventSeverity(event.action);
-  const absolute = absoluteFormatter.format(new Date(event.occurredAt));
+  const absolute = absoluteFormatter.format(new Date(event.occurred_at));
 
   return (
     <li
@@ -52,19 +44,19 @@ export default function ActivityEventRow({
       <span className={styles.label}>{label}</span>
       <time
         className={styles.time}
-        dateTime={event.occurredAt}
+        dateTime={event.occurred_at}
         title={absolute}
       >
-        {getRelativeTime(event.occurredAt)}
+        {getRelativeTime(event.occurred_at)}
       </time>
       <span className={styles.meta}>
         {groupedWithPrev ? (
           <span className={styles.groupedHint}>↳ mesmo ator</span>
         ) : (
-          <span className={styles.actor}>{event.actorId}</span>
+          <span className={styles.actor}>{event.actor_id}</span>
         )}
         <span className={styles.resource}>
-          {event.resourceType}/{event.resourceId.slice(0, 8)}
+          {event.resource_type}/{event.resource_id.slice(0, 8)}
         </span>
       </span>
     </li>
