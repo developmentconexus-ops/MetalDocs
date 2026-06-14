@@ -8,3 +8,5 @@ output: api.gen.go
 output-options:
   include-tags:
     - iam
+  exclude-operation-ids:
+    - streamPresence
