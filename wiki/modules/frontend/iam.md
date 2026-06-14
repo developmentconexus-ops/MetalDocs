@@ -40,7 +40,7 @@ Tenant operator UI for IAM. Surfaces user lifecycle, role/capability matrix, aud
 | `/admin/usage` | `UsageTab` | `metrics.view` |
 | `/admin/memberships` | `AreaMembershipAdminRoutePage` | `membership.view` |
 
-> Note: the `AppShell` gate collects every `requiresCapability` / `requiresAnyCapability` along the match chain and requires all of them to pass. Parent + child constraints both enforced (fixed at PR-12 closeout — see [`docs/audits/QA-evidence-admin-center-rebuild.md`](../../../docs/audits/QA-evidence-admin-center-rebuild.md)).
+> Note: the `AppShell` gate collects every `requiresCapability` / `requiresAnyCapability` along the match chain and requires all of them to pass. Parent + child constraints both enforced (fixed at PR-12 closeout — QA evidence `QA-evidence-admin-center-rebuild.md` removed at the v1 re-baseline, commit `c7f06f2e`).
 
 ## 4. TanStack Query
 
@@ -116,4 +116,4 @@ Presence is a WebSocket subscription (`usePresenceStream`) that writes into a de
 - Concept: [`wiki/concepts/authz-tiers.md`](../../concepts/authz-tiers.md)
 - ADRs: [`0019-cap-audit-read-and-session-manage.md`](../../decisions/0019-cap-audit-read-and-session-manage.md), [`0020-admin-center-six-tab-ia.md`](../../decisions/0020-admin-center-six-tab-ia.md), [`0021-tenant-vs-platform-admin-separation.md`](../../decisions/0021-tenant-vs-platform-admin-separation.md), [`0028-audit-events-cursor-shape.md`](../../decisions/0028-audit-events-cursor-shape.md)
 - Skill: [`metaldocs-frontend`](../../../.agents/skills/metaldocs-frontend/SKILL.md)
-- QA evidence: [`docs/audits/QA-evidence-admin-center-rebuild.md`](../../../docs/audits/QA-evidence-admin-center-rebuild.md)
+- QA evidence: `QA-evidence-admin-center-rebuild.md` (removed at the v1 re-baseline, commit `c7f06f2e`)

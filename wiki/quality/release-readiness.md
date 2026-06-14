@@ -73,5 +73,5 @@ If the gate fails:
 
 ## Source normalization note
 
-This page is the canonical wiki home for release-quality governance.
-The older draft runbook under `docs/runbooks/release-readiness.md` should be treated as staging input until references are fully normalized.
+This page is the **sole** canonical wiki home for release-quality governance.
+The older `docs/runbooks/` draft runbook it was promoted from was removed at the v1 re-baseline (commit `c7f06f2e`); no staging source remains.

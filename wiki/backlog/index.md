@@ -1,14 +1,23 @@
 # Backlog
 
-> **Last verified:** 2026-05-27
+> **Last verified:** 2026-06-14
 > **Scope:** Governed deferred work, refactor queues, and screen-specific follow-ups.
 
-## Program-level backlog
+> **Forward roadmap:** the single canonical progression surface is [`wiki/roadmap.md`](../roadmap.md).
+> The refactor roadmap below is **historical** (superseded); plan from `wiki/roadmap.md`.
 
-- [roadmap.md](roadmap.md) - ordered refactor roadmap
-- [api-contract-hardening.md](api-contract-hardening.md) - API surface coherence program (post-audit follow-up to roadmap Plan 8)
-- [contract-first-followups.md](contract-first-followups.md) - cross-cutting contract follow-ups (folded into api-contract-hardening Phase C/E)
+## Program-level backlog (active)
+
 - [planned-endpoints.md](planned-endpoints.md) - spec-ready sketches for endpoints removed from the live contract in Phase C but planned for future build (notifications, workflow transitions/approvals)
+
+> Forward program progression lives in [`wiki/roadmap.md`](../roadmap.md). The refactor
+> roadmap below is historical (superseded — see F0.3).
+
+### Closed / superseded (archived under [`wiki/_archive/`](../_archive/README.md))
+
+- [api-contract-hardening.md](../_archive/backlog/api-contract-hardening.md) - **CLOSED** completed program (Phase F shipped; closing re-audit 0 CRITICAL/0 HIGH). Archived at `wiki/_archive/backlog/`.
+- [contract-first-followups.md](../_archive/backlog/contract-first-followups.md) - **superseded** — folded into api-contract-hardening Phase C/E. Archived at `wiki/_archive/backlog/`.
+- [roadmap.md](roadmap.md) - ordered refactor roadmap (**historical** — superseded by [`wiki/roadmap.md`](../roadmap.md); its open Plan 12 carried forward)
 
 ## Module and platform refactors
 

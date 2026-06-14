@@ -3,7 +3,7 @@
 > **Last verified:** 2026-06-08 (Phase F F4: ListDocumentsPaginated cursor migration; repository.go line anchors updated)
 > **Status:** Stub. Expand with ERD + per-table schema notes when SQL stabilizes.
 > **Scope:** Postgres tables, key relationships, snapshot columns, hash columns.
-> **Out of scope:** Migration archaeology (see `docs/db-research/` and retained historical `migrations/` evidence).
+> **Out of scope:** Migration archaeology (the legacy DB-research notes were removed at the v1 re-baseline, commit `c7f06f2e`; retained historical `migrations/` evidence remains).
 > **Key files:**
 > - `db/prerequisites/0001_extensions.sql` - required extensions before schema objects
 > - `db/baseline/0001_current_schema.sql` - curated current-state schema for fresh environments

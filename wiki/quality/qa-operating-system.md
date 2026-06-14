@@ -339,7 +339,7 @@ The QA operating system is only partially promoted until the following work is c
 
 ### Phase 2 - Promote release-quality rules
 
-- normalize `docs/runbooks/release-readiness.md`
+- normalize the former `docs/runbooks/` release-readiness draft (done — source removed at the v1 re-baseline, commit `c7f06f2e`)
 - promote the durable release gate into `wiki/quality/release-readiness.md`
 - link it from `wiki/tests/` and `wiki/quality/`
 

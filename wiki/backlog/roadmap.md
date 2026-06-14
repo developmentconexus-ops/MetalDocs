@@ -1,5 +1,10 @@
 # Refactor Roadmap
 
+> ⚠️ **HISTORICAL — superseded by [`wiki/roadmap.md`](../roadmap.md).** This is a frozen
+> record of the cross-module refactor program (Plans 3–13, anchors locked 2026-05-11). Do
+> **not** plan from this file. Its one still-open item (**Plan 12** — 7-screen finalization)
+> is carried forward in the canonical roadmap. Body retained below as the historical record.
+
 > **Last verified:** 2026-06-14 (eigenpal vendor path updated to third_party/eigenpal/; Plan 12 prep correction)
 > **Scope:** Ordered sequence of cross-module refactor sub-plans from current state → professional structured architecture. Each sub-plan = one fresh implementation session = one PR series.
 > **Out of scope:** Implementation detail. Sub-plans are written one-at-a-time in their own session under `docs/superpowers/specs/` and linked back here.
@@ -29,7 +34,7 @@
 | P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | 8 commits | done 2026-05-11 |
 | P2 | 6a | Audit-trail completeness sweep (emission + sink consolidation) | 11 commits | done 2026-05-11 |
 | P3 | 7 | RFC 9457 envelope rollout | 11 commits | done 2026-05-11 |
-| P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | done 2026-05-13 (codegen only — contract incoherence carried forward) → **superseded-by [api-contract-hardening.md](api-contract-hardening.md), CLOSED 2026-06-08** (re-audit 0 CRIT/0 HIGH) |
+| P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | done 2026-05-13 (codegen only — contract incoherence carried forward) → **superseded-by [api-contract-hardening.md](../_archive/backlog/api-contract-hardening.md), CLOSED 2026-06-08** (re-audit 0 CRIT/0 HIGH) |
 | P4 | 9 | Transactional + idempotency hardening + template workflow alignment | ~6 | done 2026-05-13 (Plan 9R) |
 | P4 | 10 | Legacy purge + rename sweep (`templates → templates`, `v2 → v1`) | ~6 | pending |
 | P5 | 12 | Screen finalization × 7 (per `metaldocs-screen-implementation`) | ~7 | pending |
@@ -105,8 +110,8 @@ Status: implemented as a dedicated audit T-004 follow-up after Plan 9R. Added `a
 - **Critical rows closed:** 2 (documents T-002, approval T-002).
 - **Blockers:** Plan 7 (error schema referenced by every spec).
 - **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
-- **Correction (2026-06-05):** scope was *codegen plumbing*, not contract coherence. A 4-subagent API audit found the spec base-path schism, ~30 unserved spec paths, dual error envelopes, and missing global security/tags survived this Plan. Follow-up program: [`api-contract-hardening.md`](api-contract-hardening.md).
-- **Superseded-by → CLOSED 2026-06-08:** the [api-contract-hardening](api-contract-hardening.md) program (Phases A–F) completed the work this Plan's "done" overstated — base-path normalization + double-prefix kill (A), authz enforcement gaps (B), dead/unserved-surface prune (C), RFC 9457 envelope unification (D), full snake_case payload casing (E1), spec hygiene + standards conformance (E2), and final cleanup/no-workarounds (F). The closing 4-dimension re-audit passed with **0 CRITICAL / 0 HIGH**; the API contract surface now meets the same industry-standard bar as the auth/authz refactor. Anchor decisions formalised as ADRs 0023–0026.
+- **Correction (2026-06-05):** scope was *codegen plumbing*, not contract coherence. A 4-subagent API audit found the spec base-path schism, ~30 unserved spec paths, dual error envelopes, and missing global security/tags survived this Plan. Follow-up program: [`api-contract-hardening.md`](../_archive/backlog/api-contract-hardening.md).
+- **Superseded-by → CLOSED 2026-06-08:** the [api-contract-hardening](../_archive/backlog/api-contract-hardening.md) program (Phases A–F) completed the work this Plan's "done" overstated — base-path normalization + double-prefix kill (A), authz enforcement gaps (B), dead/unserved-surface prune (C), RFC 9457 envelope unification (D), full snake_case payload casing (E1), spec hygiene + standards conformance (E2), and final cleanup/no-workarounds (F). The closing 4-dimension re-audit passed with **0 CRITICAL / 0 HIGH**; the API contract surface now meets the same industry-standard bar as the auth/authz refactor. Anchor decisions formalised as ADRs 0023–0026.
 
 ## Plan 9 · Transactional + idempotency hardening + template workflow alignment
 

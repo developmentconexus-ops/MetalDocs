@@ -1,5 +1,10 @@
 # Backend Professionalization — Execution Roadmap (LIVING TRACKER)
 
+> ⚠️ **HISTORICAL — superseded by [`wiki/roadmap.md`](../roadmap.md).** This tracker is
+> **COMPLETE + Wave Z sealed**; it is a frozen historical record, not a live plan. Do **not**
+> plan from this file. Its Wave-3 trigger-gated items are carried forward in the canonical
+> roadmap. Body retained below as the historical record.
+
 > **Status:** ✅ **COMPLETE (2026-06-12) + WAVE Z SEALED CLOSE-OUT (2026-06-13)** — Waves 0–2 + Wave F + Wave Z all closed with evidence; frozen as the historical record. Wave Z (sealed-scope zero-defer finish, see addendum below) emptied the legacy register, executed the two deferred architecture items (OTel, full-table RLS), and passed the machine-checkable DONE gate G1–G11. Awaiting the operator's final sign-off before integration merge + Sunday v1 release (not merged by the agent, per directive).
 > **Last updated:** 2026-06-13 (Wave Z CLOSED — DONE gate G1–G11 green, register zero, blueprint all-green, ADR index trustworthy, regression-only review clean)
 > **NOTE:** the 0.4 history rewrite (2026-06-11) changed every commit hash in the repo. Hashes below are the REWRITTEN ones. Any other clone of this repo must be re-cloned.

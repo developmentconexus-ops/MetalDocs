@@ -2,7 +2,7 @@
 
 > **Last verified:** 2026-06-08 (Phase E1: all schema field names normalised to snake_case; prior: 2026-06-07)
 > **Status:** NOT served. NOT in the live OpenAPI contract.
-> **Origin:** These four operations previously sat in `api/openapi/v1/openapi.yaml` as *published-but-unserved* paths (no runtime handler). Per [`api-contract-hardening.md`](api-contract-hardening.md) **OD-2** (remove-all unserved + backlog-the-planned), an OpenAPI spec must describe only what the API *serves*. They were removed from the live contract in **Phase C** (an unserved path is an OWASP API9 liability and a lie to every SDK/consumer), but — unlike the dead legacy-taxonomy bloc — these map to **real planned features**, so their intended shape is preserved here.
+> **Origin:** These four operations previously sat in `api/openapi/v1/openapi.yaml` as *published-but-unserved* paths (no runtime handler). Per [`api-contract-hardening.md`](../_archive/backlog/api-contract-hardening.md) **OD-2** (remove-all unserved + backlog-the-planned), an OpenAPI spec must describe only what the API *serves*. They were removed from the live contract in **Phase C** (an unserved path is an OWASP API9 liability and a lie to every SDK/consumer), but — unlike the dead legacy-taxonomy bloc — these map to **real planned features**, so their intended shape is preserved here.
 
 ## Re-introduction rule
 

@@ -22,7 +22,7 @@
 - [../references/documents-approval-deep-qa/README.md](../references/documents-approval-deep-qa/README.md) - compatibility breadcrumb for older deep-QA links
 - [../references/ai-operating-system.md](../references/ai-operating-system.md) - path-stable compatibility bridge still referenced by repo instructions; this folder remains canonical for QA close-out behavior
 - [../../docs/superpowers/specs/2026-05-20-documents-approval-product-plus-qa-system-design.md](../../docs/superpowers/specs/2026-05-20-documents-approval-product-plus-qa-system-design.md) - design input, not canonical runtime truth
-- [../../docs/runbooks/release-readiness.md](../../docs/runbooks/release-readiness.md) - staging source now superseded by [release-readiness.md](release-readiness.md)
+- [release-readiness.md](release-readiness.md) - canonical release gate (its former `docs/runbooks/` staging draft was removed at the v1 re-baseline, commit `c7f06f2e`)
 
 ## Placement rule
 

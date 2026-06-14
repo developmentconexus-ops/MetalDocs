@@ -85,12 +85,16 @@ Enforcement: the `secret-scan` CI workflow (gitleaks) blocks checked-in secret v
 | `wiki/references/documents-approval-deep-qa/matrix.md` | `reference/archive content` + `compatibility breadcrumb` | Redirect-style compatibility page to the canonical QA location. |
 | `wiki/references/documents-approval-deep-qa/fixtures.md` | `reference/archive content` + `compatibility breadcrumb` | Redirect-style compatibility page to the canonical QA location. |
 | `docs/superpowers/specs/2026-05-20-documents-approval-product-plus-qa-system-design.md` | `staging/draft content` | Keep in `docs/` as design/proposal input. Its durable operating outcome should land under `wiki/quality/`, not replace the draft spec. |
-| `docs/runbooks/release-readiness.md` | `defer` | Candidate for promotion into `wiki/quality/` after normalization. Current file is still phase-specific and should not be moved blindly in the same session. |
-| `docs/adr/*` | `reference/archive content` | Legacy ADR tree remains in `docs/` until reconciled against `wiki/decisions/`. Do not merge or rename blindly. |
-| `docs/ck5-wiki/*` | `reference/archive content` | Keep in `docs/` as external/reference knowledge, not as top-level durable product truth. |
+| `docs/runbooks/release-readiness.md` (removed) | `removed at re-baseline` | **Removed** at the v1 re-baseline (commit `c7f06f2e`). Its durable release gate was already promoted to the canonical [`wiki/quality/release-readiness.md`](../quality/release-readiness.md); the legacy staging draft no longer exists. |
+| `docs/adr/*` (removed) | `removed at re-baseline` | **Removed** at the v1 re-baseline (commit `c7f06f2e`). The legacy ADR tree was superseded by [`wiki/decisions/`](../decisions/index.md); per-ADR reconciliation was completed in M0 F0.1 (see `decisions/index.md`). |
+| `docs/ck5-wiki/*` (removed) | `removed at re-baseline` | **Removed** at the v1 re-baseline (commit `c7f06f2e`). External/reference CK5 knowledge was not retained in-repo. |
+| `wiki/backlog/api-contract-hardening.md` → `wiki/_archive/backlog/api-contract-hardening.md` | `archived (closed program)` | **Relocated** in M0 F0.5. Closed program (Phase F shipped; closing re-audit 0 CRITICAL/0 HIGH); no active deferred work. Archived under [`wiki/_archive/`](../_archive/README.md), not deleted; inbound links repointed. |
+| `wiki/backlog/contract-first-followups.md` → `wiki/_archive/backlog/contract-first-followups.md` | `archived (superseded)` | **Relocated** in M0 F0.5. Superseded — folded into the api-contract-hardening program (Phases C/E). Archived under [`wiki/_archive/`](../_archive/README.md), not deleted. |
+| `wiki/backend/roadmap.md` | `historical — retained in place` | **Not relocated.** De-staled in M0 F0.3 with a top-of-file HISTORICAL banner (COMPLETE + Wave Z sealed). Kept in place because it is living-history cross-referenced by backend tracker docs; the forward surface is [`wiki/roadmap.md`](../roadmap.md). |
+| `wiki/backlog/roadmap.md` | `historical — retained in place` | **Not relocated.** De-staled in M0 F0.3 with a top-of-file HISTORICAL banner (Refactor Roadmap; its open Plan 12 carried forward). Forward surface is [`wiki/roadmap.md`](../roadmap.md). |
 
 ## Explicit defers
 
 - Do not mass-rename `README.md` files to `index.md` where existing path consumers are unknown.
 - Do not delete `wiki/references/documents-approval-deep-qa/` while startup docs, prompts, and module memory still point to it.
-- Do not reconcile the legacy `docs/adr/` tree into `wiki/decisions/` without a dedicated review of overlap and historical status.
+- ~~Do not reconcile the legacy `docs/adr/` tree into `wiki/decisions/`~~ — obsolete: the legacy ADR tree was removed at the v1 re-baseline (commit `c7f06f2e`) and reconciled into `wiki/decisions/` during M0 F0.1.
