@@ -273,7 +273,12 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 
 	summaries := make([]documentsapi.DocumentSummary, 0, len(items))
 	for _, d := range items {
-		summaries = append(summaries, toDocumentSummary(*d))
+		s, err := toDocumentSummary(*d)
+		if err != nil {
+			httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+			return
+		}
+		summaries = append(summaries, s)
 	}
 
 	httpresponse.WriteJSON(w, http.StatusOK, documentsapi.DocumentListResponse{
@@ -400,10 +405,14 @@ func (h *Handler) getDocument(w http.ResponseWriter, r *http.Request) {
 // toDocumentSummary maps a domain document to the generated DocumentSummary
 // response type (A6 — the list endpoint must emit generated types, not raw
 // domain structs, so FE codegen stays in sync).
-func toDocumentSummary(doc domain.Document) documentsapi.DocumentSummary {
-	form := doc.FormDataJSON
-	if len(form) == 0 {
-		form = []byte(`{}`)
+func toDocumentSummary(doc domain.Document) (documentsapi.DocumentSummary, error) {
+	formData := doc.FormDataJSON
+	if len(formData) == 0 {
+		formData = []byte(`{}`)
+	}
+	var formMap map[string]interface{}
+	if err := json.Unmarshal(formData, &formMap); err != nil {
+		return documentsapi.DocumentSummary{}, fmt.Errorf("invalid document form_data_json for document %s: %w", doc.ID, err)
 	}
 	return documentsapi.DocumentSummary{
 		ActiveSessionId:         doc.ActiveSessionID,
@@ -413,7 +422,7 @@ func toDocumentSummary(doc domain.Document) documentsapi.DocumentSummary {
 		CreatedAt:               doc.CreatedAt,
 		CreatedBy:               doc.CreatedBy,
 		CurrentRevisionId:       doc.CurrentRevisionID,
-		FormDataJson:            form,
+		FormDataJson:            formMap,
 		Id:                      doc.ID,
 		Name:                    doc.Name,
 		ProcessAreaCodeSnapshot: doc.ProcessAreaCodeSnapshot,
@@ -426,7 +435,7 @@ func toDocumentSummary(doc domain.Document) documentsapi.DocumentSummary {
 		TenantId:                doc.TenantID,
 		UpdatedAt:               doc.UpdatedAt,
 		ValuesFrozenAt:          doc.ValuesFrozenAt,
-	}
+	}, nil
 }
 
 // toDocumentDetailResponse maps a domain document to the generated

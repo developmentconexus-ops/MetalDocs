@@ -4290,8 +4290,8 @@ components:
           type: string
           enum: [draft, under_review, approved, rejected, scheduled, published, superseded, obsolete]
         form_data_json:
-          type: string
-          format: byte
+          type: object
+          additionalProperties: true
         current_revision_id:
           type: string
         revision_version:

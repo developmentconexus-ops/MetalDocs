@@ -2237,8 +2237,9 @@ export interface components {
             name: string;
             /** @enum {string} */
             status: "draft" | "under_review" | "approved" | "rejected" | "scheduled" | "published" | "superseded" | "obsolete";
-            /** Format: byte */
-            form_data_json: string;
+            form_data_json: {
+                [key: string]: unknown;
+            };
             current_revision_id: string;
             /** Format: int64 */
             revision_version: number;

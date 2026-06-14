@@ -358,6 +358,48 @@ func TestGetDocument_ReturnsCurrentRevisionArtifactMetadata(t *testing.T) {
 	}
 }
 
+func TestListDocuments_FormDataJSONObject(t *testing.T) {
+	svc := &fakeSvc{listPaginatedItems: []*domain.Document{{
+		ID:           "doc_1",
+		Name:         "Doc",
+		Status:       domain.DocStatusDraft,
+		FormDataJSON: []byte(`{"k":"v"}`),
+		CreatedBy:    "user_1",
+		Code:         "DOC-1",
+	}}, listPaginatedTotal: 1}
+	mux := newMux(t, svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
+	withAuthHeaders(req, "editor")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+
+	items, ok := body["items"].([]any)
+	if !ok || len(items) == 0 {
+		t.Fatalf("expected items array, got %#v", body["items"])
+	}
+	item, ok := items[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected item object, got %#v", items[0])
+	}
+	formData, ok := item["form_data_json"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected form_data_json object, got %T %#v", item["form_data_json"], item["form_data_json"])
+	}
+	if got := formData["k"]; got != "v" {
+		t.Fatalf("expected form_data_json.k=v, got %#v", got)
+	}
+}
+
 // TestListDocuments_NonAdminOwnScope replaces the former
 // TestListDocuments_Forbidden: the handler no longer role-gates the list. A
 // non-admin caller is allowed and is scoped to documents they created — the
