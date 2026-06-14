@@ -89,5 +89,12 @@ type ApprovalRepository interface {
 	// this to ErrContentHashMismatch.
 	LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error)
 	ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error)
+	// LoadActorDisplayName returns metaldocs.iam_users.display_name for (tenantID,
+	// userID), or "" when the user row is absent. It runs OFF the caller's
+	// transaction (on the pool) so it never executes inside the signoff
+	// advisory-lock atomic tx (H-PRE-1). Tenant scope is the explicit tenant_id
+	// predicate; the metaldocs.tenant_id RLS GUC is unset on the pool connection,
+	// which the NULL-permissive tenant_isolation policy (migration 0237) allows.
+	LoadActorDisplayName(ctx context.Context, tenantID, userID string) (string, error)
 	LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID string) (domain.Route, error)
 }

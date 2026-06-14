@@ -39,6 +39,7 @@ type fakeDecisionRepo struct {
 	updateInstanceErr  error
 	instanceStatusTo   domain.InstanceStatus
 	instanceStatusFrom domain.InstanceStatus
+	actorDisplayName   string
 }
 
 func (r *fakeDecisionRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
@@ -178,6 +179,10 @@ func (r *fakeDecisionRepo) LoadActiveDocumentContentHash(ctx context.Context, tx
 		return "", repository.ErrNoActiveContentHash
 	}
 	return hash.String, nil
+}
+
+func (r *fakeDecisionRepo) LoadActorDisplayName(_ context.Context, _, _ string) (string, error) {
+	return r.actorDisplayName, nil
 }
 
 func (r *fakeDecisionRepo) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
@@ -353,10 +358,6 @@ func (s *decisionTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &decisionSingleValueRows{value: s.conn.actorID}, nil
-	}
-	// IAM display name lookup for actor_display_name_snapshot.
-	if strings.Contains(q, "from metaldocs.iam_users") && strings.Contains(q, "display_name") {
-		return &decisionSingleValueRows{value: nil}, nil // NULL — best-effort
 	}
 	// loadStageSignoffs queries WHERE stage_instance_id = $1 (no "!=")
 	// loadPriorSignoffs queries WHERE stage_instance_id != $2
@@ -659,6 +660,49 @@ func TestRecordSignoff_ContentHashEchoesInstanceSubmitHash(t *testing.T) {
 	}
 	if got := repo.insertedSignoff.ContentHash(); got != inst.ContentHashAtSubmit {
 		t.Errorf("ContentHash() = %q; want instance.ContentHashAtSubmit %q", got, inst.ContentHashAtSubmit)
+	}
+}
+
+func TestRecordSignoff_ThreadsActorDisplayNameFromRepo(t *testing.T) {
+	const (
+		instanceID = "inst-dn"
+		stageID    = "stage-dn"
+		actorID    = "approver-dn"
+		authorID   = "author-dn"
+	)
+
+	inst := buildTwoApproverInstance(instanceID, stageID, authorID, []string{actorID, "approver-2"})
+	conn := &decisionTestConn{
+		authzGranted: true,
+		areaCode:     "QA",
+		actorID:      actorID,
+	}
+	repo := &fakeDecisionRepo{instance: inst, actorDisplayName: "Alice Approver"}
+	svc := &DecisionService{
+		repo:          repo,
+		emitter:       &MemoryEmitter{},
+		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		freezeInvoker: &fakeFreezeInvoker{},
+	}
+	db := newDecisionTestDB(t, conn)
+
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		SignaturePayload: map[string]any{},
+		ContentFormData:  map[string]any{"_content_hash": inst.ContentHashAtSubmit},
+	})
+	if err != nil {
+		t.Fatalf("RecordSignoff: unexpected error: %v", err)
+	}
+	if repo.insertedSignoff == nil {
+		t.Fatal("expected inserted signoff")
+	}
+	if got := repo.insertedSignoff.ActorDisplayNameSnapshot(); got != "Alice Approver" {
+		t.Errorf("ActorDisplayNameSnapshot() = %q; want %q (must be threaded from repo.LoadActorDisplayName)", got, "Alice Approver")
 	}
 }
 

@@ -439,6 +439,25 @@ func (r *postgresApprovalRepository) ListRoutesTx(ctx context.Context, tx db.Tx,
 	return scanRouteListRows(rows)
 }
 
+// LoadActorDisplayName reads the approver's display name off the connection pool
+// (NOT inside the caller's signoff transaction) so the cross-module iam_users read
+// is never held inside the signoff advisory-lock tx (H-PRE-1). Empty string when
+// the user is absent (best-effort snapshot, matches the prior inline behavior).
+func (r *postgresApprovalRepository) LoadActorDisplayName(ctx context.Context, tenantID, userID string) (string, error) {
+	var displayName sql.NullString
+	err := r.db.QueryRowContext(ctx, `
+		SELECT display_name
+		  FROM metaldocs.iam_users
+		 WHERE user_id = $1
+		   AND tenant_id = $2::uuid`,
+		userID, tenantID,
+	).Scan(&displayName)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", MapPgError(err, MapHints{})
+	}
+	return displayName.String, nil
+}
+
 const listRoutesQuery = `
 		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.active, r.version, r.created_at, r.created_at AS updated_at,
 		       s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.quorum_m, s.on_eligibility_drift,

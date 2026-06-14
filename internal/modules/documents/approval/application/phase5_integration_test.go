@@ -243,6 +243,10 @@ func (r *phase5Repo) LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx
 	return hash.String, nil
 }
 
+func (r *phase5Repo) LoadActorDisplayName(_ context.Context, _, _ string) (string, error) {
+	return "", nil
+}
+
 // ---------------------------------------------------------------------------
 // Phase 5 combined fake SQL driver
 //

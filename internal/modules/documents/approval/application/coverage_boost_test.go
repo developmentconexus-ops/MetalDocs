@@ -2966,6 +2966,10 @@ func (r *fakeDecisionRepoWithCounter) LoadRoute(_ context.Context, _ db.Tx, _, _
 	panic("fakeDecisionRepoWithCounter.LoadRoute: not expected to be called in decision tests")
 }
 
+func (r *fakeDecisionRepoWithCounter) LoadActorDisplayName(_ context.Context, _, _ string) (string, error) {
+	return "", nil
+}
+
 // ============================================================
 // RecordSignoff — UpdateStageStatus reject stage error
 // ============================================================

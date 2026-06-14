@@ -155,7 +155,16 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 
 	var result SignoffResult
 	var eligibilityEvent *GovernanceEvent
-	err := runner.Do(ctx, func(tx *sql.Tx) error {
+	// H-PRE-1: resolve the actor display-name snapshot OFF the signoff transaction.
+	// This is a cross-module read of metaldocs.iam_users; running it inside the
+	// lock-holding signoff tx (advisory lock + FOR UPDATE stage rows) on a fresh
+	// connection risks deadlock. req.TenantID/req.ActorUserID are server-derived and
+	// available pre-flight. Contained on ApprovalRepository (not a shared port — M4/F4.1).
+	actorDisplayName, err := s.repo.LoadActorDisplayName(ctx, req.TenantID, req.ActorUserID)
+	if err != nil {
+		return SignoffResult{}, fmt.Errorf("recordSignoff: lookup actor display name: %w", err)
+	}
+	err = runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
 		if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.ActorUserID); err != nil {
@@ -262,17 +271,6 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 
 		// Step 7: build the domain Signoff value object. sigPayload was resolved
 		// (and the actor re-authenticated) above.
-		var actorDisplayName sql.NullString
-		if err := tx.QueryRowContext(ctx, `
-			SELECT display_name
-			  FROM metaldocs.iam_users
-			 WHERE user_id = $1
-			   AND tenant_id = $2::uuid`,
-			req.ActorUserID, req.TenantID,
-		).Scan(&actorDisplayName); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("recordSignoff: lookup actor display name: %w", err)
-		}
-
 		now := s.clock.Now()
 		signoff, err := domain.NewSignoff(domain.SignoffParams{
 			ID:                       uuid.New().String(),
@@ -286,7 +284,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 			SignatureMethod:          req.SignatureMethod,
 			SignaturePayload:         sigPayload,
 			ContentHash:              contentHash,
-			ActorDisplayNameSnapshot: actorDisplayName.String,
+			ActorDisplayNameSnapshot: actorDisplayName,
 		})
 		if err != nil {
 			return fmt.Errorf("recordSignoff: build signoff: %w", err)
