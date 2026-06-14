@@ -1,6 +1,6 @@
 # Decisions
 
-> **Last verified:** 2026-06-14 (M0/F0.1 — decision-vs-code re-audit; docs/adr stale ref removed; RLS table count reconciled)
+> **Last verified:** 2026-06-14 (M0/F0.1 — decision-vs-code re-audit; legacy-ADR stale ref removed; RLS table count reconciled)
 > **Scope:** Durable ADRs and consequential technical decisions.
 
 | # | Title | Status | Superseded by | Current relevance |
@@ -31,4 +31,4 @@
 | [0027](0027-rls-adoption-sequencing.md) | RLS Adoption Sequencing + auth\_identities Tenant-Global by Design | Accepted (executed in full by Wave Z, 2026-06-13) | — | `auth_identities` tenant-global by design (T-008 closed); RLS live on all 29 tenant-scoped tables (migration 0237 collapsed 3-tier plan) |
 | [0028](0028-audit-events-cursor-shape.md) | Audit Events Cursor Shape Drift | Accepted (closed 2026-06-08) | — | `/audit/events` runtime reconciled to nested `page.{next_cursor,has_more}` CursorPage shape (Phase F re-audit); FE dual-shape adapter removed |
 
-The legacy `docs/adr/` tree was removed from this branch. Where its content maps to canonical `wiki/decisions/` entries is tracked by the governance migration map (to be finalized in F0.5).
+The legacy ADR tree (formerly under the now-deleted `docs/` documentation set) was removed from this branch. Where its content maps to canonical `wiki/decisions/` entries is tracked by the governance migration map (to be finalized in F0.5).
