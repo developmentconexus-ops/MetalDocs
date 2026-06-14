@@ -4612,9 +4612,10 @@ components:
         filter: { $ref: '#/components/schemas/AuditFilter' }
     AuditExportResponse:
       type: object
-      required: [export_id, signed_url, expires_at]
+      required: [export_id, status, signed_url, expires_at]
       properties:
         export_id: { type: string }
+        status: { type: string }
         signed_url: { type: string, format: uri }
         expires_at:
           type: string

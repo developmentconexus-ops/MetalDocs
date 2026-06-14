@@ -2403,6 +2403,7 @@ export interface components {
         };
         AuditExportResponse: {
             export_id: string;
+            status: string;
             /** Format: uri */
             signed_url: string;
             /** Format: date-time */
