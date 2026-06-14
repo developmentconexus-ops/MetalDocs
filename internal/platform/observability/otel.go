@@ -39,7 +39,15 @@ import (
 func SetupOTel(ctx context.Context, serviceName string) (shutdown func(context.Context) error, enabled bool, err error) {
 	noop := func(context.Context) error { return nil }
 
-	if os.Getenv("OTEL_TRACES_EXPORTER") == "" && os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
+	// OTEL_TRACES_EXPORTER=none (the OTel-spec "explicitly off" value, matched
+	// case-insensitively + trimmed) short-circuits before any SDK install —
+	// return the no-op provider even when an OTLP endpoint is also set. The
+	// empty-exporter + empty-endpoint case stays off too (unconfigured default).
+	exporter := strings.ToLower(strings.TrimSpace(os.Getenv("OTEL_TRACES_EXPORTER")))
+	if exporter == "none" {
+		return noop, false, nil
+	}
+	if exporter == "" && os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 		return noop, false, nil
 	}
 

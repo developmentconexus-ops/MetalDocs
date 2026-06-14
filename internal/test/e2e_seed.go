@@ -83,7 +83,7 @@ func RegisterE2EHandlers(mux *http.ServeMux, db *sql.DB, runSchedulerTick func(c
 	if mux == nil || db == nil {
 		return
 	}
-	if os.Getenv("METALDOCS_E2E") != "1" {
+	if !E2EEnabled() {
 		return
 	}
 
@@ -98,7 +98,7 @@ func RegisterE2EHandlers(mux *http.ServeMux, db *sql.DB, runSchedulerTick func(c
 }
 
 func (h *seedHandler) seed(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("METALDOCS_E2E") != "1" {
+	if !E2EEnabled() {
 		http.NotFound(w, r)
 		return
 	}
@@ -186,7 +186,7 @@ func (h *seedHandler) seed(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *seedHandler) reset(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("METALDOCS_E2E") != "1" {
+	if !E2EEnabled() {
 		http.NotFound(w, r)
 		return
 	}
@@ -247,7 +247,7 @@ func (h *seedHandler) reset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *seedHandler) governanceEvents(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("METALDOCS_E2E") != "1" {
+	if !E2EEnabled() {
 		http.NotFound(w, r)
 		return
 	}
@@ -336,7 +336,7 @@ ORDER BY ge.created_at ASC, ge.id ASC
 }
 
 func (h *seedHandler) advanceClock(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("METALDOCS_E2E") != "1" {
+	if !E2EEnabled() {
 		http.NotFound(w, r)
 		return
 	}
@@ -360,7 +360,7 @@ func (h *seedHandler) advanceClock(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *seedHandler) triggerSchedulerTick(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("METALDOCS_E2E") != "1" {
+	if !E2EEnabled() {
 		http.NotFound(w, r)
 		return
 	}

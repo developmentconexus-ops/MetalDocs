@@ -89,7 +89,7 @@ type fanoutComponents struct {
 // these routes either — permissions.go does not enumerate /internal/test/*,
 // so any accidental mount is treated as fully public by newPublicPathChecker.
 func e2eHandlersEnabled() bool {
-	return strings.TrimSpace(os.Getenv("METALDOCS_E2E")) == "1"
+	return e2etest.E2EEnabled()
 }
 
 func mountE2EHandlersIfEnabled(mux *http.ServeMux, register func(*http.ServeMux)) {
