@@ -1,7 +1,7 @@
 # Program: Grade-A Architecture Remediation
 
 > **Governing spec:** `docs/superpowers/specs/2026-06-14-grade-a-architecture-remediation-design.md`
-> **Status:** In progress (Milestone 1 — M0 passed 2026-06-14)
+> **Status:** In progress (M0, M1 passed 2026-06-14; test-infra-rebaseline micro-task before M2)
 > **Owner / operator:** leandrotca.work (operator) + backend agent (Opus 4.8)
 
 Take the backend's three formerly-C audit dimensions (module-boundaries/DDD, contract/API,
@@ -16,7 +16,7 @@ hard-stop. **Terminal acceptance:** the M5 independent multi-agent re-audit pass
 | # | Milestone | Objective (one line) | Status | Gate result |
 |---|-----------|----------------------|--------|-------------|
 | 0 | `milestone-0-docs-destaling` | One unambiguous progression surface; stale docs stop polluting agent context | passed | [PASS](milestone-0-docs-destaling/qa/milestone-qa.md) |
-| 1 | `milestone-1-reach-a-blockers` | Close all 4 Grade-A blockers + the error-contract (bare-405) tail | in-progress | — |
+| 1 | `milestone-1-reach-a-blockers` | Close all 4 Grade-A blockers + the error-contract (bare-405) tail | passed | [PASS](milestone-1-reach-a-blockers/qa/milestone-qa.md) |
 | 2 | `milestone-2-contract-tail` | Eliminate handler-emits-undeclared-field drift (H-D), one FE regen | planned | — |
 | 3 | `milestone-3-mechanical-quality` | Harden code-quality + persistence; dead-surface deletes, tx-hazard hoist | planned | — |
 | 4 | `milestone-4-systemic-ports` | Close H-G class via shared ports (UserDisplayNameReader, TemplateVersionStateReader) | planned | — |
@@ -29,6 +29,7 @@ Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) 
 | When | HS id | What | Resolution |
 |------|-------|------|------------|
 | 2026-06-14 | HS-1 | M0 close gate — validator PASS presented to operator | **Approved** by operator 2026-06-14; M0 → passed, M1 opened |
+| 2026-06-14 | HS-1 | M1 close gate — validator PASS (C1–C7) presented to operator | **Approved** by operator 2026-06-14 (option 2); M1 → passed. Condition: run a bounded **test-infra-rebaseline** micro-task before M2 to discharge the F1.3 AC5 full-HTTP-E2E defer. |
 | (carry-forward) | HS-2 | F0.1 watch — FE eigenpal `file:` path defer | Schedule before any FE `pnpm install` / M2 start |
 
 ## Program close-out / reconciliation
