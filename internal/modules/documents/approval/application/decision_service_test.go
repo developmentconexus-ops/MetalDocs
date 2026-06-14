@@ -39,7 +39,10 @@ type fakeDecisionRepo struct {
 	updateInstanceErr  error
 	instanceStatusTo   domain.InstanceStatus
 	instanceStatusFrom domain.InstanceStatus
-	actorDisplayName   string
+	actorDisplayName             string
+	loadActorDisplayNameCalled   bool
+	loadActorDisplayNameTenant   string
+	loadActorDisplayNameUser     string
 }
 
 func (r *fakeDecisionRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
@@ -181,7 +184,10 @@ func (r *fakeDecisionRepo) LoadActiveDocumentContentHash(ctx context.Context, tx
 	return hash.String, nil
 }
 
-func (r *fakeDecisionRepo) LoadActorDisplayName(_ context.Context, _, _ string) (string, error) {
+func (r *fakeDecisionRepo) LoadActorDisplayName(_ context.Context, tenantID, userID string) (string, error) {
+	r.loadActorDisplayNameCalled = true
+	r.loadActorDisplayNameTenant = tenantID
+	r.loadActorDisplayNameUser = userID
 	return r.actorDisplayName, nil
 }
 
@@ -703,6 +709,15 @@ func TestRecordSignoff_ThreadsActorDisplayNameFromRepo(t *testing.T) {
 	}
 	if got := repo.insertedSignoff.ActorDisplayNameSnapshot(); got != "Alice Approver" {
 		t.Errorf("ActorDisplayNameSnapshot() = %q; want %q (must be threaded from repo.LoadActorDisplayName)", got, "Alice Approver")
+	}
+	if !repo.loadActorDisplayNameCalled {
+		t.Error("expected LoadActorDisplayName to be called; it was not")
+	}
+	if repo.loadActorDisplayNameTenant != "tenant-1" {
+		t.Errorf("LoadActorDisplayName tenantID = %q; want %q", repo.loadActorDisplayNameTenant, "tenant-1")
+	}
+	if repo.loadActorDisplayNameUser != actorID {
+		t.Errorf("LoadActorDisplayName userID = %q; want %q", repo.loadActorDisplayNameUser, actorID)
 	}
 }
 

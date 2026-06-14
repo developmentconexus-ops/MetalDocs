@@ -452,7 +452,10 @@ func (r *postgresApprovalRepository) LoadActorDisplayName(ctx context.Context, t
 		   AND tenant_id = $2::uuid`,
 		userID, tenantID,
 	).Scan(&displayName)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
 		return "", MapPgError(err, MapHints{})
 	}
 	return displayName.String, nil
