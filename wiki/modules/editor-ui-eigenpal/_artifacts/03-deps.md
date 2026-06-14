@@ -1,6 +1,6 @@
 # Phase 3 — Cross-deps
 
-> **Last verified:** 2026-06-01
+> **Last verified:** 2026-06-14
 > Scope: imports IN to `packages/editor-ui/`, imports OUT, runtime callers.
 
 ## OUT-edges (runtime)
@@ -46,7 +46,7 @@ Template runtime pages consume `@metaldocs/editor-ui`; no production page mounts
 
 ## Build wiring
 
-- `packages/editor-ui/package.json:29` — `@eigenpal/docx-js-editor: file:../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (path present after Plan 3 restoration)
+- `packages/editor-ui/package.json:29` — `@eigenpal/docx-js-editor: file:../../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (relocated to `third_party/eigenpal/` 2026-06-14; path present after Plan 3 restoration)
 - `packages/editor-ui/package.json:5` — `main: ./src/index.ts` (no compile step shipped; consumers compile source via path alias)
 - TS path alias + Vite alias resolve `@metaldocs/editor-ui` to source directly.
 

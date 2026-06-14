@@ -1,6 +1,6 @@
 # Stage-1 Audit Artifact — Render Pipeline
 
-> **Produced:** 2026-06-10
+> **Produced:** 2026-06-10 | **Path tokens updated:** 2026-06-14 (eigenpal tarball relocated to third_party/eigenpal/)
 > **Scope:** `internal/modules/render`, `internal/platform/render`, `internal/platform/docgenv2`, `apps/docx-renderer`
 > **Read-only snapshot.** No redesign proposals; all claims anchored to file:line.
 
@@ -104,7 +104,7 @@ There is no "docgen v1" remnant in the codebase. The `internal/platform/docgenv2
 | `vitest.config.ts` | Vitest test config |
 | `package.json` | npm manifest; depends on vendored `@eigenpal/docx-js-editor@0.2.0` |
 | `Dockerfile` | Multi-stage build: `node:20.11-alpine` builder → runtime; healthcheck on `/health`; exposes 3100; runs as `node` user |
-| `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` | Vendored eigenpal tarball |
+| `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` | Vendored eigenpal tarball |
 | `src/render/subblocks/__tests__/*.test.ts` | Unit tests for each sub-block renderer (7 files) |
 | `src/render/__tests__/fanout.test.ts` | Unit tests for `fanout()` function |
 | `src/routes/__tests__/fanout.test.ts` | Unit tests for the HTTP route handler |

@@ -1,6 +1,6 @@
 # Refactor Roadmap
 
-> **Last verified:** 2026-05-13 (Plan 12 prep correction)
+> **Last verified:** 2026-06-14 (eigenpal vendor path updated to third_party/eigenpal/; Plan 12 prep correction)
 > **Scope:** Ordered sequence of cross-module refactor sub-plans from current state → professional structured architecture. Each sub-plan = one fresh implementation session = one PR series.
 > **Out of scope:** Implementation detail. Sub-plans are written one-at-a-time in their own session under `docs/superpowers/specs/` and linked back here.
 > **Source evidence:** Every `Closes` row cites a T-NNN (tech-debt) or R-NNN (refactor backlog) in `wiki/modules/<m>-tech-debt.md` / `wiki/backlog/<m>-refactor.md`.
@@ -42,7 +42,7 @@
 ## Plan 3 · Supply-chain unblock + tenant resolution platform fix
 
 - **Goal:** Fresh `npm install` works. Tenant identity sourced from authenticated session, not `X-Tenant-ID` header.
-- **Touches:** `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (restore); `internal/platform/tenant`; `internal/modules/templates/delivery/http/handler.go:83`; `internal/modules/taxonomy/delivery/http/routes_profiles.go:230`; `internal/modules/registry/delivery/http/routes.go:488`.
+- **Touches:** `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (restore; relocated from `vendor/eigenpal/` 2026-06-14); `internal/platform/tenant`; `internal/modules/templates/delivery/http/handler.go:83`; `internal/modules/taxonomy/delivery/http/routes_profiles.go:230`; `internal/modules/registry/delivery/http/routes.go:488`.
 - **Closes:** editor-ui-eigenpal T-001 / R-001; templates T-003 / R-003; taxonomy T-001 / R-001; registry T-005 / R-005, T-006 / R-006.
 - **Critical rows closed:** 4 (editor-ui-eigenpal T-001, templates T-003, taxonomy T-001, + registry tenant side).
 - **Blockers:** none.

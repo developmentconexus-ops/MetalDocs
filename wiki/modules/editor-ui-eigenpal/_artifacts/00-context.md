@@ -12,7 +12,7 @@
 - `wiki/concepts/token-syntax.md` — `{name}` eigenpal-native; `{{uuid}}` legacy removed 2026-04-25.
 - `wiki/decisions/0001-eigenpal-adoption.md` — accepted ADR; cites vendored `0.2.0.tgz`.
 - `wiki/references/eigenpal-spike.md` — T1–T8 outcomes that seeded plugin selection.
-- `wiki/references/eigenpal-controlled-package.md` — claims `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` artifact.
+- `wiki/references/eigenpal-controlled-package.md` — claims `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` artifact (relocated 2026-06-14).
 
 ## Module shape
 
@@ -23,8 +23,8 @@
 
 ## Eigenpal version pin / fork status
 
-- `package.json` (3 places) reference `file:.../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`.
-- **FINDING — tarball missing from repo:** commit `0ee9160d` (2026-05-04, "chore(vendor): replace custom eigenpal vendor entry with go mod vendor output") deleted both `vendor/eigenpal/README.md` and `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. The three `package.json` `file:` URIs still resolve to the deleted path. Fresh `npm install` would fail. Lockfiles still carry the old integrity hashes so existing checkouts keep working off `node_modules/`.
+- `package.json` (3 places) reference `file:.../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (relocated from `vendor/eigenpal/` 2026-06-14; root `vendor/` is Go-owned).
+- **FINDING — tarball missing from repo (at audit time 2026-05-10):** commit `0ee9160d` (2026-05-04, "chore(vendor): replace custom eigenpal vendor entry with go mod vendor output") deleted both `vendor/eigenpal/README.md` and `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. The three `package.json` `file:` URIs still resolved to the deleted path. Fresh `npm install` would fail. Lockfiles still carried the old integrity hashes so existing checkouts kept working off `node_modules/`. **Resolved:** tarball restored in Plan 3 (2026-05-11); relocated to `third_party/eigenpal/` (2026-06-14).
 - Fork status: controlled fork (per ADR 0001 + `vendor/eigenpal/README.md` reference, also deleted by the same commit). Upstream consolidation deferred. Lab-side source: `non_git/eigenpal-isolated-lab/analysis/eigenpal-upstream-source/`.
 
 ## IN-edges (consumers) — verified

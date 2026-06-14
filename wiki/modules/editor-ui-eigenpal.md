@@ -2,7 +2,7 @@
 
 > Living architecture doc. Replaces the prior integration stub. Shape: Arc42 (12 sections) + C4 (Context + Container) Mermaid diagrams + ADR links.
 >
-> **Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-17) | **Owner:** unassigned | **Status:** active (FE adapter, two production consumers) | **Maturity:** L2
+> **Last verified:** 2026-06-14 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-17) | **Owner:** unassigned | **Status:** active (FE adapter, two production consumers) | **Maturity:** L2
 
 ---
 
@@ -41,7 +41,7 @@
 ## 2. Architecture Constraints
 
 - Runtime: React 18.2 (peer dep), TypeScript 5.4, ESM-only.
-- Sole runtime library coupling: `@eigenpal/docx-js-editor`, currently pinned to `0.2.0` via `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (path declared in three `package.json` files â€” T-001 resolved 2026-05-11, tarball restored in Plan 3).
+- Sole runtime library coupling: `@eigenpal/docx-js-editor`, currently pinned to `0.2.0` via `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (path declared in three `package.json` files — T-001 resolved 2026-05-11, tarball restored in Plan 3; relocated to `third_party/eigenpal/` 2026-06-14).
 - Token syntax: `{name}` single-brace eigenpal-native only. Legacy `{{uuid}}` removed 2026-04-25; see `wiki/decisions/0003-token-syntax-migration.md`.
 - Substitution boundary: writer never substitutes. All token resolution is server-side at freeze. Driver: ADR 0008 + `concepts/placeholders.md`.
 - No HTTP, no DB, no migrations.
@@ -94,7 +94,7 @@ Outbound:
 
 ## 4. Solution Strategy
 
-- **Wrap, do not patch.** No `pnpm patch` files, no `node_modules` hacks. Refresh path is artifact-level â€” replace the tarball in `vendor/eigenpal/` + reinstall. Driver: ADR 0001.
+- **Wrap, do not patch.** No `pnpm patch` files, no `node_modules` hacks. Refresh path is artifact-level — replace the tarball in `third_party/eigenpal/` + reinstall. Driver: ADR 0001.
 - **Three modes, one prop.** A single `mode` prop drives plugin gating, autosave on/off, eigenpal `mode` mapping. Avoids per-consumer conditionals. Driver: 2026-05-06 refactor (rule has no ADR â€” T-007).
 - **Blank document default belongs in the adapter.** Consumers pass `documentBuffer` when persisted DOCX exists; otherwise the wrapper seeds editable modes with `createEmptyDocument()` and leaves readonly empty mounts unseeded. This prevents every screen from learning Eigenpal's blank-document API and avoids writing storage rows before the first user edit.
 - **Plugins composed at mount time, not on mode change.** The plugin list is rebuilt on every render; eigenpal's `PluginHost` accepts the new array. No `useMemo` â€” list is tiny and identity-stable when inputs are stable. Driver: simplicity over micro-optimization.
@@ -243,7 +243,7 @@ No production consumer currently invokes `computeSidebarModel` (verified by grep
 
 - Distribution unit: source-only npm workspace package `@metaldocs/editor-ui` (`packages/editor-ui/package.json:1`).
 - No build step in CI; consumers compile source via Vite/TS path alias.
-- Eigenpal artifact: `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` â€” declared in three `package.json` files. Path absent on `main` post-commit `0ee9160d` (2026-05-04); see T-001.
+- Eigenpal artifact: `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` — declared in three `package.json` files. Relocated from `vendor/eigenpal/` to `third_party/eigenpal/` 2026-06-14 (root `vendor/` is Go-owned; `go mod vendor` would prune a JS tarball there). T-001 closed 2026-05-11.
 - Refresh procedure: see `wiki/references/eigenpal-controlled-package.md` Â§ Refresh checklist (also needs a doc-cleanup pass â€” R-009).
 - No env vars. No secrets. No runtime config.
 
@@ -350,7 +350,7 @@ Top 3 (by severity, then by blast-radius):
 
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
-| Vendored eigenpal tarball missing / not installed | Build fails; adapter cannot import `DocxEditor` | `vendor/eigenpal/` empty; `pnpm install` reports missing | Reinstall vendored package per ADR 0001; T-001 closed 2026-05-11 |
+| Vendored eigenpal tarball missing / not installed | Build fails; adapter cannot import `DocxEditor` | `third_party/eigenpal/` empty; `pnpm install` reports missing | Reinstall vendored package per ADR 0001; T-001 closed 2026-05-11 |
 | Consumer bypasses wrapper and mounts eigenpal directly | ACL violated — token / mode / autosave rules not applied | Code review on PRs that import `@eigenpal/docx-js-editor` from outside the adapter | Reject; T-002 (closed; TemplateEditorPage migrated 2026-05-11) — regression rule |
 | Autosave debounce fires while previous PUT in-flight | Wrapper's in-flight guard short-circuits the new emit | Console / network trace; manual rapid-edit test | Expected behavior; consumer owns retry on rejected PUT |
 | `documentBuffer` absent on editable mode | Wrapper seeds with `createEmptyDocument()`; no DB row written until first edit | Adapter `MetalDocsEditor.tsx` blank-seeding path | Expected; readonly empty mounts stay unseeded by design |

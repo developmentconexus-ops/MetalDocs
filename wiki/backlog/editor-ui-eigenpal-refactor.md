@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/editor-ui-eigenpal-tech-debt.md`.
 
-**Last verified:** 2026-05-17
+**Last verified:** 2026-06-14
 
 ## Rows
 
@@ -16,7 +16,7 @@
 | R-006 | Wire `onLockLost` through to a real eigenpal lock-loss event, or remove the prop | T-006 | XS | Minor | — | — | open | — |
 | R-007 | Write ADR for `templatePlugin` mode gating rule | T-007 | S | Minor | — | — | open | — |
 | R-008 | Write ADR for wrapper-only consumption boundary (`@eigenpal/docx-js-editor` only via `@metaldocs/editor-ui`) | T-008 | S | Minor | — | — | open | — |
-| R-009 | Refresh `wiki/references/eigenpal-controlled-package.md` and ADR 0001 § Consequences to reflect `vendor/eigenpal/` removal | maint:doc-cleanup | XS | Minor | R-001 | — | open | — |
+| R-009 | Refresh wiki docs to reflect eigenpal tarball relocation to `third_party/eigenpal/` | maint:doc-cleanup | XS | Minor | R-001 | — | closed 2026-06-14 | path-token refresh PR |
 | R-010 | Bump eigenpal package to next fork build once upstream PR series lands | maint:dep-bump | M | Major | R-001 | — | open | — |
 
 ## Notes

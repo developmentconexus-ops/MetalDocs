@@ -1,6 +1,6 @@
 # docx-renderer — TypeScript DOCX Substitution Service
 
-> **Last verified:** 2026-06-11
+> **Last verified:** 2026-06-14
 > **Scope:** `apps/docx-renderer/` — the TypeScript/Node.js sidecar binary that owns DOCX token substitution and composition-block injection. This page covers the service as a deployed binary: entrypoint, HTTP API, security, eigenpal integration, MinIO I/O, build, and Dockerfile. How the Go worker calls it and where it fits in the full pipeline is in [../flows/render-pipeline.md](../flows/render-pipeline.md).
 > **Key files:**
 > - `apps/docx-renderer/src/index.ts`
@@ -191,7 +191,7 @@ Multi-stage build:
 
 ### eigenpal dependency
 
-`@eigenpal/docx-js-editor@0.2.0` is vendored as `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` and installed locally via `package.json`. It is not pulled from a registry. This is the only external DOCX processing dependency.
+`@eigenpal/docx-js-editor@0.2.0` is vendored as `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` and installed locally via `package.json`. It is not pulled from a registry. This is the only external DOCX processing dependency.
 
 Direct runtime dependencies: `fastify@4.26.2`, `minio@^7.1.3`, `zod@3.23.8`, `jszip@3.10.1` (direct dependency, declared in `package.json:19`), `ajv@^8.16.0`, `@metaldocs/shared-tokens`, `node:crypto` (stdlib). `@eigenpal/docx-js-editor@0.2.0` is a separate direct dependency (vendored tarball).
 
@@ -211,7 +211,7 @@ Fastify runs on Node.js's single-threaded async I/O event loop. The `fanout()` f
 |---|---|---|
 | `DOCX_RENDERER_GOTENBERG_URL` declared but not consumed | `src/env.ts:13` | Env var declared in Zod schema; no route handler reads it; Gotenberg was removed from the TS side; dead configuration risks operator confusion |
 | `processTemplateDetailed` blocks the event loop | `src/render/fanout.ts` | Synchronous call from eigenpal; sub-block rendering is async (awaited via `Promise.all`) but the eigenpal substitution step itself is synchronous; throughput limited by single-threaded execution at that call |
-| Vendored eigenpal tarball at `0.2.0` | `vendor/eigenpal/` | No registry; upgrade requires manual tarball replacement; version pinned in perpetuity until manually updated |
+| Vendored eigenpal tarball at `0.2.0` | `third_party/eigenpal/` | No registry; upgrade requires manual tarball replacement; version pinned in perpetuity until manually updated |
 
 See also [../_artifacts/stage1/synthesis-legacy.md](../_artifacts/stage1/synthesis-legacy.md) for the full cross-cutting legacy register.
 

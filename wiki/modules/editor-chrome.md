@@ -3,7 +3,7 @@
 > Living architecture doc. Arc42 (12 sections) + C4 Container/Component diagrams.
 > Supersedes the prior stub (slot-API note, eigenpal-overrides bullet list).
 
-**Last verified:** 2026-06-01 (P2 consolidation: §3 C4 fragment tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-11) | **Owner:** unassigned (frontend) | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-06-14 (P2 consolidation: §3 C4 fragment tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-11) | **Owner:** unassigned (frontend) | **Status:** active | **Maturity:** L2
 
 > **Scope:** Shared React primitive that wraps an eigenpal editor canvas, projects a custom toolbar via 3 absolute overlays, and applies MetalDocs visual contract to eigenpal DOM via scoped `:global(.ep-root ...)` CSS overrides. Mounted by `TemplateEditorPage` and `DocumentEditorPage`.
 > **Out of scope:** Eigenpal internals (see [modules/editor-ui-eigenpal.md](editor-ui-eigenpal.md)), template authoring business logic (see [modules/templates.md](templates.md) and [modules/templates.md](templates.md)), document editor business logic (see [modules/documents.md](documents.md)), placeholder rendering (see [concepts/placeholders.md](../concepts/placeholders.md)).
@@ -52,7 +52,7 @@ editor-chrome is the visual shell that two editor pages share. Before its extrac
 - React 18 + TypeScript + Vite + CSS Modules â€” per `wiki/architecture/frontend-structure.md`.
 - Lives under `features/shared/components/` â€” `metaldocs-frontend` skill rule "used by 2+ features â‡’ shared".
 - Coupling to eigenpal is CSS-only (`:global(.ep-root ...)` descendant selectors). No JS import from `@eigenpal/docx-js-editor` in this module.
-- Eigenpal pinned to `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` per `wiki/references/eigenpal-controlled-package.md`. Overrides are implicit version contract â€” see T-003.
+- Eigenpal pinned to `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` per `wiki/references/eigenpal-controlled-package.md`. Overrides are implicit version contract — see T-003.
 - Design tokens consumed via `var(--...)` from `frontend/apps/web/src/styles/tokens.css`. No hardcoded hex colors; **but** font sizes/weights, button heights, and durations remain hardcoded (see T-005).
 - No HTTP, no SQL, no observability sink. Presentation-only.
 
