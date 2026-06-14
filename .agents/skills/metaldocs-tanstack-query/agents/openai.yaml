@@ -1,4 +1,0 @@
-interface:
-  display_name: "MetalDocs TanStack Query"
-  short_description: "Frontend server-state workflow for MetalDocs"
-  default_prompt: "Use $metaldocs-tanstack-query to wire this MetalDocs API flow with TanStack Query."
