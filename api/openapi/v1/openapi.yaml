@@ -562,6 +562,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /audit/events/export:
     post:
       summary: Export filtered audit events as CSV or JSONL (signed URL, async if large)
@@ -4092,18 +4094,26 @@ components:
         user_id: { type: string }
         username: { type: string }
         display_name: { type: string }
-        last_seen_at: { type: string, format: date-time }
+        last_seen_at:
+          type: string
+          format: date-time
         status: { type: string, enum: [online, idle] }
     PresenceStreamEvent:
       type: object
-      description: One frame on the presence WebSocket. `type` discriminates; `presence` is present only on the initial `snapshot` frame.
+      description: >
+        One frame on the presence WebSocket, discriminated by `type`. The `snapshot` frame
+        carries the full `presence` array; delta frames (`join`/`leave`/`online`/`idle`) carry
+        the changed user's `user_id`, `username`, `display_name`, `last_seen_at`, `status`;
+        the `heartbeat` frame carries only `type`.
       required: [type]
       properties:
         type: { type: string, enum: [snapshot, join, leave, online, idle, heartbeat] }
         user_id: { type: string }
         username: { type: string }
         display_name: { type: string }
-        last_seen_at: { type: string, format: date-time }
+        last_seen_at:
+          type: string
+          format: date-time
         status: { type: string, enum: [online, idle] }
         presence:
           type: array
