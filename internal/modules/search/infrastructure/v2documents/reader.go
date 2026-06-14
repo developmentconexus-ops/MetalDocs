@@ -8,6 +8,7 @@ import (
 	"time"
 
 	searchdomain "metaldocs/internal/modules/search/domain"
+	"metaldocs/internal/platform/sqlescape"
 )
 
 type Reader struct {
@@ -53,7 +54,7 @@ LEFT JOIN public.controlled_documents cd
  AND cd.tenant_id = d.tenant_id
 WHERE d.tenant_id = $1
   AND d.archived_at IS NULL
-  AND ($2 = '' OR LOWER(COALESCE(d.name, '')) LIKE '%' || $2 || '%')
+  AND ($2 = '' OR LOWER(COALESCE(d.name, '')) LIKE '%' || $2 || '%' ESCAPE '\')
   AND ($3 = '' OR UPPER(COALESCE(d.status, '')) = $3)
   AND ($4 = '' OR LOWER(COALESCE(d.profile_code_snapshot, '')) = $4)
   AND ($5 = '' OR LOWER(COALESCE((
@@ -124,7 +125,7 @@ LIMIT $11 OFFSET $12
 		ctx,
 		q,
 		query.TenantID,
-		strings.ToLower(strings.TrimSpace(query.Text)),
+		sqlescape.LikeEscape(strings.ToLower(strings.TrimSpace(query.Text))),
 		strings.ToUpper(strings.TrimSpace(string(query.Status))),
 		profileFilter,
 		strings.ToLower(strings.TrimSpace(query.DocumentFamily)),
@@ -188,4 +189,3 @@ func cloneNullTime(value sql.NullTime) *time.Time {
 	utc := value.Time.UTC()
 	return &utc
 }
-

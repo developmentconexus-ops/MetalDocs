@@ -12,10 +12,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	"metaldocs/internal/platform/db"
-	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/pagination"
+	"metaldocs/internal/platform/sqlescape"
 )
 
 type PostgresControlledDocumentRepository struct {
@@ -125,8 +126,8 @@ WHERE tenant_id = $1`
 	}
 	if filter.Query != nil && strings.TrimSpace(*filter.Query) != "" {
 		// GIN trigram indexes idx_controlled_documents_code_trgm / _title_trgm (migration 0239) accelerate this ILIKE.
-		q += fmt.Sprintf(" AND (code ILIKE $%d OR title ILIKE $%d)", idx, idx)
-		args = append(args, "%"+strings.TrimSpace(*filter.Query)+"%")
+		q += fmt.Sprintf(" AND (code ILIKE $%d ESCAPE '\\' OR title ILIKE $%d ESCAPE '\\')", idx, idx)
+		args = append(args, "%"+sqlescape.LikeEscape(strings.TrimSpace(*filter.Query))+"%")
 		idx++
 	}
 	if filter.ActorUserID != nil {
