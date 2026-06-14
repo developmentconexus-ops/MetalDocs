@@ -542,6 +542,26 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /iam/presence/stream:
+    get:
+      summary: Online presence live stream (WebSocket upgrade)
+      description: >
+        Upgrades to a WebSocket (HTTP 101) and streams presence frames: an initial
+        `snapshot`, then `join`/`leave`/`online`/`idle` deltas and periodic `heartbeat`.
+        Each frame conforms to PresenceStreamEvent. Not a request/response operation —
+        excluded from server codegen (exclude-operation-ids: streamPresence); the
+        hand-written upgrade handler is authoritative. HTTP fallback: /iam/presence/snapshot.
+      tags: [iam]
+      operationId: streamPresence
+      x-websocket-message:
+        $ref: '#/components/schemas/PresenceStreamEvent'
+      responses:
+        '101':
+          description: Switching Protocols — WebSocket established; server streams PresenceStreamEvent frames.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /audit/events/export:
     post:
       summary: Export filtered audit events as CSV or JSONL (signed URL, async if large)
@@ -4065,6 +4085,29 @@ components:
         last_seen_at:
           type: string
           format: date-time
+    PresenceStreamItem:
+      type: object
+      required: [user_id, username, display_name, last_seen_at, status]
+      properties:
+        user_id: { type: string }
+        username: { type: string }
+        display_name: { type: string }
+        last_seen_at: { type: string, format: date-time }
+        status: { type: string, enum: [online, idle] }
+    PresenceStreamEvent:
+      type: object
+      description: One frame on the presence WebSocket. `type` discriminates; `presence` is present only on the initial `snapshot` frame.
+      required: [type]
+      properties:
+        type: { type: string, enum: [snapshot, join, leave, online, idle, heartbeat] }
+        user_id: { type: string }
+        username: { type: string }
+        display_name: { type: string }
+        last_seen_at: { type: string, format: date-time }
+        status: { type: string, enum: [online, idle] }
+        presence:
+          type: array
+          items: { $ref: '#/components/schemas/PresenceStreamItem' }
     PresenceSnapshotResponse:
       type: object
       required: [items]
