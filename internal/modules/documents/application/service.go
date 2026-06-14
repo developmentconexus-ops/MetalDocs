@@ -361,14 +361,6 @@ func (s *Service) DuplicateDocument(ctx context.Context, tenantID, userID, docID
 	})
 }
 
-func (s *Service) ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error) {
-	return s.repo.ListDocuments(ctx, tenantID)
-}
-
-func (s *Service) ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error) {
-	return s.repo.ListDocumentsForUser(ctx, tenantID, userID)
-}
-
 type DocumentStats struct {
 	ByStatus map[string]int64 `json:"by_status"`
 	ByArea   map[string]int64 `json:"by_area"`

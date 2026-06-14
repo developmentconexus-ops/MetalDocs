@@ -551,53 +551,6 @@ func marshalSignaturePayload(payload map[string]any) (json.RawMessage, error) {
 	return json.RawMessage(b), nil
 }
 
-func hasUnresolvedComments(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (bool, error) {
-	var unresolvedCount int
-	err := tx.QueryRowContext(ctx, `
-		SELECT COUNT(*)
-		  FROM document_comments
-		 WHERE tenant_id = $1
-		   AND document_id = $2
-		   AND resolved_at IS NULL`,
-		tenantID, documentID,
-	).Scan(&unresolvedCount)
-	if err != nil {
-		return false, err
-	}
-	return unresolvedCount > 0, nil
-}
-
-// loadActiveDocumentContentHash mirrors the COALESCE used by the
-// /api/v1/controlled-documents/{cd}/active-document endpoint so the value
-// compared on signoff matches what the FE received when it loaded the doc.
-func loadActiveDocumentContentHash(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error) {
-	var hash sql.NullString
-	err := tx.QueryRowContext(ctx, `
-		SELECT COALESCE(d.content_hash_at_submit,
-		                (SELECT r.content_hash FROM document_revisions r
-		                  WHERE r.document_id = d.id
-		                  ORDER BY r.created_at DESC LIMIT 1))
-		  FROM documents d
-		 WHERE d.id = $1
-		   AND d.tenant_id = $2`,
-		documentID, tenantID,
-	).Scan(&hash)
-	if errors.Is(err, sql.ErrNoRows) {
-		// Document missing or cross-tenant — treat as content-pin failure so the
-		// signoff path returns a domain error instead of leaking a raw 500.
-		return "", ErrContentHashMismatch
-	}
-	if err != nil {
-		return "", err
-	}
-	if !hash.Valid {
-		// No content_hash_at_submit and no revision rows. A document in this state
-		// cannot be signed off: there is nothing to pin against. Fail closed.
-		return "", ErrContentHashMismatch
-	}
-	return hash.String, nil
-}
-
 func clientContentHash(formData map[string]any) (string, bool) {
 	if len(formData) == 0 {
 		return "", false
