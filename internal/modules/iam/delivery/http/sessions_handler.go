@@ -16,6 +16,7 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 	"metaldocs/internal/platform/useragent"
@@ -64,7 +65,7 @@ func (h *SessionsHandler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		httpresponse.WriteMethodNotAllowed(w, "GET")
 		return
 	}
 	if h.sessions == nil {
@@ -140,7 +141,7 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 
 func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		httpresponse.WriteMethodNotAllowed(w, "DELETE")
 		return
 	}
 	if h.sessions == nil {

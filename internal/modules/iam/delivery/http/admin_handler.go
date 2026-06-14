@@ -17,6 +17,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampresence "metaldocs/internal/modules/iam/presence"
 	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
@@ -146,7 +147,7 @@ func (h *AdminHandler) handleReplaceUserRolesTyped(w http.ResponseWriter, r *htt
 //     budget is max(kpi, presence, audit) rather than the legacy sum.
 func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		httpresponse.WriteMethodNotAllowed(w, "GET")
 		return
 	}
 	if h.authService == nil {
@@ -294,7 +295,7 @@ func kpiToOverviewJSON(k iamdomain.KpiSnapshot) map[string]any {
 
 func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Request, userID string) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		httpresponse.WriteMethodNotAllowed(w, "POST")
 		return
 	}
 
