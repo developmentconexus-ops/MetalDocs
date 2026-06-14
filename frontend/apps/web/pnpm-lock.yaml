@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@eigenpal/docx-js-editor':
-        specifier: file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz
-        version: file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: file:../../../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz
+        version: file:../../../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@fontsource/dm-mono':
         specifier: ^5.2.7
         version: 5.2.7
@@ -146,13 +146,13 @@ importers:
         version: 11.0.0
       '@vitejs/plugin-react':
         specifier: ^4.3.1
-        version: 4.7.0(vite@5.4.21(@types/node@22.19.17))
+        version: 4.7.0(supports-color@10.2.2)(vite@5.4.21(@types/node@22.19.17))
       '@vitest/coverage-v8':
         specifier: ^2.1.9
-        version: 2.1.9(vitest@2.1.9(@types/node@22.19.17)(jsdom@25.0.1(canvas@2.11.2)))
+        version: 2.1.9(supports-color@10.2.2)(vitest@2.1.9(@types/node@22.19.17)(jsdom@25.0.1(canvas@2.11.2)(supports-color@10.2.2))(supports-color@10.2.2))
       jsdom:
         specifier: ^25.0.1
-        version: 25.0.1(canvas@2.11.2)
+        version: 25.0.1(canvas@2.11.2)(supports-color@10.2.2)
       openapi-typescript:
         specifier: ^7.13.0
         version: 7.13.0(typescript@5.9.3)
@@ -173,7 +173,7 @@ importers:
         version: 5.4.21(@types/node@22.19.17)
       vitest:
         specifier: ^2.1.9
-        version: 2.1.9(@types/node@22.19.17)(jsdom@25.0.1(canvas@2.11.2))
+        version: 2.1.9(@types/node@22.19.17)(jsdom@25.0.1(canvas@2.11.2)(supports-color@10.2.2))(supports-color@10.2.2)
 
 packages:
 
@@ -305,8 +305,8 @@ packages:
     resolution: {integrity: sha512-Vd/9EVDiu6PPJt9yAh6roZP6El1xHrdvIVGjyBsHR0RYwNHgL7FJPyIIW4fANJNG6FtyZfvlRPpFI4ZM/lubvw==}
     engines: {node: '>=18'}
 
-  '@eigenpal/docx-js-editor@file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz':
-    resolution: {integrity: sha512-vyEdQ+o00RPNqKepxa45YfrN89CM4voNzjY/q3B/mNdjcckyf4QmDxSyTA9vEK8wYNgx/HBrC0rtLPkWrrfpRg==, tarball: file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz}
+  '@eigenpal/docx-js-editor@file:../../../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz':
+    resolution: {integrity: sha512-vyEdQ+o00RPNqKepxa45YfrN89CM4voNzjY/q3B/mNdjcckyf4QmDxSyTA9vEK8wYNgx/HBrC0rtLPkWrrfpRg==, tarball: file:../../../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz}
     version: 0.2.0
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
@@ -2692,6 +2692,7 @@ packages:
 
   uuid@8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   vite-node@2.1.9:
@@ -2894,7 +2895,7 @@ snapshots:
 
   '@babel/compat-data@7.29.0': {}
 
-  '@babel/core@7.29.0':
+  '@babel/core@7.29.0(supports-color@10.2.2)':
     dependencies:
       '@babel/code-frame': 7.29.0
       '@babel/generator': 7.29.1
@@ -2903,7 +2904,7 @@ snapshots:
       '@babel/helpers': 7.29.2
       '@babel/parser': 7.29.2
       '@babel/template': 7.28.6
-      '@babel/traverse': 7.29.0
+      '@babel/traverse': 7.29.0(supports-color@10.2.2)
       '@babel/types': 7.29.0
       '@jridgewell/remapping': 2.3.5
       convert-source-map: 2.0.0
@@ -2934,17 +2935,17 @@ snapshots:
 
   '@babel/helper-module-imports@7.28.6':
     dependencies:
-      '@babel/traverse': 7.29.0
+      '@babel/traverse': 7.29.0(supports-color@10.2.2)
       '@babel/types': 7.29.0
     transitivePeerDependencies:
       - supports-color
 
   '@babel/helper-module-transforms@7.28.6(@babel/core@7.29.0)':
     dependencies:
-      '@babel/core': 7.29.0
+      '@babel/core': 7.29.0(supports-color@10.2.2)
       '@babel/helper-module-imports': 7.28.6
       '@babel/helper-validator-identifier': 7.28.5
-      '@babel/traverse': 7.29.0
+      '@babel/traverse': 7.29.0(supports-color@10.2.2)
     transitivePeerDependencies:
       - supports-color
 
@@ -2965,14 +2966,14 @@ snapshots:
     dependencies:
       '@babel/types': 7.29.0
 
-  '@babel/plugin-transform-react-jsx-self@7.27.1(@babel/core@7.29.0)':
+  '@babel/plugin-transform-react-jsx-self@7.27.1(@babel/core@7.29.0(supports-color@10.2.2))':
     dependencies:
-      '@babel/core': 7.29.0
+      '@babel/core': 7.29.0(supports-color@10.2.2)
       '@babel/helper-plugin-utils': 7.28.6
 
-  '@babel/plugin-transform-react-jsx-source@7.27.1(@babel/core@7.29.0)':
+  '@babel/plugin-transform-react-jsx-source@7.27.1(@babel/core@7.29.0(supports-color@10.2.2))':
     dependencies:
-      '@babel/core': 7.29.0
+      '@babel/core': 7.29.0(supports-color@10.2.2)
       '@babel/helper-plugin-utils': 7.28.6
 
   '@babel/runtime@7.29.2': {}
@@ -2983,7 +2984,7 @@ snapshots:
       '@babel/parser': 7.29.2
       '@babel/types': 7.29.0
 
-  '@babel/traverse@7.29.0':
+  '@babel/traverse@7.29.0(supports-color@10.2.2)':
     dependencies:
       '@babel/code-frame': 7.29.0
       '@babel/generator': 7.29.1
@@ -3022,7 +3023,7 @@ snapshots:
 
   '@csstools/css-tokenizer@3.0.4': {}
 
-  '@eigenpal/docx-js-editor@file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@eigenpal/docx-js-editor@file:../../../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@radix-ui/react-select': 2.2.6(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       clsx: 2.1.1
@@ -3181,7 +3182,7 @@ snapshots:
 
   '@metaldocs/editor-ui@file:../../../packages/editor-ui(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@eigenpal/docx-js-editor': file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@eigenpal/docx-js-editor': file:../../../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@metaldocs/shared-tokens': file:../../../packages/shared-tokens
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
@@ -3947,11 +3948,11 @@ snapshots:
       '@uppy/core': 5.2.0
       '@uppy/utils': 7.2.0
 
-  '@vitejs/plugin-react@4.7.0(vite@5.4.21(@types/node@22.19.17))':
+  '@vitejs/plugin-react@4.7.0(supports-color@10.2.2)(vite@5.4.21(@types/node@22.19.17))':
     dependencies:
-      '@babel/core': 7.29.0
-      '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@7.29.0)
-      '@babel/plugin-transform-react-jsx-source': 7.27.1(@babel/core@7.29.0)
+      '@babel/core': 7.29.0(supports-color@10.2.2)
+      '@babel/plugin-transform-react-jsx-self': 7.27.1(@babel/core@7.29.0(supports-color@10.2.2))
+      '@babel/plugin-transform-react-jsx-source': 7.27.1(@babel/core@7.29.0(supports-color@10.2.2))
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
@@ -3959,21 +3960,21 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@vitest/coverage-v8@2.1.9(vitest@2.1.9(@types/node@22.19.17)(jsdom@25.0.1(canvas@2.11.2)))':
+  '@vitest/coverage-v8@2.1.9(supports-color@10.2.2)(vitest@2.1.9(@types/node@22.19.17)(jsdom@25.0.1(canvas@2.11.2)(supports-color@10.2.2))(supports-color@10.2.2))':
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@bcoe/v8-coverage': 0.2.3
       debug: 4.4.3(supports-color@10.2.2)
       istanbul-lib-coverage: 3.2.2
       istanbul-lib-report: 3.0.1
-      istanbul-lib-source-maps: 5.0.6
+      istanbul-lib-source-maps: 5.0.6(supports-color@10.2.2)
       istanbul-reports: 3.2.0
       magic-string: 0.30.21
       magicast: 0.3.5
       std-env: 3.10.0
       test-exclude: 7.0.2
       tinyrainbow: 1.2.0
-      vitest: 2.1.9(@types/node@22.19.17)(jsdom@25.0.1(canvas@2.11.2))
+      vitest: 2.1.9(@types/node@22.19.17)(jsdom@25.0.1(canvas@2.11.2)(supports-color@10.2.2))(supports-color@10.2.2)
     transitivePeerDependencies:
       - supports-color
 
@@ -4468,7 +4469,7 @@ snapshots:
 
   html-escaper@2.0.2: {}
 
-  http-proxy-agent@7.0.2:
+  http-proxy-agent@7.0.2(supports-color@10.2.2):
     dependencies:
       agent-base: 7.1.4
       debug: 4.4.3(supports-color@10.2.2)
@@ -4534,7 +4535,7 @@ snapshots:
       make-dir: 4.0.0
       supports-color: 7.2.0
 
-  istanbul-lib-source-maps@5.0.6:
+  istanbul-lib-source-maps@5.0.6(supports-color@10.2.2):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       debug: 4.4.3(supports-color@10.2.2)
@@ -4561,14 +4562,14 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
-  jsdom@25.0.1(canvas@2.11.2):
+  jsdom@25.0.1(canvas@2.11.2)(supports-color@10.2.2):
     dependencies:
       cssstyle: 4.6.0
       data-urls: 5.0.0
       decimal.js: 10.6.0
       form-data: 4.0.5
       html-encoding-sniffer: 4.0.0
-      http-proxy-agent: 7.0.2
+      http-proxy-agent: 7.0.2(supports-color@10.2.2)
       https-proxy-agent: 7.0.6(supports-color@10.2.2)
       is-potential-custom-element-name: 1.0.1
       nwsapi: 2.2.23
@@ -5403,7 +5404,7 @@ snapshots:
 
   uuid@8.3.2: {}
 
-  vite-node@2.1.9(@types/node@22.19.17):
+  vite-node@2.1.9(@types/node@22.19.17)(supports-color@10.2.2):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3(supports-color@10.2.2)
@@ -5430,7 +5431,7 @@ snapshots:
       '@types/node': 22.19.17
       fsevents: 2.3.3
 
-  vitest@2.1.9(@types/node@22.19.17)(jsdom@25.0.1(canvas@2.11.2)):
+  vitest@2.1.9(@types/node@22.19.17)(jsdom@25.0.1(canvas@2.11.2)(supports-color@10.2.2))(supports-color@10.2.2):
     dependencies:
       '@vitest/expect': 2.1.9
       '@vitest/mocker': 2.1.9(vite@5.4.21(@types/node@22.19.17))
@@ -5450,11 +5451,11 @@ snapshots:
       tinypool: 1.1.1
       tinyrainbow: 1.2.0
       vite: 5.4.21(@types/node@22.19.17)
-      vite-node: 2.1.9(@types/node@22.19.17)
+      vite-node: 2.1.9(@types/node@22.19.17)(supports-color@10.2.2)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.19.17
-      jsdom: 25.0.1(canvas@2.11.2)
+      jsdom: 25.0.1(canvas@2.11.2)(supports-color@10.2.2)
     transitivePeerDependencies:
       - less
       - lightningcss
