@@ -69,13 +69,13 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "tenant context missing"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "tenant context missing"))
 		return
 	}
 	items, err := h.repo.Snapshot(r.Context(), tenantID, time.Now().UTC())
 	if err != nil {
 		h.log.Warn("presence: snapshot failed", "tenant_id", tenantID, "err", err)
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "snapshot failed"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "snapshot failed"))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -86,7 +86,7 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "tenant context missing"))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "tenant context missing"))
 		return
 	}
 

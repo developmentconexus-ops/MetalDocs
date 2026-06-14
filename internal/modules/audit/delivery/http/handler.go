@@ -74,11 +74,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/api/v1/audit/events/export") {
-		http.NotFound(w, r)
+		writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Not found"))
 		return
 	}
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed"))
 		return
 	}
 	tenantID, ok := auditTenantFromRequest(w, r)
@@ -131,7 +131,7 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed"))
 		return
 	}
 	tenantID, ok := auditTenantFromRequest(w, r)
@@ -222,7 +222,7 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed"))
 		return
 	}
 	if h.exporter == nil {
@@ -231,7 +231,7 @@ func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request
 	}
 	tail := strings.TrimPrefix(r.URL.Path, "/api/v1/audit/events/export/")
 	if tail == "" {
-		http.NotFound(w, r)
+		writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Not found"))
 		return
 	}
 	parts := strings.SplitN(tail, "/", 2)
@@ -241,7 +241,7 @@ func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if len(parts) != 1 {
-		http.NotFound(w, r)
+		writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Not found"))
 		return
 	}
 
