@@ -53,6 +53,7 @@ const (
 // Item is one entry in a presence snapshot.
 type Item struct {
 	UserID      string    `json:"user_id"`
+	Username    string    `json:"username"`
 	DisplayName string    `json:"display_name"`
 	LastSeenAt  time.Time `json:"last_seen_at"`
 	Status      Status    `json:"status"`
@@ -63,6 +64,7 @@ type Item struct {
 type Event struct {
 	Type        string    `json:"type"`
 	UserID      string    `json:"user_id,omitempty"`
+	Username    string    `json:"username,omitempty"`
 	DisplayName string    `json:"display_name,omitempty"`
 	LastSeenAt  time.Time `json:"last_seen_at,omitempty"`
 	Status      Status    `json:"status,omitempty"`

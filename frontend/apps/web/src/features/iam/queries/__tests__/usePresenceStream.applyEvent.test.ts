@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { applyEvent } from "../usePresenceStream";
 
-const alice = { userId: "u1", displayName: "Alice", lastSeenAt: "2026-06-03T12:00:00Z", status: "online" as const };
-const bob = { userId: "u2", displayName: "Bob", lastSeenAt: "2026-06-03T12:00:00Z", status: "online" as const };
+const alice = { user_id: "u1", username: "alice", display_name: "Alice", last_seen_at: "2026-06-03T12:00:00Z", status: "online" as const };
+const bob = { user_id: "u2", username: "bob", display_name: "Bob", last_seen_at: "2026-06-03T12:00:00Z", status: "online" as const };
 
 describe("usePresenceStream applyEvent", () => {
   it("replaces list on snapshot", () => {
@@ -17,30 +17,34 @@ describe("usePresenceStream applyEvent", () => {
   });
 
   it("removes user on leave", () => {
-    const out = applyEvent([alice, bob], { type: "leave", userId: "u1" });
-    expect(out.map((p) => p.userId)).toEqual(["u2"]);
+    const out = applyEvent([alice, bob], { type: "leave", user_id: "u1" });
+    expect(out.map((p) => p.user_id)).toEqual(["u2"]);
   });
 
-  it("upserts on join with new userId", () => {
+  it("upserts on join with new user_id", () => {
     const out = applyEvent([alice], {
       type: "join",
-      userId: "u3",
-      displayName: "Carol",
-      lastSeenAt: "2026-06-03T12:05:00Z",
+      user_id: "u3",
+      username: "carol",
+      display_name: "Carol",
+      last_seen_at: "2026-06-03T12:05:00Z",
       status: "online",
     });
-    expect(out.map((p) => p.userId).sort()).toEqual(["u1", "u3"]);
+    expect(out.map((p) => p.user_id).sort()).toEqual(["u1", "u3"]);
+    const joined = out.find((p) => p.user_id === "u3");
+    expect(joined?.username).toBe("carol");
   });
 
   it("upserts on idle event for existing user, updates status", () => {
     const out = applyEvent([alice, bob], {
       type: "idle",
-      userId: "u1",
-      lastSeenAt: "2026-06-03T12:10:00Z",
+      user_id: "u1",
+      last_seen_at: "2026-06-03T12:10:00Z",
       status: "idle",
     });
-    const updated = out.find((p) => p.userId === "u1");
+    const updated = out.find((p) => p.user_id === "u1");
     expect(updated?.status).toBe("idle");
-    expect(updated?.displayName).toBe("Alice");
+    expect(updated?.display_name).toBe("Alice");
+    expect(updated?.username).toBe("alice");
   });
 });

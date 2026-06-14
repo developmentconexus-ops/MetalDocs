@@ -225,6 +225,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		for _, item := range presenceItems {
 			presenceOut = append(presenceOut, map[string]any{
 				"user_id":      item.UserID,
+				"username":     item.Username,
 				"display_name": item.DisplayName,
 				"last_seen_at":  item.LastSeenAt.UTC().Format(time.RFC3339),
 				"status":      string(item.Status),

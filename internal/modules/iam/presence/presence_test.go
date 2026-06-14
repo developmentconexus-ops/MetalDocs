@@ -117,31 +117,41 @@ func TestClassifyStatus(t *testing.T) {
 func TestDiff_Join_Leave_StatusTransitions(t *testing.T) {
 	now := time.Now().UTC()
 	prev := map[string]Item{
-		"alice": {UserID: "alice", DisplayName: "Alice", LastSeenAt: now.Add(-10 * time.Second), Status: StatusOnline},
-		"bob":   {UserID: "bob", DisplayName: "Bob", LastSeenAt: now.Add(-2 * time.Minute), Status: StatusIdle},
+		"alice": {UserID: "alice", Username: "alice_u", DisplayName: "Alice", LastSeenAt: now.Add(-10 * time.Second), Status: StatusOnline},
+		"bob":   {UserID: "bob", Username: "bob_u", DisplayName: "Bob", LastSeenAt: now.Add(-2 * time.Minute), Status: StatusIdle},
 	}
 	curr := map[string]Item{
-		"alice": {UserID: "alice", DisplayName: "Alice", LastSeenAt: now.Add(-90 * time.Second), Status: StatusIdle},
+		"alice": {UserID: "alice", Username: "alice_u", DisplayName: "Alice", LastSeenAt: now.Add(-90 * time.Second), Status: StatusIdle},
 		// bob departed
-		"carol": {UserID: "carol", DisplayName: "Carol", LastSeenAt: now, Status: StatusOnline},
+		"carol": {UserID: "carol", Username: "carol_u", DisplayName: "Carol", LastSeenAt: now, Status: StatusOnline},
 	}
 	got := diff(prev, curr)
 
-	types := make(map[string]string)
+	byUser := make(map[string]Event)
 	for _, ev := range got {
-		types[ev.UserID] = ev.Type
+		byUser[ev.UserID] = ev
 	}
-	if types["alice"] != "idle" {
-		t.Fatalf("alice: got %q want idle", types["alice"])
+	if byUser["alice"].Type != "idle" {
+		t.Fatalf("alice: got %q want idle", byUser["alice"].Type)
 	}
-	if types["bob"] != "leave" {
-		t.Fatalf("bob: got %q want leave", types["bob"])
+	if byUser["alice"].Username != "alice_u" {
+		t.Fatalf("alice idle: username got %q want alice_u", byUser["alice"].Username)
 	}
-	if types["carol"] != "join" {
-		t.Fatalf("carol: got %q want join", types["carol"])
+	if byUser["bob"].Type != "leave" {
+		t.Fatalf("bob: got %q want leave", byUser["bob"].Type)
+	}
+	if byUser["carol"].Type != "join" {
+		t.Fatalf("carol: got %q want join", byUser["carol"].Type)
 	}
 	if len(got) != 3 {
 		t.Fatalf("got %d events want 3", len(got))
+	}
+	// Username must be forwarded from the source item into each event.
+	if byUser["carol"].Username != "carol_u" {
+		t.Fatalf("carol join: username got %q want carol_u", byUser["carol"].Username)
+	}
+	if byUser["bob"].Username != "bob_u" {
+		t.Fatalf("bob leave: username got %q want bob_u", byUser["bob"].Username)
 	}
 }
 
@@ -150,7 +160,7 @@ func TestDiff_Join_Leave_StatusTransitions(t *testing.T) {
 func TestHandler_Snapshot_TenantScoped(t *testing.T) {
 	repo := newFakeRepo()
 	now := time.Now().UTC()
-	repo.SetSnapshot("tenant-a", []Item{{UserID: "a1", DisplayName: "Alice", LastSeenAt: now}})
+	repo.SetSnapshot("tenant-a", []Item{{UserID: "a1", Username: "alice", DisplayName: "Alice", LastSeenAt: now}})
 	repo.SetSnapshot("tenant-b", []Item{{UserID: "b1", DisplayName: "Bob", LastSeenAt: now}})
 
 	hub := NewHub(repo, nil)
@@ -170,6 +180,9 @@ func TestHandler_Snapshot_TenantScoped(t *testing.T) {
 	}
 	if n := len(got["items"]); n != 1 || got["items"][0].UserID != "a1" {
 		t.Fatalf("tenant scoping: got %+v want only tenant-a's user", got)
+	}
+	if got["items"][0].Username != "alice" {
+		t.Fatalf("username: got %q want alice", got["items"][0].Username)
 	}
 }
 

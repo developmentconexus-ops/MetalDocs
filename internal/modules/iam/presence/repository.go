@@ -60,13 +60,14 @@ func (r *PostgresRepository) BumpLastSeen(ctx context.Context, userID string, at
 // deactivated and inactive rows, and rows older than OfflineAfter.
 func (r *PostgresRepository) Snapshot(ctx context.Context, tenantID string, now time.Time) ([]Item, error) {
 	const q = `
-SELECT user_id, display_name, last_seen_at
-FROM metaldocs.iam_users
-WHERE tenant_id = $1::uuid
-  AND is_active = true
-  AND deactivated_at IS NULL
-  AND last_seen_at >= $2
-ORDER BY last_seen_at DESC
+SELECT u.user_id, i.username, u.display_name, u.last_seen_at
+FROM metaldocs.iam_users u
+JOIN metaldocs.auth_identities i ON i.user_id = u.user_id
+WHERE u.tenant_id = $1::uuid
+  AND u.is_active = true
+  AND u.deactivated_at IS NULL
+  AND u.last_seen_at >= $2
+ORDER BY u.last_seen_at DESC
 `
 	cutoff := now.Add(-OfflineAfter).UTC()
 	rows, err := r.db.QueryContext(ctx, q, tenantID, cutoff)
@@ -78,7 +79,7 @@ ORDER BY last_seen_at DESC
 	items := make([]Item, 0)
 	for rows.Next() {
 		var item Item
-		if err := rows.Scan(&item.UserID, &item.DisplayName, &item.LastSeenAt); err != nil {
+		if err := rows.Scan(&item.UserID, &item.Username, &item.DisplayName, &item.LastSeenAt); err != nil {
 			return nil, fmt.Errorf("presence: scan snapshot row: %w", err)
 		}
 		item.LastSeenAt = item.LastSeenAt.UTC()

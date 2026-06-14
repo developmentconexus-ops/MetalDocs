@@ -66,18 +66,18 @@ export default function PresencePanel() {
       {!isLoading && !error && count > 0 ? (
         <ul className={styles.list} role="list">
           {items.map((u) => (
-            <li key={u.userId} className={styles.row}>
-              <Avatar name={u.displayName || (u.username ?? u.userId)} size="md" />
-              <span className={styles.name}>{u.displayName || (u.username ?? u.userId)}</span>
-              <span className={styles.username}>@{(u.username ?? u.userId)}</span>
+            <li key={u.user_id} className={styles.row}>
+              <Avatar name={u.display_name || (u.username ?? u.user_id)} size="md" />
+              <span className={styles.name}>{u.display_name || (u.username ?? u.user_id)}</span>
+              <span className={styles.username}>@{(u.username ?? u.user_id)}</span>
               <time
                 className={styles.lastSeen}
-                dateTime={u.lastSeenAt}
-                title={new Date(u.lastSeenAt).toLocaleString("pt-BR", {
+                dateTime={u.last_seen_at}
+                title={new Date(u.last_seen_at).toLocaleString("pt-BR", {
                   timeZone: "America/Sao_Paulo",
                 })}
               >
-                {getRelativeTime(u.lastSeenAt)}
+                {getRelativeTime(u.last_seen_at)}
               </time>
             </li>
           ))}

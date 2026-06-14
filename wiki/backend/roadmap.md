@@ -186,3 +186,15 @@ Before executing, an independent **7-plane adversarial assessment** (7 sonnet pr
 5. Tier-1 `CanDo` per-request DB query → TTL cache. Trigger: RF-3 / tenant-scale p95 regression. (Perf; touches authz path.)
 
 **Refined execution order** (conflict-minimized; each family = its own commit(s), tracker + audit disposition same-commit): **H-6a ✅ → H-3a ✅ → H-4 ✅ → H-1(a ✅ setAuthzGUC dedup · b ✅ CD→taxonomy port · c ✅ approval delivery↛infra · d ✅ approval *sql.DB→TxRunner / d′-templates ✅ · d′-CD ✅ · d″ ✅ · e ✅ documents delivery redesign) → [H-3b ✅ · H-6b ✅] → H-5 ✅ → H-2.** **H-2 ✅ done** (composition/observability — the last Wave-H family) — **Wave H complete**: all Tier-1+Tier-2 families ✅-or-deferred-with-trigger, NOT merged, awaiting operator review gate. H-6b ✅ done (DuplicateDocument on the atomic path; legacy CreateDocument chain deleted; prereq deadlock H-PRE-1 fixed same commit). H-1 fully closed (a..e ✅). (H-3b/H-6b resequenced after H-1d's TxRunner seam — both need service-owned tx boundaries that H-1d builds; see H-3/H-6 discovery notes in [wave-h-plan](wave-h-plan.md).)
+
+---
+
+## Wave V1 — release-blocker remediation (2026-06-13/14, fresh session)
+
+> **Trigger:** pre-v1 readiness pass over branch `qa/iam-area-membership` surfaced 6 release blockers (B1–B6) + the Maximal-scope fix-now defers (H-A..H-G). Goal: NOT-READY → READY-for-v1. One commit per defect family; trackers + audit dispositions updated same-commit; static gates green + recorded per commit; observable fixes runtime-verified via Docker. **Do NOT merge — operator review gate.**
+> **Plan:** [`../../docs/superpowers/plans/2026-06-13-v1-blocker-remediation.md`](../../docs/superpowers/plans/2026-06-13-v1-blocker-remediation.md).
+
+| # | Sev | Defect | Status | Commit | Evidence |
+|---|-----|--------|--------|--------|----------|
+| B1 | 🔴 Blocker | presence WS/snapshot wire keys camelCase → FE/contract mismatch | ✅ | (this commit) | `presence.Item`/`Event` json tags snake_case + FE reads `user_id`/`username`/`display_name`/`last_seen_at`/`status` matching OpenAPI `OnlinePresenceItem`. FE `usePresenceStream.ts`/`PresencePanel.tsx` migrated; `applyEvent` + panel tests snake_case. |
+| B2 | 🔴 Blocker | presence items missing `username` (spec `OnlinePresenceItem.required` includes it) | ✅ | (this commit) | Snapshot SQL resolves username via **INNER JOIN `metaldocs.auth_identities`** — username is AUTH-owned, NOT on `iam_users` (plan's "iam_users.username non-null" note was wrong; JOIN precedent `observability_repository.go:171`). diff Events propagate username (join/status from current item, leave from old). **Runtime-verified:** `GET /api/v1/iam/presence/snapshot` → `{"user_id":"admin","username":"admin","display_name":"Administrator","last_seen_at":"…","status":"online"}`. Gates: build/vet/`test -p 2 ./...` 0/api-lint -strict 0/cilint 0/FE tsc 0/presence vitest 5/5. Contract-neutral (schema already declared username + snake_case). NOT merged. |

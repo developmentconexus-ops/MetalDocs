@@ -114,3 +114,12 @@ Per-finding closure. Tracker rows mirror these in [`../roadmap.md`](../roadmap.m
 - *Redundant system_admin bypass-audit in CD-create.* Pre-existing (`repository/repository.go` `CreateDocumentTx` does `ctx = authz.WithCapCache(ctx)`, a pervasive 12×-in-file pattern, NOT introduced here) → the inner `authz.Require` re-records the bypass on the same tx. Harmless (advisory lock is session-re-entrant; same tx). **Trigger:** address when cap-cache context scoping is reworked.
 
 **Commit-boundary deviation.** H-6b and H-PRE-1 are entangled in the same functions/files (both uncommitted in the working tree) and the environment blocks interactive `git add -p`. They ship as **one combined commit** (titled H-6b, H-PRE-1 documented as a distinct finding here and in the commit body). Deviation from one-commit-per-family is justified by the entanglement + tooling constraint.
+
+## Remediation dispositions (Wave V1 — release blockers, 2026-06-13/14)
+
+Pre-v1 readiness blockers (B1–B6) + Maximal fix-now defers (H-A..H-G). Mirrored in [`../roadmap.md`](../roadmap.md) §Wave V1. Plan: [`../../../docs/superpowers/plans/2026-06-13-v1-blocker-remediation.md`](../../../docs/superpowers/plans/2026-06-13-v1-blocker-remediation.md). `RESOLVED` = bounded commit; `TRIGGER`/`KEEP` = written defer.
+
+| # | Disposition | Commit | Evidence |
+|---|-------------|--------|----------|
+| B1 | ✅ RESOLVED | (this commit) | Presence wire keys snake_case across BE `Item`/`Event` json tags + FE consumers (`usePresenceStream`/`PresencePanel`); matches OpenAPI `OnlinePresenceItem`. applyEvent + panel tests migrated. |
+| B2 | ✅ RESOLVED | (this commit) | `username` added to presence `Item`/`Event`; Snapshot SQL **INNER JOIN** AUTH-owned `metaldocs.auth_identities` (NOT `iam_users` — plan note was wrong; precedent `observability_repository.go:171`); diff Events propagate username. **Runtime:** snapshot emits `username:"admin"`. Gates green; contract-neutral; NOT merged. |

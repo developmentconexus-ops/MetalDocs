@@ -348,6 +348,7 @@ func diff(prev, curr map[string]Item) []Event {
 			out = append(out, Event{
 				Type:        "join",
 				UserID:      it.UserID,
+				Username:    it.Username,
 				DisplayName: it.DisplayName,
 				LastSeenAt:  it.LastSeenAt,
 				Status:      it.Status,
@@ -358,6 +359,7 @@ func diff(prev, curr map[string]Item) []Event {
 			out = append(out, Event{
 				Type:        string(it.Status),
 				UserID:      it.UserID,
+				Username:    it.Username,
 				DisplayName: it.DisplayName,
 				LastSeenAt:  it.LastSeenAt,
 				Status:      it.Status,
@@ -369,6 +371,7 @@ func diff(prev, curr map[string]Item) []Event {
 			out = append(out, Event{
 				Type:        "leave",
 				UserID:      old.UserID,
+				Username:    old.Username,
 				DisplayName: old.DisplayName,
 				LastSeenAt:  old.LastSeenAt,
 			})

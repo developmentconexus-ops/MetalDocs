@@ -10,18 +10,15 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, API_BASE_URL } from "../../../lib/api/client";
 import { QK } from "../../../lib/queryKeys";
+import type { components } from "../../../lib/api-types";
 
-type PresenceItem = {
-  userId: string;
-  username?: string;
-  displayName: string;
-  lastSeenAt: string;
-  status?: "online" | "idle";
-};
+type OnlinePresenceItem = components["schemas"]["OnlinePresenceItem"];
+export type PresenceStatus = "online" | "idle";
+export type PresenceItem = OnlinePresenceItem & { status?: PresenceStatus };
 
 type PresenceEvent =
   | { type: "snapshot"; presence: PresenceItem[] }
-  | { type: "join" | "leave" | "online" | "idle"; userId: string; displayName?: string; lastSeenAt?: string; status?: "online" | "idle" }
+  | { type: "join" | "leave" | "online" | "idle"; user_id: string; username?: string; display_name?: string; last_seen_at?: string; status?: PresenceStatus }
   | { type: "heartbeat" };
 
 type PresenceSnapshot = { items: PresenceItem[] };
@@ -44,17 +41,17 @@ function streamUrl(): string {
 export function applyEvent(prev: PresenceItem[], ev: PresenceEvent): PresenceItem[] {
   if (ev.type === "snapshot") return [...ev.presence];
   if (ev.type === "heartbeat") return prev;
-  if (ev.type === "leave") return prev.filter((p) => p.userId !== ev.userId);
-  // join / online / idle: upsert by userId.
-  const existing = prev.find((p) => p.userId === ev.userId);
+  if (ev.type === "leave") return prev.filter((p) => p.user_id !== ev.user_id);
+  // join / online / idle: upsert by user_id.
+  const existing = prev.find((p) => p.user_id === ev.user_id);
   const next: PresenceItem = {
-    userId: ev.userId,
-    displayName: ev.displayName ?? existing?.displayName ?? "",
-    lastSeenAt: ev.lastSeenAt ?? existing?.lastSeenAt ?? new Date().toISOString(),
+    user_id: ev.user_id,
+    username: ev.username ?? existing?.username ?? "",
+    display_name: ev.display_name ?? existing?.display_name ?? "",
+    last_seen_at: ev.last_seen_at ?? existing?.last_seen_at ?? new Date().toISOString(),
     status: ev.status ?? existing?.status ?? "online",
-    username: existing?.username,
   };
-  const without = prev.filter((p) => p.userId !== ev.userId);
+  const without = prev.filter((p) => p.user_id !== ev.user_id);
   return [next, ...without];
 }
 
