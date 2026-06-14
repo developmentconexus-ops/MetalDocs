@@ -63,7 +63,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		httpresponse.WriteMethodNotAllowed(w, "POST")
 		return
 	}
 	var req loginRequest
@@ -98,7 +98,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		httpresponse.WriteMethodNotAllowed(w, "POST")
 		return
 	}
 	if cookie, err := r.Cookie(h.service.SessionCookieName()); err == nil {
@@ -118,7 +118,7 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		httpresponse.WriteMethodNotAllowed(w, "GET")
 		return
 	}
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
@@ -131,7 +131,7 @@ func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		httpresponse.WriteMethodNotAllowed(w, "POST")
 		return
 	}
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
