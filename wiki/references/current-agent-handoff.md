@@ -304,3 +304,54 @@ These facts lived in the agent's persistent memory and are NOT derivable from th
 - Runtime (`.\scripts\start-api.ps1 -Build`): all 3 binaries rebuilt + booted; API :8081 (migration 0224 applied → "MetalDocs API listening"); login 200; structured JSON logs throughout; worker PID 34124 alive; jobs PID 13816 alive; WS upgrade `/api/v1/iam/presence/stream` → **101 Switching Protocols** (residual A1 proof).
 - Scope: 7 modified + 13 new files; no `api.gen.go`/`openapi.yaml` change → contract-neutral, no FE regen. Carried (not silent): D-H1 metrics ring-buffer NOT replaced (plan §H-2 NOT-to-do); no DI framework (manual wiring correct). One H-2 family commit, NOT merged — operator review gate.
 - **Wave H status:** all Tier-1 (A1–A6) + Tier-2 (H-1..H-6) families ✅-or-deferred-with-trigger. Remaining: Wave H DONE-gate evidence consolidation + operator review. Deferred boundaries D-H1..D-H5 + H-5.3-D1 + H-3b tier-2-principal defer carry written triggers. NOT merged.
+
+### v1 blocker remediation — close-out (2026-06-13) — branch `qa/iam-area-membership` → READY-for-v1 (operator review gate)
+
+Plan: [`docs/superpowers/plans/2026-06-13-v1-blocker-remediation.md`](../../docs/superpowers/plans/2026-06-13-v1-blocker-remediation.md). 6 release blockers (B1–B6) + every Maximal-scope fix-now defer (H-A..H-G). One bounded commit per defect family. **NOT merged** — presented for operator review.
+
+**Commit ledger** (`eae488e7c..HEAD`, 12 family commits; `a463ed375` baseline design doc precedes):
+
+| Commit | Family | Subject |
+|--------|--------|---------|
+| `82420788a` | B1+B2 | fix(presence): snake_case wire keys + username |
+| `c6ed8ceca` | B3 | fix(audit): FE consumes snake_case AuditEventItem |
+| `7d5b98f3a` | B4 | fix(documents): form_data_json object not base64 |
+| `b901c1567` | B5 | fix(documents): duplicate preserves visibility |
+| `53b2495d8` | B6 | fix(search): escape LIKE/ILIKE wildcards |
+| `3dec55631` | H-A | fix(audit): declare exportAuditEvents 202 status field |
+| `c868c884b` | H-B | fix(observability): RFC9457 error bodies |
+| `2307932ba` | H-C | fix(config): env guards |
+| `f1ed57670` | H-D | docs(iam): reclassify phantom-perm row to TRIGGER (trackers only) |
+| `b5c3b650c` | H-E | chore: remove dead code |
+| `3216da809` | H-F | fix(metrics): declare p50/p95/p99 in MetricItem |
+| `3e7fb9975` | H-G | docs(documents): reclassify profileDefaults status to TRIGGER (trackers only) |
+
+**Per-commit gates:** every commit closed green — `go build ./...` 0 · `go vet ./...` 0 · `go test -p 2 ./...` 0 FAIL/panic · `api-lint -strict` 0 violations · `cilint` exit 0. Contract-changing commits (B4, H-A, H-F) carried FE regen (`npx openapi-typescript`) + `npx tsc --noEmit` 0 in the same commit. H-C (integration-tagged `e2e_seed.go`) also ran `go build -tags integration ./...` 0 + `go vet -tags integration ./internal/test/...` 0. Observable fixes runtime-verified by us against the running API (:8081, cookie session), never delegated:
+- B1/B2 — presence stream wire keys snake_case + `username` present in admin overview (live JSON).
+- B3 — audit list/export FE consumes snake_case `AuditEventItem` (live `GET /api/v1/audit/events`).
+- B4 — `form_data_json` emitted as JSON object, not base64 (live document fetch).
+- B5 — duplicated document preserves source visibility (live duplicate probe).
+- B6 — `LIKE/ILIKE` wildcards escaped; `%`/`_` searched literally (live search probe).
+- H-A — `exportAuditEvents` 202 body declares `status` field (live 202 export).
+- H-B — error bodies are RFC9457 `application/problem+json` (live 4xx probes).
+- H-F — `GET /api/v1/metrics` items all carry `p50/p95/p99_duration_ms` (present even at 0).
+
+**Final gate (HEAD `3e7fb9975`):** full suite green incl. integration build/vet + FE tsc; `go generate ./...` → no codegen drift. **Cross-commit regression review (Opus):** APPROVE — 0 Critical, 0 Major over `git diff eae488e7c..HEAD` (36 files, +707/-328); 8/8 invariants PASS (codegen sync, snake_case wire casing, `required` correctness, RFC9457, advisory-lock deadlock untouched, two-tier authz untouched, cilint clean, surgical scope). 2 Minor, both accepted no-change: (1) presence `repository.go` Snapshot `INNER JOIN auth_identities` vs LEFT-JOIN precedent — proven unreachable (last_seen_at only set by authenticated requests, which require an auth_identities row), optional defensive nit; (2) the `admin_handler.go:228` 1-line `username` add is in B1/B2 not B3 — attribution note only, in-family benign. B6 `ESCAPE '\\'` flagged-then-confirmed FALSE POSITIVE (Go string literal → single backslash on the wire), not re-raised.
+
+**TRIGGER register** (escalated out of fix-now scope — fixing each requires a boundary the plan forbids touching here):
+- **F-001** (pre-existing) — phantom permission rows; trigger: IAM permission-catalog consolidation wave.
+- **F-4a** (pre-existing) — see plan/roadmap; trigger as documented in roadmap.
+- **concurrency** (pre-existing) — see plan/roadmap; trigger as documented in roadmap.
+- **H-D** (contingent downgrade `f1ed57670`) — iam phantom-perm row was 🟠 fix-now → ⛔ TRIGGER: real fix needs cross-module permission-catalog change (CLAUDE.md hard-stop). Trackers-only commit, no code change.
+- **H-G** (contingent downgrade `3e7fb9975`) — `profileDefaultsAdapter` hardcodes default-template `status:"published"`; real fix needs a template-version-status reader, `NewProfileDefaults` signature change + main.go wiring, AND collides with the H-PRE-1 advisory-lock deadlock constraint (status read must stay off the lock-holding atomic CD-create tx). 🟠 fix-now → ⛔ TRIGGER. Trackers-only commit, no code change. Trigger: `DocumentProfile`/taxonomy gains a default-template status field, or a status-aware template reader is threaded off-tx.
+
+**KEEP register** (7 — verified correct as-is, no action):
+1. B6 `ESCAPE '\\'` — correct (false-positive in review; single backslash on the wire).
+2. Presence Snapshot `INNER JOIN auth_identities` — behavior identical to LEFT JOIN on every reachable path; not changed (surgical scope).
+3. `admin_handler.go` `username` add — correct in-family B1/B2 enrichment, not B3 drift.
+4. H-F metrics — Go codegen empirically neutral (tag-filtered embedded-spec); only FE types regen; handler already emitted percentiles, schema-only declaration.
+5. H-C env guards — `fanout`/`retention` fail-loud-on-invalid behavior intentional + self-documented.
+6. H-B RFC9457 — `application/problem+json` content-type + member shape conform; no over-broadening.
+7. Advisory-lock deadlock constraint (H-PRE-1) — off-tx default-template fetch in documents service left untouched; H-G respects it.
+
+**Result:** branch READY-for-v1 pending operator review. No merge performed (operator review gate). Resume point: operator approves → standard merge of `qa/iam-area-membership`; the two TRIGGER downgrades (H-D, H-G) carry written triggers and do not block v1.
