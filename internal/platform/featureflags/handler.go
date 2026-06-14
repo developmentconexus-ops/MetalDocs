@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"metaldocs/internal/platform/config"
+	"metaldocs/internal/platform/httpresponse"
 )
 
 // Handler serves GET /api/v1/feature-flags.
@@ -30,7 +31,7 @@ type featureFlagsResponse struct {
 
 func (h *Handler) handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		httpresponse.WriteMethodNotAllowed(w, "GET")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

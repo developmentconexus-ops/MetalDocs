@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/requesttrace"
 
 	"go.opentelemetry.io/otel/trace"
@@ -146,7 +147,7 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 func (o *HTTPObservability) MetricsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
+			httpresponse.WriteMethodNotAllowed(w, "GET")
 			return
 		}
 
