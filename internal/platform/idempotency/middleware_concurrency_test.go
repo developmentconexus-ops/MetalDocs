@@ -1,3 +1,5 @@
+//go:build integration
+
 package idempotency_test
 
 import (
@@ -11,7 +13,7 @@ import (
 	"time"
 
 	"metaldocs/internal/platform/idempotency"
-	"metaldocs/internal/testsupport/pgtest"
+	"metaldocs/tests/integration/testdb"
 )
 
 // TestMiddleware_ConcurrentSameKey_HandlerExecutesOnce wires the real Require
@@ -19,7 +21,8 @@ import (
 // two HTTP goroutines sharing the same Idempotency-Key and body cause the
 // handler to run exactly once, with both clients receiving the same response.
 func TestMiddleware_ConcurrentSameKey_HandlerExecutesOnce(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	store := idempotency.New(db, "POST /mwc")
 
 	var executed int32
@@ -31,7 +34,7 @@ func TestMiddleware_ConcurrentSameKey_HandlerExecutesOnce(t *testing.T) {
 		w.WriteHeader(201)
 		_, _ = w.Write([]byte(`{"id":"one"}`))
 	})
-	chain := withIDs(testTenantMW, testActorMW)(
+	chain := withIDs(tenant.ID, testActorMW)(
 		idempotency.Require(store, actorFromCtx)(handler),
 	)
 
@@ -72,7 +75,8 @@ func TestMiddleware_ConcurrentSameKey_HandlerExecutesOnce(t *testing.T) {
 // TestMiddleware_HandlerPanic_FreesSlot proves the FailReplay defer releases
 // the slot when the handler panics, so a retry with the same key can run.
 func TestMiddleware_HandlerPanic_FreesSlot(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	store := idempotency.New(db, "POST /mwp")
 
 	var panicked, recovered int32
@@ -80,7 +84,7 @@ func TestMiddleware_HandlerPanic_FreesSlot(t *testing.T) {
 		atomic.AddInt32(&panicked, 1)
 		panic("simulated handler crash")
 	})
-	chain := withIDs(testTenantMW, testActorMW)(
+	chain := withIDs(tenant.ID, testActorMW)(
 		idempotency.Require(store, actorFromCtx)(panicHandler),
 	)
 
@@ -111,7 +115,7 @@ func TestMiddleware_HandlerPanic_FreesSlot(t *testing.T) {
 		atomic.AddInt32(&retryRan, 1)
 		w.WriteHeader(200)
 	})
-	retryChain := withIDs(testTenantMW, testActorMW)(
+	retryChain := withIDs(tenant.ID, testActorMW)(
 		idempotency.Require(store, actorFromCtx)(retryHandler),
 	)
 	req2 := httptest.NewRequest("POST", "/mwp", bytes.NewReader([]byte(`{}`)))
@@ -129,7 +133,8 @@ func TestMiddleware_HandlerPanic_FreesSlot(t *testing.T) {
 // TestMiddleware_NonSuccess_DoesNotCacheResponse proves a 4xx/5xx response
 // releases the slot via FailReplay so retries are not pinned to the failure.
 func TestMiddleware_NonSuccess_DoesNotCacheResponse(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	store := idempotency.New(db, "POST /mwn")
 
 	var ran int32
@@ -144,7 +149,7 @@ func TestMiddleware_NonSuccess_DoesNotCacheResponse(t *testing.T) {
 		w.WriteHeader(200)
 		_, _ = w.Write([]byte("ok"))
 	})
-	chain := withIDs(testTenantMW, testActorMW)(
+	chain := withIDs(tenant.ID, testActorMW)(
 		idempotency.Require(store, actorFromCtx)(flakyHandler),
 	)
 	key := "66666666-6666-4666-8666-666666666" + uniqSuffix()

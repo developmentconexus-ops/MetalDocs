@@ -1,3 +1,5 @@
+//go:build integration
+
 package riverjobs
 
 import (
@@ -14,7 +16,7 @@ import (
 	"github.com/riverqueue/river/rivermigrate"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 
-	"metaldocs/internal/testsupport/pgtest"
+	"metaldocs/tests/integration/testdb"
 )
 
 type compatibilityArgs struct {
@@ -26,10 +28,13 @@ func (compatibilityArgs) Kind() string { return "scheduled_publish_compatibility
 func TestRiverInsertTxCompatibilityBoundary(t *testing.T) {
 	t.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	// Open the isolated test DB first; template bootstrap can take minutes on
+	// first run. The 30-second operation timeout below applies only to the
+	// river-specific work after the DB is ready.
+	db, _ := testdb.Open(t)
 
-	db := pgtest.OpenAndMigrate(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
 	schema := fmt.Sprintf("river_task1_%d", time.Now().UTC().UnixNano())
 
 	if _, err := db.ExecContext(ctx, "CREATE SCHEMA "+schema); err != nil {
@@ -56,7 +61,7 @@ func TestRiverInsertTxCompatibilityBoundary(t *testing.T) {
 	}
 
 	clientType := reflect.TypeOf(bundle.Client).String()
-	if !strings.Contains(clientType, "*sql.Tx") {
+	if !strings.Contains(clientType, "database/sql.Tx") {
 		t.Fatalf("client type = %q; want database/sql transaction client", clientType)
 	}
 

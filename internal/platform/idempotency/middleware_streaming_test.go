@@ -1,3 +1,5 @@
+//go:build integration
+
 package idempotency_test
 
 import (
@@ -8,7 +10,7 @@ import (
 	"testing"
 
 	"metaldocs/internal/platform/idempotency"
-	"metaldocs/internal/testsupport/pgtest"
+	"metaldocs/tests/integration/testdb"
 )
 
 // streamingHandler asserts the writer is a Flusher and calls Flush.
@@ -37,9 +39,10 @@ func streamingHandler() http.Handler {
 // clear panic naming WithStreamingOptOut. The middleware's deferred
 // recover logs and re-panics, so the panic surfaces here.
 func TestMiddleware_StreamingHandler_WithoutOptOut_FailsClosed(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	store := idempotency.New(db, "POST /stream")
-	h := withIDs(testTenantMW, testActorMW)(
+	h := withIDs(tenant.ID, testActorMW)(
 		idempotency.Require(store, actorFromCtx)(streamingHandler()),
 	)
 	req := httptest.NewRequest("POST", "/stream", bytes.NewReader([]byte(`{}`)))
@@ -70,13 +73,14 @@ func TestMiddleware_StreamingHandler_WithoutOptOut_FailsClosed(t *testing.T) {
 // no Idempotency-Key required, Flush works on the raw httptest recorder,
 // and the full streamed body reaches the client.
 func TestMiddleware_StreamingHandler_WithOptOut_PassesThroughUnwrapped(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	store := idempotency.New(db, "POST /stream")
 
 	optOut := func(r *http.Request) bool {
 		return r.URL.Path == "/stream"
 	}
-	h := withIDs(testTenantMW, testActorMW)(
+	h := withIDs(tenant.ID, testActorMW)(
 		idempotency.Require(store, actorFromCtx, idempotency.WithStreamingOptOut(optOut))(streamingHandler()),
 	)
 
@@ -101,10 +105,11 @@ func TestMiddleware_StreamingHandler_WithOptOut_PassesThroughUnwrapped(t *testin
 // is consulted per-request: when it returns false, the middleware enforces
 // the Idempotency-Key contract as usual.
 func TestMiddleware_OptOutFalse_StillEnforcesIdempotency(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	store := idempotency.New(db, "POST /test")
 	neverOptOut := func(*http.Request) bool { return false }
-	h := withIDs(testTenantMW, testActorMW)(
+	h := withIDs(tenant.ID, testActorMW)(
 		idempotency.Require(store, actorFromCtx, idempotency.WithStreamingOptOut(neverOptOut))(handler201(`{}`)),
 	)
 	req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte(`{}`)))

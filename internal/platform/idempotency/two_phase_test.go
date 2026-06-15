@@ -1,3 +1,5 @@
+//go:build integration
+
 package idempotency_test
 
 import (
@@ -10,13 +12,10 @@ import (
 	"time"
 
 	"metaldocs/internal/platform/idempotency"
-	"metaldocs/internal/testsupport/pgtest"
+	"metaldocs/tests/integration/testdb"
 )
 
-const (
-	twoPhaseTenant = "00000000-0000-4000-8000-0000000000aa"
-	twoPhaseActor  = "actor-two-phase"
-)
+const twoPhaseActor = "actor-two-phase"
 
 // uniqueKey returns a fresh idempotency key per test so test ordering does not
 // matter and the table can accumulate rows from prior runs without skewing.
@@ -25,11 +24,12 @@ func uniqueKey(prefix string) string {
 }
 
 func TestBeginReplay_FirstCall_ReturnsHandle(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	s := idempotency.New(db, "POST /tp/{id}")
 	ctx := context.Background()
 
-	handle, replay, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, uniqueKey("first"), "hash-a")
+	handle, replay, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, uniqueKey("first"), "hash-a")
 	if err != nil {
 		t.Fatalf("BeginReplay: %v", err)
 	}
@@ -45,56 +45,72 @@ func TestBeginReplay_FirstCall_ReturnsHandle(t *testing.T) {
 }
 
 func TestBeginReplay_InFlightRowAllowsNullResponseColumns(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	s := idempotency.New(db, "POST /tp/{id}")
 	ctx := context.Background()
-	key := uniqueKey("in-flight")
 
-	handle, replay, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-a")
-	if err != nil {
-		t.Fatalf("BeginReplay: %v", err)
-	}
-	if replay != nil {
-		t.Fatalf("first call should not return a replay")
+	// Part A — schema check: insert an in-flight row directly (committed,
+	// so it is visible to subsequent queries) and verify response columns are
+	// nullable at rest. idempotency_keys carries no tripwire; direct insert is valid.
+	schemaKey := uniqueKey("in-flight-schema")
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO metaldocs.idempotency_keys
+			(tenant_id, actor_user_id, route_template, key, payload_hash, status, expires_at)
+		VALUES ($1::uuid, $2, $3, $4, $5, 'in_flight', now() + interval '24 hours')`,
+		tenant.ID, twoPhaseActor, "POST /tp/{id}", schemaKey, "hash-schema",
+	); err != nil {
+		t.Fatalf("direct insert in_flight row: %v", err)
 	}
 
 	var (
-		status                string
-		responseStatusIsNull  bool
-		responseBodyIsNull    bool
-		completedResponseCode int
-		completedResponseBody []byte
+		status               string
+		responseStatusIsNull bool
+		responseBodyIsNull   bool
 	)
-	err = db.QueryRowContext(ctx, `
+	if err := db.QueryRowContext(ctx, `
 		SELECT status, response_status IS NULL, response_body IS NULL
 		  FROM metaldocs.idempotency_keys
 		 WHERE tenant_id = $1
 		   AND actor_user_id = $2
 		   AND route_template = $3
 		   AND key = $4`,
-		twoPhaseTenant, twoPhaseActor, "POST /tp/{id}", key,
-	).Scan(&status, &responseStatusIsNull, &responseBodyIsNull)
-	if err != nil {
+		tenant.ID, twoPhaseActor, "POST /tp/{id}", schemaKey,
+	).Scan(&status, &responseStatusIsNull, &responseBodyIsNull); err != nil {
 		t.Fatalf("query in_flight row: %v", err)
 	}
 	if status != "in_flight" || !responseStatusIsNull || !responseBodyIsNull {
-		t.Fatalf("want in_flight row with null response fields, got status=%q status_null=%v body_null=%v", status, responseStatusIsNull, responseBodyIsNull)
+		t.Fatalf("want in_flight row with null response fields, got status=%q status_null=%v body_null=%v",
+			status, responseStatusIsNull, responseBodyIsNull)
 	}
 
+	// Part B — round-trip check: begin + complete via the store, then verify
+	// the committed completed row has the expected response columns populated.
+	rtKey := uniqueKey("in-flight-rt")
+	handle, replay, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, rtKey, "hash-a")
+	if err != nil {
+		t.Fatalf("BeginReplay: %v", err)
+	}
+	if replay != nil {
+		t.Fatalf("first call should not return a replay")
+	}
 	if err := s.CompleteReplay(handle, 201, []byte(`{"ok":true}`)); err != nil {
 		t.Fatalf("CompleteReplay: %v", err)
 	}
 
-	err = db.QueryRowContext(ctx, `
+	var (
+		completedResponseCode int
+		completedResponseBody []byte
+	)
+	if err := db.QueryRowContext(ctx, `
 		SELECT status, response_status, response_body
 		  FROM metaldocs.idempotency_keys
 		 WHERE tenant_id = $1
 		   AND actor_user_id = $2
 		   AND route_template = $3
 		   AND key = $4`,
-		twoPhaseTenant, twoPhaseActor, "POST /tp/{id}", key,
-	).Scan(&status, &completedResponseCode, &completedResponseBody)
-	if err != nil {
+		tenant.ID, twoPhaseActor, "POST /tp/{id}", rtKey,
+	).Scan(&status, &completedResponseCode, &completedResponseBody); err != nil {
 		t.Fatalf("query completed row: %v", err)
 	}
 	if status != "completed" {
@@ -109,12 +125,13 @@ func TestBeginReplay_InFlightRowAllowsNullResponseColumns(t *testing.T) {
 }
 
 func TestBeginCompleteReplay_RoundTrip(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	s := idempotency.New(db, "POST /tp/{id}")
 	ctx := context.Background()
 	key := uniqueKey("round")
 
-	handle, _, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-a")
+	handle, _, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, key, "hash-a")
 	if err != nil {
 		t.Fatalf("Begin1: %v", err)
 	}
@@ -122,7 +139,7 @@ func TestBeginCompleteReplay_RoundTrip(t *testing.T) {
 		t.Fatalf("Complete: %v", err)
 	}
 
-	_, replay, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-a")
+	_, replay, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, key, "hash-a")
 	if err != nil {
 		t.Fatalf("Begin2: %v", err)
 	}
@@ -132,12 +149,13 @@ func TestBeginCompleteReplay_RoundTrip(t *testing.T) {
 }
 
 func TestBeginReplay_ConflictOnHashMismatch(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	s := idempotency.New(db, "POST /tp/{id}")
 	ctx := context.Background()
 	key := uniqueKey("conflict")
 
-	handle, _, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-a")
+	handle, _, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, key, "hash-a")
 	if err != nil {
 		t.Fatalf("Begin1: %v", err)
 	}
@@ -145,19 +163,20 @@ func TestBeginReplay_ConflictOnHashMismatch(t *testing.T) {
 		t.Fatalf("Complete: %v", err)
 	}
 
-	_, _, err = s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-b")
+	_, _, err = s.BeginReplay(ctx, tenant.ID, twoPhaseActor, key, "hash-b")
 	if !errors.Is(err, idempotency.ErrConflict) {
 		t.Fatalf("expected ErrConflict, got %v", err)
 	}
 }
 
 func TestBeginReplay_FailReleasesSlot(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	s := idempotency.New(db, "POST /tp/{id}")
 	ctx := context.Background()
 	key := uniqueKey("fail")
 
-	handle1, _, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-a")
+	handle1, _, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, key, "hash-a")
 	if err != nil {
 		t.Fatalf("Begin1: %v", err)
 	}
@@ -165,7 +184,7 @@ func TestBeginReplay_FailReleasesSlot(t *testing.T) {
 		t.Fatalf("FailReplay: %v", err)
 	}
 
-	handle2, replay, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-a")
+	handle2, replay, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, key, "hash-a")
 	if err != nil {
 		t.Fatalf("Begin2: %v", err)
 	}
@@ -183,7 +202,8 @@ func TestBeginReplay_FailReleasesSlot(t *testing.T) {
 // must serialize them so the second observes the cached response, and the
 // handler-side "execute" counter must increment exactly once.
 func TestBeginReplay_ConcurrentSameKeySameHash(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	s := idempotency.New(db, "POST /tp/{id}")
 	ctx := context.Background()
 	key := uniqueKey("concurrent-same")
@@ -194,7 +214,7 @@ func TestBeginReplay_ConcurrentSameKeySameHash(t *testing.T) {
 
 	run := func(idx int) {
 		defer wg.Done()
-		handle, replay, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-a")
+		handle, replay, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, key, "hash-a")
 		if err != nil {
 			results[idx] = "err:" + err.Error()
 			return
@@ -241,7 +261,8 @@ func TestBeginReplay_ConcurrentSameKeySameHash(t *testing.T) {
 // TestBeginReplay_ConcurrentSameKeyDifferentHash proves the loser sees
 // ErrConflict when the winner committed a different payload hash.
 func TestBeginReplay_ConcurrentSameKeyDifferentHash(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	s := idempotency.New(db, "POST /tp/{id}")
 	ctx := context.Background()
 	key := uniqueKey("concurrent-diff")
@@ -256,7 +277,7 @@ func TestBeginReplay_ConcurrentSameKeyDifferentHash(t *testing.T) {
 
 	run := func(idx int) {
 		defer wg.Done()
-		handle, replay, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, hashes[idx])
+		handle, replay, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, key, hashes[idx])
 		if err != nil {
 			results[idx] = outcome{role: "err", err: err}
 			return
@@ -298,12 +319,13 @@ func TestBeginReplay_ConcurrentSameKeyDifferentHash(t *testing.T) {
 // completed, a stale concurrent writer cannot overwrite payload_hash via
 // CompleteReplay against a handle that was already released.
 func TestCompleteReplay_DoubleCallFails(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	s := idempotency.New(db, "POST /tp/{id}")
 	ctx := context.Background()
 	key := uniqueKey("double-complete")
 
-	handle, _, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-a")
+	handle, _, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, key, "hash-a")
 	if err != nil {
 		t.Fatalf("Begin: %v", err)
 	}
@@ -316,12 +338,13 @@ func TestCompleteReplay_DoubleCallFails(t *testing.T) {
 }
 
 func TestCompleteReplay_RejectsInvalidStatus(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
+	db, _ := testdb.Open(t)
+	tenant := testdb.NewTenant(t, db)
 	s := idempotency.New(db, "POST /tp/{id}")
 	ctx := context.Background()
 	key := uniqueKey("invalid-status")
 
-	handle, _, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-a")
+	handle, _, err := s.BeginReplay(ctx, tenant.ID, twoPhaseActor, key, "hash-a")
 	if err != nil {
 		t.Fatalf("Begin: %v", err)
 	}
