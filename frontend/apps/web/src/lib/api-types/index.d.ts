@@ -2142,6 +2142,8 @@ export interface components {
             display_name: string;
             /** Format: date-time */
             last_seen_at: string;
+            /** @enum {string} */
+            status?: "online" | "idle";
         };
         PresenceStreamItem: {
             user_id: string;
@@ -2538,6 +2540,11 @@ export interface components {
             };
             api_calls: components["schemas"]["UsageWindowCounts"];
             active_users: components["schemas"]["UsageWindowCounts"];
+            /**
+             * @description Tenant plan label; null when no plan row exists.
+             * @enum {string|null}
+             */
+            plan_tier?: "free" | "pro" | "enterprise" | null;
         };
         UpsertUserRoleRequest: {
             display_name?: string;
@@ -2603,6 +2610,15 @@ export interface components {
             /** Format: uuid */
             template_version_id: string;
             name: string;
+        };
+        ListTemplatesResponse: {
+            data: {
+                templates: components["schemas"]["TemplateDTO"][];
+            };
+            meta: {
+                limit: number;
+                offset: number;
+            };
         };
         TemplateDTO: {
             /** Format: uuid */
@@ -4117,7 +4133,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TemplateDTO"][];
+                    "application/json": components["schemas"]["ListTemplatesResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
