@@ -26,11 +26,13 @@ defect**, not a harness bug:
   metaldocs-first (the operator/dev DSN's `search_path=metaldocs,public`). That shadow is harmless in
   production (public-first) but fails the test harness (`column "tenant_id" ... does not exist`,
   SQLSTATE 42703 — "Family A").
-- `metaldocs.documents` anchors a **7-table dead FK satellite cluster** (`document_attachments`,
+- `metaldocs.documents` anchors an **8-table dead FK satellite cluster** (`document_attachments`,
   `document_collaboration_presence`, `document_edit_locks`, `document_template_assignments`,
-  `document_versions`, `document_versions_mddm`, `workflow_approvals`). All nine objects + the
-  satellites have **zero runtime Go references** (only one comment calling the schema
-  "decommissioned"). Dead at the runtime layer, verified pre-flight.
+  `document_versions`, `document_versions_mddm`, `document_version_images`, `workflow_approvals`).
+  The whole 10-object set (anchor + 8 satellites + `template_audit_log`) has **zero runtime Go
+  references** (only one comment calling the schema "decommissioned"). Dead at the runtime layer —
+  verified by F4b.1's census (`f4b.1-legacy-cluster-census/evidence.md`); `document_version_images` is
+  a 2nd-level satellite caught during that census.
 
 Operator decision 2026-06-15: **fix the root cause** (drop the dead duplicate cluster) rather than
 adapt the harness `search_path`; and **fix the Family-B stale seeds now**. F4.1b
@@ -40,7 +42,7 @@ an adaptation.
 
 ## Objective
 
-Eliminate the dead `metaldocs.documents` legacy duplicate cluster (the table, its 7 FK-satellite
+Eliminate the dead `metaldocs.documents` legacy duplicate cluster (the table, its 8 FK-satellite
 tables, their indexes/constraints/sequences) and the dead `metaldocs.template_audit_log` duplicate, so
 that bare unqualified `documents` (and `template_audit_log`) resolves to the real `public.*` table
 under **any** `search_path` ordering — permanently removing the shadow landmine. Separately, repair the
@@ -53,8 +55,8 @@ close-gate blocker and removing a latent correctness hazard ahead of the M5 re-a
 
 | Feature id | Slug / folder | What to implement | What to validate (acceptance) |
 |------------|---------------|-------------------|-------------------------------|
-| F4b.1 | `f4b.1-legacy-cluster-census` | Verify-dead census of every object slated for drop: `metaldocs.documents`, the 7 satellite tables, `metaldocs.template_audit_log`, and their indexes/constraints/sequences. Confirm zero dependents across **all** surfaces — Go runtime (done pre-flight: zero), curated baseline + migrations (views, triggers, RLS policies, FKs **inbound from any live table**), reference-data seeds, and any OpenAPI/contract anchor (cf. the `document_access_policies` keep-precedent in 0231). Produce a per-object verified-dead manifest. | A manifest listing every object to drop with its dependency proof (`0` inbound refs from any non-dropped object). **If any live dependent is found → HS-2 stop** (the cluster is not dead; report boundary, do not drop). |
-| F4b.2 | `f4b.2-drop-migration-baseline-mirror` | A forward-only, idempotent `metaldocs-database` migration that `DROP`s the verified-dead objects from F4b.1 (CASCADE-safe, ordered satellites-before-anchor or explicit CASCADE), with a `schema_migrations` row; **mirrored inline into the curated baseline** (`db/baseline/0001_current_schema.sql`) per repo policy. No production runtime wiring touched. | Migration applies clean on a fresh bootstrap from prerequisites→baseline→reference-data→migrations; post-apply `metaldocs.documents` / `metaldocs.template_audit_log` / all 7 satellites are **absent**; bare `documents` resolves to `public.documents` under `search_path=metaldocs,public`; baseline and migration agree (a from-baseline build and a from-migration build produce the same schema for the affected objects). |
+| F4b.1 | `f4b.1-legacy-cluster-census` | Verify-dead census of every object slated for drop: `metaldocs.documents`, the 8 satellite tables, `metaldocs.template_audit_log`, and their indexes/constraints/sequences. Confirm zero dependents across **all** surfaces — Go runtime (done pre-flight: zero), curated baseline + migrations (views, triggers, RLS policies, FKs **inbound from any live table**), reference-data seeds, and any OpenAPI/contract anchor (cf. the `document_access_policies` keep-precedent in 0231). Produce a per-object verified-dead manifest. | A manifest listing every object to drop with its dependency proof (`0` inbound refs from any non-dropped object). **If any live dependent is found → HS-2 stop** (the cluster is not dead; report boundary, do not drop). |
+| F4b.2 | `f4b.2-drop-migration` | A forward-only, idempotent `metaldocs-database` migration (`> 0239`) that `DROP`s the verified-dead objects from F4b.1 (`DROP TABLE IF EXISTS ... CASCADE`, satellites-before-anchor), with one `public.schema_migrations` row. The curated baseline (`db/baseline/0001_current_schema.sql`) is a **frozen snapshot** and is **left untouched** — per repo evidence (`document_subjects`/`templates_template.areas` dropped by 0236 still live in the baseline) the baseline is never re-mirrored; the migration tail carries forward state. A durable-decision **ADR** records the teardown (destructive-change rule). No production runtime wiring touched. | Migration applies clean on a fresh bootstrap (prerequisites→baseline→reference-data→migrations) — i.e. baseline creates the cluster, the new migration drops it; post-apply `metaldocs.documents` / `metaldocs.template_audit_log` / all 8 satellites are **absent**; bare `documents` resolves to `public.documents` under `search_path=metaldocs,public`; migration is idempotent (re-run = no-op). |
 | F4b.3 | `f4b.3-family-b-seed-fix` | Repair the stale tripwire-guarded test seeds (Family B, SQLSTATE P0001 `ErrCapabilityNotAsserted`): `documents/approval/jobs` (`scheduled_publish_job_test.go`), `documents/approval/repository` (`postgres_approval_repository_test.go`), `iam/authz` (`authz_bypass_test.go`), `documents/repository` (`repository_revision_history_integration_test.go`) — set `metaldocs.asserted_caps` (or use the established bypass GUC) before writing `controlled_documents` / `iam_user_roles`. Test-only; no production change. | The named tests pass from a clean baseline under the operator DSN; the tripwire still fires for genuinely-unasserted writes (no weakening of `enforce_capability_asserted`). |
 | F4b.4 | `f4b.4-integration-suite-green` | Prove the teardown re-greens the M4 blocker and introduces no regression, **without any harness change**. | F4.1a Gate #5 (`TestCreateDocumentTx_PopulatesAllSnapshotColumns`) passes deterministically with the operator DSN **including** `search_path=metaldocs,public`; `git diff tests/integration/testdb/db.go` is **empty** (db.go at HEAD — fix-not-adapt proof); full integration suite green from clean baseline under the operator DSN (captured output); Family A (42703) and Family B (P0001) classes both at 0. |
 
