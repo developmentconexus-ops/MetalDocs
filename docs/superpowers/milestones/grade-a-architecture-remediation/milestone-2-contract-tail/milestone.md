@@ -1,8 +1,15 @@
 # Milestone 2 — Contract Tail (H-D class) (Wave B)
 
 > **Program:** grade-a-architecture-remediation  ·  **Governing spec:** `docs/superpowers/specs/2026-06-14-grade-a-architecture-remediation-design.md` (§6 M2)
-> **Status:** Spec approved
+> **Status:** All 3 features closed + single FE regen done — awaiting milestone-validator (C1–C7) close gate
 > **Authored:** 2026-06-14 — *before any feature in this milestone began.*
+
+> **Execution log (not spec):** F2.1 `f2.1-usage-plantier` committed `69ad234d`; F2.2 `f2.2-presence-status`
+> committed `0f0fb1ee`; F2.3 `f2.3-templates-envelope` committed `4ab670b1`. Single milestone-batched FE
+> `gen:api` (the one regen) committed `728783f6` — `openapi-typescript` surfaced `plan_tier`,
+> `OnlinePresenceItem.status?`, `ListTemplatesResponse`; FE `tsc --noEmit` exit 0. HS-2 (FE eigenpal
+> `file:` path) did not block: `gen:api` uses the present `openapi-typescript` binary only, no `pnpm install`.
+> Next: dispatch the `milestone-validator` subagent (Phase 4).
 
 > This file is a **spec**, authored up front. It says **what** this milestone is, **which features** it
 > contains, **what each feature implements**, and **what gets validated**. It contains **no execution
