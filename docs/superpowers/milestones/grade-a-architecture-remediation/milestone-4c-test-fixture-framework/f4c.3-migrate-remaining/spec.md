@@ -145,3 +145,26 @@ For each of the 7 `pgtest.OpenAndMigrate` callers
 
 - [x] No durable decision in F4c.3 itself — the framework decision (ADR) is F4c.5; trigger fix (if
   any HS-2 surfaces) gets its own ADR under that HS-2's escalation.
+
+## HS-6 reconciliation (post-approval — declarative scope amended with build-tag filter)
+
+The approved declarative grep rules (Q1) over-counted: they matched sqlmock unit tests that
+**string-match** `set_config('metaldocs.asserted_caps`, ...)` in their mock expectation handlers.
+Those strings are mock-match patterns, not runtime DB calls — the tests never touch a real DB.
+First Workflow batch briefly over-migrated 3 of these unit-test files; reverted at `4b5e2fc5`.
+Scope rules amended:
+
+> A file is in F4c.3 scope only if its first line is `//go:build integration` **and** it inline-asserts
+> `metaldocs.asserted_caps` / hardcodes a tenant UUID / owns a local seed helper / uses bare
+> unqualified `documents` at runtime (not in a mock-string literal).
+
+Net effect on the cluster lists in this spec — 15 listed files struck (per [`evidence.md`](evidence.md)
+strike table). This filter is also the F4c.4 grep-guard input.
+
+## Post-close finding (does NOT block F4c.3 close)
+
+`go test -tags integration ./...` (AC6) is RED at suite level, **fully from pre-existing M4b
+teardown debt** in `tests/integration/scenarios/` (dropped `documents.tenant_id`, `governance_events`,
+`approval_instances`, `documents_v2/...`). Baseline-equality verified on `4b5e2fc5` (pre-F4c.3-batch-1).
+F4c.3 introduced zero new failures. Cleanup of `tests/integration/scenarios/` is bounded out as
+**M4b post-teardown debt** — see [`evidence.md`](evidence.md) Defers table.
