@@ -1,7 +1,7 @@
 # Program: Grade-A Architecture Remediation
 
 > **Governing spec:** `docs/superpowers/specs/2026-06-14-grade-a-architecture-remediation-design.md`
-> **Status:** In progress (M0–M3 passed; M4 close gate originally blocked → root-caused via M4b legacy-cluster drop (`071931c9`) + M4c unified test-fixture framework → **M4 re-validated PASS** 2026-06-15; M4c passed. **M4 closed.** M5 independent re-audit now in-progress — terminal acceptance.)
+> **Status:** **Closed 2026-06-15 — superseded by `../grade-a-completion/`.** M0–M4 + M4b/M4c passed. M5's F5.1 independent re-audit ran and returned **MICRO-WAVE NEEDED** (did **not** pass the §6 bar — see HS-5). Rather than run the F5.2 micro-wave loop inline, the operator spun the remaining gap out into the standalone **`grade-a-completion`** mission (this program's F5.2 under M5/HS-5). **Grade A is therefore not yet independently proven** — that sign-off now belongs to `grade-a-completion`'s terminal acceptance (re-run F5.1, pass §6). This program is closed-by-handoff; tracking continues there.
 > **Owner / operator:** leandrotca.work (operator) + backend agent (Opus 4.8)
 
 Take the backend's three formerly-C audit dimensions (module-boundaries/DDD, contract/API,
@@ -22,9 +22,9 @@ hard-stop. **Terminal acceptance:** the M5 independent multi-agent re-audit pass
 | 4 | `milestone-4-systemic-ports` | Close H-G class via shared ports (UserDisplayNameReader, TemplateVersionStateReader) | passed | original [FAIL](milestone-4-systemic-ports/qa/milestone-qa.md)→4b/4c→re-validated [PASS](milestone-4-systemic-ports/qa/milestone-qa-rerun-2026-06-15.md) |
 | 4b | `milestone-4b-legacy-schema-teardown` | Drop dead `metaldocs.documents` duplicate cluster + `template_audit_log` (root cause of F4.1a Gate #5); fix Family-B tripwire seeds | partial — superseded by 4c | F4b.1+F4b.2 done (drop migration `071931c9`); F4b.3/F4b.4 → 4c |
 | 4c | `milestone-4c-test-fixture-framework` | One unified test-fixture framework (factories on `testdb`) + migrate all stateful tests + CI grep-guards; closes the M4 blocker at root cause | passed | [PASS](milestone-4c-test-fixture-framework/qa/milestone-qa.md) |
-| 5 | `milestone-5-independent-re-audit` | Prove Grade A by independent fresh multi-agent re-audit (authoritative) | in-progress | — |
+| 5 | `milestone-5-independent-re-audit` | Prove Grade A by independent fresh multi-agent re-audit (authoritative) | closed-by-handoff | F5.1 done → [MICRO-WAVE NEEDED](../../../../wiki/backend/_artifacts/architecture-re-audit-2026-06-15.md); F5.2 → `../grade-a-completion/` |
 
-Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
+Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open) / `closed-by-handoff` (remaining scope continued in a successor mission).
 
 ## Hard-stops raised
 
@@ -51,15 +51,16 @@ Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) 
 | 2026-06-15 | HS-1 | M4c close gate — `milestone-validator` C1–C7 **PASS** presented to operator | **Approved** by operator 2026-06-15 ("finish M4 and move to M5"). M4c → passed; verdict `milestone-4c-test-fixture-framework/qa/milestone-qa.md`. Per the HS-6 plan (line 47), re-dispatch the M4 validator before closing M4. |
 | 2026-06-15 | HS-4 | M4 close re-dispatch — the on-disk M4 verdict was the original **FAIL** (HEAD `30503533`, F4.1a Gate #5 `search_path`-shadow); never re-run after the M4b cluster-drop (`071931c9`) removed the root cause. Operator authorized re-dispatching the M4 validator from clean state. | **Resolved — re-validation PASS** 2026-06-15. `milestone-validator` re-ran C1–C7 from clean state: F4.1a Gate #5 greens under the operator DSN `search_path=metaldocs,public` with `db.go` unmodified at HEAD (schema-level root-cause fix proven; original C6 symptom-patch hit cleared). H-G class re-measured at class-level zero. Verdict: `milestone-4-systemic-ports/qa/milestone-qa-rerun-2026-06-15.md`. M4 → passed. |
 | 2026-06-15 | HS-1 | M5 open gate — operator directed "move to M5" at the M4c close gate | **Approved** by operator 2026-06-15. M5 → in-progress; `milestone.md` authored up front (F5.1–F5.3, no execution detail) + F5.1 audit charter/plan before the re-audit ran. |
-| 2026-06-15 | HS-5 | F5.1 independent re-audit (Workflow `wf_b0109977-23a`, 42 agents) returned **VERDICT: MICRO-WAVE NEEDED** — all 4 §6 checks FAIL: 3 formerly-C dims < A− (module-boundaries B+, contract-api **C+**, composition B+); **21** skeptic-confirmed Critical/Major (1 Critical + 20 Major; report §3 headline "18" is an undercount, §4 table authoritative); H-D = **4**; H-G = **1** (+1 new boundary site). Report: `wiki/backend/_artifacts/architecture-re-audit-2026-06-15.md`. | **Awaiting operator decision (continue F5.2 micro-wave loop vs replan).** No F5.2 work begun. Highest-priority confirmed: authz `effective_from` ignored (premature access), manual-code CD-create broken for non-admins, checkpoint PascalCase FE-contract break. |
+| 2026-06-15 | HS-5 | F5.1 independent re-audit (Workflow `wf_b0109977-23a`, 42 agents) returned **VERDICT: MICRO-WAVE NEEDED** — all 4 §6 checks FAIL: 3 formerly-C dims < A− (module-boundaries B+, contract-api **C+**, composition B+); **21** skeptic-confirmed Critical/Major (1 Critical + 20 Major; report §3 headline "18" is an undercount, §4 table authoritative); H-D = **4**; H-G = **1** (+1 new boundary site). Report: `wiki/backend/_artifacts/architecture-re-audit-2026-06-15.md`. | **Resolved by handoff 2026-06-15 — operator spun the F5.2 micro-wave into a standalone mission.** The 21 findings + H-D/H-G classes were decomposed (via `/mission`) into **`../grade-a-completion/`** (5 milestones, authz→contract→observability→quality→ports-last; terminal acceptance = re-run F5.1 + pass §6). This program is closed-by-handoff; the F5.2 loop and Grade-A sign-off live there. |
 
 ## Program close-out / reconciliation
 
-Fill in only when the last milestone has passed:
+**Closed-by-handoff 2026-06-15.** M0–M4 (+M4b/M4c) delivered; M5's authoritative gate (F5.1 re-audit) ran but did **not** pass the §6 bar, so the remaining F5.2 scope was carried forward into **`../grade-a-completion/`** rather than closed here.
 
-- [ ] Every planned feature (M0–M4, M4b) has a complete evidence row.
-- [ ] Zero unplanned scope merged; anything added is recorded with rationale.
-- [ ] Every bounded defer has a written trigger and an owner.
-- [ ] M5 re-audit passed the §6 pass bar — link the evidence.
-- [ ] Forward roadmap (F0.3) reflects the executed program and any deferred triggers.
-- [ ] Operator sign-off: <date / name>
+- [x] Every planned feature (M0–M4, M4b, M4c) has a complete evidence row.
+- [x] Zero unplanned scope merged; anything added is recorded with rationale (HS-6 rows above).
+- [x] Every bounded defer has a written trigger and an owner — the open ones (21 confirmed findings, H-D=4, H-G=1) are inventoried in `../grade-a-completion/discovery-brief.md` and homed to milestones there.
+- [ ] **M5 re-audit passed the §6 pass bar** — **NOT met here.** F5.1 returned MICRO-WAVE NEEDED; the pass-bar proof is the terminal acceptance of `../grade-a-completion/` (re-run F5.1, pass §6). **Grade A is not yet independently proven.**
+- [x] Forward roadmap reflects the executed program and deferred triggers — the deferred triggers became the successor mission's milestone inventory.
+- [x] Operator decision to close-by-handoff: 2026-06-15 (leandrotca.work) — "consider grade-a-remediation completed; the new mission grade-a-completion carries it forward."
+- [ ] Grade-A sign-off: deferred to `../grade-a-completion/` terminal acceptance.
