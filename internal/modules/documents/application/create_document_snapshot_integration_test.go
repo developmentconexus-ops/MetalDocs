@@ -13,11 +13,8 @@ import (
 	docrepo "metaldocs/internal/modules/documents/repository"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/docgenv2"
-	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
-
-const createSnapshotTenantID = tenant.DevTenantID
 
 func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 	ctx := context.Background()
@@ -38,11 +35,12 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 	db.SetMaxIdleConns(4)
 	db.SetMaxOpenConns(4)
 
-	tenantID := createSnapshotTenantID
+	tenant := testdb.NewTenant(t, db)
+	tenantID := tenant.ID
+
 	actorID := testdb.DeterministicID(t, "actor")
 	templateID := testdb.DeterministicID(t, "template")
 	templateVersionID := testdb.DeterministicID(t, "template-version")
-	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
 
 	const wantDisplayName = "Snapshot Author"
 	// Seed the actor as a tenant-scoped system_admin (satisfies the create path's
@@ -51,15 +49,62 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 	// proof). iam_users is not tripwire-governed; the role write is user.manage tx-local.
 	testdb.SeedSystemAdmin(t, db, tenantID, actorID, wantDisplayName)
 
+	// Seed taxonomy parents required by the controlled_documents FK chain.
 	testdb.SeedGovernedTaxonomy(t, db, tenantID, "po", "quality")
-	seedCreateDocumentSnapshotRows(t, ctx, db, tenantID, actorID, templateID, templateVersionID, controlledDocumentID)
+
+	// Seed controlled_documents via factory (controlled_documents.create tripwire).
+	// Supply the pre-seeded taxonomy so the factory reuses it instead of minting new codes.
+	cdFixture := testdb.NewControlledDoc(t, db,
+		testdb.WithTenant(tenantID),
+		testdb.WithTaxonomy(testdb.Taxonomy{TenantID: tenantID, ProfileCode: "po", ProcessAreaCode: "quality"}),
+		testdb.WithCode("PO-TEST-001"),
+		testdb.WithOwner(actorID),
+	)
+
+	// Seed templates via SeedWithCaps (no factory builder exists for templates_template).
+	// templates_template carries template.create; templates_template_version shares the same
+	// tripwire. Both writes run in one transaction with caps asserted tx-locally (pool-safe).
+	testdb.SeedWithCaps(t, db, `[{"cap":"template.create"}]`, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO templates_template (
+				id, tenant_id, doc_type_code, key, name, latest_version, published_version_id, created_by
+			) VALUES (
+				$1::uuid, $2, 'po', 'snapshot-integration-template', 'Snapshot Integration Template',
+				1, NULL, $3
+			)`,
+			templateID, tenantID, actorID,
+		); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO templates_template_version (
+				id, template_id, version_number, status, docx_storage_key, content_hash,
+				metadata_schema, placeholder_schema, author_id, published_at
+			) VALUES (
+				$1::uuid, $2::uuid, 1, 'published', 'templates/snapshot/body.docx', 'body-hash',
+				'{}'::jsonb, '{"placeholders":[]}'::jsonb, $3, now()
+			)`,
+			templateVersionID, templateID, actorID,
+		); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE templates_template
+			   SET published_version_id = $1::uuid
+			 WHERE id = $2::uuid`,
+			templateVersionID, templateID,
+		); err != nil {
+			return err
+		}
+		return nil
+	})
 
 	cd := &controlleddocumentsdomain.ControlledDocument{
-		ID:              controlledDocumentID,
-		TenantID:        tenantID,
-		ProfileCode:     "po",
-		ProcessAreaCode: "quality",
-		Code:            "PO-TEST-001",
+		ID:              cdFixture.ID,
+		TenantID:        cdFixture.TenantID,
+		ProfileCode:     cdFixture.ProfileCode,
+		ProcessAreaCode: cdFixture.ProcessAreaCode,
+		Code:            cdFixture.Code,
 		Title:           "Snapshot Test Controlled Document",
 		OwnerUserID:     actorID,
 		Status:          controlleddocumentsdomain.CDStatusActive,
@@ -119,7 +164,7 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 		       profile_code_snapshot,
 		       process_area_code_snapshot,
 		       created_by_display_name_snapshot
-		  FROM documents
+		  FROM public.documents
 		 WHERE id = $1::uuid`,
 		ref.ID,
 	).Scan(
@@ -150,76 +195,6 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 	assertNotNullString(t, "created_by_display_name_snapshot", createdByDisplayNameSnap)
 	if createdByDisplayNameSnap.String != wantDisplayName {
 		t.Fatalf("created_by_display_name_snapshot = %q, want %q", createdByDisplayNameSnap.String, wantDisplayName)
-	}
-}
-
-func seedCreateDocumentSnapshotRows(t *testing.T, ctx context.Context, db *sql.DB, tenantID, actorID, templateID, templateVersionID, controlledDocumentID string) {
-	t.Helper()
-
-	// templates_template(_version) and controlled_documents carry the authz tripwire
-	// (template.create / controlled_documents.create). Assert both transaction-locally
-	// in one tx so the writes are pool-safe and the assertion never leaks (mirrors the
-	// production authz.appendAssertedCap pattern).
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("seedCreateDocumentSnapshotRows: begin tx: %v", err)
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"template.create"},{"cap":"controlled_documents.create"}]', true)`,
-	); err != nil {
-		t.Fatalf("seedCreateDocumentSnapshotRows: assert caps: %v", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO templates_template (
-			id, tenant_id, doc_type_code, key, name, latest_version, published_version_id, created_by
-		) VALUES (
-			$1::uuid, $2, 'po', 'snapshot-integration-template', 'Snapshot Integration Template',
-			1, NULL, $3
-		)`,
-		templateID, tenantID, actorID,
-	); err != nil {
-		t.Fatalf("seed templates_template: %v", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO templates_template_version (
-			id, template_id, version_number, status, docx_storage_key, content_hash,
-			metadata_schema, placeholder_schema, author_id, published_at
-		) VALUES (
-			$1::uuid, $2::uuid, 1, 'published', 'templates/snapshot/body.docx', 'body-hash',
-			'{}'::jsonb, '{"placeholders":[]}'::jsonb, $3, now()
-		)`,
-		templateVersionID, templateID, actorID,
-	); err != nil {
-		t.Fatalf("seed templates_template_version: %v", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE templates_template
-		   SET published_version_id = $1::uuid
-		 WHERE id = $2::uuid`,
-		templateVersionID, templateID,
-	); err != nil {
-		t.Fatalf("seed template published_version_id: %v", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO controlled_documents (
-			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
-		) VALUES (
-			$1::uuid, $2::uuid, 'po', 'quality', 'PO-TEST-001',
-			'Snapshot Test Controlled Document', $3, 'active'
-		)`,
-		controlledDocumentID, tenantID, actorID,
-	); err != nil {
-		t.Fatalf("seed controlled_documents: %v", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("seedCreateDocumentSnapshotRows: commit: %v", err)
 	}
 }
 

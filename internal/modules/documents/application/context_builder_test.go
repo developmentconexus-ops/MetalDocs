@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/uuid"
 
 	"metaldocs/internal/modules/render/resolvers"
 )
@@ -50,9 +51,9 @@ func TestBuild_WiresDocumentReaderAndControlledDocumentID(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	tenantID := "00000000-0000-0000-0000-000000000001"
-	revisionID := "00000000-0000-0000-0000-000000000002"
-	cdID := "00000000-0000-0000-0000-000000000003"
+	tenantID := uuid.NewString()
+	revisionID := uuid.NewString()
+	cdID := uuid.NewString()
 	areaCode := "QMS"
 
 	mock.ExpectQuery(`SELECT coalesce\(process_area_code_snapshot, ?''\), coalesce\(controlled_document_id::text, ?''\), coalesce\(area_name_snapshot, ?''\) FROM documents WHERE`).
