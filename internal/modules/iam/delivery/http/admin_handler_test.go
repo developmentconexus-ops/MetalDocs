@@ -14,6 +14,7 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	iampresence "metaldocs/internal/modules/iam/presence"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -187,6 +188,57 @@ func TestHandleAdminOverview_DropsUsersField_ReturnsTypedShape(t *testing.T) {
 	kpi := body["kpi"].(map[string]any)
 	if kpi["locked_accounts"] != float64(3) {
 		t.Fatalf("kpi.locked_accounts = %v, want 3", kpi["locked_accounts"])
+	}
+}
+
+type stubPresenceReader struct {
+	tenantID string
+	items    []iampresence.Item
+}
+
+func (s *stubPresenceReader) Snapshot(_ context.Context, tenantID string, _ time.Time) ([]iampresence.Item, error) {
+	s.tenantID = tenantID
+	return s.items, nil
+}
+
+// TestHandleAdminOverview_PresenceCarriesStatus is the F2.2 contract-emit
+// proof: when the presence reader is wired, each presence item emits a
+// `status` field carrying the online/idle enum value declared on
+// OnlinePresenceItem. Guards the contract↔emit agreement that the live
+// runtime could not show (no online users → empty presence[]).
+func TestHandleAdminOverview_PresenceCarriesStatus(t *testing.T) {
+	authSvc := &stubUserAdminService{}
+	presence := &stubPresenceReader{items: []iampresence.Item{{
+		UserID:      "u1",
+		Username:    "alice",
+		DisplayName: "Alice",
+		LastSeenAt:  time.Unix(1700000000, 0).UTC(),
+		Status:      iampresence.StatusOnline,
+	}}}
+	handler := NewAdminHandler(nil, authSvc).
+		WithObservabilityService(&stubKpiReader{}).
+		WithAuditEventLister(&stubAuditLister{}).
+		WithPresenceReader(presence)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/iam/admin/overview", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), tenantA))
+	rec := httptest.NewRecorder()
+	handler.handleAdminOverview(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	items, ok := body["presence"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("presence = %v, want 1 item", body["presence"])
+	}
+	item := items[0].(map[string]any)
+	if item["status"] != "online" {
+		t.Fatalf("presence[0].status = %v, want \"online\" (the declared OnlinePresenceItem enum)", item["status"])
 	}
 }
 
