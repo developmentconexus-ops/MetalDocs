@@ -1,7 +1,7 @@
 # Milestone 2 — Contract Tail (H-D class) (Wave B)
 
 > **Program:** grade-a-architecture-remediation  ·  **Governing spec:** `docs/superpowers/specs/2026-06-14-grade-a-architecture-remediation-design.md` (§6 M2)
-> **Status:** All 3 features closed + single FE regen done — awaiting milestone-validator (C1–C7) close gate
+> **Status:** PASSED — milestone-validator C1–C7 PASS (`qa/milestone-qa.md`, 2026-06-14); awaiting HS-1 operator gate to open M3
 > **Authored:** 2026-06-14 — *before any feature in this milestone began.*
 
 > **Execution log (not spec):** F2.1 `f2.1-usage-plantier` committed `69ad234d`; F2.2 `f2.2-presence-status`

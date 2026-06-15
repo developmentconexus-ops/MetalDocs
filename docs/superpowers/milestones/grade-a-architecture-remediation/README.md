@@ -1,7 +1,7 @@
 # Program: Grade-A Architecture Remediation
 
 > **Governing spec:** `docs/superpowers/specs/2026-06-14-grade-a-architecture-remediation-design.md`
-> **Status:** In progress (M0, M1 passed 2026-06-14; test-infra-rebaseline micro-task done 2026-06-14; M2 opened + specced 2026-06-14, features not yet started)
+> **Status:** In progress (M0, M1 passed 2026-06-14; test-infra-rebaseline micro-task done 2026-06-14; M2 passed 2026-06-14 — validator C1–C7 PASS; awaiting HS-1 operator gate to open M3)
 > **Owner / operator:** leandrotca.work (operator) + backend agent (Opus 4.8)
 
 Take the backend's three formerly-C audit dimensions (module-boundaries/DDD, contract/API,
@@ -17,7 +17,7 @@ hard-stop. **Terminal acceptance:** the M5 independent multi-agent re-audit pass
 |---|-----------|----------------------|--------|-------------|
 | 0 | `milestone-0-docs-destaling` | One unambiguous progression surface; stale docs stop polluting agent context | passed | [PASS](milestone-0-docs-destaling/qa/milestone-qa.md) |
 | 1 | `milestone-1-reach-a-blockers` | Close all 4 Grade-A blockers + the error-contract (bare-405) tail | passed | [PASS](milestone-1-reach-a-blockers/qa/milestone-qa.md) |
-| 2 | `milestone-2-contract-tail` | Eliminate handler-emits-undeclared-field drift (H-D), one FE regen | in-progress | — |
+| 2 | `milestone-2-contract-tail` | Eliminate handler-emits-undeclared-field drift (H-D), one FE regen | passed | [PASS](milestone-2-contract-tail/qa/milestone-qa.md) |
 | 3 | `milestone-3-mechanical-quality` | Harden code-quality + persistence; dead-surface deletes, tx-hazard hoist | planned | — |
 | 4 | `milestone-4-systemic-ports` | Close H-G class via shared ports (UserDisplayNameReader, TemplateVersionStateReader) | planned | — |
 | 5 | `milestone-5-independent-re-audit` | Prove Grade A by independent fresh multi-agent re-audit (authoritative) | planned | — |
@@ -31,7 +31,8 @@ Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) 
 | 2026-06-14 | HS-1 | M0 close gate — validator PASS presented to operator | **Approved** by operator 2026-06-14; M0 → passed, M1 opened |
 | 2026-06-14 | HS-1 | M1 close gate — validator PASS (C1–C7) presented to operator | **Approved** by operator 2026-06-14 (option 2); M1 → passed. Condition: run a bounded **test-infra-rebaseline** micro-task before M2 to discharge the F1.3 AC5 full-HTTP-E2E defer. **Condition met 2026-06-14** — full HTTP `seed→finalize→signoff` E2E green, snapshot read-back `matches=t`; evidence `milestone-1-reach-a-blockers/test-infra-rebaseline/evidence.md`. M2 awaits operator go. |
 | 2026-06-14 | HS-1 | M2 open gate — operator approved opening M2 ("Open M2 — spec it") | **Approved** by operator 2026-06-14; M2 → in-progress, `milestone.md` authored up front before any feature |
-| (carry-forward) | HS-2 | F0.1 watch — FE eigenpal `file:` path defer | Must clear before the M2 single `gen:api` regen (FE `pnpm install`) |
+| (carry-forward) | HS-2 | F0.1 watch — FE eigenpal `file:` path defer | **Did not trip in M2.** The single `gen:api` ran via the present `openapi-typescript` binary only (no FE `pnpm install`), so the eigenpal `file:` path was never exercised. Defer still open for any future FE `pnpm install`. |
+| 2026-06-14 | HS-1 | M2 close gate — `milestone-validator` C1–C7 **PASS** presented to operator | **Awaiting operator** — no M3 open and no merge without approval. Verdict: `milestone-2-contract-tail/qa/milestone-qa.md` |
 
 ## Program close-out / reconciliation
 
