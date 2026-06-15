@@ -7,6 +7,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/pagination"
 )
 
@@ -17,7 +18,7 @@ func TestListDocumentsPaginated_StatusFilter(t *testing.T) {
 	}
 	defer db.Close()
 
-	r := New(db)
+	r := New(db, iamdomain.NoopUserDisplayNameReader{})
 	now := time.Now()
 	rows := sqlmock.NewRows([]string{
 		"id", "tenant_id", "template_version_id", "name", "status", "form_data_json",
@@ -64,7 +65,7 @@ func TestListDocumentsPaginated_CursorKeyset(t *testing.T) {
 	}
 	defer db.Close()
 
-	r := New(db)
+	r := New(db, iamdomain.NoopUserDisplayNameReader{})
 	now := time.Now()
 
 	// Every row carries the same windowed grand total (25), independent of which
@@ -125,7 +126,7 @@ func TestListDocumentsPaginated_InvalidCursor(t *testing.T) {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
 	defer db.Close()
-	r := New(db)
+	r := New(db, iamdomain.NoopUserDisplayNameReader{})
 	if _, _, _, err := r.ListDocumentsPaginated(context.Background(), "tenant-1", ListOptions{Cursor: "!!!bad"}); err != pagination.ErrInvalidCursor {
 		t.Fatalf("want ErrInvalidCursor, got %v", err)
 	}
@@ -138,7 +139,7 @@ func TestCountDocuments_RespectsFilters(t *testing.T) {
 	}
 	defer db.Close()
 
-	r := New(db)
+	r := New(db, iamdomain.NoopUserDisplayNameReader{})
 	mock.ExpectQuery(`SELECT COUNT\(\*\) FROM documents WHERE`).
 		WithArgs("tenant-1", sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(int64(2)))

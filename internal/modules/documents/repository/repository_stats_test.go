@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 func TestStatsByStatus_GroupsCorrectly(t *testing.T) {
@@ -14,7 +16,7 @@ func TestStatsByStatus_GroupsCorrectly(t *testing.T) {
 	}
 	defer db.Close()
 
-	r := New(db)
+	r := New(db, iamdomain.NoopUserDisplayNameReader{})
 	rows := sqlmock.NewRows([]string{"status", "count"}).
 		AddRow("draft", int64(2)).
 		AddRow("under_review", int64(1))
@@ -42,7 +44,7 @@ func TestStatsByArea_GroupsCorrectly(t *testing.T) {
 	}
 	defer db.Close()
 
-	r := New(db)
+	r := New(db, iamdomain.NoopUserDisplayNameReader{})
 	rows := sqlmock.NewRows([]string{"area", "count"}).
 		AddRow("", int64(1)).
 		AddRow("QA", int64(2))

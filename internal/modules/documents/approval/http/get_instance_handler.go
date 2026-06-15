@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/lib/pq"
-
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
@@ -124,28 +122,15 @@ func (h *Handler) resolveEligibleActorNames(ctx context.Context, tenantID string
 	for actorID := range actorSet {
 		actorIDs = append(actorIDs, actorID)
 	}
-	rows, err := h.db.QueryContext(
-		ctx,
-		`SELECT user_id, COALESCE(NULLIF(display_name, ''), user_id)
-		   FROM metaldocs.iam_users
-		  WHERE tenant_id = $1::uuid
-		    AND user_id = ANY($2)`,
-		tenantID,
-		pq.Array(actorIDs),
-	)
+	// M4/F4.1: use the iam-owned port instead of raw iam_users SQL.
+	// The port omits absent/empty-display_name users; the post-loop fallback
+	// (missing → userID) reproduces the prior COALESCE(NULLIF(…),'') behavior.
+	portNames, err := h.displayNameReader.DisplayNames(ctx, tenantID, actorIDs)
 	if err != nil {
 		return nil, fmt.Errorf("resolve eligible actors: %w", err)
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var actorID, displayName string
-		if err := rows.Scan(&actorID, &displayName); err != nil {
-			return nil, fmt.Errorf("resolve eligible actor row: %w", err)
-		}
+	for actorID, displayName := range portNames {
 		names[actorID] = displayName
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("resolve eligible actors rows: %w", err)
 	}
 	for _, actorID := range actorIDs {
 		if _, ok := names[actorID]; !ok {

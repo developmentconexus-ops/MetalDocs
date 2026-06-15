@@ -6,12 +6,12 @@ package application_test
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"testing"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	docrepo "metaldocs/internal/modules/documents/repository"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/docgenv2"
 	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
@@ -21,11 +21,16 @@ const createSnapshotTenantID = tenant.DevTenantID
 
 func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, fmt.Sprintf(`SET search_path TO %q`, schema)); err != nil {
+	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
 		t.Fatalf("set search_path: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"template.create"},{"cap":"controlled_documents.create"},{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
+	); err != nil {
+		t.Fatalf("set asserted_caps: %v", err)
 	}
 
 	tenantID := createSnapshotTenantID
@@ -51,7 +56,7 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 		docgenv2.NewTemplatesSnapshotReader(db),
 	)
 	svc := application.NewServiceWithSnapshot(
-		docrepo.New(db),
+		docrepo.New(db, iamdomain.NoopUserDisplayNameReader{}),
 		nil,
 		docgenv2.NewTemplatesTemplateReader(db),
 		fakeFormVal{valid: true},
@@ -130,10 +135,10 @@ func seedCreateDocumentSnapshotRows(t *testing.T, ctx context.Context, db *sql.D
 
 	if _, err := db.ExecContext(ctx, `
 		INSERT INTO templates_template (
-			id, tenant_id, doc_type_code, key, name, visibility, latest_version, published_version_id, created_by
+			id, tenant_id, doc_type_code, key, name, latest_version, published_version_id, created_by
 		) VALUES (
 			$1::uuid, $2, 'po', 'snapshot-integration-template', 'Snapshot Integration Template',
-			'public', 1, NULL, $3
+			1, NULL, $3
 		)`,
 		templateID, tenantID, actorID,
 	); err != nil {

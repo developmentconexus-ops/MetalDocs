@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // TestLoadDocumentArea_FailClosed locks the ADR 0022 Phase 7 security property:
@@ -56,7 +58,7 @@ func TestMarkArchived_StampsTimestampWithoutStatusChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	r := New(db)
+	r := New(db, iamdomain.NoopUserDisplayNameReader{})
 
 	mock.ExpectBegin()
 	expectDocumentEditAuthz(t, mock)
@@ -79,7 +81,7 @@ func TestMarkArchived_NoRowsReturnsError(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	r := New(db)
+	r := New(db, iamdomain.NoopUserDisplayNameReader{})
 
 	mock.ExpectBegin()
 	expectDocumentEditAuthz(t, mock)
@@ -103,7 +105,7 @@ func TestUnarchive_ClearsTimestamp(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	r := New(db)
+	r := New(db, iamdomain.NoopUserDisplayNameReader{})
 
 	mock.ExpectBegin()
 	expectDocumentEditAuthz(t, mock)
@@ -126,7 +128,7 @@ func TestUnarchive_NoRowsReturnsError(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	r := New(db)
+	r := New(db, iamdomain.NoopUserDisplayNameReader{})
 
 	mock.ExpectBegin()
 	expectDocumentEditAuthz(t, mock)

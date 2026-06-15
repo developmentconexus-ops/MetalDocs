@@ -5,12 +5,12 @@ package repository_test
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -19,11 +19,16 @@ import (
 // empty string for legacy flow.
 func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, fmt.Sprintf(`SET search_path TO %q`, schema)); err != nil {
+	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
 		t.Fatalf("set search_path: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"controlled_documents.create"},{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
+	); err != nil {
+		t.Fatalf("set asserted_caps: %v", err)
 	}
 
 	tenantID := testdb.DeterministicID(t, "tenant")
@@ -45,7 +50,7 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 
 	profileCode := "po"
 	processAreaCode := "quality"
-	repo := repository.New(db)
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
 
 	newDocument := func(name, code string) *domain.Document {
 		return &domain.Document{
@@ -120,11 +125,16 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 // created for the same controlled_document_id get revision_number 0 and 1.
 func TestCreateDocumentTx_RevisionNumberIncrementsForSameCD(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, fmt.Sprintf(`SET search_path TO %q`, schema)); err != nil {
+	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
 		t.Fatalf("set search_path: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"controlled_documents.create"},{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
+	); err != nil {
+		t.Fatalf("set asserted_caps: %v", err)
 	}
 
 	tenantID := testdb.DeterministicID(t, "tenant")
@@ -146,7 +156,7 @@ func TestCreateDocumentTx_RevisionNumberIncrementsForSameCD(t *testing.T) {
 
 	profileCode := "po"
 	processAreaCode := "quality"
-	repo := repository.New(db)
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
 	newDocument := func(name, code string) *domain.Document {
 		return &domain.Document{
 			TenantID:                tenantID,
@@ -209,11 +219,16 @@ func TestCreateDocumentTx_RevisionNumberIncrementsForSameCD(t *testing.T) {
 // CHECK constraint blocks rows with empty/whitespace-only name values.
 func TestCreateDocumentTx_RejectsEmptyName(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, fmt.Sprintf(`SET search_path TO %q`, schema)); err != nil {
+	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
 		t.Fatalf("set search_path: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"controlled_documents.create"},{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
+	); err != nil {
+		t.Fatalf("set asserted_caps: %v", err)
 	}
 
 	tenantID := testdb.DeterministicID(t, "tenant")
@@ -235,7 +250,7 @@ func TestCreateDocumentTx_RejectsEmptyName(t *testing.T) {
 
 	profileCode := "po"
 	processAreaCode := "quality"
-	repo := repository.New(db)
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
 
 	doc := &domain.Document{
 		TenantID:                tenantID,
@@ -263,11 +278,16 @@ func TestCreateDocumentTx_RejectsEmptyName(t *testing.T) {
 
 func TestGetDocument_ReturnsSnapshotMetadata(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, fmt.Sprintf(`SET search_path TO %q`, schema)); err != nil {
+	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
 		t.Fatalf("set search_path: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"controlled_documents.create"},{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
+	); err != nil {
+		t.Fatalf("set asserted_caps: %v", err)
 	}
 
 	tenantID := testdb.DeterministicID(t, "tenant")
@@ -289,7 +309,7 @@ func TestGetDocument_ReturnsSnapshotMetadata(t *testing.T) {
 
 	profileCode := "pop"
 	processAreaCode := "general"
-	repo := repository.New(db)
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
 	doc := &domain.Document{
 		TenantID:                tenantID,
 		TemplateVersionID:       templateVersionID,

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"metaldocs/internal/modules/documents/approval/domain"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/testsupport/pgtest"
 )
 
@@ -337,7 +338,7 @@ func TestUpdateInstanceStatusOCC(t *testing.T) {
 func TestNewPostgresApprovalRepository(t *testing.T) {
 	// NewPostgresApprovalRepository must return an ApprovalRepository.
 	// We pass nil for *sql.DB; this is fine as long as we don't execute queries.
-	repo := NewPostgresApprovalRepository(nil)
+	repo := NewPostgresApprovalRepository(nil, iamdomain.NoopUserDisplayNameReader{})
 	if repo == nil {
 		t.Error("NewPostgresApprovalRepository returned nil")
 	}
@@ -358,7 +359,7 @@ func TestInsertStageInstancesBulk(t *testing.T) {
 
 func TestValidateScheduledSupersedeTarget_RealRows(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
-	repo := NewPostgresApprovalRepository(db)
+	repo := NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
 	ctx := context.Background()
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -419,7 +420,7 @@ func TestValidateScheduledSupersedeTarget_RealRows(t *testing.T) {
 
 func TestLoadCurrentPublishedHeadForDocument_RealRows(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
-	repo := NewPostgresApprovalRepository(db)
+	repo := NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
 	ctx := context.Background()
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -477,7 +478,7 @@ func TestLoadCurrentPublishedHeadForDocument_RealRows(t *testing.T) {
 
 func TestLoadActiveInstanceByDocument_LoadsDocumentRevisionVersion(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
-	repo := NewPostgresApprovalRepository(db)
+	repo := NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
 	ctx := context.Background()
 
 	tx, err := db.BeginTx(ctx, nil)
@@ -549,7 +550,7 @@ func TestLoadActiveInstanceByDocument_LoadsDocumentRevisionVersion(t *testing.T)
 
 func TestLoadInstance_LoadsDocumentRevisionVersion(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
-	repo := NewPostgresApprovalRepository(db)
+	repo := NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
 	ctx := context.Background()
 
 	tx, err := db.BeginTx(ctx, nil)

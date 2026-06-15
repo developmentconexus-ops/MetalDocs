@@ -13,6 +13,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"metaldocs/internal/modules/documents/approval/repository"
+	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 )
 
 // TestLoadActorDisplayName_ReadsOffTxAgainstLiveSchema is the F1.3 (AC5) runtime
@@ -68,7 +69,9 @@ func TestLoadActorDisplayName_ReadsOffTxAgainstLiveSchema(t *testing.T) {
 		t.Fatalf("insert iam_users: %v", err)
 	}
 
-	repo := repository.NewPostgresApprovalRepository(db)
+	// M4/F4.1: inject the real iam-owned display-name port so LoadActorDisplayName
+	// delegates to it rather than issuing raw iam_users SQL.
+	repo := repository.NewPostgresApprovalRepository(db, iampg.NewUserDisplayNameRepository(db))
 
 	// AC3 + AC5: the off-tx read returns the actor's real display_name.
 	got, err := repo.LoadActorDisplayName(ctx, tenantID, userID)

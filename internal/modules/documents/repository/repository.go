@@ -32,10 +32,16 @@ func isInvalidUUID(err error) bool {
 }
 
 type Repository struct {
-	db *sql.DB
+	db          *sql.DB
+	displayName iamdomain.UserDisplayNameReader
 }
 
-func New(db *sql.DB) *Repository { return &Repository{db: db} }
+// New constructs a Repository. displayName is a required collaborator — use
+// iamdomain.NoopUserDisplayNameReader{} for tests or paths that do not need
+// display-name resolution. Passing nil will panic at first CreateDocumentTx call.
+func New(db *sql.DB, displayName iamdomain.UserDisplayNameReader) *Repository {
+	return &Repository{db: db, displayName: displayName}
+}
 
 // mustSQLTx asserts a db.Tx to *sql.Tx. All callers of this repository pass
 // *sql.Tx at runtime; the assertion fails only if a test double is misused.
@@ -130,9 +136,17 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.D
 	// Deferrable FKs allow inserting doc -> session -> revision in any order in tx.
 	// COALESCE handles hypothetical NULL CD (schema enforces NOT NULL since migration 0129).
 
-	var createdByDisplayName sql.NullString
-	if err := tx.QueryRowContext(ctx, `SELECT display_name FROM metaldocs.iam_users WHERE user_id = $1`, d.CreatedBy).Scan(&createdByDisplayName); err != nil && err != sql.ErrNoRows {
+	// M4/F4.1: read display_name via the iam-owned port (off-tx, tenant-scoped).
+	// The port reads the iam connection pool so the snapshot is never inside the
+	// create tx (H-PRE-1). Becomes tenant-scoped — deliberate correctness
+	// tightening (spec §non-goals, two bounded divergences).
+	rawDisplayName, err := r.displayName.DisplayName(ctx, d.TenantID, d.CreatedBy)
+	if err != nil {
 		return "", "", "", fmt.Errorf("create document: lookup created_by display name: %w", err)
+	}
+	var createdByDisplayName sql.NullString
+	if rawDisplayName != "" {
+		createdByDisplayName = sql.NullString{String: rawDisplayName, Valid: true}
 	}
 
 	var areaName sql.NullString

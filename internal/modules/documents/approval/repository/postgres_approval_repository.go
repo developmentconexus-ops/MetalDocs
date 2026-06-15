@@ -12,6 +12,7 @@ import (
 	"github.com/lib/pq"
 
 	"metaldocs/internal/modules/documents/approval/domain"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
 )
 
@@ -19,14 +20,19 @@ import (
 var _ ApprovalRepository = (*postgresApprovalRepository)(nil)
 
 type postgresApprovalRepository struct {
-	db *sql.DB
+	db          *sql.DB
+	displayName iamdomain.UserDisplayNameReader
 }
 
 var ErrInvalidScheduledSupersedeTarget = errors.New("approval: invalid scheduled supersede target")
 
 // NewPostgresApprovalRepository constructs a production Postgres-backed ApprovalRepository.
-func NewPostgresApprovalRepository(db *sql.DB) ApprovalRepository {
-	return &postgresApprovalRepository{db: db}
+// displayName is a required collaborator — use iamdomain.NoopUserDisplayNameReader{} for
+// paths that do not need display-name resolution (e.g. scheduled-publish jobs that never
+// call LoadActorDisplayName). Returns the ApprovalRepository interface so the concrete
+// type is not exposed to callers.
+func NewPostgresApprovalRepository(db *sql.DB, displayName iamdomain.UserDisplayNameReader) ApprovalRepository {
+	return &postgresApprovalRepository{db: db, displayName: displayName}
 }
 
 // InsertInstance writes a new approval_instances row within the caller's transaction.
@@ -439,26 +445,12 @@ func (r *postgresApprovalRepository) ListRoutesTx(ctx context.Context, tx db.Tx,
 	return scanRouteListRows(rows)
 }
 
-// LoadActorDisplayName reads the approver's display name off the connection pool
-// (NOT inside the caller's signoff transaction) so the cross-module iam_users read
-// is never held inside the signoff advisory-lock tx (H-PRE-1). Empty string when
-// the user is absent (best-effort snapshot, matches the prior inline behavior).
+// LoadActorDisplayName returns the approver's display name via the iam-owned
+// UserDisplayNameReader port (M4/F4.1). The read runs on the pool — never inside
+// the caller's signoff advisory-lock transaction (H-PRE-1 unchanged). Returns ""
+// when the user is absent (best-effort snapshot, same semantics as before).
 func (r *postgresApprovalRepository) LoadActorDisplayName(ctx context.Context, tenantID, userID string) (string, error) {
-	var displayName sql.NullString
-	err := r.db.QueryRowContext(ctx, `
-		SELECT display_name
-		  FROM metaldocs.iam_users
-		 WHERE user_id = $1
-		   AND tenant_id = $2::uuid`,
-		userID, tenantID,
-	).Scan(&displayName)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
-	}
-	if err != nil {
-		return "", MapPgError(err, MapHints{})
-	}
-	return displayName.String, nil
+	return r.displayName.DisplayName(ctx, tenantID, userID)
 }
 
 const listRoutesQuery = `

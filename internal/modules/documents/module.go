@@ -9,6 +9,7 @@ import (
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	dhttp "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/repository"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/ratelimit"
 )
@@ -45,13 +46,21 @@ type Dependencies struct {
 	ReconstructRunner            application.ReconstructionRunner
 	SubmitSvc                    approvalSubmitter
 	IAMUserOptions               application.IAMUserOptionsReader
+	// DisplayNameReader is the iam-owned port for reading display_name off
+	// metaldocs.iam_users without crossing module boundaries (M4/F4.1).
+	// When nil, iamdomain.NoopUserDisplayNameReader{} is used automatically.
+	DisplayNameReader iamdomain.UserDisplayNameReader
 }
 
 func New(deps Dependencies) *Module {
 	if deps.Caps == nil {
 		panic("documents.New: Caps (CapabilityChecker) is required for handler authorization")
 	}
-	repo := repository.New(deps.DB)
+	displayNameReader := deps.DisplayNameReader
+	if displayNameReader == nil {
+		displayNameReader = iamdomain.NoopUserDisplayNameReader{}
+	}
+	repo := repository.New(deps.DB, displayNameReader)
 	var svc *application.Service
 	if deps.SnapshotReader != nil {
 		snapSvc := application.NewSnapshotService(deps.SnapshotReader)

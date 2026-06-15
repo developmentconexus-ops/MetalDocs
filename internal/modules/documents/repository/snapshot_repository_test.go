@@ -18,10 +18,20 @@ const snapshotTestTenantID = tenant.DevTenantID
 
 func TestSnapshotRepository_WriteFreeze_PersistsHashAndFrozenAt(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, _ := testdb.Open(t)
+	db.SetMaxOpenConns(1)
 
-	docID, tenant := testdb.InsertDraftDocument(t, db, schema, snapshotTestTenantID)
-	repo := repository.NewSnapshotRepositoryWithSchema(db, schema)
+	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
+		t.Fatalf("set search_path: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
+	); err != nil {
+		t.Fatalf("set asserted_caps: %v", err)
+	}
+
+	docID, tenant := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
+	repo := repository.NewSnapshotRepository(db)
 
 	hash, err := hex.DecodeString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	if err != nil {
@@ -37,7 +47,7 @@ func TestSnapshotRepository_WriteFreeze_PersistsHashAndFrozenAt(t *testing.T) {
 	var gotFrozenAt *time.Time
 	if err := db.QueryRowContext(ctx, `
 		SELECT values_hash, values_frozen_at
-		  FROM `+`"`+schema+`"`+`.documents
+		  FROM documents
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
 		tenant, docID,
 	).Scan(&gotHash, &gotFrozenAt); err != nil {
@@ -53,10 +63,20 @@ func TestSnapshotRepository_WriteFreeze_PersistsHashAndFrozenAt(t *testing.T) {
 
 func TestSnapshotRepository_WriteFinalDocx_PersistsKeyAndContentHash(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, _ := testdb.Open(t)
+	db.SetMaxOpenConns(1)
 
-	docID, tenant := testdb.InsertDraftDocument(t, db, schema, snapshotTestTenantID)
-	repo := repository.NewSnapshotRepositoryWithSchema(db, schema)
+	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
+		t.Fatalf("set search_path: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
+	); err != nil {
+		t.Fatalf("set asserted_caps: %v", err)
+	}
+
+	docID, tenant := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
+	repo := repository.NewSnapshotRepository(db)
 
 	contentHash, err := hex.DecodeString("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	if err != nil {
@@ -72,7 +92,7 @@ func TestSnapshotRepository_WriteFinalDocx_PersistsKeyAndContentHash(t *testing.
 	var gotHash []byte
 	if err := db.QueryRowContext(ctx, `
 		SELECT coalesce(final_docx_s3_key, ''), content_hash
-		  FROM `+`"`+schema+`"`+`.documents
+		  FROM documents
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
 		tenant, docID,
 	).Scan(&gotKey, &gotHash); err != nil {
@@ -92,10 +112,20 @@ func TestSnapshotRepository_ReadFinalDocxS3Key(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, _ := testdb.Open(t)
+	db.SetMaxOpenConns(1)
 
-	docID, tenant := testdb.InsertDraftDocument(t, db, schema, snapshotTestTenantID)
-	repo := repository.NewSnapshotRepositoryWithSchema(db, schema)
+	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
+		t.Fatalf("set search_path: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
+	); err != nil {
+		t.Fatalf("set asserted_caps: %v", err)
+	}
+
+	docID, tenant := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
+	repo := repository.NewSnapshotRepository(db)
 
 	if _, err := repo.ReadFinalDocxS3Key(ctx, tenant, docID); err == nil {
 		t.Fatal("ReadFinalDocxS3Key on unfrozen document: got nil error, want error")
@@ -122,10 +152,20 @@ func TestSnapshotRepository_ReadFinalDocxS3Key(t *testing.T) {
 
 func TestSnapshotRepository_WritePDF_PersistsAllColumns(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
+	db, _ := testdb.Open(t)
+	db.SetMaxOpenConns(1)
 
-	docID, tenant := testdb.InsertDraftDocument(t, db, schema, snapshotTestTenantID)
-	repo := repository.NewSnapshotRepositoryWithSchema(db, schema)
+	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
+		t.Fatalf("set search_path: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
+	); err != nil {
+		t.Fatalf("set asserted_caps: %v", err)
+	}
+
+	docID, tenant := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
+	repo := repository.NewSnapshotRepository(db)
 
 	pdfHash, err := hex.DecodeString("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
 	if err != nil {
@@ -143,7 +183,7 @@ func TestSnapshotRepository_WritePDF_PersistsAllColumns(t *testing.T) {
 	var gotAt *time.Time
 	if err := db.QueryRowContext(ctx, `
 		SELECT coalesce(final_pdf_s3_key,''), pdf_hash, pdf_generated_at
-		  FROM `+`"`+schema+`"`+`.documents
+		  FROM documents
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
 		tenant, docID,
 	).Scan(&gotKey, &gotHash, &gotAt); err != nil {

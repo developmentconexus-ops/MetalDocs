@@ -19,6 +19,16 @@ const fillInTenantID = tenant.DevTenantID
 func TestFillInRepository_UpsertValueAndListValues(t *testing.T) {
 	ctx := context.Background()
 	db, schema := testdb.Open(t)
+	db.SetMaxOpenConns(1)
+
+	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
+		t.Fatalf("set search_path: %v", err)
+	}
+	if _, err := db.ExecContext(ctx,
+		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
+	); err != nil {
+		t.Fatalf("set asserted_caps: %v", err)
+	}
 
 	docID, tenant := testdb.InsertDraftDocument(t, db, schema, fillInTenantID)
 
@@ -30,7 +40,7 @@ func TestFillInRepository_UpsertValueAndListValues(t *testing.T) {
 		t.Fatalf("get revision: %v", err)
 	}
 
-	repo := repository.NewFillInRepositoryWithSchema(db, schema)
+	repo := repository.NewFillInRepository(db)
 
 	v1 := repository.PlaceholderValue{
 		TenantID:      tenant,

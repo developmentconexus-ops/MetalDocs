@@ -10,6 +10,7 @@ import (
 
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/testsupport/pgtest"
 )
 
@@ -47,7 +48,7 @@ func TestScheduledPublishWorker_PublishesWhenTruthMatches(t *testing.T) {
 	})
 
 	emitter := &approvalapp.MemoryEmitter{}
-	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db), emitter, approvalapp.RealClock{})
+	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, approvalapp.RealClock{})
 	worker := NewScheduledPublishWorker(services.Scheduler, db)
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
@@ -114,7 +115,7 @@ func TestScheduledPublishWorker_NoOpWhenGenerationIsStale(t *testing.T) {
 	})
 
 	emitter := &approvalapp.MemoryEmitter{}
-	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db), emitter, approvalapp.RealClock{})
+	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, approvalapp.RealClock{})
 	worker := NewScheduledPublishWorker(services.Scheduler, db)
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
@@ -177,7 +178,7 @@ func TestScheduledPublishWorker_NoOpWhenDeliveredBeforeEffectiveTime(t *testing.
 	})
 
 	emitter := &approvalapp.MemoryEmitter{}
-	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db), emitter, fixedClock{t: effectiveAt.Add(-1 * time.Minute)})
+	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, fixedClock{t: effectiveAt.Add(-1 * time.Minute)})
 	worker := NewScheduledPublishWorker(services.Scheduler, db)
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{

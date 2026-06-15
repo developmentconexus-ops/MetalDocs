@@ -64,24 +64,29 @@ type signoffIdempStore interface {
 }
 
 type Handler struct {
-	services     *application.Services
-	db           *sql.DB
-	runner       db.TxRunner
-	submitSvc    submitService
-	decisionSvc  decisionService
-	readSvc      readService
-	cancelSvc    cancelService
-	obsoleteSvc  obsoleteService
-	supersedeSvc supersedeService
-	routeAdmin   routeAdminService
-	idempStore   signoffIdempStore
+	services          *application.Services
+	db                *sql.DB
+	runner            db.TxRunner
+	submitSvc         submitService
+	decisionSvc       decisionService
+	readSvc           readService
+	cancelSvc         cancelService
+	obsoleteSvc       obsoleteService
+	supersedeSvc      supersedeService
+	routeAdmin        routeAdminService
+	idempStore        signoffIdempStore
+	displayNameReader iamdomain.UserDisplayNameReader
 }
 
-func NewHandler(services *application.Services, database *sql.DB, idempStore signoffIdempStore) *Handler {
+// NewHandler constructs the approval HTTP handler. displayName is a required
+// collaborator for resolveEligibleActorNames; pass iamdomain.NoopUserDisplayNameReader{}
+// for tests or paths that do not need display-name resolution.
+func NewHandler(services *application.Services, database *sql.DB, idempStore signoffIdempStore, displayName iamdomain.UserDisplayNameReader) *Handler {
 	h := &Handler{
-		services:   services,
-		db:         database,
-		idempStore: idempStore,
+		services:          services,
+		db:                database,
+		idempStore:        idempStore,
+		displayNameReader: displayName,
 	}
 	if database != nil {
 		h.runner = db.NewTxRunner(database)
