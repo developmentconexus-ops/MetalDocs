@@ -4816,6 +4816,11 @@ components:
           $ref: '#/components/schemas/UsageWindowCounts'
         active_users:
           $ref: '#/components/schemas/UsageWindowCounts'
+        plan_tier:
+          type: string
+          enum: [free, pro, enterprise]
+          nullable: true
+          description: Tenant plan label; null when no plan row exists.
     UpsertUserRoleRequest:
       type: object
       required: [role]

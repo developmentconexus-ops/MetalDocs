@@ -102,7 +102,7 @@ func usageToJSON(u iamdomain.UsageSnapshot) map[string]any {
 			"last7d":  u.ActiveUsers.Last7d,
 			"last30d": u.ActiveUsers.Last30d,
 		},
-		"planTier": tier,
+		"plan_tier": tier,
 	}
 }
 
