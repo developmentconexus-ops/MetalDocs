@@ -59,6 +59,7 @@ product decision).
   `display_name`. Under operator Option-2 (full close) these are migrated in **M4/F4.6** onto this
   port (display names) + a new iam tenant-scope/membership port (the `auth_identities`-coupled tenant
   scope), not deferred. See `f4.6-security-display-name-port/` and `f4.5-iam-tenant-membership-port/`.
+  The membership port deferred here is now **built** — see [`0031-tenant-user-reader-port.md`](0031-tenant-user-reader-port.md) (`TenantUserReader`, M4/F4.5), which supersedes this note.
 - **Bounded defer (narrowed):** security's `MfaCoverage` / `CountRecentLockouts` aggregate JOINs on
   `iam_users` carry **no** display-name read and remain a bounded defer (covered by the F4.5 membership
   port if/when those are migrated). Intra-module reads (`iam/presence/*`) and the `password_hash`

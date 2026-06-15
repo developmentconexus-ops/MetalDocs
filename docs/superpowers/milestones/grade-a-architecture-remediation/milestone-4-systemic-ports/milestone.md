@@ -16,18 +16,30 @@
 > | `documents/repository/repository.go:134` | `iam_users.display_name` (created_by) | cross-module display-name read | **Yes** |
 > | `documents/approval/http/get_instance_handler.go:127` | `iam_users.display_name` batch (`COALESCE(display_name,user_id)`, `ANY($2)`) | cross-module display-name read, raw `h.db` in the HTTP handler | **Yes** |
 > | `iam/presence/*` (`repository.go`, `model.go`, `hub.go`, `middleware.go`) | `iam_users` | **iam-owned** — same module reading its own tables; **not** a cross-module reach-without-a-port | **No** — out of class (intra-module) |
-> | `security/infrastructure/postgres/repository.go` (lockouts / active-sessions / MFA counts) | `iam_users` as **JOIN for tenant-scoping** on `auth_identities`/`auth_sessions` (no display-name read) | cross-module, but a **tenant-scope JOIN**, not a display-name read — a `UserDisplayNameReader` does not cover it; the correct port (if any) is a different one | **No** — different concern (see scope decision below) |
+> | `security/infrastructure/postgres/repository.go` MfaCoverage (×2), CountRecentLockouts | `iam_users` aggregate / COUNT, **no display-name read** | cross-module **tenant-scope/aggregate JOIN**, not a display-name reach — `UserDisplayNameReader` does not cover it | **No** — non-display-name tenant-scope read (genuine defer) |
+> | `security/infrastructure/postgres/repository.go` **ListLockouts:89, CountRecentFailedLoginsByUser:137, ListNewDeviceLogins:191** | `iam_users.display_name` (`COALESCE(NULLIF(display_name,''),user_id)`) | cross-module **display-name read** — same H-G shape as the 3 F4.1 sites | **YES** — *miscounted in the original census (corrected 2026-06-15)* |
 > | `documents/approval/infrastructure/signature/password_reauth.go` | `iam_users.password_hash` | already behind an `IamUserReader` interface; reauth, not display-name | **No** — already a port, different column |
 >
-> **Net F4.1 scope:** the **3 display-name reads** (decision_service, documents/repository,
-> get_instance_handler). The other named sites are classified out-of-port above. **Scope decision
-> RESOLVED by operator 2026-06-15: defer security.** `security`'s `iam_users` tenant-scoping JOINs are
-> **not** an M4 target — they are a JOIN for tenant binding within security's own bounded read, not a
-> display-name reach, and would need a *different* port than `UserDisplayNameReader`. Recorded as a
-> **bounded defer** — *Trigger:* next structural touch of `security/infrastructure/postgres/repository.go`
-> or an M5 re-audit finding that flags it as an H-G reach; *Owner:* backend; resolved via a dedicated
-> iam tenant-scope/membership port, not by widening M4. F4.2 and the hardcode site verified exactly as
-> the spec names.
+> **⚠⚠ CENSUS CORRECTION (2026-06-15, post-validator-FAIL).** The original row above asserted
+> security's `iam_users` reads were *"tenant-scope JOINs, no display-name read"*. **That was wrong.**
+> Verified against the tree (`grep -n "NULLIF(u.display_name"`): **3** of security's reads
+> (`ListLockouts:89`, `CountRecentFailedLoginsByUser:137`, `ListNewDeviceLogins:191`) DO read
+> `iam_users.display_name` — identical H-G shape to the F4.1 sites. Plus the validator caught a 4th
+> missed site, `auth/infrastructure/postgres/sessions_admin.go:32`. **Authoritative count of
+> cross-module `iam_users.display_name` reads outside `iam/` after F4.1: 4** (1 auth + 3 security).
+> The class is therefore **not** closed by F4.1 alone, and the original "defer all security" decision
+> rested on a false premise.
+>
+> **Operator scope decision 2026-06-15 (post-correction): OPTION 2 — FULL CLOSE.** Close all 4
+> display-name reaches in M4, including building the previously-deferred **iam tenant-scope/membership
+> port** required to separate the 2 `auth_identities`-coupled security sites (ListLockouts,
+> CountRecentFailedLoginsByUser — `auth_identities` has no `tenant_id`; the `iam_users` JOIN is the
+> only tenant scoping). Executed as fix-features **F4.4 (auth) + F4.5 (iam membership port) + F4.6
+> (security)**, added to the Features table below. **Still genuinely out of class (deferred, accurate):**
+> security's `MfaCoverage`/`CountRecentLockouts` aggregate JOINs (no display-name; they count over
+> iam_users) and security's direct reads of `auth_identities` (auth-owned, a *separate* cross-module
+> concern not in the H-G display-name class) — *Trigger:* M5 re-audit flag or next structural touch;
+> *Owner:* backend. F4.2 and the hardcode site verified exactly as the spec names.
 
 > This file is a **spec**, authored up front. It says **what** this milestone is,
 > **which features** it contains, **what each feature implements**, and **what gets
@@ -60,6 +72,9 @@ instance patched.
 | F4.1 | `f4.1-user-display-name-reader` | Introduce an **iam/domain-owned** `UserDisplayNameReader` port (single-and-batch display-name lookup by `(tenantID, userID)`), implemented in iam infrastructure against `metaldocs.iam_users`. Migrate the **3 cross-module display-name read sites** to consume it: `documents/repository/repository.go:134`, `documents/approval/http/get_instance_handler.go:127`, and **generalize F1.3's contained `ApprovalRepository.LoadActorDisplayName`** (`decision_service.go:163`) onto the shared port. Reads stay live; existing off-tx placement (H-PRE-1) preserved for the signoff path. | The 3 named sites no longer issue raw `SELECT … FROM metaldocs.iam_users` for display names — each calls the iam-owned port (grep: **0** `iam_users` display-name SQL outside iam/ in those files). Port lives in iam `domain` (owned), impl in iam `infrastructure`. Empty-string-on-missing + `COALESCE(display_name,user_id)` semantics preserved per current behavior. Signoff display-name read stays **off** the lock-holding tx (H-PRE-1 intact — runtime/`pg_locks` evidence). `go build`+`go vet` clean; existing display-name tests (incl. `postgres_approval_repository_displayname_integration_test.go`, `decision_service_test.go` snapshot assertions) green or migrated; new port unit test. backend-api-qa-checklist green. **Out-of-port (documented, not migrated):** `iam/presence/*` (intra-module), `security` tenant-scope JOINs (scope decision), `password_reauth` (existing `IamUserReader`). |
 | F4.2 | `f4.2-template-version-state-reader` | **[HS-6 amended 2026-06-15 — see note below]** **Extend** the **existing** templates/domain-owned port (`TemplateVersionPort`, impl `TemplateVersionReader`, Wave Z Z-7) with a raw-state read `GetTemplateVersionState(ctx, tenantID, versionID) (*string, string, error)` = `(status, doc_type_code)` (keep `IsPublished` for taxonomy). Reuse the single existing `templateVersionQuery`. Replace (a) CD's `PostgresTemplateVersionChecker` reach into `templates_template_version`+`templates_template` (`controlleddocuments/infrastructure/repository.go:702-711`) — **delete** it; CD's module wires the templates-owned reader as `tplCheck` (directly satisfies CD's `application.TemplateVersionChecker`), and (b) the `documents_adapters.go:113` hardcoded `status := "published"` so the adapter reads the **real** template version status via the port. Read stays **off** the lock-holding CD-create tx (H-PRE-1). | CD no longer issues SQL against `templates_*` tables (grep: **0** `templates_template` references under `controlleddocuments/`); the read flows through the templates-owned port. `documents_adapters.go` no longer hardcodes `"published"` — status is read from the port (grep: **0** `status := "published"` in `wiring/`). CD's `TemplateVersionChecker` consumer contract (`(*string,string,error)` = status, profileCode/doc_type_code) preserved so the override-validation call sites (`service.go:209,308`) are behavior-identical. Status read stays off the CD-create lock-holding tx (H-PRE-1 — no authz-recording read inside the lock; runtime/`pg_locks` evidence). `go build`+`go vet` clean; existing CD override + template-checker tests + taxonomy `IsPublished` tests green or migrated; new templates port `GetTemplateVersionState` unit test. backend-api-qa-checklist + workflow-async-qa-checklist (CD-create is lock-bearing) green. |
 | F4.3 | `f4.3-port-adrs` | One **ADR per port** into the now-clean `wiki/decisions/` ledger: the `UserDisplayNameReader` boundary decision and the `TemplateVersionStateReader` boundary decision (each: context = H-G reach, decision = owning-module port, consequences = reads-live/no-snapshot, alternatives rejected incl. Approach 2). | Two ADRs exist under `wiki/decisions/` with canonical `Status:` headers, registered in the decisions `index.md`, cross-linked from F4.1/F4.2 `spec.md`, and referenced by the touched module wiki docs. Each ADR records the design D4/Approach-3 constraint (reads live, no migration). |
+| F4.4 | `f4.4-auth-session-display-name-port` | **[HS-4 fix — validator-found missed site]** Migrate `auth/infrastructure/postgres/sessions_admin.go` `ListActiveSessions` off its `JOIN metaldocs.iam_users` display-name read. `auth_sessions.tenant_id` already scopes; drop the JOIN (auth no longer touches `iam_users`), return auth-owned session rows, and have the **iam** consumer (`iam/delivery/http/sessions_handler.go`) enrich display names via the existing `UserDisplayNameReader.DisplayNames` + `missing→user_id` fallback. Remove `DisplayName` from auth's `SessionListItem` (auth doesn't own it). | `auth/` issues **0** `iam_users` SQL (grep). Rendered `display_name` byte-identical (`COALESCE(NULLIF(display_name,''),user_id)` reproduced consumer-side via port + fallback) — handler unit test (port fake + fallback) + live-PG proof that `ListActiveSessions` returns tenant-scoped sessions without reaching `iam_users`. Bounded note: prior INNER JOIN dropped sessions whose user lacks an `iam_users` membership row; on the real path a session in tenant T implies login→membership, so no behavior delta (documented, not silently changed). `go build`+`go vet` clean; existing sessions tests green/migrated. |
+| F4.5 | `f4.5-iam-tenant-membership-port` | **[Option-2 architecture piece — the previously-deferred port]** Introduce an **iam/domain-owned** tenant-scope/membership port (e.g. `TenantUserReader.TenantUserIDs(ctx, tenantID) ([]string, error)` — the set of `user_id`s with an `iam_users` row in the tenant; no `deactivated_at` filter, matching the current INNER-JOIN membership semantics), impl in iam/infrastructure on the pool (off-tx, H-PRE-1). This is the port the original census deferred; it exists to let `auth_identities`-coupled consumers tenant-scope without JOINing `iam_users`. | Port in iam `domain` (owned), impl in iam `infrastructure`, pool-backed. Returns exactly the tenant's member `user_id`s (membership semantics match the replaced JOIN — live-PG test: present members returned, other-tenant excluded, empty tenant → empty). `go build`+`go vet` clean; new port unit + integration test. ADR authored (see F4.3-style decision record; folded into the F4.3 ledger or its own ADR). |
+| F4.6 | `f4.6-security-display-name-port` | **[Option-2 — close the 3 security display-name reaches]** Migrate `security/infrastructure/postgres/repository.go` off all 3 `iam_users.display_name` JOINs: `ListNewDeviceLogins:191` (separable — `auth_sessions.tenant_id` scopes; drop JOIN + enrich via `UserDisplayNameReader`), `ListLockouts:89` and `CountRecentFailedLoginsByUser:137` (coupled — replace the `iam_users` JOIN tenant-scope with the F4.5 `TenantUserReader.TenantUserIDs` filter on `auth_identities.user_id`, then enrich display names via `UserDisplayNameReader`). Reads live, off-tx. | `security/` issues **0** `iam_users.display_name` reads (grep — only the genuinely-deferred `MfaCoverage`/`CountRecentLockouts` aggregate JOINs remain, accurately characterized). Each migrated method behavior-identical: same rows (membership-filtered identically), same `display_name` values (port + `missing→user_id` fallback). Live-PG integration per method (locked user surfaces w/ name; tenant isolation; recent-failure window). `go build`+`go vet` clean; existing security tests green/migrated; backend-api-qa-checklist green. |
 
 > **⚠ HS-6 scope/approach reconciliation (2026-06-15, F4.2).** Pre-F4.2 investigation found the
 > templates module **already owns** a cross-module port for template-version state —
@@ -90,11 +105,12 @@ writes `qa/milestone-qa.md`; the main session flips status only on its PASS), fo
 C1–C7 checklist in `.claude/skills/milestone/references/milestone-end-validation.md`. What that gate
 enforces for this milestone:
 
-1. **Per-feature acceptance** — F4.1, F4.2, F4.3 each meet their declared "what to validate", and each
-   feature's **consumer contract** (`spec.md`) was honored: F4.1's port consumers get the same
-   display-name semantics; F4.2 preserves CD's `TemplateVersionChecker` `(status, doc_type_code)`
-   shape so override-validation is behavior-identical (producer matches consumer; the port is read
-   from the consumer's existing contract, not invented).
+1. **Per-feature acceptance** — F4.1, F4.2, F4.3, **F4.4, F4.5, F4.6** each meet their declared "what
+   to validate", and each feature's **consumer contract** (`spec.md`) was honored: F4.1/F4.4/F4.6 port
+   consumers get the same display-name semantics; F4.2 preserves CD's `TemplateVersionChecker`
+   `(status, doc_type_code)` shape so override-validation is behavior-identical; F4.5's membership port
+   reproduces the replaced INNER-JOIN membership set exactly (producer matches consumer; ports read
+   from the consumers' existing behavior, not invented).
 2. **Workflow-class QA checklists** — `backend-api-qa-checklist` (both ports) **+**
    `workflow-async-qa-checklist` (F4.2 touches the CD-create lock-bearing path).
 3. **Regression** — M0, M1, M2, M3 still pass their gates; the M1 test-infra-rebaseline full-HTTP
@@ -102,17 +118,22 @@ enforces for this milestone:
    CD-create).
 4. **Quality-bar / root-cause check** — **focused audit slice** on **module-boundaries / DDD**:
    - **H-G reach-without-a-port = 0** in the swept surface: no module queries another module's owned
-     tables (grep proof — no `iam_users` display-name SQL outside iam/; no `templates_*` SQL under
-     `controlleddocuments/`);
+     tables (grep proof — **true zero** `iam_users.display_name` reads outside iam/ across the whole
+     tree, i.e. `auth` + `security` both clean after F4.4/F4.6; no `templates_*` SQL under
+     `controlleddocuments/`). The only remaining cross-module `iam_users` reads are the accurately-
+     characterized non-display-name aggregate JOINs in `security` (MfaCoverage/CountRecentLockouts),
+     recorded as a bounded defer — **not** display-name reaches;
    - **H-G hardcoded-domain-state = 0**: no fabricated domain value (`status := "published"`) in
      wiring/adapters;
    - root cause = the *class* is gone via owning-module ports, **not** a single instance patched and
      not a snapshot/denormalization shortcut (reads stay live, H-PRE-1 intact);
    - **ADRs present** for both ports;
    - dimension re-measured ≥ A−.
-5. **No unplanned scope** — anything implemented beyond F4.1–F4.3 is recorded with rationale. The
-   security tenant-scope JOIN decision and any presence/password_reauth handling are recorded as
-   explicit bounded defers with triggers (not silent skips).
+5. **No unplanned scope** — anything implemented beyond F4.1–F4.6 is recorded with rationale. The
+   security **non-display-name** aggregate JOINs (MfaCoverage/CountRecentLockouts), security's direct
+   `auth_identities` reads (separate concern), and any presence/password_reauth handling are recorded
+   as explicit bounded defers with triggers (not silent skips). The census-correction trail
+   (F4.4–F4.6 added post-validator-FAIL under operator Option 2) is itself the rationale record.
 
 ## Dependencies & constraints
 
@@ -155,7 +176,10 @@ Default catalog HS-1..HS-6 in force. What would trip each here:
   placed in the wrong module, a snapshot shortcut taken, H-PRE-1 violated, or a consumer contract
   silently changed): open the named fix feature, re-run its lifecycle, re-dispatch the validator.
 - **HS-5** — N/A mid-program (terminal acceptance is M5).
-- **HS-6** — scope drift: if execution surfaces cross-module reaches beyond the classified set (the 3
-  display-name reads + the F4.2 reach + the hardcode), **stop**, surface it, replan before absorbing
-  it. The **security tenant-scope JOIN** is the known open scope decision — resolve it at Phase 2
-  (operator), not mid-execution.
+- **HS-6** — scope drift: if execution surfaces cross-module reaches beyond the classified set, **stop**,
+  surface it, replan before absorbing it. **TRIPPED 2026-06-15** (post-validator-FAIL): the original
+  census undercounted the H-G display-name class by 3 (security's `ListLockouts`/
+  `CountRecentFailedLoginsByUser`/`ListNewDeviceLogins` were mischaracterized as non-display-name
+  JOINs) plus the validator's 1 (`sessions_admin`). Surfaced to operator; **replanned under Option 2
+  (full close)** → F4.4/F4.5/F4.6 added above; census corrected. Resolution recorded in program
+  `README.md` hard-stops.
