@@ -105,7 +105,7 @@ func TestCreate_AutoCode(t *testing.T) {
 func TestCreate_ManualCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
-	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
+	svc := NewControlledDocumentService(newTxRunner(newPermissiveMockDB(t)), repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
 
 	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:         "tenant-a",

@@ -171,11 +171,6 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 	)
 
 	if cmd.ManualCode != nil {
-		// PRE-EXISTING, DELIBERATELY-PRESERVED asymmetry: manual-code creation
-		// bypasses the tier-2 authz.Require that auto-code enforces. This is not
-		// introduced by this refactor (H-1d′-CD); it pre-dates the TxRunner port.
-		// The manual path has no SeedTxIdentity, no authz.Require, and no
-		// transaction. Flagged here for operator review — do NOT "fix" silently.
 		if !isReasonValid(cmd.ManualCodeReason) {
 			return nil, controlleddocumentsdomain.ErrManualCodeReasonRequired
 		}
@@ -271,8 +266,20 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		if err != nil {
 			return nil, fmt.Errorf("controlled_documents: build controlled document: %w", err)
 		}
-		if err := s.docs.Create(ctx, doc); err != nil {
-			return nil, fmt.Errorf("controlled_documents: create controlled document: %w", err)
+		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+			if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+				return fmt.Errorf("controlled_documents: set authz context: %w", err)
+			}
+			// ADR 0022 Phase 7: area-scoped tier-2 — symmetric with the auto branch.
+			// Closes B2 (F0.2): manual-code creation used to bypass tier-2 because the
+			// branch had no tx/identity, so the repo's authz.Require failed-closed on
+			// the missing actor_id GUC for every non-system-admin caller.
+			if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), cmd.ProcessAreaCode); err != nil {
+				return fmt.Errorf("controlled_documents: authz check manual-code create: %w", err)
+			}
+			return s.docs.CreateTx(ctx, tx, doc)
+		}); err != nil {
+			return nil, fmt.Errorf("controlled_documents: create controlled document (manual): %w", err)
 		}
 	} else {
 		// Pre-flight OFF-TX: validate the template artifact and resolve the
