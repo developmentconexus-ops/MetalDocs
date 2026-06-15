@@ -1,7 +1,7 @@
 # Program: Grade-A Architecture Remediation
 
 > **Governing spec:** `docs/superpowers/specs/2026-06-14-grade-a-architecture-remediation-design.md`
-> **Status:** In progress (M0, M1 passed 2026-06-14; test-infra-rebaseline micro-task done 2026-06-14; M2 passed 2026-06-14 — validator C1–C7 PASS; M3 passed 2026-06-15 — validator C1–C7 PASS, awaiting operator HS-1 to open M4)
+> **Status:** In progress (M0/M1/M2/M3 passed; M4 features F4.1–F4.6 built but **close gate blocked** — validator FAIL on F4.1a Gate #5 traced to a root-cause schema defect, see HS-6 2026-06-15; new milestone **4b** opened to drop the legacy `metaldocs.documents` duplicate cluster, then re-dispatch the M4 validator)
 > **Owner / operator:** leandrotca.work (operator) + backend agent (Opus 4.8)
 
 Take the backend's three formerly-C audit dimensions (module-boundaries/DDD, contract/API,
@@ -19,7 +19,8 @@ hard-stop. **Terminal acceptance:** the M5 independent multi-agent re-audit pass
 | 1 | `milestone-1-reach-a-blockers` | Close all 4 Grade-A blockers + the error-contract (bare-405) tail | passed | [PASS](milestone-1-reach-a-blockers/qa/milestone-qa.md) |
 | 2 | `milestone-2-contract-tail` | Eliminate handler-emits-undeclared-field drift (H-D), one FE regen | passed | [PASS](milestone-2-contract-tail/qa/milestone-qa.md) |
 | 3 | `milestone-3-mechanical-quality` | Harden code-quality + persistence; dead-surface deletes, tx-hazard hoist | passed | [PASS](milestone-3-mechanical-quality/qa/milestone-qa.md) |
-| 4 | `milestone-4-systemic-ports` | Close H-G class via shared ports (UserDisplayNameReader, TemplateVersionStateReader) | in-progress | — |
+| 4 | `milestone-4-systemic-ports` | Close H-G class via shared ports (UserDisplayNameReader, TemplateVersionStateReader) | blocked | FAIL→4b ([qa](milestone-4-systemic-ports/qa/milestone-qa.md)) |
+| 4b | `milestone-4b-legacy-schema-teardown` | Drop dead `metaldocs.documents` duplicate cluster + `template_audit_log` (root cause of F4.1a Gate #5); fix Family-B tripwire seeds | in-progress | — |
 | 5 | `milestone-5-independent-re-audit` | Prove Grade A by independent fresh multi-agent re-audit (authoritative) | planned | — |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
@@ -41,12 +42,15 @@ Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) 
 | 2026-06-15 | HS-1 | M4 open gate — operator approved opening M4 | **Approved** by operator 2026-06-15; M4 → in-progress, `milestone.md` authored up front (F4.1–F4.3, no execution detail) with an HS-6 scope-reconciliation note. Scope decision (later **SUPERSEDED**, see below): operator chose defer security on the premise its `iam_users` reads were tenant-scope JOINs. F4.1 = the 3 display-name reads. |
 | 2026-06-15 | HS-4 | M4 close gate — `milestone-validator` returned **FAIL**: census omitted `auth/sessions_admin.go:32` cross-module `iam_users.display_name` read; opened fix feature `f4.4-auth-session-display-name-port` | **In progress.** Verifying the finding surfaced a deeper defect (HS-6 below). |
 | 2026-06-15 | HS-6 | M4 census undercount — verifying the validator's 1 site found **3 more**: `security` `ListLockouts:89`/`CountRecentFailedLoginsByUser:137`/`ListNewDeviceLogins:191` DO read `iam_users.display_name` (original census mislabeled them "no display-name read"). Authoritative count = **4** display-name reaches outside `iam/` (1 auth + 3 security); the earlier "defer security" decision rested on a false premise. | **Replanned — operator chose Option 2 (FULL CLOSE) 2026-06-15.** Close all 4 in M4 incl. building the previously-deferred **iam tenant-scope/membership port**. `milestone.md` census **corrected**; features **F4.4 (auth) + F4.5 (iam membership port) + F4.6 (security)** added. Genuine remaining defer narrowed to security's non-display-name aggregate JOINs (MfaCoverage/CountRecentLockouts) + security's `auth_identities` reads. |
+| 2026-06-15 | HS-4 | M4 close gate (post F4.4–F4.6) — `milestone-validator` returned **FAIL** on one isolated gate: **F4.1a Gate #5** (`TestCreateDocumentTx_PopulatesAllSnapshotColumns`) is environment-coupled (passes only when the operator DSN omits `search_path`). H-G class-zero bar itself PASSED. Opened named fix feature `f4.1b-testdb-search-path-robustness`. | **Superseded by the HS-6 below.** `/systematic-debugging` of F4.1b found the failure is a *symptom*: bare unqualified `documents` in 40+ runtime SQL sites resolves by `search_path`, and a dead legacy `metaldocs.documents` duplicate shadows the real `public.documents` under any metaldocs-first `search_path`. F4.1b's harness-adapt was rejected as symptom-patching. |
+| 2026-06-15 | HS-6 | Root cause is a schema defect, not a harness bug — **two** duplicate tables exist in both schemas (`documents`, `template_audit_log`); `metaldocs.documents` anchors a 7-table dead FK satellite cluster (`document_attachments`, `document_collaboration_presence`, `document_edit_locks`, `document_template_assignments`, `document_versions`, `document_versions_mddm`, `workflow_approvals`). All **zero runtime Go refs** (dead, not live). Fixing it is a `metaldocs-database` migration outside F4.1b's named gate. | **Replanned — operator chose "new milestone: drop legacy cluster" + "fix Family-B test seeds now" 2026-06-15.** Opened **milestone 4b** (`milestone-4b-legacy-schema-teardown`) to verify-dead + `DROP` the cluster + both duplicates and mirror into the curated baseline; fix Family-B tripwire seeds (set `metaldocs.asserted_caps`). F4.1b → **superseded** (no harness change; `db.go` stays at HEAD — proof of fix-not-adapt). On 4b PASS + HS-1, **re-dispatch the M4 validator** (F4.1a Gate #5 re-greens with the operator DSN unchanged). Stash `stash@{0}` (rejected harness edits) retained until 4b green, then dropped. |
+| 2026-06-15 | HS-1 | M4b open gate — operator authorized opening 4b (scope answer: "new milestone: drop legacy cluster") | **Approved** by operator 2026-06-15; 4b → in-progress, `milestone.md` authored up front (F4b.1–F4b.4, no execution detail) before any feature. |
 
 ## Program close-out / reconciliation
 
 Fill in only when the last milestone has passed:
 
-- [ ] Every planned feature (M0–M4) has a complete evidence row.
+- [ ] Every planned feature (M0–M4, M4b) has a complete evidence row.
 - [ ] Zero unplanned scope merged; anything added is recorded with rationale.
 - [ ] Every bounded defer has a written trigger and an owner.
 - [ ] M5 re-audit passed the §6 pass bar — link the evidence.
