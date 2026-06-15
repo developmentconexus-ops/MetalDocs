@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
@@ -50,22 +49,19 @@ func (s *ReadService) LoadInstance(ctx context.Context, runner db.TxRunner, tena
 			return fmt.Errorf("read load instance: %w", err)
 		}
 
-		areaCode, found, err := loadInstanceAreaCode(ctx, tx, tenantID, instanceID)
+		_, found, err := loadInstanceAreaCode(ctx, tx, tenantID, instanceID)
 		if err != nil {
 			return fmt.Errorf("read load instance: load area: %w", err)
 		}
 		if !found {
 			return repository.ErrNoActiveInstance
 		}
-		// document.view is tenant-grade: COALESCE "" -> "tenant" so the area filter is
-		// intentionally OFF (NOT fail-closed). ADR 0022 Phase 11 (F7): the coalesce now
-		// lives at the call site, not baked into the resolver.
-		if areaCode == "" {
-			areaCode = "tenant"
-		}
 
 		ctx := authz.WithCapCache(ctx)
-		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), areaCode); err != nil {
+		// CapDocumentView is tenant-grade (iam/domain/capability_scope.go:51); pass the
+		// "tenant" sentinel so the area filter is intentionally OFF — mirrors the
+		// canonical documents/application/view_service.go:71.
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
 			return err
 		}
 
@@ -98,20 +94,12 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, runner d
 			return fmt.Errorf("read load instance by document: %w", err)
 		}
 
-		// document.view is tenant-grade: COALESCE the resolved area to "tenant" so the
-		// area filter is intentionally OFF (NOT fail-closed). The shared resolver is
-		// fail-closed for its area-grade callers; tenant-grade callers re-coalesce here
-		// (ADR 0022 Phase 8 semantics, Phase 11 F7 consolidation).
-		areaCode, found, err := docapp.LoadDocumentAreaCode(ctx, tx, tenantID, documentID)
-		if err != nil {
-			return fmt.Errorf("read load instance by document: load area: %w", err)
-		}
-		if !found || areaCode == "" {
-			areaCode = "tenant"
-		}
-
 		ctx := authz.WithCapCache(ctx)
-		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), areaCode); err != nil {
+		// CapDocumentView is tenant-grade (iam/domain/capability_scope.go:51); pass the
+		// "tenant" sentinel so the area filter is intentionally OFF — mirrors the
+		// canonical documents/application/view_service.go:71. A missing instance is
+		// surfaced as ErrNoActiveInstance by the repo lookup below.
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
 			return err
 		}
 

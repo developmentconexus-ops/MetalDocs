@@ -185,9 +185,6 @@ func TestLoadActiveInstanceByDocument_RequiresDocumentViewBeforeRepoLoad(t *test
 	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
 		WithArgs("tenant-1", "actor-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectQuery(`SELECT COALESCE\(d\.process_area_code_snapshot`).
-		WithArgs("doc-1", "tenant-1").
-		WillReturnRows(sqlmock.NewRows([]string{"area_code"}).AddRow("qa"))
 	mock.ExpectQuery(`SELECT current_setting\('metaldocs\.actor_id', true\)`).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("actor-1"))
 	mock.ExpectQuery(`SELECT current_setting\('metaldocs\.tenant_id', true\)`).
@@ -207,6 +204,11 @@ func TestLoadActiveInstanceByDocument_RequiresDocumentViewBeforeRepoLoad(t *test
 	var denied authz.ErrCapDenied
 	if !errors.As(err, &denied) {
 		t.Fatalf("expected ErrCapDenied, got %v", err)
+	}
+	// F0.3: CapDocumentView is tenant-grade — denial envelope carries "tenant" sentinel,
+	// not the document's resolved area code.
+	if denied.AreaCode != "tenant" {
+		t.Fatalf("ErrCapDenied.AreaCode = %q, want %q (tenant-grade)", denied.AreaCode, "tenant")
 	}
 	if repoSpy.called {
 		t.Fatal("repo must not be called when document.view is denied")
