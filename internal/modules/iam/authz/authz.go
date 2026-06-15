@@ -120,6 +120,7 @@ SELECT EXISTS (
     ON upa.role = rc.role
    AND upa.tenant_id = $4::uuid
    AND upa.user_id   = $3
+   AND upa.effective_from <= now()
    AND upa.effective_to IS NULL
   WHERE rc.capability = $1
     AND ($2 = 'tenant' OR upa.area_code = $2)
