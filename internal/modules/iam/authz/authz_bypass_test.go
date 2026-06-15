@@ -14,28 +14,36 @@ func TestRequire_SystemAdmin_Bypasses(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := context.Background()
 
-	// Mint a fresh tenant UUID — no hardcoded literals.
-	tenant := testdb.NewTenant(t, db)
-
-	// Seed the system_admin actor: iam_users row (no tripwire) + iam_user_roles
-	// row (user.manage tripwire asserted tx-locally by SeedSystemAdmin).
-	const actorID = "admin-local"
-	testdb.SeedSystemAdmin(t, db, tenant.ID, actorID, "Administrator")
-
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("begin tx: %v", err)
 	}
 	defer tx.Rollback()
 
-	// Set the transaction-local authz-context GUCs (actor_id + tenant_id) that
-	// authz.Require reads via MustActorID / MustTenantID. These are NOT the
-	// cap-tripwire metaldocs.asserted_caps GUC.
-	if err := authz.SeedTxIdentity(ctx, tx, tenant.ID, actorID); err != nil {
-		t.Fatalf("seed tx identity: %v", err)
+	// Set session vars for admin-local user
+	_, err = tx.ExecContext(ctx,
+		"SELECT set_config('metaldocs.actor_id', 'admin-local', true), set_config('metaldocs.tenant_id', 'ffffffff-ffff-ffff-ffff-ffffffffffff', true)")
+	if err != nil {
+		t.Fatalf("set session vars: %v", err)
 	}
 
-	// system_admin should bypass even a non-existent capability.
+	// Insert admin-local into iam_users so the FK on iam_user_roles is satisfied
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO metaldocs.iam_users (user_id, display_name) VALUES ('admin-local', 'Administrator') ON CONFLICT DO NOTHING`)
+	if err != nil {
+		t.Fatalf("seed iam_users: %v", err)
+	}
+
+	// Grant system_admin role to admin-local
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO metaldocs.iam_user_roles (user_id, role_code, tenant_id)
+		 VALUES ('admin-local', 'system_admin', 'ffffffff-ffff-ffff-ffff-ffffffffffff')
+		 ON CONFLICT DO NOTHING`)
+	if err != nil {
+		t.Fatalf("seed iam_user_roles: %v", err)
+	}
+
+	// system_admin should bypass even a non-existent capability
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.Require(ctx, tx, "does.not.exist", "any-area"); err != nil {
 		t.Fatalf("system_admin bypass failed: %v", err)

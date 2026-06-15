@@ -1,32 +1,92 @@
-//go:build integration
-
 package infrastructure
 
 import (
 	"context"
+	"regexp"
 	"testing"
 
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/tenant"
-	"metaldocs/tests/integration/testdb"
 )
 
 func TestFamilyRepository_HasActiveProfiles_TenantScoped(t *testing.T) {
-	db, _ := testdb.Open(t)
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
 	defer db.Close()
 
-	tnt := testdb.NewTenant(t, db)
-	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tnt.ID))
-
 	repo := NewFamilyRepository(db)
-	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), tnt.ID), "actor-1", nil)
+	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), "tenant-a"), "actor-1", nil)
 
-	exists, err := repo.HasActiveProfiles(ctx, tnt.ID, domain.FamilyCode(tax.FamilyCode))
+	mock.ExpectBegin()
+	expectDocumentViewAuthz(mock, "actor-1", "tenant-a")
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT EXISTS(
+  SELECT 1 FROM metaldocs.document_profiles
+  WHERE tenant_id = $1 AND family_code = $2 AND archived_at IS NULL
+)`)).
+		WithArgs("tenant-a", "fam-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectRollback()
+
+	exists, err := repo.HasActiveProfiles(ctx, "tenant-a", "fam-1")
 	if err != nil {
 		t.Fatalf("HasActiveProfiles: %v", err)
 	}
 	if !exists {
 		t.Fatal("expected exists=true")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func expectDocumentViewAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
+	mock.ExpectExec(regexp.QuoteMeta(`
+SELECT
+	set_config('metaldocs.tenant_id', $1, true),
+	set_config('metaldocs.actor_id', $2, true)
+`)).
+		WithArgs(tenantID, actorID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(actorID))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT EXISTS (
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
+)`)).
+		WithArgs(actorID, tenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(nil))
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+}
+
+func family(code string) *domain.DocumentFamily {
+	return &domain.DocumentFamily{
+		Code:        domain.FamilyCode(code),
+		Name:        "Procedimentos",
+		Description: "Familia global para fluxo de editor",
+		IsActive:    true,
 	}
 }
