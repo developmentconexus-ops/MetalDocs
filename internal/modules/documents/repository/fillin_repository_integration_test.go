@@ -21,14 +21,7 @@ func TestFillInRepository_UpsertValueAndListValues(t *testing.T) {
 	db, schema := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
-		t.Fatalf("set search_path: %v", err)
-	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
+	testdb.SetCapsOnDB(t, db, `[{"cap":"document.create"},{"cap":"document.edit"}]`)
 
 	docID, tenant := testdb.InsertDraftDocument(t, db, schema, fillInTenantID)
 

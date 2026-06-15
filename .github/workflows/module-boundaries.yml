@@ -14,3 +14,7 @@ jobs:
       - name: Run module boundaries conformance
         shell: pwsh
         run: ./scripts/check-module-boundaries.ps1
+
+      - name: Run test-discipline guard
+        shell: bash
+        run: bash scripts/check-test-discipline.sh

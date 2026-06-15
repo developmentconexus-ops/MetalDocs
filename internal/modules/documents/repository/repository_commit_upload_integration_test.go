@@ -19,14 +19,7 @@ func TestCommitUpload_PersistsRevisionAndFormDataSnapshot(t *testing.T) {
 	db, schema := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
-		t.Fatalf("set search_path: %v", err)
-	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
+	testdb.SetCapsOnDB(t, db, `[{"cap":"document.create"},{"cap":"document.edit"}]`)
 
 	tenantID := testdb.DeterministicID(t, "tenant")
 	docID, _ := testdb.InsertDraftDocument(t, db, schema, tenantID)
@@ -34,7 +27,7 @@ func TestCommitUpload_PersistsRevisionAndFormDataSnapshot(t *testing.T) {
 	var sessionID, userID, baseRevisionID string
 	if err := db.QueryRowContext(ctx,
 		`SELECT active_session_id::text, created_by::text, current_revision_id::text
-		 FROM documents WHERE id=$1::uuid`,
+		 FROM `+testdb.Qualified(schema, "documents")+` WHERE id=$1::uuid`,
 		docID,
 	).Scan(&sessionID, &userID, &baseRevisionID); err != nil {
 		t.Fatalf("load document session/base: %v", err)
@@ -69,7 +62,7 @@ func TestCommitUpload_PersistsRevisionAndFormDataSnapshot(t *testing.T) {
 
 	var gotDocumentJSON string
 	if err := db.QueryRowContext(ctx,
-		`SELECT form_data_json::text FROM documents WHERE id=$1::uuid`,
+		`SELECT form_data_json::text FROM `+testdb.Qualified(schema, "documents")+` WHERE id=$1::uuid`,
 		docID,
 	).Scan(&gotDocumentJSON); err != nil {
 		t.Fatalf("query documents.form_data_json: %v", err)
@@ -124,14 +117,7 @@ func TestCommitUpload_IdempotentReplayReturnsExistingMetadata(t *testing.T) {
 	db, schema := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
-		t.Fatalf("set search_path: %v", err)
-	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
+	testdb.SetCapsOnDB(t, db, `[{"cap":"document.create"},{"cap":"document.edit"}]`)
 
 	tenantID := testdb.DeterministicID(t, "tenant")
 	docID, _ := testdb.InsertDraftDocument(t, db, schema, tenantID)
@@ -139,7 +125,7 @@ func TestCommitUpload_IdempotentReplayReturnsExistingMetadata(t *testing.T) {
 	var sessionID, userID, baseRevisionID string
 	if err := db.QueryRowContext(ctx,
 		`SELECT active_session_id::text, created_by::text, current_revision_id::text
-		 FROM documents WHERE id=$1::uuid`,
+		 FROM `+testdb.Qualified(schema, "documents")+` WHERE id=$1::uuid`,
 		docID,
 	).Scan(&sessionID, &userID, &baseRevisionID); err != nil {
 		t.Fatalf("load document session/base: %v", err)
