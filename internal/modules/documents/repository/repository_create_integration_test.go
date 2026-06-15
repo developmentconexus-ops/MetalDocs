@@ -29,43 +29,35 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `SET search_path TO public, metaldocs`); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"controlled_documents.create"},{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
 
-	tenantID := testdb.DeterministicID(t, "tenant")
-	actorID := testdb.DeterministicID(t, "actor")
+	tenant := testdb.NewTenant(t, db)
+	actor := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID), testdb.WithRole("admin"))
+	tax := testdb.NewTaxonomy(t, db,
+		testdb.WithTenant(tenant.ID),
+		testdb.WithCode("po"),
+		testdb.WithProfile("quality"),
+	)
+
+	controlledDoc := testdb.NewControlledDoc(t, db,
+		testdb.WithTenant(tenant.ID),
+		testdb.WithTaxonomy(tax),
+		testdb.WithCode("PO-SK-001"),
+		testdb.WithOwner(actor.ID),
+	)
 	templateVersionID := testdb.DeterministicID(t, "template-version")
-	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
 
-	testdb.SeedGovernedTaxonomy(t, db, tenantID, "po", "quality")
-	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "test-actor")
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO controlled_documents (
-			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
-		) VALUES (
-			$1::uuid, $2::uuid, 'po', 'quality', 'PO-SK-001',
-			'StorageKey Invariant CD', $3::uuid, 'active'
-		)`,
-		controlledDocumentID, tenantID, actorID,
-	); err != nil {
-		t.Fatalf("seed controlled_documents: %v", err)
-	}
-
-	profileCode := "po"
-	processAreaCode := "quality"
+	profileCode := tax.ProfileCode
+	processAreaCode := tax.ProcessAreaCode
 	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
 
 	newDocument := func(name, code string) *domain.Document {
 		return &domain.Document{
-			TenantID:                tenantID,
+			TenantID:                tenant.ID,
 			TemplateVersionID:       templateVersionID,
 			Name:                    name,
 			FormDataJSON:            []byte(`{}`),
-			CreatedBy:               actorID,
-			ControlledDocumentID:    &controlledDocumentID,
+			CreatedBy:               actor.ID,
+			ControlledDocumentID:    &controlledDoc.ID,
 			ProfileCodeSnapshot:     &profileCode,
 			ProcessAreaCodeSnapshot: &processAreaCode,
 			Code:                    code,
@@ -100,7 +92,7 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 	t.Run("EmptyStorageKey", func(t *testing.T) {
 		// Supersede the first doc (legal lifecycle walk) so the second create succeeds:
 		// ux_documents_cd_active permits one active document per CD.
-		testdb.SupersedeActiveDocumentForCD(t, db, controlledDocumentID)
+		testdb.SupersedeActiveDocumentForCD(t, db, controlledDoc.ID)
 
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
@@ -140,42 +132,34 @@ func TestCreateDocumentTx_RevisionNumberIncrementsForSameCD(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `SET search_path TO public, metaldocs`); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"controlled_documents.create"},{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
 
-	tenantID := testdb.DeterministicID(t, "tenant")
-	actorID := testdb.DeterministicID(t, "actor")
+	tenant := testdb.NewTenant(t, db)
+	actor := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID), testdb.WithRole("admin"))
+	tax := testdb.NewTaxonomy(t, db,
+		testdb.WithTenant(tenant.ID),
+		testdb.WithCode("po"),
+		testdb.WithProfile("quality"),
+	)
+
+	controlledDoc := testdb.NewControlledDoc(t, db,
+		testdb.WithTenant(tenant.ID),
+		testdb.WithTaxonomy(tax),
+		testdb.WithCode("PO-REV-001"),
+		testdb.WithOwner(actor.ID),
+	)
 	templateVersionID := testdb.DeterministicID(t, "template-version")
-	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
 
-	testdb.SeedGovernedTaxonomy(t, db, tenantID, "po", "quality")
-	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "test-actor")
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO controlled_documents (
-			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
-		) VALUES (
-			$1::uuid, $2::uuid, 'po', 'quality', 'PO-REV-001',
-			'Revision Test Controlled Document', $3::uuid, 'active'
-		)`,
-		controlledDocumentID, tenantID, actorID,
-	); err != nil {
-		t.Fatalf("seed controlled_documents: %v", err)
-	}
-
-	profileCode := "po"
-	processAreaCode := "quality"
+	profileCode := tax.ProfileCode
+	processAreaCode := tax.ProcessAreaCode
 	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
 	newDocument := func(name, code string) *domain.Document {
 		return &domain.Document{
-			TenantID:                tenantID,
+			TenantID:                tenant.ID,
 			TemplateVersionID:       templateVersionID,
 			Name:                    name,
 			FormDataJSON:            []byte(`{}`),
-			CreatedBy:               actorID,
-			ControlledDocumentID:    &controlledDocumentID,
+			CreatedBy:               actor.ID,
+			ControlledDocumentID:    &controlledDoc.ID,
 			ProfileCodeSnapshot:     &profileCode,
 			ProcessAreaCodeSnapshot: &processAreaCode,
 			Code:                    code,
@@ -195,7 +179,7 @@ func TestCreateDocumentTx_RevisionNumberIncrementsForSameCD(t *testing.T) {
 	}
 
 	// Supersede the first doc (legal lifecycle walk) so the second create succeeds.
-	testdb.SupersedeActiveDocumentForCD(t, db, controlledDocumentID)
+	testdb.SupersedeActiveDocumentForCD(t, db, controlledDoc.ID)
 
 	tx2, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -239,42 +223,34 @@ func TestCreateDocumentTx_RejectsEmptyName(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `SET search_path TO public, metaldocs`); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"controlled_documents.create"},{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
 
-	tenantID := testdb.DeterministicID(t, "tenant")
-	actorID := testdb.DeterministicID(t, "actor")
+	tenant := testdb.NewTenant(t, db)
+	actor := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID), testdb.WithRole("admin"))
+	tax := testdb.NewTaxonomy(t, db,
+		testdb.WithTenant(tenant.ID),
+		testdb.WithCode("po"),
+		testdb.WithProfile("quality"),
+	)
+
+	controlledDoc := testdb.NewControlledDoc(t, db,
+		testdb.WithTenant(tenant.ID),
+		testdb.WithTaxonomy(tax),
+		testdb.WithCode("PO-EMPTY-CHECK"),
+		testdb.WithOwner(actor.ID),
+	)
 	templateVersionID := testdb.DeterministicID(t, "template-version")
-	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
 
-	testdb.SeedGovernedTaxonomy(t, db, tenantID, "po", "quality")
-	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "test-actor")
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO controlled_documents (
-			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
-		) VALUES (
-			$1::uuid, $2::uuid, 'po', 'quality', 'PO-EMPTY-CHECK',
-			'Empty Name Check CD', $3::uuid, 'active'
-		)`,
-		controlledDocumentID, tenantID, actorID,
-	); err != nil {
-		t.Fatalf("seed controlled_documents: %v", err)
-	}
-
-	profileCode := "po"
-	processAreaCode := "quality"
+	profileCode := tax.ProfileCode
+	processAreaCode := tax.ProcessAreaCode
 	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
 
 	doc := &domain.Document{
-		TenantID:                tenantID,
+		TenantID:                tenant.ID,
 		TemplateVersionID:       templateVersionID,
 		Name:                    "",
 		FormDataJSON:            []byte(`{}`),
-		CreatedBy:               actorID,
-		ControlledDocumentID:    &controlledDocumentID,
+		CreatedBy:               actor.ID,
+		ControlledDocumentID:    &controlledDoc.ID,
 		ProfileCodeSnapshot:     &profileCode,
 		ProcessAreaCodeSnapshot: &processAreaCode,
 		Code:                    "PO-EMPTY-CHECK",
@@ -304,41 +280,33 @@ func TestGetDocument_ReturnsSnapshotMetadata(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `SET search_path TO public, metaldocs`); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"controlled_documents.create"},{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
 
-	tenantID := testdb.DeterministicID(t, "tenant")
-	actorID := testdb.DeterministicID(t, "actor")
+	tenant := testdb.NewTenant(t, db)
+	actor := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID), testdb.WithRole("admin"))
+	tax := testdb.NewTaxonomy(t, db,
+		testdb.WithTenant(tenant.ID),
+		testdb.WithCode("pop"),
+		testdb.WithProfile("general"),
+	)
+
+	controlledDoc := testdb.NewControlledDoc(t, db,
+		testdb.WithTenant(tenant.ID),
+		testdb.WithTaxonomy(tax),
+		testdb.WithCode("POP-GENERAL-001"),
+		testdb.WithOwner(actor.ID),
+	)
 	templateVersionID := testdb.DeterministicID(t, "template-version")
-	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
 
-	testdb.SeedGovernedTaxonomy(t, db, tenantID, "pop", "general")
-	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "test-actor")
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO controlled_documents (
-			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
-		) VALUES (
-			$1::uuid, $2::uuid, 'pop', 'general', 'POP-GENERAL-001',
-			'Snapshot Metadata CD', $3::uuid, 'active'
-		)`,
-		controlledDocumentID, tenantID, actorID,
-	); err != nil {
-		t.Fatalf("seed controlled_documents: %v", err)
-	}
-
-	profileCode := "pop"
-	processAreaCode := "general"
+	profileCode := tax.ProfileCode
+	processAreaCode := tax.ProcessAreaCode
 	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
 	doc := &domain.Document{
-		TenantID:                tenantID,
+		TenantID:                tenant.ID,
 		TemplateVersionID:       templateVersionID,
 		Name:                    "Snapshot Metadata Doc",
 		FormDataJSON:            []byte(`{}`),
-		CreatedBy:               actorID,
-		ControlledDocumentID:    &controlledDocumentID,
+		CreatedBy:               actor.ID,
+		ControlledDocumentID:    &controlledDoc.ID,
 		ProfileCodeSnapshot:     &profileCode,
 		ProcessAreaCodeSnapshot: &processAreaCode,
 		Code:                    "POP-GENERAL-001",
@@ -358,7 +326,7 @@ func TestGetDocument_ReturnsSnapshotMetadata(t *testing.T) {
 		t.Fatalf("commit: %v", err)
 	}
 
-	got, err := repo.GetDocument(ctx, tenantID, docID)
+	got, err := repo.GetDocument(ctx, tenant.ID, docID)
 	if err != nil {
 		t.Fatalf("GetDocument: %v", err)
 	}

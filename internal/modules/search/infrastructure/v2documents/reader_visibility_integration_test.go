@@ -21,17 +21,9 @@ func TestListDocuments_EnforcesUnifiedVisibility(t *testing.T) {
 	db, schema := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	// Satisfy the capability tripwire for the seed inserts on tripwire tables.
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps',
-			'[{"cap":"document.create"},{"cap":"document.edit"},{"cap":"registry.create"},{"cap":"taxonomy.manage"},{"cap":"controlled_documents.create"},{"cap":"membership.manage"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
-
-	tenantID := testdb.DeterministicID(t, "tenant")
-	cdCompany := testdb.DeterministicID(t, "cd-company")
-	cdRestricted := testdb.DeterministicID(t, "cd-restricted")
+	// Use factory builders to set up the test data with capability assertions handled.
+	tenant := testdb.NewTenant(t, db)
+	tenantID := tenant.ID
 
 	const (
 		owner   = "user-owner"
@@ -41,35 +33,52 @@ func TestListDocuments_EnforcesUnifiedVisibility(t *testing.T) {
 		area    = "quality"
 	)
 
-	// Taxonomy parents required by the controlled_documents FKs.
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "document_families")+`
-		(code, name, description) VALUES ('procedure', 'Procedures', 'test family')`)
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "document_profiles")+`
-		(code, tenant_id, family_code, name, description, review_interval_days, alias, editable_by_role)
-		VALUES ('po', $1::uuid, 'procedure', 'PO Profile', 'test', 30, 'po', 'admin')`, tenantID)
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "document_process_areas")+`
-		(code, tenant_id, name, description) VALUES ($1, $2::uuid, 'Quality', 'test area')`, area, tenantID)
+	// Create users.
+	testdb.NewUser(t, db, testdb.WithTenant(tenantID), testdb.WithUserID(owner))
+	testdb.NewUser(t, db, testdb.WithTenant(tenantID), testdb.WithUserID(areaMem))
+	testdb.NewUser(t, db, testdb.WithTenant(tenantID), testdb.WithUserID(userGr))
+	testdb.NewUser(t, db, testdb.WithTenant(tenantID), testdb.WithUserID(none))
 
-	// Two controlled documents: one company-wide, one restricted.
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "controlled_documents")+`
-		(id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, visibility_scope, status)
-		VALUES ($1::uuid,$2::uuid,'po',$3,'PO-CO-001','Company CD',$4,'company','active')`,
-		cdCompany, tenantID, area, owner)
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "controlled_documents")+`
-		(id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, visibility_scope, status)
-		VALUES ($1::uuid,$2::uuid,'po',$3,'PO-RE-001','Restricted CD',$4,'restricted','active')`,
-		cdRestricted, tenantID, area, owner)
+	// Create the taxonomy (will include the process area and profile).
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenantID), testdb.WithProfile("po"), testdb.WithCode(area))
 
-	// Restricted CD shared with area QA and directly with userGr.
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "controlled_document_area_grants")+`
-		(tenant_id, controlled_document_id, area_code) VALUES ($1::uuid,$2::uuid,$3)`, tenantID, cdRestricted, area)
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "controlled_document_user_grants")+`
-		(tenant_id, controlled_document_id, user_id) VALUES ($1::uuid,$2::uuid,$3)`, tenantID, cdRestricted, userGr)
+	// Create the company-scoped controlled document.
+	cdCompany := testdb.NewControlledDoc(t, db,
+		testdb.WithTenant(tenantID),
+		testdb.WithCode("PO-CO-001"),
+		testdb.WithOwner(owner),
+		testdb.WithTaxonomy(tax),
+		testdb.WithName("Company CD"),
+		testdb.WithStatus("active"))
 
-	// areaMem is an active member of the area (any membership in the area is enough).
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "user_process_areas")+`
-		(user_id, tenant_id, area_code, role, effective_from) VALUES ($1,$2::uuid,$3,'qms_admin', now())`,
-		areaMem, tenantID, area)
+	// Create the restricted controlled document.
+	cdRestricted := testdb.NewControlledDoc(t, db,
+		testdb.WithTenant(tenantID),
+		testdb.WithCode("PO-RE-001"),
+		testdb.WithOwner(owner),
+		testdb.WithTaxonomy(tax),
+		testdb.WithName("Restricted CD"),
+		testdb.WithStatus("active"))
+
+	// Seed area grant and direct grant for restricted CD using capability assertion.
+	testdb.SeedWithCaps(t, db, `[{"cap":"membership.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO `+testdb.Qualified(schema, "controlled_document_area_grants")+`
+			(tenant_id, controlled_document_id, area_code) VALUES ($1::uuid,$2::uuid,$3)`, tenantID, cdRestricted.ID, area)
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO `+testdb.Qualified(schema, "controlled_document_user_grants")+`
+			(tenant_id, controlled_document_id, user_id) VALUES ($1::uuid,$2::uuid,$3)`, tenantID, cdRestricted.ID, userGr)
+		return err
+	})
+
+	// Seed the area membership for areaMem.
+	testdb.SeedWithCaps(t, db, `[{"cap":"membership.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO `+testdb.Qualified(schema, "user_process_areas")+`
+			(user_id, tenant_id, area_code, role, effective_from) VALUES ($1,$2::uuid,$3,'qms_admin', now())`,
+			areaMem, tenantID, area)
+		return err
+	})
 
 	// Documents: one per CD plus a standalone doc. InsertDraftDocument handles the
 	// templates/document/session/revision FK chain; we then set the visibility-
@@ -80,8 +89,8 @@ func TestListDocuments_EnforcesUnifiedVisibility(t *testing.T) {
 			SET name=$2, created_by=$3, controlled_document_id=$4::uuid WHERE id=$1::uuid`,
 			docID, "Doc "+suffix, createdBy, nullableUUID(cdID))
 	}
-	setDoc("company", owner, cdCompany)
-	setDoc("restricted", owner, cdRestricted)
+	setDoc("company", owner, cdCompany.ID)
+	setDoc("restricted", owner, cdRestricted.ID)
 	setDoc("standalone", owner, "")
 
 	reader := NewReader(db)
