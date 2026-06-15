@@ -5,6 +5,7 @@ package repository_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/hex"
 	"testing"
 	"time"
@@ -21,16 +22,7 @@ func TestSnapshotRepository_WriteFreeze_PersistsHashAndFrozenAt(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
-		t.Fatalf("set search_path: %v", err)
-	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
-
-	docID, tenant := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
+	docID, tnt := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
 	repo := repository.NewSnapshotRepository(db)
 
 	hash, err := hex.DecodeString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -39,17 +31,19 @@ func TestSnapshotRepository_WriteFreeze_PersistsHashAndFrozenAt(t *testing.T) {
 	}
 	frozenAt := time.Date(2026, 4, 23, 18, 0, 0, 0, time.UTC)
 
-	if err := repo.WriteFreeze(ctx, tenant, docID, hash, frozenAt); err != nil {
-		t.Fatalf("WriteFreeze: %v", err)
-	}
+	// WriteFreeze updates public.documents — guarded by document.edit tripwire.
+	// Pass the tx via the variadic DBTX parameter; cap set tx-locally via SeedWithCaps.
+	testdb.SeedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		return repo.WriteFreeze(ctx, tnt, docID, hash, frozenAt, tx)
+	})
 
 	var gotHash []byte
 	var gotFrozenAt *time.Time
 	if err := db.QueryRowContext(ctx, `
 		SELECT values_hash, values_frozen_at
-		  FROM documents
+		  FROM public.documents
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
-		tenant, docID,
+		tnt, docID,
 	).Scan(&gotHash, &gotFrozenAt); err != nil {
 		t.Fatalf("read freeze columns: %v", err)
 	}
@@ -66,16 +60,7 @@ func TestSnapshotRepository_WriteFinalDocx_PersistsKeyAndContentHash(t *testing.
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
-		t.Fatalf("set search_path: %v", err)
-	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
-
-	docID, tenant := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
+	docID, tnt := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
 	repo := repository.NewSnapshotRepository(db)
 
 	contentHash, err := hex.DecodeString("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
@@ -84,17 +69,19 @@ func TestSnapshotRepository_WriteFinalDocx_PersistsKeyAndContentHash(t *testing.
 	}
 	s3Key := "final/doc.docx"
 
-	if err := repo.WriteFinalDocx(ctx, tenant, docID, s3Key, contentHash); err != nil {
-		t.Fatalf("WriteFinalDocx: %v", err)
-	}
+	// WriteFinalDocx updates public.documents — guarded by document.edit tripwire.
+	// Pass the tx via the variadic DBTX parameter; cap set tx-locally via SeedWithCaps.
+	testdb.SeedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		return repo.WriteFinalDocx(ctx, tnt, docID, s3Key, contentHash, tx)
+	})
 
 	var gotKey string
 	var gotHash []byte
 	if err := db.QueryRowContext(ctx, `
 		SELECT coalesce(final_docx_s3_key, ''), content_hash
-		  FROM documents
+		  FROM public.documents
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
-		tenant, docID,
+		tnt, docID,
 	).Scan(&gotKey, &gotHash); err != nil {
 		t.Fatalf("read final columns: %v", err)
 	}
@@ -115,19 +102,10 @@ func TestSnapshotRepository_ReadFinalDocxS3Key(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
-		t.Fatalf("set search_path: %v", err)
-	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
-
-	docID, tenant := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
+	docID, tnt := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
 	repo := repository.NewSnapshotRepository(db)
 
-	if _, err := repo.ReadFinalDocxS3Key(ctx, tenant, docID); err == nil {
+	if _, err := repo.ReadFinalDocxS3Key(ctx, tnt, docID); err == nil {
 		t.Fatal("ReadFinalDocxS3Key on unfrozen document: got nil error, want error")
 	}
 
@@ -137,11 +115,12 @@ func TestSnapshotRepository_ReadFinalDocxS3Key(t *testing.T) {
 	}
 	s3Key := "final/read-doc.docx"
 
-	if err := repo.WriteFinalDocx(ctx, tenant, docID, s3Key, contentHash); err != nil {
-		t.Fatalf("WriteFinalDocx: %v", err)
-	}
+	// WriteFinalDocx updates public.documents — guarded by document.edit tripwire.
+	testdb.SeedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		return repo.WriteFinalDocx(ctx, tnt, docID, s3Key, contentHash, tx)
+	})
 
-	got, err := repo.ReadFinalDocxS3Key(ctx, tenant, docID)
+	got, err := repo.ReadFinalDocxS3Key(ctx, tnt, docID)
 	if err != nil {
 		t.Fatalf("ReadFinalDocxS3Key: %v", err)
 	}
@@ -155,16 +134,7 @@ func TestSnapshotRepository_WritePDF_PersistsAllColumns(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
-		t.Fatalf("set search_path: %v", err)
-	}
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
-
-	docID, tenant := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
+	docID, tnt := testdb.InsertDraftDocument(t, db, "", snapshotTestTenantID)
 	repo := repository.NewSnapshotRepository(db)
 
 	pdfHash, err := hex.DecodeString("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
@@ -174,7 +144,11 @@ func TestSnapshotRepository_WritePDF_PersistsAllColumns(t *testing.T) {
 	pdfKey := "final/doc.pdf"
 	generated := time.Date(2026, 4, 23, 19, 0, 0, 0, time.UTC)
 
-	if err := repo.WritePDF(ctx, tenant, docID, pdfKey, pdfHash, generated); err != nil {
+	// WritePDF uses r.db.ExecContext directly (no DBTX variadic). Assert
+	// document.edit session-locally via SetCapsOnDB — safe because this test DB
+	// is isolated (cloned per-test, dropped after, MaxOpenConns=1).
+	testdb.SetCapsOnDB(t, db, `[{"cap":"document.edit"}]`)
+	if err := repo.WritePDF(ctx, tnt, docID, pdfKey, pdfHash, generated); err != nil {
 		t.Fatalf("WritePDF: %v", err)
 	}
 
@@ -183,9 +157,9 @@ func TestSnapshotRepository_WritePDF_PersistsAllColumns(t *testing.T) {
 	var gotAt *time.Time
 	if err := db.QueryRowContext(ctx, `
 		SELECT coalesce(final_pdf_s3_key,''), pdf_hash, pdf_generated_at
-		  FROM documents
+		  FROM public.documents
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
-		tenant, docID,
+		tnt, docID,
 	).Scan(&gotKey, &gotHash, &gotAt); err != nil {
 		t.Fatalf("read pdf columns: %v", err)
 	}

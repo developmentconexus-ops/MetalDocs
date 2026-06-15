@@ -12,6 +12,9 @@ import (
 // InsertDraftDocument inserts a minimal draft document with an initial revision
 // into the test schema. Returns (docID, tenantID).
 // tenantID must be a valid UUID string.
+//
+// Guarded writes (INSERT/UPDATE on public.documents) are wrapped in seedWithCaps
+// transaction-locally — pool-safe, never leaks session state.
 func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (docID, tenant string) {
 	t.Helper()
 	ctx := context.Background()
@@ -19,7 +22,7 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 	userID := DeterministicID(t, "user")
 	templateKey := "test-template-" + randomSuffix(t)
 
-	// Insert minimal stub template.
+	// Insert minimal stub template (no tripwire on public.templates).
 	var tplID string
 	if err := db.QueryRowContext(ctx,
 		`INSERT INTO `+Qualified(schema, "templates")+
@@ -31,7 +34,7 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 		t.Fatalf("InsertDraftDocument: insert template: %v", err)
 	}
 
-	// Insert minimal published template version.
+	// Insert minimal published template version (no tripwire on public.template_versions).
 	var tvID string
 	if err := db.QueryRowContext(ctx,
 		`INSERT INTO `+Qualified(schema, "template_versions")+
@@ -45,18 +48,18 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 		t.Fatalf("InsertDraftDocument: insert template_version: %v", err)
 	}
 
-	// Insert document.
-	if err := db.QueryRowContext(ctx,
-		`INSERT INTO `+Qualified(schema, "documents")+
-			` (tenant_id, template_version_id, name, status, form_data_json, created_by)
-		 VALUES ($1::uuid, $2::uuid, 'Test Doc', 'draft', '{}', $3::uuid)
-		 RETURNING id::text`,
-		tenantID, tvID, userID,
-	).Scan(&docID); err != nil {
-		t.Fatalf("InsertDraftDocument: insert document: %v", err)
-	}
+	// Insert document — guarded by document.create tripwire.
+	seedWithCaps(t, db, `[{"cap":"document.create"}]`, func(tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx,
+			`INSERT INTO `+Qualified(schema, "documents")+
+				` (tenant_id, template_version_id, name, status, form_data_json, created_by)
+			 VALUES ($1::uuid, $2::uuid, 'Test Doc', 'draft', '{}', $3::uuid)
+			 RETURNING id::text`,
+			tenantID, tvID, userID,
+		).Scan(&docID)
+	})
 
-	// Insert editor session.
+	// Insert editor session (no tripwire on public.editor_sessions).
 	var sessID string
 	if err := db.QueryRowContext(ctx,
 		`INSERT INTO `+Qualified(schema, "editor_sessions")+
@@ -69,7 +72,7 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 		t.Fatalf("InsertDraftDocument: insert session: %v", err)
 	}
 
-	// Insert initial revision.
+	// Insert initial revision (no tripwire on public.document_revisions).
 	var revID string
 	if err := db.QueryRowContext(ctx,
 		`INSERT INTO `+Qualified(schema, "document_revisions")+
@@ -81,17 +84,18 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 		t.Fatalf("InsertDraftDocument: insert revision: %v", err)
 	}
 
-	// Update document pointers.
-	if _, err := db.ExecContext(ctx,
-		`UPDATE `+Qualified(schema, "documents")+
-			` SET current_revision_id=$1::uuid, active_session_id=$2::uuid, updated_at=now()
-		 WHERE id=$3::uuid`,
-		revID, sessID, docID,
-	); err != nil {
-		t.Fatalf("InsertDraftDocument: update document pointers: %v", err)
-	}
+	// Update document pointers — guarded by document.edit tripwire.
+	seedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`UPDATE `+Qualified(schema, "documents")+
+				` SET current_revision_id=$1::uuid, active_session_id=$2::uuid, updated_at=now()
+			 WHERE id=$3::uuid`,
+			revID, sessID, docID,
+		)
+		return err
+	})
 
-	// Update session ack.
+	// Update session ack (no tripwire on public.editor_sessions).
 	if _, err := db.ExecContext(ctx,
 		`UPDATE `+Qualified(schema, "editor_sessions")+
 			` SET last_acknowledged_revision_id=$1::uuid WHERE id=$2::uuid AND tenant_id=$3::uuid`,
@@ -110,6 +114,33 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 func SeedWithCaps(t *testing.T, db *sql.DB, capsJSON string, fn func(tx *sql.Tx) error) {
 	t.Helper()
 	seedWithCaps(t, db, capsJSON, fn)
+}
+
+// SetCapsOnTx asserts capabilities transaction-locally on an already-open tx.
+// Use this when the test owns the tx (e.g., passes it to a repo method that
+// requires a caller-managed transaction) and must satisfy the tripwire without
+// inline set_config in the test file. Mirrors what the production authz layer
+// does: set_config with is_local=true so the assertion is discarded on commit.
+func SetCapsOnTx(t *testing.T, tx *sql.Tx, capsJSON string) {
+	t.Helper()
+	if _, err := tx.ExecContext(context.Background(),
+		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, capsJSON,
+	); err != nil {
+		t.Fatalf("SetCapsOnTx: %v", err)
+	}
+}
+
+// SetCapsOnDB asserts capabilities at session level on the given *sql.DB. Safe
+// only for isolated per-test databases (MaxOpenConns=1, DB dropped after test).
+// Use when the system-under-test takes a *sql.DB directly and cannot be wrapped
+// in a SeedWithCaps transaction (e.g., repo methods with no DBTX variadic).
+func SetCapsOnDB(t *testing.T, db *sql.DB, capsJSON string) {
+	t.Helper()
+	if _, err := db.ExecContext(context.Background(),
+		`SELECT set_config('metaldocs.asserted_caps', $1, false)`, capsJSON,
+	); err != nil {
+		t.Fatalf("SetCapsOnDB: %v", err)
+	}
 }
 
 // seedWithCaps runs fn inside its own transaction with the given capabilities

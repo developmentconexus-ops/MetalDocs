@@ -21,64 +21,98 @@ func TestListDocuments_EnforcesUnifiedVisibility(t *testing.T) {
 	db, schema := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	// Satisfy the capability tripwire for the seed inserts on tripwire tables.
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps',
-			'[{"cap":"document.create"},{"cap":"document.edit"},{"cap":"registry.create"},{"cap":"taxonomy.manage"},{"cap":"controlled_documents.create"},{"cap":"membership.manage"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
+	// Seed tenant + users via factory (no tripwire on tenants or iam_users).
+	tenant := testdb.NewTenant(t, db)
+	tenantID := tenant.ID
 
-	tenantID := testdb.DeterministicID(t, "tenant")
+	ownerUser := testdb.NewUser(t, db, testdb.WithTenant(tenantID))
+	owner := ownerUser.ID
+
+	areaMember := testdb.NewUser(t, db, testdb.WithTenant(tenantID))
+	areaMem := areaMember.ID
+
+	directUser := testdb.NewUser(t, db, testdb.WithTenant(tenantID))
+	userGr := directUser.ID
+
+	noneUser := testdb.NewUser(t, db, testdb.WithTenant(tenantID))
+	none := noneUser.ID
+
+	const area = "quality"
+
+	// Seed taxonomy (document_families / document_process_areas / document_profiles)
+	// via factory — all three carry the taxonomy.manage tripwire; factory wraps them.
+	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenantID))
+
+	// Seed the process area code we need for grants (area = "quality"). The
+	// taxonomy factory minted a random code; seed a separate process-area row with
+	// the fixed "quality" code so the area-grant and membership FK resolve.
+	testdb.SeedWithCaps(t, db, `[{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.document_process_areas (code, tenant_id, name)
+			 VALUES ($1, $2::uuid, 'Quality')
+			 ON CONFLICT (tenant_id, code) DO NOTHING`,
+			area, tenantID,
+		)
+		return err
+	})
+
+	// Seed two controlled documents with visibility_scope via SeedWithCaps
+	// (controlled_documents INSERT requires controlled_documents.create).
 	cdCompany := testdb.DeterministicID(t, "cd-company")
 	cdRestricted := testdb.DeterministicID(t, "cd-restricted")
 
-	const (
-		owner   = "user-owner"
-		areaMem = "user-area"
-		userGr  = "user-direct"
-		none    = "user-none"
-		area    = "quality"
-	)
+	testdb.SeedWithCaps(t, db, `[{"cap":"controlled_documents.create"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO public.controlled_documents
+			   (id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, visibility_scope, status)
+			 VALUES ($1::uuid,$2::uuid,$3,$4,'PO-CO-001','Company CD',$5,'company','active')`,
+			cdCompany, tenantID, tax.ProfileCode, area, owner,
+		)
+		return err
+	})
+	testdb.SeedWithCaps(t, db, `[{"cap":"controlled_documents.create"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO public.controlled_documents
+			   (id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, visibility_scope, status)
+			 VALUES ($1::uuid,$2::uuid,$3,$4,'PO-RE-001','Restricted CD',$5,'restricted','active')`,
+			cdRestricted, tenantID, tax.ProfileCode, area, owner,
+		)
+		return err
+	})
 
-	// Taxonomy parents required by the controlled_documents FKs.
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "document_families")+`
-		(code, name, description) VALUES ('procedure', 'Procedures', 'test family')`)
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "document_profiles")+`
-		(code, tenant_id, family_code, name, description, review_interval_days, alias, editable_by_role)
-		VALUES ('po', $1::uuid, 'procedure', 'PO Profile', 'test', 30, 'po', 'admin')`, tenantID)
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "document_process_areas")+`
-		(code, tenant_id, name, description) VALUES ($1, $2::uuid, 'Quality', 'test area')`, area, tenantID)
+	// Area + user grants on the restricted CD — no tripwire on these tables.
+	mustExec(t, db, ctx, `INSERT INTO public.controlled_document_area_grants
+		(tenant_id, controlled_document_id, area_code) VALUES ($1::uuid,$2::uuid,$3)`,
+		tenantID, cdRestricted, area)
+	mustExec(t, db, ctx, `INSERT INTO public.controlled_document_user_grants
+		(tenant_id, controlled_document_id, user_id) VALUES ($1::uuid,$2::uuid,$3)`,
+		tenantID, cdRestricted, userGr)
 
-	// Two controlled documents: one company-wide, one restricted.
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "controlled_documents")+`
-		(id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, visibility_scope, status)
-		VALUES ($1::uuid,$2::uuid,'po',$3,'PO-CO-001','Company CD',$4,'company','active')`,
-		cdCompany, tenantID, area, owner)
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "controlled_documents")+`
-		(id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, visibility_scope, status)
-		VALUES ($1::uuid,$2::uuid,'po',$3,'PO-RE-001','Restricted CD',$4,'restricted','active')`,
-		cdRestricted, tenantID, area, owner)
+	// areaMem is an active member of the area — user_process_areas carries
+	// the membership.manage tripwire.
+	testdb.SeedWithCaps(t, db, `[{"cap":"membership.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO public.user_process_areas
+			   (user_id, tenant_id, area_code, role, effective_from)
+			 VALUES ($1,$2::uuid,$3,'qms_admin', now())`,
+			areaMem, tenantID, area,
+		)
+		return err
+	})
 
-	// Restricted CD shared with area QA and directly with userGr.
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "controlled_document_area_grants")+`
-		(tenant_id, controlled_document_id, area_code) VALUES ($1::uuid,$2::uuid,$3)`, tenantID, cdRestricted, area)
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "controlled_document_user_grants")+`
-		(tenant_id, controlled_document_id, user_id) VALUES ($1::uuid,$2::uuid,$3)`, tenantID, cdRestricted, userGr)
-
-	// areaMem is an active member of the area (any membership in the area is enough).
-	mustExec(t, db, ctx, `INSERT INTO `+testdb.Qualified(schema, "user_process_areas")+`
-		(user_id, tenant_id, area_code, role, effective_from) VALUES ($1,$2::uuid,$3,'qms_admin', now())`,
-		areaMem, tenantID, area)
-
-	// Documents: one per CD plus a standalone doc. InsertDraftDocument handles the
-	// templates/document/session/revision FK chain; we then set the visibility-
-	// relevant columns (name, created_by, controlled_document_id).
+	// Documents — InsertDraftDocument handles the template/session/revision chain
+	// (already factory-safe). The UPDATE to wire name/created_by/controlled_document_id
+	// touches documents (UPDATE tripwire: document.edit), so wrap in SeedWithCaps.
 	setDoc := func(suffix, createdBy, cdID string) {
 		docID, _ := testdb.InsertDraftDocument(t, db, schema, tenantID)
-		mustExec(t, db, ctx, `UPDATE `+testdb.Qualified(schema, "documents")+`
-			SET name=$2, created_by=$3, controlled_document_id=$4::uuid WHERE id=$1::uuid`,
-			docID, "Doc "+suffix, createdBy, nullableUUID(cdID))
+		testdb.SeedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx,
+				`UPDATE `+testdb.Qualified(schema, "documents")+`
+				 SET name=$2, created_by=$3, controlled_document_id=$4::uuid WHERE id=$1::uuid`,
+				docID, "Doc "+suffix, createdBy, nullableUUID(cdID),
+			)
+			return err
+		})
 	}
 	setDoc("company", owner, cdCompany)
 	setDoc("restricted", owner, cdRestricted)

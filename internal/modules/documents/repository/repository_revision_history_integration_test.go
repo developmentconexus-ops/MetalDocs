@@ -18,21 +18,17 @@ func TestGovernedRevisionTitleColumnExistsAndCanBeRead(t *testing.T) {
 	db, schema := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
+	tnt := testdb.NewTenant(t, db)
+	docID, _ := testdb.InsertDraftDocument(t, db, schema, tnt.ID)
 
-	tenantID := testdb.DeterministicID(t, "tenant")
-	docID, _ := testdb.InsertDraftDocument(t, db, schema, tenantID)
-
-	if _, err := db.ExecContext(ctx,
-		`UPDATE `+testdb.Qualified(schema, "documents")+` SET revision_title = $2 WHERE id = $1::uuid`,
-		docID, "Correcao de procedimento",
-	); err != nil {
-		t.Fatalf("update revision_title: %v", err)
-	}
+	// UPDATE public.documents — guarded by document.edit tripwire.
+	testdb.SeedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`UPDATE `+testdb.Qualified(schema, "documents")+` SET revision_title = $2 WHERE id = $1::uuid`,
+			docID, "Correcao de procedimento",
+		)
+		return err
+	})
 
 	var title sql.NullString
 	if err := db.QueryRowContext(ctx,
@@ -52,108 +48,120 @@ func TestListRevisionHistory_ReturnsGovernedDocumentsNotAutosaveRows(t *testing.
 	db, schema := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', '[{"cap":"document.create"},{"cap":"document.edit"},{"cap":"registry.create"},{"cap":"taxonomy.manage"}]', false)`,
-	); err != nil {
-		t.Fatalf("set asserted_caps: %v", err)
-	}
-
-	tenantID := testdb.DeterministicID(t, "tenant-history")
+	tnt := testdb.NewTenant(t, db)
 	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
 	ownerUserID := testdb.DeterministicID(t, "user")
 	profileCode := "qa"
 	processAreaCode := "ops"
 
-	firstDocID, _ := testdb.InsertDraftDocument(t, db, schema, tenantID)
-	secondDocID, _ := testdb.InsertDraftDocument(t, db, schema, tenantID)
+	firstDocID, _ := testdb.InsertDraftDocument(t, db, schema, tnt.ID)
+	secondDocID, _ := testdb.InsertDraftDocument(t, db, schema, tnt.ID)
 
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO `+testdb.Qualified(schema, "document_families")+`
-		    (code, name, description)
-		 VALUES ('procedure', 'Procedimentos', 'familia global de teste')`,
-	); err != nil {
-		t.Fatalf("insert document_family: %v", err)
-	}
-
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO `+testdb.Qualified(schema, "document_profiles")+`
-		    (code, tenant_id, family_code, name, description, review_interval_days, alias, editable_by_role)
-		 VALUES ($1, $2::uuid, 'procedure', 'Perfil QA', 'perfil de teste', 30, 'qa', 'admin')`,
-		profileCode,
-		tenantID,
-	); err != nil {
-		t.Fatalf("insert document_profile: %v", err)
-	}
-
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO `+testdb.Qualified(schema, "document_process_areas")+`
-		    (code, tenant_id, name, description)
-		 VALUES ($1, $2::uuid, 'Operacoes', 'area de teste')`,
-		processAreaCode,
-		tenantID,
-	); err != nil {
-		t.Fatalf("insert document_process_area: %v", err)
-	}
-
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO `+testdb.Qualified(schema, "controlled_documents")+`
-		    (id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status, visibility_scope)
-		 VALUES ($1::uuid, $2::uuid, $3, $4, 'QA-OPS-001', 'Documento controlado de teste', $5, 'active', 'company')`,
-		controlledDocumentID,
-		tenantID,
-		profileCode,
-		processAreaCode,
-		ownerUserID,
-	); err != nil {
-		t.Fatalf("insert controlled_document: %v", err)
-	}
-
-	if _, err := db.ExecContext(ctx,
-		`UPDATE `+testdb.Qualified(schema, "documents")+`
-		    SET controlled_document_id = $2::uuid,
-		        revision_number = 0,
-		        revision_title = 'Primeira versao',
-		        created_at = '2026-05-10T12:00:00Z'::timestamptz,
-		        updated_at = '2026-05-10T12:00:00Z'::timestamptz,
-		        placeholder_schema_snapshot = '[]'::jsonb,
-		        placeholder_schema_hash = decode(repeat('11', 32), 'hex'),
-		        composition_config_snapshot = '{}'::jsonb,
-		        composition_config_hash = decode(repeat('22', 32), 'hex'),
-		        body_docx_snapshot_s3_key = 'snapshots/doc-1.docx',
-		        body_docx_hash = decode(repeat('33', 32), 'hex')
-		  WHERE id = $1::uuid`,
-		firstDocID,
-		controlledDocumentID,
-	); err != nil {
-		t.Fatalf("prepare historical governed document %s: %v", firstDocID, err)
-	}
-
-	for _, nextStatus := range []string{"under_review", "approved", "published"} {
-		if _, err := db.ExecContext(ctx,
-			`UPDATE `+testdb.Qualified(schema, "documents")+`
-			    SET status = $2
-			  WHERE id = $1::uuid`,
-			firstDocID,
-			nextStatus,
+	// Seed taxonomy (document_families, document_profiles, document_process_areas)
+	// — all guarded by taxonomy.manage tripwire.
+	testdb.SeedWithCaps(t, db, `[{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO `+testdb.Qualified(schema, "document_families")+`
+			    (code, name, description)
+			 VALUES ('procedure', 'Procedimentos', 'familia global de teste')
+			 ON CONFLICT (code) DO NOTHING`,
 		); err != nil {
-			t.Fatalf("transition historical governed document to %s: %v", nextStatus, err)
+			return err
 		}
-	}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO `+testdb.Qualified(schema, "document_profiles")+`
+			    (code, tenant_id, family_code, name, description, review_interval_days, alias, editable_by_role)
+			 VALUES ($1, $2::uuid, 'procedure', 'Perfil QA', 'perfil de teste', 30, 'qa', 'admin')`,
+			profileCode, tnt.ID,
+		); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO `+testdb.Qualified(schema, "document_process_areas")+`
+			    (code, tenant_id, name, description)
+			 VALUES ($1, $2::uuid, 'Operacoes', 'area de teste')`,
+			processAreaCode, tnt.ID,
+		); err != nil {
+			return err
+		}
+		return nil
+	})
 
+	// Seed owner user (iam_users has no tripwire).
 	if _, err := db.ExecContext(ctx,
-		`UPDATE `+testdb.Qualified(schema, "documents")+`
-		    SET controlled_document_id = $2::uuid,
-		        revision_number = 1,
-		        revision_title = 'Ajuste operacional',
-		        created_at = '2026-05-18T12:00:00Z'::timestamptz,
-		        updated_at = '2026-05-18T12:00:00Z'::timestamptz
-		  WHERE id = $1::uuid`,
-		secondDocID,
-		controlledDocumentID,
+		`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
+		 VALUES ($1, 'Owner', $2::uuid)
+		 ON CONFLICT (user_id) DO NOTHING`,
+		ownerUserID, tnt.ID,
 	); err != nil {
-		t.Fatalf("prepare current governed document %s: %v", secondDocID, err)
+		t.Fatalf("insert iam_user: %v", err)
 	}
 
+	// Seed controlled document — guarded by controlled_documents.create tripwire.
+	testdb.SeedWithCaps(t, db, `[{"cap":"controlled_documents.create"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO `+testdb.Qualified(schema, "controlled_documents")+`
+			    (id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status, visibility_scope)
+			 VALUES ($1::uuid, $2::uuid, $3, $4, 'QA-OPS-001', 'Documento controlado de teste', $5, 'active', 'company')`,
+			controlledDocumentID, tnt.ID, profileCode, processAreaCode, ownerUserID,
+		)
+		return err
+	})
+
+	// Attach firstDocID to the controlled document and set snapshot columns
+	// (required by enforce_snapshot_on_submit for non-draft statuses).
+	// UPDATE public.documents — guarded by document.edit tripwire.
+	testdb.SeedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE `+testdb.Qualified(schema, "documents")+`
+			    SET controlled_document_id = $2::uuid,
+			        revision_number = 0,
+			        revision_title = 'Primeira versao',
+			        created_at = '2026-05-10T12:00:00Z'::timestamptz,
+			        updated_at = '2026-05-10T12:00:00Z'::timestamptz,
+			        placeholder_schema_snapshot = '[]'::jsonb,
+			        placeholder_schema_hash = decode(repeat('11', 32), 'hex'),
+			        composition_config_snapshot = '{}'::jsonb,
+			        composition_config_hash = decode(repeat('22', 32), 'hex'),
+			        body_docx_snapshot_s3_key = 'snapshots/doc-1.docx',
+			        body_docx_hash = decode(repeat('33', 32), 'hex')
+			  WHERE id = $1::uuid`,
+			firstDocID, controlledDocumentID,
+		); err != nil {
+			return err
+		}
+
+		// Walk firstDocID through the legal status lifecycle to 'published'.
+		for _, nextStatus := range []string{"under_review", "approved", "published"} {
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE `+testdb.Qualified(schema, "documents")+`
+				    SET status = $2
+				  WHERE id = $1::uuid`,
+				firstDocID, nextStatus,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	// Attach secondDocID to the controlled document.
+	// UPDATE public.documents — guarded by document.edit tripwire.
+	testdb.SeedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`UPDATE `+testdb.Qualified(schema, "documents")+`
+			    SET controlled_document_id = $2::uuid,
+			        revision_number = 1,
+			        revision_title = 'Ajuste operacional',
+			        created_at = '2026-05-18T12:00:00Z'::timestamptz,
+			        updated_at = '2026-05-18T12:00:00Z'::timestamptz
+			  WHERE id = $1::uuid`,
+			secondDocID, controlledDocumentID,
+		)
+		return err
+	})
+
+	// Insert autosave revisions for secondDocID (public.document_revisions has no tripwire).
 	for i := 0; i < 3; i++ {
 		if _, err := db.ExecContext(ctx,
 			`INSERT INTO `+testdb.Qualified(schema, "document_revisions")+`
@@ -170,7 +178,7 @@ func TestListRevisionHistory_ReturnsGovernedDocumentsNotAutosaveRows(t *testing.
 	}
 
 	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
-	items, err := repo.ListRevisionHistory(ctx, tenantID, secondDocID)
+	items, err := repo.ListRevisionHistory(ctx, tnt.ID, secondDocID)
 	if err != nil {
 		t.Fatalf("ListRevisionHistory: %v", err)
 	}
