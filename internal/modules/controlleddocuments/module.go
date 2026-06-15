@@ -11,6 +11,7 @@ import (
 	"metaldocs/internal/modules/controlleddocuments/infrastructure"
 	taxonomyapp "metaldocs/internal/modules/taxonomy/application"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
+	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
 	platformdb "metaldocs/internal/platform/db"
 )
 
@@ -32,7 +33,9 @@ func New(deps Dependencies) *Module {
 	}
 	repo := infrastructure.NewPostgresControlledDocumentRepository(deps.DB)
 	seq := infrastructure.NewPostgresSequenceAllocator(deps.DB)
-	tplCheck := infrastructure.NewPostgresTemplateVersionChecker(deps.DB)
+	// Template-version override state is read through the templates-owned port
+	// (M4 F4.2 — H-G reach closed); the reader satisfies application.TemplateVersionChecker.
+	tplCheck := templatesinfra.NewTemplateVersionReader(deps.DB)
 	// Read profiles/areas through the canonical taxonomy repositories so the
 	// authz GUC and CapTaxonomyView check run on every lookup (H-1b). Every role
 	// that can create a controlled document already holds taxonomy.view, so the

@@ -46,3 +46,25 @@ func (r *TemplateVersionReader) IsPublished(ctx context.Context, versionID strin
 	}
 	return true, profileCode.String, nil
 }
+
+// GetTemplateVersionState returns the raw status and owning-template doc_type_code
+// for versionID, scoped to tenantID. status is nil when the version is absent or
+// its status column is NULL; not-found is (nil, "", nil). tenantID is explicit
+// (not ctx-derived) so cross-module / off-tx callers (controlled-documents create)
+// pass it directly.
+func (r *TemplateVersionReader) GetTemplateVersionState(ctx context.Context, tenantID, versionID string) (*string, string, error) {
+	var status sql.NullString
+	var docTypeCode sql.NullString
+	err := r.db.QueryRowContext(ctx, templateVersionQuery, versionID, tenantID).Scan(&status, &docTypeCode)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, "", nil
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	if !status.Valid {
+		return nil, docTypeCode.String, nil
+	}
+	state := status.String
+	return &state, docTypeCode.String, nil
+}

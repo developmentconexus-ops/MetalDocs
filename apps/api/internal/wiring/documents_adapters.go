@@ -86,20 +86,33 @@ func (a controlledDocumentDuplicatorAdapter) DuplicateControlledDocument(ctx con
 	}, nil
 }
 
-// profileDefaultsAdapter bridges a taxonomy ProfileRepository to
-// docapp.ProfileDefaultTemplateReader.
-type profileDefaultsAdapter struct {
-	profileRepo interface {
-		GetByCode(ctx context.Context, tenantID string, code taxonomydomain.ProfileCode) (*taxonomydomain.DocumentProfile, error)
-	}
+// profileRepoByCode is the narrow profile-lookup capability the adapter needs.
+type profileRepoByCode interface {
+	GetByCode(ctx context.Context, tenantID string, code taxonomydomain.ProfileCode) (*taxonomydomain.DocumentProfile, error)
 }
 
-// NewProfileDefaults returns a docapp.ProfileDefaultTemplateReader backed by the given
-// profile repository.
-func NewProfileDefaults(profileRepo interface {
-	GetByCode(ctx context.Context, tenantID string, code taxonomydomain.ProfileCode) (*taxonomydomain.DocumentProfile, error)
-}) docapp.ProfileDefaultTemplateReader {
-	return &profileDefaultsAdapter{profileRepo: profileRepo}
+// templateVersionStateReader is the templates-owned port the adapter reads the
+// real template-version status through (M4 F4.2 — replaces a hardcoded status).
+type templateVersionStateReader interface {
+	GetTemplateVersionState(ctx context.Context, tenantID, versionID string) (*string, string, error)
+}
+
+// profileDefaultsAdapter bridges a taxonomy ProfileRepository to
+// docapp.ProfileDefaultTemplateReader, resolving the default template version's
+// real status via the templates-owned port.
+type profileDefaultsAdapter struct {
+	profileRepo profileRepoByCode
+	tplState    templateVersionStateReader
+}
+
+// NewProfileDefaults returns a docapp.ProfileDefaultTemplateReader backed by the
+// given profile repository and templates-owned version-state reader. Panics if
+// tplState is nil — a missing reader would silently mis-resolve template status.
+func NewProfileDefaults(profileRepo profileRepoByCode, tplState templateVersionStateReader) docapp.ProfileDefaultTemplateReader {
+	if tplState == nil {
+		panic("wiring: profile defaults template-version state reader is nil")
+	}
+	return &profileDefaultsAdapter{profileRepo: profileRepo, tplState: tplState}
 }
 
 func (a *profileDefaultsAdapter) GetDefaultTemplateVersionID(ctx context.Context, tenantID, profileCode string) (*string, *string, error) {
@@ -110,6 +123,11 @@ func (a *profileDefaultsAdapter) GetDefaultTemplateVersionID(ctx context.Context
 	if profile.DefaultTemplateVersionID == nil {
 		return nil, nil, nil
 	}
-	status := "published"
-	return profile.DefaultTemplateVersionID, &status, nil
+	// Read the real status from the templates-owned port instead of fabricating
+	// "published" — an obsolete/draft default must resolve as such (M4 F4.2).
+	status, _, err := a.tplState.GetTemplateVersionState(ctx, tenantID, *profile.DefaultTemplateVersionID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("profile defaults: read template version state: %w", err)
+	}
+	return profile.DefaultTemplateVersionID, status, nil
 }

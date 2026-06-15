@@ -691,36 +691,11 @@ func (a *PostgresSequenceAllocator) NextAndIncrement(ctx context.Context, tx db.
 	return next, nil
 }
 
-type PostgresTemplateVersionChecker struct {
-	db *sql.DB
-}
-
-func NewPostgresTemplateVersionChecker(db *sql.DB) *PostgresTemplateVersionChecker {
-	return &PostgresTemplateVersionChecker{db: db}
-}
-
-func (c *PostgresTemplateVersionChecker) GetTemplateVersionState(ctx context.Context, tenantID, templateVersionID string) (*string, string, error) {
-	var status sql.NullString
-	var profileCode sql.NullString
-	err := c.db.QueryRowContext(ctx, `
-		SELECT v.status, t.doc_type_code
-		FROM templates_template_version v
-		JOIN templates_template t ON t.id = v.template_id
-		WHERE v.id = $1
-		  AND t.tenant_id = $2::uuid`, templateVersionID, tenantID,
-	).Scan(&status, &profileCode)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, "", nil
-	}
-	if err != nil {
-		return nil, "", fmt.Errorf("get template version state: %w", err)
-	}
-	if !status.Valid {
-		return nil, profileCode.String, nil
-	}
-	state := status.String
-	return &state, profileCode.String, nil
-}
+// Template-version state reads moved to the templates-owned port
+// (templates/domain.TemplateVersionPort.GetTemplateVersionState, impl
+// templates/infrastructure.TemplateVersionReader) in M4 F4.2 — controlled-documents
+// no longer queries templates_* tables. The reader is wired as the module's
+// TemplateVersionChecker in module.go.
 
 type rowScanner interface {
 	Scan(dest ...any) error

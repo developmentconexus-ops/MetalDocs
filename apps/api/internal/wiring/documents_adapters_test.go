@@ -8,6 +8,7 @@ import (
 	controlleddocumentsapp "metaldocs/internal/modules/controlleddocuments/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
 // fakeDuplicatorSvc implements controlledDocumentDuplicatorService for unit tests.
@@ -67,5 +68,67 @@ func TestDuplicateControlledDocument_PreservesVisibility(t *testing.T) {
 	}
 	if !reflect.DeepEqual(cmd.VisibilityUserIDs, []string{"u1", "u2"}) {
 		t.Errorf("VisibilityUserIDs: got %v, want %v", cmd.VisibilityUserIDs, []string{"u1", "u2"})
+	}
+}
+
+type fakeProfileRepo struct {
+	profile *taxonomydomain.DocumentProfile
+}
+
+func (f *fakeProfileRepo) GetByCode(_ context.Context, _ string, _ taxonomydomain.ProfileCode) (*taxonomydomain.DocumentProfile, error) {
+	return f.profile, nil
+}
+
+type fakeTplState struct {
+	status     *string
+	docType    string
+	gotTenant  string
+	gotVersion string
+}
+
+func (f *fakeTplState) GetTemplateVersionState(_ context.Context, tenantID, versionID string) (*string, string, error) {
+	f.gotTenant = tenantID
+	f.gotVersion = versionID
+	return f.status, f.docType, nil
+}
+
+func strptr(s string) *string { return &s }
+
+func TestProfileDefaults_ReadsRealStatusFromPort(t *testing.T) {
+	versionID := "tv-obsolete-1"
+	obsolete := "obsolete"
+	tpl := &fakeTplState{status: &obsolete, docType: "po"}
+	adapter := NewProfileDefaults(
+		&fakeProfileRepo{profile: &taxonomydomain.DocumentProfile{DefaultTemplateVersionID: &versionID}},
+		tpl,
+	)
+
+	id, status, err := adapter.GetDefaultTemplateVersionID(context.Background(), "tenant-1", "po")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if id == nil || *id != versionID {
+		t.Fatalf("templateVersionID: got %v, want %q", id, versionID)
+	}
+	// The real status must flow through — NOT the old hardcoded "published".
+	if status == nil || *status != "obsolete" {
+		t.Fatalf("status: got %v, want %q (real status from port, not hardcoded)", status, "obsolete")
+	}
+	if tpl.gotTenant != "tenant-1" || tpl.gotVersion != versionID {
+		t.Fatalf("port called with (%q,%q), want (tenant-1,%q)", tpl.gotTenant, tpl.gotVersion, versionID)
+	}
+}
+
+func TestProfileDefaults_NoDefaultTemplate_ReturnsNil(t *testing.T) {
+	adapter := NewProfileDefaults(
+		&fakeProfileRepo{profile: &taxonomydomain.DocumentProfile{DefaultTemplateVersionID: nil}},
+		&fakeTplState{status: strptr("published"), docType: "po"},
+	)
+	id, status, err := adapter.GetDefaultTemplateVersionID(context.Background(), "tenant-1", "po")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if id != nil || status != nil {
+		t.Fatalf("no-default: got (%v,%v), want (nil,nil)", id, status)
 	}
 }

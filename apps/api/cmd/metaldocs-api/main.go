@@ -395,6 +395,10 @@ func main() {
 	}
 	fanoutCfg := buildFanoutComponents(deps, fanoutClientCfg, controlledDocumentsModule)
 
+	// M4/F4.1: construct the iam-owned display-name port once and inject into all
+	// three consumers (approval repo, documents repo, approval handler).
+	displayNameRepo := iampg.NewUserDisplayNameRepository(deps.SQLDB)
+
 	docSnapshotReader := docgenv2.NewTemplatesSnapshotReader(deps.SQLDB)
 	docDeps := documents.Dependencies{
 		DB:      deps.SQLDB,
@@ -408,8 +412,9 @@ func main() {
 		ExportPresign:                docPresigner,
 		ControlledDocumentDuplicator: controlledDocumentDuplicator,
 		Caps:                         wiring.NewCapabilityChecker(capabilityService),
-		ProfileDefaults:              wiring.NewProfileDefaults(profileRepo),
+		ProfileDefaults:              wiring.NewProfileDefaults(profileRepo, templatesinfra.NewTemplateVersionReader(deps.SQLDB)),
 		SnapshotReader:               docSnapshotReader,
+		DisplayNameReader:            displayNameRepo,
 	}
 	if deps.PDFConverter != nil {
 		docDeps.ExportDocgen = deps.PDFConverter
@@ -426,7 +431,7 @@ func main() {
 
 	// Approval services must be constructed before docMod so that
 	// SubmitSvc can be wired into the finalize→submit flow.
-	approvalRepo := approvalrepo.NewPostgresApprovalRepository(deps.SQLDB)
+	approvalRepo := approvalrepo.NewPostgresApprovalRepository(deps.SQLDB, displayNameRepo)
 	approvalEmitter := approvalapp.NewSQLEmitter()
 	approvalServices := approvalapp.NewServices(approvalRepo, approvalEmitter, approvalapp.RealClock{})
 	jobsCfg, err := config.LoadJobsConfig()
@@ -493,7 +498,7 @@ func main() {
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	routeAdminIdempStore := approvalinfra.NewPostgresRouteAdminIdempStore(deps.SQLDB)
 	approvalServices = approvalServices.WithRouteAdminIdempStore(routeAdminIdempStore)
-	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)
+	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore, displayNameRepo)
 	approvalHandler.RegisterRoutes(mux)
 	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {
 		e2etest.RegisterE2EHandlers(m, deps.SQLDB, nil)
