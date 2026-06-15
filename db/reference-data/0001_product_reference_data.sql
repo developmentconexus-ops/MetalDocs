@@ -138,9 +138,14 @@ SELECT set_config(
   true
 );
 
+-- NOTE: `visibility` is included here because the curated bootstrap applies this
+-- reference-data bundle AFTER the pre-tail baseline (where templates_template.visibility
+-- is NOT NULL with no default) but BEFORE the migration tail. Migration 0236 drops the
+-- column later; this value is benign and only satisfies the pre-tail NOT-NULL constraint.
+-- Omitting it (regression from dce4c81d) breaks any fresh bootstrap with SQLSTATE 23502.
 INSERT INTO public.templates_template (
   id, tenant_id, doc_type_code, key, name, description,
-  latest_version, published_version_id, created_by, system_owned, archived_at
+  visibility, latest_version, published_version_id, created_by, system_owned, archived_at
 ) VALUES (
   '00000000-0000-0000-0000-000000000101'::uuid,
   'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid,
@@ -148,6 +153,7 @@ INSERT INTO public.templates_template (
   '__system_blank__',
   'Em branco',
   'System blank template for controlled document creation.',
+  'internal',
   1,
   NULL,
   'system',
