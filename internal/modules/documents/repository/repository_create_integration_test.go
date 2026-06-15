@@ -22,7 +22,11 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
+	// Bare runtime tables (documents, controlled_documents, ...) must resolve to the
+	// real public.* schema; metaldocs.documents is a dead legacy duplicate lacking
+	// controlled_document_id. public first so bare `documents` -> public.documents;
+	// metaldocs second for the governed taxonomy parents (document_families/...).
+	if _, err := db.ExecContext(ctx, `SET search_path TO public, metaldocs`); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
 	if _, err := db.ExecContext(ctx,
@@ -36,6 +40,8 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 	templateVersionID := testdb.DeterministicID(t, "template-version")
 	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
 
+	testdb.SeedGovernedTaxonomy(t, db, tenantID, "po", "quality")
+	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "test-actor")
 	if _, err := db.ExecContext(ctx, `
 		INSERT INTO controlled_documents (
 			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
@@ -92,10 +98,9 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 	})
 
 	t.Run("EmptyStorageKey", func(t *testing.T) {
-		// Publish first doc so the sequence advances and the second insert succeeds.
-		if _, err := db.ExecContext(ctx, `UPDATE documents SET status='published' WHERE controlled_document_id = $1::uuid`, controlledDocumentID); err != nil {
-			t.Fatalf("publish first: %v", err)
-		}
+		// Supersede the first doc (legal lifecycle walk) so the second create succeeds:
+		// ux_documents_cd_active permits one active document per CD.
+		testdb.SupersedeActiveDocumentForCD(t, db, controlledDocumentID)
 
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
@@ -128,7 +133,11 @@ func TestCreateDocumentTx_RevisionNumberIncrementsForSameCD(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
+	// Bare runtime tables (documents, controlled_documents, ...) must resolve to the
+	// real public.* schema; metaldocs.documents is a dead legacy duplicate lacking
+	// controlled_document_id. public first so bare `documents` -> public.documents;
+	// metaldocs second for the governed taxonomy parents (document_families/...).
+	if _, err := db.ExecContext(ctx, `SET search_path TO public, metaldocs`); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
 	if _, err := db.ExecContext(ctx,
@@ -142,6 +151,8 @@ func TestCreateDocumentTx_RevisionNumberIncrementsForSameCD(t *testing.T) {
 	templateVersionID := testdb.DeterministicID(t, "template-version")
 	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
 
+	testdb.SeedGovernedTaxonomy(t, db, tenantID, "po", "quality")
+	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "test-actor")
 	if _, err := db.ExecContext(ctx, `
 		INSERT INTO controlled_documents (
 			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
@@ -183,9 +194,8 @@ func TestCreateDocumentTx_RevisionNumberIncrementsForSameCD(t *testing.T) {
 		t.Fatalf("commit tx1: %v", err)
 	}
 
-	if _, err := db.ExecContext(ctx, `UPDATE documents SET status='published' WHERE id=$1::uuid`, firstDocID); err != nil {
-		t.Fatalf("publish first document: %v", err)
-	}
+	// Supersede the first doc (legal lifecycle walk) so the second create succeeds.
+	testdb.SupersedeActiveDocumentForCD(t, db, controlledDocumentID)
 
 	tx2, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -222,7 +232,11 @@ func TestCreateDocumentTx_RejectsEmptyName(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
+	// Bare runtime tables (documents, controlled_documents, ...) must resolve to the
+	// real public.* schema; metaldocs.documents is a dead legacy duplicate lacking
+	// controlled_document_id. public first so bare `documents` -> public.documents;
+	// metaldocs second for the governed taxonomy parents (document_families/...).
+	if _, err := db.ExecContext(ctx, `SET search_path TO public, metaldocs`); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
 	if _, err := db.ExecContext(ctx,
@@ -236,6 +250,8 @@ func TestCreateDocumentTx_RejectsEmptyName(t *testing.T) {
 	templateVersionID := testdb.DeterministicID(t, "template-version")
 	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
 
+	testdb.SeedGovernedTaxonomy(t, db, tenantID, "po", "quality")
+	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "test-actor")
 	if _, err := db.ExecContext(ctx, `
 		INSERT INTO controlled_documents (
 			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
@@ -281,7 +297,11 @@ func TestGetDocument_ReturnsSnapshotMetadata(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.ExecContext(ctx, `SET search_path TO metaldocs, public`); err != nil {
+	// Bare runtime tables (documents, controlled_documents, ...) must resolve to the
+	// real public.* schema; metaldocs.documents is a dead legacy duplicate lacking
+	// controlled_document_id. public first so bare `documents` -> public.documents;
+	// metaldocs second for the governed taxonomy parents (document_families/...).
+	if _, err := db.ExecContext(ctx, `SET search_path TO public, metaldocs`); err != nil {
 		t.Fatalf("set search_path: %v", err)
 	}
 	if _, err := db.ExecContext(ctx,
@@ -295,6 +315,8 @@ func TestGetDocument_ReturnsSnapshotMetadata(t *testing.T) {
 	templateVersionID := testdb.DeterministicID(t, "template-version")
 	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
 
+	testdb.SeedGovernedTaxonomy(t, db, tenantID, "pop", "general")
+	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "test-actor")
 	if _, err := db.ExecContext(ctx, `
 		INSERT INTO controlled_documents (
 			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
