@@ -1,4 +1,0 @@
-interface:
-  display_name: "Screen Integration Audit"
-  short_description: "Map screens to real product capability"
-  default_prompt: "Audit a MetalDocs designed screen against real API, frontend, wiki, and backlog truth before implementation."
