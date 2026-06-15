@@ -40,7 +40,8 @@ func TestCommitUpload_PersistsRevisionAndFormDataSnapshot(t *testing.T) {
 		t.Fatalf("load document session/base: %v", err)
 	}
 
-	seedTenantRole(t, db, schema, userID, tenantID, "system_admin")
+	testdb.NewTenant(t, db, testdb.WithTenant(tenantID))
+	testdb.NewUser(t, db, testdb.WithUserID(userID), testdb.WithTenant(tenantID), testdb.WithRole("system_admin"))
 
 	pendingID := testdb.DeterministicID(t, "pending")
 	contentHash := "hash-commit-upload"
@@ -143,7 +144,8 @@ func TestCommitUpload_IdempotentReplayReturnsExistingMetadata(t *testing.T) {
 	).Scan(&sessionID, &userID, &baseRevisionID); err != nil {
 		t.Fatalf("load document session/base: %v", err)
 	}
-	seedTenantRole(t, db, schema, userID, tenantID, "system_admin")
+	testdb.NewTenant(t, db, testdb.WithTenant(tenantID))
+	testdb.NewUser(t, db, testdb.WithUserID(userID), testdb.WithTenant(tenantID), testdb.WithRole("system_admin"))
 
 	pendingID := testdb.DeterministicID(t, "pending-replay")
 	contentHash := "hash-commit-upload-replay"
@@ -183,28 +185,5 @@ func TestCommitUpload_IdempotentReplayReturnsExistingMetadata(t *testing.T) {
 	}
 	if second.PageCountSource == nil || *second.PageCountSource != "eigenpal_client" {
 		t.Fatalf("replay page_count_source = %v, want eigenpal_client", second.PageCountSource)
-	}
-}
-
-func seedTenantRole(t *testing.T, db *sql.DB, schema, userID, tenantID, roleCode string) {
-	t.Helper()
-	ctx := context.Background()
-
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO `+testdb.Qualified(schema, "iam_users")+` (user_id, display_name, tenant_id)
-		 VALUES ($1, $2, $3::uuid)
-		 ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name, tenant_id = EXCLUDED.tenant_id`,
-		userID, userID, tenantID,
-	); err != nil {
-		t.Fatalf("insert iam_users: %v", err)
-	}
-
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO `+testdb.Qualified(schema, "iam_user_roles")+` (user_id, role_code, tenant_id, assigned_by)
-		 VALUES ($1, $2, $3::uuid, $1)
-		 ON CONFLICT (tenant_id, user_id) DO UPDATE SET role_code = EXCLUDED.role_code, assigned_by = EXCLUDED.assigned_by`,
-		userID, roleCode, tenantID,
-	); err != nil {
-		t.Fatalf("insert iam_user_roles: %v", err)
 	}
 }

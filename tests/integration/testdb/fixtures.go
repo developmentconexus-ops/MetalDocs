@@ -103,6 +103,15 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 	return docID, tenantID
 }
 
+// SeedWithCaps is the exported wrapper over seedWithCaps, for consumer tests
+// that must run a raw guarded write (INSERT/UPDATE on a tripwire table) as their
+// system-under-test without an inline set_config. The capability is asserted
+// transaction-locally (pool-safe), exactly as the production authz layer does.
+func SeedWithCaps(t *testing.T, db *sql.DB, capsJSON string, fn func(tx *sql.Tx) error) {
+	t.Helper()
+	seedWithCaps(t, db, capsJSON, fn)
+}
+
 // seedWithCaps runs fn inside its own transaction with the given capabilities
 // asserted transaction-locally (set_config third arg true), exactly as the
 // production authz layer asserts them (authz.appendAssertedCap). Doing the

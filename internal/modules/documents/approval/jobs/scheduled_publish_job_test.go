@@ -1,4 +1,14 @@
+//go:build integration
+// +build integration
+
 package jobs
+
+// Real-DB tests for the scheduled-publish worker, migrated off the drifted
+// shared `pgtest` database onto the unified `testdb` factory (template-DB cloned
+// per test, curated baseline). The scheduled document graph is seeded through
+// the factory's Scenario.ScheduledRevision; the worker's own publish UPDATE
+// satisfies the curated-baseline capability tripwire via authz.BypassSystem
+// (metaldocs.bypass_authz = 'scheduler'), exactly as in production.
 
 import (
 	"context"
@@ -11,41 +21,39 @@ import (
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	"metaldocs/internal/testsupport/pgtest"
+	"metaldocs/tests/integration/testdb"
 )
 
 type fixedClock struct {
 	t time.Time
 }
 
-
 func (c fixedClock) Now() time.Time {
 	return c.t
 }
 
+// openSchedulerDB opens a template-cloned DB pinned to a single connection with
+// the runtime search path, so the worker's unqualified `documents` reads resolve
+// and the session setting survives into the TxRunner's transaction.
+func openSchedulerDB(t *testing.T) *sql.DB {
+	t.Helper()
+	db, _ := testdb.Open(t)
+	db.SetMaxOpenConns(1)
+	if _, err := db.ExecContext(context.Background(), `SET search_path TO metaldocs, public`); err != nil {
+		t.Fatalf("set search_path: %v", err)
+	}
+	return db
+}
+
 func TestScheduledPublishWorker_PublishesWhenTruthMatches(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
 	ctx := context.Background()
+	db := openSchedulerDB(t)
 	effectiveAt := time.Date(2026, 5, 21, 14, 0, 0, 0, time.UTC)
 
-	const (
-		tenantID          = "11111111-aaaa-bbbb-cccc-111111111111"
-		ownerUserID       = "22222222-aaaa-bbbb-cccc-222222222222"
-		templateVersionID = "33333333-aaaa-bbbb-cccc-333333333333"
-		controlledDocID   = "44444444-aaaa-bbbb-cccc-444444444444"
-		documentID        = "55555555-aaaa-bbbb-cccc-555555555555"
+	doc := testdb.Scenario{}.ScheduledRevision(t, db, 2,
+		testdb.WithEffectiveFrom(effectiveAt),
+		testdb.WithRevisionVersion(4),
 	)
-
-	seedScheduledDocument(t, ctx, db, scheduledDocumentSeed{
-		tenantID:           tenantID,
-		ownerUserID:        ownerUserID,
-		templateVersionID:  templateVersionID,
-		controlledDocID:    controlledDocID,
-		documentID:         documentID,
-		effectiveFrom:      effectiveAt,
-		revisionVersion:    4,
-		scheduleGeneration: 2,
-	})
 
 	emitter := &approvalapp.MemoryEmitter{}
 	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, approvalapp.RealClock{})
@@ -53,8 +61,8 @@ func TestScheduledPublishWorker_PublishesWhenTruthMatches(t *testing.T) {
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
 		Args: ScheduledPublishArgs{
-			TenantID:                tenantID,
-			DocumentID:              documentID,
+			TenantID:                doc.TenantID,
+			DocumentID:              doc.ID,
 			ExpectedRevisionVersion: 4,
 			ScheduledEffectiveAt:    effectiveAt,
 			ScheduleGeneration:      2,
@@ -71,7 +79,7 @@ func TestScheduledPublishWorker_PublishesWhenTruthMatches(t *testing.T) {
 		  FROM public.documents
 		 WHERE tenant_id = $1
 		   AND id = $2`,
-		tenantID, documentID,
+		doc.TenantID, doc.ID,
 	).Scan(&status, &effectiveFrom, &revisionVersion)
 	if err != nil {
 		t.Fatalf("load document: %v", err)
@@ -91,28 +99,14 @@ func TestScheduledPublishWorker_PublishesWhenTruthMatches(t *testing.T) {
 }
 
 func TestScheduledPublishWorker_NoOpWhenGenerationIsStale(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
 	ctx := context.Background()
+	db := openSchedulerDB(t)
 	effectiveAt := time.Date(2026, 5, 21, 14, 0, 0, 0, time.UTC)
 
-	const (
-		tenantID          = "66666666-aaaa-bbbb-cccc-666666666666"
-		ownerUserID       = "77777777-aaaa-bbbb-cccc-777777777777"
-		templateVersionID = "88888888-aaaa-bbbb-cccc-888888888888"
-		controlledDocID   = "99999999-aaaa-bbbb-cccc-999999999999"
-		documentID        = "aaaaaaaa-aaaa-bbbb-cccc-aaaaaaaaaaaa"
+	doc := testdb.Scenario{}.ScheduledRevision(t, db, 3,
+		testdb.WithEffectiveFrom(effectiveAt),
+		testdb.WithRevisionVersion(7),
 	)
-
-	seedScheduledDocument(t, ctx, db, scheduledDocumentSeed{
-		tenantID:           tenantID,
-		ownerUserID:        ownerUserID,
-		templateVersionID:  templateVersionID,
-		controlledDocID:    controlledDocID,
-		documentID:         documentID,
-		effectiveFrom:      effectiveAt,
-		revisionVersion:    7,
-		scheduleGeneration: 3,
-	})
 
 	emitter := &approvalapp.MemoryEmitter{}
 	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, approvalapp.RealClock{})
@@ -120,8 +114,8 @@ func TestScheduledPublishWorker_NoOpWhenGenerationIsStale(t *testing.T) {
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
 		Args: ScheduledPublishArgs{
-			TenantID:                tenantID,
-			DocumentID:              documentID,
+			TenantID:                doc.TenantID,
+			DocumentID:              doc.ID,
 			ExpectedRevisionVersion: 7,
 			ScheduledEffectiveAt:    effectiveAt,
 			ScheduleGeneration:      2,
@@ -137,7 +131,7 @@ func TestScheduledPublishWorker_NoOpWhenGenerationIsStale(t *testing.T) {
 		  FROM public.documents
 		 WHERE tenant_id = $1
 		   AND id = $2`,
-		tenantID, documentID,
+		doc.TenantID, doc.ID,
 	).Scan(&status, &scheduleGeneration)
 	if err != nil {
 		t.Fatalf("load document: %v", err)
@@ -154,28 +148,14 @@ func TestScheduledPublishWorker_NoOpWhenGenerationIsStale(t *testing.T) {
 }
 
 func TestScheduledPublishWorker_NoOpWhenDeliveredBeforeEffectiveTime(t *testing.T) {
-	db := pgtest.OpenAndMigrate(t)
 	ctx := context.Background()
+	db := openSchedulerDB(t)
 	effectiveAt := time.Date(2026, 5, 21, 14, 0, 0, 0, time.UTC)
 
-	const (
-		tenantID          = "12121212-aaaa-bbbb-cccc-121212121212"
-		ownerUserID       = "34343434-aaaa-bbbb-cccc-343434343434"
-		templateVersionID = "56565656-aaaa-bbbb-cccc-565656565656"
-		controlledDocID   = "78787878-aaaa-bbbb-cccc-787878787878"
-		documentID        = "90909090-aaaa-bbbb-cccc-909090909090"
+	doc := testdb.Scenario{}.ScheduledRevision(t, db, 2,
+		testdb.WithEffectiveFrom(effectiveAt),
+		testdb.WithRevisionVersion(4),
 	)
-
-	seedScheduledDocument(t, ctx, db, scheduledDocumentSeed{
-		tenantID:           tenantID,
-		ownerUserID:        ownerUserID,
-		templateVersionID:  templateVersionID,
-		controlledDocID:    controlledDocID,
-		documentID:         documentID,
-		effectiveFrom:      effectiveAt,
-		revisionVersion:    4,
-		scheduleGeneration: 2,
-	})
 
 	emitter := &approvalapp.MemoryEmitter{}
 	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, fixedClock{t: effectiveAt.Add(-1 * time.Minute)})
@@ -183,8 +163,8 @@ func TestScheduledPublishWorker_NoOpWhenDeliveredBeforeEffectiveTime(t *testing.
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
 		Args: ScheduledPublishArgs{
-			TenantID:                tenantID,
-			DocumentID:              documentID,
+			TenantID:                doc.TenantID,
+			DocumentID:              doc.ID,
 			ExpectedRevisionVersion: 4,
 			ScheduledEffectiveAt:    effectiveAt,
 			ScheduleGeneration:      2,
@@ -200,7 +180,7 @@ func TestScheduledPublishWorker_NoOpWhenDeliveredBeforeEffectiveTime(t *testing.
 		  FROM public.documents
 		 WHERE tenant_id = $1
 		   AND id = $2`,
-		tenantID, documentID,
+		doc.TenantID, doc.ID,
 	).Scan(&status, &revisionVersion)
 	if err != nil {
 		t.Fatalf("load document: %v", err)
@@ -213,65 +193,5 @@ func TestScheduledPublishWorker_NoOpWhenDeliveredBeforeEffectiveTime(t *testing.
 	}
 	if len(emitter.Events) != 0 {
 		t.Fatalf("expected no events for early delivery, got %+v", emitter.Events)
-	}
-}
-
-type scheduledDocumentSeed struct {
-	tenantID           string
-	ownerUserID        string
-	templateVersionID  string
-	controlledDocID    string
-	documentID         string
-	effectiveFrom      time.Time
-	revisionVersion    int
-	scheduleGeneration int64
-}
-
-func seedScheduledDocument(t *testing.T, ctx context.Context, db *sql.DB, seed scheduledDocumentSeed) {
-	t.Helper()
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin tx: %v", err)
-	}
-	defer tx.Rollback()
-
-	for _, stmt := range []struct {
-		query string
-		args  []any
-	}{
-		{
-			query: `
-				INSERT INTO public.controlled_documents
-					(id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status)
-				VALUES
-					($1::uuid, $2::uuid, 'po', 'quality', 'PO-JOB-001', 'Scheduled Publish Worker', $3, 'active')`,
-			args: []any{seed.controlledDocID, seed.tenantID, seed.ownerUserID},
-		},
-		{
-			query: `
-				INSERT INTO public.documents
-					(id, tenant_id, template_version_id, name, status, form_data_json, created_by, controlled_document_id, revision_number, revision_version, effective_from, schedule_generation)
-				VALUES
-					($1::uuid, $2::uuid, $3::uuid, 'Scheduled Revision', 'scheduled', '{}'::jsonb, $4, $5::uuid, 1, $6, $7, $8)`,
-			args: []any{
-				seed.documentID,
-				seed.tenantID,
-				seed.templateVersionID,
-				seed.ownerUserID,
-				seed.controlledDocID,
-				seed.revisionVersion,
-				seed.effectiveFrom,
-				seed.scheduleGeneration,
-			},
-		},
-	} {
-		if _, err := tx.ExecContext(ctx, stmt.query, stmt.args...); err != nil {
-			t.Fatalf("seed rows: %v", err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit seed: %v", err)
 	}
 }
