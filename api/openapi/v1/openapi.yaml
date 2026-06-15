@@ -1109,9 +1109,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TemplateDTO'
+                $ref: '#/components/schemas/ListTemplatesResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4941,6 +4939,24 @@ components:
         template_id: { type: string, format: uuid }
         template_version_id: { type: string, format: uuid }
         name: { type: string }
+    ListTemplatesResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [templates]
+          properties:
+            templates:
+              type: array
+              items:
+                $ref: '#/components/schemas/TemplateDTO'
+        meta:
+          type: object
+          required: [limit, offset]
+          properties:
+            limit: { type: integer }
+            offset: { type: integer }
     TemplateDTO:
       type: object
       required: [id, tenant_id, key, name, latest_version, latest_revision_number, created_by, created_at]
