@@ -243,8 +243,11 @@ func main() {
 	if sqlDB := deps.SQLDB; sqlDB != nil {
 		authRepo := authpg.NewRepository(sqlDB)
 		sessionSvc := iamapp.NewSessionService(db.NewTxRunner(sqlDB), deps.AuditWriter, authRepo)
+		// M4/F4.4: auth returns auth-owned session rows; the iam consumer enriches
+		// display names via the iam-owned port (read off-tx on the pool).
 		sessionsHandler = iamdelivery.NewSessionsHandler(authRepo, deps.AuditWriter).
-			WithSessionService(sessionSvc)
+			WithSessionService(sessionSvc).
+			WithDisplayNameReader(iampg.NewUserDisplayNameRepository(sqlDB))
 	}
 	var securityService *securityapp.Service
 	var securityHandler *securitydelivery.Handler

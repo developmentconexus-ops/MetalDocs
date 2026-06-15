@@ -18,20 +18,20 @@ type SessionAdminQuery struct {
 }
 
 // SessionListItem is the row shape returned to the Admin Center
-// Sessions & Security tab. DisplayName is joined from metaldocs.iam_users
-// so the UI can render a recognisable label without a second round-trip.
+// Sessions & Security tab. It carries only auth-owned auth_sessions columns;
+// display names are owned by IAM (metaldocs.iam_users) and resolved by the IAM
+// consumer via the UserDisplayNameReader port (M4/F4.4), so auth never reaches
+// across the module boundary into iam_users.
 //
-// Tenant scoping is enforced inside the repository implementation: every
-// query is filtered on s.tenant_id = $1 + the JOIN matches iam_users on the
-// same (user_id, tenant_id) tuple, so a session belonging to another tenant
-// is not visible even if its user_id collides.
+// Tenant scoping is enforced inside the repository implementation: every query
+// is filtered on s.tenant_id = $1, so a session belonging to another tenant is
+// not visible even if its user_id collides.
 type SessionListItem struct {
-	SessionID   string
-	UserID      string
-	DisplayName string
-	IPAddress   string
-	UserAgent   string
-	CreatedAt   sql.NullTime
-	LastSeenAt  sql.NullTime
-	ExpiresAt   sql.NullTime
+	SessionID  string
+	UserID     string
+	IPAddress  string
+	UserAgent  string
+	CreatedAt  sql.NullTime
+	LastSeenAt sql.NullTime
+	ExpiresAt  sql.NullTime
 }

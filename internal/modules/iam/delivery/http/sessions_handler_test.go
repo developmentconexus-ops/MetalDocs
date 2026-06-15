@@ -24,7 +24,28 @@ func (f *fakeSessionAdmin) ListActiveSessions(_ context.Context, q authdomain.Se
 		if s.TenantID != q.TenantID {
 			continue
 		}
-		out = append(out, authdomain.SessionListItem{SessionID: s.SessionID, UserID: s.UserID, DisplayName: s.UserID})
+		out = append(out, authdomain.SessionListItem{SessionID: s.SessionID, UserID: s.UserID})
+	}
+	return out, nil
+}
+
+// fakeDisplayNameReader is a fixture iamdomain.UserDisplayNameReader: DisplayNames
+// returns the preloaded map (omitting any user_id not present, so the handler must
+// apply its own missing->user_id fallback).
+type fakeDisplayNameReader struct {
+	names map[string]string
+}
+
+func (f *fakeDisplayNameReader) DisplayName(_ context.Context, _, _ string) (string, error) {
+	return "", nil
+}
+
+func (f *fakeDisplayNameReader) DisplayNames(_ context.Context, _ string, userIDs []string) (map[string]string, error) {
+	out := make(map[string]string, len(userIDs))
+	for _, id := range userIDs {
+		if n, ok := f.names[id]; ok {
+			out[id] = n
+		}
 	}
 	return out, nil
 }
@@ -117,6 +138,33 @@ func TestSessionsHandler_List401WithoutTenant(t *testing.T) {
 	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", ""))
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("missing tenant: want 401, got %d", rr.Code)
+	}
+}
+
+func TestSessionsHandler_ListEnrichesDisplayNameViaPort(t *testing.T) {
+	fake := &fakeSessionAdmin{
+		sessions: map[string]authdomain.Session{
+			"sess-1": {SessionID: "sess-1", UserID: "user-1", TenantID: "tenant-a"},
+			"sess-2": {SessionID: "sess-2", UserID: "user-2", TenantID: "tenant-a"},
+		},
+	}
+	// Reader knows user-1's name, omits user-2 -> handler must fall back to user_id.
+	reader := &fakeDisplayNameReader{names: map[string]string{"user-1": "Alice"}}
+	h := NewSessionsHandler(fake, nil).WithDisplayNameReader(reader)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", "tenant-a"))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("list: want 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `"display_name":"Alice"`) {
+		t.Fatalf("user-1 should render port name Alice; body=%s", body)
+	}
+	if !strings.Contains(body, `"display_name":"user-2"`) {
+		t.Fatalf("user-2 should fall back to user_id; body=%s", body)
 	}
 }
 

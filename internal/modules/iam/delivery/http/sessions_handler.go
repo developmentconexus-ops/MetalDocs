@@ -15,6 +15,7 @@ import (
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
@@ -34,9 +35,10 @@ type SessionAdmin interface {
 }
 
 type SessionsHandler struct {
-	sessions       SessionAdmin
-	sessionService *iamapp.SessionService
-	now            func() time.Time
+	sessions          SessionAdmin
+	sessionService    *iamapp.SessionService
+	displayNameReader iamdomain.UserDisplayNameReader
+	now               func() time.Time
 }
 
 func NewSessionsHandler(sessions SessionAdmin, _ ...auditdomain.Writer) *SessionsHandler {
@@ -44,9 +46,22 @@ func NewSessionsHandler(sessions SessionAdmin, _ ...auditdomain.Writer) *Session
 	// discarded: audit is now emitted in-tx by SessionService (H-3b Site 1).
 	// Call sites that pass deps.AuditWriter continue to compile without change.
 	return &SessionsHandler{
-		sessions: sessions,
-		now:      func() time.Time { return time.Now().UTC() },
+		sessions:          sessions,
+		displayNameReader: iamdomain.NoopUserDisplayNameReader{},
+		now:               func() time.Time { return time.Now().UTC() },
 	}
+}
+
+// WithDisplayNameReader wires the iam-owned UserDisplayNameReader port used to
+// enrich the session list with display names (M4/F4.4). Auth returns auth-owned
+// session rows only; the iam consumer resolves names from metaldocs.iam_users
+// via this port (read off-tx on the pool), so auth never reaches across the
+// module boundary. Defaults to the Noop reader (all names fall back to user_id).
+func (h *SessionsHandler) WithDisplayNameReader(r iamdomain.UserDisplayNameReader) *SessionsHandler {
+	if r != nil {
+		h.displayNameReader = r
+	}
+	return h
 }
 
 // WithSessionService wires the application-layer service that performs the
@@ -108,12 +123,22 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Enrich auth-owned session rows with iam-owned display names via the port
+	// (M4/F4.4). Missing/empty names fall back to the user_id, reproducing the
+	// old COALESCE(NULLIF(display_name,''), user_id) value consumer-side. The
+	// read is best-effort: on error we render fallbacks rather than fail the list.
+	displayNames := h.resolveDisplayNames(r.Context(), tenantID, items)
+
 	out := make([]map[string]any, 0, len(items))
 	for _, item := range items {
+		name := item.UserID
+		if n, ok := displayNames[item.UserID]; ok && n != "" {
+			name = n
+		}
 		entry := map[string]any{
 			"session_id":   item.SessionID,
 			"user_id":      item.UserID,
-			"display_name": item.DisplayName,
+			"display_name": name,
 			"created_at":   nullTimeRFC3339(item.CreatedAt),
 			"last_seen_at":  nullTimeRFC3339(item.LastSeenAt),
 			"expires_at":   nullTimeRFC3339(item.ExpiresAt),
@@ -230,6 +255,30 @@ func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNoContent)
 }
 
+
+// resolveDisplayNames batches the unique user_ids of the session rows and looks
+// up their display names through the iam-owned port. Returns user_id -> name for
+// users with a non-empty display_name; callers fall back to user_id for the rest.
+func (h *SessionsHandler) resolveDisplayNames(ctx context.Context, tenantID string, items []authdomain.SessionListItem) map[string]string {
+	if len(items) == 0 {
+		return map[string]string{}
+	}
+	seen := make(map[string]struct{}, len(items))
+	ids := make([]string, 0, len(items))
+	for _, item := range items {
+		if _, ok := seen[item.UserID]; ok {
+			continue
+		}
+		seen[item.UserID] = struct{}{}
+		ids = append(ids, item.UserID)
+	}
+	names, err := h.displayNameReader.DisplayNames(ctx, tenantID, ids)
+	if err != nil {
+		slog.Warn("iam sessions: display-name resolve failed; falling back to user_id", "err", err)
+		return map[string]string{}
+	}
+	return names
+}
 
 func (h *SessionsHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
 	if err := problem.Write(w, p); err != nil {

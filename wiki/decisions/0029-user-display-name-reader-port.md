@@ -10,6 +10,7 @@
 > - `internal/modules/documents/repository/repository.go` — created-by display-name consumer (was raw `iam_users` SQL at :134)
 > - `internal/modules/documents/approval/http/get_instance_handler.go` — batch display-name consumer (was raw `COALESCE(display_name,user_id)` `ANY($2)`)
 > - `internal/modules/documents/approval/repository/postgres_approval_repository.go` — F1.3's contained `LoadActorDisplayName`, generalized onto the shared port
+> - `internal/modules/iam/delivery/http/sessions_handler.go` — session-list display-name consumer (M4/F4.4; auth's `ListActiveSessions` `iam_users` JOIN removed, names resolved here via `DisplayNames`)
 
 ## Context
 
@@ -52,12 +53,16 @@ product decision).
   source to keep in sync.
 - The signoff display-name read stays off the lock-holding tx — H-PRE-1 preserved (runtime/`pg_locks`
   evidence in F4.1).
-- **Bounded defer:** `security/infrastructure/postgres/repository.go` JOINs `iam_users` for
-  *tenant-scoping* (not a display-name read); it is **not** covered by this port and is not an F4.1/M4
-  target. Trigger: next structural touch of that file, or an M5 re-audit flagging it as an H-G reach —
-  resolved then via a dedicated iam tenant-scope/membership port, not by widening this one. Intra-module
-  reads (`iam/presence/*`) and the `password_hash` reauth read (existing `IamUserReader`) are out of
-  class.
+- **⚠ Census correction (2026-06-15, post-F4.1):** the original claim here that
+  `security/infrastructure/postgres/repository.go` JOINs `iam_users` *only* for tenant-scoping was
+  **wrong** — `ListLockouts`, `CountRecentFailedLoginsByUser`, and `ListNewDeviceLogins` DO read
+  `display_name`. Under operator Option-2 (full close) these are migrated in **M4/F4.6** onto this
+  port (display names) + a new iam tenant-scope/membership port (the `auth_identities`-coupled tenant
+  scope), not deferred. See `f4.6-security-display-name-port/` and `f4.5-iam-tenant-membership-port/`.
+- **Bounded defer (narrowed):** security's `MfaCoverage` / `CountRecentLockouts` aggregate JOINs on
+  `iam_users` carry **no** display-name read and remain a bounded defer (covered by the F4.5 membership
+  port if/when those are migrated). Intra-module reads (`iam/presence/*`) and the `password_hash`
+  reauth read (existing `IamUserReader`) are out of class.
 
 ## References
 - Feature F4.1 — `docs/superpowers/milestones/grade-a-architecture-remediation/milestone-4-systemic-ports/f4.1-user-display-name-reader/spec.md`
