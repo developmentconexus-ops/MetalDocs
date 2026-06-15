@@ -15,6 +15,7 @@
 - [backend-api-qa-checklist.md](backend-api-qa-checklist.md) - default QA pass for backend/API and contract-backed route work
 - [workflow-async-qa-checklist.md](workflow-async-qa-checklist.md) - required proof split for worker-owned, delayed, and multi-stage workflows
 - [release-closeout-checklist.md](release-closeout-checklist.md) - final close-out checklist before merge/release declaration
+- [integration-test-harness.md](integration-test-harness.md) - how-to guide for writing integration tests: harness choice, factory builders, guarded writes, qualified table names, working examples
 - [test-discipline.md](test-discipline.md) - integration test harness rules (R1–R4), sanctioned patterns, and CI guard reference
 
 ## Current source inputs and compatibility areas

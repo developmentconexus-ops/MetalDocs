@@ -1,6 +1,6 @@
 # Repository Topology
 
-> **Last verified:** 2026-06-11 (Wave 1)
+> **Last verified:** 2026-06-15 (M4c F4c.5 — pgtest deleted, testdb canonical harness)
 > **Scope:** Top-level directory layout, all binaries built and run, Go module configuration, CI pipeline shape, script entry points, and orphan/legacy classification for every top-level directory. Does not descend into `frontend/`, `node_modules/`, `vendor/`, `.worktrees/`, `.clone/`, or `non_git/` beyond identification.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (binary 1)
@@ -232,11 +232,9 @@ graph TD
 | `e2e_clock_offset_nonprod.go` | Controllable clock for E2E (non-prod build tag) |
 | `e2e_clock_offset_production.go` | Real clock for production build tag |
 
-#### internal/testsupport/pgtest/
+#### internal/testsupport/pgtest/ — DELETED (M4c F4c.4)
 
-| File | Role |
-|---|---|
-| `pgtest.go` | `NewTestDB()` — spins up an isolated Postgres database for integration tests via `METALDOCS_DATABASE_URL` |
+`pgtest` had zero callers after M4c F4c.3 migrated all integration tests onto the `testdb` factory framework. The package was deleted in F4c.4. The canonical integration test harness is now `tests/integration/testdb/` — see [wiki/quality/integration-test-harness.md](../quality/integration-test-harness.md).
 
 #### internal/api/v2/ — DELETED (Wave 1, F-03)
 
@@ -370,7 +368,7 @@ The entire `internal/api/v2/` package (`types_gen.go` + `contract_test.go`) was 
 | Path | Role |
 |---|---|
 | `tests/integration/scenarios/` | Integration test scenarios (trigger bypass, membership, schema lockdown, e2e happy path, concurrency, idempotency, outbox) |
-| `tests/integration/testdb/` | `NewTestDB()` helper (wraps `internal/testsupport/pgtest`) |
+| `tests/integration/testdb/` | Canonical integration test harness — `Open(t)` (IntegreSQL template-DB-per-test), factory builders (`factory.go`), guarded-write helpers (`fixtures.go`); see [integration-test-harness.md](../quality/integration-test-harness.md) and [ADR 0034](../decisions/0034-integration-test-fixture-framework.md) |
 | `tests/integration/fixtures/` | `seed.go` — fixture seeding |
 | `tests/integration/approval/`, `documents/`, `iam/`, `migrations/` | Module-level integration suites |
 | `tests/unit/` | Unit-level test files (cross-cutting: auth, IAM, CORS, origin protection, rate limit) |
