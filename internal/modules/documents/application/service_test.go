@@ -1,10 +1,12 @@
 package application_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -129,12 +131,13 @@ func (f *fakeRepo) ListDocumentsForUser(_ context.Context, _, _ string) ([]domai
 	return f.listReturn, nil
 }
 
-func (f *fakeRepo) ListDocumentsPaginated(_ context.Context, _ string, opts application.ListOptions) ([]*domain.Document, bool, error) {
+func (f *fakeRepo) ListDocumentsPaginated(_ context.Context, _ string, opts application.ListOptions) ([]*domain.Document, int64, bool, error) {
 	f.lastOpts = opts
 	if f.listPaginatedErr != nil {
-		return nil, false, f.listPaginatedErr
+		return nil, 0, false, f.listPaginatedErr
 	}
-	return f.listPaginatedReturn, false, nil
+	// Single-snapshot query yields the grand total alongside the page rows.
+	return f.listPaginatedReturn, f.countReturn, false, nil
 }
 
 func (f *fakeRepo) CountDocuments(_ context.Context, _ string, opts application.ListOptions) (int64, error) {
@@ -506,6 +509,61 @@ func TestCommitAutosave_InvalidPageCount(t *testing.T) {
 	})
 	if !errors.Is(err, domain.ErrInvalidPageCount) {
 		t.Fatalf("expected ErrInvalidPageCount, got %v", err)
+	}
+}
+
+func TestCommitAutosave_LogsCleanupFailureOnHashMismatch(t *testing.T) {
+	repo := &fakeRepo{
+		docReturn: &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft},
+		pendingMeta: &application.PendingCommitMeta{
+			ExpectedContentHash: "h1",
+			StorageKey:          "tenants/t/documents/d/revisions/h1.docx",
+		},
+	}
+	presigner := &fakePresigner{
+		hashReturn: "WRONG",          // forces hash mismatch path
+		deleteErr:  errors.New("s3 down"), // forces delete to fail → WARN fires
+	}
+
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	_, err := application.New(repo, presigner, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{}).
+		CommitAutosave(context.Background(), application.CommitAutosaveCmd{
+			TenantID:         "tenant_1",
+			ActorUserID:      "user_1",
+			DocumentID:       "doc_1",
+			SessionID:        "sess_1",
+			PendingUploadID:  "pending_1",
+			FormDataSnapshot: []byte(`{"ok":true}`),
+		})
+
+	// G1: behavior unchanged — still returns ErrContentHashMismatch
+	if !errors.Is(err, domain.ErrContentHashMismatch) {
+		t.Fatalf("expected ErrContentHashMismatch, got %v", err)
+	}
+	// G2: delete was still attempted
+	if presigner.deleteCalls != 1 {
+		t.Fatalf("expected 1 delete call, got %d", presigner.deleteCalls)
+	}
+	// G3: WARN with context was emitted
+	logged := buf.String()
+	if logged == "" {
+		t.Fatal("expected WARN log output, got empty buffer")
+	}
+	// Assert every attribute the impl promises to log — key names and values — so a
+	// regression dropping document_id or err from the WarnContext call fails the test.
+	for _, want := range []string{
+		"level=WARN",
+		"storage_key", "tenants/t/documents/d/revisions/h1.docx",
+		"document_id", "doc_1",
+		"err", "s3 down",
+	} {
+		if !bytes.Contains([]byte(logged), []byte(want)) {
+			t.Fatalf("WARN log missing %q; got: %s", want, logged)
+		}
 	}
 }
 

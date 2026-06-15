@@ -430,56 +430,77 @@ func buildDocumentFilter(tenantID string, opts ListOptions) (whereClause string,
 // reports whether a further page exists (a limit+1 probe row was found and
 // trimmed). The caller builds the next cursor from the last returned document's
 // (UpdatedAt, ID).
-func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) (items []*domain.Document, hasMore bool, err error) {
+func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) (items []*domain.Document, total int64, hasMore bool, err error) {
 	where, args := buildDocumentFilter(tenantID, opts)
 
 	cursorTS, cursorID, err := pagination.DecodeCursor(opts.Cursor)
 	if err != nil {
-		return nil, false, err
+		return nil, 0, false, err
 	}
+
+	// The grand total must be counted over the base-filtered set BEFORE the cursor
+	// predicate (a window over the cursor-filtered rows would only count the remaining
+	// page tail). A CTE computes COUNT(*) OVER() on the base filter; the cursor + limit
+	// are applied in the outer query. Page rows and total then share one MVCC snapshot
+	// (one statement), eliminating the list/count TOCTOU race.
+	var cursorClause string
 	if cursorTS != "" {
 		args = append(args, cursorTS, cursorID)
-		where += fmt.Sprintf(" AND (updated_at, id) < ($%d::timestamptz, $%d)", len(args)-1, len(args))
+		cursorClause = fmt.Sprintf(" WHERE (updated_at, id) < ($%d::timestamptz, $%d)", len(args)-1, len(args))
 	}
 
 	limit := opts.Limit()
 	args = append(args, limit+1) // +1 probe row to detect hasMore
-	q := fmt.Sprintf(`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
-			coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
-			archived_at, created_at, updated_at, created_by,
-			controlled_document_id, coalesce(code,''),
+	q := fmt.Sprintf(`WITH filtered AS (
+			SELECT id, tenant_id, template_version_id, name, status, form_data_json,
+				coalesce(current_revision_id::text, '') AS current_revision_id,
+				coalesce(active_session_id::text, '') AS active_session_id,
+				archived_at, created_at, updated_at, created_by,
+				controlled_document_id, coalesce(code,'') AS code,
+				profile_code_snapshot, process_area_code_snapshot,
+				revision_version, revision_number,
+				COUNT(*) OVER() AS total_count
+			FROM documents
+			WHERE %s
+		)
+		SELECT id, tenant_id, template_version_id, name, status, form_data_json,
+			current_revision_id, active_session_id, archived_at, created_at, updated_at,
+			created_by, controlled_document_id, code,
 			profile_code_snapshot, process_area_code_snapshot,
-			revision_version, revision_number
-		FROM documents
-		WHERE %s
+			revision_version, revision_number, total_count
+		FROM filtered%s
 		ORDER BY updated_at DESC, id DESC
-		LIMIT $%d`, where, len(args))
+		LIMIT $%d`, where, cursorClause, len(args))
 
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, false, err
+		return nil, 0, false, err
 	}
 	defer rows.Close()
 
 	out := make([]*domain.Document, 0, limit+1)
 	for rows.Next() {
 		var d domain.Document
+		var rowTotal int64
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
 			&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code,
 			&d.ProfileCodeSnapshot, &d.ProcessAreaCodeSnapshot,
-			&d.RevisionVersion, &d.RevisionNumber); err != nil {
-			return nil, false, err
+			&d.RevisionVersion, &d.RevisionNumber, &rowTotal); err != nil {
+			return nil, 0, false, err
 		}
+		total = rowTotal // identical on every row (window over the full filtered set)
 		out = append(out, &d)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, false, err
+		return nil, 0, false, err
 	}
+	// Empty result (e.g. a cursor past the end) carries no total_count row; total stays 0.
+	// Keyset clients read total on the first page only, so this edge is benign.
 	if len(out) > limit {
-		return out[:limit], true, nil
+		return out[:limit], total, true, nil
 	}
-	return out, false, nil
+	return out, total, false, nil
 }
 
 func (r *Repository) CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error) {

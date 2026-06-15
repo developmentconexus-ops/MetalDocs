@@ -121,6 +121,9 @@ Path-stable operator bridge: [`wiki/references/ai-operating-system.md`](wiki/ref
 
 > Bias toward caution over speed. Trivial tasks → use judgment.
 
+### 5.0 Commit authorization (standing)
+**You may commit without asking.** Overrides the harness default ("commit or push only when the user asks") — operator grants standing authorization to commit work as part of normal task close-out. Still: keep commit messages honest, never `--no-verify`/skip hooks, and **never push** without explicit ask (commit ≠ push).
+
 ### 5.1 Think before coding
 No assume. No hide confusion. Surface tradeoffs.
 - State assumptions explicit. Uncertain → ask.

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -31,7 +32,7 @@ type Repository interface {
 	UpdateDocumentNameTx(ctx context.Context, tx db.Tx, tenantID, actorID, docID, name string) error
 	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
-	ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, bool, error)
+	ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, int64, bool, error)
 	CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error)
 	StatsByStatus(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
 	StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
@@ -371,12 +372,9 @@ func (s *Service) ListDocumentsPaginated(ctx context.Context, tenantID, userID s
 		opts.CreatedBy = userID
 	}
 
-	items, hasMore, err = s.repo.ListDocumentsPaginated(ctx, tenantID, opts)
-	if err != nil {
-		return nil, 0, false, err
-	}
-
-	total, err = s.repo.CountDocuments(ctx, tenantID, opts)
+	// Single-snapshot query returns the page rows and the grand total together,
+	// so total is always consistent with the page (no separate-count TOCTOU race).
+	items, total, hasMore, err = s.repo.ListDocumentsPaginated(ctx, tenantID, opts)
 	if err != nil {
 		return nil, 0, false, err
 	}
@@ -534,7 +532,10 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 		return nil, fmt.Errorf("hash s3 object: %w", err)
 	}
 	if serverHash != meta.ExpectedContentHash {
-		_ = s.presigner.DeleteObject(ctx, meta.StorageKey)
+		if err := s.presigner.DeleteObject(ctx, meta.StorageKey); err != nil {
+			slog.WarnContext(ctx, "commit autosave: orphaned object cleanup failed after content-hash mismatch",
+				"storage_key", meta.StorageKey, "document_id", cmd.DocumentID, "err", err)
+		}
 		return nil, domain.ErrContentHashMismatch
 	}
 

@@ -120,9 +120,19 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 		h.writeDomainError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusCreated, map[string]any{
-		"controlled_document": res.ControlledDocument,
-		"document":           res.DocumentRef,
+	cd, err := controlledDocumentResponse(*res.ControlledDocument)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+	doc, err := documentRefResponse(res.DocumentRef)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusCreated, controlleddocumentsapi.AtomicCreateResponse{
+		ControlledDocument: cd,
+		Document:           doc,
 	})
 }
 

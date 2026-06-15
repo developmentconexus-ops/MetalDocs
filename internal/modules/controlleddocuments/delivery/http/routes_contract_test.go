@@ -146,6 +146,7 @@ func (f fakeGovernanceLogger) LogTx(_ context.Context, _ db.Tx, _ taxonomydomain
 
 type spyControlledDocumentService struct {
 	gotCreate          application.CreateControlledDocumentCmd
+	createResult       *application.CreateResult
 	gotListFilter      application.CDFilter
 	gotListTenantID    string
 	listResult         []controlleddocumentsdomain.ControlledDocument
@@ -166,9 +167,15 @@ type spyControlledDocumentService struct {
 
 func (s *spyControlledDocumentService) Create(ctx context.Context, cmd application.CreateControlledDocumentCmd) (*application.CreateResult, error) {
 	s.gotCreate = cmd
+	if s.createResult != nil {
+		return s.createResult, nil
+	}
+	// Default to UUID-valid sample data so the handler's typed domain→api
+	// mappers (uuid.Parse on id/tenant_id) succeed.
+	doc := sampleControlledDocument()
 	return &application.CreateResult{
-		ControlledDocument: &controlleddocumentsdomain.ControlledDocument{ID: "cd-1"},
-		DocumentRef:        &controlleddocumentsdomain.DocumentRef{ID: "doc-1", ContentHash: "hash-1"},
+		ControlledDocument: &doc,
+		DocumentRef:        &controlleddocumentsdomain.DocumentRef{ID: "99999999-9999-9999-9999-999999999999", ContentHash: "hash-1"},
 	}, nil
 }
 
@@ -531,6 +538,70 @@ func TestAtomicCreate_ForwardsGeneratedOnlyFields(t *testing.T) {
 	}
 	if spy.gotCreate.VisibilityScope != "company" {
 		t.Fatalf("VisibilityScope = %q, want company", spy.gotCreate.VisibilityScope)
+	}
+}
+
+// F3.3 — the 201 body must be the generated AtomicCreateResponse contract: optionals
+// OMITTED when absent (api type is ,omitempty), not serialized as null (the raw-map/domain
+// drift this feature removes).
+func TestAtomicCreate_UsesGeneratedResponse(t *testing.T) {
+	created := &application.CreateResult{
+		ControlledDocument: &controlleddocumentsdomain.ControlledDocument{
+			ID:              "77777777-7777-7777-7777-777777777777",
+			TenantID:        "88888888-8888-8888-8888-888888888888",
+			ProfileCode:     "DC",
+			ProcessAreaCode: "RH",
+			Code:            "DC-RH-001",
+			Title:           "Policy",
+			OwnerUserID:     "user-1",
+			// DepartmentCode, SequenceNum, OverrideTemplateVersionID intentionally nil.
+			Visibility: controlleddocumentsdomain.Visibility{
+				Scope:     controlleddocumentsdomain.VisibilityScopeCompany,
+				AreaCodes: []string{},
+				UserIDs:   []string{},
+			},
+			Status: controlleddocumentsdomain.CDStatusActive,
+		},
+		DocumentRef: &controlleddocumentsdomain.DocumentRef{
+			ID:          "99999999-9999-9999-9999-999999999999",
+			ContentHash: "hash-1",
+		},
+	}
+	spy := &spyControlledDocumentService{createResult: created}
+	handler := &Handler{svc: spy}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
+		"document_name":"Policy v1",
+		"visibility":{"scope":"company","area_codes":[],"user_ids":[]},
+		"profile_code":"DC",
+		"process_area_code":"RH",
+		"title":"Policy",
+		"owner_user_id":"user-1"
+	}`))
+	ctx := tenant.WithTenantID(req.Context(), "test-tenant")
+	ctx = iamdomain.WithAuthContext(ctx, "actor-test", []iamdomain.Role{iamdomain.RoleSystemAdmin})
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.AtomicCreateControlledDocument(rec, req, controlleddocumentsapi.AtomicCreateControlledDocumentParams{})
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	var body controlleddocumentsapi.AtomicCreateResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body is not AtomicCreateResponse: %v; body=%s", err, rec.Body.String())
+	}
+	if body.ControlledDocument.Id.String() != "77777777-7777-7777-7777-777777777777" {
+		t.Fatalf("controlled_document.id = %s, want 7777…", body.ControlledDocument.Id)
+	}
+	if body.Document.Id.String() != "99999999-9999-9999-9999-999999999999" || body.Document.ContentHash != "hash-1" {
+		t.Fatalf("document = %+v, want id 9999… hash hash-1", body.Document)
+	}
+	// Absent optionals must be omitted, not null (the ,omitempty contract).
+	for _, key := range []string{`"department_code"`, `"override_template_version_id"`, `"sequence_num"`} {
+		if strings.Contains(rec.Body.String(), key) {
+			t.Fatalf("absent optional %s must be omitted, not present; body=%s", key, rec.Body.String())
+		}
 	}
 }
 

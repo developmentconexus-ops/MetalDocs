@@ -29,7 +29,7 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 		"current_revision_id", "active_session_id", "archived_at",
 		"created_at", "updated_at", "created_by", "controlled_document_id", "code",
 		"profile_code_snapshot", "process_area_code_snapshot",
-		"revision_version", "revision_number",
+		"revision_version", "revision_number", "total_count",
 	}
 
 	areaCode := "rh"
@@ -42,7 +42,7 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 			"", "", nil,
 			time.Unix(0, 0), time.Unix(0, 0), "user-1", nil, "PO-RH-001",
 			profileCode, areaCode,
-			int64(1), int64(1),
+			int64(1), int64(1), int64(2),
 		).
 		// Row 2: snapshots NULL (must scan into *string without panicking) and rev 0.
 		AddRow(
@@ -50,14 +50,14 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 			"", "", nil,
 			time.Unix(0, 0), time.Unix(0, 0), "user-1", nil, "PO-RH-002",
 			nil, nil,
-			int64(0), int64(0),
+			int64(0), int64(0), int64(2),
 		)
 
 	// Match SELECT shape and ORDER BY. Anchor on the four columns whose absence caused F12.
 	mock.ExpectQuery(regexp.QuoteMeta(`profile_code_snapshot, process_area_code_snapshot`)).
 		WillReturnRows(rows)
 
-	got, _, err := repo.ListDocumentsPaginated(context.Background(), "tenant-1", repository.ListOptions{PageSize: 20})
+	got, _, _, err := repo.ListDocumentsPaginated(context.Background(), "tenant-1", repository.ListOptions{PageSize: 20})
 	if err != nil {
 		t.Fatalf("ListDocumentsPaginated: %v", err)
 	}
