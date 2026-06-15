@@ -1,7 +1,7 @@
 # Program: Grade-A Architecture Remediation
 
 > **Governing spec:** `docs/superpowers/specs/2026-06-14-grade-a-architecture-remediation-design.md`
-> **Status:** In progress (M0/M1/M2/M3 passed; M4 features F4.1–F4.6 built but **close gate blocked**; M4b F4b.1/F4b.2 done — legacy `metaldocs.documents` cluster dropped (`071931c9`); the remaining seed-fix was found to be a **test-architecture defect**, so milestone **4c** (unified test-fixture framework) is opened to close the M4 blocker at root cause, then re-dispatch the M4 validator)
+> **Status:** In progress (M0–M3 passed; M4 close gate originally blocked → root-caused via M4b legacy-cluster drop (`071931c9`) + M4c unified test-fixture framework → **M4 re-validated PASS** 2026-06-15; M4c passed. **M4 closed.** M5 independent re-audit now in-progress — terminal acceptance.)
 > **Owner / operator:** leandrotca.work (operator) + backend agent (Opus 4.8)
 
 Take the backend's three formerly-C audit dimensions (module-boundaries/DDD, contract/API,
@@ -19,10 +19,10 @@ hard-stop. **Terminal acceptance:** the M5 independent multi-agent re-audit pass
 | 1 | `milestone-1-reach-a-blockers` | Close all 4 Grade-A blockers + the error-contract (bare-405) tail | passed | [PASS](milestone-1-reach-a-blockers/qa/milestone-qa.md) |
 | 2 | `milestone-2-contract-tail` | Eliminate handler-emits-undeclared-field drift (H-D), one FE regen | passed | [PASS](milestone-2-contract-tail/qa/milestone-qa.md) |
 | 3 | `milestone-3-mechanical-quality` | Harden code-quality + persistence; dead-surface deletes, tx-hazard hoist | passed | [PASS](milestone-3-mechanical-quality/qa/milestone-qa.md) |
-| 4 | `milestone-4-systemic-ports` | Close H-G class via shared ports (UserDisplayNameReader, TemplateVersionStateReader) | blocked | FAIL→4b ([qa](milestone-4-systemic-ports/qa/milestone-qa.md)) |
+| 4 | `milestone-4-systemic-ports` | Close H-G class via shared ports (UserDisplayNameReader, TemplateVersionStateReader) | passed | original [FAIL](milestone-4-systemic-ports/qa/milestone-qa.md)→4b/4c→re-validated [PASS](milestone-4-systemic-ports/qa/milestone-qa-rerun-2026-06-15.md) |
 | 4b | `milestone-4b-legacy-schema-teardown` | Drop dead `metaldocs.documents` duplicate cluster + `template_audit_log` (root cause of F4.1a Gate #5); fix Family-B tripwire seeds | partial — superseded by 4c | F4b.1+F4b.2 done (drop migration `071931c9`); F4b.3/F4b.4 → 4c |
 | 4c | `milestone-4c-test-fixture-framework` | One unified test-fixture framework (factories on `testdb`) + migrate all stateful tests + CI grep-guards; closes the M4 blocker at root cause | passed | [PASS](milestone-4c-test-fixture-framework/qa/milestone-qa.md) |
-| 5 | `milestone-5-independent-re-audit` | Prove Grade A by independent fresh multi-agent re-audit (authoritative) | planned | — |
+| 5 | `milestone-5-independent-re-audit` | Prove Grade A by independent fresh multi-agent re-audit (authoritative) | in-progress | — |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
 
@@ -48,7 +48,9 @@ Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) 
 | 2026-06-15 | HS-1 | M4b open gate — operator authorized opening 4b (scope answer: "new milestone: drop legacy cluster") | **Approved** by operator 2026-06-15; 4b → in-progress, `milestone.md` authored up front (F4b.1–F4b.4, no execution detail) before any feature. |
 | 2026-06-15 | HS-6 | M4b F4b.3 seed-fix is a **test-architecture defect, not a seed bug** — two integration harnesses coexist with no governance rule (`testdb` template-DB-per-test vs `pgtest` shared-DB); ~35 hardcoded-tenant + ~28 inline `set_config` (one `is_local=false` leaks caps) + ~11 copy-paste-taxonomy + 5 local seed helpers drifted across files; the per-tenant-code seed patch collides (`document_profiles_pkey` 23505) on the shared DB. | **Replanned — operator chose "Full framework now" 2026-06-15.** Opened **milestone 4c** (`milestone-4c-test-fixture-framework`): build factories on `testdb` + migrate ALL stateful test files + CI grep-guards, as its own milestone, before closing the program. **Supersedes M4b's F4b.3/F4b.4** (F4b.1 census + F4b.2 drop migration `071931c9` stand). Abandoned per-tenant-code WIP in the tree (`postgres_approval_repository_test.go`, `scheduled_publish_job_test.go`, +minor `repository_revision_history_integration_test.go`/`authz_bypass_test.go`) is **replaced** by the factory migration (F4c.2), not built upon. |
 | 2026-06-15 | HS-1 | M4c open gate — `milestone.md` authored up front (F4c.1–F4c.5, no execution detail); presented to operator for Phase-2 agreement | **Approved** by operator 2026-06-15 ("Approve — start F4c.1"); M4c → in-progress. Executing F4c.1 only, stop at its evidence before F4c.2. |
-| 2026-06-15 | HS-1 | M4c close gate — `milestone-validator` C1–C7 **PASS** presented to operator | **Awaiting operator approval.** M4c → passed; verdict `milestone-4c-test-fixture-framework/qa/milestone-qa.md`. Proposed next: M5 independent re-audit. |
+| 2026-06-15 | HS-1 | M4c close gate — `milestone-validator` C1–C7 **PASS** presented to operator | **Approved** by operator 2026-06-15 ("finish M4 and move to M5"). M4c → passed; verdict `milestone-4c-test-fixture-framework/qa/milestone-qa.md`. Per the HS-6 plan (line 47), re-dispatch the M4 validator before closing M4. |
+| 2026-06-15 | HS-4 | M4 close re-dispatch — the on-disk M4 verdict was the original **FAIL** (HEAD `30503533`, F4.1a Gate #5 `search_path`-shadow); never re-run after the M4b cluster-drop (`071931c9`) removed the root cause. Operator authorized re-dispatching the M4 validator from clean state. | **Resolved — re-validation PASS** 2026-06-15. `milestone-validator` re-ran C1–C7 from clean state: F4.1a Gate #5 greens under the operator DSN `search_path=metaldocs,public` with `db.go` unmodified at HEAD (schema-level root-cause fix proven; original C6 symptom-patch hit cleared). H-G class re-measured at class-level zero. Verdict: `milestone-4-systemic-ports/qa/milestone-qa-rerun-2026-06-15.md`. M4 → passed. |
+| 2026-06-15 | HS-1 | M5 open gate — operator directed "move to M5" at the M4c close gate | **Approved** by operator 2026-06-15. M5 → in-progress; `milestone.md` to be authored up front (no execution detail) before the independent re-audit runs. |
 
 ## Program close-out / reconciliation
 
