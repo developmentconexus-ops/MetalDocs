@@ -16,6 +16,7 @@ import (
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	approvaljobs "metaldocs/internal/modules/documents/approval/jobs"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
+	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/observability"
@@ -32,7 +33,10 @@ func run(ctx context.Context) error {
 	}
 
 	deps, err := bootstrap.BuildJobsDependencies(ctx, jobsCfg, func(db *sql.DB) (*river.Workers, error) {
-		repo := approvalrepo.NewPostgresApprovalRepository(db)
+		// The scheduled-publish job never calls LoadActorDisplayName, but we pass
+		// the real reader so the binary is correct if the code path ever is reached.
+		displayNameRepo := iampg.NewUserDisplayNameRepository(db)
+		repo := approvalrepo.NewPostgresApprovalRepository(db, displayNameRepo)
 		services := approvalapp.NewServices(repo, approvalapp.NewSQLEmitter(), approvalapp.RealClock{})
 		return approvaljobs.NewWorkers(services.Scheduler, db), nil
 	})
