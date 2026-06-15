@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-06-12 (Wave 2.12 sync — db==nil authz-bypass class-B branch in Create DELETED (authz now unconditional); DBTX local interface replaced with db.Tx; sequence.go no longer imports database/sql; nosqltxindomain CI guard. Prior Wave 2 sync: GetActiveInstance service+repo extraction, ActiveDocumentInstance domain type, ErrNoActiveInstance, govLogger.LogTx in changeStatus, AuditWriter nil-panic guard in module.go, RLS migration 0234) | **Owner:** leandro | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-06-15 (M4/F4.2 — port ADR 0030 cross-link: `PostgresTemplateVersionChecker` deleted; CD now consumes templates-owned `TemplateVersionPort.GetTemplateVersionState` — `status := "published"` hardcode removed) | **Prior:** 2026-06-12 (Wave 2.12 sync — db==nil authz-bypass class-B branch in Create DELETED (authz now unconditional); DBTX local interface replaced with db.Tx; sequence.go no longer imports database/sql; nosqltxindomain CI guard. Prior Wave 2 sync: GetActiveInstance service+repo extraction, ActiveDocumentInstance domain type, ErrNoActiveInstance, govLogger.LogTx in changeStatus, AuditWriter nil-panic guard in module.go, RLS migration 0234) | **Owner:** leandro | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/controlleddocuments/module.go:27` - module wiring (`New`, dependencies)
@@ -412,6 +412,7 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 | Read-path authz contract (e.g. `GetActiveDocument` tenant source) | tech-debt: missing-ADR (T-006) |
 | Where controlled-documents audit sink should live (own logger vs shared taxonomy sink) | implementation debt closed in tech-debt (T-008); standalone ADR still missing |
 | Documents DI cycle resolution (`WithDocumentInitializer` setter) | tech-debt: missing-ADR (T-010) |
+| `PostgresTemplateVersionChecker` deleted; CD now consumes templates-owned `TemplateVersionPort.GetTemplateVersionState` port (consumer; `status := "published"` hardcode removed — M4/F4.2) | [`wiki/decisions/0030-template-version-state-port.md`](../decisions/0030-template-version-state-port.md) |
 | OpenAPI partial directory (`v1/` for `/api/v1/` routes) | tech-debt: missing-ADR (T-011) |
 | Exported-symbol doc-comment policy | tech-debt: missing-ADR (T-012) |
 

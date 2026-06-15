@@ -109,5 +109,5 @@ Three existing consumers reach directly into `metaldocs.iam_users` for `display_
 ## ADR needed?
 
 - [x] Durable decision made → **ADR authored in F4.3** (`UserDisplayNameReader` boundary: iam owns the
-  `iam_users` read; cross-module consumers depend on the port, reads stay live, no snapshot). Linked
-  here when F4.3 lands.
+  `iam_users` read; cross-module consumers depend on the port, reads stay live, no snapshot):
+  [`wiki/decisions/0029-user-display-name-reader-port.md`](../../../../../../wiki/decisions/0029-user-display-name-reader-port.md).

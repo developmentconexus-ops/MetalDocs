@@ -106,5 +106,5 @@ them. **Read from the consumers; nothing invented.**
 
 - [x] Durable decision made → recorded in **F4.3** as the `TemplateVersionStateReader` boundary ADR
   under `wiki/decisions/` (owning-module port; reads live, no snapshot; alternatives rejected incl.
-  Approach 2 and the "introduce a parallel port" option this feature rejected). Link added here once
-  F4.3 writes it: `<f4.3 adr link>`.
+  Approach 2 and the "introduce a parallel port" option this feature rejected). ADR written in F4.3:
+  [`wiki/decisions/0030-template-version-state-port.md`](../../../../../../wiki/decisions/0030-template-version-state-port.md).
