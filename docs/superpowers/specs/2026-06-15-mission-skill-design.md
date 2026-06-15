@@ -81,12 +81,13 @@ docs/superpowers/milestones/<mission-slug>/
   mission.md            # ★ governing spec + Terminal Acceptance
   discovery-brief.md    # cited evidence base
   README.md             # program index (from milestone's program-README template)
-  milestone-0-<slug>/   # first milestone scaffolded; /milestone executes from here
+  milestone-<n>-<slug>/ # authored by /milestone (its Phase 2), NOT by /mission — one source of truth
     milestone.md
   qa/
     mission-validation.md  # mission-validator's terminal PASS/FAIL (written at the very end)
 ```
-`README.md` "Governing spec:" → `./mission.md`. `/milestone` operates on this tree unchanged.
+`README.md` "Governing spec:" → `./mission.md`. `/mission` writes only `mission.md` + `discovery-brief.md` +
+`README.md`; `/milestone` owns every `milestone-<n>/` folder and operates on this tree unchanged.
 
 ## 5. The flow (6 phases)
 
@@ -139,16 +140,23 @@ docs/superpowers/milestones/<mission-slug>/
 2. Operator reviews `mission.md`. Iterate until approved.
 
 ### Phase 5 — Scaffold + handoff to `/milestone`
-1. Scaffold the tree: `README.md` (milestone's program-README template), `milestone-0-<slug>/milestone.md`
-   for the first milestone.
-2. Commit (standing authorization, CLAUDE.md §5.0). Never push.
-3. Hand off: invoke `/milestone` (its Phase 2 onward) — it sees the governing spec = `mission.md` and runs
-   M0. The terminal `mission-validator` (§8) fires only **after the last milestone passes its own
-   `milestone-validator`**.
+1. Scaffold **program-level files only**: `README.md` (milestone's program-README template) with the
+   milestone table filled and a literal "dispatch `mission-validator`" line added to its close-out checklist.
+   `/mission` authors **no** `milestone-<n>/` folder or `milestone.md` — `/milestone` owns those (its
+   Phase 2), so the milestone spec has one source of truth.
+2. Commit `mission.md` + `discovery-brief.md` + `README.md` (standing authorization, CLAUDE.md §5.0). Never push.
+3. **Hand off as a baton, not a call.** Stop here and tell the operator to start M0 by invoking `/milestone`
+   **in a fresh session** (missions are large; one context can't hold the whole program, and §10 commits to
+   fresh-session-per-milestone). The terminal `mission-validator` (§8) fires only **after the last milestone
+   passes its own `milestone-validator`** and clears HS-1 — triggered via the README close-out line, since
+   this `/mission` session is gone by then. For a **fan-out** terminal validation (e.g. a remediation
+   re-audit) the **main session** runs the fan-out and the validator judges the artifact; a single subagent
+   has no `Agent` tool and cannot fan out.
 
 ## 6. `mission.md` template — section spec
 
-13 sections. The standout is §9 (the operator's headline ask).
+13 sections (the header counts as §1; Terminal Acceptance lands at **§8** in the shipped template). The
+standout is the Terminal Acceptance section (the operator's headline ask).
 
 1. **Header** — status · date · branch · author/operator · mission type · slug · links (discovery-brief, README).
 2. **Problem / why now** — evidence-cited problem statement.
@@ -186,7 +194,7 @@ docs/superpowers/milestones/<mission-slug>/
 ## 8. `mission-validator` agent — spec
 - Lives at `.claude/agents/mission-validator.md`; **program-scale sibling** of `milestone-validator`.
 - Runs **once**, at the very end, after the last milestone's `milestone-validator` returns PASS.
-- Reads `mission.md` §9 Terminal Acceptance, **executes the declared validation** (re-audit / E2E /
+- Reads `mission.md` §8 Terminal Acceptance, **executes the declared validation** (re-audit / E2E /
   acceptance suite — whatever the mission declared), writes `qa/mission-validation.md` with a PASS/FAIL
   verdict and per-criterion evidence.
 - **Separation of powers:** judges and writes the verdict **only** — never edits code, never fixes
@@ -197,7 +205,7 @@ docs/superpowers/milestones/<mission-slug>/
 - `/mission` produces precisely `/milestone` Phase-1 inputs: a governing spec (`mission.md`) + a program
   README. `/milestone` then runs Phase 2→5 per milestone **unchanged**.
 - The **only** addition beyond milestone's machinery is the program-scale `mission-validator` terminal gate
-  tied to `mission.md` §9. Per-feature/per-milestone discipline is referenced, not re-implemented.
+  tied to `mission.md` §8. Per-feature/per-milestone discipline is referenced, not re-implemented.
 
 ## 10. Token efficiency & model policy
 - Discovery sized to the mission (3–6 agents default); **haiku** mechanical, **sonnet** analysis,
@@ -233,7 +241,7 @@ Built via `skill-creator` (D6). The skill is accepted when:
 - [ ] `.claude/agents/mission-validator.md` exists with strict separation-of-powers wording.
 - [ ] **Dry-run proof:** running `/mission` on a small intent produces a valid `mission.md` +
       `discovery-brief.md` + scaffolded tree that `/milestone` Phase 1 accepts without modification.
-- [ ] `mission.md` template includes a non-optional §9 Terminal Acceptance with all five fields.
+- [ ] `mission.md` template includes a non-optional §8 Terminal Acceptance with all five fields.
 
 ## 14. Open risks / non-goals restated
 - Discovery rigor is a token/quality trade-off; default lean, operator can opt into a heavier sweep.

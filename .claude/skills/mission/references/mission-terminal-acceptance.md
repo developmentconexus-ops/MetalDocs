@@ -45,8 +45,12 @@ the same reason `milestone` uses `milestone-validator`: the session that built t
 passing it. The validator:
 
 - **Judges and writes one file only** — `qa/mission-validation.md` (PASS/FAIL + per-criterion evidence).
-- **Executes the §8 "how to validate" from clean state** — it re-runs the audit/suite/guards itself; it does
-  not trust the milestones' evidence transcripts.
+- **Verifies, sized to its tools.** It has no `Agent` tool and cannot fan out. **Deterministic** §8 methods
+  (suites, CI greps, single-pass review) it **runs itself** with `Bash`/`Grep`, not trusting the milestones'
+  transcripts. **Fan-out** §8 methods (a multi-dimension re-audit) are run by the **main session**, which
+  hands the validator the artifact to **judge** — and the validator independently **spot-checks** its
+  load-bearing claims (re-grep a sample of "0 remaining" sites; re-run a named proof). This split is why §8's
+  "how to validate" must say which methods are deterministic and which need a main-session fan-out.
 - **Never** edits code, fixes findings, or flips program status. If it finds a gap, it records a finding and
   fails the criterion — it does not repair it. Status flips and the final Grade/Done declaration belong to
   the main session and the operator.

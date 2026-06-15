@@ -30,8 +30,6 @@ inputs `milestone` expects — then gets out of the way. It does **not** execute
 — a mission built by hand (governing spec + program README + M0–M5 + an independent re-audit as terminal
 acceptance). `/mission` automates the construction of that front matter. Read it to see a finished mission.
 
-**Governing design for this skill:** `docs/superpowers/specs/2026-06-15-mission-skill-design.md`.
-
 ## Core principles
 
 - **Plan, then hand off.** A mission does research → decision-gate → `mission.md` → scaffold, then invokes
@@ -66,14 +64,15 @@ docs/superpowers/milestones/<mission-slug>/
   mission.md            # ★ the governing spec + Terminal Acceptance (definition-of-done, up front)
   discovery-brief.md    # the cited evidence base every claim in mission.md traces to
   README.md             # program index (from milestone's templates/program-README.md)
-  milestone-0-<slug>/   # the FIRST milestone, scaffolded; milestone skill executes from here
+  milestone-<n>-<slug>/ # authored by the `milestone` skill (its Phase 2), NOT by `/mission`
     milestone.md
   qa/
     mission-validation.md  # the mission-validator's terminal PASS/FAIL verdict (written at the very end)
 ```
 
-`README.md`'s "Governing spec:" line points to `./mission.md`. The `milestone` skill operates on this tree
-**unchanged** — `mission.md` *is* the governing spec it looks for.
+`README.md`'s "Governing spec:" line points to `./mission.md`. `/mission` writes only `mission.md`,
+`discovery-brief.md`, and `README.md`; the `milestone` skill owns every `milestone-<n>/` folder and operates
+on this tree **unchanged** — `mission.md` *is* the governing spec it looks for.
 
 ## Workflow
 
@@ -116,12 +115,16 @@ digraph mission {
 4. Pick a `<mission-slug>` (short kebab-case); verify it doesn't collide with an existing program tree.
 5. Output a **one-screen framing**: intent · type · slug · success-in-one-sentence. No files yet.
 
-### Phase 1 — Discovery (mandatory, adaptive depth, token-efficient)
-Read `references/mission-discovery.md` for the per-type playbooks and the model/token policy.
+### Phase 1 — Discovery (always produces a brief; effort proportional to risk)
+Read `references/mission-discovery.md` for the per-type playbooks and the model/token policy. The
+`discovery-brief.md` artifact is non-negotiable — decomposing on un-cited assumptions is the failure this
+phase exists to prevent. The *effort*, though, scales to the unknowns: a well-understood small mission may
+warrant a single confirm-and-cite agent; an unfamiliar audit warrants real fan-out.
 
-1. Fan out a **small** set of parallel agents **sized to the mission** — default **3–6**, never a large
-   fleet unless the mission is genuinely huge and the operator opts in. Model policy: **sonnet** for
-   analysis/judgement, **haiku** for mechanical sweeps, **never fable** for workers, **≤15 concurrent**.
+1. Fan out a set of parallel agents **sized to the mission** — default **3–6**, down to **1** for a small
+   well-scoped mission, and a large fleet only when the mission is genuinely huge **and** the operator opts
+   in (say what it costs first). Model policy: **sonnet** for analysis/judgement, **haiku** for mechanical
+   sweeps, **never fable** for workers, **≤15 concurrent**.
 2. Run the playbook for the mission type (audit / requirements+prior-art / impact scan / site census).
 3. Run **one cheap skeptic pass** over the findings so the evidence base isn't hallucinated. Scale rigor to
    risk; if you skip verification for a trivially-checkable finding, say so.
@@ -129,6 +132,10 @@ Read `references/mission-discovery.md` for the per-type playbooks and the model/
    Include a **coverage statement**: what was *not* swept. No silent caps.
 
 ### Phase 2 — Decision interview (fail-closed)
+This phase **is** the brainstorming discipline applied to strategy — so compose, don't re-implement: where
+`superpowers:brainstorming` is installed, use it to run the interview; this loop is the fallback when it
+isn't. If a `brainstorming` session already produced this mission's intent, **carry those decisions forward
+into the Locked Decisions table — do not re-interview** the operator on choices already made.
 1. Present **2–3 strategic approaches** with trade-offs and a clear recommendation (scope: full vs bounded;
    sequencing; what counts as proof-of-done).
 2. Interview the operator **one question at a time** on the load-bearing choices. Record each answer in the
@@ -162,26 +169,42 @@ Read `references/mission-decomposition.md` for the decomposition heuristics and 
    scaffold or hand off without approval.
 
 ### Phase 5 — Scaffold + hand off to `milestone`
-1. Scaffold the tree: copy `milestone`'s `templates/program-README.md` → `README.md` and fill the milestone
-   table; create `milestone-0-<slug>/milestone.md` for the **first** milestone (copy `milestone`'s
-   `templates/milestone.md`). Do **not** scaffold every milestone's internals up front — `milestone` does
-   that as it reaches each one.
-2. **Commit** the mission artifacts (standing authorization, `CLAUDE.md §5.0`). **Never push.**
-3. **Hand off:** invoke the `milestone` skill (its Phase 2 onward). It sees the governing spec = `mission.md`
-   and runs M0. Tell the operator the handoff is happening and that the next operator gate is HS-1 at the M0
-   boundary.
+`/mission` writes the **program-level** files only — it does **not** author any milestone's `milestone.md`
+and creates no `milestone-<n>/` folder. Owning the milestone files is `milestone`'s job (its Phase 2);
+authoring them in both skills would create two sources of truth for the same milestone spec.
+1. Scaffold the program index: copy `milestone`'s `templates/program-README.md` → `README.md`; fill the
+   milestone table (titles + one-line objectives + status `planned`); and **add the terminal-gate line** to
+   the close-out checklist (a literal "dispatch `mission-validator`" step — see "Terminal acceptance" below)
+   so the gate can't be silently skipped once this session is gone.
+2. **Commit** the mission artifacts — `mission.md` + `discovery-brief.md` + `README.md` (standing
+   authorization, `CLAUDE.md §5.0`). **Never push.**
+3. **Hand off as a baton, not a call.** A mission is large; executing every milestone in this same context
+   would blow it out, and §11/D2 commit to a **fresh session per milestone**. So **stop here.** Tell the
+   operator: the mission is specced and scaffolded; start M0 by invoking `/milestone` **in a fresh session**
+   (it reads `mission.md` as its governing spec and owns all milestone files from its Phase 2). The next
+   operator gate is HS-1 at the M0 boundary. Do **not** begin executing M0 in this session.
 
 ### Terminal acceptance (after the LAST milestone)
-This is the one thing the mission adds beyond `milestone`'s machinery. After the last milestone passes its
-own `milestone-validator` **and** the operator approves it (HS-1):
-1. **Dispatch the `mission-validator` subagent** (`.claude/agents/mission-validator.md`). It reads
-   `mission.md` §8 Terminal Acceptance, **executes the declared validation** (re-audit / E2E / acceptance
-   suite — whatever the mission declared), and writes `qa/mission-validation.md` (PASS/FAIL + per-criterion
-   evidence). Separation of powers: it judges only.
-2. On **FAIL** → **HS-5**: open a bounded remediation micro-milestone for the missed criteria, run it through
-   `milestone`, then re-dispatch the `mission-validator`. The operator decides continue vs replan at each loop.
-3. On **PASS** → the main session presents it to the operator for the final sign-off and writes the program
-   close-out / reconciliation in `README.md`.
+The one thing the mission adds beyond `milestone`'s machinery — and the easiest to lose. **Trigger
+ownership:** by the time the last milestone closes, this `/mission` session is long gone and `/milestone`
+knows nothing about the terminal gate. So the trigger is made durable during Phase 5 in two places — the
+program `README.md` close-out checklist carries an explicit **"dispatch `mission-validator`"** line, and
+`mission.md` §8 names who invokes it (the operator, or whichever session closes the last milestone). Without
+that, the gate is silently skipped.
+
+After the last milestone passes its own `milestone-validator` **and** clears its HS-1 operator gate:
+1. **Run the validation according to its shape (a single subagent cannot fan out — it has no `Agent` tool):**
+   - **Fan-out validation** (e.g. a remediation re-audit across many dimensions) → the **main session** runs
+     it with `Workflow`/`Agent` and captures the artifact, then dispatches `mission-validator` to **judge
+     that artifact** against §8.
+   - **Deterministic validation** (test suites, CI greps, single-pass review) → dispatch `mission-validator`
+     directly; it runs those itself.
+2. `mission-validator` (`.claude/agents/mission-validator.md`) reads `mission.md` §8, verifies each criterion
+   against real evidence, and writes `qa/mission-validation.md` (PASS/FAIL + per-criterion). Separation of
+   powers: it judges and writes the verdict only — never edits code, never flips status.
+3. On **FAIL** → **HS-5**: bounded remediation micro-milestone for the missed criteria via `milestone`, then
+   re-dispatch. The operator decides continue vs replan at each loop.
+4. On **PASS** → present to the operator for final sign-off; write the §12 program close-out in `README.md`.
 
 ## Hard-stop catalog (defaults; each mission generalizes them in `mission.md` §9)
 
@@ -206,7 +229,7 @@ In `references/` (read when you reach the relevant phase):
 - `mission-terminal-acceptance.md` — how to author §8 + the `mission-validator` charter
 
 Reused from the `milestone` skill (referenced, not copied):
-- `.claude/skills/milestone/templates/program-README.md` — the program index
-- `.claude/skills/milestone/templates/milestone.md` — the first milestone's up-front spec
+- `.claude/skills/milestone/templates/program-README.md` — the program index (the only milestone template
+  `/mission` fills; every `milestone.md` is authored later by the `milestone` skill, not here)
 
 Agent: `.claude/agents/mission-validator.md` — the independent, program-scale terminal-acceptance judge.

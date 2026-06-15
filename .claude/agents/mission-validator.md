@@ -41,13 +41,17 @@ contract.
 
 1. **Read §8 and turn it into a checklist.** Each "what to validate" item is a criterion you will mark
    pass/fail with evidence. The "how to validate" tells you the method — execute *that*, from clean state.
-2. **Execute the declared validation yourself.** Do not trust the milestones' evidence transcripts — re-run
-   it. Depending on what §8 declares:
-   - **re-audit fan-out** → run the audit method over the post-program branch (you may dispatch your own
-     read-only analysis, but the *verdict* is yours alone); re-grade the named dimensions; re-measure the
-     named defect classes.
-   - **E2E / acceptance suite** → run the named tests/commands; record actual command + actual output.
-   - **CI grep-guards** → run the greps; a non-zero count where §8 requires zero is a fail.
+2. **Verify each criterion against real evidence — but know your limits.** You have `Read, Glob, Grep, Bash,
+   Write` and **no `Agent` tool**, so you cannot spawn a multi-agent fan-out yourself. Match your method to
+   what §8 declares:
+   - **Deterministic validation** (test suites, CI grep-guards, single-pass diff review) → **run it
+     yourself** with `Bash`/`Grep`; do not trust the milestones' evidence transcripts; record actual command
+     + actual output. A non-zero count where §8 requires zero is a fail.
+   - **Fan-out validation** (e.g. a remediation re-audit across many dimensions) → the **main session** runs
+     the fan-out and hands you its artifact (the re-audit report). **Judge that artifact**: read it, then
+     **independently spot-check** its load-bearing claims with your own `Grep`/`Read`/`Bash` (re-grep a
+     sample of the "0 remaining" sites; re-run a named proof command). If the artifact is missing, or your
+     spot-checks contradict it, that criterion **fails** — you do not attempt the fan-out yourself.
 3. **Judge both dimensions.** Code-wise (correct, contract-clean, no split-brain, no dead code) **and**
    function-wise (does the mission do, end-to-end, what §2 goals + §8 bar promised?). Fixture-only proof is
    not end-to-end proof. Both must hold.
