@@ -76,8 +76,8 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 func TestPresignAutosave_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:             "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:             "22222222-2222-4222-8222-222222222222",
 		TemplateID:     "11111111-1111-1111-1111-111111111111",
 		VersionNumber:  1,
 		Status:         domain.VersionStatusDraft,
@@ -96,31 +96,29 @@ func TestPresignAutosave_Happy(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 (F1.2/ADR-0035: presign returns 200), got %d body=%s", rr.Code, rr.Body.String())
 	}
 	if gotAction != "template.edit" {
 		t.Fatalf("expected authz action template.edit, got %q", gotAction)
 	}
 
 	var out struct {
-		Data struct {
-			UploadURL string `json:"upload_url"`
-		} `json:"data"`
+		UploadURL string `json:"upload_url"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Data.UploadURL == "" {
-		t.Fatal("expected data.upload_url to be present")
+	if out.UploadURL == "" {
+		t.Fatal("expected upload_url to be present (flat shape)")
 	}
 }
 
 func TestCommitAutosave_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:             "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:             "22222222-2222-4222-8222-222222222222",
 		TemplateID:     "11111111-1111-1111-1111-111111111111",
 		VersionNumber:  1,
 		Status:         domain.VersionStatusDraft,
@@ -139,25 +137,21 @@ func TestCommitAutosave_Happy(t *testing.T) {
 	}
 
 	var out struct {
-		Data struct {
-			Version struct {
-				ContentHash string `json:"content_hash"`
-			} `json:"version"`
-		} `json:"data"`
+		ContentHash *string `json:"content_hash"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Data.Version.ContentHash != "hash_abc" {
-		t.Fatalf("expected data.version.content_hash=hash_abc, got %q", out.Data.Version.ContentHash)
+	if out.ContentHash == nil || *out.ContentHash != "hash_abc" {
+		t.Fatalf("expected content_hash=hash_abc (flat shape), got %v", out.ContentHash)
 	}
 }
 
 func TestCommitAutosave_HashMismatch(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:             "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:             "22222222-2222-4222-8222-222222222222",
 		TemplateID:     "11111111-1111-1111-1111-111111111111",
 		VersionNumber:  1,
 		Status:         domain.VersionStatusDraft,

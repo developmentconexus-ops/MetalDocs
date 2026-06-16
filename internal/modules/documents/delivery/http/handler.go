@@ -512,13 +512,9 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	doc, err := h.svc.GetDocument(r.Context(), tenantID, docID)
-	if err != nil {
-		status, msg := mapErr(err)
-		httpErr(w, status, msg)
-		return
-	}
-	httpresponse.WriteJSON(w, http.StatusOK, doc)
+	// F1.2 / ADR 0035 — renameDocument returns 200 OK with empty body. OpenAPI declares no
+	// response schema. Consumer FE adapter is Promise<void>. No domain.Document leak.
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {

@@ -1183,7 +1183,11 @@ paths:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
       responses:
-        '200': { description: ok }
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionDTO' }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1351,8 +1355,11 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        '200':
-          description: ok
+        '201':
+          description: created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionDTO' }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1436,6 +1443,9 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TemplatePresignAutosaveResponse' }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1457,6 +1467,9 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionDTO' }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -5008,7 +5021,14 @@ components:
         docx_storage_key: { type: string, nullable: true }
         content_hash: { type: string, nullable: true }
         metadata_schema: { type: object, nullable: true, additionalProperties: true }
-        placeholder_schema: { type: object, nullable: true, additionalProperties: true }
+        placeholder_schema:
+          type: array
+          nullable: true
+          items: { type: object, additionalProperties: true }
+          description: >
+            Ordered placeholder list. Matches `domain.TemplateVersion.PlaceholderSchema`
+            ([]Placeholder). Backend always emits as array; ADR 0035 declared shape
+            corrected from `object` 2026-06-15 (F1.2).
         author_id: { type: string }
         pending_reviewer_role: { type: string, nullable: true }
         pending_approver_role: { type: string, nullable: true }
@@ -5029,6 +5049,14 @@ components:
             `expected_lock_version` on PUT .../schema and PUT .../draft. A
             mismatch yields HTTP 412 with code `stale_lock_version`.
         created_at: { type: string, format: date-time }
+    TemplatePresignAutosaveResponse:
+      type: object
+      required: [upload_url, storage_key, expires_at]
+      additionalProperties: false
+      properties:
+        upload_url: { type: string, description: presigned S3-compatible PUT URL }
+        storage_key: { type: string, description: target storage key for the draft .docx blob }
+        expires_at: { type: string, format: date-time, description: presigned URL expiry (RFC3339 UTC) }
     CreateTemplateResponse:
       type: object
       required: [data]

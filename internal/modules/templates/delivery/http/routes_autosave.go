@@ -3,9 +3,9 @@ package http
 import (
 	"net/http"
 	"strconv"
-	"time"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
 )
 
@@ -39,12 +39,10 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"data": map[string]any{
-			"upload_url":  res.UploadURL,
-			"storage_key": res.StorageKey,
-			"expires_at":  res.ExpiresAt.UTC().Format(time.RFC3339),
-		},
+	writeJSON(w, http.StatusOK, templatesapi.TemplatePresignAutosaveResponse{
+		UploadUrl:  res.UploadURL,
+		StorageKey: res.StorageKey,
+		ExpiresAt:  res.ExpiresAt.UTC(),
 	})
 }
 
@@ -87,9 +85,10 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"version": toVersionResponse(v),
-		},
-	})
+	dto, err := toAPIVersionDTO(v)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
 }

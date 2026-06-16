@@ -33,11 +33,12 @@ func (h *Handler) createNextVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"data": map[string]any{
-			"version": toVersionResponse(v),
-		},
-	})
+	dto, err := toAPIVersionDTO(v)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, dto)
 }
 
 func toTemplateResponse(t *domain.Template) map[string]any {

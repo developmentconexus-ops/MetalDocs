@@ -323,7 +323,9 @@ type fakeUUID struct {
 
 func (u *fakeUUID) New() string {
 	u.counter++
-	return fmt.Sprintf("id_%d", u.counter)
+	// Deterministic, valid UUIDv4 shape — required by F1.2 mappers (toAPIVersionDTO,
+	// toAPITemplateDTO) which uuid.Parse the field. Counter populates the last 12 hex chars.
+	return fmt.Sprintf("00000000-0000-4000-8000-%012d", u.counter)
 }
 
 type fakePresigner struct{}

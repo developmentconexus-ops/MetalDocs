@@ -157,11 +157,12 @@ func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"version": toVersionResponse(v),
-		},
-	})
+	dto, err := toAPIVersionDTO(v)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	writeJSON(w, http.StatusOK, dto)
 }
 
 func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {

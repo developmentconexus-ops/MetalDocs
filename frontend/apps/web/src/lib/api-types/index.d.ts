@@ -2667,9 +2667,10 @@ export interface components {
             metadata_schema?: {
                 [key: string]: unknown;
             } | null;
+            /** @description Ordered placeholder list. Matches `domain.TemplateVersion.PlaceholderSchema` ([]Placeholder). Backend always emits as array; ADR 0035 declared shape corrected from `object` 2026-06-15 (F1.2). */
             placeholder_schema?: {
                 [key: string]: unknown;
-            } | null;
+            }[] | null;
             author_id: string;
             pending_reviewer_role?: string | null;
             pending_approver_role?: string | null;
@@ -2692,6 +2693,17 @@ export interface components {
             lock_version?: number;
             /** Format: date-time */
             created_at: string;
+        };
+        TemplatePresignAutosaveResponse: {
+            /** @description presigned S3-compatible PUT URL */
+            upload_url: string;
+            /** @description target storage key for the draft .docx blob */
+            storage_key: string;
+            /**
+             * Format: date-time
+             * @description presigned URL expiry (RFC3339 UTC)
+             */
+            expires_at: string;
         };
         CreateTemplateResponse: {
             data: {
@@ -4219,7 +4231,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["VersionDTO"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
@@ -4400,12 +4414,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description ok */
-            200: {
+            /** @description created */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["VersionDTO"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -4483,7 +4499,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TemplatePresignAutosaveResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -4509,7 +4527,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["VersionDTO"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];

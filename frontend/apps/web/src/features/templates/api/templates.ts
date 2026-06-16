@@ -151,21 +151,19 @@ export async function getTemplate(id: string): Promise<{ template: TemplateDTO; 
   return body.data;
 }
 
+// F1.2 / ADR 0035 — flat typed bodies, no { data: { ... } } envelope.
 export async function getVersion(templateId: string, n: number): Promise<VersionDTO> {
-  const body = await apiFetch<{ data: { version: VersionDTO } }>(
-    `/api/v1/templates/${templateId}/versions/${n}`,
-  );
-  return body.data.version;
+  return apiFetch<VersionDTO>(`/api/v1/templates/${templateId}/versions/${n}`);
 }
 
 export async function presignAutosave(
   templateId: string,
   versionNum: number,
 ): Promise<{ upload_url: string; storage_key: string; expires_at: string }> {
-  const body = await apiFetch<{
-    data: { upload_url: string; storage_key: string; expires_at: string };
-  }>(`/api/v1/templates/${templateId}/versions/${versionNum}/autosave/presign`, { method: 'POST' });
-  return body.data;
+  return apiFetch<{ upload_url: string; storage_key: string; expires_at: string }>(
+    `/api/v1/templates/${templateId}/versions/${versionNum}/autosave/presign`,
+    { method: 'POST' },
+  );
 }
 
 export async function commitAutosave(
@@ -173,11 +171,10 @@ export async function commitAutosave(
   versionNum: number,
   expectedContentHash: string,
 ): Promise<VersionDTO> {
-  const body = await apiFetch<{ data: { version: VersionDTO } }>(
+  return apiFetch<VersionDTO>(
     `/api/v1/templates/${templateId}/versions/${versionNum}/autosave/commit`,
     { method: 'POST', body: JSON.stringify({ expected_content_hash: expectedContentHash }) },
   );
-  return body.data.version;
 }
 
 async function sha256Hex(buf: ArrayBuffer): Promise<string> {
