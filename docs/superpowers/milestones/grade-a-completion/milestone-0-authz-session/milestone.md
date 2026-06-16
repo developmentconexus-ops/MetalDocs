@@ -1,7 +1,7 @@
 # Milestone 0 — Auth / authz / session correctness
 
 > **Program:** grade-a-completion  ·  **Governing spec:** `../mission.md`
-> **Status:** Spec (drafting)
+> **Status:** validator-PASS (awaiting HS-1 operator approval) — 2026-06-15
 > **Authored:** 2026-06-15 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** this milestone is,

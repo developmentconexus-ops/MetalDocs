@@ -19,7 +19,7 @@ judges it against §6 — 3 dims ≥ A−, 0 new Critical/Major, H-D=0, H-G=0.
 
 | # | Milestone | Objective (one line) | Status | Gate result |
 |---|-----------|----------------------|--------|-------------|
-| 0 | `milestone-0-authz-session` | Close the 4 auth/authz/session defects at their shared root (incl. B1 effective_from security bug) | in-progress | — |
+| 0 | `milestone-0-authz-session` | Close the 4 auth/authz/session defects at their shared root (incl. B1 effective_from security bug) | validator-PASS (awaiting HS-1) | [PASS](milestone-0-authz-session/qa/milestone-qa.md) |
 | 1 | `milestone-1-contract-integrity` | Drive contract-api ≥ A− and **H-D → 0** — typed responses, spec-conformant status/body | planned | — |
 | 2 | `milestone-2-observability` | Drive composition ≥ A− — slog, scrapeable job metrics, app-level OTel spans | planned | — |
 | 3 | `milestone-3-quality-tail` | Lift code-quality/legacy — wire IAMUserOptions (functional), type-safety, dead-code, minor sweep | planned | — |
