@@ -9,6 +9,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
@@ -148,8 +152,15 @@ type SignoffResult struct {
 // RecordSignoff records an approve or reject decision for the given stage instance.
 // Approve path only; reject path shares this method and is gated by req.Decision.
 func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner, req SignoffRequest) (SignoffResult, error) {
+	ctx, span := otel.Tracer("metaldocs/documents/approval").Start(ctx, "signoff.record",
+		oteltrace.WithAttributes(attribute.String("signoff.verdict", string(req.Decision))),
+	)
+	defer span.End()
+
 	// Step 1: validate signature payload — no float64 values.
 	if err := ValidateEventPayload(req.SignaturePayload); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return SignoffResult{}, err
 	}
 
@@ -162,7 +173,10 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 	// available pre-flight. Contained on ApprovalRepository (not a shared port — M4/F4.1).
 	actorDisplayName, err := s.repo.LoadActorDisplayName(ctx, req.TenantID, req.ActorUserID)
 	if err != nil {
-		return SignoffResult{}, fmt.Errorf("recordSignoff: lookup actor display name: %w", err)
+		err = fmt.Errorf("recordSignoff: lookup actor display name: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return SignoffResult{}, err
 	}
 	err = runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
@@ -499,11 +513,20 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 	})
 	if eligibilityEvent != nil {
 		if emitErr := s.emitEligibilityRejection(ctx, runner, req.TenantID, req.ActorUserID, *eligibilityEvent); emitErr != nil {
-			return SignoffResult{}, fmt.Errorf("recordSignoff: emit eligibility rejection: %w", emitErr)
+			wrappedErr := fmt.Errorf("recordSignoff: emit eligibility rejection: %w", emitErr)
+			span.RecordError(wrappedErr)
+			span.SetStatus(codes.Error, wrappedErr.Error())
+			return SignoffResult{}, wrappedErr
+		}
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 		}
 		return SignoffResult{}, err
 	}
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return SignoffResult{}, err
 	}
 	return result, nil
