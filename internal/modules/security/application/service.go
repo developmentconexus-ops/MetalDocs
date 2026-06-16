@@ -11,7 +11,7 @@ package application
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -177,7 +177,7 @@ func severityRank(s string) int {
 // requests. The UI uses this to de-dupe cards across refreshes and to attach
 // per-card dismiss state without persisting it server-side.
 func stableID(parts ...string) string {
-	h := sha1.New()
+	h := sha256.New()
 	for i, p := range parts {
 		if i > 0 {
 			_, _ = h.Write([]byte{0})

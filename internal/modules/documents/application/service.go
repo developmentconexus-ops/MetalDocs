@@ -124,6 +124,7 @@ func (s *Service) WithRunner(runner db.TxRunner) *Service {
 	return s
 }
 
+// Deprecated: use NewService.
 func New(r Repository, p Presigner, t TemplateReader, fv FormValidator, a Audit) *Service {
 	return &Service{
 		repo:      r,
