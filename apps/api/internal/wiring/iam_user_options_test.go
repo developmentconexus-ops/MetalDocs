@@ -131,12 +131,21 @@ func TestDocumentsIAMUserOptions(t *testing.T) {
 			if len(got) != len(tc.wantUserIDs) {
 				t.Fatalf("len: got %d (%+v) want %d (%v)", len(got), got, len(tc.wantUserIDs), tc.wantUserIDs)
 			}
+			// Build a lookup map from UserID to DisplayName for all active users in this case,
+			// so we can assert each returned element has the correct DisplayName.
+			allUsers := []authdomain.ManagedUser{zoeActive, aliceActive, bobInactive, mikeActive, mikeTwinActive}
+			displayNameByUserID := make(map[string]string, len(allUsers))
+			for _, u := range allUsers {
+				displayNameByUserID[u.UserID] = u.DisplayName
+			}
+
 			for i, want := range tc.wantUserIDs {
 				if got[i].UserID != want {
 					t.Errorf("idx %d UserID: got %q want %q", i, got[i].UserID, want)
 				}
-				if got[i].DisplayName == "" {
-					t.Errorf("idx %d DisplayName empty", i)
+				wantDisplayName := displayNameByUserID[want]
+				if got[i].DisplayName != wantDisplayName {
+					t.Errorf("idx %d DisplayName: got %q want %q", i, got[i].DisplayName, wantDisplayName)
 				}
 			}
 
