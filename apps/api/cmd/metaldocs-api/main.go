@@ -522,7 +522,7 @@ func main() {
 	})
 
 	leaderID := schedulerLeaderID()
-	s, err := jobscheduler.New(deps.SQLDB, leaderID)
+	s, err := jobscheduler.New(deps.SQLDB, leaderID, slog.Default())
 	if err != nil {
 		slog.Error("jobs scheduler configuration failed", "err", err)
 		deps.Cleanup()
