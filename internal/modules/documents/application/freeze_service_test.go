@@ -37,6 +37,10 @@ func (f fakeSnapshotReader) ReadSnapshotWithFreezeAt(_ context.Context, _, _ str
 	return f.snap, f.valuesFrozenAt, f.err
 }
 
+func (f fakeSnapshotReader) ReadFreezeAt(_ context.Context, _, _ string, _ ...repository.DBTX) (*time.Time, error) {
+	return f.valuesFrozenAt, f.err
+}
+
 type fakeFinalDocxWriter struct {
 	calls int
 	key   string

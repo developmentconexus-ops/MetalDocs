@@ -60,6 +60,23 @@ func (r *SnapshotRepository) ReadSnapshotWithFreezeAt(ctx context.Context, tenan
 	return r.readSnapshot(ctx, exec, tenantID, docID)
 }
 
+// ReadFreezeAt reads only values_frozen_at — used by Pin to check idempotency without
+// fetching the snapshot blobs that Pin does not consume.
+func (r *SnapshotRepository) ReadFreezeAt(ctx context.Context, tenantID, docID string, q ...DBTX) (*time.Time, error) {
+	exec := DBTX(r.db)
+	if len(q) > 0 && q[0] != nil {
+		exec = q[0]
+	}
+	var valuesFrozenAt *time.Time
+	err := exec.QueryRowContext(ctx, fmt.Sprintf(`
+		SELECT values_frozen_at
+		  FROM %s
+		 WHERE tenant_id = $1::uuid AND id = $2::uuid`, r.table("documents")),
+		tenantID, docID,
+	).Scan(&valuesFrozenAt)
+	return valuesFrozenAt, err
+}
+
 func (r *SnapshotRepository) readSnapshot(ctx context.Context, exec DBTX, tenantID, docID string) (domain.TemplateSnapshot, *time.Time, error) {
 	var s domain.TemplateSnapshot
 	var valuesFrozenAt *time.Time

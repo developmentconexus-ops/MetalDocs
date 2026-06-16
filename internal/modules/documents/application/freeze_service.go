@@ -21,6 +21,7 @@ type FreezeFinalizer interface {
 
 type SnapshotReader interface {
 	ReadSnapshotWithFreezeAt(ctx context.Context, tenantID, revisionID string, q ...repository.DBTX) (v2dom.TemplateSnapshot, *time.Time, error)
+	ReadFreezeAt(ctx context.Context, tenantID, revisionID string, q ...repository.DBTX) (*time.Time, error)
 }
 
 type FinalDocxWriter interface {
@@ -188,11 +189,10 @@ func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID 
 	if tx == nil {
 		return fmt.Errorf("freeze_service: tx required (ADR 0015 amended by Wave Z Z-5)")
 	}
-	snap, valuesFrozenAt, err := s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, revisionID, tx)
+	valuesFrozenAt, err := s.snapshots.ReadFreezeAt(ctx, tenantID, revisionID, tx)
 	if err != nil {
-		return fmt.Errorf("pin: read snapshot: %w", err)
+		return fmt.Errorf("pin: read freeze_at: %w", err)
 	}
-	_ = snap
 	if valuesFrozenAt != nil {
 		return nil
 	}
