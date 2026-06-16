@@ -30,7 +30,7 @@ func withActorRoles(req *http.Request, roles string) {
 func TestSubmitForReview_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:            "ver-1",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
@@ -73,7 +73,7 @@ func TestSubmitForReview_Happy(t *testing.T) {
 func TestSubmitForReview_UsesTemplateSubmitCapability(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:            "ver-1",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
@@ -109,7 +109,7 @@ func TestSubmitForReview_UsesTemplateSubmitCapability(t *testing.T) {
 
 func TestSubmitForReview_NonDraft(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:            "ver-1",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
@@ -141,7 +141,7 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 
 func TestSubmitForReview_NoUpload(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:            "ver-1",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
@@ -177,7 +177,7 @@ func TestSubmitForReview_SystemOwnedTemplateImmutable(t *testing.T) {
 	templateID := "00000000-0000-0000-0000-000000000101"
 	repo.templates[templateID] = &domain.Template{
 		ID:          templateID,
-		TenantID:    "tenant-a",
+		TenantID:    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 		SystemOwned: true,
 	}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
@@ -213,7 +213,7 @@ func TestSubmitForReview_SystemOwnedTemplateImmutable(t *testing.T) {
 func TestReview_Accept_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:                  "ver-1",
 		TemplateID:          "11111111-1111-1111-1111-111111111111",
@@ -254,7 +254,7 @@ func TestReview_Accept_Happy(t *testing.T) {
 func TestApprove_Accept_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:                  "ver-1",
 		TemplateID:          "11111111-1111-1111-1111-111111111111",
@@ -312,7 +312,7 @@ func TestApprove_Accept_Happy(t *testing.T) {
 func TestApprove_Reject_NextDraftNull(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:                  "ver-1",
 		TemplateID:          "11111111-1111-1111-1111-111111111111",
@@ -361,7 +361,7 @@ func TestApprove_Reject_NextDraftNull(t *testing.T) {
 
 func TestArchiveTemplate_Happy(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/archive", nil)
@@ -391,7 +391,7 @@ func TestArchiveTemplate_Happy(t *testing.T) {
 func TestArchiveTemplate_SystemOwnedTemplateImmutable(t *testing.T) {
 	repo := newFakeRepo()
 	templateID := "00000000-0000-0000-0000-000000000101"
-	repo.templates[templateID] = &domain.Template{ID: templateID, TenantID: "tenant-a", SystemOwned: true}
+	repo.templates[templateID] = &domain.Template{ID: templateID, TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", SystemOwned: true}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+templateID+"/archive", nil)
@@ -421,7 +421,7 @@ func TestArchiveTemplate_SystemOwnedTemplateImmutable(t *testing.T) {
 func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
 	repo := newFakeRepo()
 	templateID := "11111111-1111-1111-1111-111111111111"
-	repo.templates[templateID] = &domain.Template{ID: templateID, TenantID: "tenant-a", LatestVersion: 1}
+	repo.templates[templateID] = &domain.Template{ID: templateID, TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", LatestVersion: 1}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:                  "ver-1",
 		TemplateID:          templateID,
@@ -470,7 +470,7 @@ func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
 
 func TestUpsertApprovalConfig_Happy(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a", CreatedBy: "user-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", CreatedBy: "user-a"}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
 	raw, _ := json.Marshal(map[string]any{

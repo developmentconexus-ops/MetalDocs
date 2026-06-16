@@ -7,7 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 // templateVersionDeclaredKeys is the flat snake_case key set declared by the OpenAPI
@@ -70,7 +72,7 @@ func mapKeysT(m map[string]json.RawMessage) []string {
 func TestCreateNextVersion_TypedResponseShape(t *testing.T) {
 	repo := newFakeRepo()
 	const tplID = "11111111-1111-1111-1111-111111111111"
-	repo.templates[tplID] = &domain.Template{ID: tplID, TenantID: "tenant-a", Key: "k", Name: "n", LatestVersion: 1}
+	repo.templates[tplID] = &domain.Template{ID: tplID, TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", Key: "k", Name: "n", LatestVersion: 1}
 	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
 		ID:             "22222222-2222-4222-8222-222222222222",
 		TemplateID:     tplID,
@@ -102,7 +104,7 @@ func TestCreateNextVersion_TypedResponseShape(t *testing.T) {
 func TestPresignAutosave_TypedResponseShape(t *testing.T) {
 	repo := newFakeRepo()
 	const tplID = "11111111-1111-1111-1111-111111111111"
-	repo.templates[tplID] = &domain.Template{ID: tplID, TenantID: "tenant-a"}
+	repo.templates[tplID] = &domain.Template{ID: tplID, TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
 		ID:             "22222222-2222-4222-8222-222222222222",
 		TemplateID:     tplID,
@@ -148,7 +150,7 @@ func TestPresignAutosave_TypedResponseShape(t *testing.T) {
 func TestCommitAutosave_TypedResponseShape(t *testing.T) {
 	repo := newFakeRepo()
 	const tplID = "11111111-1111-1111-1111-111111111111"
-	repo.templates[tplID] = &domain.Template{ID: tplID, TenantID: "tenant-a"}
+	repo.templates[tplID] = &domain.Template{ID: tplID, TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
 		ID:             "22222222-2222-4222-8222-222222222222",
 		TemplateID:     tplID,
@@ -181,7 +183,7 @@ func TestCommitAutosave_TypedResponseShape(t *testing.T) {
 func TestGetTemplateVersion_TypedResponseShape(t *testing.T) {
 	repo := newFakeRepo()
 	const tplID = "11111111-1111-1111-1111-111111111111"
-	repo.templates[tplID] = &domain.Template{ID: tplID, TenantID: "tenant-a"}
+	repo.templates[tplID] = &domain.Template{ID: tplID, TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
 		ID:             "22222222-2222-4222-8222-222222222222",
 		TemplateID:     tplID,
@@ -205,4 +207,92 @@ func TestGetTemplateVersion_TypedResponseShape(t *testing.T) {
 		t.Fatalf("decode body: %v (raw=%s)", err, rr.Body.String())
 	}
 	assertFlatTemplateVersionShape(t, raw)
+}
+
+// TestCreateTemplate_TypedResponseShape — V1/V2 (F1.3/A3).
+// POST /api/v1/templates (createTemplate) must return 201 + {data:{template:TemplateDTO,version:VersionDTO}}
+// with NO undeclared top-level "id" or "version_id" (H-D fix).
+// Uses a UUID-format tenant so toAPITemplateDTO can parse TenantId (the mapper calls uuid.Parse).
+func TestCreateTemplate_TypedResponseShape(t *testing.T) {
+	repo := newFakeRepo()
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	const tenantUUID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	body := createBody("shape-f13-key")
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates", bytes.NewReader(body))
+	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Idempotency-Key", "33333333-3333-4333-8333-333333333333")
+	ctx := tenant.WithTenantID(req.Context(), tenantUUID)
+	ctx = iamdomain.WithAuthContext(ctx, "user-shape", []iamdomain.Role{})
+	req = req.WithContext(ctx)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(rr.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("decode raw: %v (body=%s)", err, rr.Body.String())
+	}
+
+	// V1: undeclared top-level fields must be absent.
+	if _, ok := raw["id"]; ok {
+		t.Error("top-level 'id' must not be present (A3/H-D: field not declared in CreateTemplateResponse)")
+	}
+	if _, ok := raw["version_id"]; ok {
+		t.Error("top-level 'version_id' must not be present (A3/H-D: field not declared in CreateTemplateResponse)")
+	}
+
+	// V2: declared envelope structure must be present.
+	dataRaw, ok := raw["data"]
+	if !ok {
+		t.Fatal("missing top-level 'data' key (declared by CreateTemplateResponse)")
+	}
+
+	var dataObj struct {
+		Template json.RawMessage `json:"template"`
+		Version  json.RawMessage `json:"version"`
+	}
+	if err := json.Unmarshal(dataRaw, &dataObj); err != nil {
+		t.Fatalf("decode data: %v", err)
+	}
+	if dataObj.Template == nil {
+		t.Fatal("data.template must be present")
+	}
+	if dataObj.Version == nil {
+		t.Fatal("data.version must be present")
+	}
+
+	// Smoke fields: data.template must carry id and tenant_id (TemplateDTO required).
+	var tpl struct {
+		Id       string `json:"id"`
+		TenantId string `json:"tenant_id"`
+		Key      string `json:"key"`
+	}
+	if err := json.Unmarshal(dataObj.Template, &tpl); err != nil {
+		t.Fatalf("decode data.template: %v", err)
+	}
+	if tpl.Id == "" {
+		t.Error("data.template.id must be non-empty (TemplateDTO required field)")
+	}
+	if tpl.TenantId != tenantUUID {
+		t.Errorf("data.template.tenant_id = %q; want %q", tpl.TenantId, tenantUUID)
+	}
+	if tpl.Key != "shape-f13-key" {
+		t.Errorf("data.template.key = %q; want %q", tpl.Key, "shape-f13-key")
+	}
+
+	// Smoke fields: data.version must carry version_number (VersionDTO required).
+	var ver struct {
+		VersionNumber int `json:"version_number"`
+	}
+	if err := json.Unmarshal(dataObj.Version, &ver); err != nil {
+		t.Fatalf("decode data.version: %v", err)
+	}
+	if ver.VersionNumber != 1 {
+		t.Errorf("data.version.version_number = %d; want 1", ver.VersionNumber)
+	}
 }

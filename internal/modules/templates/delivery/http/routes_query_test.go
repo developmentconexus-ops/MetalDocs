@@ -40,14 +40,14 @@ func TestGetSystemBlankTemplate_RequiresTemplateViewAuthz(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
 	}
-	if gotTenant != "tenant-a" || gotArea != "*" || gotAction != "template.view" {
+	if gotTenant != "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" || gotArea != "*" || gotAction != "template.view" {
 		t.Fatalf("unexpected authz call: tenant=%q area=%q action=%q", gotTenant, gotArea, gotAction)
 	}
 }
 
 func TestListTemplates_LimitOver200Rejected(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a", Name: "Template"}
+	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", Name: "Template"}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/templates?limit=201", nil)

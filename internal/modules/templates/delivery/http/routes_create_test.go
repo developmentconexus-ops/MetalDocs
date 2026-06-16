@@ -72,7 +72,7 @@ func newPermissiveMockDB(t *testing.T) *sql.DB {
 		mock.ExpectQuery("").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 				sqlmock.AnyArg(), sqlmock.AnyArg()).
-			WillReturnRows(sqlmock.NewRows([]string{"tenant_id"}).AddRow("tenant-a"))
+			WillReturnRows(sqlmock.NewRows([]string{"tenant_id"}).AddRow("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
 	}
 
 	// 2-arg query pool: system_admin EXISTS check → bool true.
@@ -85,12 +85,12 @@ func newPermissiveMockDB(t *testing.T) *sql.DB {
 	// 0-arg query pool: actor_id, tenant_id, asserted_caps GUC reads.
 	// Each Require call consumes three 0-arg queries in this order:
 	//   1. actor_id  → "user-a"  (non-empty, passes MustActorID check)
-	//   2. tenant_id → "tenant-a" (non-empty, passes MustTenantID check)
+	//   2. tenant_id → "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" (non-empty, passes MustTenantID check)
 	//   3. asserted_caps → "" (empty, skips json.Unmarshal in loadAssertedCaps)
 	// 10 cycles covers up to 10 Require calls per test.
 	for i := 0; i < 10; i++ {
 		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("user-a"))
-		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("tenant-a"))
+		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
 		mock.ExpectQuery("").WithoutArgs().WillReturnRows(sqlmock.NewRows([]string{"v"}).AddRow(""))
 	}
 	return mockDB
@@ -376,7 +376,7 @@ func createBody(key string) []byte {
 func withHeaders(req *http.Request) {
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Idempotency-Key", "11111111-1111-1111-1111-111111111111")
-	ctx := tenant.WithTenantID(req.Context(), "tenant-a")
+	ctx := tenant.WithTenantID(req.Context(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 	ctx = iamdomain.WithAuthContext(ctx, "user-a", []iamdomain.Role{})
 	*req = *req.WithContext(ctx)
 }
@@ -403,7 +403,7 @@ func TestCreateTemplate_Happy(t *testing.T) {
 		t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
 	}
 
-	if gotTenant != "tenant-a" || gotArea != "*" || gotAction != "template.create" {
+	if gotTenant != "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" || gotArea != "*" || gotAction != "template.create" {
 		t.Fatalf("unexpected authz call: tenant=%q area=%q action=%q", gotTenant, gotArea, gotAction)
 	}
 
@@ -417,6 +417,17 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
+	}
+	// F1.3: top-level undeclared fields must be absent.
+	var rawTop map[string]json.RawMessage
+	if err := json.Unmarshal(rr.Body.Bytes(), &rawTop); err != nil {
+		t.Fatalf("decode raw top-level: %v", err)
+	}
+	if _, ok := rawTop["id"]; ok {
+		t.Error("top-level 'id' must not be present after F1.3 (A3/H-D)")
+	}
+	if _, ok := rawTop["version_id"]; ok {
+		t.Error("top-level 'version_id' must not be present after F1.3 (A3/H-D)")
 	}
 	if out.Data.Template["id"] == "" {
 		t.Fatal("expected template.id to be present")
@@ -433,12 +444,9 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	if out.Data.Version.VersionNumber != 1 {
 		t.Fatalf("expected version.version_number=1, got %d", out.Data.Version.VersionNumber)
 	}
-	pvnField, ok := out.Data.Template["published_version_number"]
-	if !ok {
-		t.Fatal("expected published_version_number field present on template response")
-	}
-	if pvnField != nil {
-		t.Fatalf("expected published_version_number=null on freshly created template, got %v", pvnField)
+	// TemplateDTO uses omitempty — nil published_version_number is omitted, not null.
+	if pvnField, ok := out.Data.Template["published_version_number"]; ok && pvnField != nil {
+		t.Fatalf("expected published_version_number absent or null on freshly created template, got %v", pvnField)
 	}
 }
 
@@ -502,7 +510,7 @@ func TestCreateNextVersion_SystemOwnedTemplateImmutable(t *testing.T) {
 	templateID := "00000000-0000-0000-0000-000000000101"
 	repo.templates[templateID] = &domain.Template{
 		ID:          templateID,
-		TenantID:    "tenant-a",
+		TenantID:    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 		SystemOwned: true,
 	}
 	repo.versions["ver-1"] = &domain.TemplateVersion{

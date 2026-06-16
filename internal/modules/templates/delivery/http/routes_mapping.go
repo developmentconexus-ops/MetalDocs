@@ -115,3 +115,56 @@ func placeholdersToSlice(ps []domain.Placeholder) (*[]map[string]interface{}, er
 	}
 	return &out, nil
 }
+
+// toAPITemplateDTO maps a domain.Template to the OpenAPI-generated TemplateDTO type.
+// F1.3 / ADR 0035 — flat typed wire shape. Mirrors the toAPIVersionDTO pattern.
+// SystemOwned is not present in TemplateDTO (not a public API field).
+func toAPITemplateDTO(t *domain.Template) (templatesapi.TemplateDTO, error) {
+	if t == nil {
+		return templatesapi.TemplateDTO{}, fmt.Errorf("toAPITemplateDTO: nil template")
+	}
+	id, err := uuid.Parse(t.ID)
+	if err != nil {
+		return templatesapi.TemplateDTO{}, fmt.Errorf("template id %q: %w", t.ID, err)
+	}
+	tenantID, err := uuid.Parse(t.TenantID)
+	if err != nil {
+		return templatesapi.TemplateDTO{}, fmt.Errorf("template tenant_id %q: %w", t.TenantID, err)
+	}
+
+	latestRevNum := int32(t.LatestRevisionNumber)
+	dto := templatesapi.TemplateDTO{
+		Id:                   id,
+		TenantId:             tenantID,
+		Key:                  t.Key,
+		Name:                 t.Name,
+		LatestVersion:        t.LatestVersion,
+		LatestRevisionNumber: latestRevNum,
+		CreatedBy:            t.CreatedBy,
+		CreatedAt:            t.CreatedAt.UTC(),
+	}
+
+	if t.Description != "" {
+		dto.Description = &t.Description
+	}
+	if t.DocTypeCode != "" {
+		dto.DocTypeCode = &t.DocTypeCode
+	}
+	if t.PublishedVersionID != nil {
+		pvID, err := uuid.Parse(*t.PublishedVersionID)
+		if err != nil {
+			return templatesapi.TemplateDTO{}, fmt.Errorf("template published_version_id %q: %w", *t.PublishedVersionID, err)
+		}
+		dto.PublishedVersionId = &pvID
+	}
+	dto.PublishedVersionNumber = t.PublishedVersionNumber
+	if t.CurrentRevisionNumber != nil {
+		n := int32(*t.CurrentRevisionNumber)
+		dto.CurrentRevisionNumber = &n
+	}
+	if t.ArchivedAt != nil {
+		u := t.ArchivedAt.UTC()
+		dto.ArchivedAt = &u
+	}
+	return dto, nil
+}

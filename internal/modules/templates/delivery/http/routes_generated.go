@@ -61,14 +61,20 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"id":         res.Template.ID,
-		"version_id": res.Version.ID,
-		"data": map[string]any{
-			"template": toTemplateResponse(res.Template),
-			"version":  toVersionResponse(res.Version),
-		},
-	})
+	tplDTO, err := toAPITemplateDTO(res.Template)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	vDTO, err := toAPIVersionDTO(res.Version)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	var resp templatesapi.CreateTemplateResponse
+	resp.Data.Template = tplDTO
+	resp.Data.Version = vDTO
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 func missingCreateTemplateField(req templatesapi.CreateTemplateJSONRequestBody) string {

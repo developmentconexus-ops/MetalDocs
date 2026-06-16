@@ -16,7 +16,7 @@ func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{
 		ID:            "11111111-1111-1111-1111-111111111111",
-		TenantID:      "tenant-a",
+		TenantID:      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 		Key:           "contract",
 		Name:          "Contract",
 		LatestVersion: 1,
@@ -79,7 +79,7 @@ func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
 
 func TestGeneratedTemplatesRoutes_RejectInvalidBodies(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
 		ID:             "22222222-2222-4222-8222-222222222222",
 		TemplateID:     "11111111-1111-1111-1111-111111111111",
@@ -123,7 +123,7 @@ func TestUpdateTemplateSchema_StaleLockVersion_412(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{
 		ID:       "11111111-1111-1111-1111-111111111111",
-		TenantID: "tenant-a",
+		TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 	}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:            "ver-1",
@@ -164,7 +164,7 @@ func TestUpdateTemplateSchema_StaleLockVersion_412(t *testing.T) {
 
 func TestGeneratedTemplatesRoutes_RejectValidation(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
 		ID:             "22222222-2222-4222-8222-222222222222",
 		TemplateID:     "11111111-1111-1111-1111-111111111111",
@@ -206,7 +206,7 @@ func TestGeneratedTemplatesRoutes_RejectValidation(t *testing.T) {
 
 func TestGeneratedTemplatesRoutes_IdempotencyKeyRequired(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
 	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
 		ID:             "22222222-2222-4222-8222-222222222222",
 		TemplateID:     "11111111-1111-1111-1111-111111111111",
@@ -234,7 +234,7 @@ func TestGeneratedTemplatesRoutes_IdempotencyKeyRequired(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, bytes.NewBufferString(tt.body))
 			req.Header.Set("content-type", "application/json")
-			*req = *req.WithContext(tenant.WithTenantID(req.Context(), "tenant-a"))
+			*req = *req.WithContext(tenant.WithTenantID(req.Context(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
 			*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-a", []iamdomain.Role{}))
 			rr := httptest.NewRecorder()
 
