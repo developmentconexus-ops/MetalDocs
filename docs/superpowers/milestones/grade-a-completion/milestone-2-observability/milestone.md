@@ -1,7 +1,7 @@
 # Milestone 2 — Composition / observability
 
 > **Program:** grade-a-completion  ·  **Governing spec:** `../mission.md`
-> **Status:** Awaiting validator (F2.1 ✅, F2.2 ✅, F2.3 ✅, F2.4 ✅ — all features closed; milestone-validator dispatched 2026-06-16)
+> **Status:** PASSED (validator 2026-06-16, re-run after f2.5 fix PASS) — awaiting HS-1 operator gate before M3
 > **Authored:** 2026-06-16 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** this milestone is,

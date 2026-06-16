@@ -62,13 +62,9 @@ Driven inline (brainstorming engine flow; one question at a time, persisted belo
 Add app-level OTel child spans to a pragmatic A− bar. Concrete changes, scoped to four files:
 
 1. **`internal/platform/db/postgres/connect.go`**
-   - Add `go.opentelemetry.io/contrib/instrumentation/database/sql/otelsql` dependency.
-   - Register the instrumented driver:
-     ```go
-     otelsql.Register("pgx", otelsql.WithDatabaseName("metaldocs"), otelsql.WithAttributes(...))
-     ```
-   - Change `sql.Open("pgx", dsn)` → `sql.Open("pgx-otel", dsn)` (or equivalent pattern per
-     `otelsql` docs for `pgx/v5/stdlib` driver wrapper).
+   - Add `github.com/XSAM/otelsql` dependency (`v0.42.0`).
+   - Replace `sql.Open("pgx", dsn)` with `otelsql.Open("pgx", dsn, otelsql.WithAttributes(semconv.DBSystemNamePostgreSQL))`.
+   - `openWithOptions` (the shared helper) uses `otelsql.Open`; `OpenWithTracerProvider` additionally passes `otelsql.WithTracerProvider(tp)`.
    - No change to pool settings, ping, or return type.
 
 2. **`internal/modules/controlleddocuments/application/service.go`**
