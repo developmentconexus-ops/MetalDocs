@@ -426,6 +426,7 @@ func main() {
 		ProfileDefaults:              wiring.NewProfileDefaults(profileRepo, templatesinfra.NewTemplateVersionReader(deps.SQLDB)),
 		SnapshotReader:               docSnapshotReader,
 		DisplayNameReader:            displayNameRepo,
+		IAMUserOptions:               wiring.NewDocumentsIAMUserOptions(authService),
 	}
 	if deps.PDFConverter != nil {
 		docDeps.ExportDocgen = deps.PDFConverter
