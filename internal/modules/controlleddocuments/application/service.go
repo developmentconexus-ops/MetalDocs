@@ -11,6 +11,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
@@ -145,8 +149,15 @@ func (s *ControlledDocumentService) WithDocumentInitializer(d controlleddocument
 }
 
 func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateControlledDocumentCmd) (*CreateResult, error) {
+	ctx, span := otel.Tracer("metaldocs/controlleddocuments").Start(ctx, "cd.create",
+		oteltrace.WithAttributes(attribute.String("document.profile_code", cmd.ProfileCode)),
+	)
+	defer span.End()
+
 	profile, err := s.profiles.GetByCode(ctx, cmd.TenantID, cmd.ProfileCode)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("controlled_documents: get profile: %w", err)
 	}
 	if !profile.IsActive() {
@@ -155,6 +166,8 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 
 	area, err := s.areas.GetByCode(ctx, cmd.TenantID, cmd.ProcessAreaCode)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("controlled_documents: get process area: %w", err)
 	}
 	if !area.IsActive() {
@@ -177,6 +190,8 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		code = strings.TrimSpace(*cmd.ManualCode)
 		taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("controlled_documents: check manual code availability: %w", err)
 		}
 		if taken {
@@ -184,6 +199,8 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		}
 		payload, err := json.Marshal(map[string]string{"code": code})
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("controlled_documents: marshal numbering override payload: %w", err)
 		}
 		events = append(events, taxonomydomain.GovernanceEvent{
@@ -203,6 +220,8 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			}
 			status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, cmd.TenantID, *cmd.OverrideTemplateVersionID)
 			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
 				return nil, fmt.Errorf("controlled_documents: get override template version state: %w", err)
 			}
 			_, err = controlleddocumentsdomain.Resolve(controlleddocumentsdomain.TemplateResolutionInput{
@@ -214,17 +233,23 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 				},
 			})
 			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
 				return nil, fmt.Errorf("controlled_documents: resolve template version: %w", err)
 			}
 			overrideID = cmd.OverrideTemplateVersionID
 		}
 		if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("controlled_documents: ensure template artifact: %w", err)
 		}
 
 		if overrideID != nil {
 			payload, err := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
 			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
 				return nil, fmt.Errorf("controlled_documents: marshal template override payload: %w", err)
 			}
 			events = append(events, taxonomydomain.GovernanceEvent{
@@ -246,6 +271,8 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			cmd.ProcessAreaCode,
 		)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("controlled_documents: build visibility: %w", err)
 		}
 		doc, err = controlleddocumentsdomain.NewControlledDocument(controlleddocumentsdomain.ControlledDocument{
@@ -264,6 +291,8 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			UpdatedAt:                 now,
 		})
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("controlled_documents: build controlled document: %w", err)
 		}
 		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
@@ -279,6 +308,8 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			}
 			return s.docs.CreateTx(ctx, tx, doc)
 		}); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("controlled_documents: create controlled document (manual): %w", err)
 		}
 	} else {
@@ -289,10 +320,14 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		// records the system_admin bypass — self-deadlocks. Pre-resolving keeps the
 		// tx free of off-tx authz reads.
 		if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("controlled_documents: ensure template artifact: %w", err)
 		}
 		resolvedTemplateVersionID, err := s.docInit.ResolveTemplateVersionID(ctx, cmd.TenantID, cmd.ProfileCode, cmd.TemplateVersionID)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("controlled_documents: resolve initial template version: %w", err)
 		}
 		// Auto path: sequence allocation, authz, and persistence run atomically.
@@ -408,6 +443,8 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			}
 			return nil
 		}); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 	}
