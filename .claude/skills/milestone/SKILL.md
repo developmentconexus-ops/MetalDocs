@@ -25,10 +25,25 @@ builds a milestone never rules on it, and the operator can stop, replan, or redi
 
 This skill owns the layer *above* per-feature implementation: the milestone spec, the per-feature
 contract gate, the folder structure, the **rigid milestone-close validator**, and the hard-stops.
-Where the `superpowers:writing-plans` and `superpowers:subagent-driven-development` skills are
-installed, use them as the per-feature plan/execute engine (Phase 3). **Where they are not installed,
-run the inline lifecycle in Phase 3 directly** — the lifecycle is the contract, the skills are one
-way to execute it. Do not block on a skill that isn't present.
+
+**Per-feature spec depth is delegated, not reinvented.** Where these superpowers skills are installed,
+the milestone workflow **invokes them as named engines** at fixed points in Phase 3 — not as
+suggestions:
+
+- `superpowers:brainstorming` → the **feature interview engine** (Phase 3 step 2). Runs the
+  consumer-contract discovery dialog whose output populates `spec.md`.
+- `superpowers:writing-plans` → the **feature plan engine** (Phase 3 step 5). Its output IS
+  `plan.md`.
+- `superpowers:subagent-driven-development` → the **TDD execution engine** (Phase 3 step 6).
+
+What's **binding is the artifact**, not the skill. The validator (C1) checks `spec.md` /
+`plan.md` / `evidence.md` exist with the required structure — it does not check which skill
+produced them. Skill absent → run the equivalent lifecycle inline against the same artifact
+shape. Skills are the preferred engine; artifacts are the contract.
+
+Milestone-spec quality (Phase 2) is governed by `references/milestone-spec-template.md` (Shape Up
+appetite + PR/FAQ outcome + arc42 constraints) — read it before authoring any non-trivial
+`milestone.md`.
 
 **Canonical worked example:** `docs/superpowers/specs/2026-06-14-grade-a-architecture-remediation-design.md`
 (the Grade-A remediation program — Milestones M0..M5, Features, per-milestone gates, hard-stop
@@ -133,12 +148,18 @@ Do this once, when a program is first organized into milestones.
 
 ### Phase 2 — Milestone spec (before any feature)
 1. Create `milestone-<n>-<slug>/`; copy `templates/milestone.md` into it.
-2. Fill it: milestone objective; the feature list; per feature *what to implement* and *what to
-   validate* (acceptance); the **milestone validation definition** (what the close gate checks,
-   including any quality-bar / root-cause criteria); applicable hard-stops.
-3. **Write no execution steps.** Catching yourself describing *how* a feature will be built means it
+2. **Read `references/milestone-spec-template.md`** — the spec-quality guide (Shape Up appetite +
+   PR/FAQ outcome + arc42 constraints). It binds the *quality bar* of every section the template
+   shapes. Skip → expect weak spec → validator fails at close.
+3. Fill `milestone.md`: outcome-stated objective; appetite + rabbit holes (named refusals);
+   feature list with one *outcome per row* and a *named consumer per row*; per feature *what to
+   implement* and *what to validate* (acceptance); top-3 ranked quality goals + hard constraints +
+   named risks; the **milestone validation definition** (each line executable by a fresh subagent —
+   workflow-class QA file path, regression target milestones, quality-bar re-measure command);
+   applicable hard-stops.
+4. **Write no execution steps.** Catching yourself describing *how* a feature will be built means it
    belongs in that feature's `spec.md`/`plan.md`, not here.
-4. Get operator agreement on `milestone.md` before executing features if the milestone is large or risky.
+5. Get operator agreement on `milestone.md` before executing features if the milestone is large or risky.
 
 ### Phase 3 — Feature lifecycle (one feature at a time, in order)
 For each feature in `milestone.md`, run this lifecycle. One home: `f<n>.x-<slug>/`.
@@ -149,19 +170,25 @@ spike? → interview (B1.5) → spec.md (+approval gate) → ADR? → plan.md �
 
 1. **Spike? (optional)** If unknowns are large, do a throwaway spike to learn — then discard the code
    and spec for real. A spike never ships.
-2. **Interview (B1.5) — fail-closed.** If scope, approach, or the **consumer contract** is ambiguous,
-   or a better solution may exist → interview the operator **one question at a time** (brainstorming
-   style) **before** writing the spec. Record Q&A in `spec.md`. Never guess a contract.
-3. **spec.md (+ approval gate).** Copy `templates/feature-spec.md`. Define the **consumer contract
-   first**, then non-goals (mandatory), then a concrete **Validation Gate** (acceptance + named tests
-   + proof commands). **Approve it before any code** (fill the approval line).
+2. **Interview (B1.5) — fail-closed. Engine: `superpowers:brainstorming`.** Invoke it as the
+   interview driver — its job is exactly this: explore intent, constraints, the consumer contract,
+   tradeoffs, *before* implementation. Run it with the feature row from `milestone.md` as the seed.
+   Persist the Q&A transcript into the `spec.md` Interview record table — that transcript IS the
+   evidence the validator reads (C1). **Skill absent → run the same dialog inline, one question at
+   a time, and persist the same Q&A.** Never guess a contract; ask.
+3. **spec.md (+ approval gate).** Copy `templates/feature-spec.md`. Distill the brainstorming output
+   into: **consumer contract first**, then non-goals (mandatory), then a concrete **Validation
+   Gate** (acceptance + named tests + proof commands). **Approve it before any code** (fill the
+   approval line). The approval line is what unlocks step 5.
 4. **ADR?** If the feature makes a durable decision, record an ADR under `wiki/decisions/` and link it.
-5. **plan.md.** Write the "how" (use `superpowers:writing-plans` if installed; else write the plan
-   inline into `plan.md`).
-6. **TDD.** Failing test first → implement → green. Execute with
-   `superpowers:subagent-driven-development` if installed (fresh implementer, then spec-compliance and
-   code-quality review, fixing by root-cause family); else implement directly under the same review
-   discipline.
+5. **plan.md. Engine: `superpowers:writing-plans`.** Invoke it with `spec.md` as the input — its
+   output IS `plan.md` (paste under the `## Plan` heading of `templates/feature-plan.md`). **Skill
+   absent → write the plan inline using the same structure (task list, files touched, test
+   strategy, ordering).**
+6. **TDD. Engine: `superpowers:subagent-driven-development`.** Invoke it to execute `plan.md`:
+   failing test first → implement → green; fresh implementer subagent; spec-compliance + code-quality
+   review pass; fix by root-cause family. **Skill absent → run the same loop inline (failing test,
+   implement, review, fix-by-family).**
 7. **evidence.md.** Copy `templates/feature-evidence.md`: commands + real output, TDD proof, runtime
    proof for every observable change, fixture-vs-real labeled, review/QA disposition, bounded defers
    with triggers. A feature closes only when its evidence row is complete.
@@ -217,6 +244,8 @@ In `templates/` (copy and fill):
 - `milestone-qa.md` — the validator's C1–C7 verdict (written by the `milestone-validator` subagent)
 
 In `references/`:
+- `milestone-spec-template.md` — milestone-spec quality guide (Shape Up + PR/FAQ + arc42). Read
+  before authoring `milestone.md`.
 - `milestone-end-validation.md` — the **binding** C1–C7 close-gate checklist the validator runs
 
 Agent: `.claude/agents/milestone-validator.md` — the independent close-out judge.

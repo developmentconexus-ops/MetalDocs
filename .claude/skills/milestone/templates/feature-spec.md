@@ -10,9 +10,15 @@
 
 ## Interview record (fail-closed gate)
 
-Before writing the contract below, resolve ambiguity. If scope, approach, or the consumer contract
-was unclear — or a better solution might exist — interview the operator **one question at a time**
-(brainstorming-style) and record it here. **Never guess a contract; ask.**
+Before writing the contract below, resolve ambiguity. **Engine: `superpowers:brainstorming`** —
+invoke it with the feature row from `milestone.md` as the seed; it drives the consumer-contract
+discovery dialog (intent → constraints → tradeoffs → contract shape). Persist the resulting Q&A
+into the table below. **Skill absent → run the dialog inline, one question at a time, and persist
+the same Q&A.** Validator C1 reads this table to confirm the contract was discovered, not guessed.
+
+If you genuinely needed no interview (trivial feature, contract already explicit in the consumer's
+existing code), record a single row with `none needed` + the reason — that line IS the evidence
+for C1.
 
 | # | Question | Answer |
 |---|----------|--------|

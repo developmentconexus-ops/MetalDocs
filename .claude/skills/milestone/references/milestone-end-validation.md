@@ -33,11 +33,33 @@ a working result built on a split-brain or a guessed contract FAILs.
 ## The checklist
 
 ### C1 — Spec & plan conformance (per feature)
-For **each** feature: its `evidence.md` acceptance table matches its `spec.md` Validation Gate, and
-the **consumer contract declared in `spec.md` was honored** (the producer matches the contract the
-consumer depends on — not the reverse). Non-goals were respected (nothing built that the spec
-declared out of scope). Any deviation must carry a written rationale in evidence. Missing
-spec/evidence row → **C1 fail**.
+
+**C1 binds on artifacts, not on which skill produced them.** The validator does not check whether
+`superpowers:brainstorming` / `superpowers:writing-plans` / `superpowers:subagent-driven-development`
+were used — it checks that the artifacts those skills are supposed to produce exist with the
+required structure. Skill absent + equivalent inline output present = PASS. Skill present + thin
+artifact = FAIL.
+
+For **each** feature, verify all of:
+
+1. **`spec.md` exists and is approved before code.** The `Approved before code:` line is filled
+   with a date + operator. An empty approval line → **C1 fail** (work started without a contract).
+2. **`spec.md` Interview record is populated** — either a Q&A table with at least one row, OR an
+   explicit "none needed — why" justification. An empty interview record on a feature that touches
+   a contract → **C1 fail** (consumer contract was guessed, violating fail-closed).
+3. **Consumer contract declared in `spec.md` was honored** — the producer matches the contract the
+   consumer depends on, not the reverse. Cross-check by reading the consumer site referenced in
+   `spec.md`'s "Source of truth for the contract" line.
+4. **`plan.md` exists and is execution-shaped** — task list, files touched, test strategy, ordering.
+   A `plan.md` that is just a restatement of `spec.md` → **C1 fail** (no plan was written, only
+   re-spec'd).
+5. **`evidence.md` acceptance table matches `spec.md` Validation Gate** row-for-row.
+6. **Non-goals respected** — nothing built that `spec.md` declared out of scope (and nothing in the
+   milestone's rabbit-hole list).
+7. **Any deviation carries a written rationale** in `evidence.md`.
+
+Missing `spec.md` / `plan.md` / `evidence.md` for any feature in `milestone.md`'s Features table →
+**C1 fail**, name the missing artifact(s).
 
 ### C2 — Gates re-run, isolated
 Re-run **each feature's named tests and proof commands yourself**, fresh, from a clean state — do
