@@ -23,7 +23,7 @@ judges it against §6 — 3 dims ≥ A−, 0 new Critical/Major, H-D=0, H-G=0.
 | 1 | `milestone-1-contract-integrity` | Drive contract-api ≥ A− and **H-D → 0** — typed responses, spec-conformant status/body | passed (HS-1 approved 2026-06-15) | [PASS](milestone-1-contract-integrity/qa/milestone-qa.md) |
 | 2 | `milestone-2-observability` | Drive composition ≥ A− — slog, scrapeable job metrics, app-level OTel spans | passed (HS-1 approved 2026-06-16) | [PASS](milestone-2-observability/qa/milestone-qa.md) |
 | 3 | `milestone-3-quality-tail` | Lift code-quality/legacy — wire IAMUserOptions (functional), type-safety, dead-code, minor sweep | passed (HS-1 approved 2026-06-16) | [PASS](milestone-3-quality-tail/qa/milestone-qa.md) |
-| 4 | `milestone-4-module-ports` | *(LAST)* Drive module-boundaries ≥ A− and **H-G → 0** — published constant, IAM role port, MfaCoverage port | in-progress (spec) | — |
+| 4 | `milestone-4-module-ports` | *(LAST)* Drive module-boundaries ≥ A− and **H-G → 0** — published constant, IAM role port, MfaCoverage port | passed (HS-1 pending) | [PASS](milestone-4-module-ports/qa/milestone-qa.md) |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
 The **Gate result** column links each milestone-validator verdict (`milestone-<n>/qa/milestone-qa.md`);
