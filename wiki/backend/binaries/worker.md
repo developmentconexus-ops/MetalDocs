@@ -1,6 +1,6 @@
 # Binary: metaldocs-worker
 
-> **Last verified:** 2026-06-10
+> **Last verified:** 2026-06-16
 > **Scope:** The `apps/worker` binary — its purpose, what it consumes from Postgres, what external services it calls, how it is configured, and its full lifecycle from startup to shutdown. This document also covers the three in-API async goroutine subsystems that are architecturally part of the same worker concern (outbox relay, maintenance jobs, sweepers) even though they run inside the API process.
 > **Key files:**
 > - `apps/worker/cmd/metaldocs-worker/main.go` — binary entrypoint
@@ -124,7 +124,7 @@ The `startOutboxWorker` wrapper at `apps/api/main.go:462–486` contains a resta
 
 ### 5.2 In-API maintenance scheduler
 
-`jobscheduler.New(deps.SQLDB, leaderID)` called at `apps/api/main.go:523`. `leaderID = hostname:pid`.
+`jobscheduler.New(deps.SQLDB, leaderID, slog.Default())` called at `apps/api/cmd/metaldocs-api/main.go:525`. `leaderID = hostname:pid`.
 
 Runs four jobs, each in its own goroutine with a `time.Ticker`, protected by Postgres advisory lease (`metaldocs.acquire_lease`/`heartbeat_lease`/`release_lease` functions):
 

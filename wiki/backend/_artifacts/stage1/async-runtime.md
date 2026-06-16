@@ -1,7 +1,7 @@
 # Stage-1 Audit Artifact — async-runtime
 
 **Area:** async-runtime (jobs vs worker)
-**Last verified:** 2026-06-10
+**Last verified:** 2026-06-16
 **Author:** Stage-1 audit agent
 
 ---
@@ -183,8 +183,8 @@ Stage B — **outbox → worker materialize** (in `apps/worker`):
 
 ### Flow 4 — In-API scheduler (maintenance jobs)
 
-1. At API startup, `apps/api/main.go:523` calls `jobscheduler.New(deps.SQLDB, leaderID)` where `leaderID = hostname:pid`.
-2. Each registered `JobConfig` gets its own goroutine via `Scheduler.Start` (`internal/modules/jobs/scheduler/scheduler.go:141`). Each loop iteration: (a) probe Postgres for connection-ratio backpressure (`probePressure`); (b) if not under pressure, call `acquireLease` — a Postgres function `metaldocs.acquire_lease($job, $leader, '5 minutes')` that returns `(acquired bool, epoch int64)`; (c) if acquired, spawn a heartbeat goroutine and call `cfg.Fn(jobCtx, epoch)`; (d) on completion, stop the heartbeat and call `releaseLease`.
+1. At API startup, `apps/api/cmd/metaldocs-api/main.go:525` calls `jobscheduler.New(deps.SQLDB, leaderID, slog.Default())` where `leaderID = hostname:pid`. The logger is the process-wide JSON logger set at startup via `slog.SetDefault` (F2.1).
+2. Each registered `JobConfig` gets its own goroutine via `Scheduler.Start` (`internal/modules/jobs/scheduler/scheduler.go:143`). Each loop iteration: (a) probe Postgres for connection-ratio backpressure (`probePressure`); (b) if not under pressure, call `acquireLease` — a Postgres function `metaldocs.acquire_lease($job, $leader, '5 minutes')` that returns `(acquired bool, epoch int64)`; (c) if acquired, spawn a heartbeat goroutine and call `cfg.Fn(jobCtx, epoch)`; (d) on completion, stop the heartbeat and call `releaseLease`.
 3. The four registered jobs (all use `SkipOnPressure` policy): `stuck-instance-watchdog` (5 min interval), `idempotency-janitor` (15 min), `audit-integrity-validator` (1 h), `lease-reaper` (10 min).
 4. On SIGTERM, the scheduler calls `drain()` which waits up to 30 s for in-flight jobs then up to 5 s more with forced cancellation before releasing leases.
 
