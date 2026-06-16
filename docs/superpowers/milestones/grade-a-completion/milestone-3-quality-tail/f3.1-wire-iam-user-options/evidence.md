@@ -100,7 +100,8 @@ M2 `NewTextHandler` sentinel (`grep -RIn "NewTextHandler" internal/modules/jobs/
 ## Review disposition
 
 - Spec-compliance review: **APPROVED** — all 10 adapter spec requirements met; all 6 wiring requirements met. No violations.
-- Code-quality review: **APPROVED** — one nit (`sort.SliceStable` vs `sort.Slice`; both correct since tie-break by unique UserID makes stability irrelevant); one false-positive about UUID fixture reproducibility (wantUserIDs uses same variable references — internally stable). DisplayName assertion strengthened from non-empty check to exact match per review finding. No blocking issues.
+- Code-quality review (per-task): **APPROVED** — one nit (`sort.SliceStable` vs `sort.Slice`; both correct since tie-break by unique UserID makes stability irrelevant); one false-positive about UUID fixture reproducibility (wantUserIDs uses same variable references — internally stable). DisplayName assertion strengthened from non-empty check to exact match per review finding. No blocking issues.
+- Final holistic code review (full F3.1 diff, base `22a80208` → head `d6a3d416`): **Ready to merge: Yes.** No Critical or Important issues. Two Minor/advisory improvements applied: (1) comment added in `ListUserOptions` clarifying that `auth.Service.ListUsers` tenant-filters by role-map but does NOT filter `IsActive` — that is the adapter's responsibility; (2) type guard moved from inside test loop to package scope (`var _ docapp.IAMUserOptionsReader = (*DocumentsIAMUserOptions)(nil)`) for idiomatic Go placement. Both applied and re-verified green.
 
 ## Bounded defers
 

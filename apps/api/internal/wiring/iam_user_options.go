@@ -50,6 +50,9 @@ func (a *DocumentsIAMUserOptions) ListUserOptions(ctx context.Context, tenantID 
 	}
 	out := make([]docapp.UserOption, 0, len(users))
 	for _, u := range users {
+		// auth.Service.ListUsers already filters by tenant membership (role-map join),
+		// but does not filter on the account-level IsActive flag — that responsibility
+		// belongs to the consumer. Drop deactivated accounts here.
 		if !u.IsActive {
 			continue
 		}

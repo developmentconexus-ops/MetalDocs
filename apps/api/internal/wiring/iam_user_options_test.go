@@ -149,8 +149,9 @@ func TestDocumentsIAMUserOptions(t *testing.T) {
 				}
 			}
 
-			// Type guard: result must satisfy the consumer port.
-			var _ docapp.IAMUserOptionsReader = adapter
 		})
 	}
 }
+
+// Compile-time interface satisfaction check.
+var _ docapp.IAMUserOptionsReader = (*DocumentsIAMUserOptions)(nil)
