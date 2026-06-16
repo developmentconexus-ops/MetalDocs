@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/XSAM/otelsql v0.42.0
 	github.com/coder/websocket v1.8.14
 	github.com/getkin/kin-openapi v0.135.0
 	github.com/google/uuid v1.6.0
