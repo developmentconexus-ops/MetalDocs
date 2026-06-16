@@ -280,7 +280,7 @@ func (s *Service) resolveTemplateVersionID(ctx context.Context, tenantID, profil
 
 	var overrideTemplate *controlleddocumentsdomain.TemplateVersionCandidate
 	if templateVersionID != nil && strings.TrimSpace(*templateVersionID) != "" {
-		overrideStatus := "published"
+		overrideStatus := string(templatesdomain.VersionStatusPublished)
 		overrideTemplate = &controlleddocumentsdomain.TemplateVersionCandidate{
 			ID:          strings.TrimSpace(*templateVersionID),
 			ProfileCode: profileCode,
