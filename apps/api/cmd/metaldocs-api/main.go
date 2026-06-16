@@ -529,6 +529,7 @@ func main() {
 		os.Exit(1)
 	}
 	registerScheduledJobs(s, deps, approvalServices.Cancel, approvalEmitter)
+	httpObs.SetSchedulerMetrics(s)
 
 	var schedulerWG sync.WaitGroup
 	schedulerWG.Add(1)

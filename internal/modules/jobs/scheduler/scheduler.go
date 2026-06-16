@@ -276,6 +276,56 @@ func (s *Scheduler) MetricsSnapshot() MetricsSnapshot {
 	return s.metrics.Snapshot()
 }
 
+// schedulerMetricsFromSnapshot transforms a MetricsSnapshot into the per-job
+// grouped shape expected by the /api/v1/metrics "scheduler" payload:
+//
+//	{"jobs": {"job-name": {"runs": N, "errors": N, "skips": N}}}
+//
+// All three counter maps are merged so a job present only in ErrorsTotal or
+// SkipsTotal (e.g. skipped before its first successful run) still appears.
+func schedulerMetricsFromSnapshot(snap MetricsSnapshot) map[string]any {
+	seen := make(map[string]struct{})
+	jobs := make(map[string]any)
+
+	for name, runs := range snap.RunsTotal {
+		seen[name] = struct{}{}
+		jobs[name] = map[string]int64{
+			"runs":   runs,
+			"errors": snap.ErrorsTotal[name],
+			"skips":  snap.SkipsTotal[name],
+		}
+	}
+	for name, errors := range snap.ErrorsTotal {
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		jobs[name] = map[string]int64{
+			"runs":   0,
+			"errors": errors,
+			"skips":  snap.SkipsTotal[name],
+		}
+	}
+	for name, skips := range snap.SkipsTotal {
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		jobs[name] = map[string]int64{
+			"runs":   0,
+			"errors": 0,
+			"skips":  skips,
+		}
+	}
+	return map[string]any{"jobs": jobs}
+}
+
+// SchedulerMetrics satisfies observability.SchedulerMetricsProvider. Returns the
+// current per-job run/error/skip counters as a map suitable for JSON encoding in
+// the /api/v1/metrics payload.
+func (s *Scheduler) SchedulerMetrics() map[string]any {
+	return schedulerMetricsFromSnapshot(s.MetricsSnapshot())
+}
+
 func (s *Scheduler) heartbeatLoop(ctx context.Context, cancel context.CancelFunc, job, leader string, epoch int64, stop <-chan struct{}) {
 	ticker := time.NewTicker(s.heartbeatEvery)
 	defer ticker.Stop()

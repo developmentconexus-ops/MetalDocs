@@ -26,11 +26,20 @@ type routeMetrics struct {
 	cursor     int
 }
 
+// SchedulerMetricsProvider is satisfied by any scheduler whose per-job counters
+// should appear in the /api/v1/metrics payload. Defined here so the platform
+// package stays free of module imports (REQ-TOP-2); the jobs package implements
+// it implicitly via duck typing.
+type SchedulerMetricsProvider interface {
+	SchedulerMetrics() map[string]any
+}
+
 type HTTPObservability struct {
-	runtimeProvider RuntimeStatusProvider
-	userIDResolver  func(*http.Request) string
-	mu              sync.RWMutex
-	byKey           map[string]*routeMetrics
+	runtimeProvider  RuntimeStatusProvider
+	schedulerMetrics SchedulerMetricsProvider
+	userIDResolver   func(*http.Request) string
+	mu               sync.RWMutex
+	byKey            map[string]*routeMetrics
 }
 
 type metricItem struct {
@@ -62,6 +71,13 @@ func NewHTTPObservability(userIDResolver func(*http.Request) string, runtimeProv
 		userIDResolver:  userIDResolver,
 		byKey:           make(map[string]*routeMetrics),
 	}
+}
+
+// SetSchedulerMetrics wires a scheduler whose counters will appear as a top-level
+// "scheduler" key in MetricsHandler's response. Call once during startup, before
+// ListenAndServe — same set-once pattern as runtimeProvider.
+func (o *HTTPObservability) SetSchedulerMetrics(s SchedulerMetricsProvider) {
+	o.schedulerMetrics = s
 }
 
 func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
@@ -155,6 +171,9 @@ func (o *HTTPObservability) MetricsHandler() http.Handler {
 		payload := map[string]any{"items": items}
 		if o.runtimeProvider != nil {
 			payload["runtime"] = o.runtimeProvider.RuntimeMetrics(r.Context())
+		}
+		if o.schedulerMetrics != nil {
+			payload["scheduler"] = o.schedulerMetrics.SchedulerMetrics()
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(payload)
