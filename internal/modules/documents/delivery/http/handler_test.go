@@ -129,7 +129,7 @@ func (f *fakeSvc) AcquireSession(_ context.Context, _, _, _ string) (*domain.Ses
 		return nil, false, f.acquireErr
 	}
 	if f.acquireSession == nil {
-		return &domain.Session{ID: "sess_1", DocumentID: "doc_1", UserID: "user_1", Status: domain.SessionActive}, f.acquireRO, nil
+		return &domain.Session{ID: "aaaaaaaa-aaaa-4aaa-8aaa-000000000001", DocumentID: "doc_1", UserID: "user_1", Status: domain.SessionActive, LastAcknowledgedRevisionID: "aaaaaaaa-aaaa-4aaa-8aaa-000000000002"}, f.acquireRO, nil
 	}
 	return f.acquireSession, f.acquireRO, nil
 }
@@ -141,7 +141,7 @@ func (f *fakeSvc) ReleaseSession(_ context.Context, _, _, _, _ string) error { r
 func (f *fakeSvc) ForceReleaseSession(_ context.Context, _, _, _, _ string) error { return nil }
 
 func (f *fakeSvc) PresignAutosave(_ context.Context, _ application.PresignAutosaveCmd) (*application.PresignAutosaveResult, error) {
-	return &application.PresignAutosaveResult{UploadURL: "https://example/upload", PendingUploadID: "pending_1", ExpiresAt: time.Now().Add(time.Minute)}, nil
+	return &application.PresignAutosaveResult{UploadURL: "https://example/upload", PendingUploadID: "cccccccc-cccc-4ccc-8ccc-000000000001", ExpiresAt: time.Now().Add(time.Minute)}, nil
 }
 
 func (f *fakeSvc) CommitAutosave(_ context.Context, cmd application.CommitAutosaveCmd) (*application.CommitResult, error) {
@@ -150,7 +150,7 @@ func (f *fakeSvc) CommitAutosave(_ context.Context, cmd application.CommitAutosa
 		return nil, f.commitErr
 	}
 	if f.commitResult == nil {
-		return &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2}, nil
+		return &application.CommitResult{RevisionID: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001", RevisionNum: 2}, nil
 	}
 	return f.commitResult, nil
 }
@@ -175,7 +175,7 @@ func (f *fakeSvc) ListRevisionHistory(_ context.Context, _, _ string) ([]domain.
 	}
 	if f.revisionHistory == nil {
 		return []domain.RevisionHistoryItem{{
-			DocumentID:     "doc_1",
+			DocumentID:     "11111111-1111-4111-8111-111111111111",
 			RevisionNumber: 2,
 			RevisionTitle:  "Ajuste operacional",
 			Status:         domain.DocStatusDraft,
@@ -488,7 +488,7 @@ func TestListDocuments_AdminSeesAllVsOwnScope(t *testing.T) {
 }
 
 func TestAcquireSession_Happy(t *testing.T) {
-	mux := newMux(t, &fakeSvc{acquireSession: &domain.Session{ID: "sess_1"}})
+	mux := newMux(t, &fakeSvc{acquireSession: &domain.Session{ID: "aaaaaaaa-aaaa-4aaa-8aaa-000000000001", LastAcknowledgedRevisionID: "aaaaaaaa-aaaa-4aaa-8aaa-000000000002"}})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/session/acquire", bytes.NewReader([]byte(`{}`)))
 	withAuthHeaders(req, "editor")
@@ -517,7 +517,7 @@ func TestAcquireSession_Forbidden(t *testing.T) {
 }
 
 func TestCommitAutosave_IdempotentReplay_Returns200(t *testing.T) {
-	mux := newMux(t, &fakeSvc{commitResult: &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2, AlreadyConsumed: true}})
+	mux := newMux(t, &fakeSvc{commitResult: &application.CommitResult{RevisionID: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001", RevisionNum: 2, AlreadyConsumed: true}})
 
 	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1}}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/autosave/commit", bytes.NewReader(body))
@@ -543,7 +543,7 @@ func TestCommitAutosave_AcceptsPageCountAndReturnsArtifactMetadata(t *testing.T)
 	pageCount := 3
 	pageCountSource := "eigenpal_client"
 	svc := &fakeSvc{commitResult: &application.CommitResult{
-		RevisionID:      "rev_2",
+		RevisionID:      "bbbbbbbb-bbbb-4bbb-8bbb-000000000001",
 		RevisionNum:     2,
 		FileSizeBytes:   &fileSizeBytes,
 		PageCount:       &pageCount,

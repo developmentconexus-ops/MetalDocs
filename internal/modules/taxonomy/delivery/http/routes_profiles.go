@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	taxonomyapi "metaldocs/internal/modules/taxonomy/api"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
@@ -64,7 +65,11 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
 		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "failed to list profiles")
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+	dtos := make([]taxonomyapi.DocumentProfileItem, len(items))
+	for i := range items {
+		dtos[i] = toDocumentProfileItem(&items[i])
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, taxonomyapi.ListDocumentProfilesResponse{Items: dtos})
 }
 
 func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +113,7 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 		h.writeProfileError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusCreated, profile)
+	httpresponse.WriteJSON(w, http.StatusCreated, toDocumentProfileItem(profile))
 }
 
 func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
@@ -123,7 +128,7 @@ func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
 		h.writeProfileError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, profile)
+	httpresponse.WriteJSON(w, http.StatusOK, toDocumentProfileItem(profile))
 }
 
 func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +171,7 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		h.writeProfileError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, profile)
+	httpresponse.WriteJSON(w, http.StatusOK, toDocumentProfileItem(profile))
 }
 
 func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
@@ -200,7 +205,7 @@ func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 		h.writeProfileError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{})
+	httpresponse.WriteJSON(w, http.StatusOK, taxonomyapi.SetTaxonomyProfileDefaultTemplate200Response{})
 }
 
 func (h *Handler) archiveProfile(w http.ResponseWriter, r *http.Request) {

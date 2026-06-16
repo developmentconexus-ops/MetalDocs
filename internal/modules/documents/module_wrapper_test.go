@@ -50,7 +50,7 @@ func (s *moduleTestService) ForceReleaseSession(context.Context, string, string,
 	return nil
 }
 func (s *moduleTestService) PresignAutosave(context.Context, application.PresignAutosaveCmd) (*application.PresignAutosaveResult, error) {
-	return &application.PresignAutosaveResult{UploadURL: "https://example/upload", PendingUploadID: "pending_1", ExpiresAt: time.Now().Add(time.Minute)}, nil
+	return &application.PresignAutosaveResult{UploadURL: "https://example/upload", PendingUploadID: "cccccccc-cccc-4ccc-8ccc-000000000001", ExpiresAt: time.Now().Add(time.Minute)}, nil
 }
 func (s *moduleTestService) CommitAutosave(context.Context, application.CommitAutosaveCmd) (*application.CommitResult, error) {
 	return &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2}, nil

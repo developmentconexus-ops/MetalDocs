@@ -117,6 +117,24 @@ Path-stable operator bridge: [`wiki/references/ai-operating-system.md`](wiki/ref
 - [`wiki/quality/workflow-async-qa-checklist.md`](wiki/quality/workflow-async-qa-checklist.md)
 - [`wiki/quality/release-closeout-checklist.md`](wiki/quality/release-closeout-checklist.md)
 
+### Test framework hard gate
+
+**All tests must use the canonical test framework for their class. No exceptions for new tests.**
+
+- **DB integration tests** → unified `testdb` factory framework (M4c). No ad-hoc `sqlmock` / per-package fixture builders for new tests.
+- **HTTP handler / delivery tests** → canonical handler-test framework with typed fixtures (UUIDs for UUID-typed contract fields, deterministic identity, shared fake builders). No new ad-hoc `fakeSvc` literals with sloppy fixture strings (`"sess_1"`, `"doc_1"`, `"tenant-a"`, `"rev_2"`).
+- **Application / domain unit tests** → table-driven Go tests with shared in-memory fakes from the module's `testing` subpackage. No new bespoke per-test stubs duplicating service contracts.
+
+**No new test outside the framework.** A new test file or new test function that bypasses the canonical framework for its class is a review block. Reviewers reject; authors migrate before merge.
+
+**Drive-by repair (not big-bang).** Pre-existing non-framework tests are not a mass-migration sweep. Policy: when a feature touches a test file with non-framework patterns, migrate the touched tests to the framework as part of that feature. Adjacent untouched tests stay until their own feature touches them. Same surgical rule as §5.3.
+
+**Trigger smell:** a typed contract change (`uuid.Parse`, typed struct) breaks tests because fixtures used sloppy strings → root cause = non-framework fixture, not the contract fix. Migrate the fixture, do not weaken the contract.
+
+**Framework references:**
+- M4c testdb framework: see memory `m4c-test-fixture-framework.md` + related ADRs in `wiki/decisions/`
+- Handler-test framework (formalization pending — track via wiki + ADR when scaffolded)
+
 ## 5. Behavioral Guidelines
 
 > Bias toward caution over speed. Trivial tasks → use judgment.

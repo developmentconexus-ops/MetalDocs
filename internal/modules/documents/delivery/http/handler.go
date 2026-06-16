@@ -316,7 +316,10 @@ func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpresponse.WriteJSON(w, http.StatusOK, stats)
+	httpresponse.WriteJSON(w, http.StatusOK, documentsapi.DocumentStatsResponse{
+		ByArea:   stats.ByArea,
+		ByStatus: stats.ByStatus,
+	})
 }
 
 func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (application.ListOptions, string, error) {
@@ -691,18 +694,28 @@ func (h *Handler) acquireSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if readonly {
-		httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-			"mode":       "readonly",
-			"held_by":    sess.UserID,
-			"held_until": sess.ExpiresAt,
+		httpresponse.WriteJSON(w, http.StatusOK, documentsapi.DocumentSessionReadonlyResponse{
+			Mode:      documentsapi.Readonly,
+			HeldBy:    sess.UserID,
+			HeldUntil: sess.ExpiresAt,
 		})
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusCreated, map[string]any{
-		"mode":                 "writer",
-		"session_id":           sess.ID,
-		"expires_at":           sess.ExpiresAt,
-		"last_ack_revision_id": sess.LastAcknowledgedRevisionID,
+	sessID, err := uuid.Parse(sess.ID)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		return
+	}
+	lastAckID, err := uuid.Parse(sess.LastAcknowledgedRevisionID)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusCreated, documentsapi.DocumentSessionWriterResponse{
+		Mode:              documentsapi.Writer,
+		SessionId:         sessID,
+		ExpiresAt:         sess.ExpiresAt,
+		LastAckRevisionId: lastAckID,
 	})
 }
 
@@ -811,10 +824,15 @@ func (h *Handler) presignAutosave(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"upload_url":        res.UploadURL,
-		"pending_upload_id": res.PendingUploadID,
-		"expires_at":        res.ExpiresAt,
+	pendingID, err := uuid.Parse(res.PendingUploadID)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, documentsapi.DocumentAutosavePresignResponse{
+		UploadUrl:       res.UploadURL,
+		PendingUploadId: pendingID,
+		ExpiresAt:       res.ExpiresAt,
 	})
 }
 
@@ -852,13 +870,25 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"revision_id":       res.RevisionID,
-		"revision_num":      res.RevisionNum,
-		"idempotent_replay": res.AlreadyConsumed,
-		"file_size_bytes":   res.FileSizeBytes,
-		"page_count":        res.PageCount,
-		"page_count_source": res.PageCountSource,
+	commitRevID, err := uuid.Parse(res.RevisionID)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		return
+	}
+	idempotentReplay := res.AlreadyConsumed
+	commitRevNum := int(res.RevisionNum)
+	var commitPageCountSource *documentsapi.CommitDocumentAutosave200JSONResponseBodyPageCountSource
+	if res.PageCountSource != nil {
+		src := documentsapi.CommitDocumentAutosave200JSONResponseBodyPageCountSource(*res.PageCountSource)
+		commitPageCountSource = &src
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, documentsapi.CommitDocumentAutosave200JSONResponse{
+		RevisionId:       commitRevID,
+		RevisionNum:      commitRevNum,
+		IdempotentReplay: &idempotentReplay,
+		FileSizeBytes:    res.FileSizeBytes,
+		PageCount:        res.PageCount,
+		PageCountSource:  commitPageCountSource,
 	})
 }
 
@@ -900,8 +930,13 @@ func (h *Handler) listRevisionHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"items": toRevisionHistoryResponse(items),
+	histItems, err := toAPIRevisionHistoryItems(items)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, documentsapi.DocumentRevisionHistoryResponse{
+		Items: histItems,
 	})
 }
 
@@ -965,6 +1000,25 @@ func toRevisionHistoryResponse(items []domain.RevisionHistoryItem) []revisionHis
 	return out
 }
 
+func toAPIRevisionHistoryItems(items []domain.RevisionHistoryItem) ([]documentsapi.DocumentRevisionHistoryItem, error) {
+	out := make([]documentsapi.DocumentRevisionHistoryItem, 0, len(items))
+	for _, item := range items {
+		docID, err := uuid.Parse(item.DocumentID)
+		if err != nil {
+			return nil, fmt.Errorf("revision history document_id %q: %w", item.DocumentID, err)
+		}
+		out = append(out, documentsapi.DocumentRevisionHistoryItem{
+			DocumentId:     docID,
+			RevisionNumber: item.RevisionNumber,
+			RevisionTitle:  item.RevisionTitle,
+			Status:         string(item.Status),
+			CreatedAt:      item.CreatedAt,
+			IsCurrent:      item.IsCurrent,
+		})
+	}
+	return out, nil
+}
+
 func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 	r = withAdminCtx(r)
 	docID := r.PathValue("id")
@@ -1020,11 +1074,17 @@ func (h *Handler) restoreCheckpoint(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"new_revision_id":               res.NewRevisionID,
-		"new_revision_num":              res.NewRevisionNum,
-		"source_checkpoint_version_num": versionNum,
-		"idempotent":                    res.Idempotent,
+	newRevID, err := uuid.Parse(res.NewRevisionID)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+		return
+	}
+	newRevNum := int(res.NewRevisionNum)
+	httpresponse.WriteJSON(w, http.StatusOK, documentsapi.RestoreDocumentCheckpoint200JSONResponse{
+		NewRevisionId:              newRevID,
+		NewRevisionNum:             newRevNum,
+		SourceCheckpointVersionNum: &versionNum,
+		Idempotent:                 res.Idempotent,
 	})
 }
 
