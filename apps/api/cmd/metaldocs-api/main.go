@@ -262,6 +262,7 @@ func main() {
 			iampg.NewUserDisplayNameRepository(sqlDB),
 			iampg.NewTenantUserRepository(sqlDB),
 			iampg.NewAdminRoleMemberRepository(sqlDB),
+			iampg.NewMfaUserRepository(sqlDB),
 		))
 		securityHandler = securitydelivery.NewHandler(securityService)
 	} else {

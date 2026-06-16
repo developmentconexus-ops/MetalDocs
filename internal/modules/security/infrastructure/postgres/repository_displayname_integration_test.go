@@ -56,6 +56,7 @@ func TestSecurityRepository_NoIamUsersJoin_Live(t *testing.T) {
 		iampg.NewUserDisplayNameRepository(db),
 		iampg.NewTenantUserRepository(db),
 		iampg.NewAdminRoleMemberRepository(db),
+		iampg.NewMfaUserRepository(db),
 	)
 
 	const (

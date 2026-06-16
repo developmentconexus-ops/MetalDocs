@@ -19,16 +19,17 @@ import (
 
 type Repository struct {
 	db *sql.DB
-	// displayNames, members, and adminRoles are iam-owned ports. Security reports
-	// on auth_identities / auth_sessions but does NOT own metaldocs.iam_users or
-	// iam_user_roles, so it resolves tenant membership, display names, and admin-role
-	// membership through these ports. All read the pool (off-tx, H-PRE-1).
+	// displayNames, members, adminRoles, and mfaUsers are iam-owned ports. Security
+	// reports on auth_identities / auth_sessions but does NOT own metaldocs.iam_users
+	// or iam_user_roles; it resolves tenant membership, display names, admin-role
+	// membership, and MFA coverage through these ports. All read the pool (off-tx, H-PRE-1).
 	displayNames iamdomain.UserDisplayNameReader
 	members      iamdomain.TenantUserReader
 	adminRoles   iamdomain.AdminRoleMemberReader
+	mfaUsers     iamdomain.MfaUserReader
 }
 
-func NewRepository(db *sql.DB, displayNames iamdomain.UserDisplayNameReader, members iamdomain.TenantUserReader, adminRoles iamdomain.AdminRoleMemberReader) *Repository {
+func NewRepository(db *sql.DB, displayNames iamdomain.UserDisplayNameReader, members iamdomain.TenantUserReader, adminRoles iamdomain.AdminRoleMemberReader, mfaUsers iamdomain.MfaUserReader) *Repository {
 	if displayNames == nil {
 		displayNames = iamdomain.NoopUserDisplayNameReader{}
 	}
@@ -38,7 +39,10 @@ func NewRepository(db *sql.DB, displayNames iamdomain.UserDisplayNameReader, mem
 	if adminRoles == nil {
 		adminRoles = iamdomain.NoopAdminRoleMemberReader{}
 	}
-	return &Repository{db: db, displayNames: displayNames, members: members, adminRoles: adminRoles}
+	if mfaUsers == nil {
+		mfaUsers = iamdomain.NoopMfaUserReader{}
+	}
+	return &Repository{db: db, displayNames: displayNames, members: members, adminRoles: adminRoles, mfaUsers: mfaUsers}
 }
 
 // resolveNames fetches display names for the given user ids via the iam port and
@@ -65,48 +69,24 @@ func (r *Repository) resolveNames(ctx context.Context, tenantID string, ids []st
 }
 
 func (r *Repository) MfaCoverage(ctx context.Context, tenantID string) (securitydomain.MfaCoverage, error) {
-	const totalQ = `
-SELECT COUNT(*) FILTER (WHERE u.deactivated_at IS NULL)                       AS total,
-       COUNT(*) FILTER (WHERE u.deactivated_at IS NULL AND u.mfa_enabled)     AS enabled
-FROM metaldocs.iam_users u
-WHERE u.tenant_id = $1::uuid
-`
-	var total, enabled int
-	if err := r.db.QueryRowContext(ctx, totalQ, tenantID).Scan(&total, &enabled); err != nil {
+	// Resolve MFA counts via IAM port (off-tx, H-PRE-1).
+	total, enabled, err := r.mfaUsers.TenantMfaCounts(ctx, tenantID)
+	if err != nil {
 		return securitydomain.MfaCoverage{}, fmt.Errorf("mfa coverage total: %w", err)
 	}
 
-	const byRoleQ = `
-SELECT ur.role_code,
-       COUNT(*)                                       AS total,
-       COUNT(*) FILTER (WHERE u.mfa_enabled)          AS enabled
-FROM metaldocs.iam_user_roles ur
-JOIN metaldocs.iam_users u
-  ON u.user_id   = ur.user_id
- AND u.tenant_id = ur.tenant_id
-WHERE ur.tenant_id = $1::uuid
-  AND u.deactivated_at IS NULL
-GROUP BY ur.role_code
-ORDER BY ur.role_code
-`
-	rows, err := r.db.QueryContext(ctx, byRoleQ, tenantID)
+	roleCounts, err := r.mfaUsers.TenantMfaCountsByRole(ctx, tenantID)
 	if err != nil {
 		return securitydomain.MfaCoverage{}, fmt.Errorf("mfa coverage by role: %w", err)
 	}
-	defer rows.Close()
-	var slices []securitydomain.MfaRoleSlice
-	for rows.Next() {
-		var s securitydomain.MfaRoleSlice
-		if err := rows.Scan(&s.Role, &s.Total, &s.MfaEnabled); err != nil {
-			return securitydomain.MfaCoverage{}, fmt.Errorf("scan mfa role slice: %w", err)
-		}
+
+	slices := make([]securitydomain.MfaRoleSlice, 0, len(roleCounts))
+	for _, rc := range roleCounts {
+		s := securitydomain.MfaRoleSlice{Role: rc.Role, Total: rc.Total, MfaEnabled: rc.MfaEnabled}
 		if s.Total > 0 {
 			s.Pct = float32(s.MfaEnabled) * 100 / float32(s.Total)
 		}
 		slices = append(slices, s)
-	}
-	if err := rows.Err(); err != nil {
-		return securitydomain.MfaCoverage{}, fmt.Errorf("iterate mfa role slices: %w", err)
 	}
 
 	cov := securitydomain.MfaCoverage{
