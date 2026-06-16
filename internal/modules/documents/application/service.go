@@ -430,7 +430,7 @@ func (s *Service) IsDocumentOwner(ctx context.Context, tenantID, docID, userID s
 	return s.repo.IsDocumentOwner(ctx, tenantID, docID, userID)
 }
 
-func (s *Service) ListDocumentComments(ctx context.Context, tenantID, userID, documentID string) ([]domain.Comment, error) {
+func (s *Service) ListDocumentComments(ctx context.Context, tenantID, documentID string) ([]domain.Comment, error) {
 	return s.repo.ListComments(ctx, tenantID, documentID)
 }
 

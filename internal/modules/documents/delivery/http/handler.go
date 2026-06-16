@@ -67,7 +67,7 @@ type autosaveArtifacts interface {
 
 // documentComments covers comment CRUD on a document.
 type documentComments interface {
-	ListDocumentComments(ctx context.Context, tenantID, userID, documentID string) ([]domain.Comment, error)
+	ListDocumentComments(ctx context.Context, tenantID, documentID string) ([]domain.Comment, error)
 	AddDocumentComment(ctx context.Context, tenantID, userID, authorDisplay, documentID string, in domain.CommentCreateInput) (*domain.Comment, error)
 	UpdateDocumentComment(ctx context.Context, tenantID, userID, documentID string, libraryID int, in domain.CommentUpdateInput) (*domain.Comment, error)
 	DeleteDocumentComment(ctx context.Context, tenantID, userID, documentID string, libraryID int) error
@@ -1108,12 +1108,12 @@ func (h *Handler) signedRevisionURL(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listComments(w http.ResponseWriter, r *http.Request) {
 	r = withAdminCtx(r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, _, ok := h.authorizeDocumentScope(w, r, docID)
 	if !ok {
 		return
 	}
 
-	comments, err := h.svc.ListDocumentComments(r.Context(), tenantID, userID, docID)
+	comments, err := h.svc.ListDocumentComments(r.Context(), tenantID, docID)
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)

@@ -203,7 +203,7 @@ func (f *fakeSvc) SignedRevisionURL(_ context.Context, _, _, _ string) (string, 
 	return "https://example/rev", nil
 }
 
-func (f *fakeSvc) ListDocumentComments(_ context.Context, _, _, _ string) ([]domain.Comment, error) {
+func (f *fakeSvc) ListDocumentComments(_ context.Context, _, _ string) ([]domain.Comment, error) {
 	return nil, nil
 }
 

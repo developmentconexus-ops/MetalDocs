@@ -31,7 +31,7 @@ func newCommentsStatefulSvc() *commentsStatefulSvc {
 	}
 }
 
-func (s *commentsStatefulSvc) ListDocumentComments(_ context.Context, _, _, _ string) ([]domain.Comment, error) {
+func (s *commentsStatefulSvc) ListDocumentComments(_ context.Context, _, _ string) ([]domain.Comment, error) {
 	out := make([]domain.Comment, 0, len(s.comments))
 	for _, c := range s.comments {
 		out = append(out, c)

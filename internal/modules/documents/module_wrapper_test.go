@@ -72,7 +72,7 @@ func (s *moduleTestService) Archive(context.Context, string, string, string) err
 func (s *moduleTestService) SignedRevisionURL(context.Context, string, string, string) (string, error) {
 	return "https://example/rev", nil
 }
-func (s *moduleTestService) ListDocumentComments(context.Context, string, string, string) ([]domain.Comment, error) {
+func (s *moduleTestService) ListDocumentComments(context.Context, string, string) ([]domain.Comment, error) {
 	return nil, nil
 }
 func (s *moduleTestService) AddDocumentComment(context.Context, string, string, string, string, domain.CommentCreateInput) (*domain.Comment, error) {
