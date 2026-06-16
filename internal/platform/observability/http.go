@@ -34,9 +34,15 @@ type SchedulerMetricsProvider interface {
 	SchedulerMetrics() map[string]any
 }
 
+// DBPoolStatsProvider exposes database connection pool stats for the metrics endpoint.
+type DBPoolStatsProvider interface {
+	DBPoolStats() map[string]any
+}
+
 type HTTPObservability struct {
 	runtimeProvider  RuntimeStatusProvider
 	schedulerMetrics SchedulerMetricsProvider
+	dbPool           DBPoolStatsProvider
 	userIDResolver   func(*http.Request) string
 	mu               sync.RWMutex
 	byKey            map[string]*routeMetrics
@@ -78,6 +84,12 @@ func NewHTTPObservability(userIDResolver func(*http.Request) string, runtimeProv
 // ListenAndServe — same set-once pattern as runtimeProvider.
 func (o *HTTPObservability) SetSchedulerMetrics(s SchedulerMetricsProvider) {
 	o.schedulerMetrics = s
+}
+
+// SetDBPool wires a DB pool stats provider. Call once during startup, before
+// ListenAndServe. Absent → "db_pool" key omitted from MetricsHandler response.
+func (o *HTTPObservability) SetDBPool(p DBPoolStatsProvider) {
+	o.dbPool = p
 }
 
 func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
@@ -174,6 +186,9 @@ func (o *HTTPObservability) MetricsHandler() http.Handler {
 		}
 		if o.schedulerMetrics != nil {
 			payload["scheduler"] = o.schedulerMetrics.SchedulerMetrics()
+		}
+		if o.dbPool != nil {
+			payload["db_pool"] = o.dbPool.DBPoolStats()
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(payload)
