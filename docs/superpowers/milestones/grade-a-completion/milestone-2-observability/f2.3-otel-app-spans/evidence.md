@@ -8,7 +8,7 @@
 
 | Row | Criterion | Command / proof | Result | Fixture vs real |
 |-----|-----------|-----------------|--------|-----------------|
-| 1 | `Open()` emits ≥1 span when query executes | `go test ./internal/platform/db/postgres/ -run TestOpen_EmitsOTelSpan` → SKIP (no test DB in dev env); real-provider DB spans captured in smoke run (see §Real-provider below) | PASS (real-provider) | **real-provider** (smoke log) |
+| 1 | `OpenWithTracerProvider` emits ≥1 `sql.*` span (no DB required) | `go test ./internal/platform/db/postgres/ -run TestOpen_EmitsOTelSpan` → PASS (0.00s, unreachable DSN triggers `sql.connector.connect` span on PingContext failure) — fixed in f2.5 | PASS | fixture (in-process recorder) |
 | 2 | `Create` emits `cd.create` span with `document.profile_code` | `go test ./internal/modules/controlleddocuments/application/ -run TestCreate_EmitsCdCreateSpan` → PASS | PASS | fixture |
 | 3 | `RecordSignoff` emits `signoff.record` span with `signoff.verdict` | `go test ./internal/modules/documents/approval/application/ -run TestRecordSignoff_EmitsSignoffRecordSpan` → PASS | PASS | fixture |
 | 4 | Error path — `Create` returning error sets span status `Error` | `go test ./internal/modules/controlleddocuments/application/ -run TestCreate_SpanStatusError_OnFailure` → PASS | PASS | fixture |

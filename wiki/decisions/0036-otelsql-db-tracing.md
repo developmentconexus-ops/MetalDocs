@@ -27,7 +27,7 @@ Three alternatives were evaluated:
 
 ## Decision
 
-Replace `sql.Open("pgx", dsn)` with `otelsql.Open("pgx", dsn, ...)` in `internal/platform/db/postgres/connect.go`. The `github.com/XSAM/otelsql` package wraps the already-registered `"pgx"` driver and emits OTel child spans (`go.sql.query`, `go.sql.exec`) for every `database/sql` call. Return type stays `*sql.DB`; all callers are unchanged.
+Replace `sql.Open("pgx", dsn)` with `otelsql.Open("pgx", dsn, ...)` in `internal/platform/db/postgres/connect.go`. The `github.com/XSAM/otelsql` package wraps the already-registered `"pgx"` driver and emits OTel child spans for every `database/sql` call. Span names follow the library's own conventions (`sql.connector.connect`, `sql.conn.ping`, `sql.conn.query`, `sql.conn.exec`, `sql.conn.prepare`, `sql.conn.begin_tx`, `sql.conn.reset_session`, `sql.rows`, etc. — `vendor/github.com/XSAM/otelsql/methods.go:25-47`). Return type stays `*sql.DB`; all callers are unchanged.
 
 `OTEL_TRACES_EXPORTER` env var continues to gate the entire OTel pipeline — when unset (dev/production without tracing configured), the `otelsql` wrapper emits spans to the NOOP tracer; zero overhead, zero output.
 
@@ -37,6 +37,6 @@ The `_ "github.com/jackc/pgx/v5/stdlib"` blank import remains in `connect.go` to
 
 - **All DB queries traced by default.** New repositories and services inherit coverage automatically — no per-author action required.
 - **Connection DSN excluded from span attributes** (`otelsql.WithDBConnectStringAttribute(false)` or equivalent) to prevent credential leakage in traces.
-- **Span cardinality is bounded.** `otelsql` defaults use operation type as span name (`go.sql.query`), not query text. Full query text is an opt-in attribute (`otelsql.WithSQLCommenter` / `otelsql.WithAttributes`) — **not enabled by default** in this ADR to avoid cardinality explosion and PII risk.
+- **Span cardinality is bounded.** `otelsql` defaults use operation type as span name (e.g. `sql.conn.query`, `sql.conn.exec`), not query text. Full query text is an opt-in attribute (`otelsql.WithSQLCommenter` / `otelsql.WithAttributes`) — **not enabled by default** in this ADR to avoid cardinality explosion and PII risk.
 - **One new dependency** (`github.com/XSAM/otelsql`) added to `go.mod`. Maintained by the community; tracks OTel SDK releases.
 - **Manual semantic spans** (`cd.create`, `signoff.record`) are layered on top of driver-level spans — they provide business-domain labels that SQL text cannot. This ADR governs only the driver layer; semantic spans are an independent concern.

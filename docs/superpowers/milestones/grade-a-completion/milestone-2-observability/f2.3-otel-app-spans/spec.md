@@ -29,8 +29,10 @@ Driven inline (brainstorming engine flow; one question at a time, persisted belo
 
 - **Contract:**
   1. Every `database/sql` query executed in the `metaldocs-api` process emits an OTel child span
-     under the active trace context. Span names follow `otelsql` defaults
-     (`go.sql.query`, `go.sql.exec`, `go.sql.ping`). No filtering — all queries traced.
+     under the active trace context. Span names follow `github.com/XSAM/otelsql` defaults:
+     `sql.connector.connect`, `sql.conn.ping`, `sql.conn.query`, `sql.conn.exec`,
+     `sql.conn.prepare`, `sql.conn.begin_tx`, `sql.conn.reset_session`, `sql.rows`, etc.
+     (`vendor/github.com/XSAM/otelsql/methods.go:25-47`). No filtering — all queries traced.
   2. `ControlledDocumentService.Create` wraps its body in a manual span named **`cd.create`**
      (`internal/modules/controlleddocuments/application/service.go:147`). The span carries at
      minimum the attribute `document.profile_code` (string). The span is a child of the incoming
@@ -104,12 +106,12 @@ Add app-level OTel child spans to a pragmatic A− bar. Concrete changes, scoped
 
 | Acceptance criterion | Named test / proof command | Real vs fixture |
 |----------------------|----------------------------|-----------------|
-| 1. `Open()` produces a `*sql.DB` whose driver emits at least one span when a query executes (driver-level auto-instrumentation confirmed). | `go test ./internal/platform/db/postgres/ -run TestOpen_EmitsOTelSpan -count=1` — creates DB, runs `SELECT 1`, asserts `SpanRecorder.Ended()` has ≥ 1 span with name containing `go.sql`. | fixture (in-process recorder) |
+| 1. `OpenWithTracerProvider` produces a `*sql.DB` whose driver emits at least one `sql.*` span (driver-level auto-instrumentation confirmed). No live DB required — `github.com/XSAM/otelsql` emits `sql.connector.connect` even on connection failure. | `go test ./internal/platform/db/postgres/ -run TestOpen_EmitsOTelSpan -count=1` — unreachable DSN, calls `PingContext`, asserts `SpanRecorder.Ended()` has ≥ 1 span with name prefix `sql.`. Always runs (no skip). | fixture (in-process recorder) |
 | 2. `Create` emits a `cd.create` span with `document.profile_code` attribute. | `go test ./internal/modules/controlleddocuments/application/ -run TestCreate_EmitsCdCreateSpan -count=1` — stub deps, call `Create`, assert span name `"cd.create"` and attribute `document.profile_code` present in `SpanRecorder.Ended()`. | fixture |
 | 3. `RecordSignoff` emits a `signoff.record` span with `signoff.verdict` attribute. | `go test ./internal/modules/documents/approval/application/ -run TestRecordSignoff_EmitsSignoffRecordSpan -count=1` — stub deps, call `RecordSignoff`, assert span name `"signoff.record"` and attribute `signoff.verdict` present. | fixture |
 | 4. Error path — `Create` returning error sets span status to `Error`. | `go test ./internal/modules/controlleddocuments/application/ -run TestCreate_SpanStatusError_OnFailure -count=1` — stub `Create` to return error; assert `span.Status().Code == codes.Error`. | fixture |
 | 5. Whole-repo regression — no existing test broken by driver wrapper. | `go test ./...` exits 0; no FAIL lines. | fixture |
-| 6. Runtime proof — trace tree captured with OTel console exporter showing child spans under HTTP envelope. | Start API with `OTEL_TRACES_EXPORTER=console`; trigger `POST /api/v1/controlled-documents` (CD create) via curl with auth; capture stdout trace JSON; paste verbatim snippet showing `cd.create` child span + at least one `go.sql.*` grandchild span into `evidence.md`, labeled **real-provider**. | **real-provider** |
+| 6. Runtime proof — trace tree captured with OTel console exporter showing child spans under HTTP envelope. | Start API with `OTEL_TRACES_EXPORTER=console`; trigger `POST /api/v1/controlled-documents` (CD create) via curl with auth; capture stdout trace JSON; paste verbatim snippet showing `cd.create` child span + at least one `sql.*` grandchild span (e.g. `sql.connector.connect`, `sql.conn.exec`) into `evidence.md`, labeled **real-provider**. | **real-provider** |
 
 > TDD: rows 1–4 are failing tests, written first. Row 5 is regression guard. Row 6 is runtime
 > evidence from a real `start-api.ps1` run with console exporter.
