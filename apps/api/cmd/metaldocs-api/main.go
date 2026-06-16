@@ -63,6 +63,7 @@ import (
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/db"
+	postgres "metaldocs/internal/platform/db/postgres"
 	docgenv2 "metaldocs/internal/platform/docgenv2"
 	"metaldocs/internal/platform/featureflags"
 	"metaldocs/internal/platform/formval"
@@ -530,6 +531,9 @@ func main() {
 	}
 	registerScheduledJobs(s, deps, approvalServices.Cancel, approvalEmitter)
 	httpObs.SetSchedulerMetrics(s)
+	if deps.SQLDB != nil {
+		httpObs.SetDBPool(postgres.NewPoolStatsAdapter(deps.SQLDB))
+	}
 
 	var schedulerWG sync.WaitGroup
 	schedulerWG.Add(1)

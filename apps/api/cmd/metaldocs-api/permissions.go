@@ -92,7 +92,7 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathExact: "/api/v1/auth/logout", visibility: iamdelivery.VisibilitySessionRequired},
 
 	// ---- Permission-guarded ---------------------------------------------
-	// Metrics — Prometheus scrape endpoint; read-only.
+	// Metrics — JSON scrape endpoint; read-only.
 	{method: http.MethodGet, pathExact: "/api/v1/metrics", capability: iamdomain.CapMetricsView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Search.
