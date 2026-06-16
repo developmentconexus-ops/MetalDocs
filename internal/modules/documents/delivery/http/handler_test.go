@@ -53,6 +53,9 @@ type fakeSvc struct {
 
 	getDocumentResult *domain.Document
 
+	listCheckpointsItems   []domain.Checkpoint
+	createCheckpointResult *domain.Checkpoint
+
 	notOwner bool
 }
 
@@ -153,10 +156,16 @@ func (f *fakeSvc) CommitAutosave(_ context.Context, cmd application.CommitAutosa
 }
 
 func (f *fakeSvc) CreateCheckpoint(_ context.Context, _, _, _, _ string) (*domain.Checkpoint, error) {
+	if f.createCheckpointResult != nil {
+		return f.createCheckpointResult, nil
+	}
 	return &domain.Checkpoint{ID: "cp_1", VersionNum: 1}, nil
 }
 
 func (f *fakeSvc) ListCheckpoints(_ context.Context, _, _ string) ([]domain.Checkpoint, error) {
+	if f.listCheckpointsItems != nil {
+		return f.listCheckpointsItems, nil
+	}
 	return []domain.Checkpoint{{ID: "cp_1", VersionNum: 1}}, nil
 }
 

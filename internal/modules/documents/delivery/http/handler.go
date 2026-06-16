@@ -26,6 +26,8 @@ import (
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/ratelimit"
 	"metaldocs/internal/platform/tenant"
+
+	"github.com/google/uuid"
 )
 
 // documentReader covers read/list/stats/ownership queries.
@@ -878,7 +880,13 @@ func (h *Handler) listCheckpoints(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, items)
+	resp, err := toAPICheckpoints(items)
+	if err != nil {
+		slog.Error("documents.list_checkpoints malformed uuid", "doc_id", docID, "tenant_id", tenantID, "err", err)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) listRevisionHistory(w http.ResponseWriter, r *http.Request) {
@@ -908,6 +916,42 @@ type revisionHistoryItemResponse struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	IsCurrent      bool      `json:"is_current"`
+}
+
+func toAPICheckpoint(cp domain.Checkpoint) (documentsapi.DocumentCheckpoint, error) {
+	id, err := uuid.Parse(cp.ID)
+	if err != nil {
+		return documentsapi.DocumentCheckpoint{}, fmt.Errorf("checkpoint id %q: %w", cp.ID, err)
+	}
+	docID, err := uuid.Parse(cp.DocumentID)
+	if err != nil {
+		return documentsapi.DocumentCheckpoint{}, fmt.Errorf("checkpoint document_id %q: %w", cp.DocumentID, err)
+	}
+	revID, err := uuid.Parse(cp.RevisionID)
+	if err != nil {
+		return documentsapi.DocumentCheckpoint{}, fmt.Errorf("checkpoint revision_id %q: %w", cp.RevisionID, err)
+	}
+	return documentsapi.DocumentCheckpoint{
+		Id:         id,
+		DocumentId: docID,
+		RevisionId: revID,
+		VersionNum: cp.VersionNum,
+		Label:      cp.Label,
+		CreatedAt:  cp.CreatedAt,
+		CreatedBy:  cp.CreatedBy,
+	}, nil
+}
+
+func toAPICheckpoints(cps []domain.Checkpoint) ([]documentsapi.DocumentCheckpoint, error) {
+	out := make([]documentsapi.DocumentCheckpoint, 0, len(cps))
+	for _, c := range cps {
+		mapped, err := toAPICheckpoint(c)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, mapped)
+	}
+	return out, nil
 }
 
 func toRevisionHistoryResponse(items []domain.RevisionHistoryItem) []revisionHistoryItemResponse {
@@ -951,7 +995,13 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusCreated, cp)
+	resp, err := toAPICheckpoint(*cp)
+	if err != nil {
+		slog.Error("documents.create_checkpoint malformed uuid", "doc_id", docID, "tenant_id", tenantID, "err", err)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusCreated, resp)
 }
 
 func (h *Handler) restoreCheckpoint(w http.ResponseWriter, r *http.Request) {
