@@ -24,6 +24,7 @@ judges it against §6 — 3 dims ≥ A−, 0 new Critical/Major, H-D=0, H-G=0.
 | 2 | `milestone-2-observability` | Drive composition ≥ A− — slog, scrapeable job metrics, app-level OTel spans | passed (HS-1 approved 2026-06-16) | [PASS](milestone-2-observability/qa/milestone-qa.md) |
 | 3 | `milestone-3-quality-tail` | Lift code-quality/legacy — wire IAMUserOptions (functional), type-safety, dead-code, minor sweep | passed (HS-1 approved 2026-06-16) | [PASS](milestone-3-quality-tail/qa/milestone-qa.md) |
 | 4 | `milestone-4-module-ports` | *(LAST)* Drive module-boundaries ≥ A− and **H-G → 0** — published constant, IAM role port, MfaCoverage port | passed (HS-1 approved 2026-06-16) | [PASS](milestone-4-module-ports/qa/milestone-qa.md) |
+| 5 | `milestone-5-hs5-remediation` | HS-5 micro-milestone — close 4 re-audit gaps: H-G→0, H-D→0, 4 Majors, contract-api+module-boundaries ≥ A− | planned | — |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
 The **Gate result** column links each milestone-validator verdict (`milestone-<n>/qa/milestone-qa.md`);
@@ -34,7 +35,7 @@ authored later by the `milestone` skill (its Phase 2), in a fresh session — no
 
 | When | HS id | What | Resolution |
 |------|-------|------|------------|
-| | | | |
+| 2026-06-16 | HS-5 | Terminal re-audit FAIL — 4 §8 checks unmet (H-G=2, H-D=2, 4 Majors, 2 dims below A−) | M5 bounded micro-milestone opened; operator approved 2026-06-16 |
 
 ## Program close-out / reconciliation
 

@@ -1,8 +1,73 @@
 # Current Agent Handoff
 
-> **Last verified:** 2026-06-10
-> **Scope:** Recovery context for a fresh agent session after the user reinstalls Claude/Codex. Captures workspace state, in-flight programs, the new architecture reference stack, and the agent-memory contents that do not survive a tool reinstall.
-> **Out of scope:** Implementation details — follow the linked ADRs, backlog programs, and architecture docs.
+> **Last verified:** 2026-06-16 (updated — M5 is the active task)
+> **Scope:** Recovery context for a fresh agent session. Captures workspace state, in-flight programs, and operating rules.
+> **Out of scope:** Implementation details — follow linked docs below.
+
+---
+
+## ★ CURRENT STATE (2026-06-16) — READ THIS FIRST
+
+**Branch:** `main` (all work committed here; no push without explicit ask).  
+**HEAD:** `9394bfc9` — mission-validator FAIL verdict committed.  
+**Active program:** `grade-a-completion` — milestone 5 is the next task.
+
+### What just happened
+
+M0–M4 of `grade-a-completion` all PASSED (HS-1 approved). The terminal re-audit ran at HEAD and the `mission-validator` returned **FAIL** (HS-5). The next session executes **M5 — HS-5 remediation**.
+
+### What M5 must close (7 features, 3 families)
+
+| Family | Feature | File | What to do |
+|--------|---------|------|-----------|
+| H-G (family A) | F5.1 `templates-literal` | `internal/modules/templates/infrastructure/template_version_reader.go:44` | Replace `"published"` with `templatesdomain.VersionStatusPublished` (same as M4/F4.1) |
+| H-G (family A) | F5.2 `auth-usertenant-port` | `internal/modules/auth/infrastructure/postgres/repository.go:104` + new IAM port | Create `UserTenantReader` port in `iamdomain`; postgres impl reads `iam_user_roles` off-tx (H-PRE-1); wire into auth |
+| H-D / contract (family B) | F5.3 `routes-generated-typed` | `internal/modules/templates/delivery/http/routes_generated.go:128,238` | Replace `map[string]any{...}` with typed generated response structs |
+| H-D / contract (family B) | F5.4 `templates-routes-typed` | `internal/modules/templates/delivery/http/routes_create.go:44,67` | Fix toTemplateResponse/toVersionResponse map[string]any |
+| H-D / contract (family B) | F5.5 `iam-admin-typed` | `internal/modules/iam/delivery/http/admin_handler.go:262` | Replace map[string]any admin overview with typed response |
+| Authz/persistence (family C) | F5.6 `authz-effective-to` | `internal/modules/iam/authz/authz.go:124` | `effective_to IS NULL` → `(effective_to IS NULL OR effective_to > now())` |
+| Authz/persistence (family C) | F5.7 `role-admin-tenant-id` | `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:61-68,109-116` | Fix iam_users upsert to include tenant_id |
+
+**Pass-bar:** when all 7 are done, re-run the `milestone-validator` for M5, then re-run the 10-dimension re-audit Workflow, then re-dispatch `mission-validator`.
+
+### Key paths
+
+- M5 milestone spec: `docs/superpowers/milestones/grade-a-completion/milestone-5-hs5-remediation/milestone.md`
+- Program README: `docs/superpowers/milestones/grade-a-completion/README.md`
+- Re-audit that triggered HS-5: `wiki/backend/_artifacts/architecture-re-audit-2026-06-16.md`
+- Mission-validator verdict: `docs/superpowers/milestones/grade-a-completion/qa/mission-validation.md`
+
+### How to start M5
+
+1. Read `CLAUDE.md` → `wiki/README.md` → this file → `milestone-5-hs5-remediation/milestone.md`.
+2. Follow the `milestone` skill (Phase 3 lifecycle): per-feature `spec.md` approved before code, `plan.md`, TDD, `evidence.md`.
+3. Execute F5.1–F5.7 in family order (H-G first, then H-D/contract, then authz/persistence).
+4. After all 7: `milestone-validator` → if PASS → re-run terminal re-audit Workflow (10 dimensions) → `mission-validator`.
+5. If terminal re-audit PASS: flip program README status + present HS-1 to operator.
+
+### §6 grep commands (re-audit pass-bar checks)
+
+```sh
+# H-G: must be 0 after F5.1+F5.2
+grep -rn "FROM metaldocs\.iam_user_roles" --include="*.go" internal/modules/ | grep -v "internal/modules/iam/" | grep -v "_test\.go"
+grep -rn '"published"' --include="*.go" internal/modules/templates/infrastructure/ | grep -v "_test\.go"
+
+# H-D: must be 0 after F5.3
+grep -rn "map\[string\]any" internal/modules/templates/delivery/http/routes_generated.go
+```
+
+### Standing constraints (ALL still active)
+
+- **H-PRE-1:** new port reads must stay off any lock-holding atomic tx (advisory-lock deadlock constraint)
+- **ADR 0022:** never symptom-patch authz — fix at the shared predicate layer (F5.6)
+- **No merge by agent; never push without explicit ask**
+- **CLAUDE.md §5.0:** commit without asking is authorized
+- **Test framework hard gate (CLAUDE.md §4):** DB integration tests → `testdb` framework; existing security integration tests follow `//go:build integration` + raw `sql.DB` pattern
+- **Workflow model:** sonnet implement/review, haiku mechanical, NEVER fable workers, ≤15 concurrent agents
+
+---
+
+## PRIOR HISTORY (2026-06-10 and earlier — kept as record)
 
 ## Why this exists (2026-06-10 rewrite)
 
