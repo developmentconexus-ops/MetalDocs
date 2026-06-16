@@ -67,6 +67,8 @@ type ResolverContextBuilder interface {
 	BuildForDraft(ctx context.Context, tenantID, revisionID string) (resolvers.ResolveInput, error)
 }
 
+var _ FanoutClient = (*fanout.Client)(nil)
+
 func NewFreezeService(
 	schemas SchemaReader, values FillInWriter,
 	valuesRead interface {
@@ -74,14 +76,13 @@ func NewFreezeService(
 	},
 	reg *resolvers.Registry, final FreezeFinalizer, ctxBuilder ResolverContextBuilder,
 	snapshots SnapshotReader, finalDocx FinalDocxWriter,
-	fanoutClient any,
+	fanoutClient FanoutClient,
 ) *FreezeService {
-	fc, _ := fanoutClient.(FanoutClient)
 	return &FreezeService{
 		schemas: schemas, values: values, valuesRead: valuesRead,
 		resolvers: reg, finalize: final, resolveCtx: ctxBuilder,
 		snapshots: snapshots, finalDocx: finalDocx,
-		fanout: fc,
+		fanout: fanoutClient,
 	}
 }
 
