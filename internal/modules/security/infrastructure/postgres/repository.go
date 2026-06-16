@@ -19,22 +19,26 @@ import (
 
 type Repository struct {
 	db *sql.DB
-	// displayNames + members are iam-owned ports (M4/F4.1, F4.5). Security reports
-	// on auth_identities / auth_sessions but does NOT own metaldocs.iam_users, so
-	// it resolves tenant membership and display names through these ports instead
-	// of JOINing iam's table. Both read the pool (off-tx, H-PRE-1).
+	// displayNames, members, and adminRoles are iam-owned ports. Security reports
+	// on auth_identities / auth_sessions but does NOT own metaldocs.iam_users or
+	// iam_user_roles, so it resolves tenant membership, display names, and admin-role
+	// membership through these ports. All read the pool (off-tx, H-PRE-1).
 	displayNames iamdomain.UserDisplayNameReader
 	members      iamdomain.TenantUserReader
+	adminRoles   iamdomain.AdminRoleMemberReader
 }
 
-func NewRepository(db *sql.DB, displayNames iamdomain.UserDisplayNameReader, members iamdomain.TenantUserReader) *Repository {
+func NewRepository(db *sql.DB, displayNames iamdomain.UserDisplayNameReader, members iamdomain.TenantUserReader, adminRoles iamdomain.AdminRoleMemberReader) *Repository {
 	if displayNames == nil {
 		displayNames = iamdomain.NoopUserDisplayNameReader{}
 	}
 	if members == nil {
 		members = iamdomain.NoopTenantUserReader{}
 	}
-	return &Repository{db: db, displayNames: displayNames, members: members}
+	if adminRoles == nil {
+		adminRoles = iamdomain.NoopAdminRoleMemberReader{}
+	}
+	return &Repository{db: db, displayNames: displayNames, members: members, adminRoles: adminRoles}
 }
 
 // resolveNames fetches display names for the given user ids via the iam port and
@@ -329,6 +333,19 @@ func (r *Repository) ListOffHoursAdminActions(ctx context.Context, tenantID stri
 	if len(adminRoles) == 0 {
 		return nil, nil
 	}
+	// Resolve admin-role membership via IAM port (off-tx, H-PRE-1).
+	userRoles, err := r.adminRoles.AdminRoleMembers(ctx, tenantID, adminRoles)
+	if err != nil {
+		return nil, fmt.Errorf("off-hours-admin: resolve role members: %w", err)
+	}
+	if len(userRoles) == 0 {
+		return nil, nil
+	}
+	userIDs := make([]string, 0, len(userRoles))
+	for uid := range userRoles {
+		userIDs = append(userIDs, uid)
+	}
+
 	// Off-hours predicate: hour in [start..24) OR [0..end). UTC for v1; once
 	// per-tenant timezone is wired (see iam_tenants.timezone proposal in
 	// security-tech-debt.md) replace EXTRACT(hour FROM occurred_at) with
@@ -336,27 +353,22 @@ func (r *Repository) ListOffHoursAdminActions(ctx context.Context, tenantID stri
 	const q = `
 SELECT e.id,
        e.actor_id,
-       MIN(ur.role_code)    AS role_code,
        e.action,
        e.resource_type,
        e.resource_id,
        e.occurred_at
 FROM metaldocs.audit_events e
-JOIN metaldocs.iam_user_roles ur
-  ON ur.user_id   = e.actor_id
- AND ur.tenant_id = e.tenant_id::uuid
 WHERE e.tenant_id = $1
-  AND e.occurred_at >= NOW() - ($2 * INTERVAL '1 second')
-  AND ur.role_code = ANY($3)
+  AND e.actor_id = ANY($2)
+  AND e.occurred_at >= NOW() - ($3 * INTERVAL '1 second')
   AND (
     EXTRACT(HOUR FROM e.occurred_at AT TIME ZONE 'UTC') >= $4
     OR EXTRACT(HOUR FROM e.occurred_at AT TIME ZONE 'UTC') <  $5
   )
-GROUP BY e.id, e.actor_id, e.action, e.resource_type, e.resource_id, e.occurred_at
 ORDER BY e.occurred_at DESC
 LIMIT 50
 `
-	rows, err := r.db.QueryContext(ctx, q, strings.TrimSpace(tenantID), windowSeconds, pq.Array(adminRoles), offHoursStartHour, offHoursEndHour)
+	rows, err := r.db.QueryContext(ctx, q, strings.TrimSpace(tenantID), pq.Array(userIDs), windowSeconds, offHoursStartHour, offHoursEndHour)
 	if err != nil {
 		return nil, fmt.Errorf("off hours admin actions: %w", err)
 	}
@@ -365,12 +377,13 @@ LIMIT 50
 	for rows.Next() {
 		var a securitydomain.OffHoursAction
 		var occurred sql.NullTime
-		if err := rows.Scan(&a.EventID, &a.ActorID, &a.ActorRole, &a.Action, &a.ResourceType, &a.ResourceID, &occurred); err != nil {
+		if err := rows.Scan(&a.EventID, &a.ActorID, &a.Action, &a.ResourceType, &a.ResourceID, &occurred); err != nil {
 			return nil, fmt.Errorf("scan off-hours action: %w", err)
 		}
 		if occurred.Valid {
 			a.OccurredAt = occurred.Time.UTC().Format("2006-01-02T15:04:05Z")
 		}
+		a.ActorRole = userRoles[a.ActorID]
 		out = append(out, a)
 	}
 	return out, rows.Err()

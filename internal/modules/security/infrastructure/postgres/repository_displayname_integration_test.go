@@ -55,6 +55,7 @@ func TestSecurityRepository_NoIamUsersJoin_Live(t *testing.T) {
 	repo := securitypg.NewRepository(db,
 		iampg.NewUserDisplayNameRepository(db),
 		iampg.NewTenantUserRepository(db),
+		iampg.NewAdminRoleMemberRepository(db),
 	)
 
 	const (

@@ -254,12 +254,14 @@ func main() {
 	var securityHandler *securitydelivery.Handler
 	if sqlDB := deps.SQLDB; sqlDB != nil {
 		// Security reports on auth_identities/auth_sessions but does not own
-		// iam_users; it resolves tenant membership + display names via the
-		// iam-owned ports (M4/F4.6) instead of JOINing iam's table.
+		// iam_users or iam_user_roles; it resolves tenant membership, display names,
+		// and admin-role membership via iam-owned ports (M4/F4.2) instead of JOINing
+		// iam's tables.
 		securityService = securityapp.NewService(securitypg.NewRepository(
 			sqlDB,
 			iampg.NewUserDisplayNameRepository(sqlDB),
 			iampg.NewTenantUserRepository(sqlDB),
+			iampg.NewAdminRoleMemberRepository(sqlDB),
 		))
 		securityHandler = securitydelivery.NewHandler(securityService)
 	} else {
