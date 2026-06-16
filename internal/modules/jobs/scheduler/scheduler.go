@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
-	"os"
 	"sync"
 	"time"
 )
@@ -115,9 +114,12 @@ type Scheduler struct {
 	logger         *slog.Logger
 }
 
-func New(db *sql.DB, leaderID string) (*Scheduler, error) {
+func New(db *sql.DB, leaderID string, logger *slog.Logger) (*Scheduler, error) {
 	if leaderID == "" {
 		return nil, errors.New("leaderID required")
+	}
+	if logger == nil {
+		return nil, errors.New("logger required")
 	}
 	return &Scheduler{
 		db:             db,
@@ -128,7 +130,7 @@ func New(db *sql.DB, leaderID string) (*Scheduler, error) {
 		drainWait:      30 * time.Second,
 		forceWait:      5 * time.Second,
 		maxSkipStreak:  10,
-		logger:         slog.New(slog.NewTextHandler(os.Stdout, nil)),
+		logger:         logger,
 	}, nil
 }
 

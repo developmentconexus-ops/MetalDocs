@@ -1,9 +1,11 @@
 package scheduler
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -178,14 +180,14 @@ func newFakeSchedulerDB(t *testing.T, state *fakeSchedulerDB) *sql.DB {
 }
 
 func newTestScheduler(db *sql.DB) *Scheduler {
-	s, err := New(db, "test-leader")
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	s, err := New(db, "test-leader", logger)
 	if err != nil {
 		panic(err)
 	}
 	s.heartbeatEvery = 5 * time.Millisecond
 	s.drainWait = 200 * time.Millisecond
 	s.forceWait = 100 * time.Millisecond
-	s.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	return s
 }
 
@@ -202,8 +204,9 @@ func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {
 }
 
 func TestNew_LeaderIDRequired(t *testing.T) {
-	if _, err := New(nil, ""); err == nil || err.Error() != "leaderID required" {
-		t.Fatalf("New(nil, \"\") error = %v, want leaderID required", err)
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	if _, err := New(nil, "", logger); err == nil || err.Error() != "leaderID required" {
+		t.Fatalf("New(nil, \"\", logger) error = %v, want leaderID required", err)
 	}
 }
 
@@ -466,6 +469,14 @@ func TestScheduler_Metrics_IncrementOnRun(t *testing.T) {
 	}
 }
 
+func TestScheduler_New_RejectsNilLogger(t *testing.T) {
+	db := newFakeSchedulerDB(t, &fakeSchedulerDB{})
+	_, err := New(db, "test-leader", nil)
+	if err == nil || err.Error() != "logger required" {
+		t.Fatalf("New(db, \"test-leader\", nil) error = %v, want \"logger required\"", err)
+	}
+}
+
 func TestScheduler_MetricsSnapshot_IsolatedFromMutation(t *testing.T) {
 	state := &fakeSchedulerDB{
 		acquireResults:  []leaseAcquireResult{{acquired: true, epoch: 13}},
@@ -499,5 +510,69 @@ func TestScheduler_MetricsSnapshot_IsolatedFromMutation(t *testing.T) {
 	}
 	if got := after.SkipsTotal["new"]; got != 0 {
 		t.Fatalf("SkipsTotal[new] = %d, want 0", got)
+	}
+}
+
+func TestScheduler_LoggerEmitsJSON(t *testing.T) {
+	db := newFakeSchedulerDB(t, &fakeSchedulerDB{
+		acquireResults:  []leaseAcquireResult{{acquired: true, epoch: 1}},
+		pressureResults: []pressureSample{{active: 0, max: 100}},
+	})
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+
+	s, err := New(db, "test-leader", logger)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	s.heartbeatEvery = 5 * time.Millisecond
+	s.drainWait = 50 * time.Millisecond
+	s.forceWait = 50 * time.Millisecond
+
+	ran := make(chan struct{}, 1)
+	s.Register(JobConfig{
+		Name:     "json_probe",
+		Interval: 10 * time.Millisecond,
+		Fn: func(ctx context.Context, epoch int64) error {
+			select {
+			case ran <- struct{}{}:
+			default:
+			}
+			return nil
+		},
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.Start(ctx)
+	}()
+
+	select {
+	case <-ran:
+	case <-ctx.Done():
+		t.Fatalf("job did not run before context deadline")
+	}
+
+	cancel()
+	<-done
+
+	var foundCompleted bool
+	for _, line := range bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte("\n")) {
+		if len(line) == 0 {
+			continue
+		}
+		var rec map[string]any
+		if err := json.Unmarshal(line, &rec); err != nil {
+			t.Fatalf("scheduler log line is not JSON: %q (err: %v)", string(line), err)
+		}
+		if rec["msg"] == "scheduler_job_completed" && rec["job"] == "json_probe" {
+			foundCompleted = true
+		}
+	}
+	if !foundCompleted {
+		t.Fatalf("no JSON line with msg=scheduler_job_completed job=json_probe in %q", buf.String())
 	}
 }
