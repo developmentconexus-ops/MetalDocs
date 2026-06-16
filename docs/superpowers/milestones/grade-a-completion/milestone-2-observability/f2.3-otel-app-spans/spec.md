@@ -116,7 +116,4 @@ Add app-level OTel child spans to a pragmatic A− bar. Concrete changes, scoped
 
 ## ADR needed?
 
-- [ ] Durable decision — `otelsql` driver-level instrumentation as the standard DB tracing
-      pattern for MetalDocs. Record ADR under `wiki/decisions/` before implementation. This is a
-      durable architectural choice (all future DB queries traced by default; new repos/services
-      inherit coverage automatically). Link ADR here once created.
+- [x] Durable decision — recorded as **ADR 0036** [`wiki/decisions/0036-otelsql-db-tracing.md`](../../../../../wiki/decisions/0036-otelsql-db-tracing.md) — Accepted 2026-06-16.
