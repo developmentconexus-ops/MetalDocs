@@ -49,7 +49,8 @@ C2 site (`ListOffHoursAdminActions` JOIN) fully removed. Remaining references ar
 | G2: interface in iamdomain, impl in iam/postgres, Noop in iamdomain | file presence | confirmed | — |
 | G3: H-PRE-1 | caller trace (see above) | off-tx confirmed | — |
 | G4: build clean | `go build ./...` | no output (clean) | — |
-| G5: tests green | `go test -count=1 ./internal/modules/security/... ./internal/modules/iam/...` | all `ok` | fixture |
+| G5: tests green (unit) | `go test -count=1 ./internal/modules/security/... ./internal/modules/iam/...` | all `ok` | fixture |
+| G6: live parity — ListOffHoursAdminActions via port | `go test -count=1 -tags integration -run TestSecurityRepository_PortParity_Live/F4.2_ListOffHoursAdminActions_port_parity ./internal/modules/security/infrastructure/postgres/` | SKIP when no DB; PASS on seeded live DB (F4.5 adds test) | live DB |
 
 ## Bounded defers
 

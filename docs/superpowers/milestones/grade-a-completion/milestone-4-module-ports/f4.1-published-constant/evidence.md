@@ -22,7 +22,7 @@ overrideStatus := string(templatesdomain.VersionStatusPublished)
 | Gate | Command | Result | Real vs fixture |
 |------|---------|--------|-----------------|
 | G1: `"published"` literal gone from overrideStatus site | `grep -n '"published"' internal/modules/documents/application/service.go` | 0 matches | — |
-| G2: constant wire-value = `"published"` | `VersionStatusPublished` defined in `templates/domain/version.go:14` as `VersionStatus = "published"` | confirmed by read | — |
+| G2: constant wire-value = `"published"` | `go test -count=1 -run TestVersionStatusPublished_WireValue ./internal/modules/documents/application/` | PASS — `ok metaldocs/internal/modules/documents/application` (F4.5 adds test) | unit |
 | G3: build clean | `go build ./...` | no output (clean) | — |
 | G4: tests green | `go test -count=1 ./internal/modules/documents/application/...` | `ok metaldocs/internal/modules/documents/application 2.170s` | fixture |
 
