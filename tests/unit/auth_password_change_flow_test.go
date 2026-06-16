@@ -87,6 +87,54 @@ func TestPasswordChangeRevokesSessionAndClearsMustChangePassword(t *testing.T) {
 	}
 }
 
+// F0.4: handleChangePassword must emit an expired session cookie on success,
+// mirroring handleLogout. Server-side revocation already happens in the service
+// tx (CWE-613). This test pins the client-visible cookie clear so the browser
+// drops the now-revoked cookie instead of carrying a dead value.
+func TestPasswordChangeEmitsExpiredCookie(t *testing.T) {
+	repo := authmemory.NewRepository()
+	cfg := authapp.Config{
+		SessionCookieName:      "metaldocs_session",
+		SessionTTL:             time.Hour,
+		SessionSecret:          "0123456789abcdef0123456789abcdef",
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      5 * time.Minute,
+		AllowDevTenantFallback: true,
+	}
+	svc, err := authapp.NewService(repo, repo, repo, noopLoginCtxPort{}, cfg)
+	if err != nil {
+		t.Fatalf("new auth service: %v", err)
+	}
+	if err := svc.CreateUser(context.Background(), "cookie-user", "cookie.user", "cookie.user@test.local", "Cookie User", "abc12345", tenant.DevTenantID, []iamdomain.Role{iamdomain.RoleViewer}, "test"); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	authHandler := httpdelivery.NewHandler(svc)
+	mux := http.NewServeMux()
+	authHandler.RegisterRoutes(mux)
+	handler := httpdelivery.NewMiddleware(svc, cfg, true).Wrap(mux)
+
+	loginResp := performJSONRequest(t, handler, http.MethodPost, "/api/v1/auth/login", `{"identifier":"cookie.user","password":"abc12345"}`, nil)
+	if loginResp.Code != http.StatusOK {
+		t.Fatalf("expected initial login 200, got %d body=%s", loginResp.Code, loginResp.Body.String())
+	}
+	sessionCookie := findCookie(t, loginResp.Result().Cookies(), cfg.SessionCookieName)
+
+	changeResp := performJSONRequest(t, handler, http.MethodPost, "/api/v1/auth/change-password", `{"new_password":"abc12346"}`, sessionCookie)
+	if changeResp.Code != http.StatusOK {
+		t.Fatalf("expected change password 200, got %d body=%s", changeResp.Code, changeResp.Body.String())
+	}
+
+	expired := findCookie(t, changeResp.Result().Cookies(), cfg.SessionCookieName)
+	if expired.MaxAge >= 0 {
+		t.Fatalf("expected expired session cookie (MaxAge<0), got MaxAge=%d", expired.MaxAge)
+	}
+	if expired.Value != "" {
+		t.Fatalf("expected empty cookie value, got %q", expired.Value)
+	}
+}
+
 func performJSONRequest(t *testing.T, handler http.Handler, method, path, body string, cookie *http.Cookie) *httptest.ResponseRecorder {
 	t.Helper()
 	var reader *strings.Reader

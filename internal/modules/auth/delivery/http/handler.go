@@ -155,6 +155,9 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error"))
 		return
 	}
+	// F0.4: service already revoked all sessions (CWE-613). Mirror handleLogout
+	// and expire the cookie client-side so the browser drops the dead value.
+	http.SetCookie(w, h.service.ExpiredSessionCookie())
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
 		"changed": true,
 		"user":    currentUser,
