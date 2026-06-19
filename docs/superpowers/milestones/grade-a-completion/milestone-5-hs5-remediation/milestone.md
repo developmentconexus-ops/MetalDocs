@@ -1,7 +1,7 @@
 # Milestone 5 — HS-5 Remediation (close the re-audit gap)
 
 > **Program:** grade-a-completion  
-> **Status:** all 7 features closed; milestone-validator returned FAIL (C6 scope-drift on `61389120`) → HS-4 fix feature **F5.8** added (semconv reclassified as prerequisite repair; 2 bundled otel tests disclosed+ratified). Awaiting validator re-dispatch, then HS-1 operator gate. F5.1–F5.5 CLOSED (H-G=0, H-D=0, Major #3+#4 closed); **F5.6 CLOSED as REFUTED** (Major #1 false-positive — effective_to is a soft-delete tombstone, not a future-dated interval; ADR 0037; HS-2 raised+operator-approved Option A, doc-only); **F5.7 CLOSED** (Major #2 fixed — role-admin iam_users upsert now carries tenant_id, was defaulting to the sentinel placeholder).  
+> **Status:** **milestone-validator PASS (re-dispatch 2026-06-19, `qa/milestone-qa.md`)** after HS-4 fix feature F5.8. All 8 features closed (7 planned + F5.8 reconcile). **Awaiting HS-1 operator gate** before the program's terminal re-audit. F5.1–F5.5 CLOSED (H-G=0, H-D=0, Major #3+#4 closed); **F5.6 CLOSED as REFUTED** (Major #1 false-positive — effective_to is a soft-delete tombstone, not a future-dated interval; ADR 0037; HS-2 raised+operator-approved Option A, doc-only); **F5.7 CLOSED** (Major #2 fixed — role-admin iam_users upsert now carries tenant_id, was defaulting to the sentinel placeholder).  
 > **Opened by:** HS-5 (mission-validator FAIL on terminal re-audit `architecture-re-audit-2026-06-16.md`)  
 > **Re-audit artifact:** `wiki/backend/_artifacts/architecture-re-audit-2026-06-16.md`  
 > **Governing spec:** `../mission.md §8`  
