@@ -81,8 +81,8 @@ SELECT EXISTS (
 	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
 		WithArgs(`[{"area":"tenant","cap":"user.manage"}]`).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO metaldocs.iam_users`)).
-		WithArgs("alice", "Alice").
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id, is_active, updated_at)`)).
+		WithArgs("alice", "Alice", testTenant).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`)).
 		WithArgs(testTenant, "alice").
@@ -168,8 +168,8 @@ SELECT EXISTS (
 	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
 		WithArgs(`[{"area":"tenant","cap":"user.manage"}]`).
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO metaldocs.iam_users`)).
-		WithArgs("alice", "Alice").
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id, is_active, updated_at)`)).
+		WithArgs("alice", "Alice", testTenant).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`)).
 		WithArgs(testTenant, "alice").

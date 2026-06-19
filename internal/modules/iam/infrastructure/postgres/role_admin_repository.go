@@ -58,13 +58,17 @@ func (r *RoleAdminRepository) UpsertUserAndAssignRoleTx(ctx context.Context, tx 
 		return fmt.Errorf("require iam user.manage authorization: %w", err)
 	}
 
+	// tenant_id is NOT NULL on iam_users with a sentinel default; it must be set
+	// explicitly so new rows carry the caller's real tenant (re-audit Major #2,
+	// M5/F5.7). EXCLUDED.tenant_id on conflict also repairs any pre-existing
+	// sentinel row on the next upsert.
 	const upsertUser = `
-INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, updated_at)
-VALUES ($1, $2, TRUE, NOW())
+INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id, is_active, updated_at)
+VALUES ($1, $2, $3::uuid, TRUE, NOW())
 ON CONFLICT (user_id)
-DO UPDATE SET display_name = EXCLUDED.display_name, is_active = TRUE, updated_at = NOW()
+DO UPDATE SET display_name = EXCLUDED.display_name, tenant_id = EXCLUDED.tenant_id, is_active = TRUE, updated_at = NOW()
 `
-	if _, err := tx.ExecContext(ctx, upsertUser, userID, displayName); err != nil {
+	if _, err := tx.ExecContext(ctx, upsertUser, userID, displayName, tenantID); err != nil {
 		return fmt.Errorf("upsert iam user: %w", err)
 	}
 
@@ -106,13 +110,17 @@ func (r *RoleAdminRepository) ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx
 		return fmt.Errorf("require iam user.manage authorization: %w", err)
 	}
 
+	// tenant_id is NOT NULL on iam_users with a sentinel default; set it
+	// explicitly so new rows carry the caller's real tenant (re-audit Major #2,
+	// M5/F5.7). EXCLUDED.tenant_id on conflict also repairs any pre-existing
+	// sentinel row on the next upsert.
 	const upsertUser = `
-INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, updated_at)
-VALUES ($1, $2, TRUE, NOW())
+INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id, is_active, updated_at)
+VALUES ($1, $2, $3::uuid, TRUE, NOW())
 ON CONFLICT (user_id)
-DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = NOW()
+DO UPDATE SET display_name = EXCLUDED.display_name, tenant_id = EXCLUDED.tenant_id, updated_at = NOW()
 `
-	if _, err := tx.ExecContext(ctx, upsertUser, userID, displayName); err != nil {
+	if _, err := tx.ExecContext(ctx, upsertUser, userID, displayName, tenantID); err != nil {
 		return fmt.Errorf("upsert iam user: %w", err)
 	}
 

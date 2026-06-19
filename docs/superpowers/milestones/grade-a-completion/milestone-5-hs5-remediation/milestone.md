@@ -1,7 +1,7 @@
 # Milestone 5 — HS-5 Remediation (close the re-audit gap)
 
 > **Program:** grade-a-completion  
-> **Status:** in-progress (spec approved 2026-06-16; HS-5 opened+approved 2026-06-16) — F5.1–F5.5 CLOSED (H-G=0, H-D=0, Major #3+#4 closed); **F5.6 CLOSED as REFUTED** (Major #1 false-positive — effective_to is a soft-delete tombstone, not a future-dated interval; ADR 0037; HS-2 raised+operator-approved Option A, doc-only). Remaining: F5.7 (role-admin tenant_id)  
+> **Status:** all 7 features CLOSED — awaiting milestone-validator (Phase 4) + HS-1 operator gate. F5.1–F5.5 CLOSED (H-G=0, H-D=0, Major #3+#4 closed); **F5.6 CLOSED as REFUTED** (Major #1 false-positive — effective_to is a soft-delete tombstone, not a future-dated interval; ADR 0037; HS-2 raised+operator-approved Option A, doc-only); **F5.7 CLOSED** (Major #2 fixed — role-admin iam_users upsert now carries tenant_id, was defaulting to the sentinel placeholder).  
 > **Opened by:** HS-5 (mission-validator FAIL on terminal re-audit `architecture-re-audit-2026-06-16.md`)  
 > **Re-audit artifact:** `wiki/backend/_artifacts/architecture-re-audit-2026-06-16.md`  
 > **Governing spec:** `../mission.md §8`  
