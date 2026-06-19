@@ -1,7 +1,7 @@
 # Milestone 5 — HS-5 Remediation (close the re-audit gap)
 
 > **Program:** grade-a-completion  
-> **Status:** all 7 features CLOSED — awaiting milestone-validator (Phase 4) + HS-1 operator gate. F5.1–F5.5 CLOSED (H-G=0, H-D=0, Major #3+#4 closed); **F5.6 CLOSED as REFUTED** (Major #1 false-positive — effective_to is a soft-delete tombstone, not a future-dated interval; ADR 0037; HS-2 raised+operator-approved Option A, doc-only); **F5.7 CLOSED** (Major #2 fixed — role-admin iam_users upsert now carries tenant_id, was defaulting to the sentinel placeholder).  
+> **Status:** all 7 features closed; milestone-validator returned FAIL (C6 scope-drift on `61389120`) → HS-4 fix feature **F5.8** added (semconv reclassified as prerequisite repair; 2 bundled otel tests disclosed+ratified). Awaiting validator re-dispatch, then HS-1 operator gate. F5.1–F5.5 CLOSED (H-G=0, H-D=0, Major #3+#4 closed); **F5.6 CLOSED as REFUTED** (Major #1 false-positive — effective_to is a soft-delete tombstone, not a future-dated interval; ADR 0037; HS-2 raised+operator-approved Option A, doc-only); **F5.7 CLOSED** (Major #2 fixed — role-admin iam_users upsert now carries tenant_id, was defaulting to the sentinel placeholder).  
 > **Opened by:** HS-5 (mission-validator FAIL on terminal re-audit `architecture-re-audit-2026-06-16.md`)  
 > **Re-audit artifact:** `wiki/backend/_artifacts/architecture-re-audit-2026-06-16.md`  
 > **Governing spec:** `../mission.md §8`  
@@ -30,6 +30,15 @@ composition is already A− — do not touch.
 - Minor findings in `§7` of the re-audit (session rotation, audit handler 405, persistence minors, etc.) — carry as bounded defers; do not drag scope.
 - Do not re-litigate refuted findings from F5.1 or the 2026-06-15 baseline.
 - Do not touch composition/observability (already A−).
+  - **Ratified exception (HS-4, 2026-06-19):** commit `61389120` bundled two additive
+    `*_otel_test.go` files (`controlleddocuments/application/service_otel_test.go`,
+    `documents/approval/application/decision_otel_test.go`) that pin existing F2.3/ADR-0036 spans
+    (`cd.create`, `signoff.record`). Operator **ratified keeping** them, disclosed and attributed to
+    M2/F2.3 lineage (see F5.8). No new observability *production* code is in M5.
+  - **Reclassification (HS-4, 2026-06-19):** the vendored `otel/semconv/v1.24.0`+`v1.30.0` files in
+    the same commit are a **build-prerequisite vendor repair**, not new scope — `vendor/modules.txt`
+    at the parent commit already declared both (transitive deps of `otelsql`/`otel`) but the files
+    were missing, breaking `go build -mod=vendor`. Materializing them restored the build. See F5.8.
 
 ---
 
@@ -46,6 +55,7 @@ Executed in order. Each gets `spec.md → plan.md → evidence.md` before code.
 | **F5.5** `iam-admin-typed` | Replace `map[string]any` admin overview response at `iam/delivery/http/admin_handler.go:262` with the generated IAM admin response type | No `map[string]any` on public IAM admin route; tests green | Major #4 |
 | **F5.6** `authz-effective-to` | Fix `internal/modules/iam/authz/authz.go:124` — `effective_to IS NULL` predicate should be `(effective_to IS NULL OR effective_to > now())` to allow time-bounded active memberships (mirrors the M0/F0.1 `effective_from` fix on the same query) | Test: a time-bounded membership with `effective_to` in the future is **granted**; a membership with `effective_to` in the past is **denied**; existing authz tests green | Major #1 |
 | **F5.7** `role-admin-tenant-id` | Fix `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:61-68` and `:109-116` — iam_users upsert must include `tenant_id`; identify the correct tenant source in the call path and pass it through | iam_users rows created via role_admin path carry the correct tenant_id; test proves it | Major #2 |
+| **F5.8** `otel-scope-reconcile` *(HS-4 fix feature)* | Reconcile the scope finding from the milestone-validator FAIL on commit `61389120`: reclassify the vendored `semconv/v1.24.0`+`v1.30.0` (≈23.8k lines) as a build-prerequisite vendor repair (declared in `modules.txt` at parent, files missing), and disclose+ratify the two bundled `*_otel_test.go` files (F2.3/ADR 0036 lineage). Doc-only; no code reverted. | Validator re-dispatch returns PASS; C6 satisfied (drift disclosed+ratified, 24k payload reclassified with git evidence) | validator FAIL (HS-4) |
 
 ---
 
@@ -81,6 +91,10 @@ All three families are independent — the session may interleave them if it hel
 | HS-3 | Build / route / contract prerequisite fails | Repair first; then resume |
 | HS-4 | milestone-validator FAIL | Open named fix feature; re-dispatch |
 | HS-5 | Re-audit still misses bar | Another bounded micro-milestone; operator decides |
+
+> **HS-4 fired 2026-06-19.** milestone-validator returned FAIL (C6 scope-drift on commit `61389120`).
+> Fix feature **F5.8** opened: reclassified the semconv vendor payload as prerequisite repair and
+> disclosed+ratified the two bundled otel tests. Validator to be re-dispatched.
 
 ---
 
