@@ -111,6 +111,11 @@ func Require(ctx context.Context, tx *sql.Tx, capability, areaCode string) error
 		return appendAssertedCap(ctx, tx, capability, areaCode)
 	}
 
+	// Active-now capability check. `upa.effective_to IS NULL` is the canonical "active"
+	// definition (soft-delete model, ADR 0037) and matches the ux_user_process_areas_*_active
+	// partial indexes. Do NOT change to an interval form (`effective_to > now()`): no
+	// future-dated memberships exist, so it would grant nothing and regress this hot path off
+	// the partial indexes. (Re-audit 2026-06-16 Major #1, refuted with evidence — see ADR 0037.)
 	var granted bool
 	err = tx.QueryRowContext(ctx, `
 SELECT EXISTS (

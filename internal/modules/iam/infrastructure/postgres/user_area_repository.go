@@ -141,6 +141,8 @@ func (r *UserAreaRepository) MembershipDirectoryScope(ctx context.Context, tenan
 	// The system_admin EXISTS predicate is shared with authz.Require (R1 bypass)
 	// via authz.SystemAdminExistsSQL ($1 = actor, $2 = tenant) so the two cannot
 	// drift (ADR 0022 Phase 7 DRY fix).
+	// has_managed_areas gates on `upa.effective_to IS NULL` ($4=now) — the canonical
+	// active-now membership predicate (soft-delete model, ADR 0037). Not an interval bug.
 	const q = `
 SELECT
   ` + authz.SystemAdminExistsSQL + ` AS tenant_wide,
@@ -170,6 +172,10 @@ SELECT
 // restriction is a SQL subquery JOIN (ADR 0022 R3 — filter at the data access
 // layer, never post-fetch). Optional exact-match filters follow ListByTenant.
 func (r *UserAreaRepository) ListByTenantInManagedAreas(ctx context.Context, tenantID, userID, areaCode, role, actorID, capability string, now time.Time) ([]iamdomain.UserProcessArea, error) {
+	// Two predicates, intentionally different (ADR 0037): the outer SELECT returns rows valid
+	// as-of $2 via `(effective_to IS NULL OR effective_to > $2)`; the managed-area subquery gates
+	// the actor's own active-now capability via `upa.effective_to IS NULL`. Neither is an
+	// interval bug — active-now and as-of are different questions.
 	const q = `
 SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
 FROM public.user_process_areas

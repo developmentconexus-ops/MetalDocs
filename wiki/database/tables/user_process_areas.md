@@ -8,6 +8,26 @@
 ## Purpose
 Current curated-baseline table owned by `iam`. See the owning module wiki and runtime repositories for business behavior.
 
+## Temporal model (active vs revoked) — ADR 0037
+
+This table uses **soft-delete with a current marker**, not a future-dated validity interval:
+
+- A membership is **active ⟺ `effective_to IS NULL`**. This is enforced by the partial indexes
+  `ux_user_process_areas_single_active` / `ux_user_process_areas_one_active` /
+  `ix_user_process_areas_active`, all `WHERE effective_to IS NULL` (the UNIQUE one guarantees at most
+  one active row per `(tenant_id,user_id,area_code,role)`).
+- **Revoke** stamps `effective_to = now()` (a past tombstone) + `revoked_by`; the row is retained for
+  history. No code path writes a **future** `effective_to`, and `Grant` exposes no end-date argument.
+- **Active-now reads** therefore filter `effective_to IS NULL` (authz `Require`, CD/search visibility,
+  membership directory). **As-of / history reads** that take a point-in-time parameter `$t` use
+  `(effective_to IS NULL OR effective_to > $t)` — a *different question*, correctly answered by the
+  interval form. Both are correct; this is not drift.
+- Do **not** change the active-now predicate to the interval form: it would grant nothing (no
+  future-dated rows exist), regress authz off the partial indexes, and contradict the unique index.
+  See **ADR 0037** (`wiki/decisions/0037-membership-temporal-model.md`), which refutes re-audit
+  2026-06-16 Major #1 on this point. Time-bounded/scheduled memberships (Model B) are gated behind a
+  successor ADR.
+
 ## Columns
 
 | Column | Type | Nullable | Meaning |

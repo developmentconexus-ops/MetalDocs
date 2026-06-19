@@ -26,6 +26,9 @@ func (r *Reader) ListDocuments(ctx context.Context, query searchdomain.Query, li
 	// not on public.documents — selecting/filtering them errored at runtime, so
 	// they are not part of v2 search. Per-document visibility is enforced against
 	// the caller ($13) using the unified model (AD-3).
+	// The area-grant EXISTS subquery below gates document visibility on `upa.effective_to IS NULL`
+	// — the canonical active-now membership predicate (soft-delete model, ADR 0037). Not an
+	// interval bug.
 	const q = `
 SELECT
 	d.id,

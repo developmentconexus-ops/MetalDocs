@@ -85,6 +85,8 @@ func (r *PostgresControlledDocumentRepository) CodeExists(ctx context.Context, t
 // reports whether a further page exists; the caller builds the next cursor from
 // the last returned document's (CreatedAt, ID).
 func (r *PostgresControlledDocumentRepository) List(ctx context.Context, tenantID string, filter controlleddocumentsdomain.CDFilter) (items []controlleddocumentsdomain.ControlledDocument, hasMore bool, err error) {
+	// The area-grant EXISTS subquery below gates on `upa.effective_to IS NULL` — the canonical
+	// active-now membership predicate (soft-delete model, ADR 0037). Not an interval bug.
 	q := `
 SELECT id::text, tenant_id::text, profile_code, process_area_code, department_code,
        code, sequence_num, title, owner_user_id, coalesce(override_template_version_id::text, ''),
@@ -466,6 +468,8 @@ func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Contex
 }
 
 func (r *PostgresControlledDocumentRepository) CanRead(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (bool, error) {
+	// The area-grant EXISTS subquery below gates on `upa.effective_to IS NULL` — the canonical
+	// active-now membership predicate (soft-delete model, ADR 0037). Not an interval bug.
 	const q = `
 SELECT EXISTS (
   SELECT 1
