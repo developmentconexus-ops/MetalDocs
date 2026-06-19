@@ -1638,6 +1638,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTemplateResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1657,6 +1661,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetTemplateDocxUrlResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -1677,6 +1685,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTemplateAuditResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -5149,6 +5161,53 @@ components:
           properties:
             approval_config:
               $ref: '#/components/schemas/TemplateApprovalConfig'
+    GetTemplateResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [template, latest_version]
+          properties:
+            template: { $ref: '#/components/schemas/TemplateDTO' }
+            latest_version: { $ref: '#/components/schemas/VersionDTO' }
+    GetTemplateDocxUrlResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [url]
+          properties:
+            url: { type: string }
+    TemplateAuditEvent:
+      type: object
+      required: [tenant_id, template_id, actor_id, action, occurred_at]
+      properties:
+        tenant_id: { type: string, format: uuid }
+        template_id: { type: string, format: uuid }
+        version_id: { type: string, format: uuid, nullable: true }
+        actor_id: { type: string, format: uuid }
+        action: { type: string }
+        details: { type: object, additionalProperties: true, nullable: true }
+        occurred_at: { type: string, format: date-time }
+    ListTemplateAuditResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [audit]
+          properties:
+            audit:
+              type: array
+              items: { $ref: '#/components/schemas/TemplateAuditEvent' }
+        meta:
+          type: object
+          required: [limit, offset]
+          properties:
+            limit: { type: integer }
+            offset: { type: integer }
     PlaceholderCatalogEntry:
       type: object
       required: [key, label, description]

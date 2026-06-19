@@ -17,8 +17,8 @@ func TestGetSystemBlankTemplate_RequiresTemplateViewAuthz(t *testing.T) {
 		Name:          "Blank",
 		LatestVersion: 1,
 	}
-	repo.versions["blank-ver-1"] = &domain.TemplateVersion{
-		ID:            "blank-ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:            "22222222-2222-4222-8222-222222222222",
 		TemplateID:    "00000000-0000-0000-0000-000000000101",
 		VersionNumber: 1,
 	}

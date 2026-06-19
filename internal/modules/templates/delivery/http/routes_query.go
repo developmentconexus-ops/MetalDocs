@@ -4,7 +4,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/google/uuid"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
@@ -70,15 +71,11 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 		out = append(out, dto)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"templates": out,
-		},
-		"meta": map[string]int{
-			"limit":  limit,
-			"offset": offset,
-		},
-	})
+	var resp templatesapi.ListTemplatesResponse
+	resp.Data.Templates = out
+	resp.Meta.Limit = limit
+	resp.Meta.Offset = offset
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request) {
@@ -101,11 +98,21 @@ func (h *Handler) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request)
 		writeMappedErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"template_id":         tpl.ID,
-		"template_version_id": ver.ID,
-		"name":                tpl.Name,
-	})
+	tplUUID, err := uuid.Parse(tpl.ID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	verUUID, err := uuid.Parse(ver.ID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	var resp templatesapi.SystemBlankTemplateResponse
+	resp.TemplateId = tplUUID
+	resp.TemplateVersionId = verUUID
+	resp.Name = tpl.Name
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
@@ -142,12 +149,10 @@ func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"template":       tplDTO,
-			"latest_version": latestDTO,
-		},
-	})
+	var resp templatesapi.GetTemplateResponse
+	resp.Data.Template = tplDTO
+	resp.Data.LatestVersion = latestDTO
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
@@ -208,9 +213,9 @@ func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{"url": url},
-	})
+	var resp templatesapi.GetTemplateDocxUrlResponse
+	resp.Data.Url = url
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
@@ -244,28 +249,50 @@ func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := make([]map[string]any, 0, len(events))
+	out := make([]templatesapi.TemplateAuditEvent, 0, len(events))
 	for _, event := range events {
-		out = append(out, map[string]any{
-			"tenant_id":   event.TenantID,
-			"template_id": event.TemplateID,
-			"version_id":  event.VersionID,
-			"actor_id":    event.ActorID,
-			"action":      event.Action,
-			"details":     event.Details,
-			"occurred_at": event.OccurredAt.UTC().Format(time.RFC3339),
-		})
+		tenantUUID, err := uuid.Parse(event.TenantID)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+			return
+		}
+		tplUUID, err := uuid.Parse(event.TemplateID)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+			return
+		}
+		actorUUID, err := uuid.Parse(event.ActorID)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+			return
+		}
+		e := templatesapi.TemplateAuditEvent{
+			TenantId:   tenantUUID,
+			TemplateId: tplUUID,
+			ActorId:    actorUUID,
+			Action:     string(event.Action),
+			OccurredAt: event.OccurredAt.UTC(),
+		}
+		if event.VersionID != nil {
+			verUUID, err := uuid.Parse(*event.VersionID)
+			if err != nil {
+				writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+				return
+			}
+			e.VersionId = &verUUID
+		}
+		if event.Details != nil {
+			d := map[string]interface{}(event.Details)
+			e.Details = &d
+		}
+		out = append(out, e)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"audit": out,
-		},
-		"meta": map[string]int{
-			"limit":  limit,
-			"offset": offset,
-		},
-	})
+	var resp templatesapi.ListTemplateAuditResponse
+	resp.Data.Audit = out
+	resp.Meta.Limit = limit
+	resp.Meta.Offset = offset
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func readQueryInt(raw string, fallback int) (int, bool) {
