@@ -2722,11 +2722,72 @@ export interface components {
                  *     transition does not publish (reject path, or reviewer path
                  *     that only flips to approved).
                  */
-                next_draft?: {
+                next_draft: {
                     /** Format: uuid */
                     id: string;
                     version_number: number;
                 } | null;
+            };
+        };
+        /**
+         * @description Shared 200 response envelope for template version mutations that return the
+         *     post-transition version DTO. Used by submit/review.
+         */
+        TemplateVersionEnvelope: {
+            data: {
+                version: components["schemas"]["VersionDTO"];
+            };
+        };
+        ArchiveTemplateResponse: {
+            data: {
+                template: components["schemas"]["TemplateDTO"];
+            };
+        };
+        TemplateApprovalConfig: {
+            /** Format: uuid */
+            template_id: string;
+            reviewer_role?: string | null;
+            approver_role: string;
+        };
+        UpsertTemplateApprovalConfigResponse: {
+            data: {
+                approval_config: components["schemas"]["TemplateApprovalConfig"];
+            };
+        };
+        GetTemplateResponse: {
+            data: {
+                template: components["schemas"]["TemplateDTO"];
+                latest_version: components["schemas"]["VersionDTO"];
+            };
+        };
+        GetTemplateDocxUrlResponse: {
+            data: {
+                url: string;
+            };
+        };
+        TemplateAuditEvent: {
+            /** Format: uuid */
+            tenant_id: string;
+            /** Format: uuid */
+            template_id: string;
+            /** Format: uuid */
+            version_id?: string | null;
+            /** Format: uuid */
+            actor_id: string;
+            action: string;
+            details?: {
+                [key: string]: unknown;
+            } | null;
+            /** Format: date-time */
+            occurred_at: string;
+        };
+        ListTemplateAuditResponse: {
+            data: {
+                audit: components["schemas"]["TemplateAuditEvent"][];
+            };
+            meta: {
+                limit: number;
+                offset: number;
             };
         };
         PlaceholderCatalogEntry: {
@@ -4558,7 +4619,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TemplateVersionEnvelope"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -4587,7 +4650,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["TemplateVersionEnvelope"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -4644,7 +4709,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ArchiveTemplateResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -4670,7 +4737,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["UpsertTemplateApprovalConfigResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -4696,7 +4765,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["GetTemplateResponse"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
@@ -4721,7 +4792,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["GetTemplateDocxUrlResponse"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
@@ -4745,7 +4818,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ListTemplateAuditResponse"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
