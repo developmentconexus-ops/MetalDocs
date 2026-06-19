@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	iamapi "metaldocs/internal/modules/iam/api"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/problem"
@@ -78,48 +79,47 @@ func (h *ObservabilityHandler) writeProblem(w http.ResponseWriter, p *problem.Pr
 	}
 }
 
-func usageToJSON(u iamdomain.UsageSnapshot) map[string]any {
-	tier := any(nil)
+func usageToJSON(u iamdomain.UsageSnapshot) iamapi.UsageSnapshot {
+	// iamdomain.CountWindows and StorageUsage use int64; iamapi uses int.
+	// Values are safe to narrow: seat counts and window counts never approach
+	// int32 max in practice, and storage bytes is capped by the plan envelope.
+	snap := iamapi.UsageSnapshot{
+		ApiCalls: iamapi.UsageWindowCounts{
+			Last24h: int(u.APICalls.Last24h),
+			Last7d:  int(u.APICalls.Last7d),
+			Last30d: int(u.APICalls.Last30d),
+		},
+		ActiveUsers: iamapi.UsageWindowCounts{
+			Last24h: int(u.ActiveUsers.Last24h),
+			Last7d:  int(u.ActiveUsers.Last7d),
+			Last30d: int(u.ActiveUsers.Last30d),
+		},
+	}
+	snap.Seats.Used = u.Seats.Used
+	snap.Seats.Allocated = u.Seats.Allocated
+	snap.Storage.UsedBytes = int(u.Storage.UsedBytes)
+	snap.Storage.AllocatedBytes = int(u.Storage.AllocatedBytes)
 	if u.PlanTier != "" {
-		tier = string(u.PlanTier)
+		tier := iamapi.UsageSnapshotPlanTier(string(u.PlanTier))
+		snap.PlanTier = &tier
 	}
-	return map[string]any{
-		"seats": map[string]any{
-			"used":      u.Seats.Used,
-			"allocated": u.Seats.Allocated,
-		},
-		"storage": map[string]any{
-			"used_bytes":      u.Storage.UsedBytes,
-			"allocated_bytes": u.Storage.AllocatedBytes,
-		},
-		"api_calls": map[string]any{
-			"last24h": u.APICalls.Last24h,
-			"last7d":  u.APICalls.Last7d,
-			"last30d": u.APICalls.Last30d,
-		},
-		"active_users": map[string]any{
-			"last24h": u.ActiveUsers.Last24h,
-			"last7d":  u.ActiveUsers.Last7d,
-			"last30d": u.ActiveUsers.Last30d,
-		},
-		"plan_tier": tier,
-	}
+	return snap
 }
 
-func kpiToJSON(k iamdomain.KpiSnapshot) map[string]any {
-	dist := make([]map[string]any, 0, len(k.RoleDistribution))
+func kpiToJSON(k iamdomain.KpiSnapshot) iamapi.IamKpiSnapshot {
+	dist := make([]iamapi.IamKpiRoleCount, 0, len(k.RoleDistribution))
 	for _, rc := range k.RoleDistribution {
-		dist = append(dist, map[string]any{
-			"role":  string(rc.Role),
-			"count": rc.Count,
+		dist = append(dist, iamapi.IamKpiRoleCount{
+			Role:  iamapi.UserRole(string(rc.Role)),
+			Count: rc.Count,
 		})
 	}
-	return map[string]any{
-		"locked_accounts":       k.LockedAccounts,
-		"mfa_coverage_pct":       k.MfaCoveragePct,
-		"failed_logins24h":      k.FailedLogins24h,
-		"dormant_users30d":      k.DormantUsers30d,
-		"role_distribution":     dist,
-		"audit_events_per_minute": k.AuditEventsPerMinute,
+	return iamapi.IamKpiSnapshot{
+		LockedAccounts:       k.LockedAccounts,
+		MfaCoveragePct:       k.MfaCoveragePct,
+		FailedLogins24h:      int(k.FailedLogins24h),
+		DormantUsers30d:      k.DormantUsers30d,
+		RoleDistribution:     dist,
+		AuditEventsPerMinute: k.AuditEventsPerMinute,
 	}
 }

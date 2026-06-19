@@ -246,7 +246,8 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	}
 	eventOut := make([]iamapi.AuditEventItem, 0, len(recentEvents))
 	for _, item := range recentEvents {
-		payload := map[string]any{}
+		// AuditEventItem.Payload is map[string]interface{} per codegen contract.
+		payload := make(map[string]interface{})
 		if strings.TrimSpace(item.PayloadJSON) != "" {
 			_ = json.Unmarshal([]byte(item.PayloadJSON), &payload)
 		}
@@ -338,10 +339,15 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"user_id":      userID,
-		"role":        string(role),
-		"display_name": strings.TrimSpace(req.DisplayName),
+	dn := strings.TrimSpace(req.DisplayName)
+	var dnPtr *string
+	if dn != "" {
+		dnPtr = &dn
+	}
+	writeJSON(w, http.StatusOK, iamapi.UpsertUserRoleResponse{
+		UserId:      userID,
+		Role:        string(role),
+		DisplayName: dnPtr,
 	})
 	// Audit is now emitted in-tx by AdminService.UpsertUserAndAssignRole (H-3b).
 }
@@ -375,10 +381,10 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"user_id":      userID,
-		"display_name": strings.TrimSpace(req.DisplayName),
-		"roles":       []string{string(role)},
+	writeJSON(w, http.StatusOK, iamapi.ReplaceUserRolesResponse{
+		UserId:      userID,
+		DisplayName: strings.TrimSpace(req.DisplayName),
+		Roles:       []iamapi.ReplaceUserRolesResponseRoles{iamapi.ReplaceUserRolesResponseRoles(role)},
 	})
 	// Audit is now emitted in-tx by AdminService.ReplaceUserRoles (H-3b).
 }

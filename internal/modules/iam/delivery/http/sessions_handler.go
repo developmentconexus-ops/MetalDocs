@@ -14,6 +14,7 @@ import (
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
+	iamapi "metaldocs/internal/modules/iam/api"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/authn"
@@ -129,38 +130,53 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 	// read is best-effort: on error we render fallbacks rather than fail the list.
 	displayNames := h.resolveDisplayNames(r.Context(), tenantID, items)
 
-	out := make([]map[string]any, 0, len(items))
+	out := make([]iamapi.SessionItem, 0, len(items))
 	for _, item := range items {
 		name := item.UserID
 		if n, ok := displayNames[item.UserID]; ok && n != "" {
 			name = n
 		}
-		entry := map[string]any{
-			"session_id":   item.SessionID,
-			"user_id":      item.UserID,
-			"display_name": name,
-			"created_at":   nullTimeRFC3339(item.CreatedAt),
-			"last_seen_at":  nullTimeRFC3339(item.LastSeenAt),
-			"expires_at":   nullTimeRFC3339(item.ExpiresAt),
+		// sql.NullTime fields: zero time.Time for invalid (never-set) values.
+		// Real active sessions always have valid CreatedAt/ExpiresAt; LastSeenAt
+		// may be zero on very fresh sessions that haven't been refreshed yet.
+		createdAt := item.CreatedAt.Time
+		if item.CreatedAt.Valid {
+			createdAt = item.CreatedAt.Time.UTC()
+		}
+		lastSeenAt := item.LastSeenAt.Time
+		if item.LastSeenAt.Valid {
+			lastSeenAt = item.LastSeenAt.Time.UTC()
+		}
+		expiresAt := item.ExpiresAt.Time
+		if item.ExpiresAt.Valid {
+			expiresAt = item.ExpiresAt.Time.UTC()
+		}
+		si := iamapi.SessionItem{
+			SessionId:   item.SessionID,
+			UserId:      item.UserID,
+			DisplayName: name,
+			CreatedAt:   createdAt,
+			LastSeenAt:  lastSeenAt,
+			ExpiresAt:   expiresAt,
 		}
 		if item.IPAddress != "" {
-			entry["ip_address"] = item.IPAddress
+			ip := item.IPAddress
+			si.IpAddress = &ip
 		}
 		if item.UserAgent != "" {
-			entry["user_agent"] = item.UserAgent
-			entry["device_label"] = useragent.Label(item.UserAgent)
+			ua := item.UserAgent
+			si.UserAgent = &ua
+			dl := useragent.Label(item.UserAgent)
+			si.DeviceLabel = &dl
 		}
-		out = append(out, entry)
+		out = append(out, si)
 	}
 
 	// Cursor pagination is deferred (see authpg.ListActiveSessions doc).
 	// has_more=false is honest for the limit-only MVP.
-	writeJSON(w, http.StatusOK, map[string]any{
-		"items": out,
-		"page": map[string]any{
-			"has_more":    false,
-			"next_cursor": nil,
-		},
+	writeJSON(w, http.StatusOK, iamapi.ListSessionsResponse{
+		Items: out,
+		Page:  iamapi.CursorPage{HasMore: false},
 	})
 }
 
