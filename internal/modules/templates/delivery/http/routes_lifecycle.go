@@ -4,7 +4,11 @@ import (
 	"net/http"
 	"strconv"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
+	"github.com/google/uuid"
+
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
 )
 
@@ -43,11 +47,9 @@ func (h *Handler) submitForReview(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"version": dto,
-		},
-	})
+	var resp templatesapi.TemplateVersionEnvelope
+	resp.Data.Version = dto
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) review(w http.ResponseWriter, r *http.Request) {
@@ -97,11 +99,9 @@ func (h *Handler) review(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"version": dto,
-		},
-	})
+	var resp templatesapi.TemplateVersionEnvelope
+	resp.Data.Version = dto
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
@@ -151,17 +151,23 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
-	data := map[string]any{
-		"version":    verDTO,
-		"next_draft": nil,
-	}
+	var resp templatesapi.ApproveTemplateVersionResponse
+	resp.Data.Version = verDTO
 	if res.NextDraft != nil {
-		data["next_draft"] = map[string]any{
-			"id":             res.NextDraft.ID,
-			"version_number": res.NextDraft.VersionNumber,
+		nextID, parseErr := uuid.Parse(res.NextDraft.ID)
+		if parseErr != nil {
+			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+			return
+		}
+		resp.Data.NextDraft = &struct {
+			Id            openapi_types.UUID `json:"id"`
+			VersionNumber int                `json:"version_number"`
+		}{
+			Id:            nextID,
+			VersionNumber: res.NextDraft.VersionNumber,
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": data})
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
@@ -193,11 +199,9 @@ func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"template": dto,
-		},
-	})
+	var resp templatesapi.ArchiveTemplateResponse
+	resp.Data.Template = dto
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) upsertApprovalConfig(w http.ResponseWriter, r *http.Request) {
@@ -236,15 +240,18 @@ func (h *Handler) upsertApprovalConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"approval_config": map[string]any{
-				"template_id":   cfg.TemplateID,
-				"reviewer_role": cfg.ReviewerRole,
-				"approver_role": cfg.ApproverRole,
-			},
-		},
-	})
+	cfgTemplateID, parseErr := uuid.Parse(cfg.TemplateID)
+	if parseErr != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	var resp templatesapi.UpsertTemplateApprovalConfigResponse
+	resp.Data.ApprovalConfig = templatesapi.TemplateApprovalConfig{
+		TemplateId:   cfgTemplateID,
+		ReviewerRole: cfg.ReviewerRole,
+		ApproverRole: cfg.ApproverRole,
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func actorRolesFromReq(r *http.Request) []string {

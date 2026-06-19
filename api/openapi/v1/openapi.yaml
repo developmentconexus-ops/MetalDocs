@@ -1497,6 +1497,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateVersionEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1524,6 +1528,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateVersionEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1578,6 +1586,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchiveTemplateResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1600,6 +1612,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpsertTemplateApprovalConfigResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -5075,7 +5091,7 @@ components:
       properties:
         data:
           type: object
-          required: [version]
+          required: [version, next_draft]
           properties:
             version:
               $ref: '#/components/schemas/VersionDTO'
@@ -5093,6 +5109,46 @@ components:
               properties:
                 id: { type: string, format: uuid }
                 version_number: { type: integer, minimum: 1 }
+    TemplateVersionEnvelope:
+      description: |
+        Shared 200 response envelope for template version mutations that return the
+        post-transition version DTO. Used by submit/review.
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [version]
+          properties:
+            version:
+              $ref: '#/components/schemas/VersionDTO'
+    ArchiveTemplateResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [template]
+          properties:
+            template:
+              $ref: '#/components/schemas/TemplateDTO'
+    TemplateApprovalConfig:
+      type: object
+      required: [template_id, approver_role]
+      properties:
+        template_id: { type: string, format: uuid }
+        reviewer_role: { type: string, nullable: true }
+        approver_role: { type: string }
+    UpsertTemplateApprovalConfigResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [approval_config]
+          properties:
+            approval_config:
+              $ref: '#/components/schemas/TemplateApprovalConfig'
     PlaceholderCatalogEntry:
       type: object
       required: [key, label, description]
