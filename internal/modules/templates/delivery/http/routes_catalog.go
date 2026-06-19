@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	templatesapi "metaldocs/internal/modules/templates/api"
 )
 
 type catalogEntry struct {
@@ -32,5 +33,9 @@ func (h *Handler) listPlaceholderCatalog(w http.ResponseWriter, r *http.Request)
 		writeMappedErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": placeholderCatalog})
+	entries := make([]templatesapi.PlaceholderCatalogEntry, len(placeholderCatalog))
+	for i, e := range placeholderCatalog {
+		entries[i] = templatesapi.PlaceholderCatalogEntry{Key: e.Key, Label: e.Label, Description: e.Description}
+	}
+	writeJSON(w, http.StatusOK, templatesapi.PlaceholderCatalogResponse{Items: entries})
 }

@@ -6,6 +6,7 @@ import (
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/application"
+	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/domain"
 )
 
@@ -65,9 +66,7 @@ func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"version": dto,
-		},
-	})
+	var resp templatesapi.TemplateVersionEnvelope
+	resp.Data.Version = dto
+	writeJSON(w, http.StatusOK, resp)
 }

@@ -11,6 +11,10 @@ import (
 	"metaldocs/internal/modules/taxonomy/domain"
 )
 
+type listFamiliesResponse struct {
+	Items []domain.DocumentFamily `json:"items"`
+}
+
 type familyUpsertRequest struct {
 	Code        string `json:"code"`
 	Name        string `json:"name"`
@@ -28,7 +32,7 @@ func (h *Handler) listFamilies(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list families")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	writeJSON(w, http.StatusOK, listFamiliesResponse{Items: items})
 }
 
 func (h *Handler) createFamily(w http.ResponseWriter, r *http.Request) {

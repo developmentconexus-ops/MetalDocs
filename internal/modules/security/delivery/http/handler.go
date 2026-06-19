@@ -16,6 +16,48 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// --- typed response structs (F6.4) ---
+
+type mfaCoverageByRoleItem struct {
+	Role       string  `json:"role"`
+	Total      int     `json:"total"`
+	MfaEnabled int     `json:"mfa_enabled"`
+	Pct        float32 `json:"pct"`
+}
+
+type mfaCoverageResponse struct {
+	TotalUsers    int                     `json:"total_users"`
+	MfaEnabled    int                     `json:"mfa_enabled"`
+	MfaEnabledPct float32                 `json:"mfa_enabled_pct"`
+	ByRole        []mfaCoverageByRoleItem  `json:"by_role"`
+}
+
+type lockoutItem struct {
+	UserID         string  `json:"user_id"`
+	DisplayName    string  `json:"display_name"`
+	FailedAttempts int     `json:"failed_attempts"`
+	LockedUntil    *string `json:"locked_until,omitempty"`
+	LastFailedAt   *string `json:"last_failed_at,omitempty"`
+	LastFailedIP   string  `json:"last_failed_ip,omitempty"`
+}
+
+type lockoutsResponse struct {
+	Items []lockoutItem `json:"items"`
+}
+
+type signalItem struct {
+	SignalID   string         `json:"signal_id"`
+	Kind       string         `json:"kind"`
+	Severity   string         `json:"severity"`
+	Summary    string         `json:"summary"`
+	DetectedAt string         `json:"detected_at"`
+	Evidence   map[string]any `json:"evidence,omitempty"`
+}
+
+type signalsResponse struct {
+	Items []signalItem `json:"items"`
+}
+
 var writeJSON = httpresponse.WriteJSON
 
 type Handler struct {
@@ -64,7 +106,7 @@ func (h *Handler) handleLockouts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.service == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"items": []any{}})
+		writeJSON(w, http.StatusOK, lockoutsResponse{Items: []lockoutItem{}})
 		return
 	}
 	items, err := h.service.ListLockouts(r.Context(), tenantID)
@@ -73,25 +115,25 @@ func (h *Handler) handleLockouts(w http.ResponseWriter, r *http.Request) {
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list lockouts"))
 		return
 	}
-	out := make([]map[string]any, 0, len(items))
+	out := make([]lockoutItem, 0, len(items))
 	for _, l := range items {
-		row := map[string]any{
-			"user_id":         l.UserID,
-			"display_name":    l.DisplayName,
-			"failed_attempts": l.FailedAttempts,
+		row := lockoutItem{
+			UserID:         l.UserID,
+			DisplayName:    l.DisplayName,
+			FailedAttempts: l.FailedAttempts,
+			LastFailedIP:   l.LastFailedIP,
 		}
 		if l.LockedUntil != nil {
-			row["locked_until"] = l.LockedUntil.Format(time.RFC3339)
+			s := l.LockedUntil.Format(time.RFC3339)
+			row.LockedUntil = &s
 		}
 		if l.LastFailedAt != nil {
-			row["last_failed_at"] = l.LastFailedAt.Format(time.RFC3339)
-		}
-		if l.LastFailedIP != "" {
-			row["last_failed_ip"] = l.LastFailedIP
+			s := l.LastFailedAt.Format(time.RFC3339)
+			row.LastFailedAt = &s
 		}
 		out = append(out, row)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": out})
+	writeJSON(w, http.StatusOK, lockoutsResponse{Items: out})
 }
 
 func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +146,7 @@ func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.service == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"items": []any{}})
+		writeJSON(w, http.StatusOK, signalsResponse{Items: []signalItem{}})
 		return
 	}
 	signals, err := h.service.ListSignals(r.Context(), tenantID)
@@ -113,21 +155,21 @@ func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list security signals"))
 		return
 	}
-	out := make([]map[string]any, 0, len(signals))
+	out := make([]signalItem, 0, len(signals))
 	for _, s := range signals {
-		row := map[string]any{
-			"signal_id":   s.SignalID,
-			"kind":       s.Kind,
-			"severity":   s.Severity,
-			"summary":    s.Summary,
-			"detected_at": s.DetectedAt.Format(time.RFC3339),
+		row := signalItem{
+			SignalID:   s.SignalID,
+			Kind:       s.Kind,
+			Severity:   s.Severity,
+			Summary:    s.Summary,
+			DetectedAt: s.DetectedAt.Format(time.RFC3339),
 		}
 		if len(s.Evidence) > 0 {
-			row["evidence"] = s.Evidence
+			row.Evidence = s.Evidence
 		}
 		out = append(out, row)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": out})
+	writeJSON(w, http.StatusOK, signalsResponse{Items: out})
 }
 
 func (h *Handler) requireTenant(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -151,29 +193,29 @@ func (h *Handler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
 	}
 }
 
-func mfaCoverageToJSON(c securitydomain.MfaCoverage) map[string]any {
-	byRole := make([]map[string]any, 0, len(c.ByRole))
+func mfaCoverageToJSON(c securitydomain.MfaCoverage) mfaCoverageResponse {
+	byRole := make([]mfaCoverageByRoleItem, 0, len(c.ByRole))
 	for _, s := range c.ByRole {
-		byRole = append(byRole, map[string]any{
-			"role":       s.Role,
-			"total":      s.Total,
-			"mfa_enabled": s.MfaEnabled,
-			"pct":        s.Pct,
+		byRole = append(byRole, mfaCoverageByRoleItem{
+			Role:       s.Role,
+			Total:      s.Total,
+			MfaEnabled: s.MfaEnabled,
+			Pct:        s.Pct,
 		})
 	}
-	return map[string]any{
-		"total_users":    c.TotalUsers,
-		"mfa_enabled":    c.MfaEnabled,
-		"mfa_enabled_pct": c.MfaEnabledPct,
-		"by_role":        byRole,
+	return mfaCoverageResponse{
+		TotalUsers:    c.TotalUsers,
+		MfaEnabled:    c.MfaEnabled,
+		MfaEnabledPct: c.MfaEnabledPct,
+		ByRole:        byRole,
 	}
 }
 
 func writeMfaCoverageZero(w http.ResponseWriter) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"total_users":    0,
-		"mfa_enabled":    0,
-		"mfa_enabled_pct": 0,
-		"by_role":        []any{},
+	writeJSON(w, http.StatusOK, mfaCoverageResponse{
+		TotalUsers:    0,
+		MfaEnabled:    0,
+		MfaEnabledPct: 0,
+		ByRole:        []mfaCoverageByRoleItem{},
 	})
 }

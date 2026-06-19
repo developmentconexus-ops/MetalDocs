@@ -11,6 +11,10 @@ import (
 	"metaldocs/internal/platform/authn"
 )
 
+type listAreasResponse struct {
+	Items []domain.ProcessArea `json:"items"`
+}
+
 type areaUpsertRequest struct {
 	Code                string  `json:"code"`
 	Name                string  `json:"name"`
@@ -37,7 +41,7 @@ func (h *Handler) listAreas(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list areas")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	writeJSON(w, http.StatusOK, listAreasResponse{Items: items})
 }
 
 func (h *Handler) createArea(w http.ResponseWriter, r *http.Request) {

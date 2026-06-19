@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	iamapi "metaldocs/internal/modules/iam/api"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -61,6 +62,10 @@ type membershipDTO struct {
 	EffectiveFrom string  `json:"effective_from"`
 	EffectiveTo   *string `json:"effective_to"`
 	GrantedBy     *string `json:"granted_by"`
+}
+
+type listMembershipsResponse struct {
+	Items []membershipDTO `json:"items"`
 }
 
 func toMembershipDTO(m iamdomain.UserProcessArea) membershipDTO {
@@ -165,7 +170,7 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 	for _, m := range items {
 		dtos = append(dtos, toMembershipDTO(m))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": dtos})
+	writeJSON(w, http.StatusOK, listMembershipsResponse{Items: dtos})
 }
 
 // grantMembership — operationId grantAreaMembership.
@@ -232,11 +237,11 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 	// Audit is written in-tx by AreaMembershipService.Grant (AuditMembershipLogger);
 	// no post-commit emission here (would be a duplicate row — H-3a).
 
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"user_id":   userID,
-		"tenant_id": tenantID,
-		"area_code": areaCode,
-		"role":      role,
+	writeJSON(w, http.StatusCreated, iamapi.GrantAreaMembershipResponse{
+		UserId:   userID,
+		TenantId: tenantID,
+		AreaCode: areaCode,
+		Role:     iamapi.UserRole(role),
 	})
 }
 
