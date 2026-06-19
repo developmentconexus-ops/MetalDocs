@@ -12,6 +12,7 @@ import (
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
+	iamapi "metaldocs/internal/modules/iam/api"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampresence "metaldocs/internal/modules/iam/presence"
@@ -239,6 +240,63 @@ func TestHandleAdminOverview_PresenceCarriesStatus(t *testing.T) {
 	item := items[0].(map[string]any)
 	if item["status"] != "online" {
 		t.Fatalf("presence[0].status = %v, want \"online\" (the declared OnlinePresenceItem enum)", item["status"])
+	}
+}
+
+// TestHandleAdminOverview_DecodesIntoGeneratedContract is the F5.5 (Major #4)
+// guard: the overview route body must decode strictly into the strict-server
+// generated iamapi.AdminOverviewResponse — no unknown fields, every key typed.
+// Locks the route to the OpenAPI contract so future drift fails the suite.
+func TestHandleAdminOverview_DecodesIntoGeneratedContract(t *testing.T) {
+	authSvc := &stubUserAdminService{}
+	presence := &stubPresenceReader{items: []iampresence.Item{{
+		UserID:      "u1",
+		Username:    "alice",
+		DisplayName: "Alice",
+		LastSeenAt:  time.Unix(1700000000, 0).UTC(),
+		Status:      iampresence.StatusOnline,
+	}}}
+	handler := NewAdminHandler(nil, authSvc).
+		WithObservabilityService(&stubKpiReader{snap: iamdomain.KpiSnapshot{
+			LockedAccounts:   3,
+			FailedLogins24h:  7,
+			RoleDistribution: []iamdomain.RoleCount{{Role: iamdomain.RoleEditor, Count: 2}},
+		}}).
+		WithAuditEventLister(&stubAuditLister{events: []auditdomain.Event{{
+			ID: "evt_1", TenantID: tenantA, Action: "login", ResourceType: "user", ResourceID: "u1",
+		}}}).
+		WithPresenceReader(presence)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/iam/admin/overview", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), tenantA))
+	rec := httptest.NewRecorder()
+	handler.handleAdminOverview(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(rec.Body.Bytes()))
+	dec.DisallowUnknownFields()
+	var out iamapi.AdminOverviewResponse
+	if err := dec.Decode(&out); err != nil {
+		t.Fatalf("body does not conform to iamapi.AdminOverviewResponse: %v\nbody=%s", err, rec.Body.String())
+	}
+
+	if out.Kpi.LockedAccounts != 3 {
+		t.Fatalf("kpi.locked_accounts = %d, want 3", out.Kpi.LockedAccounts)
+	}
+	if out.Kpi.FailedLogins24h != 7 {
+		t.Fatalf("kpi.failed_logins24h = %d, want 7", out.Kpi.FailedLogins24h)
+	}
+	if len(out.Kpi.RoleDistribution) != 1 || string(out.Kpi.RoleDistribution[0].Role) != "editor" {
+		t.Fatalf("kpi.role_distribution = %+v, want [{editor 2}]", out.Kpi.RoleDistribution)
+	}
+	if len(out.Presence) != 1 || out.Presence[0].Status == nil || *out.Presence[0].Status != iamapi.Online {
+		t.Fatalf("presence = %+v, want 1 item with status=online", out.Presence)
+	}
+	if len(out.RecentActivities) != 1 || out.RecentActivities[0].Action != "login" {
+		t.Fatalf("recent_activities = %+v, want 1 item action=login", out.RecentActivities)
 	}
 }
 

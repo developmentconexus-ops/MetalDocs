@@ -13,6 +13,7 @@ import (
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
+	iamapi "metaldocs/internal/modules/iam/api"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampresence "metaldocs/internal/modules/iam/presence"
@@ -221,69 +222,71 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	presenceOut := make([]map[string]any, 0, len(onlineUsers)+len(presenceItems))
+	presenceOut := make([]iamapi.OnlinePresenceItem, 0, len(onlineUsers)+len(presenceItems))
 	if h.presence != nil {
 		for _, item := range presenceItems {
-			presenceOut = append(presenceOut, map[string]any{
-				"user_id":      item.UserID,
-				"username":     item.Username,
-				"display_name": item.DisplayName,
-				"last_seen_at":  item.LastSeenAt.UTC().Format(time.RFC3339),
-				"status":      string(item.Status),
+			status := iamapi.OnlinePresenceItemStatus(string(item.Status))
+			presenceOut = append(presenceOut, iamapi.OnlinePresenceItem{
+				UserId:      item.UserID,
+				Username:    item.Username,
+				DisplayName: item.DisplayName,
+				LastSeenAt:  item.LastSeenAt.UTC(),
+				Status:      &status,
 			})
 		}
 	} else {
 		for _, item := range onlineUsers {
-			presenceOut = append(presenceOut, map[string]any{
-				"user_id":      item.UserID,
-				"username":    item.Username,
-				"display_name": item.DisplayName,
-				"last_seen_at":  item.LastSeenAt.UTC().Format(time.RFC3339),
+			presenceOut = append(presenceOut, iamapi.OnlinePresenceItem{
+				UserId:      item.UserID,
+				Username:    item.Username,
+				DisplayName: item.DisplayName,
+				LastSeenAt:  item.LastSeenAt.UTC(),
 			})
 		}
 	}
-	eventOut := make([]map[string]any, 0, len(recentEvents))
+	eventOut := make([]iamapi.AuditEventItem, 0, len(recentEvents))
 	for _, item := range recentEvents {
 		payload := map[string]any{}
 		if strings.TrimSpace(item.PayloadJSON) != "" {
 			_ = json.Unmarshal([]byte(item.PayloadJSON), &payload)
 		}
-		eventOut = append(eventOut, map[string]any{
-			"id":           item.ID,
-			"occurred_at":   item.OccurredAt.UTC().Format(time.RFC3339),
-			"actor_id":      item.ActorID,
-			"action":       item.Action,
-			"resource_type": item.ResourceType,
-			"resource_id":   item.ResourceID,
-			"payload":      payload,
-			"trace_id":      item.TraceID,
+		eventOut = append(eventOut, iamapi.AuditEventItem{
+			Id:           item.ID,
+			OccurredAt:   item.OccurredAt.UTC(),
+			ActorId:      item.ActorID,
+			Action:       item.Action,
+			ResourceType: item.ResourceType,
+			ResourceId:   item.ResourceID,
+			Payload:      payload,
+			TraceId:      item.TraceID,
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"kpi":              kpiToOverviewJSON(kpiSnapshot),
-		"presence":         presenceOut,
-		"recent_activities": eventOut,
+	writeJSON(w, http.StatusOK, iamapi.AdminOverviewResponse{
+		Kpi:              kpiToOverviewTyped(kpiSnapshot),
+		Presence:         presenceOut,
+		RecentActivities: eventOut,
 	})
 }
 
-// kpiToOverviewJSON mirrors the shape produced by ObservabilityHandler so
-// the composed overview and the standalone /iam/kpi endpoint return
-// identical kpi payloads.
-func kpiToOverviewJSON(k iamdomain.KpiSnapshot) map[string]any {
-	dist := make([]map[string]any, 0, len(k.RoleDistribution))
+// kpiToOverviewTyped folds the domain KpiSnapshot into the strict-server
+// generated iamapi.IamKpiSnapshot — the same shape the standalone /iam/kpi
+// endpoint returns. FailedLogins24h widens int64→int per the generated
+// contract; Role carries through as the iamapi.UserRole enum.
+func kpiToOverviewTyped(k iamdomain.KpiSnapshot) iamapi.IamKpiSnapshot {
+	dist := make([]iamapi.IamKpiRoleCount, 0, len(k.RoleDistribution))
 	for _, rc := range k.RoleDistribution {
-		dist = append(dist, map[string]any{
-			"role":  string(rc.Role),
-			"count": rc.Count,
+		dist = append(dist, iamapi.IamKpiRoleCount{
+			Role:  iamapi.UserRole(string(rc.Role)),
+			Count: rc.Count,
 		})
 	}
-	return map[string]any{
-		"locked_accounts":       k.LockedAccounts,
-		"mfa_coverage_pct":       k.MfaCoveragePct,
-		"failed_logins24h":      k.FailedLogins24h,
-		"dormant_users30d":      k.DormantUsers30d,
-		"role_distribution":     dist,
-		"audit_events_per_minute": k.AuditEventsPerMinute,
+	return iamapi.IamKpiSnapshot{
+		LockedAccounts:       k.LockedAccounts,
+		MfaCoveragePct:       k.MfaCoveragePct,
+		FailedLogins24h:      int(k.FailedLogins24h),
+		DormantUsers30d:      k.DormantUsers30d,
+		RoleDistribution:     dist,
+		AuditEventsPerMinute: k.AuditEventsPerMinute,
 	}
 }
 
