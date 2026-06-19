@@ -38,9 +38,14 @@ func (h *Handler) submitForReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dto, err := toAPIVersionDTO(v)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"version": toVersionResponse(v),
+			"version": dto,
 		},
 	})
 }
@@ -87,9 +92,14 @@ func (h *Handler) review(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dto, err := toAPIVersionDTO(v)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"version": toVersionResponse(v),
+			"version": dto,
 		},
 	})
 }
@@ -136,8 +146,13 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	verDTO, err := toAPIVersionDTO(res.Version)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
 	data := map[string]any{
-		"version":    toVersionResponse(res.Version),
+		"version":    verDTO,
 		"next_draft": nil,
 	}
 	if res.NextDraft != nil {
@@ -173,9 +188,14 @@ func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dto, err := toAPITemplateDTO(tpl)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"template": toTemplateResponse(tpl),
+			"template": dto,
 		},
 	})
 }

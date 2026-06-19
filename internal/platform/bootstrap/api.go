@@ -77,7 +77,7 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 		if err != nil {
 			return APIDependencies{}, fmt.Errorf("open postgres: %w", err)
 		}
-		authRepo := authpg.NewRepository(db)
+		authRepo := authpg.NewRepository(db, iampg.NewUserTenantRepository(db))
 		var minioClient *miniogo.Client
 		var minioPublicClient *miniogo.Client
 		var minioBucket string

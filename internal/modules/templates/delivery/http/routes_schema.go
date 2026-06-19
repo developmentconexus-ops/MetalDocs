@@ -60,9 +60,14 @@ func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dto, err := toAPIVersionDTO(v)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"version": toVersionResponse(v),
+			"version": dto,
 		},
 	})
 }

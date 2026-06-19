@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -41,7 +42,7 @@ func (r *TemplateVersionReader) IsPublished(ctx context.Context, versionID strin
 	if err != nil {
 		return false, "", err
 	}
-	if !status.Valid || status.String != "published" {
+	if !status.Valid || status.String != string(templatesdomain.VersionStatusPublished) {
 		return false, profileCode.String, nil
 	}
 	return true, profileCode.String, nil

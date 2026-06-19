@@ -13,8 +13,8 @@ import (
 func TestUpdateSchemas_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:            "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:            "22222222-2222-4222-8222-222222222222",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
 		Status:        domain.VersionStatusDraft,

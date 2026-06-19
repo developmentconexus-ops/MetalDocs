@@ -11,6 +11,7 @@ import (
 	"github.com/lib/pq"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // Compile-time assertion that the postgres adapter satisfies the auth port.
@@ -18,10 +19,21 @@ var _ authdomain.Repository = (*Repository)(nil)
 
 type Repository struct {
 	db *sql.DB
+	// userTenants is the iam-owned read port for a user's tenant memberships.
+	// auth does NOT own metaldocs.iam_user_roles; it resolves a user's tenant set
+	// through this port instead of reading that table directly (H-G remediation,
+	// M5/F5.2; see ADR 0031). It reads the pool (off-tx, H-PRE-1).
+	userTenants iamdomain.UserTenantReader
 }
 
-func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db}
+// NewRepository constructs the postgres auth adapter. userTenants is the iam port
+// backing GetUserTenants; a nil value installs the Noop null-object (callers that
+// never resolve tenant membership — e.g. unit tests of other methods).
+func NewRepository(db *sql.DB, userTenants iamdomain.UserTenantReader) *Repository {
+	if userTenants == nil {
+		userTenants = iamdomain.NoopUserTenantReader{}
+	}
+	return &Repository{db: db, userTenants: userTenants}
 }
 
 func (r *Repository) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
@@ -98,27 +110,12 @@ WHERE session_id = $1
 	return session, nil
 }
 
+// GetUserTenants resolves the user's tenant memberships through the iam-owned
+// UserTenantReader port rather than reading metaldocs.iam_user_roles directly
+// (module-boundary remediation, M5/F5.2). The port reproduces the prior query
+// (distinct, sorted) on the connection pool (off-tx, H-PRE-1).
 func (r *Repository) GetUserTenants(ctx context.Context, userID string) ([]string, error) {
-	const q = `
-SELECT DISTINCT tenant_id::text
-FROM metaldocs.iam_user_roles
-WHERE user_id = $1
-ORDER BY tenant_id
-`
-	rows, err := r.db.QueryContext(ctx, q, userID)
-	if err != nil {
-		return nil, fmt.Errorf("get user tenants: %w", err)
-	}
-	defer rows.Close()
-	var tenants []string
-	for rows.Next() {
-		var tid string
-		if err := rows.Scan(&tid); err != nil {
-			return nil, fmt.Errorf("scan user tenant: %w", err)
-		}
-		tenants = append(tenants, tid)
-	}
-	return tenants, rows.Err()
+	return r.userTenants.UserTenantIDs(ctx, userID)
 }
 
 func (r *Repository) GetTenantByID(ctx context.Context, tenantID string) (authdomain.Tenant, error) {

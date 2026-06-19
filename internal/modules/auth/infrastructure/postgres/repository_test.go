@@ -54,7 +54,7 @@ VALUES ($1, $1, NULL, 'Test Unlock', TRUE, 'hash', 'bcrypt', FALSE, 3, $2, NOW()
 		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.auth_identities WHERE user_id = $1`, userID)
 	})
 
-	repo := authpostgres.NewRepository(db)
+	repo := authpostgres.NewRepository(db, nil)
 
 	err = repo.UpdateUser(ctx, authdomain.UpdateUserParams{
 		UserID:         userID,
@@ -88,7 +88,7 @@ FROM metaldocs.auth_identities WHERE user_id = $1
 func TestWithinLoginLock_BoundsConcurrentFailedLogins(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	repo := authpostgres.NewRepository(db)
+	repo := authpostgres.NewRepository(db, nil)
 
 	userID := fmt.Sprintf("lock-itest-%d", time.Now().UnixNano())
 	if _, err := db.ExecContext(ctx, `
@@ -141,7 +141,7 @@ SELECT failed_login_attempts FROM metaldocs.auth_identities WHERE user_id = $1
 func TestUpdateUserMissingIdentityReturnsNotFound(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	repo := authpostgres.NewRepository(db)
+	repo := authpostgres.NewRepository(db, nil)
 
 	err := repo.UpdateUser(ctx, authdomain.UpdateUserParams{
 		UserID:      fmt.Sprintf("missing-user-%d", time.Now().UnixNano()),
@@ -155,7 +155,7 @@ func TestUpdateUserMissingIdentityReturnsNotFound(t *testing.T) {
 func TestListOnlineUsers_FiltersByTenant(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	repo := authpostgres.NewRepository(db)
+	repo := authpostgres.NewRepository(db, nil)
 
 	tenantA := "11111111-1111-1111-1111-111111111111"
 	tenantB := "22222222-2222-2222-2222-222222222222"

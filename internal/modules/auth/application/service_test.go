@@ -1000,7 +1000,7 @@ SELECT EXISTS (
 		WillReturnError(sqlmock.ErrCancelled)
 	mock.ExpectRollback()
 
-	repo := authpostgres.NewRepository(db)
+	repo := authpostgres.NewRepository(db, nil)
 	roleProvider := newMockRoleProvider()
 	roleAdmin := iampostgres.NewRoleAdminRepository(db)
 	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{

@@ -22,7 +22,7 @@ import (
 func TestListActiveSessions_NoIamUsersJoin(t *testing.T) {
 	db := openTestDB(t)
 	ctx := context.Background()
-	repo := authpostgres.NewRepository(db)
+	repo := authpostgres.NewRepository(db, nil)
 
 	// Seeded tenants (FK fk_auth_sessions_tenant requires real tenant rows).
 	tenantA := "ffffffff-ffff-ffff-ffff-ffffffffffff"

@@ -28,7 +28,7 @@ SELECT EXISTS (
 		WithArgs("user-1").
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 
-	repo := NewRepository(db)
+	repo := NewRepository(db, nil)
 	if err := repo.UpdateUser(context.Background(), authdomain.UpdateUserParams{UserID: "user-1"}); err != nil {
 		t.Fatalf("UpdateUser: %v", err)
 	}
@@ -53,7 +53,7 @@ SELECT EXISTS (
 		WithArgs("missing-user").
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 
-	repo := NewRepository(db)
+	repo := NewRepository(db, nil)
 	err = repo.UpdateUser(context.Background(), authdomain.UpdateUserParams{UserID: "missing-user"})
 	if !errors.Is(err, authdomain.ErrIdentityNotFound) {
 		t.Fatalf("UpdateUser error = %v, want ErrIdentityNotFound", err)
@@ -81,7 +81,7 @@ WHERE session_id = $1
 		WithArgs("session-1", seenAt).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	repo := NewRepository(db)
+	repo := NewRepository(db, nil)
 	if err := repo.TouchSession(context.Background(), "session-1", seenAt); err != nil {
 		t.Fatalf("TouchSession: %v", err)
 	}

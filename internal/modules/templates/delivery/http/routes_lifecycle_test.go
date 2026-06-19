@@ -31,8 +31,8 @@ func TestSubmitForReview_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:            "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:            "22222222-2222-4222-8222-222222222222",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
 		Status:        domain.VersionStatusDraft,
@@ -74,8 +74,8 @@ func TestSubmitForReview_UsesTemplateSubmitCapability(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:            "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:            "22222222-2222-4222-8222-222222222222",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
 		Status:        domain.VersionStatusDraft,
@@ -110,8 +110,8 @@ func TestSubmitForReview_UsesTemplateSubmitCapability(t *testing.T) {
 func TestSubmitForReview_NonDraft(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:            "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:            "22222222-2222-4222-8222-222222222222",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
 		Status:        domain.VersionStatusInReview,
@@ -142,8 +142,8 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 func TestSubmitForReview_NoUpload(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:            "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:            "22222222-2222-4222-8222-222222222222",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
 		Status:        domain.VersionStatusDraft,
@@ -180,8 +180,8 @@ func TestSubmitForReview_SystemOwnedTemplateImmutable(t *testing.T) {
 		TenantID:    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 		SystemOwned: true,
 	}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:            "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:            "22222222-2222-4222-8222-222222222222",
 		TemplateID:    templateID,
 		VersionNumber: 1,
 		Status:        domain.VersionStatusDraft,
@@ -214,8 +214,8 @@ func TestReview_Accept_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:                  "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:                  "22222222-2222-4222-8222-222222222222",
 		TemplateID:          "11111111-1111-1111-1111-111111111111",
 		VersionNumber:       1,
 		Status:              domain.VersionStatusInReview,
@@ -255,8 +255,8 @@ func TestApprove_Accept_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:                  "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:                  "22222222-2222-4222-8222-222222222222",
 		TemplateID:          "11111111-1111-1111-1111-111111111111",
 		VersionNumber:       1,
 		Status:              domain.VersionStatusApproved,
@@ -313,8 +313,8 @@ func TestApprove_Reject_NextDraftNull(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:                  "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:                  "22222222-2222-4222-8222-222222222222",
 		TemplateID:          "11111111-1111-1111-1111-111111111111",
 		VersionNumber:       1,
 		Status:              domain.VersionStatusApproved,
@@ -422,8 +422,8 @@ func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
 	repo := newFakeRepo()
 	templateID := "11111111-1111-1111-1111-111111111111"
 	repo.templates[templateID] = &domain.Template{ID: templateID, TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", LatestVersion: 1}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:                  "ver-1",
+	repo.versions["22222222-2222-4222-8222-222222222222"] = &domain.TemplateVersion{
+		ID:                  "22222222-2222-4222-8222-222222222222",
 		TemplateID:          templateID,
 		VersionNumber:       1,
 		Status:              domain.VersionStatusDraft,
@@ -459,7 +459,7 @@ func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
 		t.Fatalf("expected error.code=FORBIDDEN_CAPABILITY, got %q (body=%s)", out.Code, rr.Body.String())
 	}
 
-	stored := repo.versions["ver-1"]
+	stored := repo.versions["22222222-2222-4222-8222-222222222222"]
 	if stored.Status != domain.VersionStatusDraft {
 		t.Fatalf("expected version status unchanged (draft), got %q", stored.Status)
 	}

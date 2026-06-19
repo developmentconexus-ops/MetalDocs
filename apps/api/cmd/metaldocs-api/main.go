@@ -242,7 +242,7 @@ func main() {
 	// PR-7 Sessions & Security tab.
 	var sessionsHandler *iamdelivery.SessionsHandler
 	if sqlDB := deps.SQLDB; sqlDB != nil {
-		authRepo := authpg.NewRepository(sqlDB)
+		authRepo := authpg.NewRepository(sqlDB, iampg.NewUserTenantRepository(sqlDB))
 		sessionSvc := iamapp.NewSessionService(db.NewTxRunner(sqlDB), deps.AuditWriter, authRepo)
 		// M4/F4.4: auth returns auth-owned session rows; the iam consumer enriches
 		// display names via the iam-owned port (read off-tx on the pool).
@@ -373,7 +373,7 @@ func main() {
 	// H-3b Site 3: wire atomic PatchAtomic (UpdateUserTx + ReplaceUserRolesTx + RecordTx).
 	// authpg.Repository satisfies the userUpdaterTx port (UpdateUserTx method).
 	if deps.SQLDB != nil {
-		peopleService.WithTxAudit(db.NewTxRunner(deps.SQLDB), deps.AuditWriter, authpg.NewRepository(deps.SQLDB))
+		peopleService.WithTxAudit(db.NewTxRunner(deps.SQLDB), deps.AuditWriter, authpg.NewRepository(deps.SQLDB, iampg.NewUserTenantRepository(deps.SQLDB)))
 	}
 	iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter).RegisterRoutes(mux)
 

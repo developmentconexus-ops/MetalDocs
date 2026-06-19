@@ -95,23 +95,42 @@ func (h *Handler) GetTemplateVersion(w http.ResponseWriter, r *http.Request, id 
 }
 
 func (h *Handler) PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
-	h.presignTemplateUpload(w, r, id, n, "")
+	url, key, ok := h.presignTemplateUpload(w, r, id, n, "")
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, templatesapi.PresignTemplateDocxUploadUrl200JSONResponse{
+		Url:        &url,
+		StorageKey: &key,
+	})
 }
 
 func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
-	h.presignTemplateUpload(w, r, id, n, "templates/"+id+"/versions/"+intString(n)+".schema.json")
+	url, key, ok := h.presignTemplateUpload(w, r, id, n, "templates/"+id+"/versions/"+intString(n)+".schema.json")
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, templatesapi.PresignTemplateSchemaUploadUrl200JSONResponse{
+		Url:        &url,
+		StorageKey: &key,
+	})
 }
 
-func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, id string, n int, storageKey string) {
+// presignTemplateUpload runs the shared authz + service flow and returns the
+// presigned URL and storage key. Each caller writes the op-specific generated
+// 200 type so each route is pinned to its strict-server response contract
+// (M5/F5.3 H-D remediation; M1/F1.3 declared-fields-only). On error this writes
+// the problem+json response and returns ok=false.
+func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, id string, n int, storageKey string) (string, string, bool) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
-		return
+		return "", "", false
 	}
 	actorID := userIDFromReq(r)
 	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
 		writeMappedErr(w, err)
-		return
+		return "", "", false
 	}
 
 	res, err := h.svc.PresignTemplateUpload(r.Context(), application.PresignTemplateUploadCmd{
@@ -123,12 +142,9 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 	})
 	if err != nil {
 		writeMappedErr(w, err)
-		return
+		return "", "", false
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"url":         res.UploadURL,
-		"storage_key": res.StorageKey,
-	})
+	return res.UploadURL, res.StorageKey, true
 }
 
 func (h *Handler) RedirectSignedUrl(w http.ResponseWriter, r *http.Request, params templatesapi.RedirectSignedUrlParams) {
@@ -235,11 +251,13 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		writeMappedErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"published_version_id":     res.PublishedVersion.ID,
-		"next_draft_id":            res.NextDraft.ID,
-		"next_draft_version_num":   res.NextDraft.VersionNumber,
-		"published_version_number": res.PublishedVersion.VersionNumber,
+	// Strict-server typed response — exactly the 3 fields declared at
+	// openapi.yaml:1331 (M5/F5.3 H-D remediation; closes the M1/F1.3 declared-
+	// fields-only leak that emitted an undeclared `published_version_number`).
+	writeJSON(w, http.StatusOK, templatesapi.PublishTemplateVersion200JSONResponse{
+		PublishedVersionId:  res.PublishedVersion.ID,
+		NextDraftId:         res.NextDraft.ID,
+		NextDraftVersionNum: res.NextDraft.VersionNumber,
 	})
 }
 

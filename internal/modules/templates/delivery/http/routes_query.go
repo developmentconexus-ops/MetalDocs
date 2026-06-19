@@ -7,6 +7,7 @@ import (
 	"time"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
 )
 
@@ -59,9 +60,14 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := make([]map[string]any, 0, len(templates))
+	out := make([]templatesapi.TemplateDTO, 0, len(templates))
 	for _, tpl := range templates {
-		out = append(out, toTemplateResponse(tpl))
+		dto, err := toAPITemplateDTO(tpl)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+			return
+		}
+		out = append(out, dto)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -126,10 +132,20 @@ func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tplDTO, err := toAPITemplateDTO(tpl)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	latestDTO, err := toAPIVersionDTO(latest)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"data": map[string]any{
-			"template":       toTemplateResponse(tpl),
-			"latest_version": toVersionResponse(latest),
+			"template":       tplDTO,
+			"latest_version": latestDTO,
 		},
 	})
 }
