@@ -24,7 +24,7 @@ judges it against §6 — 3 dims ≥ A−, 0 new Critical/Major, H-D=0, H-G=0.
 | 2 | `milestone-2-observability` | Drive composition ≥ A− — slog, scrapeable job metrics, app-level OTel spans | passed (HS-1 approved 2026-06-16) | [PASS](milestone-2-observability/qa/milestone-qa.md) |
 | 3 | `milestone-3-quality-tail` | Lift code-quality/legacy — wire IAMUserOptions (functional), type-safety, dead-code, minor sweep | passed (HS-1 approved 2026-06-16) | [PASS](milestone-3-quality-tail/qa/milestone-qa.md) |
 | 4 | `milestone-4-module-ports` | *(LAST)* Drive module-boundaries ≥ A− and **H-G → 0** — published constant, IAM role port, MfaCoverage port | passed (HS-1 approved 2026-06-16) | [PASS](milestone-4-module-ports/qa/milestone-qa.md) |
-| 5 | `milestone-5-hs5-remediation` | HS-5 micro-milestone — close 4 re-audit gaps: H-G→0, H-D→0, 4 Majors, contract-api+module-boundaries ≥ A− | validator PASS (2026-06-19) — awaiting HS-1 | [PASS](milestone-5-hs5-remediation/qa/milestone-qa.md) |
+| 5 | `milestone-5-hs5-remediation` | HS-5 micro-milestone — close 4 re-audit gaps: H-G→0, H-D→0, 4 Majors, contract-api+module-boundaries ≥ A− | passed (HS-1 approved 2026-06-19) | [PASS](milestone-5-hs5-remediation/qa/milestone-qa.md) |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
 The **Gate result** column links each milestone-validator verdict (`milestone-<n>/qa/milestone-qa.md`);
@@ -39,15 +39,19 @@ authored later by the `milestone` skill (its Phase 2), in a fresh session — no
 
 ## Program close-out / reconciliation
 
-Fill in only when the last milestone (M4) has passed:
+All five milestones (M0–M5) have passed validator + HS-1. Terminal acceptance is the last open item —
+**deferred to a fresh session by operator decision (2026-06-19, token efficiency).**
 
-- [ ] Every planned feature (M0..M4) has a complete evidence row.
-- [ ] Zero unplanned scope (anything added is recorded with rationale).
-- [ ] Every bounded defer has a written trigger and an owner.
-- [ ] **Terminal acceptance — dispatch `mission-validator`:** the session that closes M4 (after its HS-1 gate)
-      re-runs the F5.1 10-dimension re-audit via `Workflow`, then dispatches the independent
-      `mission-validator` (`.claude/agents/mission-validator.md`) to judge the new report against `mission.md`
-      §8 and write `qa/mission-validation.md` (PASS/FAIL). On FAIL → HS-5. **Do not skip this gate.**
+- [x] Every planned feature (M0..M5) has a complete evidence row. (M5: F5.1–F5.8 each have evidence.md.)
+- [x] Zero unplanned scope — the only added item (F5.8 + the 2 bundled otel tests) is recorded with
+      rationale and operator-ratified; semconv vendor payload reclassified as prerequisite repair.
+- [x] Every bounded defer has a written trigger and an owner. (M5 features close with no open defers;
+      Model-B time-bounded memberships gated behind a successor ADR per ADR 0037 D4.)
+- [ ] **Terminal acceptance — RUN IN A FRESH SESSION (operator-deferred 2026-06-19):** re-run the F5.1
+      10-dimension re-audit via `Workflow`, then dispatch the independent `mission-validator`
+      (`.claude/agents/mission-validator.md`) to judge the new report against `mission.md` §8
+      (3 dims ≥ A−, 0 new Critical/Major, H-D=0, H-G=0) and write `qa/mission-validation.md`
+      (PASS/FAIL). On FAIL → HS-5. **Do not skip this gate.** All M5 commits are local (not pushed).
 - [ ] Terminal acceptance passed — link `qa/mission-validation.md` + the new re-audit report.
 - [ ] Parent program M5 closed; `../grade-a-architecture-remediation/README.md` updated.
 - [ ] Operator Grade-A sign-off: <date / name>
