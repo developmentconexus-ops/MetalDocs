@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	documentsapi "metaldocs/internal/modules/documents/api"
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/modules/iam/authz"
@@ -55,11 +56,13 @@ func (h *FillInHandler) GetFillInSchema(w http.ResponseWriter, r *http.Request) 
 	if phs == nil {
 		phs = []templatesdomain.Placeholder{}
 	}
-	writeFillInJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"placeholder_schema": phs,
-		},
-	})
+	// Typed envelope (M7 F7.4): the generated DocumentFillInSchemaResponse pins the
+	// {data:{placeholder_schema:[...]}} shape. The placeholder items are owned by the
+	// templates domain, so they are boxed through []any opaquely — each Placeholder
+	// marshals via its own json tags, yielding byte-identical wire with no conversion.
+	var resp documentsapi.DocumentFillInSchemaResponse
+	resp.Data.PlaceholderSchema = toAnySlice(phs)
+	writeFillInJSON(w, http.StatusOK, resp)
 }
 
 func (h *FillInHandler) ListPlaceholderValues(w http.ResponseWriter, r *http.Request) {
@@ -113,9 +116,11 @@ func (h *FillInHandler) PutPlaceholderValue(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	writeFillInJSON(w, http.StatusOK, map[string]any{
-		"placeholder_id": r.PathValue("pid"),
-		"updated_at":     time.Now().UTC().Format(time.RFC3339),
+	// Truncate to the second so the generated time.Time field marshals RFC3339
+	// seconds-only, byte-identical to the prior Format(time.RFC3339) wire output.
+	writeFillInJSON(w, http.StatusOK, documentsapi.PutPlaceholderValueResponse{
+		PlaceholderId: r.PathValue("pid"),
+		UpdatedAt:     time.Now().UTC().Truncate(time.Second),
 	})
 }
 
@@ -166,6 +171,19 @@ func writeFillInJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(data)
+}
+
+// toAnySlice boxes a typed slice into []any so it can populate a generated
+// `[]interface{}` body field. Each element keeps its own concrete type and thus
+// marshals via its own json tags — the boxing is wire-neutral. Used by the
+// typed-envelope response sites whose item shapes are owned elsewhere
+// (templates-domain placeholders; polymorphic placeholder options).
+func toAnySlice[T any](items []T) []any {
+	out := make([]any, len(items))
+	for i := range items {
+		out[i] = items[i]
+	}
+	return out
 }
 
 func decodeJSON(r *http.Request, out any) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	documentsapi "metaldocs/internal/modules/documents/api"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/tenant"
 )
@@ -62,16 +63,19 @@ func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *h
 		return
 	}
 
+	// Typed envelope (M7 F7.4): the option item is polymorphic by placeholder type,
+	// so items are boxed opaquely through []any — each keeps its own json tags,
+	// preserving the prior wire {"options":[...]} byte-for-byte.
 	switch ph.Type {
 	case templatesdomain.PHSelect:
-		writeFillInJSON(w, http.StatusOK, map[string]any{"options": selectOptions(ph.Options)})
+		writeFillInJSON(w, http.StatusOK, documentsapi.PlaceholderOptionsResponse{Options: toAnySlice(selectOptions(ph.Options))})
 	case templatesdomain.PHUser:
 		opts, err := h.iam.ListUserOptions(r.Context(), tenantID)
 		if err != nil {
 			writeFillInError(w, requestID(r), err)
 			return
 		}
-		writeFillInJSON(w, http.StatusOK, map[string]any{"options": opts})
+		writeFillInJSON(w, http.StatusOK, documentsapi.PlaceholderOptionsResponse{Options: toAnySlice(opts)})
 	default:
 		writeFillInError(w, requestID(r), errNotChoicePlaceholder(placeholderID))
 	}

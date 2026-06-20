@@ -3103,6 +3103,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentFillInSchemaResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3149,6 +3153,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PutPlaceholderValueResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3171,6 +3179,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ViewDocumentResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -3219,6 +3231,10 @@ paths:
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceholderOptionsResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4277,6 +4293,52 @@ components:
           items:
             type: string
             enum: [system_admin, approver, author, editor, viewer]
+    DocumentFillInSchemaResponse:
+      type: object
+      required: [data]
+      description: >-
+        Fill-in schema envelope. The placeholder item shape is owned by the
+        templates domain (templatesdomain.Placeholder) and is surfaced opaquely
+        here (items left unconstrained); the contract pins the envelope.
+      properties:
+        data:
+          type: object
+          required: [placeholder_schema]
+          properties:
+            placeholder_schema:
+              type: array
+              items: {}
+    PutPlaceholderValueResponse:
+      type: object
+      required: [placeholder_id, updated_at]
+      properties:
+        placeholder_id:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    PlaceholderOptionsResponse:
+      type: object
+      required: [options]
+      description: >-
+        Placeholder-options envelope. The option item is polymorphic by
+        placeholder type (select -> {value, display_name}; user -> {user_id,
+        display_name}); items are left unconstrained and the contract pins the
+        envelope.
+      properties:
+        options:
+          type: array
+          items: {}
+    ViewDocumentResponse:
+      type: object
+      required: [pdf_status]
+      properties:
+        pdf_status:
+          type: string
+        signed_url:
+          type: string
+        pdf_url:
+          type: string
     DocumentListResponse:
       type: object
       required: [items, page, total]

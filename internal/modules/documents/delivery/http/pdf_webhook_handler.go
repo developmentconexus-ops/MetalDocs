@@ -47,6 +47,16 @@ type pdfCompleteBody struct {
 	PDFGeneratedAt string `json:"pdf_generated_at"`
 }
 
+// pdfCompleteResponse is the hand-rolled typed 200 body for the internal HMAC
+// webhook (M7 F7.4 / HS-6). The route stays off the OpenAPI spec (Phase C
+// wont-fix) and is currently unwired, so it gets a hand-rolled typed struct per
+// the ADR 0012 pre-codegen posture rather than a generated model — wire-identical
+// to the prior {document_id, final_pdf_s3_key} literal.
+type pdfCompleteResponse struct {
+	DocumentID    string `json:"document_id"`
+	FinalPDFS3Key string `json:"final_pdf_s3_key"`
+}
+
 const pdfWebhookMaxBytes = 64 << 10 // 64 KiB
 
 func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Request) {
@@ -110,9 +120,9 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	writeFillInJSON(w, http.StatusOK, map[string]any{
-		"document_id":      docID,
-		"final_pdf_s3_key": body.FinalPDFS3Key,
+	writeFillInJSON(w, http.StatusOK, pdfCompleteResponse{
+		DocumentID:    docID,
+		FinalPDFS3Key: body.FinalPDFS3Key,
 	})
 }
 

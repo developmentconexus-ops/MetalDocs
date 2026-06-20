@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	documentsapi "metaldocs/internal/modules/documents/api"
 	"metaldocs/internal/modules/documents/application"
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
@@ -43,12 +44,15 @@ func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {
 		writeViewError(r.Context(), w, tenantID, r.PathValue("id"), requestID(r), err)
 		return
 	}
-	payload := map[string]any{"pdf_status": result.PDFStatus}
+	// Typed body (M7 F7.4): pdf_status is always present; signed_url/pdf_url ride
+	// only when the PDF is ready, mirrored via *string + omitempty so the absent
+	// case omits both keys exactly as the prior map literal did.
+	resp := documentsapi.ViewDocumentResponse{PdfStatus: result.PDFStatus}
 	if result.PDFStatus == "ready" && result.SignedURL != "" {
-		payload["signed_url"] = result.SignedURL
-		payload["pdf_url"] = result.SignedURL
+		resp.SignedUrl = &result.SignedURL
+		resp.PdfUrl = &result.SignedURL
 	}
-	writeFillInJSON(w, http.StatusOK, payload)
+	writeFillInJSON(w, http.StatusOK, resp)
 }
 
 func writeViewError(ctx context.Context, w http.ResponseWriter, tenantID, documentID, reqID string, err error) {
