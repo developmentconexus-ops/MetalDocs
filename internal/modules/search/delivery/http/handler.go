@@ -44,6 +44,16 @@ type SearchDocumentResponse struct {
 	CreatedAt        string `json:"created_at"`
 }
 
+// searchDocumentsResponse is the typed envelope for the search-documents 200
+// body, mirroring the OpenAPI SearchDocumentsResponse schema (required:
+// [items]). Search is pre-codegen; per ADR 0012 hand-rolled typed structs are
+// the sanctioned posture. It replaces the prior untyped-map response literal
+// (M7 F7.3 typed-body parity) with byte-identical wire output: the same
+// already-initialized slice is emitted under the same "items" key.
+type searchDocumentsResponse struct {
+	Items []SearchDocumentResponse `json:"items"`
+}
+
 func NewHandler(service Searcher) *Handler {
 	return &Handler{service: service}
 }
@@ -131,7 +141,7 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{"items": out})
+	httpresponse.WriteJSON(w, http.StatusOK, searchDocumentsResponse{Items: out})
 }
 
 func parseOptionalDateTimeQuery(r *http.Request, key string) (*time.Time, error) {
