@@ -1,7 +1,7 @@
 # Milestone 0 — ADR-0039: lock the definition + binding census + CI guard
 
 > **Program:** backend-module-boundary-hardening  ·  **Governing spec:** `../mission.md`
-> **Status:** All features closed (F0.1/F0.2/F0.3) · milestone-validator **PASS** (`qa/milestone-qa.md`) · HS-1 operator gate pending
+> **Status:** **PASSED** — all features closed (F0.1/F0.2/F0.3) · milestone-validator **PASS** (`qa/milestone-qa.md`) · operator HS-1 approval + ADR-0039 ratified 2026-06-20
 > **Authored:** 2026-06-20 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** this milestone is,
