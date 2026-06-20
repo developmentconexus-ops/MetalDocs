@@ -35,7 +35,8 @@ var allowedTxPackages = []string{
 	"/platform/messaging/",
 	"/platform/worker/",
 	"jobs/",
-	"internal/test/", // integration seed harness (build-tagged, non-prod)
+	"internal/test/",            // integration seed harness (build-tagged, non-prod)
+	"tests/integration/testdb/", // M4c unified testdb fixture framework — seed helpers (seedWithCaps) own a tx to set_config asserted-caps + governed write on one conn; same seed-harness category as internal/test/
 }
 
 // RunAll runs every analyzer over the given patterns and aggregates findings.
@@ -50,6 +51,7 @@ func RunAll(targets []string) []Finding {
 	out = append(out, DeliveryAuditSink(files)...)
 	out = append(out, NoSQLTxInDomain(files)...)
 	out = append(out, NoDualMode(files)...)
+	out = append(out, NoResponseMap(files)...)
 	return out
 }
 

@@ -201,8 +201,25 @@ report §6 greps after all features; module-boundaries indicatively A−. `miles
 - **What to validate:**
   - The re-audit report exists, is cited, and grades all 10 dimensions; the 3 formerly-C dimensions each carry an explicit ≥A− call with evidence.
   - Every previously-confirmed finding (the 21 in §5) is either fixed (cited) or carried as an operator-approved bounded defer with a trigger; no new confirmed Critical/Major appears.
-  - H-D and H-G are **0**, proven by re-running the exact report §6 grep commands.
+  - H-D and H-G are **0**, proven by re-running the report §6 grep commands **at the M8-widened scope**
+    (see the §8 scope amendment below) — not the original path-scoped grep.
   - Whole-repo `go test ./...` green; no prior-milestone regression.
+
+> **§8 scope amendment (M8 / F8.6 — root-cause fix for the 4th miss).** The H-D and H-G classes are
+> defined against the **FULL public-route surface**, not just `internal/modules/*/delivery/http/`:
+> - **H-D** (response-literal `map[string]any` on a public route) — scope now also covers
+>   `internal/modules/iam/presence/`, `internal/platform/observability/`, and
+>   `internal/modules/documents/approval/http/`. The honest two-part grep lives in
+>   `wiki/architecture/api-contract.md` §5b (widened path globs); a **mechanical CI guard**
+>   (`tools/cilint` `noresponsemap`, run by `.github/workflows/invariants.yml`) enforces it
+>   laundering-resistantly (catches the built-then-written-local pattern Grep A is blind to).
+> - **H-G** (cross-module/cross-schema raw read of another module's owned table) — defined as *any*
+>   such read, not only the two IAM tables; the F8.3 close removed the last
+>   `metaldocs.document_profiles` reach from `search` behind the ADR-0038 `FamilyCodeResolver` port.
+> - **Recorded exemptions (named, not silent):** `observability/health.go` liveness/readiness probes
+>   (infra, not the typed FE API; dynamic readiness body) and the F8.2 declared-dynamic metrics-envelope
+>   leaves. Both are in the §5b allowlist and encoded in the `noresponsemap` analyzer. The terminal
+>   re-audit treats these as compliant; any *new* response literal outside them is a miss.
 - **How to validate (method + split):** the terminal validation is a **fan-out re-audit** (a subagent cannot
   fan out). So: the **main session** re-runs the F5.1 `Workflow` (10 sonnet dimension auditors +
   adversarial skeptic per Critical/Major + 2 H-D/H-G class-counters + synthesis; refute-by-default), writing

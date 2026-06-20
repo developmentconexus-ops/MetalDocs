@@ -1,9 +1,18 @@
-# Feature F8.6 — Spec (SEED — approval pending)
+# Feature F8.6 — Spec (APPROVED)
 
 > **Milestone:** 8 — Grade-A Contract & Boundary Completion  ·  **Folder:** `f8.6-gate-scope-widening`
-> **Status:** Drafting (seed — root-cause fix for the 4th miss; **interview + approval pending**)
-> **Approved before code:** PENDING — *no implementation begins until this line is filled (Phase 3, fresh session).*
-> **Sequenced LAST** — the widened gate must measure F8.1–F8.5 after they land.
+> **Status:** APPROVED 2026-06-20
+> **Approved before code:** YES — 2026-06-20. Sequenced LAST; F8.1–F8.5 landed first.
+> **Operator decision (interview Q3, asked at execution):** health endpoints → **explicit recorded
+> exemption** (not source-typed). Rationale: liveness/readiness are infra probes (k8s/LB), not the typed FE
+> resource API (no generated client consumes them); the readiness body is genuinely dynamic (variable
+> dependency-check array) — same category as the F8.2 declared-dynamic metrics envelope. Recorded in §5b
+> allowlist + mission §8 + the `noresponsemap` analyzer (`noResponseMapExemptFiles`), never silently passed.
+> **Runtime-truth finding:** a naive whole-repo `map[string]any` grep is far too broad (audit payloads,
+> command FormData, security Evidence, declared-dynamic metrics are all legitimate non-response uses). The
+> H-D class is specifically a *response literal reaching a 2xx writer*; the guard encodes that semantic, not
+> a dumb text match. Widened Part A at HEAD = the 2 recorded-exempt `health.go` lines only (0 elsewhere);
+> mechanical guard returns 0.
 
 ## Interview record (fail-closed gate)
 
