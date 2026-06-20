@@ -1,7 +1,7 @@
 # Milestone 8 — Grade-A Contract & Boundary Completion (HS-5, 4th-miss closure)
 
 > **Program:** grade-a-completion  ·  **Governing spec:** `../mission.md`
-> **Status:** Spec (drafting)
+> **Status:** PASS — milestone-validator VERDICT PASS 2026-06-20 (`qa/milestone-qa.md`); all 6 features closed (F8.1–F8.6). HS-1 operator gate pending; post-M8 terminal re-audit + mission-validator pending.
 > **Authored:** 2026-06-20 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** this milestone is, **which features**
