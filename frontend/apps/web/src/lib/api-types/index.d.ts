@@ -2615,6 +2615,14 @@ export interface components {
             runtime: {
                 [key: string]: unknown;
             };
+            /** @description Present only when a scheduler metrics provider is wired; per-job run/error counters. */
+            scheduler?: {
+                [key: string]: unknown;
+            };
+            /** @description Present only when a DB pool stats provider is wired; connection-pool gauges. */
+            db_pool?: {
+                [key: string]: unknown;
+            };
         };
         /** @description Server-controlled feature flag values exposed to the frontend. */
         FeatureFlagsResponse: {

@@ -1,15 +1,16 @@
-# Feature F8.2 — Spec (SEED — approval pending)
+# Feature F8.2 — Spec (APPROVED)
 
 > **Milestone:** 8 — Grade-A Contract & Boundary Completion  ·  **Folder:** `f8.2-metrics-typed-envelope`
-> **Status:** Drafting (seed from post-M7 re-audit Composition Major #5; **interview + approval pending**)
-> **Approved before code:** PENDING — *no implementation begins until this line is filled (Phase 3, fresh session).*
+> **Status:** Approved 2026-06-20 (execution session) — seed confirmed against runtime truth (`observability/http.go:183-194`, `openapi.yaml:5013`); one wire-equivalence edge documented (Q3).
+> **Approved before code:** ✅ 2026-06-20 — divergence verified (handler emits `scheduler`+`db_pool`; OpenAPI declares only `items`+`runtime`). No code written before this line.
 
 ## Interview record (fail-closed gate)
 
 | # | Question | Answer |
 |---|----------|--------|
 | 1 | Type the sub-objects (`runtime`/`scheduler`/`db_pool`) or keep dynamic? | **Keep dynamic** (operator decision 2026-06-20): declare them in OpenAPI as `additionalProperties:true`; type only the top-level envelope. Minimal provider churn. |
-| 2 | Where does the typed envelope live (REQ-TOP-2)? | Platform-local in `internal/platform/observability/` — hand-rolled `MetricsResponse`/`MetricItem`; platform must not import a module's generated package. |
+| 2 | Where does the typed envelope live (REQ-TOP-2)? | Platform-local in `internal/platform/observability/` — exported `MetricsResponse` reusing the existing unexported `metricItem`; platform must not import a module's generated package. |
+| 3 | Current handler keys `runtime`/`scheduler`/`db_pool` off **provider != nil**, not map contents; a typed struct with `omitempty` keys off map emptiness. Wire-equivalent? | **Yes, within contract** — providers in production return populated maps (asserted by existing `http_dbpool_test.go` / `http_scheduler_test.go`, which decode the body to `map[string]any` and check key presence/absence; those pass unmodified against the `omitempty` struct). The one untested edge — a wired provider returning an **empty non-nil** map — would now omit the key rather than emit `{}`; both decode to "no data" under the OpenAPI optional-`additionalProperties:true` object, so it is within the contract. Documented as the single honest caveat (parallels F8.1 key-order). `items` is unconditional (no omitempty). |
 
 ## Consumer contract (FIRST)
 

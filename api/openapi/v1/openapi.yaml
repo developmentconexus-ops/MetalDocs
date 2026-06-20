@@ -5021,6 +5021,14 @@ components:
         runtime:
           type: object
           additionalProperties: true
+        scheduler:
+          type: object
+          additionalProperties: true
+          description: Present only when a scheduler metrics provider is wired; per-job run/error counters.
+        db_pool:
+          type: object
+          additionalProperties: true
+          description: Present only when a DB pool stats provider is wired; connection-pool gauges.
     FeatureFlagsResponse:
       type: object
       description: Server-controlled feature flag values exposed to the frontend.

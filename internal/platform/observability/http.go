@@ -1,7 +1,6 @@
 package observability
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -172,6 +171,22 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 	})
 }
 
+// MetricsResponse is the typed envelope for GET /api/v1/metrics. It is
+// platform-local (REQ-TOP-2: the platform package must not import a module's
+// generated API package) and mirrors the OpenAPI MetricsResponse schema.
+//
+// Runtime/Scheduler/DBPool are intentionally map[string]any (declared-dynamic,
+// additionalProperties:true in OpenAPI — operator decision 2026-06-20, F8.2):
+// their providers stay map-backed. omitempty preserves the prior conditional
+// wire shape — a key appears only when its provider is wired (the providers
+// return populated maps; existing http_scheduler_test/http_dbpool_test pin this).
+type MetricsResponse struct {
+	Items     []metricItem   `json:"items"`
+	Runtime   map[string]any `json:"runtime,omitempty"`
+	Scheduler map[string]any `json:"scheduler,omitempty"`
+	DBPool    map[string]any `json:"db_pool,omitempty"`
+}
+
 func (o *HTTPObservability) MetricsHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -179,19 +194,17 @@ func (o *HTTPObservability) MetricsHandler() http.Handler {
 			return
 		}
 
-		items := o.snapshot()
-		payload := map[string]any{"items": items}
+		resp := MetricsResponse{Items: o.snapshot()}
 		if o.runtimeProvider != nil {
-			payload["runtime"] = o.runtimeProvider.RuntimeMetrics(r.Context())
+			resp.Runtime = o.runtimeProvider.RuntimeMetrics(r.Context())
 		}
 		if o.schedulerMetrics != nil {
-			payload["scheduler"] = o.schedulerMetrics.SchedulerMetrics()
+			resp.Scheduler = o.schedulerMetrics.SchedulerMetrics()
 		}
 		if o.dbPool != nil {
-			payload["db_pool"] = o.dbPool.DBPoolStats()
+			resp.DBPool = o.dbPool.DBPoolStats()
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(payload)
+		httpresponse.WriteJSON(w, http.StatusOK, resp)
 	})
 }
 
