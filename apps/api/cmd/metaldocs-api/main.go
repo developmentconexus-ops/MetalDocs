@@ -204,7 +204,10 @@ func main() {
 	// system_admin short-circuit and every background BypassSystem invocation is
 	// recorded into the same audit pipe (audit.read surface). Set once, before serving.
 	authz.SetBypassAuditSink(wiring.NewBypassAuditSink(deps.AuditWriter))
-	searchService := searchapp.NewService(searchdocs.NewReader(deps.SQLDB))
+	// ADR 0038: search resolves document family_code through the taxonomy-owned
+	// FamilyCodeResolver port instead of a raw metaldocs.document_profiles subquery.
+	familyCodeResolver := taxonomyinfra.NewFamilyCodeResolverRepository(deps.SQLDB)
+	searchService := searchapp.NewService(searchdocs.NewReader(deps.SQLDB, familyCodeResolver))
 	searchHandler := searchdelivery.NewHandler(searchService)
 	authHandler := authdelivery.NewHandler(authService).WithAudit(deps.AuditWriter)
 	healthHandler := observability.NewHealthHandler(deps.StatusProvider)

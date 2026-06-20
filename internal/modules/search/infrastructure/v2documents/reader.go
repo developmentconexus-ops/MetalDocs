@@ -7,16 +7,28 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
+
 	searchdomain "metaldocs/internal/modules/search/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/sqlescape"
 )
 
 type Reader struct {
-	db *sql.DB
+	db       *sql.DB
+	families taxonomydomain.FamilyCodeResolver
 }
 
-func NewReader(db *sql.DB) *Reader {
-	return &Reader{db: db}
+// NewReader builds the v2 documents reader. families resolves each document's
+// family_code from taxonomy through a port (ADR 0038) instead of a raw
+// cross-schema subquery against taxonomy's profile table (H-G remediation). A nil
+// resolver falls back to the no-op (family projection/filter resolve to empty), so
+// callers that never use the family dimension need not wire taxonomy.
+func NewReader(db *sql.DB, families taxonomydomain.FamilyCodeResolver) *Reader {
+	if families == nil {
+		families = taxonomydomain.NoopFamilyCodeResolver{}
+	}
+	return &Reader{db: db, families: families}
 }
 
 func (r *Reader) ListDocuments(ctx context.Context, query searchdomain.Query, limit, offset int) ([]searchdomain.Document, error) {
@@ -29,20 +41,23 @@ func (r *Reader) ListDocuments(ctx context.Context, query searchdomain.Query, li
 	// The area-grant EXISTS subquery below gates document visibility on `upa.effective_to IS NULL`
 	// — the canonical active-now membership predicate (soft-delete model, ADR 0037). Not an
 	// interval bug.
+	// family_code is no longer resolved by a correlated subquery against taxonomy's
+	// profile table (H-G cross-schema read, ADR 0038). Instead:
+	//   - projection: column 5 selects the raw join key
+	//     COALESCE(d.profile_code_snapshot, cd.profile_code); the FamilyCodeResolver
+	//     batch-maps key → family in Go after the scan.
+	//   - filter ($5): the caller's family is resolved to its profile-code set up
+	//     front (ProfileCodesForFamily) and applied IN SQL via `key = ANY($14)`, so
+	//     LIMIT/OFFSET pagination is unchanged. $5 stays only as the active-filter
+	//     flag; an empty resolved set ($14) with $5 set excludes every row (no
+	//     profile has that family) — same as the old family<>filter subquery.
 	const q = `
 SELECT
 	d.id,
 	d.name,
 	COALESCE(d.status, ''),
 	COALESCE(d.profile_code_snapshot, ''),
-	COALESCE((
-		SELECT dp.family_code
-		FROM metaldocs.document_profiles dp
-		WHERE dp.code = COALESCE(d.profile_code_snapshot, cd.profile_code)
-		  AND dp.tenant_id IN (d.tenant_id, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid)
-		ORDER BY CASE WHEN dp.tenant_id = d.tenant_id THEN 0 ELSE 1 END
-		LIMIT 1
-	), ''),
+	COALESCE(d.profile_code_snapshot, cd.profile_code),
 	COALESCE(d.process_area_code_snapshot, ''),
 	COALESCE(cd.department_code, ''),
 	d.created_by::text,
@@ -60,14 +75,7 @@ WHERE d.tenant_id = $1
   AND ($2 = '' OR LOWER(COALESCE(d.name, '')) LIKE '%' || $2 || '%' ESCAPE '\')
   AND ($3 = '' OR UPPER(COALESCE(d.status, '')) = $3)
   AND ($4 = '' OR LOWER(COALESCE(d.profile_code_snapshot, '')) = $4)
-  AND ($5 = '' OR LOWER(COALESCE((
-		SELECT dp.family_code
-		FROM metaldocs.document_profiles dp
-		WHERE dp.code = COALESCE(d.profile_code_snapshot, cd.profile_code)
-		  AND dp.tenant_id IN (d.tenant_id, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid)
-		ORDER BY CASE WHEN dp.tenant_id = d.tenant_id THEN 0 ELSE 1 END
-		LIMIT 1
-	), '')) = $5)
+  AND ($5 = '' OR COALESCE(d.profile_code_snapshot, cd.profile_code) = ANY($14))
   AND ($6 = '' OR LOWER(COALESCE(d.process_area_code_snapshot, '')) = $6)
   AND ($7 = '' OR COALESCE(cd.department_code, '') = $7)
   AND ($8 = '' OR d.created_by::text = $8)
@@ -124,6 +132,24 @@ LIMIT $11 OFFSET $12
 	if query.ExpiryAfter != nil {
 		expiryAfter = query.ExpiryAfter.UTC()
 	}
+
+	// Family filter ($5/$14): resolve the requested family to its profile-code set
+	// via the taxonomy port (precedence-aware, case-insensitive) and push it into
+	// SQL so pagination is computed on the filtered set. $5 is the lowercased family
+	// (active-filter flag, matches the old `LOWER(family)=$5`); $14 carries the codes.
+	familyFilter := strings.ToLower(strings.TrimSpace(query.DocumentFamily))
+	filterCodeStrs := []string{}
+	if familyFilter != "" {
+		codes, err := r.families.ProfileCodesForFamily(ctx, strings.TrimSpace(query.TenantID), taxonomydomain.FamilyCode(query.DocumentFamily))
+		if err != nil {
+			return nil, fmt.Errorf("v2 resolve family filter: %w", err)
+		}
+		filterCodeStrs = make([]string, 0, len(codes))
+		for _, c := range codes {
+			filterCodeStrs = append(filterCodeStrs, string(c))
+		}
+	}
+
 	rows, err := r.db.QueryContext(
 		ctx,
 		q,
@@ -131,7 +157,7 @@ LIMIT $11 OFFSET $12
 		sqlescape.LikeEscape(strings.ToLower(strings.TrimSpace(query.Text))),
 		strings.ToUpper(strings.TrimSpace(string(query.Status))),
 		profileFilter,
-		strings.ToLower(strings.TrimSpace(query.DocumentFamily)),
+		familyFilter,
 		strings.ToLower(strings.TrimSpace(query.ProcessArea)),
 		strings.TrimSpace(query.Department),
 		strings.TrimSpace(query.OwnerID),
@@ -140,6 +166,7 @@ LIMIT $11 OFFSET $12
 		limit,
 		offset,
 		strings.TrimSpace(query.ActorUserID),
+		pq.Array(filterCodeStrs),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("v2 list documents: %w", err)
@@ -147,11 +174,14 @@ LIMIT $11 OFFSET $12
 	defer rows.Close()
 
 	var out []searchdomain.Document
+	// familyKeys[i] is the profile-code join key for out[i]; resolved to a family in
+	// a single batch after the scan (projection path of ADR 0038).
+	var familyKeys []string
 	for rows.Next() {
 		var doc searchdomain.Document
 		var status string
 		var profile string
-		var family string
+		var familyKey sql.NullString
 		var effectiveAt sql.NullTime
 		var expiryAt sql.NullTime
 		if err := rows.Scan(
@@ -159,7 +189,7 @@ LIMIT $11 OFFSET $12
 			&doc.Title,
 			&status,
 			&profile,
-			&family,
+			&familyKey,
 			&doc.ProcessArea,
 			&doc.Department,
 			&doc.OwnerID,
@@ -174,13 +204,30 @@ LIMIT $11 OFFSET $12
 		doc.Status = searchdomain.Status(status)
 		doc.DocumentProfile = profile
 		doc.DocumentType = doc.DocumentProfile
-		doc.DocumentFamily = family
 		doc.EffectiveAt = cloneNullTime(effectiveAt)
 		doc.ExpiryAt = cloneNullTime(expiryAt)
 		out = append(out, doc)
+		familyKeys = append(familyKeys, familyKey.String)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("v2 list documents rows: %w", err)
+	}
+
+	// Batch-resolve each row's family_code through the taxonomy port. Keys absent
+	// from the map (no matching profile for tenant or sentinel) default to "" —
+	// identical to the old `COALESCE(subquery, '')`.
+	if len(out) > 0 {
+		codes := make([]taxonomydomain.ProfileCode, 0, len(familyKeys))
+		for _, k := range familyKeys {
+			codes = append(codes, taxonomydomain.ProfileCode(k))
+		}
+		families, err := r.families.ResolveFamilyCodes(ctx, strings.TrimSpace(query.TenantID), codes)
+		if err != nil {
+			return nil, fmt.Errorf("v2 resolve family projection: %w", err)
+		}
+		for i := range out {
+			out[i].DocumentFamily = string(families[taxonomydomain.ProfileCode(familyKeys[i])])
+		}
 	}
 	return out, nil
 }

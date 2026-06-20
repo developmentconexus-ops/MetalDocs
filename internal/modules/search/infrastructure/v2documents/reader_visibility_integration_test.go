@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	searchdomain "metaldocs/internal/modules/search/domain"
+	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -39,8 +40,8 @@ func TestListDocuments_EnforcesUnifiedVisibility(t *testing.T) {
 
 	const area = "quality"
 
-	// Seed taxonomy (document_families / document_process_areas / document_profiles)
-	// via factory — all three carry the taxonomy.manage tripwire; factory wraps them.
+	// Seed the taxonomy chain (families / process areas / profiles) via factory —
+	// all three carry the taxonomy.manage tripwire; factory wraps them.
 	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenantID))
 
 	// Seed the process area code we need for grants (area = "quality"). The
@@ -118,7 +119,7 @@ func TestListDocuments_EnforcesUnifiedVisibility(t *testing.T) {
 	setDoc("restricted", owner, cdRestricted)
 	setDoc("standalone", owner, "")
 
-	reader := NewReader(db)
+	reader := NewReader(db, taxonomyinfra.NewFamilyCodeResolverRepository(db))
 	visibleTitles := func(actor string) map[string]bool {
 		docs, err := reader.ListDocuments(ctx, searchdomain.Query{TenantID: tenantID, ActorUserID: actor}, 50, 0)
 		if err != nil {

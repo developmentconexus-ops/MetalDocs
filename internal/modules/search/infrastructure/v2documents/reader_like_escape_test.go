@@ -6,6 +6,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	searchdomain "metaldocs/internal/modules/search/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
 // TestListDocuments_EscapesLikeWildcards guards B6 / CWE-943: the $2 text
@@ -38,10 +39,11 @@ func TestListDocuments_EscapesLikeWildcards(t *testing.T) {
 			20,          // $11 limit
 			0,           // $12 offset
 			"user-1",    // $13 actor
+			sqlmock.AnyArg(), // $14 family-filter codes (pq.Array, empty here)
 		).
 		WillReturnRows(rows)
 
-	_, err = NewReader(db).ListDocuments(
+	_, err = NewReader(db, taxonomydomain.NoopFamilyCodeResolver{}).ListDocuments(
 		context.Background(),
 		searchdomain.Query{TenantID: "tenant-1", Text: "a%b_c", ActorUserID: "user-1"},
 		20, 0,
