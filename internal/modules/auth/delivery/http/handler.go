@@ -37,6 +37,21 @@ type changePasswordRequest struct {
 	NewPassword     string `json:"new_password"`
 }
 
+// authLoginResponse / changePasswordResponse are hand-rolled typed response bodies
+// mirroring the OpenAPI AuthLoginResponse / ChangePasswordResponse schemas. Auth is
+// pre-codegen (no api.gen.go); per ADR 0012 hand-rolled typed structs are the
+// sanctioned posture for pre-codegen modules. They replace the prior untyped-map
+// response literals (M7 F7.2 typed-body parity) with byte-identical wire output.
+type authLoginResponse struct {
+	User      authdomain.CurrentUser `json:"user"`
+	ExpiresAt string                 `json:"expires_at"`
+}
+
+type changePasswordResponse struct {
+	Changed bool                   `json:"changed"`
+	User    authdomain.CurrentUser `json:"user"`
+}
+
 func (r loginRequest) String() string {
 	return fmt.Sprintf("{identifier:%s}", strings.TrimSpace(r.Identifier))
 }
@@ -87,9 +102,9 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, h.service.SessionCookie(session.RawToken, session.ExpiresAt))
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"user":      session.CurrentUser,
-		"expires_at": session.ExpiresAt.UTC().Format(time.RFC3339),
+	httpresponse.WriteJSON(w, http.StatusOK, authLoginResponse{
+		User:      session.CurrentUser,
+		ExpiresAt: session.ExpiresAt.UTC().Format(time.RFC3339),
 	})
 	h.recordAudit(r, session.CurrentUser.UserID, "auth.login", session.CurrentUser.UserID, map[string]any{
 		"tenant_id": session.CurrentUser.TenantID,
@@ -158,9 +173,9 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	// F0.4: service already revoked all sessions (CWE-613). Mirror handleLogout
 	// and expire the cookie client-side so the browser drops the dead value.
 	http.SetCookie(w, h.service.ExpiredSessionCookie())
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"changed": true,
-		"user":    currentUser,
+	httpresponse.WriteJSON(w, http.StatusOK, changePasswordResponse{
+		Changed: true,
+		User:    currentUser,
 	})
 	// Audit for auth.password.changed is now emitted inside the service tx (H-3b, F-07).
 }
