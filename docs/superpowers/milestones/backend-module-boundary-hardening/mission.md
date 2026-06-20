@@ -42,9 +42,12 @@ corrected census instead.
 - No change to runtime behavior, query results, or visibility/authz semantics — this is a **seam** change,
   not a logic change. Parity tests enforce this.
 - No new features, no schema migrations beyond the published view(s) the C-α mechanism requires.
-- No touching auth/security cross-module reads — already ported (M4 work holds; confirmed in discovery).
+- No re-porting auth/security cross-module reads — **dispositioned** by parent grade-a M4 (ADR 0029/0031) and
+  **exempt** under ADR-0039 D3(e) (M0/F0.2 census confirmed they are still raw SQL but principled-exempt, not
+  re-opened). Likewise `audit_events` platform-sink reads (D3(d)) and `jobs` worker-layer reads (D3(f)).
 - No widening to owned-table classes outside the H-G scope **until** M0's census re-scopes against ADR-0039
-  (then in-scope items are addressed; genuinely out-of-scope ones are recorded as such).
+  (then in-scope items are addressed; genuinely out-of-scope ones are recorded as such). **Done in M0/F0.2:**
+  widen complete; N1 folded into M2; X1–X8 exempted via ADR-0039 D3(d)–(f) (HS-6 ruling 2026-06-20).
 - Not flipping the parent `grade-a-completion` to Grade-A — that sign-off is the operator's, gated on this
   mission's terminal PASS.
 
@@ -87,10 +90,16 @@ Every milestone below traces to a Category A/B/C finding in the brief.
 | 13 | `controlleddocuments/infrastructure/repository.go:492` — `user_process_areas` EXISTS (CanRead) | C — authz-visibility membership | M3 |
 | 14 | `documents/approval/repository/postgres_approval_repository.go:1136` — `user_process_areas` (in-tx, H-PRE-1) | C — authz-visibility membership (tx-aware) | M3 |
 | 15 | `search/infrastructure/v2documents/reader.go:70,97,102,111` — inlines CD's whole visibility predicate (CD+iam) (+literals :92,:94) | C4 — visibility-contract redesign | M4 |
+| 16 | `documents/application/fillin_service.go:225` — reads `templates_template_version` (placeholder_schema) | B (N1) — foreign point-read; **added by M0/F0.2 census, HS-6 ruling 2026-06-20** | M2 |
 
-Out-of-scope (recorded, with reason): auth/security cross-module reads — **already ported** (no live SQL,
-discovery-confirmed). Any owned-table read **outside** the H-G token set is deferred to M0's re-scope; if M0
-surfaces new in-scope sites, they are added to the relevant milestone (HS-6 if it changes milestone shape).
+Out-of-scope (recorded, with reason): **Resolved by M0/F0.2 census + HS-6 operator ruling 2026-06-20** — the
+binding census widened to the full owned-base-table set and surfaced (a) N1 (row 16, folded into M2) and (b)
+the auth/audit/platform reads (security/iam→`auth_identities`/`auth_sessions`; iam/templates/security→
+`audit_events`; jobs→`approval_*`). The latter are **exempt** under the amended **ADR-0039 D3(d)** platform
+append-sink, **D3(e)** parent-grade-a-dispositioned auth (ADR 0029/0031), **D3(f)** worker-layer — enumerated
+in the F0.3 guard allowlist with per-site justification. See
+`./milestone-0-adr-and-census/f0.2-binding-census/{census.md,hs-6-scope-decision.md}`. `auth_failure_counters`
+was a false positive (documents/approval owns it — same-module read).
 
 ## 6. Program architecture (by reference)
 

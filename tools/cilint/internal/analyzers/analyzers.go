@@ -52,6 +52,7 @@ func RunAll(targets []string) []Finding {
 	out = append(out, NoSQLTxInDomain(files)...)
 	out = append(out, NoDualMode(files)...)
 	out = append(out, NoResponseMap(files)...)
+	out = append(out, HGCrossModule(files)...)
 	return out
 }
 

@@ -1,6 +1,6 @@
 # Decisions
 
-> **Last verified:** 2026-06-14 (M0/F0.1 — decision-vs-code re-audit; legacy-ADR stale ref removed; RLS table count reconciled)
+> **Last verified:** 2026-06-20 (backend-module-boundary-hardening M0/F0.1 — added ADR 0039 row; backfilled the missing ADR 0038 row)
 > **Scope:** Durable ADRs and consequential technical decisions.
 
 | # | Title | Status | Superseded by | Current relevance |
@@ -39,5 +39,7 @@
 | [0035](0035-flat-typed-responses-and-presign-status.md) | Flat typed responses and presign status | Accepted | — | Flat typed response shape; presign status handling |
 | [0036](0036-otelsql-db-tracing.md) | Driver-Level DB Tracing via `otelsql` | Accepted 2026-06-16 | — | `otelsql.Open` replaces `sql.Open` at `internal/platform/db/postgres/connect.go`; all `database/sql` queries auto-traced via OTel driver wrapper; composition-root injection, not per-repo wiring (M2/F2.3) |
 | [0037](0037-membership-temporal-model.md) | Membership temporal model — soft-delete current-marker (active ⟺ `effective_to IS NULL`) | Accepted 2026-06-19 | — | Records that `user_process_areas` is Model A (soft-delete + partial-unique-on-active), not bitemporal valid-time; **refutes re-audit 2026-06-16 Major #1** (the proposed `effective_to > now()` interval predicate grants nothing, regresses authz off its partial indexes, and contradicts the unique index); active-now reads use `IS NULL`, as-of reads use the interval form; future time-bounded memberships gated behind a successor ADR (M5/F5.6) |
+| [0038](0038-family-code-resolver-port.md) | `FamilyCodeResolver` — cross-module document-profile→family reads go through a taxonomy-owned port | Accepted 2026-06-20 | — | search resolves `family_code` via a taxonomy `domain` port (batch projection + filter), not raw `document_profiles` subqueries; sentinel-tenant fallback + precedence + `archived_at`-agnostic semantics wire-equivalent to the replaced SQL; reads live, off-tx (H-PRE-1); sibling of ADR 0031 (`grade-a-completion` M8/F8.3) |
+| [0039](0039-cross-module-base-table-read-boundary.md) | Cross-module read boundary — published view / read-port = compliant, base table = violation (H-G definition) | Accepted 2026-06-20 | — | Locks the H-G done-bar mechanically: raw `SELECT`/`JOIN`/`EXISTS` against another module's **base table** = violation; published versioned view / owner read-port / own tables = compliant; "owned table" refined to "owned **base** table" so H-G=0 holds under both readings; active-now view encodes exactly `effective_to IS NULL` (ADR 0037); H-PRE-1 preserved; CI-enforced by cilint `hgcrossmodule` guard; worked classification of all ~20 sites (`backend-module-boundary-hardening` M0/F0.1) |
 
 The legacy ADR tree (formerly under the now-deleted `docs/` documentation set) was removed from this branch. Where its content maps to canonical `wiki/decisions/` entries is tracked by the governance migration map (to be finalized in F0.5).

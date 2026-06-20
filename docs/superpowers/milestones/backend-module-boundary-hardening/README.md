@@ -1,7 +1,7 @@
 # Program: Backend Module-Boundary Hardening
 
 > **Governing spec:** `./mission.md`
-> **Status:** Planning
+> **Status:** Executing — M0 milestone-validator **PASS**; HS-1 operator gate pending
 > **Owner / operator:** leandrotca
 
 Eliminate the pre-existing cross-module raw-SQL debt (~20 sites in 3 categories — see
@@ -16,7 +16,7 @@ program's terminal PASS.
 
 | # | Milestone | Objective (one line) | Status | Gate result |
 |---|-----------|----------------------|--------|-------------|
-| 0 | `milestone-0-adr-and-census` | ADR-0039 locks the H-G definition + exemption list; binding re-census; cilint H-G guard | planned | — |
+| 0 | `milestone-0-adr-and-census` | ADR-0039 locks the H-G definition + exemption list; binding re-census; cilint H-G guard | validator PASS — HS-1 pending | [PASS](milestone-0-adr-and-census/qa/milestone-qa.md) |
 | 1 | `milestone-1-category-a-constants` | Typed status constants in `controlleddocuments/domain/resolution.go` (no SQL) | planned | — |
 | 2 | `milestone-2-category-b-read-ports` | 8 clean foreign point-reads → owner-published read-ports (parity-before-delete) | planned | — |
 | 3 | `milestone-3-category-c-membership-view` | iam publishes active-membership view; CD list/CanRead + approval (H-PRE-1) consume it | planned | — |
@@ -30,7 +30,7 @@ a validator **PASS** *and* operator HS-1 approval.
 
 | When | HS id | What | Resolution |
 |------|-------|------|------------|
-| | | | |
+| 2026-06-20 (M0/F0.2) | HS-6 | Binding census widen surfaced sites beyond the §5 inventory: **N1** (`documents/application/fillin_service.go:225` → `templates_template_version`) and **X1–X8** (auth/audit/platform reads the §2 Non-Goal called "already ported" but which are still raw SQL). | **Operator-ruled 2026-06-20:** 1a — fold **N1 into M2** (one templates read-port); 2a — resolve **X1–X8** via principled **ADR-0039 D3(d)** platform append-sink / **D3(e)** parent-ADR-dispositioned auth / **D3(f)** worker-layer exemptions, enumerated in the F0.3 guard allowlist. ADR-0039 amended; mission §5 row 16 + §2 updated. See `milestone-0-adr-and-census/f0.2-binding-census/hs-6-scope-decision.md`. |
 
 ## Program close-out / reconciliation
 
