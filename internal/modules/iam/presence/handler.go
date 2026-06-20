@@ -10,6 +10,8 @@ import (
 
 	"github.com/coder/websocket"
 
+	iamapi "metaldocs/internal/modules/iam/api"
+	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
@@ -78,9 +80,28 @@ func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 		_ = problem.Write(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "snapshot failed"))
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{"items": items})
+	httpresponse.WriteJSON(w, http.StatusOK, toPresenceSnapshotResponse(items))
+}
+
+// toPresenceSnapshotResponse maps the internal presence snapshot onto the
+// generated iamapi.PresenceSnapshotResponse typed body. Status is always set
+// (snapshot items are never "off", which is excluded upstream), so the
+// generated *omitempty pointer always serialises — the wire stays equivalent
+// to the prior map[string]any{"items":…} output (key order aside, which is not
+// part of the JSON/OpenAPI contract).
+func toPresenceSnapshotResponse(items []Item) iamapi.PresenceSnapshotResponse {
+	out := make([]iamapi.OnlinePresenceItem, 0, len(items))
+	for _, it := range items {
+		status := iamapi.OnlinePresenceItemStatus(it.Status)
+		out = append(out, iamapi.OnlinePresenceItem{
+			UserId:      it.UserID,
+			Username:    it.Username,
+			DisplayName: it.DisplayName,
+			LastSeenAt:  it.LastSeenAt,
+			Status:      &status,
+		})
+	}
+	return iamapi.PresenceSnapshotResponse{Items: out}
 }
 
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request) {
