@@ -1,0 +1,48 @@
+# Program: Backend Module-Boundary Hardening
+
+> **Governing spec:** `./mission.md`
+> **Status:** Planning
+> **Owner / operator:** leandrotca
+
+Eliminate the pre-existing cross-module raw-SQL debt (~20 sites in 3 categories — see
+`./discovery-brief.md`) that the parent `grade-a-completion` post-M9 re-audit surfaced but never measured, so
+the module-boundaries / DDD dimension reaches **A** and **H-G = 0 under both readings** (canonical §6 greps
+AND the broad "any cross-module owned-base-table read", reconciled by ADR-0039's published-contract
+exemption). Terminal acceptance = a fresh re-run of the F5.1 10-dimension architecture re-audit hitting that
+bar, judged by an independent `mission-validator`. The parent's **Grade-A sign-off is HELD** until this
+program's terminal PASS.
+
+## Milestones
+
+| # | Milestone | Objective (one line) | Status | Gate result |
+|---|-----------|----------------------|--------|-------------|
+| 0 | `milestone-0-adr-and-census` | ADR-0039 locks the H-G definition + exemption list; binding re-census; cilint H-G guard | planned | — |
+| 1 | `milestone-1-category-a-constants` | Typed status constants in `controlleddocuments/domain/resolution.go` (no SQL) | planned | — |
+| 2 | `milestone-2-category-b-read-ports` | 8 clean foreign point-reads → owner-published read-ports (parity-before-delete) | planned | — |
+| 3 | `milestone-3-category-c-membership-view` | iam publishes active-membership view; CD list/CanRead + approval (H-PRE-1) consume it | planned | — |
+| 4 | `milestone-4-search-visibility-contract` | search consumes a CD-published visibility contract (risk-isolated, last) | planned | — |
+
+Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
+The **Gate result** column links the milestone-validator's verdict (`qa/milestone-qa.md`); `passed` requires
+a validator **PASS** *and* operator HS-1 approval.
+
+## Hard-stops raised
+
+| When | HS id | What | Resolution |
+|------|-------|------|------------|
+| | | | |
+
+## Program close-out / reconciliation
+
+Fill in only when the last milestone has passed:
+
+- [ ] Every planned feature has a complete evidence row.
+- [ ] Zero unplanned scope (anything added is recorded with rationale).
+- [ ] Every bounded defer has a written trigger and an owner.
+- [ ] **Terminal acceptance:** main session re-runs the F5.1 10-dimension re-audit from clean state →
+      captures `wiki/backend/_artifacts/architecture-re-audit-<date>-post-boundary-hardening.md` → **dispatch
+      `mission-validator`** to judge it against `mission.md` §8 and write `qa/mission-validation.md`. (This
+      line is the durable trigger for the terminal gate — do not skip it once this planning session is gone.)
+- [ ] Terminal acceptance passed — link `qa/mission-validation.md`.
+- [ ] Parent `grade-a-completion` Grade-A sign-off unblocked and presented to operator.
+- [ ] Operator sign-off: <date / name>
