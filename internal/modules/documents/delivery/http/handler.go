@@ -621,7 +621,13 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	respBody := map[string]string{"instance_id": result.InstanceID}
+	instanceUUID, err := uuid.Parse(result.InstanceID)
+	if err != nil {
+		slog.Error("documents finalize produced unparseable instance id", "doc_id", docID, "tenant_id", tenantID, "actor_id", actorID, "err", err)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		return
+	}
+	respBody := documentsapi.DocumentFinalizeResult{InstanceId: instanceUUID}
 	if idempStore != nil && idempHandle != nil {
 		body, err := json.Marshal(respBody)
 		if err != nil {
@@ -671,11 +677,37 @@ func (h *Handler) duplicateDocument(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusCreated, map[string]string{
-		"document_id":         res.DocumentID,
-		"initial_revision_id": res.InitialRevisionID,
-		"session_id":          res.SessionID,
+	docUUID, ridUUID, sidUUID, parseErr := parseCreateResultUUIDs(res.DocumentID, res.InitialRevisionID, res.SessionID)
+	if parseErr != nil {
+		slog.Error("documents duplicate produced unparseable id", "doc_id", docID, "tenant_id", tenantID, "actor_id", userID, "err", parseErr)
+		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusCreated, documentsapi.DocumentCreateResult{
+		DocumentId:        docUUID,
+		InitialRevisionId: ridUUID,
+		SessionId:         sidUUID,
 	})
+}
+
+// parseCreateResultUUIDs parses the three server-generated id strings of a
+// duplicate/create result into typed UUIDs for the generated DocumentCreateResult
+// body. Any parse failure is a server-side invariant violation (the ids are
+// freshly generated), surfaced as a 500 by the caller.
+func parseCreateResultUUIDs(documentID, initialRevisionID, sessionID string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
+	docUUID, err := uuid.Parse(documentID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, uuid.Nil, fmt.Errorf("document_id: %w", err)
+	}
+	ridUUID, err := uuid.Parse(initialRevisionID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, uuid.Nil, fmt.Errorf("initial_revision_id: %w", err)
+	}
+	sidUUID, err := uuid.Parse(sessionID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, uuid.Nil, fmt.Errorf("session_id: %w", err)
+	}
+	return docUUID, ridUUID, sidUUID, nil
 }
 
 func (h *Handler) acquireSession(w http.ResponseWriter, r *http.Request) {
@@ -1102,7 +1134,7 @@ func (h *Handler) signedRevisionURL(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]string{"url": url})
+	httpresponse.WriteJSON(w, http.StatusOK, documentsapi.RevisionUrlResponse{Url: url})
 }
 
 func (h *Handler) listComments(w http.ResponseWriter, r *http.Request) {
@@ -1119,7 +1151,7 @@ func (h *Handler) listComments(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	resp := make([]commentResponse, 0, len(comments))
+	resp := make([]documentsapi.DocumentCommentResponse, 0, len(comments))
 	for i := range comments {
 		resp = append(resp, toCommentResponse(comments[i]))
 	}
@@ -1214,32 +1246,34 @@ func (h *Handler) deleteComment(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-type commentResponse struct {
-	ID               string          `json:"id"`
-	LibraryCommentID int             `json:"library_comment_id"`
-	ParentLibraryID  *int            `json:"parent_library_id"`
-	Author           string          `json:"author"`
-	AuthorID         string          `json:"author_id"`
-	Content          json.RawMessage `json:"content"`
-	Done             bool            `json:"done"`
-	CreatedAt        string          `json:"created_at"`
-	UpdatedAt        string          `json:"updated_at"`
-	ResolvedAt       *time.Time      `json:"resolved_at"`
-}
-
-func toCommentResponse(c domain.Comment) commentResponse {
-	return commentResponse{
-		ID:               c.ID.String(),
-		LibraryCommentID: c.LibraryCommentID,
-		ParentLibraryID:  c.ParentLibraryID,
+func toCommentResponse(c domain.Comment) documentsapi.DocumentCommentResponse {
+	return documentsapi.DocumentCommentResponse{
+		Id:               c.ID,
+		LibraryCommentId: c.LibraryCommentID,
+		ParentLibraryId:  c.ParentLibraryID,
 		Author:           c.AuthorDisplay,
-		AuthorID:         c.AuthorID,
-		Content:          c.ContentJSON,
+		AuthorId:         c.AuthorID,
+		Content:          decodeCommentContent(c.ContentJSON),
 		Done:             c.ResolvedAt != nil,
-		CreatedAt:        c.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:        c.UpdatedAt.UTC().Format(time.RFC3339),
+		CreatedAt:        c.CreatedAt,
+		UpdatedAt:        c.UpdatedAt,
 		ResolvedAt:       c.ResolvedAt,
 	}
+}
+
+// decodeCommentContent decodes a comment's stored content JSON (an array of
+// rich-text nodes) into the generated typed node slice. The generated Content
+// field is non-omitempty, so a nil/empty/invalid blob serializes as [] (never
+// null) to honor the published contract.
+func decodeCommentContent(raw json.RawMessage) []documentsapi.DocumentCommentContentNode {
+	nodes := []documentsapi.DocumentCommentContentNode{}
+	if len(raw) == 0 {
+		return nodes
+	}
+	if err := json.Unmarshal(raw, &nodes); err != nil {
+		return []documentsapi.DocumentCommentContentNode{}
+	}
+	return nodes
 }
 
 func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request, docID string) (tenantID string, userID string, ok bool) {

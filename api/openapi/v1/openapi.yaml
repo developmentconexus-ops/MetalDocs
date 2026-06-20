@@ -2487,10 +2487,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [instance_id]
-                properties:
-                  instance_id: { type: string, format: uuid }
+                $ref: '#/components/schemas/DocumentFinalizeResult'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2901,7 +2898,12 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: rid, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        '302': { description: redirect to signed URL }
+        '200':
+          description: signed URL for the document revision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionUrlResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4364,6 +4366,19 @@ components:
           type: string
           format: uuid
         session_id:
+          type: string
+          format: uuid
+    RevisionUrlResponse:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+    DocumentFinalizeResult:
+      type: object
+      required: [instance_id]
+      properties:
+        instance_id:
           type: string
           format: uuid
     DocumentSessionWriterResponse:

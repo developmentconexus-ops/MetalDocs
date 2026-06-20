@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	documentsapi "metaldocs/internal/modules/documents/api"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
@@ -114,6 +116,70 @@ func TestPlaceholderOptionsResponse_BothBranchesParity(t *testing.T) {
 	wantUser, _ := json.Marshal(users)
 	if string(gotUser) != string(wantUser) {
 		t.Fatalf("user options boxed = %s, want %s", gotUser, wantUser)
+	}
+}
+
+// --- M9 (HS-5 contract type-gate) typed-body locks -------------------------
+// Each replaces a former map[string]<T> literal that evaded the H-D gate. The
+// lock is the consumer wire: the generated struct must serialize to exactly the
+// OpenAPI-declared key set, byte-for-byte where the shape is closed.
+
+// TestDocumentCreateResult_WireContract locks the duplicateDocument body (F9.1),
+// formerly map[string]string, to {document_id, initial_revision_id, session_id}.
+func TestDocumentCreateResult_WireContract(t *testing.T) {
+	id := uuid.MustParse("11111111-1111-4111-8111-111111111111")
+	resp := documentsapi.DocumentCreateResult{DocumentId: id, InitialRevisionId: id, SessionId: id}
+	if got, want := jsonTopKeys(t, resp), "document_id,initial_revision_id,session_id"; got != want {
+		t.Fatalf("create-result keys = %q, want %q", got, want)
+	}
+}
+
+// TestRevisionUrlResponse_WireContract locks the signedRevisionURL body (F9.3),
+// formerly map[string]string, to {url} — the 200 body the FE consumer reads.
+func TestRevisionUrlResponse_WireContract(t *testing.T) {
+	resp := documentsapi.RevisionUrlResponse{Url: "https://example/s3/rev"}
+	if got, want := jsonTopKeys(t, resp), "url"; got != want {
+		t.Fatalf("revision-url keys = %q, want %q", got, want)
+	}
+	raw, _ := json.Marshal(resp)
+	if string(raw) != `{"url":"https://example/s3/rev"}` {
+		t.Fatalf("revision-url wire = %s", raw)
+	}
+}
+
+// TestDocumentFinalizeResult_WireContract locks the finalizeDocument body (F9.4
+// consequence), formerly map[string]string, to {instance_id}.
+func TestDocumentFinalizeResult_WireContract(t *testing.T) {
+	resp := documentsapi.DocumentFinalizeResult{InstanceId: uuid.MustParse("22222222-2222-4222-8222-222222222222")}
+	if got, want := jsonTopKeys(t, resp), "instance_id"; got != want {
+		t.Fatalf("finalize keys = %q, want %q", got, want)
+	}
+}
+
+// TestDocumentCommentResponse_WireContract locks the comment body (F9.2),
+// formerly a hand-rolled map, to the OpenAPI key set. resolved_at and
+// parent_library_id are omitempty pointers — absent when unset.
+func TestDocumentCommentResponse_WireContract(t *testing.T) {
+	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
+	resp := documentsapi.DocumentCommentResponse{
+		Id:               uuid.MustParse("33333333-3333-4333-8333-333333333333"),
+		Author:           "Alice",
+		AuthorId:         "u-1",
+		Content:          []documentsapi.DocumentCommentContentNode{},
+		Done:             false,
+		LibraryCommentId: 7,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	if got, want := jsonTopKeys(t, resp), "author,author_id,content,created_at,done,id,library_comment_id,updated_at"; got != want {
+		t.Fatalf("comment keys (unresolved) = %q, want %q", got, want)
+	}
+	resolved := resp
+	resolved.ResolvedAt = &now
+	parent := 4
+	resolved.ParentLibraryId = &parent
+	if got, want := jsonTopKeys(t, resolved), "author,author_id,content,created_at,done,id,library_comment_id,parent_library_id,resolved_at,updated_at"; got != want {
+		t.Fatalf("comment keys (resolved) = %q, want %q", got, want)
 	}
 }
 

@@ -246,7 +246,7 @@ type fakeApprovalSubmitter struct {
 
 func (f *fakeApprovalSubmitter) SubmitRevisionForReview(_ context.Context, _ platformdb.TxRunner, _ approvalapp.SubmitRequest) (approvalapp.SubmitResult, error) {
 	f.called = true
-	return approvalapp.SubmitResult{InstanceID: "inst_1"}, nil
+	return approvalapp.SubmitResult{InstanceID: "22222222-2222-4222-8222-222222222222"}, nil
 }
 
 type fakeFinalizeIdempotencyStore struct {

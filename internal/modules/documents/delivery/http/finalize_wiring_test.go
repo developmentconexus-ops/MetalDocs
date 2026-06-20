@@ -15,7 +15,7 @@ type stubApprovalSubmitter struct {
 
 func (s *stubApprovalSubmitter) SubmitRevisionForReview(_ context.Context, _ db.TxRunner, _ approvalapp.SubmitRequest) (approvalapp.SubmitResult, error) {
 	s.called = true
-	return approvalapp.SubmitResult{InstanceID: "inst-test"}, nil
+	return approvalapp.SubmitResult{InstanceID: "33333333-3333-4333-8333-333333333333"}, nil
 }
 
 func TestNewHandlerWithSubmit_Compiles(t *testing.T) {

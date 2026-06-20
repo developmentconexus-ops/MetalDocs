@@ -34,6 +34,38 @@ func (h *Handler) View(w interface{}) {
 	}
 }
 
+func TestNoResponseMap_Positive_MapStringString(t *testing.T) {
+	// M9 / F9.4: the post-M8 re-audit found map[string]string response literals
+	// (documents duplicate/comment/revision-url) that the any-only check let
+	// through. The widened gate must flag ANY map[string]<T> reaching a writer.
+	src := `package httpdelivery
+func (h *Handler) Duplicate(w interface{}) {
+	WriteJSON(w, 201, map[string]string{"document_id": "x"})
+}
+`
+	path := noResponseMapFixture(t, "internal/modules/documents/delivery/http/handler.go", src)
+	findings := analyzers.NoResponseMap([]string{path})
+	if len(findings) == 0 {
+		t.Fatal("expected finding for map[string]string response literal (F9.4 widened scope)")
+	}
+}
+
+func TestNoResponseMap_Negative_NonResponseMapStringString(t *testing.T) {
+	// A map[string]string that never reaches a 2xx writer must still pass —
+	// the widening is response-safe, scoped to writer-reaching literals only.
+	src := `package httpdelivery
+func (h *Handler) View(w interface{}) {
+	labels := map[string]string{"k": "v"}
+	h.metrics.Tag(labels)
+}
+`
+	path := noResponseMapFixture(t, "internal/modules/foo/delivery/http/handler.go", src)
+	findings := analyzers.NoResponseMap([]string{path})
+	if len(findings) != 0 {
+		t.Fatalf("non-response map[string]string must not be flagged, got %d: %+v", len(findings), findings)
+	}
+}
+
 func TestNoResponseMap_Positive_BuiltThenWrittenLocal(t *testing.T) {
 	// The exact laundering the historical grep was blind to.
 	src := `package httpdelivery

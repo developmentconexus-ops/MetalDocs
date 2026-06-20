@@ -2257,6 +2257,13 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
+        RevisionUrlResponse: {
+            url: string;
+        };
+        DocumentFinalizeResult: {
+            /** Format: uuid */
+            instance_id: string;
+        };
         DocumentSessionWriterResponse: {
             /** @enum {string} */
             mode: "writer";
@@ -5640,10 +5647,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        instance_id: string;
-                    };
+                    "application/json": components["schemas"]["DocumentFinalizeResult"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -6073,12 +6077,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description redirect to signed URL */
-            302: {
+            /** @description signed URL for the document revision */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RevisionUrlResponse"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];

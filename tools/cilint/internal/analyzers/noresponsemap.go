@@ -29,8 +29,9 @@ var noResponseMapExemptFiles = []string{
 	"internal/platform/observability/health.go",
 }
 
-// NoResponseMap flags a map[string]any RESPONSE LITERAL passed to a 2xx body
-// writer on a registered public route — the H-D class (api-contract.md §5b).
+// NoResponseMap flags a map[string]<T> RESPONSE LITERAL (any value type) passed
+// to a 2xx body writer on a registered public route — the H-D class
+// (api-contract.md §5b).
 // It is the laundering-resistant, path-widened successor to the historical
 // `grep writeJSON.*map[string]any` gate, which was blind to (a) the WriteJSON /
 // writeFillInJSON writer aliases and (b) built-then-written locals
@@ -83,7 +84,7 @@ func NoResponseMap(files []string) []Finding {
 					if i >= len(as.Lhs) {
 						break
 					}
-					if !isMapStringAnyLiteral(rhs) {
+					if !isMapStringLiteral(rhs) {
 						continue
 					}
 					if id, ok := as.Lhs[i].(*ast.Ident); ok && id.Name != "_" {
@@ -104,7 +105,7 @@ func NoResponseMap(files []string) []Finding {
 					return true
 				}
 				for _, arg := range call.Args {
-					flagged := isMapStringAnyLiteral(arg)
+					flagged := isMapStringLiteral(arg)
 					if !flagged {
 						if id, ok := arg.(*ast.Ident); ok && boundMapIdents[id.Name] {
 							flagged = true
@@ -115,7 +116,7 @@ func NoResponseMap(files []string) []Finding {
 							Analyzer: "noresponsemap",
 							File:     path,
 							Line:     pos.Line,
-							Message:  "map[string]any response literal passed to a 2xx body writer on a registered route (H-D, api-contract.md §5b): every 200/201 body must be a typed struct; convert it or record an explicit exemption",
+							Message:  "map[string]<T> response literal passed to a 2xx body writer on a registered route (H-D, api-contract.md §5b): every 200/201 body must be a typed struct; convert it or record an explicit exemption",
 						})
 						return true
 					}
@@ -167,9 +168,15 @@ func isResponseWriter(fn ast.Expr) bool {
 	return false
 }
 
-// isMapStringAnyLiteral reports whether e is a composite literal of type
-// map[string]any or map[string]interface{}.
-func isMapStringAnyLiteral(e ast.Expr) bool {
+// isMapStringLiteral reports whether e is a composite literal of type
+// map[string]<T> for ANY value type T — map[string]any, map[string]interface{},
+// map[string]string, etc. The H-D class is "no untyped map response body", not
+// "no map[string]any specifically": the post-M8 re-audit found map[string]string
+// response literals (documents duplicate/comment/revision-url) that an
+// any-only check let through. The widening is response-safe because the analyzer
+// only flags map literals that actually reach a 2xx body writer — non-response
+// maps (audit payloads, command FormData, security Evidence) never do.
+func isMapStringLiteral(e ast.Expr) bool {
 	cl, ok := e.(*ast.CompositeLit)
 	if !ok {
 		return false
@@ -182,11 +189,5 @@ func isMapStringAnyLiteral(e ast.Expr) bool {
 	if !ok || key.Name != "string" {
 		return false
 	}
-	switch val := mt.Value.(type) {
-	case *ast.Ident:
-		return val.Name == "any"
-	case *ast.InterfaceType:
-		return val.Methods == nil || len(val.Methods.List) == 0
-	}
-	return false
+	return true
 }

@@ -112,9 +112,17 @@ This prevents silent data corruption even if a future handler regression bypasse
 
 ## 5b. Response-body typing gate (H-D — honest two-part)
 
-**Rule:** no public delivery route may emit a `map[string]any` **response literal**. Every 200/201 body
+**Rule:** no public delivery route may emit a `map[string]<T>` **response literal** — for **any** value
+type `T` (`map[string]any`, `map[string]string`, `map[string]int`, …). Every 200/201 body
 is a typed struct — a generated model (oapi-codegen modules) or a hand-rolled typed struct (pre-codegen
 modules per ADR 0012, e.g. auth/search, and deliberately off-spec routes).
+
+**Type scope widened (F9.4 — post-M8 5th miss).** The M8 gate named `map[string]any` only; the post-M8
+re-audit found three documents-handler response literals (`duplicateDocument`, comment list/create/update,
+`signedRevisionURL`) that evaded it by emitting `map[string]string`. The class the gate enforces is "no
+untyped map response body", not one value type — the rule and the `noresponsemap` analyzer now flag any
+`map[string]<T>` reaching a 2xx body writer. The non-response allowlist below is unchanged (those are
+non-response uses regardless of value type).
 
 **Why two parts:** the historical one-liner `grep -rEn 'writeJSON.*map\[string\]any'` ("Grep A") is
 **necessary but not sufficient** — it is blind to:
@@ -134,24 +142,24 @@ that registers a public route:
 ```bash
 ROUTE_PATHS='internal/modules/*/delivery/http/ internal/modules/documents/approval/http/ internal/modules/iam/presence/ internal/platform/observability/'
 
-# Part A — necessary (the one-liner). Must be 0.
-grep -rEn 'write(JSON|FillInJSON)|WriteJSON' $ROUTE_PATHS --include='*.go' | grep -v _test.go | grep 'map\[string\]any'
+# Part A — necessary (the one-liner). Must be 0. Any map[string]<T>, not just any.
+grep -rEn 'write(JSON|FillInJSON)|WriteJSON' $ROUTE_PATHS --include='*.go' | grep -v _test.go | grep -E 'map\[string\]'
 
 # Part B — completeness (closes the blindspot). Every surviving hit must be on the
 # NON-RESPONSE allowlist below; zero response literals.
-grep -rEn 'map\[string\]any' $ROUTE_PATHS --include='*.go' | grep -v _test.go
+grep -rEn 'map\[string\]' $ROUTE_PATHS --include='*.go' | grep -v _test.go
 ```
 
 **Mechanical guard (F8.6 — laundering-resistant, runs in CI).** `tools/cilint` ships the `noresponsemap`
-analyzer: it flags a `map[string]any` composite literal reaching a 2xx body writer (`writeJSON` /
-`writeFillInJSON` / `WriteJSON`) on any registered-route package — **including** built-then-written locals
+analyzer: it flags a `map[string]<T>` composite literal (any value type — F9.4) reaching a 2xx body writer
+(`writeJSON` / `writeFillInJSON` / `WriteJSON`) on any registered-route package — **including** built-then-written locals
 (`page := map[string]any{...}; writeJSON(w, 200, page)`) that Grep A is blind to. Run `go run ./tools/cilint
 ./internal/...`; CI runs it via `.github/workflows/invariants.yml`. Suppress a deliberately off-spec route
 with `//cilint:allow-responsemap <reason>` on the writer-call line.
 
-A **response literal** = a `map[string]any` passed (directly, or via a built local such as `page :=` /
-`payload :=`, on one line or many) to `writeJSON` / `writeFillInJSON` / `WriteJSON` (or any 2xx body
-writer). These are forbidden — convert to a typed body.
+A **response literal** = a `map[string]<T>` (any value type) passed (directly, or via a built local such
+as `page :=` / `payload :=`, on one line or many) to `writeJSON` / `writeFillInJSON` / `WriteJSON` (or any
+2xx body writer). These are forbidden — convert to a typed body.
 
 **Non-response allowlist** (Part B survivors that are NOT response literals — keep):
 - **Domain-mirror struct fields:** `audit AuditEventItem.Payload` (fed by a JSON decode buffer for
@@ -168,8 +176,9 @@ writer). These are forbidden — convert to a typed body.
   `noresponsemap` analyzer encodes this exemption by file (`noResponseMapExemptFiles`); it is recorded
   here, **not** silently passed. Any NEW health field stays inside this file or the exemption no longer applies.
 
-> Anti-evasion: do not launder a response literal past Part A (e.g. `writeJSON(any(map[string]any{}))`)
-> or hide it in a helper — Part B will still flag the `map[string]any`, and any survivor that is not on
+> Anti-evasion: do not launder a response literal past Part A (e.g. `writeJSON(any(map[string]any{}))`),
+> swap the value type to dodge an `any`-only check (`map[string]string` — the post-M8 evasion, now closed),
+> or hide it in a helper — Part B will still flag any `map[string]<T>`, and any survivor that is not on
 > the allowlist is a gate failure. Adding a response-shaped exception to the allowlist is forbidden; the
 > allowlist is for non-response uses only.
 
