@@ -2,7 +2,7 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-06-19 (M6 / F6.1–F6.6 — templates lifecycle + query 200 schemas declared; IAM admin/sessions/observability/memberships typed; security/taxonomy/catalog/schema typed; FE openapi-typescript regenerated; H-D Grep A = 0. Prior: 2026-06-15)
+> **Last verified:** 2026-06-20 (M7 / F7.1–F7.5 — HS-2 contract completion: audit/auth/search/documents 200 bodies typed (generated models + ADR-0012 hand-rolled structs); 4 documents 200 schemas declared + BE/FE codegen regenerated; **honest two-part H-D gate** defined in §5b — Part A = 0 AND Part B = non-response allowlist only, 0 response literals whole-repo. Prior: 2026-06-19 M6)
 > **Scope:** OpenAPI spec location, backend codegen (oapi-codegen v2), frontend codegen (openapi-typescript v7), runtime enforcement gaps, CI drift guard, and freeze-law contract checks.
 > **Out of scope:** Auth/IAM mechanics (`modules/iam.md`), approval-specific request shapes (`modules/approval.md`), frontend API call patterns (`architecture/frontend-structure.md section 7`).
 > **Key files:**
@@ -102,6 +102,47 @@ ALTER TABLE documents
 ```
 
 This prevents silent data corruption even if a future handler regression bypasses the spec-generated struct.
+
+---
+
+## 5b. Response-body typing gate (H-D — honest two-part)
+
+**Rule:** no public delivery route may emit a `map[string]any` **response literal**. Every 200/201 body
+is a typed struct — a generated model (oapi-codegen modules) or a hand-rolled typed struct (pre-codegen
+modules per ADR 0012, e.g. auth/search, and deliberately off-spec routes).
+
+**Why two parts:** the historical one-liner `grep -rEn 'writeJSON.*map\[string\]any'` ("Grep A") is
+**necessary but not sufficient** — it is blind to:
+- the `writeFillInJSON` / `WriteJSON` (capital) writer aliases, and
+- built-then-written locals (`page := map[string]any{...}` / `payload := map[string]any{...}` on one or
+  many lines, written on a later line).
+
+In M6 Grep A read 0 while **10** response-literal sites survived behind exactly these patterns. The
+honest gate therefore measures in two parts:
+
+```bash
+# Part A — necessary (the one-liner). Must be 0.
+grep -rEn 'writeJSON.*map\[string\]any' internal/modules/*/delivery/http/ --include='*.go' | grep -v _test.go
+
+# Part B — completeness (closes the blindspot). Every surviving hit must be on the
+# NON-RESPONSE allowlist below; zero response literals.
+grep -rEn 'map\[string\]any' internal/modules/*/delivery/http/ --include='*.go' | grep -v _test.go
+```
+
+A **response literal** = a `map[string]any` passed (directly, or via a built local such as `page :=` /
+`payload :=`, on one line or many) to `writeJSON` / `writeFillInJSON` / `WriteJSON` (or any 2xx body
+writer). These are forbidden — convert to a typed body.
+
+**Non-response allowlist** (Part B survivors that are NOT response literals — keep):
+- **Domain-mirror struct fields:** `audit AuditEventItem.Payload` (fed by a JSON decode buffer for
+  arbitrary stored payload), `security signalItem.Evidence`.
+- **Internal audit-emit params:** `recordAudit(... payload map[string]any)` in auth / iam / audit.
+- **Command inputs:** `controlleddocuments formData`, `documents ContentFormData`.
+
+> Anti-evasion: do not launder a response literal past Part A (e.g. `writeJSON(any(map[string]any{}))`)
+> or hide it in a helper — Part B will still flag the `map[string]any`, and any survivor that is not on
+> the allowlist is a gate failure. Adding a response-shaped exception to the allowlist is forbidden; the
+> allowlist is for non-response uses only.
 
 ---
 

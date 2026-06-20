@@ -2220,6 +2220,26 @@ export interface components {
             display_name: string;
             roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
         };
+        /** @description Fill-in schema envelope. The placeholder item shape is owned by the templates domain (templatesdomain.Placeholder) and is surfaced opaquely here (items left unconstrained); the contract pins the envelope. */
+        DocumentFillInSchemaResponse: {
+            data: {
+                placeholder_schema: unknown[];
+            };
+        };
+        PutPlaceholderValueResponse: {
+            placeholder_id: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description Placeholder-options envelope. The option item is polymorphic by placeholder type (select -> {value, display_name}; user -> {user_id, display_name}); items are left unconstrained and the contract pins the envelope. */
+        PlaceholderOptionsResponse: {
+            options: unknown[];
+        };
+        ViewDocumentResponse: {
+            pdf_status: string;
+            signed_url?: string;
+            pdf_url?: string;
+        };
         DocumentListResponse: {
             items: components["schemas"]["DocumentSummary"][];
             page: components["schemas"]["CursorPage"];
@@ -6273,7 +6293,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentFillInSchemaResponse"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
@@ -6326,7 +6348,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PutPlaceholderValueResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -6352,7 +6376,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ViewDocumentResponse"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
@@ -6407,7 +6433,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PlaceholderOptionsResponse"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
