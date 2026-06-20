@@ -1,8 +1,16 @@
-# Feature F8.5 — Spec (SEED — approval pending)
+# Feature F8.5 — Spec (APPROVED)
 
 > **Milestone:** 8 — Grade-A Contract & Boundary Completion  ·  **Folder:** `f8.5-problem-json-405`
-> **Status:** Drafting (seed from post-M7 re-audit Middleware Major #2, D-03; **interview + approval pending**)
-> **Approved before code:** PENDING — *no implementation begins until this line is filled (Phase 3, fresh session).*
+> **Status:** APPROVED 2026-06-20
+> **Approved before code:** YES — 2026-06-20. Runtime truth confirmed: `problem.Write` sets
+> `application/problem+json` (`problem.go:77-87`); `problem.CodeMethodNotAllowed` / `CodeNotFound`
+> exist (`codes.go:21-22`); `WriteMethodNotAllowed` is the canonical 405 envelope incl. `Allow`
+> (`httpresponse/response.go:20-25`); `recovery.go` establishes the best-effort response-rewrite
+> precedent; chain wired at `apps/api/cmd/metaldocs-api/main.go:583` (`buildChain(mux, apiChain(...))`).
+> Go 1.22 method-routed `ServeMux` emits `405`/`404` via `http.Error` → `Content-Type: text/plain;
+> charset=utf-8` + `X-Content-Type-Options: nosniff`, with `Allow` set before the body on a 405 —
+> this is the exact signature the interceptor keys on. Interceptor must preserve `http.Flusher` /
+> `http.Hijacker` so streaming/upgrade routes are unaffected.
 
 ## Interview record (fail-closed gate)
 

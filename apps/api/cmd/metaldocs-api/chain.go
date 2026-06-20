@@ -22,7 +22,7 @@ type chainLink struct {
 // the process, but otel wraps everything else so httpObs sees the active span
 // for trace-id correlation. chain_test.go asserts both the declared order and
 // the composed execution order; reorder here and the build breaks, not production.
-func apiChain(recovery, otel, httpObs, cors, origin, preAuthLoginLimit, authn, iamAuthz, presence, rateLimit func(http.Handler) http.Handler) []chainLink {
+func apiChain(recovery, otel, httpObs, cors, origin, preAuthLoginLimit, authn, iamAuthz, presence, rateLimit, methodNotAllowed func(http.Handler) http.Handler) []chainLink {
 	return []chainLink{
 		{"panic_recovery", recovery},
 		{"otel", otel},
@@ -34,6 +34,9 @@ func apiChain(recovery, otel, httpObs, cors, origin, preAuthLoginLimit, authn, i
 		{"iam_authz", iamAuthz},
 		{"presence_bump", presence},
 		{"rate_limit", rateLimit},
+		// Innermost (nearest the mux): rewrite the stdlib text/plain 404/405 the
+		// method-routed ServeMux emits into problem+json, preserving Allow (D-03).
+		{"method_not_allowed", methodNotAllowed},
 	}
 }
 

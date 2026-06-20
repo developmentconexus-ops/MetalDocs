@@ -21,6 +21,7 @@ var normativeChainOrder = []string{
 	"iam_authz",
 	"presence_bump",
 	"rate_limit",
+	"method_not_allowed",
 }
 
 // TestAPIChainOrder_REQMW7 asserts (a) apiChain declares the normative order
@@ -48,6 +49,7 @@ func TestAPIChainOrder_REQMW7(t *testing.T) {
 		probe("iam_authz"),
 		probe("presence_bump"),
 		probe("rate_limit"),
+		probe("method_not_allowed"),
 	)
 
 	if len(links) != len(normativeChainOrder) {

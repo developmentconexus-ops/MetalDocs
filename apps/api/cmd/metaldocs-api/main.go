@@ -591,6 +591,9 @@ func main() {
 		iamMiddleware.Wrap,
 		presenceWrap,
 		func(next http.Handler) http.Handler { return globalLimiter.GlobalEnvelopeWrap(userIDExtractor, next) },
+		// Innermost (nearest the mux): rewrite the stdlib text/plain 404/405 the
+		// method-routed ServeMux emits into problem+json, preserving Allow (D-03).
+		platformmw.MethodNotAllowedJSON,
 	))
 
 	serverCfg, err := config.LoadServerConfig()
