@@ -2,7 +2,7 @@
 
 > **Program:** grade-a-completion
 > **Governing spec:** `../mission.md` (§8 terminal acceptance; §2 Non-Goals; §9 HS-2 signal)
-> **Status:** In progress — spec operator-approved at Phase-2 gate (2026-06-20, README + commit `45a03fa6`); F7.x execution running in this fresh session
+> **Status:** Validator PASS 2026-06-20 (independent milestone-validator, `qa/milestone-qa.md`; HEAD `dadb8275`). F7.1–F7.5 closed. **HS-1 operator gate pending** — no next milestone / no merge without operator approval.
 > **Authored:** 2026-06-20 — before any F7.x feature began.
 > **Opened by:** HS-2 — third consecutive Contract/API miss on the post-M6 terminal re-audit
 > (`wiki/backend/_artifacts/architecture-re-audit-2026-06-19-post-m6.md`, `qa/mission-validation.md`, HEAD `5650b328`).
