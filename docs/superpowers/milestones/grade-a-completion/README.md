@@ -26,6 +26,7 @@ judges it against §6 — 3 dims ≥ A−, 0 new Critical/Major, H-D=0, H-G=0.
 | 4 | `milestone-4-module-ports` | *(LAST)* Drive module-boundaries ≥ A− and **H-G → 0** — published constant, IAM role port, MfaCoverage port | passed (HS-1 approved 2026-06-16) | [PASS](milestone-4-module-ports/qa/milestone-qa.md) |
 | 5 | `milestone-5-hs5-remediation` | HS-5 micro-milestone — close 4 re-audit gaps: H-G→0, H-D→0, 4 Majors, contract-api+module-boundaries ≥ A− | passed (HS-1 approved 2026-06-19) | [PASS](milestone-5-hs5-remediation/qa/milestone-qa.md) |
 | 6 | `milestone-6-hs5-contract-sweep` | HS-5 micro-milestone — drive contract-api ≥ A− and H-D Grep A → 0: typed `*JSONResponse` on 5 confirmed Major hot-sites + class sweep + OpenAPI 200 alignment on templates lifecycle | passed (HS-1 approved 2026-06-19) | [PASS](milestone-6-hs5-contract-sweep/qa/milestone-qa.md) |
+| 7 | `milestone-7-hs2-contract-completion` | HS-2 decision (operator-scoped typed-body parity, not full StrictServerInterface rewire) — close the surviving contract gap: audit/auth/search/documents typed responses + OpenAPI 200 declarations + honest H-D gate redefinition | in-progress (spec authoring 2026-06-20) | — |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
 The **Gate result** column links each milestone-validator verdict (`milestone-<n>/qa/milestone-qa.md`);
@@ -38,11 +39,18 @@ authored later by the `milestone` skill (its Phase 2), in a fresh session — no
 |------|-------|------|------------|
 | 2026-06-16 | HS-5 | Terminal re-audit FAIL — 4 §8 checks unmet (H-G=2, H-D=2, 4 Majors, 2 dims below A−) | M5 bounded micro-milestone opened; operator approved 2026-06-16 |
 | 2026-06-19 | HS-5 | Terminal re-audit FAIL — 3 §8 checks unmet (contract-api B−, 5 confirmed Majors, H-D=24); H-G=0 PASS. Contract/API missed twice (HS-2 signal noted). | M6 `milestone-6-hs5-contract-sweep` opened; operator chose bounded sweep over HS-2 redesign (2026-06-19) |
+| 2026-06-20 | HS-2 | Post-M6 terminal re-audit FAIL — 3 §8 checks unmet (contract-api **B**, 1 confirmed Major, H-D=10 via `writeFillInJSON`/multiline-map sites Grep A is blind to); H-G=0 PASS. **Contract/API missed a third consecutive time (B+ → B− → B)** — the HS-2 redesign-boundary signal. M6's own HS-5 rule said "do not open a bounded M7 by default." | Operator weighed the HS-2 redesign boundary against discovery evidence: (a) the A− bar was reached **twice without** StrictServerInterface (templates std-server wrappers + typed bodies; IAM hand-rolled typed structs per ADR 0012), and (b) auth + search have **no codegen pipeline at all**, making a full codegen-first rewire disproportionate to what §8 requires (contract ≥ A−, 0 Majors, H-D=0 — not a specific framework). **Operator decision 2026-06-20: open M7 as a bounded typed-body-parity sweep**, not the full rewire. M7 `milestone-7-hs2-contract-completion` opened. |
 
 ## Program close-out / reconciliation
 
-M0–M5 passed validator + HS-1. Terminal acceptance **ran 2026-06-19 (HEAD `ad8e6fc8`) — VERDICT: FAIL**.
-Operator opened **HS-5 M6** (bounded contract-sweep) over an HS-2 redesign. Mission stays open.
+M0–M6 passed validator + HS-1. Terminal acceptance has run twice — both FAIL on the Contract/API
+dimension. M6 closed all 5 prior contract Majors and zeroed Grep A, but the **post-M6 re-audit
+(2026-06-20, HEAD `5650b328`) FAILed** the §8 bar: contract-api **B** (not A−), 1 confirmed Major
+(audit export status), and **H-D = 10** sites that Grep A's one-liner pattern structurally cannot
+see (the `writeFillInJSON` alias + multi-line map construction). This was Contract/API's **third
+consecutive miss** (B+ → B− → B) — the HS-2 redesign-boundary signal. Operator opened **M7**
+(bounded typed-body parity, not full StrictServerInterface rewire — see hard-stops 2026-06-20).
+Mission stays open.
 
 - [x] Every planned feature (M0..M5) has a complete evidence row. (M5: F5.1–F5.8 each have evidence.md.)
 - [x] Zero unplanned scope — the only added item (F5.8 + the 2 bundled otel tests) is recorded with
@@ -53,11 +61,18 @@ Operator opened **HS-5 M6** (bounded contract-sweep) over an HS-2 redesign. Miss
       `wiki/backend/_artifacts/architecture-re-audit-2026-06-19.md`,
       `qa/mission-validation.md`. Verdict: **FAIL** (3 of 4 §8 checks unmet — contract/API B−,
       5 confirmed Majors, H-D=24; H-G=0 PASS). Commit `cecb559d` (local).
-- [ ] **HS-5 M6 — `milestone-6-hs5-contract-sweep`** (operator-approved 2026-06-19): drive contract-API
-      ≥ A− and H-D Grep A → 0. Scope in `qa/mission-validation.md` Verdict §. Execute in a **fresh
-      session** via the `milestone` skill (Phase 2 milestone spec + features). On M6 close, re-run
-      F5.1 fan-out and re-dispatch `mission-validator`. Contract/API has missed twice — if M6's
-      re-audit misses a third time, treat as HS-2 (codegen-first StrictServerInterface adoption).
+- [x] **HS-5 M6 — `milestone-6-hs5-contract-sweep`** (operator-approved 2026-06-19): closed all 5
+      prior contract Majors + zeroed Grep A. Validator PASS + HS-1 approved. Post-M6 terminal re-audit
+      ran 2026-06-20 (HEAD `5650b328`) — **FAIL** (`architecture-re-audit-2026-06-19-post-m6.md`,
+      `qa/mission-validation.md`): contract-api B, 1 Major, H-D=10. Third consecutive Contract/API miss.
+- [ ] **HS-2 M7 — `milestone-7-hs2-contract-completion`** (operator-scoped 2026-06-20): drive
+      contract-API ≥ A−, close the 1 confirmed Major + all 10 surviving H-D sites across audit / auth /
+      search / documents, and **redefine the H-D acceptance gate** so it is no longer blind to the
+      `writeFillInJSON` alias + multi-line map construction (the flaw that let M6 report Grep A = 0 while
+      10 sites survived). Operator chose **typed-body parity** (audit/documents via existing codegen;
+      auth/search via hand-rolled typed structs per ADR 0012) over a full codegen-first
+      StrictServerInterface rewire — the lighter pattern that already produced A− twice and satisfies §8.
+      On M7 close, re-run F5.1 fan-out and re-dispatch `mission-validator`.
 - [ ] Terminal acceptance passed — link the new `qa/mission-validation.md` + the new re-audit report.
 - [ ] Parent program M5 closed; `../grade-a-architecture-remediation/README.md` updated.
 - [ ] Operator Grade-A sign-off: <date / name>
