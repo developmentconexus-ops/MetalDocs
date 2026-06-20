@@ -1094,3 +1094,124 @@ func TestChangePasswordForUser_RevokesSessions(t *testing.T) {
 		t.Fatalf("expected session to be revoked after password change, but ResolveSession succeeded")
 	}
 }
+
+// f8_4NewActiveUserService creates an active user with a dev-tenant role and a
+// service wired to the same in-memory repo, returning everything F8.4 deactivation
+// tests need. Mirrors the change-password test setup.
+func f8_4NewActiveUserService(t *testing.T, userID string) (*Service, *memory.Repository, context.Context) {
+	t.Helper()
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	ctx := context.Background()
+
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:       userID,
+		Username:     userID,
+		Email:        userID + "@example.com",
+		DisplayName:  "Deact Test " + userID,
+		PasswordHash: mustHashPassword(t, "TestPassword123!"),
+		PasswordAlgo: "bcrypt",
+		IsActive:     true,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
+
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          testSessionSecret,
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		AllowDevTenantFallback: true,
+		CookieSecure:           false,
+	})
+	return svc, repo, ctx
+}
+
+// TestUpdateUser_DeactivateRevokesSessions guards F8.4 (CWE-613, write path): when
+// auth.UpdateUser flips IsActive false, every existing session for that user is
+// revoked so it cannot survive deactivation.
+func TestUpdateUser_DeactivateRevokesSessions(t *testing.T) {
+	userID := "deact-revoke-user"
+	svc, _, ctx := f8_4NewActiveUserService(t, userID)
+
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+	authSession, err := svc.Authenticate(ctx, userID, "TestPassword123!", req)
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+	if _, err := svc.ResolveSession(ctx, authSession.RawToken); err != nil {
+		t.Fatalf("ResolveSession before deactivate: %v", err)
+	}
+
+	inactive := false
+	if err := svc.UpdateUser(ctx, authdomain.UpdateUserParams{UserID: userID, IsActive: &inactive}, ""); err != nil {
+		t.Fatalf("UpdateUser(deactivate): %v", err)
+	}
+
+	if _, err := svc.ResolveSession(ctx, authSession.RawToken); err == nil {
+		t.Fatalf("expected session rejected after deactivate, but ResolveSession succeeded")
+	}
+}
+
+// TestResolveSession_FailsClosedWhenIdentityInactive guards F8.4 (read path): even
+// if a live, un-revoked session row exists, resolving it for a deactivated identity
+// must fail closed with ErrIdentityInactive — independent of the revoke-on-write
+// path (here the repo is mutated directly, bypassing the service revoke).
+func TestResolveSession_FailsClosedWhenIdentityInactive(t *testing.T) {
+	userID := "deact-failclosed-user"
+	svc, repo, ctx := f8_4NewActiveUserService(t, userID)
+
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+	authSession, err := svc.Authenticate(ctx, userID, "TestPassword123!", req)
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+
+	// Deactivate at the repo directly — the session row stays un-revoked, isolating
+	// the resolve-time fail-closed check.
+	inactive := false
+	if err := repo.UpdateUser(ctx, authdomain.UpdateUserParams{UserID: userID, IsActive: &inactive}); err != nil {
+		t.Fatalf("repo.UpdateUser(deactivate): %v", err)
+	}
+
+	_, err = svc.ResolveSession(ctx, authSession.RawToken)
+	if !errors.Is(err, authdomain.ErrIdentityInactive) {
+		t.Fatalf("ResolveSession on inactive identity = %v, want ErrIdentityInactive", err)
+	}
+}
+
+// TestUpdateUser_NonDeactivatingEditDoesNotRevoke guards F8.4 scope: a profile edit
+// or a reactivation (IsActive=true) must NOT revoke a live session — only a
+// transition to inactive does.
+func TestUpdateUser_NonDeactivatingEditDoesNotRevoke(t *testing.T) {
+	userID := "deact-noop-user"
+	svc, _, ctx := f8_4NewActiveUserService(t, userID)
+
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+	authSession, err := svc.Authenticate(ctx, userID, "TestPassword123!", req)
+	if err != nil {
+		t.Fatalf("Authenticate: %v", err)
+	}
+
+	// Display-name edit (IsActive untouched).
+	newName := "Renamed"
+	if err := svc.UpdateUser(ctx, authdomain.UpdateUserParams{UserID: userID, DisplayName: &newName}, ""); err != nil {
+		t.Fatalf("UpdateUser(rename): %v", err)
+	}
+	if _, err := svc.ResolveSession(ctx, authSession.RawToken); err != nil {
+		t.Fatalf("session must survive a non-deactivating edit, got: %v", err)
+	}
+
+	// Explicit reactivation (IsActive=true) also must not revoke.
+	active := true
+	if err := svc.UpdateUser(ctx, authdomain.UpdateUserParams{UserID: userID, IsActive: &active}, ""); err != nil {
+		t.Fatalf("UpdateUser(activate): %v", err)
+	}
+	if _, err := svc.ResolveSession(ctx, authSession.RawToken); err != nil {
+		t.Fatalf("session must survive reactivation, got: %v", err)
+	}
+}

@@ -72,7 +72,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value)
 		if err != nil {
-			if errors.Is(err, authdomain.ErrSessionNotFound) || errors.Is(err, authdomain.ErrSessionExpired) || errors.Is(err, authdomain.ErrSessionRevoked) {
+			if errors.Is(err, authdomain.ErrSessionNotFound) || errors.Is(err, authdomain.ErrSessionExpired) || errors.Is(err, authdomain.ErrSessionRevoked) || errors.Is(err, authdomain.ErrIdentityInactive) {
 				_ = problem.Write(w, problem.New(http.StatusUnauthorized, problem.CodeAuthUnauthorized, "Authentication required"))
 				return
 			}

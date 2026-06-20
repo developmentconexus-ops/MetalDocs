@@ -1,8 +1,8 @@
-# Feature F8.4 — Spec (SEED — approval pending)
+# Feature F8.4 — Spec (APPROVED)
 
 > **Milestone:** 8 — Grade-A Contract & Boundary Completion  ·  **Folder:** `f8.4-deactivation-session-enforcement`
-> **Status:** Drafting (seed from post-M7 re-audit Sessions Major #1, CWE-613; **interview + approval pending**)
-> **Approved before code:** PENDING — *no implementation begins until this line is filled (Phase 3, fresh session).*
+> **Status:** Approved 2026-06-20 (execution session) — seed confirmed against runtime truth: `auth.UpdateUser` (`service.go:618`) currently does **not** revoke on deactivate; `UpdateUserParams.IsActive *bool` (`model.go:116`) exists; `buildCurrentUser` (`service.go:845`) does **not** consult `identity.IsActive` (which exists, `model.go:40`); `ResolveSession`→`buildCurrentUser` (`service.go:399`); revoke primitives `RevokeSessionsByUserIDTx`/`RevokeSessionsByUserID` + the atomic-tx pattern exist (`AdminResetPassword` `service.go:693-718`); `ErrIdentityInactive` sentinel exists (`errors.go:13`) but is **not** in the middleware resolve 401 set (`middleware.go:75`).
+> **Approved before code:** ✅ 2026-06-20 — no code written before this line. Fail-closed sentinel chosen: `buildCurrentUser` returns `ErrIdentityInactive`, added to the middleware resolve 401 set (outcome = "treated as revoked", per the consumer contract).
 
 ## Interview record (fail-closed gate)
 

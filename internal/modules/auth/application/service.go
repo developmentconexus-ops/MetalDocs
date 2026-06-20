@@ -627,7 +627,47 @@ func (s *Service) UpdateUser(ctx context.Context, params authdomain.UpdateUserPa
 		}
 		params.NewPasswordHash = &passwordHash
 	}
-	return s.repo.UpdateUser(ctx, params)
+
+	// Deactivation revokes all of the user's sessions (F8.4, CWE-613): a session must
+	// not outlive the account it authenticates. Mirrors the credential-change revoke
+	// (ChangePasswordForUser / AdminResetPassword). Revoke is idempotent, so it fires
+	// whenever IsActive is being set false — over-firing is harmless, under-firing is
+	// a security hole. A non-deactivating update keeps the plain single-write path.
+	deactivating := params.IsActive != nil && !*params.IsActive
+	if !deactivating {
+		return s.repo.UpdateUser(ctx, params)
+	}
+
+	now := s.now().UTC()
+	repoTx, repoTxOK := s.repo.(updateUserTxRepository)
+	revokeTx, revokeTxOK := s.repo.(revokeSessionsByUserIDTxRepository)
+	beginner, beginOK := s.repo.(beginTxRepository)
+	if !(repoTxOK && revokeTxOK && beginOK) {
+		// Fallback: in-memory / test repo — no tx available, so the mutation and the
+		// revoke run as separate autocommits.
+		if err := s.repo.UpdateUser(ctx, params); err != nil {
+			return err
+		}
+		return s.repo.RevokeSessionsByUserID(ctx, params.UserID, now)
+	}
+
+	// Atomic path: deactivation + session revocation in one tx. No authz-recording
+	// read inside the tx (H-PRE-1) — same shape as AdminResetPassword.
+	tx, err := beginner.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin deactivate user tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := repoTx.UpdateUserTx(ctx, tx, params); err != nil {
+		return err
+	}
+	if err := revokeTx.RevokeSessionsByUserIDTx(ctx, tx, params.UserID, now); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit deactivate user tx: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) AdminResetPassword(ctx context.Context, userID, newPassword string) error {
@@ -846,6 +886,14 @@ func (s *Service) buildCurrentUser(ctx context.Context, userID, tenantID string)
 	identity, err := s.repo.FindIdentityByUserID(ctx, userID)
 	if err != nil {
 		return authdomain.CurrentUser{}, err
+	}
+	// Fail closed (F8.4, CWE-613): a deactivated identity never yields a CurrentUser,
+	// even if a live session row still exists. This is the read-path backstop to the
+	// revoke-on-deactivate write path in UpdateUser — resolve rejects the session
+	// regardless of which path (or neither) revoked it. Login (Authenticate) already
+	// rejects inactive accounts earlier, so this only ever fires on the resolve path.
+	if !identity.IsActive {
+		return authdomain.CurrentUser{}, authdomain.ErrIdentityInactive
 	}
 	tenantRow, err := s.repo.GetTenantByID(ctx, tenantID)
 	if err != nil {
