@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	auditapi "metaldocs/internal/modules/audit/api"
 	"metaldocs/internal/modules/audit/application"
 	"metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/platform/authn"
@@ -39,17 +40,6 @@ type AuditExporter interface {
 type Handler struct {
 	service  AuditQuerier
 	exporter AuditExporter
-}
-
-type EventResponse struct {
-	ID           string         `json:"id"`
-	OccurredAt   string         `json:"occurred_at"`
-	ActorID      string         `json:"actor_id"`
-	Action       string         `json:"action"`
-	ResourceType string         `json:"resource_type"`
-	ResourceID   string         `json:"resource_id"`
-	Payload      map[string]any `json:"payload"`
-	TraceID      string         `json:"trace_id"`
 }
 
 func NewHandler(service AuditQuerier) *Handler {
@@ -117,21 +107,23 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	// bridged with a dual-shape adapter (closed: ADR 0028-audit-events-cursor-shape).
 	// has_more now comes from the reader's limit+1 probe, so an exact-multiple last
 	// page no longer falsely advertises a next page (AIP-158).
-	page := map[string]any{"next_cursor": nil, "has_more": false}
+	page := auditapi.CursorPage{NextCursor: nil, HasMore: false}
 	if hasMore && len(items) > 0 {
 		last := items[len(items)-1]
-		page["next_cursor"] = encodeCursor(domain.Cursor{OccurredAt: last.OccurredAt, ID: last.ID})
-		page["has_more"] = true
+		cursor := encodeCursor(domain.Cursor{OccurredAt: last.OccurredAt, ID: last.ID})
+		page.NextCursor = &cursor
+		page.HasMore = true
 	}
 
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"items": responseItems,
-		"page":  page,
+	httpresponse.WriteJSON(w, http.StatusOK, auditapi.ListAuditEventsResponse{
+		Items: responseItems,
+		Page:  page,
 	})
 }
 
 func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
 		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed"))
 		return
 	}
@@ -213,16 +205,17 @@ func (h *Handler) handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpresponse.WriteJSON(w, http.StatusAccepted, map[string]any{
-		"export_id":  job.ID,
-		"status":    string(job.Status),
-		"signed_url": h.exporter.BuildSignedURL(job),
-		"expires_at": job.ExpiresAt.UTC().Format(time.RFC3339),
+	httpresponse.WriteJSON(w, http.StatusAccepted, auditapi.AuditExportResponse{
+		ExportId:  job.ID,
+		Status:    string(job.Status),
+		SignedUrl: h.exporter.BuildSignedURL(job),
+		ExpiresAt: job.ExpiresAt.UTC().Truncate(time.Second),
 	})
 }
 
 func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
 		writeProblem(w, problem.New(http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed"))
 		return
 	}
@@ -265,16 +258,18 @@ func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request
 		writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to read export status"))
 		return
 	}
-	resp := map[string]any{
-		"export_id":  job.ID,
-		"status":    string(job.Status),
-		"signed_url": h.exporter.BuildSignedURL(job),
+	resp := auditapi.AuditExportStatusResponse{
+		ExportId:  job.ID,
+		Status:    string(job.Status),
+		SignedUrl: h.exporter.BuildSignedURL(job),
 	}
 	if !job.ExpiresAt.IsZero() {
-		resp["expires_at"] = job.ExpiresAt.UTC().Format(time.RFC3339)
+		expiresAt := job.ExpiresAt.UTC().Truncate(time.Second)
+		resp.ExpiresAt = &expiresAt
 	}
 	if job.ErrorMessage != "" {
-		resp["error"] = job.ErrorMessage
+		msg := job.ErrorMessage
+		resp.Error = &msg
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }
@@ -398,8 +393,13 @@ func decodeCursor(raw string) (domain.Cursor, *problem.Problem) {
 	return domain.Cursor{OccurredAt: ts, ID: id}, nil
 }
 
-func buildEventResponses(items []domain.Event) ([]EventResponse, error) {
-	responseItems := make([]EventResponse, 0, len(items))
+// buildEventResponses maps stored events onto the generated auditapi.AuditEventItem.
+// OccurredAt is truncated to the second (UTC) so the marshaled time.Time matches the
+// historical RFC3339 second-precision wire output byte-for-byte. The payload decode
+// buffer stays an untyped map — it feeds the allowlisted AuditEventItem.Payload
+// domain-mirror field (arbitrary stored JSON), not a response literal.
+func buildEventResponses(items []domain.Event) ([]auditapi.AuditEventItem, error) {
+	responseItems := make([]auditapi.AuditEventItem, 0, len(items))
 	for _, item := range items {
 		payload := map[string]any{}
 		if raw := strings.TrimSpace(item.PayloadJSON); raw != "" {
@@ -407,15 +407,15 @@ func buildEventResponses(items []domain.Event) ([]EventResponse, error) {
 				return nil, fmt.Errorf("decode payload for event %s: %w", item.ID, err)
 			}
 		}
-		responseItems = append(responseItems, EventResponse{
-			ID:           item.ID,
-			OccurredAt:   item.OccurredAt.UTC().Format(time.RFC3339),
-			ActorID:      item.ActorID,
+		responseItems = append(responseItems, auditapi.AuditEventItem{
+			Id:           item.ID,
+			OccurredAt:   item.OccurredAt.UTC().Truncate(time.Second),
+			ActorId:      item.ActorID,
 			Action:       item.Action,
 			ResourceType: item.ResourceType,
-			ResourceID:   item.ResourceID,
+			ResourceId:   item.ResourceID,
 			Payload:      payload,
-			TraceID:      item.TraceID,
+			TraceId:      item.TraceID,
 		})
 	}
 	return responseItems, nil

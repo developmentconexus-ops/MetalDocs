@@ -36,3 +36,52 @@ func TestHandleEvents_405_Allow(t *testing.T) {
 		t.Error("expected Allow header in 405 response (RFC 7231), got empty")
 	}
 }
+
+// TestHandleExport_405_Allow asserts the export POST endpoint advertises Allow: POST
+// on a 405 (F7.1 drive-by, RFC 7231).
+func TestHandleExport_405_Allow(t *testing.T) {
+	service := application.NewService(memory.NewWriter())
+	handler := httpdelivery.NewHandler(service)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit/events/export", nil)
+	ctx := tenant.WithTenantID(req.Context(), "tenant-test")
+	ctx = iamdomain.WithAuthContext(ctx, "user-a", []iamdomain.Role{})
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Allow"); got != "POST" {
+		t.Errorf("Allow = %q, want POST", got)
+	}
+}
+
+// TestHandleExportSubresource_405_Allow asserts the export subresource endpoint
+// advertises Allow: GET on a 405 (F7.1 drive-by, RFC 7231).
+func TestHandleExportSubresource_405_Allow(t *testing.T) {
+	// Method check precedes the nil-exporter check, so the 405 fires without an exporter.
+	service := application.NewService(memory.NewWriter())
+	handler := httpdelivery.NewHandler(service)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/audit/events/export/some-id", nil)
+	ctx := tenant.WithTenantID(req.Context(), "tenant-test")
+	ctx = iamdomain.WithAuthContext(ctx, "user-a", []iamdomain.Role{})
+	req = req.WithContext(ctx)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Allow"); got != "GET" {
+		t.Errorf("Allow = %q, want GET", got)
+	}
+}
