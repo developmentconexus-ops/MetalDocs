@@ -27,7 +27,8 @@ judges it against §6 — 3 dims ≥ A−, 0 new Critical/Major, H-D=0, H-G=0.
 | 5 | `milestone-5-hs5-remediation` | HS-5 micro-milestone — close 4 re-audit gaps: H-G→0, H-D→0, 4 Majors, contract-api+module-boundaries ≥ A− | passed (HS-1 approved 2026-06-19) | [PASS](milestone-5-hs5-remediation/qa/milestone-qa.md) |
 | 6 | `milestone-6-hs5-contract-sweep` | HS-5 micro-milestone — drive contract-api ≥ A− and H-D Grep A → 0: typed `*JSONResponse` on 5 confirmed Major hot-sites + class sweep + OpenAPI 200 alignment on templates lifecycle | passed (HS-1 approved 2026-06-19) | [PASS](milestone-6-hs5-contract-sweep/qa/milestone-qa.md) |
 | 7 | `milestone-7-hs2-contract-completion` | HS-2 decision (operator-scoped typed-body parity, not full StrictServerInterface rewire) — close the surviving contract gap: audit/auth/search/documents typed responses + OpenAPI 200 declarations + honest H-D gate redefinition | **validator PASS 2026-06-20** (F7.1–F7.5 closed; HS-1 operator gate pending) | [PASS](milestone-7-hs2-contract-completion/qa/milestone-qa.md) |
-| 8 | `milestone-8-grade-a-contract-completion` | HS-5 (4th-miss) closure — typed-everywhere + gate-scope honesty: presence/metrics typed bodies, search→taxonomy port, deactivation session enforcement, problem+json 405, widen §5b/§8 gate to the whole public surface | **PASS** (milestone-validator VERDICT PASS 2026-06-20; F8.1–F8.6 closed; HS-1 gate + post-M8 re-audit pending) | `qa/milestone-qa.md` |
+| 8 | `milestone-8-grade-a-contract-completion` | HS-5 (4th-miss) closure — typed-everywhere + gate-scope honesty: presence/metrics typed bodies, search→taxonomy port, deactivation session enforcement, problem+json 405, widen §5b/§8 gate to the whole public surface | passed (validator PASS 2026-06-20; HS-1 approved; post-M8 re-audit FAIL → HS-5 5th miss → M9) | [PASS](milestone-8-grade-a-contract-completion/qa/milestone-qa.md) |
+| 9 | `milestone-9-hs5-contract-typegate` | HS-5 (5th-miss, operator option A) — close 3 post-M8 documents-handler Majors (duplicate/comments/revision-url typed) + widen noresponsemap to ANY `map[string]<T>` (kills the `map[string]string` evasion; surfaced+closed a 4th site, finalize) | **PASS** (milestone-validator VERDICT PASS 2026-06-20; F9.1–F9.4 closed; HS-1 gate + post-M9 re-audit pending) | [PASS](milestone-9-hs5-contract-typegate/qa/milestone-qa.md) |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
 The **Gate result** column links each milestone-validator verdict (`milestone-<n>/qa/milestone-qa.md`);
@@ -41,6 +42,7 @@ authored later by the `milestone` skill (its Phase 2), in a fresh session — no
 | 2026-06-16 | HS-5 | Terminal re-audit FAIL — 4 §8 checks unmet (H-G=2, H-D=2, 4 Majors, 2 dims below A−) | M5 bounded micro-milestone opened; operator approved 2026-06-16 |
 | 2026-06-19 | HS-5 | Terminal re-audit FAIL — 3 §8 checks unmet (contract-api B−, 5 confirmed Majors, H-D=24); H-G=0 PASS. Contract/API missed twice (HS-2 signal noted). | M6 `milestone-6-hs5-contract-sweep` opened; operator chose bounded sweep over HS-2 redesign (2026-06-19) |
 | 2026-06-20 | HS-2 | Post-M6 terminal re-audit FAIL — 3 §8 checks unmet (contract-api **B**, 1 confirmed Major, H-D=10 via `writeFillInJSON`/multiline-map sites Grep A is blind to); H-G=0 PASS. **Contract/API missed a third consecutive time (B+ → B− → B)** — the HS-2 redesign-boundary signal. M6's own HS-5 rule said "do not open a bounded M7 by default." | Operator weighed the HS-2 redesign boundary against discovery evidence: (a) the A− bar was reached **twice without** StrictServerInterface (templates std-server wrappers + typed bodies; IAM hand-rolled typed structs per ADR 0012), and (b) auth + search have **no codegen pipeline at all**, making a full codegen-first rewire disproportionate to what §8 requires (contract ≥ A−, 0 Majors, H-D=0 — not a specific framework). **Operator decision 2026-06-20: open M7 as a bounded typed-body-parity sweep**, not the full rewire. M7 `milestone-7-hs2-contract-completion` opened. |
+| 2026-06-20 | HS-5 | **Post-M8 terminal re-audit FAIL — Contract/API B+ (below A−), 3 confirmed documents-handler Majors, H-D=3 at the M8-WIDENED scope** (`architecture-re-audit-2026-06-20-post-m8.md`, `qa/mission-validation.md`, mission-validator corroborated). The 3 Majors (`duplicateDocument`, comment list/create/update, `signedRevisionURL`) evaded the M8 gate by emitting `map[string]string` — the F8.6 analyzer was scoped to `map[string]any` only. **Contract/API's 5th consecutive miss (B+ → B− → B → B+ → B+).** Per M8's HS-5 rule, no M9 by default. | Operator decision 2026-06-20: **option A — bounded M9 micro-milestone** (type the 3 sites + widen the analyzer to any `map[string]<T>` so the evasion class is closed, not just the instances), then re-run terminal acceptance. Opened **M9** `milestone-9-hs5-contract-typegate` (F9.1–F9.4). |
 | 2026-06-20 | HS-5 | **Post-M7 terminal re-audit FAIL — all 4 §8 checks unmet** (`architecture-re-audit-2026-06-20-post-m7.md`, `qa/mission-validation.md`, mission-validator corroborated): contract-api **B+**, composition **B+** (both below A−), **5 confirmed Majors**, **honest H-D=2** (presence + metrics response literals the §5b path-scoped gate misses), **honest H-G=1** (search→taxonomy `document_profiles`). Build+tests green. **Contract/API's 4th consecutive miss (B+ → B− → B → B+).** Root cause: §5b/§8 gates scoped narrower than intent — sites outside `internal/modules/*/delivery/http/` + the two IAM tables survived every bounded sweep. | Operator decision 2026-06-20: option A — **typed-everywhere + gate-scope honesty**. Opened **M8** `milestone-8-grade-a-contract-completion` (F8.1 presence typed body, F8.2 metrics typed envelope, F8.3 search→taxonomy port, F8.4 deactivation session enforcement, F8.5 problem+json 405, F8.6 widen §5b/§8 gate + CI guard). Spec + feature tree scaffolded; execution in a fresh session. |
 
 ## Program close-out / reconciliation
@@ -81,11 +83,18 @@ Mission stays open.
       H-D=2, honest H-G=1. M7's in-scope work was sound (audit-export Major closed, 4 docs schemas
       aligned, in-path Part B allowlisted) but 2 response literals + 1 cross-schema reach sit outside
       the gate scope. Commit `9ed83235` (local). **Contract/API 4th consecutive miss → HS-5.**
-- [ ] **HS-5 M8 — `milestone-8-grade-a-contract-completion`** (operator option A, 2026-06-20):
-      typed-everywhere + gate-scope honesty. F8.1–F8.6 close the 5 Majors and widen §5b/§8 to the
-      whole public surface. Spec + feature tree scaffolded this session; execution in a fresh session.
-      On M8 close, re-run the post-M8 re-audit + `mission-validator`. **5th miss ⇒ no M9 by default
-      (HS-5): full codegen-first rewire or §8 re-scope is the operator's call.**
+- [x] **HS-5 M8 — `milestone-8-grade-a-contract-completion`** (operator option A, 2026-06-20):
+      typed-everywhere + gate-scope honesty. F8.1–F8.6 closed; validator PASS + HS-1 approved. Post-M8
+      terminal re-audit ran 2026-06-20 — **FAIL** (`architecture-re-audit-2026-06-20-post-m8.md`,
+      `qa/mission-validation.md`): contract-api B+, 3 documents-handler Majors that evaded the widened
+      gate via `map[string]string`, H-D=3. **5th consecutive Contract/API miss.**
+- [ ] **HS-5 M9 — `milestone-9-hs5-contract-typegate`** (operator option A, 2026-06-20): close the 3
+      `map[string]string` Majors (duplicate/comments/revision-url) by routing through generated typed
+      bodies, and **widen the `noresponsemap` analyzer from `map[string]any` to any `map[string]<T>`**
+      so the value-type evasion class is closed — which surfaced and closed a 4th site (`finalizeDocument`)
+      via `DocumentFinalizeResult`. F9.1–F9.4 closed; **milestone-validator VERDICT PASS 2026-06-20**
+      (`milestone-9-hs5-contract-typegate/qa/milestone-qa.md`); commits `2e3c8a8b` + `9248d715` (local).
+      HS-1 operator gate pending; on approval, re-run post-M9 F5.1 re-audit + re-dispatch `mission-validator`.
 - [ ] Terminal acceptance passed — link the new `qa/mission-validation.md` + the new re-audit report.
 - [ ] Parent program M5 closed; `../grade-a-architecture-remediation/README.md` updated.
 - [ ] Operator Grade-A sign-off: <date / name>
