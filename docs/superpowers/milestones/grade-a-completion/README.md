@@ -26,7 +26,7 @@ judges it against §6 — 3 dims ≥ A−, 0 new Critical/Major, H-D=0, H-G=0.
 | 4 | `milestone-4-module-ports` | *(LAST)* Drive module-boundaries ≥ A− and **H-G → 0** — published constant, IAM role port, MfaCoverage port | passed (HS-1 approved 2026-06-16) | [PASS](milestone-4-module-ports/qa/milestone-qa.md) |
 | 5 | `milestone-5-hs5-remediation` | HS-5 micro-milestone — close 4 re-audit gaps: H-G→0, H-D→0, 4 Majors, contract-api+module-boundaries ≥ A− | passed (HS-1 approved 2026-06-19) | [PASS](milestone-5-hs5-remediation/qa/milestone-qa.md) |
 | 6 | `milestone-6-hs5-contract-sweep` | HS-5 micro-milestone — drive contract-api ≥ A− and H-D Grep A → 0: typed `*JSONResponse` on 5 confirmed Major hot-sites + class sweep + OpenAPI 200 alignment on templates lifecycle | passed (HS-1 approved 2026-06-19) | [PASS](milestone-6-hs5-contract-sweep/qa/milestone-qa.md) |
-| 7 | `milestone-7-hs2-contract-completion` | HS-2 decision (operator-scoped typed-body parity, not full StrictServerInterface rewire) — close the surviving contract gap: audit/auth/search/documents typed responses + OpenAPI 200 declarations + honest H-D gate redefinition | in-progress (spec authoring 2026-06-20) | — |
+| 7 | `milestone-7-hs2-contract-completion` | HS-2 decision (operator-scoped typed-body parity, not full StrictServerInterface rewire) — close the surviving contract gap: audit/auth/search/documents typed responses + OpenAPI 200 declarations + honest H-D gate redefinition | spec approved 2026-06-20 (Phase 2 gate); F7.x execution deferred to fresh session | — |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
 The **Gate result** column links each milestone-validator verdict (`milestone-<n>/qa/milestone-qa.md`);
