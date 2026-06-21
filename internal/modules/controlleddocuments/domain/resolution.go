@@ -1,6 +1,10 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+
+	templatesdomain "metaldocs/internal/modules/templates/domain"
+)
 
 type TemplateResolutionInput struct {
 	ProfileCode      string
@@ -39,7 +43,7 @@ func resolveOverrideTemplate(profileCode string, candidate *TemplateVersionCandi
 	if candidate.Status == nil {
 		return TemplateResolutionResult{}, ErrOverrideTemplateDeleted
 	}
-	if *candidate.Status != "published" {
+	if *candidate.Status != string(templatesdomain.VersionStatusPublished) {
 		return TemplateResolutionResult{}, ErrOverrideNotPublished
 	}
 	if candidate.ProfileCode != profileCode {
@@ -52,10 +56,10 @@ func resolveDefaultTemplate(candidate *TemplateVersionCandidate) (TemplateResolu
 	if candidate == nil || candidate.Status == nil {
 		return TemplateResolutionResult{}, ErrProfileHasNoDefaultTemplate
 	}
-	if *candidate.Status == "obsolete" {
+	if *candidate.Status == string(templatesdomain.VersionStatusObsolete) {
 		return TemplateResolutionResult{}, ErrDefaultObsolete
 	}
-	if *candidate.Status != "published" {
+	if *candidate.Status != string(templatesdomain.VersionStatusPublished) {
 		return TemplateResolutionResult{}, ErrProfileHasNoDefaultTemplate
 	}
 	return TemplateResolutionResult{TemplateVersionID: candidate.ID, Source: "default"}, nil

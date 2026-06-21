@@ -3,7 +3,40 @@ package domain
 import (
 	"errors"
 	"testing"
+
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
+
+// TestResolve_UsesTemplatesVocabulary is a boundary regression guard: it feeds the templates-owned
+// VersionStatus constants directly as Resolve inputs and asserts the resolver agrees with that
+// vocabulary. If the templates published/obsolete wire values ever drift from what resolution.go
+// compares against, this fails at CD's boundary instead of passing silently.
+func TestResolve_UsesTemplatesVocabulary(t *testing.T) {
+	published := string(templatesdomain.VersionStatusPublished)
+	obsolete := string(templatesdomain.VersionStatusObsolete)
+
+	res, err := Resolve(TemplateResolutionInput{
+		ProfileCode:     "po",
+		DefaultTemplate: &TemplateVersionCandidate{ID: "def-1", ProfileCode: "po", Status: &published},
+	})
+	if err != nil || res.TemplateVersionID != "def-1" || res.Source != "default" {
+		t.Fatalf("published default should resolve, got res=%+v err=%v", res, err)
+	}
+
+	if _, err := Resolve(TemplateResolutionInput{
+		ProfileCode:     "po",
+		DefaultTemplate: &TemplateVersionCandidate{ID: "def-1", ProfileCode: "po", Status: &obsolete},
+	}); !errors.Is(err, ErrDefaultObsolete) {
+		t.Fatalf("obsolete default should be ErrDefaultObsolete, got %v", err)
+	}
+
+	if _, err := Resolve(TemplateResolutionInput{
+		ProfileCode:      "po",
+		OverrideTemplate: &TemplateVersionCandidate{ID: "ovr-1", ProfileCode: "po", Status: &obsolete},
+	}); !errors.Is(err, ErrOverrideNotPublished) {
+		t.Fatalf("non-published override should be ErrOverrideNotPublished, got %v", err)
+	}
+}
 
 func TestResolve_Override_Wins(t *testing.T) {
 	published := "published"
