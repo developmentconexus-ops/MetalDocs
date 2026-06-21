@@ -1,7 +1,7 @@
 # Program: Backend Module-Boundary Hardening
 
 > **Governing spec:** `./mission.md`
-> **Status:** Executing — M0 **passed** + M1 **passed** (both validator PASS + operator HS-1, 2026-06-20); M2 next (fresh session)
+> **Status:** Executing — M0 **passed** + M1 **passed** (both validator PASS + operator HS-1, 2026-06-20); **M2 in progress** (spec authored 2026-06-20)
 > **Owner / operator:** leandrotca
 
 Eliminate the pre-existing cross-module raw-SQL debt (~20 sites in 3 categories — see
@@ -18,7 +18,7 @@ program's terminal PASS.
 |---|-----------|----------------------|--------|-------------|
 | 0 | `milestone-0-adr-and-census` | ADR-0039 locks the H-G definition + exemption list; binding re-census; cilint H-G guard | passed | [PASS](milestone-0-adr-and-census/qa/milestone-qa.md) + HS-1 approved 2026-06-20 |
 | 1 | `milestone-1-category-a-constants` | Typed status constants in `controlleddocuments/domain/resolution.go` (no SQL) | passed | [PASS](milestone-1-category-a-constants/qa/milestone-qa.md) + HS-1 approved 2026-06-20 |
-| 2 | `milestone-2-category-b-read-ports` | 8 clean foreign point-reads → owner-published read-ports (parity-before-delete) | planned | — |
+| 2 | `milestone-2-category-b-read-ports` | 9 clean foreign point-reads → owner-published read-ports (parity-before-delete) | in-progress (PG live :5434; F2.1 executing) | — |
 | 3 | `milestone-3-category-c-membership-view` | iam publishes active-membership view; CD list/CanRead + approval (H-PRE-1) consume it | planned | — |
 | 4 | `milestone-4-search-visibility-contract` | search consumes a CD-published visibility contract (risk-isolated, last) | planned | — |
 

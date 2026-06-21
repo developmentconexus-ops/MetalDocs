@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -17,7 +18,7 @@ import (
 // (fail-closed, ADR 0022 Phase 8; matches the Phase 7 document.create decision).
 // ADR 0022 Phase 10 (F2): the redundant doc.edit_draft cap was merged into the
 // canonical CapDocumentEdit — identical grant set, same area-grade enforcement.
-func requireDocEditDraft(ctx context.Context, runner db.TxRunner, tenantID, actorID, docID string) error {
+func requireDocEditDraft(ctx context.Context, runner db.TxRunner, cdRead controlleddocumentsdomain.CDFieldReader, tenantID, actorID, docID string) error {
 	// NOTE: logically read-only; uses Do (RW) to match the prior BeginTx(ctx,nil). RO-tightening (DoReadOnly) deferred — flagged for operator.
 	ctx = authz.WithCapCache(ctx)
 	return runner.Do(ctx, func(tx *sql.Tx) error {
@@ -28,7 +29,7 @@ func requireDocEditDraft(ctx context.Context, runner db.TxRunner, tenantID, acto
 		// or null area yields "" which fail-closes (authz.Require denies non-system
 		// actors). ADR 0022 Phase 11 (F7): the per-file loadDocumentAreaCode was merged
 		// into the shared LoadDocumentAreaCode.
-		areaCode, _, err := LoadDocumentAreaCode(ctx, tx, tenantID, docID)
+		areaCode, _, err := LoadDocumentAreaCode(ctx, tx, cdRead, tenantID, docID)
 		if err != nil {
 			return fmt.Errorf("fillin authz: load area: %w", err)
 		}

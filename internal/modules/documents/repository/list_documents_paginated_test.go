@@ -8,6 +8,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/documents/repository"
 )
@@ -23,7 +24,7 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
 
 	cols := []string{
 		"id", "tenant_id", "template_version_id", "name", "status", "form_data_json",

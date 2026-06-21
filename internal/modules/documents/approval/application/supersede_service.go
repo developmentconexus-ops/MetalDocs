@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
@@ -19,6 +20,7 @@ type SupersedeService struct {
 	repo    repository.ApprovalRepository
 	emitter EventEmitter
 	clock   Clock
+	cdRead  controlleddocumentsdomain.CDFieldReader
 }
 
 // SupersedeRequest carries all inputs for PublishSuperseding.
@@ -51,7 +53,7 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, runner db.TxR
 		}
 
 		// document.supersede is area-grade: pass the resolved area as-is ("" fail-closes).
-		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, req.NewDocumentID)
+		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, req.NewDocumentID)
 		if err != nil {
 			return fmt.Errorf("publishSuperseding: load document area: %w", err)
 		}

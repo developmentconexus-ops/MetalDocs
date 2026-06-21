@@ -8,6 +8,7 @@ import (
 	"errors"
 	"testing"
 
+	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -57,7 +58,7 @@ func seedTenantGradeViewFixture(t *testing.T, db *sql.DB, role string) (tenantID
 func newReadServiceForIntegration(t *testing.T, db *sql.DB) *ReadService {
 	t.Helper()
 	repo := approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
-	return newReadService(repo)
+	return newReadService(repo, cdinfra.NewCDFieldReaderPG())
 }
 
 func ctxWithIdentity(tenantID, actorID string) context.Context {

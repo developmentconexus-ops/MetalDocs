@@ -63,7 +63,7 @@ func TestRealClock_Now_ReturnsUTC(t *testing.T) {
 // ============================================================
 
 func TestNewServices_NotNil(t *testing.T) {
-	svcs := NewServices(nil, &MemoryEmitter{}, fixedClock{t: time.Now()})
+	svcs := NewServices(nil, &MemoryEmitter{}, fixedClock{t: time.Now()}, nil)
 	if svcs == nil {
 		t.Fatal("NewServices returned nil")
 	}
@@ -1561,7 +1561,7 @@ func (s *commitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &submitSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
 	}
 	if strings.Contains(q, "from documents") {
-		return &submitSingleValueRows{value: "QA"}, nil
+		return &docAreaRows{snapshot: "QA"}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &submitSingleValueRows{value: false}, nil
@@ -2409,7 +2409,7 @@ func (s *decisionPriorQueryFailStmt) Query(_ []driver.Value) (driver.Rows, error
 		return &decisionSingleValueRows{value: validContentHash}, nil
 	}
 	if strings.Contains(q, "from documents") {
-		return &decisionSingleValueRows{value: "QA"}, nil
+		return &docAreaRows{snapshot: "QA"}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &decisionSingleValueRows{value: false}, nil
@@ -2683,7 +2683,7 @@ func (s *decisionReplayCommitFailStmt) Query(_ []driver.Value) (driver.Rows, err
 		return &decisionSingleValueRows{value: validContentHash}, nil
 	}
 	if strings.Contains(q, "from documents") {
-		return &decisionSingleValueRows{value: "QA"}, nil
+		return &docAreaRows{snapshot: "QA"}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &decisionSingleValueRows{value: false}, nil
@@ -3102,7 +3102,7 @@ func (s *decisionCommitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &decisionSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
 	}
 	if strings.Contains(q, "from documents") {
-		return &decisionSingleValueRows{value: "QA"}, nil
+		return &docAreaRows{snapshot: "QA"}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &decisionSingleValueRows{value: false}, nil
@@ -3186,7 +3186,7 @@ func (s *submitNoStageStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &submitSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
 	}
 	if strings.Contains(q, "from documents") {
-		return &submitSingleValueRows{value: "QA"}, nil
+		return &docAreaRows{snapshot: "QA"}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &submitSingleValueRows{value: false}, nil

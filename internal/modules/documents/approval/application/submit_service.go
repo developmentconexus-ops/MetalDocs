@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
@@ -24,6 +25,7 @@ type SubmitService struct {
 	repo    repository.ApprovalRepository
 	emitter EventEmitter
 	clock   Clock
+	cdRead  controlleddocumentsdomain.CDFieldReader
 }
 
 // SubmitRequest carries all inputs for SubmitRevisionForReview.
@@ -85,7 +87,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 
 		// document.submit is area-grade: pass the resolved area as-is ("" fail-closes,
 		// denying non-system actors). ADR 0022 Phase 11 (F7): shared LoadDocumentAreaCode.
-		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, req.DocumentID)
+		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, req.DocumentID)
 		if err != nil {
 			return fmt.Errorf("submit: load document area: %w", err)
 		}

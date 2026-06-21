@@ -15,6 +15,7 @@ import (
 
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	approvaljobs "metaldocs/internal/modules/documents/approval/jobs"
+	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/bootstrap"
@@ -37,7 +38,7 @@ func run(ctx context.Context) error {
 		// the real reader so the binary is correct if the code path ever is reached.
 		displayNameRepo := iampg.NewUserDisplayNameRepository(db)
 		repo := approvalrepo.NewPostgresApprovalRepository(db, displayNameRepo)
-		services := approvalapp.NewServices(repo, approvalapp.NewSQLEmitter(), approvalapp.RealClock{})
+		services := approvalapp.NewServices(repo, approvalapp.NewSQLEmitter(), approvalapp.RealClock{}, cdinfra.NewCDFieldReaderPG())
 		return approvaljobs.NewWorkers(services.Scheduler, db), nil
 	})
 	if err != nil {

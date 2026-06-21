@@ -153,7 +153,7 @@ func (s *publishTestStmt) Query(args []driver.Value) (driver.Rows, error) {
 		return &publishSingleValueRows{value: s.conn.scheduleGeneration}, nil
 	}
 	if strings.Contains(q, "from documents") {
-		return &publishSingleValueRows{value: s.conn.areaCode}, nil
+		return &docAreaRows{snapshot: s.conn.areaCode}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &publishSingleValueRows{value: false}, nil

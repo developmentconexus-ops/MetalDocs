@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 )
 
 // LoadDocumentAreaCode resolves a document's process area inside tx, preferring
@@ -30,20 +32,48 @@ import (
 //
 // The found bool lets a caller distinguish "no such document" from "document with
 // no area" when those need different handling.
-func LoadDocumentAreaCode(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (areaCode string, found bool, err error) {
-	err = tx.QueryRowContext(ctx, `
-		SELECT COALESCE(d.process_area_code_snapshot, cd.process_area_code, '')
-		  FROM documents d
-		  LEFT JOIN controlled_documents cd
-		    ON cd.id = d.controlled_document_id AND cd.tenant_id = d.tenant_id
-		 WHERE d.id = $1 AND d.tenant_id = $2`,
+// cdRead is the controlleddocuments-owned read-port (ADR-0039 D3(b), M2/F2.1):
+// the cd.process_area_code term of the resolver is read through it instead of
+// joining controlled_documents (owned by another module). It is tx-aware — the
+// caller's *sql.Tx is passed straight through as the executor, so the CD read
+// runs inside the same transaction as the document read, preserving the prior
+// JOIN's snapshot consistency. The COALESCE(snapshot, cd.process_area_code, '')
+// precedence is reproduced in Go: a non-NULL snapshot wins even when "", and
+// only a NULL snapshot falls through to the CD area (a missing/NULL CD area ⇒ "").
+func LoadDocumentAreaCode(ctx context.Context, tx *sql.Tx, cdRead controlleddocumentsdomain.CDFieldReader, tenantID, documentID string) (areaCode string, found bool, err error) {
+	// Nil-safe: a caller that never wires the read-port (unit tests with no CD
+	// area) gets the null object, which resolves the CD term to "" — the same
+	// fail-closed "" the LEFT JOIN produced for an absent CD. Production wires the
+	// real CDFieldReaderPG at the composition root.
+	if cdRead == nil {
+		cdRead = controlleddocumentsdomain.NoopCDFieldReader{}
+	}
+	var snapshot sql.NullString
+	var cdID sql.NullString
+	err = tx.QueryRowContext(ctx,
+		`SELECT process_area_code_snapshot, controlled_document_id
+		   FROM documents WHERE id = $1 AND tenant_id = $2`,
 		documentID, tenantID,
-	).Scan(&areaCode)
+	).Scan(&snapshot, &cdID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
 	}
 	if err != nil {
 		return "", false, fmt.Errorf("load document area code: %w", err)
 	}
-	return areaCode, true, nil
+	// Non-NULL snapshot wins outright (COALESCE first non-NULL term), including "".
+	if snapshot.Valid {
+		return snapshot.String, true, nil
+	}
+	// NULL snapshot: fall through to the controlled document's area via the port.
+	// The port returns "" for a missing CD row or a NULL CD area, matching the
+	// LEFT JOIN's COALESCE-to-'' tail.
+	if cdID.Valid && cdID.String != "" {
+		area, _, perr := cdRead.ProcessAreaCode(ctx, tx, tenantID, cdID.String)
+		if perr != nil {
+			return "", false, fmt.Errorf("load document area code: %w", perr)
+		}
+		return area, true, nil
+	}
+	return "", true, nil
 }

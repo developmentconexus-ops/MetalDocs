@@ -10,6 +10,7 @@ import (
 
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/tests/integration/testdb"
 )
@@ -32,7 +33,7 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 	)
 
 	templateVersionID := testdb.DeterministicID(t, "template-version")
-	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
 
 	newDocument := func(name, code string) *domain.Document {
 		profileCode := cd.ProfileCode
@@ -132,7 +133,7 @@ func TestCreateDocumentTx_RevisionNumberIncrementsForSameCD(t *testing.T) {
 	)
 
 	templateVersionID := testdb.DeterministicID(t, "template-version")
-	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
 	newDocument := func(name, code string) *domain.Document {
 		profileCode := cd.ProfileCode
 		processAreaCode := cd.ProcessAreaCode
@@ -216,7 +217,7 @@ func TestCreateDocumentTx_RejectsEmptyName(t *testing.T) {
 	)
 
 	templateVersionID := testdb.DeterministicID(t, "template-version")
-	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
 
 	profileCode := cd.ProfileCode
 	processAreaCode := cd.ProcessAreaCode
@@ -263,7 +264,7 @@ func TestGetDocument_ReturnsSnapshotMetadata(t *testing.T) {
 	)
 
 	templateVersionID := testdb.DeterministicID(t, "template-version")
-	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
 
 	profileCode := cd.ProfileCode
 	processAreaCode := cd.ProcessAreaCode

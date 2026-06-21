@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	dhttp "metaldocs/internal/modules/documents/delivery/http"
@@ -50,6 +51,11 @@ type Dependencies struct {
 	// metaldocs.iam_users without crossing module boundaries (M4/F4.1).
 	// When nil, iamdomain.NoopUserDisplayNameReader{} is used automatically.
 	DisplayNameReader iamdomain.UserDisplayNameReader
+	// CDFieldReader is the controlleddocuments-owned read-port for individual
+	// controlled_documents fields (profile_code) consumed without crossing the
+	// module boundary (M2/F2.1; ADR-0039 D3(b)). When nil,
+	// controlleddocumentsdomain.NoopCDFieldReader{} is used automatically.
+	CDFieldReader controlleddocumentsdomain.CDFieldReader
 }
 
 func New(deps Dependencies) *Module {
@@ -60,7 +66,11 @@ func New(deps Dependencies) *Module {
 	if displayNameReader == nil {
 		displayNameReader = iamdomain.NoopUserDisplayNameReader{}
 	}
-	repo := repository.New(deps.DB, displayNameReader)
+	cdFieldReader := deps.CDFieldReader
+	if cdFieldReader == nil {
+		cdFieldReader = controlleddocumentsdomain.NoopCDFieldReader{}
+	}
+	repo := repository.New(deps.DB, displayNameReader, cdFieldReader)
 	var svc *application.Service
 	if deps.SnapshotReader != nil {
 		snapSvc := application.NewSnapshotService(deps.SnapshotReader)
@@ -89,7 +99,8 @@ func New(deps Dependencies) *Module {
 	fillInRepo := repository.NewFillInRepository(deps.DB)
 	fillInSvc := application.NewFillInService(db.NewTxRunner(deps.DB), application.NewSnapshotSchemaReader(deps.DB), fillInRepo).
 		WithReader(fillInRepo).
-		WithTemplateSchemaReader(application.NewTemplateVersionSchemaReader(deps.DB))
+		WithTemplateSchemaReader(application.NewTemplateVersionSchemaReader(deps.DB)).
+		WithCDFieldReader(cdFieldReader)
 	fillInHandler := dhttp.NewFillInHandler(fillInSvc)
 	placeholderOptionsHandler := dhttp.NewPlaceholderOptionsHandler(
 		application.NewSnapshotSchemaReader(deps.DB),
@@ -104,7 +115,7 @@ func New(deps Dependencies) *Module {
 
 	var reconstructHandler *dhttp.ReconstructHandler
 	if deps.ReconstructRunner != nil && deps.DB != nil {
-		reconstructSvc := application.NewReconstructionService(db.NewTxRunner(deps.DB), deps.ReconstructRunner)
+		reconstructSvc := application.NewReconstructionService(db.NewTxRunner(deps.DB), deps.ReconstructRunner, cdFieldReader)
 		reconstructHandler = dhttp.NewReconstructHandler(reconstructSvc)
 	}
 

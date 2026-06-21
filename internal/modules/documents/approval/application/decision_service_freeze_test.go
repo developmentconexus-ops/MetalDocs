@@ -128,7 +128,7 @@ func (s *freezeDecisionStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &freezeDecisionSingleValueRows{value: validContentHash}, nil
 	}
 	if strings.Contains(q, "from documents") {
-		return &freezeDecisionSingleValueRows{value: s.conn.areaCode}, nil
+		return &docAreaRows{snapshot: s.conn.areaCode}, nil
 	}
 	if strings.Contains(q, "from document_comments") {
 		return &freezeDecisionSingleValueRows{value: s.conn.unresolvedComments}, nil

@@ -312,7 +312,7 @@ func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &submitSingleValueRows{value: validContentHash}, nil
 	}
 	if strings.Contains(q, "from documents") {
-		return &submitSingleValueRows{value: "QA"}, nil
+		return &docAreaRows{snapshot: "QA"}, nil
 	}
 	if strings.Contains(q, "from document_comments") {
 		return &submitSingleValueRows{value: s.conn.unresolvedComments}, nil

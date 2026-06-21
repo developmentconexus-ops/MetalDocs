@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
@@ -30,11 +31,15 @@ type InboxView struct {
 
 // ReadService exposes read-only operations for approval HTTP handlers.
 type ReadService struct {
-	repo repository.ApprovalRepository
+	repo   repository.ApprovalRepository
+	cdRead controlleddocumentsdomain.CDFieldReader
 }
 
-func newReadService(repo repository.ApprovalRepository) *ReadService {
-	return &ReadService{repo: repo}
+func newReadService(repo repository.ApprovalRepository, cdRead controlleddocumentsdomain.CDFieldReader) *ReadService {
+	if cdRead == nil {
+		cdRead = controlleddocumentsdomain.NoopCDFieldReader{}
+	}
+	return &ReadService{repo: repo, cdRead: cdRead}
 }
 
 // Read methods intentionally use default (read-write) transactions because
@@ -49,7 +54,7 @@ func (s *ReadService) LoadInstance(ctx context.Context, runner db.TxRunner, tena
 			return fmt.Errorf("read load instance: %w", err)
 		}
 
-		_, found, err := loadInstanceAreaCode(ctx, tx, tenantID, instanceID)
+		_, found, err := loadInstanceAreaCode(ctx, tx, s.cdRead, tenantID, instanceID)
 		if err != nil {
 			return fmt.Errorf("read load instance: load area: %w", err)
 		}
@@ -345,15 +350,29 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, runner db.TxRunn
 // docapp.LoadDocumentAreaCode (ADR 0022 Phase 11 F7) it bakes in NO empty-area
 // default — the (tenant-grade) callers COALESCE "" -> "tenant" at the call site so
 // the area-filter-OFF decision is explicit, not hidden in the resolver.
-func loadInstanceAreaCode(ctx context.Context, tx *sql.Tx, tenantID, instanceID string) (areaCode string, found bool, err error) {
+func loadInstanceAreaCode(ctx context.Context, tx *sql.Tx, cdRead controlleddocumentsdomain.CDFieldReader, tenantID, instanceID string) (areaCode string, found bool, err error) {
+	if cdRead == nil {
+		cdRead = controlleddocumentsdomain.NoopCDFieldReader{}
+	}
+	// Own-module read only: the approval/documents tables. The controlled_documents
+	// JOIN was deleted (M2/F2.1 B6, ADR-0039 D3(b)); its area is resolved through
+	// the CDFieldReader port below, preserving the original COALESCE precedence
+	// (active-stage snapshot, then document snapshot, then CD area, then ""). The
+	// snapshots are read as NULLable so an empty-string snapshot still WINS the
+	// COALESCE exactly as the SQL did — only a NULL snapshot falls through.
+	var (
+		stageSnap sql.NullString
+		docSnap   sql.NullString
+		cdID      sql.NullString
+	)
 	err = tx.QueryRowContext(ctx, `
-		SELECT COALESCE(asi.area_code_snapshot, d.process_area_code_snapshot, cd.process_area_code, '')
+		SELECT asi.area_code_snapshot,
+		       d.process_area_code_snapshot,
+		       d.controlled_document_id
 		  FROM approval_instances ai
 		  JOIN documents d
 		    ON d.id = ai.document_id
 		   AND d.tenant_id = ai.tenant_id
-		  LEFT JOIN controlled_documents cd
-		    ON cd.id = d.controlled_document_id
 		  LEFT JOIN approval_stage_instances asi
 		    ON asi.approval_instance_id = ai.id
 		   AND asi.status = 'active'
@@ -361,12 +380,29 @@ func loadInstanceAreaCode(ctx context.Context, tx *sql.Tx, tenantID, instanceID 
 		   AND ai.tenant_id = $2
 		 LIMIT 1`,
 		instanceID, tenantID,
-	).Scan(&areaCode)
+	).Scan(&stageSnap, &docSnap, &cdID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
 	}
 	if err != nil {
 		return "", false, fmt.Errorf("load instance area code: %w", err)
 	}
-	return areaCode, true, nil
+	switch {
+	case stageSnap.Valid:
+		return stageSnap.String, true, nil
+	case docSnap.Valid:
+		return docSnap.String, true, nil
+	case cdID.Valid:
+		// tx-aware foreign read-port (in-tx, non-recording SELECT — HS-PRE-1 safe).
+		// The original LEFT JOIN keyed only on cd.id (a globally-unique PK); the
+		// port additionally scopes by tenant_id, which is parity-preserving because
+		// documents.controlled_document_id always references a same-tenant CD.
+		area, _, perr := cdRead.ProcessAreaCode(ctx, tx, tenantID, cdID.String)
+		if perr != nil {
+			return "", false, fmt.Errorf("load instance area code: cd area port: %w", perr)
+		}
+		return area, true, nil
+	default:
+		return "", true, nil
+	}
 }

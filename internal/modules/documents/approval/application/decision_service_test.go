@@ -345,7 +345,7 @@ func (s *decisionTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &decisionSingleValueRows{value: hash}, nil
 	}
 	if strings.Contains(q, "from documents") {
-		return &decisionSingleValueRows{value: s.conn.areaCode}, nil
+		return &docAreaRows{snapshot: s.conn.areaCode}, nil
 	}
 	if strings.Contains(q, "from document_comments") {
 		return &decisionSingleValueRows{value: s.conn.unresolvedComments}, nil

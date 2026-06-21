@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
@@ -45,8 +47,21 @@ func (f *fakeFillInWriter) UpsertValue(_ context.Context, v repository.Placehold
 // controlleddocuments/delivery/http/routes_contract_test.go.
 func newPermissiveFillInDB(t *testing.T) *sql.DB {
 	t.Helper()
-	anyMatcher := sqlmock.QueryMatcherFunc(func(_, _ string) error { return nil })
-	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(anyMatcher))
+	// Substring matcher: an empty expected pattern is a wildcard; otherwise the
+	// actual SQL must contain the (lowercased) expected token. This lets the
+	// ported 2-column LoadDocumentAreaCode read (SELECT process_area_code_snapshot,
+	// controlled_document_id FROM documents ...) be routed to a 2-column result,
+	// distinct from the 1-column authz EXISTS read that also takes two args.
+	matcher := sqlmock.QueryMatcherFunc(func(expected, actual string) error {
+		if strings.TrimSpace(expected) == "" {
+			return nil
+		}
+		if strings.Contains(strings.ToLower(actual), strings.ToLower(expected)) {
+			return nil
+		}
+		return fmt.Errorf("actual SQL %q does not contain %q", actual, expected)
+	})
+	mockDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(matcher))
 	if err != nil {
 		t.Fatalf("newPermissiveFillInDB: sqlmock.New: %v", err)
 	}
@@ -59,8 +74,14 @@ func newPermissiveFillInDB(t *testing.T) *sql.DB {
 	for i := 0; i < 100; i++ {
 		mock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
 	}
+	// Ported B5 area read (declared first so it wins routing for "from documents").
+	for i := 0; i < 20; i++ {
+		mock.ExpectQuery("from documents").
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnRows(sqlmock.NewRows([]string{"process_area_code_snapshot", "controlled_document_id"}).AddRow("QA", nil))
+	}
 	for i := 0; i < 10; i++ {
-		mock.ExpectQuery("").
+		mock.ExpectQuery("exists").
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	}

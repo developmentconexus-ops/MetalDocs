@@ -81,13 +81,16 @@ type hgSite struct {
 // mission's terminal acceptance (mission.md §8) this slice MUST be empty.
 var hgPendingRemediation = []hgSite{
 	// Category B — foreign point-reads → owner read-ports (M2)
-	{"documents/repository/repository.go", "controlled_documents"},                   // B1
+	// B1 ported (M2/F2.1): documents/repository reads profile_code via
+	// controlleddocuments/domain.CDFieldReader (ADR-0039 D3(b)); raw read deleted.
 	{"documents/repository/repository.go", "document_process_areas"},                 // B7
 	{"controlleddocuments/infrastructure/repository.go", "document_revisions"},       // B2
 	{"controlleddocuments/infrastructure/repository.go", "documents"},                // B3
 	{"controlleddocuments/infrastructure/repository.go", "approval_instances"},       // B4
-	{"documents/application/document_area.go", "controlled_documents"},               // B5
-	{"documents/approval/application/read_service.go", "controlled_documents"},       // B6
+	// B5 ported (M2/F2.1): LoadDocumentAreaCode resolves the CD area via
+	// controlleddocuments/domain.CDFieldReader (tx-aware); LEFT JOIN deleted.
+	// B6 ported (M2/F2.1): loadInstanceAreaCode resolves the CD area via
+	// controlleddocuments/domain.CDFieldReader (tx-aware); LEFT JOIN deleted.
 	{"iam/infrastructure/postgres/area_catalog_reader.go", "document_process_areas"}, // B8
 	{"documents/application/fillin_service.go", "templates_template_version"},        // N1 (M0/HS-6 → M2)
 	// Category C — authz-visibility membership reads → published view (M3)

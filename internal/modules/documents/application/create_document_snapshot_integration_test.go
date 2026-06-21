@@ -114,7 +114,7 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 		docgenv2.NewTemplatesSnapshotReader(db),
 	)
 	svc := application.NewServiceWithSnapshot(
-		docrepo.New(db, iampg.NewUserDisplayNameRepository(db)),
+		docrepo.New(db, iampg.NewUserDisplayNameRepository(db), controlleddocumentsdomain.NoopCDFieldReader{}),
 		nil,
 		docgenv2.NewTemplatesTemplateReader(db),
 		fakeFormVal{valid: true},

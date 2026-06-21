@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 
@@ -34,13 +35,17 @@ func isInvalidUUID(err error) bool {
 type Repository struct {
 	db          *sql.DB
 	displayName iamdomain.UserDisplayNameReader
+	cdRead      controlleddocumentsdomain.CDFieldReader
 }
 
-// New constructs a Repository. displayName is a required collaborator — use
-// iamdomain.NoopUserDisplayNameReader{} for tests or paths that do not need
-// display-name resolution. Passing nil will panic at first CreateDocumentTx call.
-func New(db *sql.DB, displayName iamdomain.UserDisplayNameReader) *Repository {
-	return &Repository{db: db, displayName: displayName}
+// New constructs a Repository. displayName and cdRead are required collaborators
+// — use iamdomain.NoopUserDisplayNameReader{} / controlleddocumentsdomain.
+// NoopCDFieldReader{} for tests or paths that do not exercise them. cdRead is the
+// controlleddocuments-owned read-port for controlled_documents fields (ADR-0039
+// D3(b), M2/F2.1): this module reads profile_code through it instead of issuing
+// raw cross-module SQL. Passing nil will panic at first use.
+func New(db *sql.DB, displayName iamdomain.UserDisplayNameReader, cdRead controlleddocumentsdomain.CDFieldReader) *Repository {
+	return &Repository{db: db, displayName: displayName, cdRead: cdRead}
 }
 
 // mustSQLTx asserts a db.Tx to *sql.Tx. All callers of this repository pass
@@ -1694,13 +1699,15 @@ func (r *Repository) GetFinalizePrereqs(ctx context.Context, tenantID, docID str
 		return nil, fmt.Errorf("finalize prereqs: load document: %w", err)
 	}
 
-	// Step 2: load profile_code from the linked controlled document.
+	// Step 2: load profile_code from the linked controlled document via the
+	// controlleddocuments read-port (M2/F2.1; ADR-0039 D3(b)). controlleddocuments
+	// owns controlled_documents — this module no longer reads its base table. The
+	// port returns "" for an absent CD, matching the prior ErrNoRows tolerance.
 	var profileCode string
 	if cdID.Valid && cdID.String != "" {
-		if err := r.db.QueryRowContext(ctx,
-			`SELECT profile_code FROM controlled_documents WHERE id = $1 AND tenant_id = $2`,
-			cdID.String, tenantID,
-		).Scan(&profileCode); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		var err error
+		profileCode, err = r.cdRead.ProfileCode(ctx, r.db, tenantID, cdID.String)
+		if err != nil {
 			return nil, fmt.Errorf("finalize prereqs: load profile code: %w", err)
 		}
 	}

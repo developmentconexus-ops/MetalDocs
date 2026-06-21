@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/infrastructure/signature"
@@ -63,6 +64,7 @@ type DecisionService struct {
 	// sigRegistry verifies the e-signature credential before a sign-off is
 	// recorded. nil only in tests that exercise non-reauth methods.
 	sigRegistry *signature.Registry
+	cdRead      controlleddocumentsdomain.CDFieldReader
 }
 
 func NewDecisionService(
@@ -82,6 +84,13 @@ func NewDecisionService(
 // WithPDFOutbox sets the transactional outbox enqueuer, replacing the post-commit dispatcher.
 func (s *DecisionService) WithPDFOutbox(enqueuer PDFOutboxEnqueuer) *DecisionService {
 	s.pdfOutbox = enqueuer
+	return s
+}
+
+// WithCDFieldReader wires the controlleddocuments read-port used to resolve a
+// document's controlled-document area in the area-grade authz checks (M2/F2.1).
+func (s *DecisionService) WithCDFieldReader(r controlleddocumentsdomain.CDFieldReader) *DecisionService {
+	s.cdRead = r
 	return s
 }
 
@@ -206,7 +215,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		}
 
 		// document.signoff is area-grade: pass the resolved area as-is ("" fail-closes).
-		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
+		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, instance.DocumentID)
 		if err != nil {
 			return fmt.Errorf("recordSignoff: load document area: %w", err)
 		}

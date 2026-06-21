@@ -9,6 +9,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
@@ -58,7 +59,7 @@ func TestMarkArchived_StampsTimestampWithoutStatusChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	r := New(db, iamdomain.NoopUserDisplayNameReader{})
+	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
 
 	mock.ExpectBegin()
 	expectDocumentEditAuthz(t, mock)
@@ -81,7 +82,7 @@ func TestMarkArchived_NoRowsReturnsError(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	r := New(db, iamdomain.NoopUserDisplayNameReader{})
+	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
 
 	mock.ExpectBegin()
 	expectDocumentEditAuthz(t, mock)
@@ -105,7 +106,7 @@ func TestUnarchive_ClearsTimestamp(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	r := New(db, iamdomain.NoopUserDisplayNameReader{})
+	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
 
 	mock.ExpectBegin()
 	expectDocumentEditAuthz(t, mock)
@@ -128,7 +129,7 @@ func TestUnarchive_NoRowsReturnsError(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	r := New(db, iamdomain.NoopUserDisplayNameReader{})
+	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
 
 	mock.ExpectBegin()
 	expectDocumentEditAuthz(t, mock)

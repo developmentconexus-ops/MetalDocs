@@ -197,6 +197,7 @@ func (r *submitSingleValueRows) Next(dest []driver.Value) error {
 	return nil
 }
 
+
 // routeRow returns a single-column-set row representing approval_routes.
 // Columns: id, tenant_id, profile_code, version
 type routeRows struct {
@@ -263,7 +264,11 @@ func (s *submitTestStmt) Exec(_ []driver.Value) (driver.Result, error) {
 func (s *submitTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
 	if strings.Contains(q, "from documents") {
-		return &submitSingleValueRows{value: s.conn.areaCode}, nil
+		// Ported area resolver (M2/F2.1) selects two columns
+		// (process_area_code_snapshot, controlled_document_id). A non-NULL
+		// snapshot wins the COALESCE, so returning areaCode as the snapshot with
+		// a NULL CD link reproduces the prior single-column "QA" result.
+		return &docAreaRows{snapshot: s.conn.areaCode}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &submitSingleValueRows{value: false}, nil

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/platform/db"
 )
@@ -49,17 +50,19 @@ type ScheduledPublishEnqueuer interface {
 
 var ErrContentHashMismatch = errors.New("approval: content hash mismatch")
 
-// NewServices constructs a fully wired Services value.
-func NewServices(repo repository.ApprovalRepository, emitter EventEmitter, clock Clock) *Services {
+// NewServices constructs a fully wired Services value. cdRead is the
+// controlleddocuments read-port (M2/F2.1) used by the area-grade authz checks in
+// Submit/Publish/Supersede/Decision; a nil reader fail-closes the CD area to "".
+func NewServices(repo repository.ApprovalRepository, emitter EventEmitter, clock Clock, cdRead controlleddocumentsdomain.CDFieldReader) *Services {
 	return &Services{
-		Submit:     &SubmitService{repo: repo, emitter: emitter, clock: clock},
-		Decision:   &DecisionService{repo: repo, emitter: emitter, clock: clock},
-		Publish:    &PublishService{repo: repo, emitter: emitter, clock: clock},
+		Submit:     &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		Decision:   &DecisionService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		Publish:    &PublishService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
 		Scheduler:  &SchedulerService{repo: repo, emitter: emitter, clock: clock},
-		Supersede:  &SupersedeService{repo: repo, emitter: emitter, clock: clock},
+		Supersede:  &SupersedeService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
 		Obsolete:   &ObsoleteService{repo: repo, emitter: emitter, clock: clock},
 		Cancel:     newCancelService(repo, emitter, clock),
-		Read:       newReadService(repo),
+		Read:       newReadService(repo, cdRead),
 		RouteAdmin: &RouteAdminService{repo: repo, emitter: emitter, clock: clock},
 		clock:      clock,
 	}

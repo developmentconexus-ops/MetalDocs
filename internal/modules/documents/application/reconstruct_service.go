@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/render/fanout"
@@ -18,10 +19,11 @@ type ReconstructionRunner interface {
 type ReconstructionService struct {
 	txRunner db.TxRunner
 	runner   ReconstructionRunner
+	cdRead   controlleddocumentsdomain.CDFieldReader
 }
 
-func NewReconstructionService(txRunner db.TxRunner, runner ReconstructionRunner) *ReconstructionService {
-	return &ReconstructionService{txRunner: txRunner, runner: runner}
+func NewReconstructionService(txRunner db.TxRunner, runner ReconstructionRunner, cdRead controlleddocumentsdomain.CDFieldReader) *ReconstructionService {
+	return &ReconstructionService{txRunner: txRunner, runner: runner, cdRead: cdRead}
 }
 
 func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID, actorID, docID string) (fanout.ReconstructionEntry, error) {
@@ -33,7 +35,7 @@ func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID,
 		}
 
 		// document.edit is area-grade: pass the resolved area as-is ("" fail-closes).
-		areaCode, _, err := LoadDocumentAreaCode(ctx, tx, tenantID, docID)
+		areaCode, _, err := LoadDocumentAreaCode(ctx, tx, s.cdRead, tenantID, docID)
 		if err != nil {
 			return fmt.Errorf("reconstruct authz: load area: %w", err)
 		}

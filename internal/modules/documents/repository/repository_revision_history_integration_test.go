@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"testing"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/documents/repository"
 	"metaldocs/tests/integration/testdb"
@@ -177,7 +178,7 @@ func TestListRevisionHistory_ReturnsGovernedDocumentsNotAutosaveRows(t *testing.
 		}
 	}
 
-	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{})
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
 	items, err := repo.ListRevisionHistory(ctx, tnt.ID, secondDocID)
 	if err != nil {
 		t.Fatalf("ListRevisionHistory: %v", err)

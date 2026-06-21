@@ -42,6 +42,7 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	controlleddocuments "metaldocs/internal/modules/controlleddocuments"
+	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
@@ -434,6 +435,11 @@ func main() {
 		DisplayNameReader:            displayNameRepo,
 		IAMUserOptions:               wiring.NewDocumentsIAMUserOptions(authService),
 	}
+	// cdReader is the controlleddocuments-owned read-port for controlled_documents
+	// fields (M2/F2.1; ADR-0039 D3(b)). One stateless instance serves documents'
+	// profile_code read and the area-grade authz checks in the approval services.
+	cdReader := cdinfra.NewCDFieldReaderPG()
+	docDeps.CDFieldReader = cdReader
 	if deps.PDFConverter != nil {
 		docDeps.ExportDocgen = deps.PDFConverter
 	}
@@ -451,7 +457,7 @@ func main() {
 	// SubmitSvc can be wired into the finalize→submit flow.
 	approvalRepo := approvalrepo.NewPostgresApprovalRepository(deps.SQLDB, displayNameRepo)
 	approvalEmitter := approvalapp.NewSQLEmitter()
-	approvalServices := approvalapp.NewServices(approvalRepo, approvalEmitter, approvalapp.RealClock{})
+	approvalServices := approvalapp.NewServices(approvalRepo, approvalEmitter, approvalapp.RealClock{}, cdReader)
 	jobsCfg, err := config.LoadJobsConfig()
 	if err != nil {
 		slog.Error("invalid jobs config", "err", err)
@@ -494,7 +500,8 @@ func main() {
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService,
 	).WithPDFOutbox(pdfOutboxRepo).WithPinInvoker(fanoutCfg.freezeService).
-		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB))
+		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB)).
+		WithCDFieldReader(cdReader)
 	docDeps.SubmitSvc = approvalServices.Submit
 
 	docMod := documents.New(docDeps)

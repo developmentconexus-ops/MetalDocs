@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/domain"
@@ -23,6 +24,7 @@ type PublishService struct {
 	emitter                  EventEmitter
 	clock                    Clock
 	scheduledPublishEnqueuer ScheduledPublishEnqueuer
+	cdRead                   controlleddocumentsdomain.CDFieldReader
 }
 
 // ErrInstanceNotApproved is returned when PublishApproved is called on an
@@ -77,7 +79,7 @@ func (s *PublishService) PublishApproved(ctx context.Context, runner db.TxRunner
 		}
 
 		// document.publish is area-grade: pass the resolved area as-is ("" fail-closes).
-		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
+		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, instance.DocumentID)
 		if err != nil {
 			return fmt.Errorf("publishApproved: load document area: %w", err)
 		}
@@ -210,7 +212,7 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 		}
 
 		// document.publish is area-grade: pass the resolved area as-is ("" fail-closes).
-		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
+		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, instance.DocumentID)
 		if err != nil {
 			return fmt.Errorf("schedulePublish: load document area: %w", err)
 		}

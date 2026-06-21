@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
@@ -31,13 +32,23 @@ type FillInService struct {
 	reader        FillInReader
 	schemaFromTpl *TemplateVersionSchemaReader
 	iam           IAMUserOptionsReader
+	cdRead        controlleddocumentsdomain.CDFieldReader
 }
 
 // NewFillInService wires the service with a TxRunner for authz enforcement.
 // Production callers MUST use this constructor — it enforces the document.edit
 // capability (ADR 0022 Phase 10 merged the redundant doc.edit_draft cap into it).
+// cdRead is the controlleddocuments read-port used by the area-grade authz check
+// (M2/F2.1); a nil reader fail-closes the CD area term to "".
 func NewFillInService(runner db.TxRunner, s SchemaReader, w FillInWriter) *FillInService {
 	return &FillInService{runner: runner, schemas: s, writer: w}
+}
+
+// WithCDFieldReader attaches the controlleddocuments read-port used to resolve a
+// document's controlled-document area in the document.edit authz check (M2/F2.1).
+func (s *FillInService) WithCDFieldReader(r controlleddocumentsdomain.CDFieldReader) *FillInService {
+	s.cdRead = r
+	return s
 }
 
 // WithIAMReader attaches an IAMUserOptionsReader for validating user-typed placeholders.
@@ -92,7 +103,7 @@ func parsePlaceholderSchema(raw []byte) ([]templatesdomain.Placeholder, error) {
 }
 
 func (s *FillInService) SetPlaceholderValue(ctx context.Context, tenantID, actorID, revisionID, placeholderID, raw string) error {
-	if err := requireDocEditDraft(ctx, s.runner, tenantID, actorID, revisionID); err != nil {
+	if err := requireDocEditDraft(ctx, s.runner, s.cdRead, tenantID, actorID, revisionID); err != nil {
 		return err
 	}
 	schema, err := s.schemas.LoadPlaceholderSchema(ctx, tenantID, revisionID)

@@ -56,6 +56,7 @@ func (r *supersedeSingleValueRows) Next(dest []driver.Value) error {
 	return nil
 }
 
+
 type supersedeTestStmt struct {
 	conn  *supersedeTestConn
 	query string
@@ -94,7 +95,9 @@ func (s *supersedeTestStmt) Exec(args []driver.Value) (driver.Result, error) {
 func (s *supersedeTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
 	if strings.Contains(q, "from documents") {
-		return &supersedeSingleValueRows{value: s.conn.areaCode}, nil
+		// Ported area resolver (M2/F2.1): two columns; non-NULL snapshot wins the
+		// COALESCE, so areaCode-as-snapshot with a NULL CD link reproduces prior.
+		return &docAreaRows{snapshot: s.conn.areaCode}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &supersedeSingleValueRows{value: false}, nil
