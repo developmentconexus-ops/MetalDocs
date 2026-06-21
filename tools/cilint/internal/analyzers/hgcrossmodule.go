@@ -99,7 +99,9 @@ var hgPendingRemediation = []hgSite{
 	// through the templates-owned TemplateVersionPort (ADR-0030 extended; ADR-0039
 	// D3(b)); the cross-module JOIN was deleted.
 	// Category C — authz-visibility membership reads → published view (M3)
-	{"controlleddocuments/infrastructure/repository.go", "user_process_areas"},              // C1+C2
+	// C1+C2 ported (M3/F3.2): controlleddocuments List + CanRead read iam's published
+	// metaldocs.v_active_user_areas view (ADR-0039 D3a); the raw user_process_areas
+	// reads were deleted.
 	{"documents/approval/repository/postgres_approval_repository.go", "user_process_areas"}, // C3
 	// Category C4 — search visibility-contract redesign (M4)
 	{"search/infrastructure/v2documents/reader.go", "documents"},                       // C4a

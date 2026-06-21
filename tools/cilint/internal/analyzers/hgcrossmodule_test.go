@@ -78,16 +78,16 @@ func TestHGCrossModule_Negative_CommentMention(t *testing.T) {
 
 func TestHGCrossModule_Negative_PendingBaseline(t *testing.T) {
 	// A known in-scope debt site on hgPendingRemediation is suppressed until its
-	// milestone ports it. Uses a STILL-PENDING site — the C1+C2 baseline
-	// (controlleddocuments/infrastructure/repository.go reading iam's
-	// user_process_areas), scheduled for M3. The original B1 site this test used
-	// (documents/repository reading controlled_documents) was ported and drained in
-	// M2/F2.1, so the fixture was realigned to a live ledger entry (M2/F2.5).
-	src := "package infrastructure\n" +
+	// milestone ports it. Uses a STILL-PENDING site — the C4d search baseline
+	// (search/infrastructure/v2documents/reader.go reading iam's user_process_areas),
+	// scheduled for M4. The prior C1+C2 site this test used
+	// (controlleddocuments/infrastructure/repository.go reading user_process_areas) was
+	// ported and drained in M3/F3.2, so the fixture was realigned to a live ledger entry.
+	src := "package v2documents\n" +
 		"func q() string {\n" +
 		"\treturn `SELECT area_code FROM user_process_areas WHERE user_id = $1 AND tenant_id = $2`\n" +
 		"}\n"
-	path := hgFixture(t, "internal/modules/controlleddocuments/infrastructure/repository.go", src)
+	path := hgFixture(t, "internal/modules/search/infrastructure/v2documents/reader.go", src)
 	findings := analyzers.HGCrossModule([]string{path})
 	if len(findings) != 0 {
 		t.Fatalf("pending-remediation baseline site must be suppressed, got %d: %+v", len(findings), findings)

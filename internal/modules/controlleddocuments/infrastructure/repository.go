@@ -93,8 +93,10 @@ func (r *PostgresControlledDocumentRepository) CodeExists(ctx context.Context, t
 // reports whether a further page exists; the caller builds the next cursor from
 // the last returned document's (CreatedAt, ID).
 func (r *PostgresControlledDocumentRepository) List(ctx context.Context, tenantID string, filter controlleddocumentsdomain.CDFilter) (items []controlleddocumentsdomain.ControlledDocument, hasMore bool, err error) {
-	// The area-grant EXISTS subquery below gates on `upa.effective_to IS NULL` — the canonical
-	// active-now membership predicate (soft-delete model, ADR 0037). Not an interval bug.
+	// The area-grant EXISTS subquery reads iam's PUBLISHED active-membership view
+	// metaldocs.v_active_user_areas (M3/F3.2, ADR-0039 D3a) — the view encodes the
+	// active-now predicate `effective_to IS NULL` (ADR 0037 D1), so CD names no
+	// iam base table and re-derives no temporal predicate.
 	q := `
 SELECT id::text, tenant_id::text, profile_code, process_area_code, department_code,
        code, sequence_num, title, owner_user_id, coalesce(override_template_version_id::text, ''),
@@ -155,11 +157,10 @@ WHERE tenant_id = $1`
                   AND cdag.controlled_document_id = controlled_documents.id
                   AND EXISTS (
                     SELECT 1
-                      FROM user_process_areas upa
+                      FROM metaldocs.v_active_user_areas upa
                      WHERE upa.tenant_id = controlled_documents.tenant_id
                        AND upa.user_id = $%d
                        AND upa.area_code = cdag.area_code
-                       AND upa.effective_to IS NULL
                   )
              )
              OR EXISTS (
@@ -476,8 +477,10 @@ func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Contex
 }
 
 func (r *PostgresControlledDocumentRepository) CanRead(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (bool, error) {
-	// The area-grant EXISTS subquery below gates on `upa.effective_to IS NULL` — the canonical
-	// active-now membership predicate (soft-delete model, ADR 0037). Not an interval bug.
+	// The area-grant EXISTS subquery reads iam's PUBLISHED active-membership view
+	// metaldocs.v_active_user_areas (M3/F3.2, ADR-0039 D3a) — the view encodes the
+	// active-now predicate `effective_to IS NULL` (ADR 0037 D1), so CD names no
+	// iam base table and re-derives no temporal predicate.
 	const q = `
 SELECT EXISTS (
   SELECT 1
@@ -497,11 +500,10 @@ SELECT EXISTS (
                       AND cdag.controlled_document_id = cd.id
                       AND EXISTS (
                         SELECT 1
-                          FROM user_process_areas upa
+                          FROM metaldocs.v_active_user_areas upa
                          WHERE upa.tenant_id = cd.tenant_id
                            AND upa.user_id = $3
                            AND upa.area_code = cdag.area_code
-                           AND upa.effective_to IS NULL
                       )
                  )
                  OR EXISTS (
