@@ -9,6 +9,7 @@ import (
 	"metaldocs/internal/modules/controlleddocuments/application"
 	dhttp "metaldocs/internal/modules/controlleddocuments/delivery/http"
 	"metaldocs/internal/modules/controlleddocuments/infrastructure"
+	docrepo "metaldocs/internal/modules/documents/repository"
 	taxonomyapp "metaldocs/internal/modules/taxonomy/application"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
 	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
@@ -31,7 +32,11 @@ func New(deps Dependencies) *Module {
 	if deps.AuditWriter == nil {
 		panic("controlled_documents: AuditWriter is required (nil provided)")
 	}
-	repo := infrastructure.NewPostgresControlledDocumentRepository(deps.DB)
+	// documents-owned active-instance read-port (M2/F2.2): CD reads the active/
+	// published documents + in-progress approval instance projection through the
+	// owner's port instead of its own SQL.
+	activeInstance := docrepo.NewActiveInstanceReaderPG(deps.DB)
+	repo := infrastructure.NewPostgresControlledDocumentRepository(deps.DB, activeInstance)
 	seq := infrastructure.NewPostgresSequenceAllocator(deps.DB)
 	// Template-version override state is read through the templates-owned port
 	// (M4 F4.2 — H-G reach closed); the reader satisfies application.TemplateVersionChecker.

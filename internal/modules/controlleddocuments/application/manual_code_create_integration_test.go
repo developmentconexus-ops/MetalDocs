@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	controlleddocumentsinfrastructure "metaldocs/internal/modules/controlleddocuments/infrastructure"
+	docrepo "metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/modules/iam/authz"
 	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
@@ -49,7 +50,7 @@ func seedActorWithGrant(t *testing.T, db *sql.DB, role string) (string, string, 
 
 func newManualCodeServiceForIntegration(t *testing.T, db *sql.DB) *ControlledDocumentService {
 	t.Helper()
-	repo := controlleddocumentsinfrastructure.NewPostgresControlledDocumentRepository(db)
+	repo := controlleddocumentsinfrastructure.NewPostgresControlledDocumentRepository(db, docrepo.NewActiveInstanceReaderPG(db))
 	return NewControlledDocumentService(
 		platformdb.NewTxRunner(db),
 		repo,

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	documentsdomain "metaldocs/internal/modules/documents/domain"
+
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
@@ -17,7 +19,7 @@ func TestPostgresControlledDocumentRepository_GetByIDLoadsVisibilityGrants(t *te
 	}
 	defer db.Close()
 
-	repo := NewPostgresControlledDocumentRepository(db)
+	repo := NewPostgresControlledDocumentRepository(db, documentsdomain.NoopActiveInstanceReader{})
 	now := time.Date(2026, 5, 14, 12, 0, 0, 0, time.UTC)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
@@ -74,7 +76,7 @@ func TestPostgresControlledDocumentRepository_UpdateStatus_RowsAffectedError(t *
 	}
 	defer db.Close()
 
-	repo := NewPostgresControlledDocumentRepository(db)
+	repo := NewPostgresControlledDocumentRepository(db, documentsdomain.NoopActiveInstanceReader{})
 	rowsErr := errors.New("rows affected failed")
 	mock.ExpectExec(regexp.QuoteMeta(`UPDATE controlled_documents SET status = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4`)).
 		WithArgs("obsolete", sqlmock.AnyArg(), "tenant-1", "cd-1").

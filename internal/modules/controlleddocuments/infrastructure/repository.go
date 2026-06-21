@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	documentsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -21,10 +22,17 @@ import (
 
 type PostgresControlledDocumentRepository struct {
 	db *sql.DB
+	// activeInstance is the documents-owned read-port for the active-instance
+	// projection (M2/F2.2, ADR-0039 D3(b)). CD no longer reads documents/
+	// document_revisions/approval_instances directly.
+	activeInstance documentsdomain.ActiveInstanceReader
 }
 
-func NewPostgresControlledDocumentRepository(db *sql.DB) *PostgresControlledDocumentRepository {
-	return &PostgresControlledDocumentRepository{db: db}
+func NewPostgresControlledDocumentRepository(db *sql.DB, activeInstance documentsdomain.ActiveInstanceReader) *PostgresControlledDocumentRepository {
+	if activeInstance == nil {
+		activeInstance = documentsdomain.NoopActiveInstanceReader{}
+	}
+	return &PostgresControlledDocumentRepository{db: db, activeInstance: activeInstance}
 }
 
 func (r *PostgresControlledDocumentRepository) GetByID(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error) {
@@ -519,95 +527,25 @@ SELECT EXISTS (
 // for the given controlled document. Returns nil, nil when no active or
 // published document exists for this controlled document.
 func (r *PostgresControlledDocumentRepository) GetActiveInstance(ctx context.Context, tenantID, controlledDocumentID string) (*controlleddocumentsdomain.ActiveDocumentInstance, error) {
-	var (
-		docID          sql.NullString
-		contentHash    sql.NullString
-		revisionVer    sql.NullInt64
-		approvalState  sql.NullString
-		publishedDocID sql.NullString
-	)
-	err := r.db.QueryRowContext(ctx, `
-SELECT active.id,
-       COALESCE(active.content_hash_at_submit,
-                (SELECT r.content_hash FROM document_revisions r
-                  WHERE r.document_id = active.id
-                  ORDER BY r.created_at DESC LIMIT 1)),
-       active.revision_version,
-       active.status,
-       pub.id::text
-  FROM (SELECT id, content_hash_at_submit, revision_version, status
-          FROM documents
-         WHERE tenant_id = $1::uuid
-           AND controlled_document_id = $2::uuid
-           AND status IN ('draft','under_review','approved','rejected','scheduled')
-         LIMIT 1) active
-  FULL OUTER JOIN
-       (SELECT id FROM documents
-         WHERE tenant_id = $1::uuid
-           AND controlled_document_id = $2::uuid
-           AND status = 'published'
-         ORDER BY revision_number DESC
-         LIMIT 1) pub ON TRUE`,
-		tenantID, controlledDocumentID,
-	).Scan(&docID, &contentHash, &revisionVer, &approvalState, &publishedDocID)
-
+	// B2/B3/B4 ported (M2/F2.2, ADR-0039 D3(b)): the active-instance projection
+	// over documents/document_revisions/approval_instances is resolved through the
+	// documents-owned ActiveInstanceReader port; CD maps the view 1:1 onto its own
+	// ActiveDocumentInstance and no longer names those base tables in its own SQL.
+	view, err := r.activeInstance.ActiveInstanceForControlledDocument(ctx, tenantID, controlledDocumentID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("get active document instance: %w", err)
 	}
-
-	// Both sides NULL means the controlled document simply has no documents.
-	if !docID.Valid && !publishedDocID.Valid {
+	if view == nil {
 		return nil, nil
 	}
-
-	inst := &controlleddocumentsdomain.ActiveDocumentInstance{}
-	if docID.Valid {
-		v := docID.String
-		inst.DocumentID = &v
-	}
-	if contentHash.Valid {
-		v := contentHash.String
-		inst.ContentHash = &v
-	}
-	if revisionVer.Valid {
-		v := int(revisionVer.Int64)
-		inst.RevisionVersion = &v
-	}
-	if approvalState.Valid {
-		v := approvalState.String
-		inst.ApprovalState = &v
-	}
-	if publishedDocID.Valid {
-		v := publishedDocID.String
-		inst.PublishedDocumentID = &v
-	}
-
-	// When the active document is under review, fetch the in-progress approval instance.
-	if inst.DocumentID != nil && inst.ApprovalState != nil && *inst.ApprovalState == "under_review" {
-		var approvalInstanceID sql.NullString
-		err := r.db.QueryRowContext(ctx, `
-SELECT id::text
-  FROM approval_instances
- WHERE document_id = $1::uuid
-   AND tenant_id = $2::uuid
-   AND status = 'in_progress'
- ORDER BY submitted_at DESC
- LIMIT 1`,
-			*inst.DocumentID, tenantID,
-		).Scan(&approvalInstanceID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("get active approval instance: %w", err)
-		}
-		if approvalInstanceID.Valid {
-			v := approvalInstanceID.String
-			inst.ApprovalInstanceID = &v
-		}
-	}
-
-	return inst, nil
+	return &controlleddocumentsdomain.ActiveDocumentInstance{
+		DocumentID:          view.DocumentID,
+		ContentHash:         view.ContentHash,
+		RevisionVersion:     view.RevisionVersion,
+		ApprovalState:       view.Status,
+		PublishedDocumentID: view.PublishedDocumentID,
+		ApprovalInstanceID:  view.ApprovalInstanceID,
+	}, nil
 }
 
 type PostgresSequenceAllocator struct {

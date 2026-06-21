@@ -84,9 +84,10 @@ var hgPendingRemediation = []hgSite{
 	// B1 ported (M2/F2.1): documents/repository reads profile_code via
 	// controlleddocuments/domain.CDFieldReader (ADR-0039 D3(b)); raw read deleted.
 	{"documents/repository/repository.go", "document_process_areas"},                 // B7
-	{"controlleddocuments/infrastructure/repository.go", "document_revisions"},       // B2
-	{"controlleddocuments/infrastructure/repository.go", "documents"},                // B3
-	{"controlleddocuments/infrastructure/repository.go", "approval_instances"},       // B4
+	// B2/B3/B4 ported (M2/F2.2): GetActiveInstance reads the active/published
+	// documents + in-progress approval_instances projection through the
+	// documents-owned ActiveInstanceReader port (ADR-0039 D3(b)); the inline
+	// documents/document_revisions/approval_instances reads were deleted.
 	// B5 ported (M2/F2.1): LoadDocumentAreaCode resolves the CD area via
 	// controlleddocuments/domain.CDFieldReader (tx-aware); LEFT JOIN deleted.
 	// B6 ported (M2/F2.1): loadInstanceAreaCode resolves the CD area via

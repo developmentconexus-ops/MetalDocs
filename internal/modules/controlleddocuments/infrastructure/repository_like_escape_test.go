@@ -6,6 +6,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	documentsdomain "metaldocs/internal/modules/documents/domain"
 )
 
 // ptr is a local helper (not re-declared if already present in the package's
@@ -28,7 +29,7 @@ func TestList_EscapesLikeWildcards(t *testing.T) {
 	}
 	defer db.Close()
 
-	repo := NewPostgresControlledDocumentRepository(db)
+	repo := NewPostgresControlledDocumentRepository(db, documentsdomain.NoopActiveInstanceReader{})
 
 	// With only Query set, args order is:
 	//   $1 = tenantID
