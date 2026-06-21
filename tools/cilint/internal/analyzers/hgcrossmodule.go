@@ -105,12 +105,14 @@ var hgPendingRemediation = []hgSite{
 	// C3 ported (M3/F3.3): documents/approval ResolveEligibleActors reads the same
 	// published view in-tx (H-PRE-1 preserved); the interval-predicate read of
 	// metaldocs.user_process_areas was deleted.
-	// Category C4 — search visibility-contract redesign (M4)
-	{"search/infrastructure/v2documents/reader.go", "documents"},                       // C4a
-	{"search/infrastructure/v2documents/reader.go", "controlled_documents"},            // C4b
-	{"search/infrastructure/v2documents/reader.go", "controlled_document_area_grants"}, // C4c
-	{"search/infrastructure/v2documents/reader.go", "controlled_document_user_grants"}, // C4e
-	{"search/infrastructure/v2documents/reader.go", "user_process_areas"},              // C4d
+	// C4a/C4b/C4c/C4d/C4e ported (M4/F4.3): search/v2documents/reader.go reads the
+	// published contracts metaldocs.v_document_search_facts (documents),
+	// metaldocs.v_cd_search_facts + metaldocs.v_cd_grantee (controlleddocuments,
+	// the latter joined to iam's v_active_user_areas) instead of the five base
+	// tables public.documents / controlled_documents / controlled_document_area_grants
+	// / controlled_document_user_grants / user_process_areas; all five raw reads were
+	// deleted (ADR-0039 D3a). This was the last in-scope debt site: the ledger is now
+	// EMPTY, satisfying mission.md §8 terminal acceptance.
 }
 
 // hgExempt is the PERMANENT allowlist: cross-module reads that are compliant by a

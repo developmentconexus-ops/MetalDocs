@@ -52,9 +52,10 @@ func TestListDocumentsFiltersByTenantID(t *testing.T) {
 		"QMS-001", 7, nil, nil,
 		time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
 	)
-	// The query must enforce per-document visibility against the unified grant
-	// model — assert the predicate is present, then assert the actor is bound.
-	mock.ExpectQuery("controlled_document_area_grants[\\s\\S]*controlled_document_user_grants[\\s\\S]*LIMIT \\$11 OFFSET \\$12").
+	// The query must enforce per-document visibility through controlleddocuments'
+	// PUBLISHED contract (v_cd_grantee, ADR-0039 D3a / M4/F4.3) — assert the grantee
+	// EXISTS leg is present, then assert the actor is bound at $13.
+	mock.ExpectQuery("v_cd_grantee[\\s\\S]*LIMIT \\$11 OFFSET \\$12").
 		WithArgs("tenant-1", "", "", "", "", "", "", "", nil, nil, 20, 0, "user-1", sqlmock.AnyArg()).
 		WillReturnRows(rows)
 
@@ -93,7 +94,7 @@ func TestListDocumentsBindsActorForVisibility(t *testing.T) {
 		"QMS-002", 8, nil, nil,
 		time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC),
 	)
-	mock.ExpectQuery("controlled_document_area_grants[\\s\\S]*controlled_document_user_grants[\\s\\S]*LIMIT \\$11 OFFSET \\$12").
+	mock.ExpectQuery("v_cd_grantee[\\s\\S]*LIMIT \\$11 OFFSET \\$12").
 		WithArgs("tenant-1", "", "", "", "", "", "", "", nil, nil, 20, 0, "user-9", sqlmock.AnyArg()).
 		WillReturnRows(rows)
 

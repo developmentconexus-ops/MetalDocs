@@ -32,15 +32,15 @@ func NewReader(db *sql.DB, families taxonomydomain.FamilyCodeResolver) *Reader {
 }
 
 func (r *Reader) ListDocuments(ctx context.Context, query searchdomain.Query, limit, offset int) ([]searchdomain.Document, error) {
-	// Only columns that exist on public.documents / public.controlled_documents
-	// are referenced. The legacy governance columns (subject, business_unit,
-	// classification, tags) live on the decommissioned metaldocs.documents schema,
-	// not on public.documents — selecting/filtering them errored at runtime, so
-	// they are not part of v2 search. Per-document visibility is enforced against
-	// the caller ($13) using the unified model (AD-3).
-	// The area-grant EXISTS subquery below gates document visibility on `upa.effective_to IS NULL`
-	// — the canonical active-now membership predicate (soft-delete model, ADR 0037). Not an
-	// interval bug.
+	// This query reads ONLY published cross-module contracts (ADR-0039 D3a), never a
+	// foreign module's base table: documents' metaldocs.v_document_search_facts
+	// (projection of public.documents) and controlleddocuments' metaldocs.v_cd_search_facts
+	// + metaldocs.v_cd_grantee (CD projection + visibility legs). The legacy governance
+	// columns (subject, business_unit, classification, tags) are not part of v2 search.
+	// Per-document visibility is enforced against the caller ($13) using the unified
+	// model (AD-3); the active-membership semantics (revoked members excluded) are
+	// encoded inside v_cd_grantee via iam's v_active_user_areas (effective_to IS NULL,
+	// soft-delete model, ADR 0037) — see the visibility predicate below.
 	// family_code is no longer resolved by a correlated subquery against taxonomy's
 	// profile table (H-G cross-schema read, ADR 0038). Instead:
 	//   - projection: column 5 selects the raw join key
@@ -66,9 +66,9 @@ SELECT
 	d.effective_from,
 	d.effective_to,
 	d.created_at
-FROM public.documents d
-LEFT JOIN public.controlled_documents cd
-  ON cd.id = d.controlled_document_id
+FROM metaldocs.v_document_search_facts d
+LEFT JOIN metaldocs.v_cd_search_facts cd
+  ON cd.controlled_document_id = d.controlled_document_id
  AND cd.tenant_id = d.tenant_id
 WHERE d.tenant_id = $1
   AND d.archived_at IS NULL
@@ -83,37 +83,28 @@ WHERE d.tenant_id = $1
   AND ($10::timestamptz IS NULL OR (d.effective_to IS NOT NULL AND d.effective_to >= $10::timestamptz))
   -- Per-document visibility (unified model, AD-3): a document is visible only
   -- when the caller ($13) can see it. Documents linked to a controlled document
-  -- inherit its company/owner/restricted+grant visibility (the same predicate
-  -- the controlled-documents list enforces); standalone documents fall back to
-  -- creator ownership. No system_admin bypass — matches the CD list semantics.
+  -- inherit its company/owner/restricted+grant visibility; standalone documents
+  -- fall back to creator ownership. No system_admin bypass.
+  --
+  -- The CD legs are composed from controlleddocuments' PUBLISHED contract
+  -- (ADR-0039 D3a, M4/F4.1) instead of CD's base tables: v_cd_search_facts carries
+  -- the unbounded scalar legs (is_company replaces the scope-enum literal;
+  -- owner_user_id), and v_cd_grantee enumerates the bounded restricted-CD edges
+  -- (active area-grant members via iam's v_active_user_areas ∪ direct user-grants).
+  -- This set is identical to the former inline base-table predicate (proven by the
+  -- F4.1 composed-decision parity test and F4.3's frozen-raw parity test).
   AND (
-    (d.controlled_document_id IS NULL AND d.created_by::text = $13)
-    OR (cd.id IS NOT NULL AND (
-         cd.visibility_scope = 'company'
+    (d.controlled_document_id IS NULL AND d.created_by = $13)
+    OR (cd.controlled_document_id IS NOT NULL AND (
+         cd.is_company
       OR cd.owner_user_id = $13
-      OR (cd.visibility_scope = 'restricted' AND (
-           EXISTS (
-             SELECT 1
-               FROM public.controlled_document_area_grants cdag
-              WHERE cdag.tenant_id = cd.tenant_id
-                AND cdag.controlled_document_id = cd.id
-                AND EXISTS (
-                  SELECT 1
-                    FROM public.user_process_areas upa
-                   WHERE upa.tenant_id = cd.tenant_id
-                     AND upa.user_id = $13
-                     AND upa.area_code = cdag.area_code
-                     AND upa.effective_to IS NULL
-                )
-           )
-           OR EXISTS (
-             SELECT 1
-               FROM public.controlled_document_user_grants cdug
-              WHERE cdug.tenant_id = cd.tenant_id
-                AND cdug.controlled_document_id = cd.id
-                AND cdug.user_id = $13
-           )
-      ))
+      OR EXISTS (
+           SELECT 1
+             FROM metaldocs.v_cd_grantee g
+            WHERE g.tenant_id = cd.tenant_id
+              AND g.controlled_document_id = cd.controlled_document_id
+              AND g.grantee_user_id = $13
+         )
     ))
   )
 ORDER BY d.created_at DESC, d.id DESC
