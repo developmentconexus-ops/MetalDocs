@@ -11,6 +11,7 @@
 > - The in-scope sites this ADR classifies: mission `docs/superpowers/milestones/backend-module-boundary-hardening/mission.md` §5, evidence base `…/discovery-brief.md`.
 > - `db/migrations/0242_iam_v_active_user_areas_view.sql` — the D3(a)/D4 iam-published active-membership view `metaldocs.v_active_user_areas` (`effective_to IS NULL`; columns `tenant_id, user_id, area_code, role`), built in M3/F3.1. The C1–C3 consumers (mission §5 rows 12–14) read this view.
 > - `db/migrations/0243_cd_search_visibility_contract.sql` — the D3(a)/D4 controlleddocuments-published search read contract, built in M4/F4.1: `metaldocs.v_cd_search_facts` (1 row/CD: projection cols `code, department_code, profile_code, sequence_num` + `is_company` + `owner_user_id`) and `metaldocs.v_cd_grantee` (bounded restricted-CD visibility edges via `controlled_document_area_grants` ⋈ `v_active_user_areas` ∪ `controlled_document_user_grants`). The C4b/C4c/C4e consumer (search `v2documents/reader.go`, mission §5) reads these in M4/F4.3 instead of CD's base tables.
+> - `db/migrations/0244_documents_search_projection.sql` — the D3(a)/D4 documents-published search projection contract, built in M4/F4.2: `metaldocs.v_document_search_facts`, a pure 1:1 projection of `public.documents` (the 14 columns search reads; no WHERE, no COALESCE — `archived_at` exposed, consumer applies its own active filter). The C4a consumer (search `v2documents/reader.go`, mission §5) reads this in M4/F4.3 instead of `public.documents`.
 
 ---
 
