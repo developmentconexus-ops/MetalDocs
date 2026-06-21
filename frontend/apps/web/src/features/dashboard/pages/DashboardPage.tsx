@@ -1,6 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../store/auth.store';
 import { useDashboardInboxQuery } from '../queries/useDashboardInboxQuery';
+import { useDashboardStatsQuery } from '../queries/useDashboardStatsQuery';
+import { useDashboardActivityQuery } from '../queries/useDashboardActivityQuery';
+import { deriveDashboardStats } from '../lib/deriveDashboardStats';
+import { deriveActivityItems } from '../lib/deriveActivity';
 import type { InboxItem } from '../../approval/api/approvalTypes';
 import styles from './DashboardPage.module.css';
 
@@ -109,27 +113,34 @@ function PendingRow({ item, rank }: { item: InboxItem; rank: number }) {
   );
 }
 
-// TODO: replace with real API data when /api/v1/approval/stats endpoint is available
-const MOCK_STATS = [
-  { label: 'Aprovados', value: '—', sub: 'esta semana', color: 'var(--success)' as const },
-  { label: 'Devolvidos', value: '—', sub: 'aguardando', color: 'var(--warning)' as const },
-  { label: 'Tempo médio', value: '—', sub: 'por decisão', color: 'var(--brand)' as const },
-];
-
-// TODO: replace with real API data when /api/v1/activity or audit endpoint supports it
-const MOCK_ACTIVITY = [
-  { who: 'Sistema', what: 'Nenhuma atividade recente carregada.', code: '', time: '' },
-];
-
 // ─── Main page ────────────────────────────────────────────────────
 
 export function Component() {
   const user = useAuthStore((s) => s.user);
   const { data, isLoading, isError } = useDashboardInboxQuery();
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    isError: statsError,
+  } = useDashboardStatsQuery();
 
   const firstName = user ? getFirstName(user.displayName) : 'você';
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
+
+  // Static card scaffolding (labels/subs/colors) derived from an empty stats
+  // shape; live values fill in once `statsData` arrives. Loading → '…',
+  // error → '—' (honest non-value, never a fabricated number).
+  const statCards = deriveDashboardStats(statsData ?? { by_status: {}, by_area: {} });
+  const statValue = (i: number): string =>
+    statsLoading ? '…' : statsError || !statsData ? '—' : statCards[i].value;
+
+  const {
+    data: activityData,
+    isLoading: activityLoading,
+    isError: activityError,
+  } = useDashboardActivityQuery();
+  const activityItems = deriveActivityItems(activityData?.items ?? []);
 
   return (
     <div className={styles.page}>
@@ -168,11 +179,11 @@ export function Component() {
               </div>
               <div className={styles.statPillSub}>pendências</div>
             </div>
-            {MOCK_STATS.map((s) => (
+            {statCards.map((s, i) => (
               <div key={s.label} className={styles.statPill}>
                 <div className={styles.statPillLabel}>{s.label.toUpperCase()}</div>
                 <div className={styles.statPillValue} style={{ color: 'white' }}>
-                  {s.value}
+                  {statValue(i)}
                 </div>
                 <div className={styles.statPillSub}>{s.sub}</div>
               </div>
@@ -227,12 +238,12 @@ export function Component() {
               <span className={styles.sectionTitle}>§ SEU PULSO</span>
               <span className={styles.sectionCount}>5 dias úteis</span>
             </div>
-            {MOCK_STATS.map((s) => (
+            {statCards.map((s, i) => (
               <div key={s.label} className={styles.statRow}>
                 <div className={styles.statRowInfo}>
                   <div className={styles.statRowLabel}>{s.label.toUpperCase()}</div>
                   <div className={styles.statRowValue} style={{ color: s.color }}>
-                    {s.value}
+                    {statValue(i)}
                   </div>
                 </div>
               </div>
@@ -246,15 +257,39 @@ export function Component() {
             </div>
             <div className={styles.activityList}>
               <span className={styles.activityLine} />
-              {MOCK_ACTIVITY.map((a, i) => (
-                <div key={i} className={styles.activityItem}>
+
+              {activityLoading && (
+                <div className={styles.activityItem}>
                   <span className={styles.activityDot} />
-                  <div style={{ color: 'var(--text-muted)' }}>
+                  <div className={styles.activityMuted}>Carregando atividade…</div>
+                </div>
+              )}
+
+              {!activityLoading && activityError && (
+                <div className={styles.activityItem} role="alert">
+                  <span className={styles.activityDot} />
+                  <div className={styles.activityMuted}>
+                    Atividade indisponível no momento.
+                  </div>
+                </div>
+              )}
+
+              {!activityLoading && !activityError && activityItems.length === 0 && (
+                <div className={styles.activityItem}>
+                  <span className={styles.activityDot} />
+                  <div className={styles.activityMuted}>Nenhuma atividade recente.</div>
+                </div>
+              )}
+
+              {!activityLoading && !activityError && activityItems.map((a) => (
+                <div key={a.id} className={styles.activityItem}>
+                  <span className={styles.activityDot} />
+                  <div className={styles.activityMuted}>
                     <span className={styles.activityWho}>{a.who}</span>
                     {a.what && ` ${a.what} `}
                     {a.code && <span className={styles.activityCode}>{a.code}</span>}
                   </div>
-                  {a.time && <span className={styles.activityTime}>{a.time}</span>}
+                  <span className={styles.activityTime}>{formatRelative(a.occurredAt)}</span>
                 </div>
               ))}
             </div>

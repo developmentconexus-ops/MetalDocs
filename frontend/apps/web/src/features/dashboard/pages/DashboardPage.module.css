@@ -403,6 +403,10 @@
   border: 2px solid var(--text);
 }
 
+.activityMuted {
+  color: var(--text-muted);
+}
+
 .activityWho {
   color: var(--text);
   font-weight: 600;
