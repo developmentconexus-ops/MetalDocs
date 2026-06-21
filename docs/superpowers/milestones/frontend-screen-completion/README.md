@@ -1,7 +1,7 @@
 # Program: Frontend Screen Completion
 
 > **Governing spec:** `./mission.md`
-> **Status:** In progress — M0 passed; M1 validator PASS, awaiting operator HS-1
+> **Status:** In progress — M0 + M1 passed (validator PASS + operator HS-1); M2 not started
 > **Owner / operator:** leandrotca
 
 Finish every remaining/partial frontend screen to Professional-SaaS, industry-grade quality, matching the Grade-A backend (HEAD `d477e9f0`) and the canonical frontend architecture rules. Screens that are blocked on missing backend endpoints (Distribuição fanout, Notifications) get those endpoints built full-stack to the Grade-A bar (D1). **Terminal acceptance:** an independent `mission-validator` judges a per-screen completion re-audit — every in-scope screen real-API + redesign-tokens + both reviewer agents APPROVE, zero mock/dead-route/stub remaining, new backend `api-lint -strict` = 0 with all 6 CI guards green. Evidence base: `./discovery-brief.md`.
@@ -11,7 +11,7 @@ Finish every remaining/partial frontend screen to Professional-SaaS, industry-gr
 | # | Milestone | Objective (one line) | Status | Gate result |
 |---|-----------|----------------------|--------|-------------|
 | 0 | `milestone-0-truth-reset` | Honest routed app: 1 index route, no dead stubs, correct tracker, per-screen DoD written | passed | [PASS](milestone-0-truth-reset/qa/milestone-qa.md) |
-| 1 | `milestone-1-dashboard-real-data` | Home screen renders 100% live data (kill MOCK_STATS/MOCK_ACTIVITY) | validator-PASS · awaiting HS-1 | [PASS](milestone-1-dashboard-real-data/qa/milestone-qa.md) |
+| 1 | `milestone-1-dashboard-real-data` | Home screen renders 100% live data (kill MOCK_STATS/MOCK_ACTIVITY) | passed | [PASS](milestone-1-dashboard-real-data/qa/milestone-qa.md) |
 | 2 | `milestone-2-distribuicao` | Distribuição backed by a Grade-A fanout/coverage endpoint; live coverage, no illustrative data | planned | — |
 | 3 | `milestone-3-notifications` | Notifications center real end-to-end (new backend + wired screen) | planned | — |
 | 4 | `milestone-4-publicado-obsoleto` | Publicado "em breve" gaps closed + Documento Obsoleto variant built | planned | — |
