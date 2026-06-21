@@ -6,9 +6,10 @@
 > **Context window:** Mission `backend-module-boundary-hardening` · Milestone M0 · Feature F0.1. This mission GATES the parent `grade-a-completion` Grade-A sign-off (met-on-bar, Grade-A HELD).
 > **Supersedes:** none.
 > **Related ADRs:** [0022 — Authz capability coherence](./0022-authz-capability-coherence.md) (never symptom-patch authz visibility); [0037 — Membership temporal model](./0037-membership-temporal-model.md) (active-now ⟺ `effective_to IS NULL`); [0038 — `FamilyCodeResolver` port](./0038-family-code-resolver-port.md) and [0029](./0029-user-display-name-reader-port.md)/[0030](./0030-template-version-state-port.md)/[0031](./0031-tenant-user-reader-port.md) (owner-published read-port precedent — the compliant mechanism this ADR generalizes).
-> **Related code (Last verified 2026-06-20):**
+> **Related code (Last verified 2026-06-21):**
 > - `tools/cilint/internal/analyzers/` — the H-G analyzer (`hgcrossmodule`) that mechanizes this ADR (M0/F0.3), sibling of `noresponsemap.go` (H-D).
 > - The in-scope sites this ADR classifies: mission `docs/superpowers/milestones/backend-module-boundary-hardening/mission.md` §5, evidence base `…/discovery-brief.md`.
+> - `db/migrations/0242_iam_v_active_user_areas_view.sql` — the D3(a)/D4 iam-published active-membership view `metaldocs.v_active_user_areas` (`effective_to IS NULL`; columns `tenant_id, user_id, area_code, role`), built in M3/F3.1. The C1–C3 consumers (mission §5 rows 12–14) read this view.
 
 ---
 
