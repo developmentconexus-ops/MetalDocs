@@ -19,7 +19,7 @@
   respected). The constant values equal the prior literals
   (`templates/domain/version.go:14-15`: `VersionStatusPublished="published"`,
   `VersionStatusObsolete="obsolete"`), so the comparison semantics are identical.
-- Commit: `<filled at commit>`.
+- Commit: `4a21a7dc feat(controlleddocuments): M1/F1.1 typed status constants in resolution.go` (local, not pushed).
 
 ## Verification
 

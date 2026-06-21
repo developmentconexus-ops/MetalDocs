@@ -1,7 +1,7 @@
 # Milestone 1 — Category A: typed status constants
 
 > **Program:** backend-module-boundary-hardening  ·  **Governing spec:** `../mission.md` (§5 row 3, §7 M1)
-> **Status:** Spec approved
+> **Status:** Passed (validator PASS 2026-06-20 → `qa/milestone-qa.md`; HS-1 operator gate **pending**)
 > **Authored:** 2026-06-20 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** this milestone is, **which features**
