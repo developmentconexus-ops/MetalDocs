@@ -5,8 +5,9 @@
 > live test Postgres directly; a throwaway tmpfs container runs on `:5434` (non-secret CI creds
 > `metaldocs:metaldocs`, role `metaldocs_app` created, isolated from the dev DB on `:5433`). The
 > `tests/integration/testdb` harness is green against it (`go test -tags integration
-> ./tests/integration/testdb/...` → ok), so D6 parity-before-delete can run on a real DB. **F2.1
-> executing.**
+> ./tests/integration/testdb/...` → ok), so D6 parity-before-delete can run on a real DB.
+> **Validator PASS 2026-06-21** (F2.1–F2.4 closed + F2.5 HS-4 guard-test-realign fix;
+> `qa/milestone-qa.md`). **HS-1 operator gate pending** — no M3 start, no merge, without approval.
 > **Authored:** 2026-06-20 — *before any feature in this milestone began.* Test-PG DSN:
 > `postgres://metaldocs:metaldocs@localhost:5434/metaldocs?sslmode=disable` (ephemeral; never `.env`).
 
