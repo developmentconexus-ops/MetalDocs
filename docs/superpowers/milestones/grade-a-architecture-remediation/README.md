@@ -60,7 +60,11 @@ Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) 
 - [x] Every planned feature (M0–M4, M4b, M4c) has a complete evidence row.
 - [x] Zero unplanned scope merged; anything added is recorded with rationale (HS-6 rows above).
 - [x] Every bounded defer has a written trigger and an owner — the open ones (21 confirmed findings, H-D=4, H-G=1) are inventoried in `../grade-a-completion/discovery-brief.md` and homed to milestones there.
-- [ ] **M5 re-audit passed the §6 pass bar** — **NOT met here.** F5.1 returned MICRO-WAVE NEEDED; the pass-bar proof is the terminal acceptance of `../grade-a-completion/` (re-run F5.1, pass §6). **Grade A is not yet independently proven.**
+- [x] **M5 re-audit passed the §6 pass bar** — **met via successor.** The F5.2 loop in `../grade-a-completion/`
+      reached a post-M9 met-on-bar PASS, and the sibling gating mission `../backend-module-boundary-hardening/`
+      passed its terminal gate 2026-06-21 (module-boundaries B+→A, H-G=0 both readings, independent
+      `mission-validator` PASS). **Grade A is now independently proven.**
 - [x] Forward roadmap reflects the executed program and deferred triggers — the deferred triggers became the successor mission's milestone inventory.
 - [x] Operator decision to close-by-handoff: 2026-06-15 (leandrotca.work) — "consider grade-a-remediation completed; the new mission grade-a-completion carries it forward."
-- [ ] Grade-A sign-off: deferred to `../grade-a-completion/` terminal acceptance.
+- [x] Grade-A sign-off: **2026-06-21 / leandrotca** (via `../grade-a-completion/`, gated on
+      `../backend-module-boundary-hardening/` terminal PASS). Backend is Grade-A.

@@ -2,7 +2,7 @@
 
 > **Governing spec:** `./mission.md`
 > **Evidence base:** `./discovery-brief.md`
-> **Status:** ✅ **Grade-A bar MET — awaiting operator sign-off.** M0–M9 complete; post-M9 terminal acceptance
+> **Status:** ✅ **GRADE-A — operator signed off 2026-06-21 (leandrotca).** M0–M9 complete; post-M9 terminal acceptance
 > met-on-bar PASS (HEAD `d7d53590`, §6-grep convention). Grade-A was operator-**HELD** pending the sibling
 > gating mission `backend-module-boundary-hardening`, which **PASSED its terminal gate 2026-06-21** (HEAD
 > `44b83071`; module-boundaries B+→A, H-G=0 under both readings, independent `mission-validator` PASS). The
@@ -111,6 +111,7 @@ Mission stays open.
       **VERDICT PASS** (`../backend-module-boundary-hardening/qa/mission-validation.md`,
       `wiki/backend/_artifacts/architecture-re-audit-2026-06-21-post-boundary-hardening.md`). **The Grade-A
       hold is cleared.**
-- [ ] Parent program M5 closed; `../grade-a-architecture-remediation/README.md` updated.
-- [ ] **Operator Grade-A sign-off: <date / name>** ← unblocked; awaiting operator. (Both gating conditions met:
-      post-M9 §8 PASS + boundary-hardening terminal PASS. Work is local — not merged, not pushed.)
+- [x] Parent program M5 closed; `../grade-a-architecture-remediation/README.md` updated (Grade-A reached).
+- [x] **Operator Grade-A sign-off: 2026-06-21 / leandrotca.** ✅ Backend is **Grade-A** (A-minus-or-better
+      across all 10 re-audit dimensions; 4 straight-A, 6 A− with documented Minors only). Both gating
+      conditions met: post-M9 §8 PASS + boundary-hardening terminal PASS. Pushed to `origin/main`.

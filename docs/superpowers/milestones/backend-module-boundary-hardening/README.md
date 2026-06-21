@@ -53,4 +53,4 @@ Completed 2026-06-21 (HEAD `44b83071`, local — not merged, not pushed):
       Critical/Major; build + unit + testdb-parity green; raw-base-DSN `_Live` tests recorded HS-3 not-run).
 - [x] Parent `grade-a-completion` Grade-A sign-off **UNBLOCKED** and presented to operator (the held gate —
       D2 — is the boundary-hardening terminal PASS, now achieved). See that program's README close-out.
-- [ ] Operator sign-off: <date / name>
+- [x] Operator sign-off: **2026-06-21 / leandrotca** — mission accepted; parent Grade-A signed off (below).

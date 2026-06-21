@@ -257,4 +257,4 @@ Completed 2026-06-21 (HEAD `44b83071`, local — not merged, not pushed):
       `mission-validator`, re-audit `wf_6fd45429-eb4` →
       `wiki/backend/_artifacts/architecture-re-audit-2026-06-21-post-boundary-hardening.md`).
 - [x] Parent `grade-a-completion` Grade-A sign-off **unblocked** and presented to operator (D2 gate met).
-- [ ] Operator sign-off: <date / name>
+- [x] Operator sign-off: **2026-06-21 / leandrotca**.
