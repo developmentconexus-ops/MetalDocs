@@ -1,7 +1,7 @@
 # Milestone 4 — search consumes published visibility contracts (C4, risk-isolated, last)
 
 > **Program:** backend-module-boundary-hardening  ·  **Governing spec:** `../mission.md`
-> **Status:** Passed — milestone-validator **PASS** 2026-06-21 (C1–C7, gates re-run from clean state; pre-existing failures independently confirmed via pre-M4 worktree). All 3 features (F4.1/F4.2/F4.3, within the ~4-feature appetite cap) closed. **Awaiting HS-1 operator acceptance** (not merged, not pushed). Verdict: `qa/milestone-qa.md`.
+> **Status:** Passed — milestone-validator **PASS** + **HS-1 operator-APPROVED 2026-06-21** (not merged, not pushed). All 3 features (F4.1/F4.2/F4.3, within the ~4-feature appetite cap) closed; gates re-run from clean state; pre-existing failures independently confirmed via pre-M4 worktree. Verdict: `qa/milestone-qa.md`. **Last milestone — H-G ledger now EMPTY; mission terminal acceptance (mission.md §8) is next** (mission-validator, fresh session).
 > **Authored:** 2026-06-21 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** this milestone is,

@@ -1,7 +1,7 @@
 # Program: Backend Module-Boundary Hardening
 
 > **Governing spec:** `./mission.md`
-> **Status:** Executing — M0 **passed** + M1 **passed** + M2 **passed** + M3 **passed** (all validator PASS + operator HS-1; M0/M1 2026-06-20, M2/M3 2026-06-21). M3 HS-1 approved 2026-06-21 (not merged, not pushed). **M4 validator PASS 2026-06-21 — awaiting HS-1 operator acceptance** (not merged, not pushed). On M4 HS-1, the H-G debt ledger is empty → mission terminal acceptance (mission.md §8) is ready for the mission-validator.
+> **Status:** All milestones PASSED + HS-1-approved — M0 + M1 + M2 + M3 + **M4** (all validator PASS + operator HS-1; M0/M1 2026-06-20, M2/M3/M4 2026-06-21; not merged, not pushed). **M4 HS-1 approved 2026-06-21** → H-G debt ledger is **EMPTY**. **Next: mission terminal acceptance (mission.md §8) via `mission-validator` in a fresh session.**
 > **Owner / operator:** leandrotca
 
 Eliminate the pre-existing cross-module raw-SQL debt (~20 sites in 3 categories — see
@@ -20,7 +20,7 @@ program's terminal PASS.
 | 1 | `milestone-1-category-a-constants` | Typed status constants in `controlleddocuments/domain/resolution.go` (no SQL) | passed | [PASS](milestone-1-category-a-constants/qa/milestone-qa.md) + HS-1 approved 2026-06-20 |
 | 2 | `milestone-2-category-b-read-ports` | 9 clean foreign point-reads → owner-published read-ports (parity-before-delete) | passed | [PASS](milestone-2-category-b-read-ports/qa/milestone-qa.md) (validator 2026-06-21; F2.1–F2.4 + F2.5 HS-4 fix) + HS-1 approved 2026-06-21 |
 | 3 | `milestone-3-category-c-membership-view` | iam publishes active-membership view; CD list/CanRead + approval (H-PRE-1) consume it | passed | [PASS](milestone-3-category-c-membership-view/qa/milestone-qa.md) (validator 2026-06-21; F3.1 view + F3.2 CD C1+C2 + F3.3 approval C3) + HS-1 approved 2026-06-21 |
-| 4 | `milestone-4-search-visibility-contract` | search consumes a CD-published visibility contract (risk-isolated, last) | validator PASS — awaiting HS-1 | F4.1/F4.2/F4.3 closed; views 0243+0244; reader.go consumes 3 views; H-G ledger drained EMPTY; validator PASS 2026-06-21 (`qa/milestone-qa.md`) |
+| 4 | `milestone-4-search-visibility-contract` | search consumes a CD-published visibility contract (risk-isolated, last) | **passed** (HS-1 2026-06-21) | F4.1/F4.2/F4.3 closed; views 0243+0244; reader.go consumes 3 views; H-G ledger drained EMPTY; validator PASS + HS-1 approved 2026-06-21 (`qa/milestone-qa.md`) |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
 The **Gate result** column links the milestone-validator's verdict (`qa/milestone-qa.md`); `passed` requires
