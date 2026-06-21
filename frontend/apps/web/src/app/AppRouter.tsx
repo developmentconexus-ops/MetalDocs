@@ -1,13 +1,11 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom';
 import { AppRoot } from '../features/shell/pages/AppRoot';
 import { approvalRoutes } from '../features/approval/routes';
-import { auditRoutes } from '../features/audit/routes';
 import { contentBuilderRoutes } from '../features/content-builder/routes';
 import { dashboardRoutes } from '../features/dashboard/routes';
 import { documentsRoutes } from '../features/documents/routes';
 import { iamRoutes } from '../features/iam/routes';
 import { notificationsRoutes } from '../features/notifications/routes';
-import { operationsRoutes } from '../features/operations/routes';
 import { passwordChangeRoutes } from '../features/password-change/routes';
 import { taxonomyRoutes } from '../features/taxonomy/routes';
 import { templatesRoutes } from '../features/templates/routes';
@@ -28,7 +26,6 @@ export const router = createBrowserRouter([
           import('../features/shell/components/AppShell').then((m) => ({ Component: m.AppShell })),
         children: [
           ...dashboardRoutes,
-          ...operationsRoutes,
           ...documentsRoutes,
           ...templatesRoutes,
           ...taxonomyRoutes,
@@ -36,7 +33,6 @@ export const router = createBrowserRouter([
           ...approvalRoutes,
           ...notificationsRoutes,
           ...contentBuilderRoutes,
-          ...auditRoutes,
           ...passwordChangeRoutes,
           { path: '*', element: <Navigate to="/" replace /> },
         ],
