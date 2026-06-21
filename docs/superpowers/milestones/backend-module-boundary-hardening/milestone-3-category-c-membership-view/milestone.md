@@ -1,7 +1,7 @@
 # Milestone 3 — Category C: published active-membership view + consumption
 
 > **Program:** backend-module-boundary-hardening  ·  **Governing spec:** `../mission.md` (§5 rows 12–14, §7 M3)
-> **Status:** Executing — *dispatched to this fresh session 2026-06-21; authored before any feature began.*
+> **Status:** Validator **PASS** 2026-06-21 (`qa/milestone-qa.md`) — **HS-1 operator gate pending**. All 3 features closed: F3.1 (view `fe181f34`), F3.2 (CD C1+C2 `764a9d08`), F3.3 (approval C3 `c1b654d6`). Not merged, not pushed. Awaiting operator approval before M4.
 > **Authored:** 2026-06-21 — *before any feature in this milestone began.*
 > Test-PG DSN: `postgres://metaldocs:metaldocs@localhost:5434/metaldocs?sslmode=disable` (ephemeral; never `.env`).
 > Integration parity needs this live + `-tags integration`; if down, mark the step **not-run (HS-3)** — never false-green.
