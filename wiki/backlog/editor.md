@@ -1,12 +1,9 @@
 # Editor — Deferred Backlog
 
-> **Last verified:** 2026-05-18
+> **Last verified:** 2026-06-21 (verify-and-archive sweep; see _cleanup-2026-06-21.md)
 > **Scope:** Historical backlog and audit memory for the `/documents/:documentID/edit` editor screen. The governed sidebar slice is now implemented with real runtime data; this page now tracks only the remaining editor defers and the audit history that led to the implementation.
 > **Out of scope:** Bug fixes (see `bugs/`), shared editor primitive (`EditorChrome`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/components/EditorMetaSidebar.tsx:12` — TODO block for `MOCK_META`
-> - `frontend/apps/web/src/features/documents/components/EditorMetaSidebar.tsx:23` — TODO block for `MOCK_REVISIONS`
-> - `frontend/apps/web/src/features/documents/components/EditorMetaSidebar.tsx:34` — TODO block for `MOCK_APPROVERS`
 > - `frontend/apps/web/design-source/editor/IMPLEMENTATION.md` — Phase 3c open item
 
 ---
@@ -17,8 +14,6 @@
 |---|---|---|---|
 | Metadados rows (Perfil, Área, Próx. revisão, Visibilidade) | High | Extend `GET /api/v1/documents/:id` response | Deferred |
 | Vigência atual (approval date) | High | Extend `GET /api/v1/documents/:id` response | Deferred |
-| Revisões timeline (full history list) | High | New endpoint `GET /api/v1/documents/:id/revisions` | Deferred |
-| Próximos aprovadores (signoff list) | Medium | New endpoint `GET /api/v1/documents/:id/signoffs` | Deferred |
 
 ---
 

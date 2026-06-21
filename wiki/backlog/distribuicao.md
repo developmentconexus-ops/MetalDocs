@@ -1,7 +1,14 @@
 # Distribuição & Cobertura — Deferred Items
 
-> **Last verified:** 2026-06-08 (Phase E1: planned endpoint field names normalised to snake_case; prior: 2026-05-29)
-> **Scope:** Deferred items for the Distribuição & Cobertura de Leitura screen (`/documents/:documentId/distribution`).
+> **Last verified:** 2026-06-21 (write-path design extracted to the parked mission; prior: 2026-06-08)
+> **Scope:** M2 (frontend-screen-completion) derive-on-read **coverage-scope** follow-ups for the
+> Distribuição & Cobertura de Leitura screen (`/documents/:documentId/distribution`) — the *denominator*
+> (real obligated recipients + by-area + deadline + pending) rendered live, read/ack shown as an honest
+> *"tracking pending"* state.
+> **Write-path moved out:** the full evidence (read/ack) + action (reminders/export/fanout) domain — the
+> *numerator* — is parked as a designed mission:
+> [`document-distribution-mission.md`](document-distribution-mission.md). Build it only after the
+> frontend-screen-completion mission finishes. Everything below the screen context now lives there.
 > **Out of scope:** Published view deferred items (see `backlog/documento-publicado.md`), fanout render pipeline (see `modules/render-fanout.md`).
 > **Key files:**
 > - `frontend/apps/web/src/features/documents/pages/DocumentDistributionPage.tsx` — page entry; wires real document identity via `useDocumentDetailQuery`, wraps the full mock design as illustrative scaffolding under aria-hidden + watermark blocks with a role=note em-breve banner above
@@ -26,38 +33,26 @@ Gate 3 Preview proof (document `c1bb2112-21ea-46fc-ac1f-719d04994d41` / `PO-RH-0
 
 ---
 
-## Backend endpoints (contract design — no implementation yet)
+## What M2 builds (derive-on-read coverage-scope)
 
-Design per `wiki/architecture/backend-api-structure.md` + `wiki/architecture/api-contract.md` (contract-first via OpenAPI / oapi-codegen). Implement only when fanout / read-tracking module is scheduled (out of `qa/documents-distribution` boundary — see hard-stop note below).
+M2 wires the **denominator** only, from data that exists at baseline (visibility grants + area
+membership — `controlled_document_area_grants`, `controlled_document_user_grants`,
+`document_process_areas`, `user_process_areas`, view `metaldocs.v_active_user_areas`):
 
-| Endpoint | Purpose | Priority |
-|---|---|---|
-| `GET /api/v1/documents/:id/distribution` | KPI rollup (`total_targets`, `acknowledged`, `read`, `pending`, `overdue`) + sidebar facts (`published_at`, `read_deadline`, `policy`, `channel`, `reminders_scheduled`, `groups[]`) | High |
-| `GET /api/v1/documents/:id/distribution/recipients?page=&pageSize=&status=` | Paginated recipient table (`user_id`, `name`, `area`, `status`, `last_event_at`, `read_at`, `acknowledged_at`) — `X-Total-Count` + `Link` headers per library pagination pattern | High |
-| `GET /api/v1/documents/:id/distribution/coverage` | By-area breakdown (`area_code`, `area_name`, `total`, `read`, `acknowledged`) | Medium |
-| `GET /api/v1/documents/:id/distribution/timeline?granularity=day` | Cumulative daily read/ack series for adoption curve | Low |
+- Real obligated recipients (paginated), real by-area breakdown, real read-deadline, real `pending`.
+- Read / acknowledge numerator rendered as an explicit **"tracking pending"** state — never a fake
+  `0%`, never illustrative data. The honest scaffolding/watermark pattern (below) is replaced by live
+  denominator data; the numerator slots stay truthfully empty.
 
-Wire via TanStack Query hooks in `features/documents/queries/` (`useDistributionSummaryQuery`, `useDistributionRecipientsQuery`, `useDistributionCoverageQuery`, `useDistributionTimelineQuery`) when endpoints exist. Generated FE types from `lib/api-types/`.
+The **endpoint contract** M2 consumes (and the precise M2-vs-mission field split) is specified in
+[`document-distribution-mission.md`](document-distribution-mission.md) §6. M2 ships the
+denominator-bearing subset of the first three endpoints; the numerator fields, the timeline endpoint,
+the 4 CTAs, and all row/bulk actions are the parked mission's scope (§8 there).
 
-## Fanout module (hard-stop — out of `qa/documents-distribution` scope)
-
-The 4 hero CTAs and all recipient bulk/row actions require a fanout + read-tracking Go module that does not exist. Classification: missing-shared-contract + missing-module. **Redesign-grade** (worker/outbox semantics, recipient resolution from groups/areas/explicit users, idempotent reminder dispatch, ack semantics). Per the QA operating-system hard-stop rule, this is reported, not patched.
-
-| CTA | Required endpoint | Status |
-|---|---|---|
-| Lembrete em massa | `POST /api/v1/documents/:id/fanout/reminders/bulk` | No module |
-| Exportar relatório | `GET /api/v1/documents/:id/distribution/export` | No module |
-| Adicionar destinatários | `POST /api/v1/documents/:id/fanout/recipients` | No module |
-| Política de fanout | Settings modal (no design) | No design |
-| Row action — mail | `POST /api/v1/documents/:id/fanout/reminders/:recipientId` | No module |
-| Bulk action bar | Bulk send reminder, reassign, export | No module |
-
-Minimum prerequisite plan:
-1. New module `internal/modules/distribution` owning recipient resolution, read events, ack events, reminder dispatch (worker + outbox).
-2. New tables: `document_distribution_targets`, `document_read_events`, `document_acknowledgement_events`, `document_reminder_jobs`.
-3. Contract-first OpenAPI surface (4 endpoints above + fanout endpoints), oapi-codegen wiring.
-4. Worker for reminder dispatch (reuses outbox pattern from `render-fanout` if applicable).
-5. Wire TanStack hooks + remove `aria-disabled` from CTAs once endpoints land.
+> **Write-path / fanout / read-tracking design** (the 4 tables, the publish-path snapshot-vs-derive
+> decision, caps, reminder worker, the full endpoint table, minimum prerequisite plan) was **moved**
+> to [`document-distribution-mission.md`](document-distribution-mission.md). It is **redesign-grade**
+> and reported, not patched, inside this screen-wiring scope.
 
 ## Chart library
 

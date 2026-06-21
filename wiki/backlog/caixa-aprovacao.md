@@ -1,26 +1,18 @@
-# Backlog: Caixa de Aprovação screen (`/approvals`)
+# Backlog: Caixa de Aprovaï¿½ï¿½o screen (`/approvals`)
 
-> Last updated: 2026-05-14
+> Last updated: 2026-06-21 (verify-and-archive sweep; see _cleanup-2026-06-21.md)
 > Implementation artifacts: `frontend/apps/web/design-source/caixa-aprovacao/artifacts/`
 
-## Integration Audit — 2026-05-14
+## Integration Audit ï¿½ 2026-05-14
 
 Preflight evidence:
 
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/approvals` — PASS (normalized to runtime `/api/v1/approval/inbox`).
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-module-contract-sync.ps1 -Module approval` — PASS.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/approvals` ï¿½ PASS (normalized to runtime `/api/v1/approval/inbox`).
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-module-contract-sync.ps1 -Module approval` ï¿½ PASS.
 - Runtime sample: `GET /api/v1/approval/inbox?limit=3` returned empty payload shape `{ items: [], total: 0 }`.
 
 ## Classification (post-implementation)
 
-- `implemented and aligned`
-  - `/approvals` route with `stack` + `timeline` views
-  - validated persisted view state (`stack | timeline`)
-  - honest empty-state behavior (no mock fallback)
-  - `InboxStack`, card, and timeline rendering from real `InboxItem` fields
-  - `Abrir documento` and timeline `Revisar` actions navigate to `/controlled-documents/{controlled_document_id}`
-  - `Aprovar e assinar` and `Devolver` open real signoff flow after active-document context lookup
-  - action icon parity (`eye`)
 - `implemented but legacy-wired`
   - `features/approval/api/approvalApi.ts` remains on legacy manual wrappers (kept as bounded debt)
 - `missing backend capability`
@@ -38,7 +30,7 @@ Preflight evidence:
 
 ## Verification evidence
 
-- `pnpm --filter web test -- src/features/approval/pages/InboxPage.test.tsx` — PASS
-- `pnpm --filter web test -- src/features/approval/components/SignoffDialog.test.tsx` — PASS
-- `pnpm.cmd --filter web exec tsc --noEmit -p tsconfig.build.json` — PASS
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/approvals` — PASS
+- `pnpm --filter web test -- src/features/approval/pages/InboxPage.test.tsx` ï¿½ PASS
+- `pnpm --filter web test -- src/features/approval/components/SignoffDialog.test.tsx` ï¿½ PASS
+- `pnpm.cmd --filter web exec tsc --noEmit -p tsconfig.build.json` ï¿½ PASS
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/approvals` ï¿½ PASS

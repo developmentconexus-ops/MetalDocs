@@ -1,6 +1,6 @@
 # Backlog: Novo-Documento Wizard
 
-> **Last verified:** 2026-05-28 (runtime QA pass post-PC-reset; happy path live-validated for `company` + `restricted` area scope, blank template real)
+> **Last verified:** 2026-06-21 (verify-and-archive sweep; see _cleanup-2026-06-21.md)
 > **Scope:** Deferred items for the 4-step wizard at `/documents/new` (`NewDocumentWizardPage`). Each item corresponds to a `TODO(novo-documento:*)` comment in code.
 > **Out of scope:** Library screen deferrals (`backlog/library-screen.md`), editor deferrals (`backlog/editor.md`).
 > **Key files:**
@@ -28,19 +28,9 @@ Runtime evidence from 2026-05-28 live browser pass (post-PC-reset, API `:8081`, 
 
 | Item | Source | Runtime/API reality | Frontend reality | Classification | Action |
 |---|---|---|---|---|---|
-| Step 1 profile cards | design + current screen | `GET /api/v1/taxonomy/profiles` exists, wired via `useProfilesQuery` | Real cards render from live data | implemented and aligned | keep |
 | Step 1 profile count badge | design + backlog `profile-counts` | profiles response has no document-count field | UI shows `—` placeholder only | missing backend capability | keep deferred in backlog |
-| Step 2 area selector + title | design + current screen | `GET /api/v1/taxonomy/areas` + atomic create accepts `processAreaCode` + `title` | Real selector/input gate progression | implemented and aligned | keep |
-| Step 2 code preview | design + backlog `sequence-preview` | `GET /api/v1/controlled-documents/preview-code` returns real next code | Banner shows live preview | implemented and aligned | keep closed |
-| Step 2 visibility — `company` | design + backlog `visibility` | `visibility` accepted by atomic create, persisted on `controlled_documents` | submitted + persisted | implemented and aligned | move to closed |
-| Step 2 visibility — `area` / restricted-area scope | design + backlog `visibility` | atomic create accepts `visibilityAreaCodes`; restricted-area visibility persisted (editor metadata reflects it) | submitted + persisted | implemented and aligned | move to closed |
 | Step 2 visibility — `people` / external subcontrols | design + backlog `visibility` | no invitee/external-share endpoints exist | rendered with `Em breve` for unsupported subcontrols | missing backend capability | keep deferred |
-| Step 3 template list | design + current screen | `GET /api/v1/templates?doc_type=...` returns published version IDs | real list wired and selectable | implemented and aligned | keep |
 | Step 3 per-version picker | design + backlog `template-versions` | no versions-list route for the wizard | wizard exposes only published-version selection | defer | preserve backlog item |
-| Step 3 blank template | design + backlog `blank-template` | `GET /api/v1/templates/system/blank` returns real sentinel; atomic create accepts that `templateVersionId` | blank card selectable, real submit | implemented and aligned | move to closed |
-| Step 4 summary card | design + current screen | preview endpoint + selected template available by Step 4 | summary mirrors real preview code + template | implemented and aligned | keep |
-| Step 4 create action | design + current screen | `POST /api/v1/controlled-documents` returns `201` for valid atomic-create request via the real browser flow; landing redirects to `/documents/:id/edit` | wizard submits via `createControlledDocumentAtomic`, lands editor | implemented and aligned | keep |
-| Template query/preview disabled-key wiring | frontend-only audit | n/a | canonical non-sentinel keys | implemented and aligned | keep |
 
 Open caveat:
 - A raw PowerShell `POST /api/v1/controlled-documents` was observed returning `403` during direct API probing while the real browser flow succeeded. Treat as a possible auth/session/tooling nuance, not a product blocker. Investigate before reopening the screen blocker.
@@ -79,9 +69,9 @@ Verification needed next:
 
 ---
 
-### ~~sequence-preview~~ {#sequence-preview} — CLOSED (feat/cd-atomic-create, 2026-05-07)
+### Closed (see git history)
 
-`GET /api/v1/controlled-documents/preview-code?profileCode=…&areaCode=…` was shipped. Returns next code preview read-only (no reservation). Wizard now shows a live preview instead of `{profile}-{area}-???`. See `concepts/controlled-documents.md` for endpoint details.
+sequence-preview (feat/cd-atomic-create, 2026-05-07), blank-template (2026-05-28), slot-rollback (feat/cd-atomic-create, 2026-05-07) — all closed; details recoverable from git history.
 
 ---
 
@@ -92,18 +82,6 @@ Verification needed next:
 **Why deferred:** the template selector calls `GET /api/v1/templates?doc_type=…` and uses `published_version_id` to select the real published version. No version-picker UI exists.
 
 **Backend prereq:** none blocking — UI work only to expose version picker.
-
----
-
-### ~~blank-template~~ {#blank-template} — CLOSED (2026-05-28)
-
-`GET /api/v1/templates/system/blank` ships a real sentinel: `templateId=00000000-0000-0000-0000-000000000101`, `templateVersionId=00000000-0000-0000-0000-000000000102`. Step 3 "Em branco" card is selectable and submits that sentinel `templateVersionId` through the standard atomic-create payload. Runtime QA verified blank-template creation ends on the real editor route.
-
----
-
-### ~~slot-rollback~~ {#slot-rollback} — CLOSED (feat/cd-atomic-create, 2026-05-07)
-
-`POST /api/v1/controlled-documents` now creates the CD slot + first document revision in a single DB transaction. The two-call sequence no longer exists; orphan slots are structurally impossible. The legacy create-from-CD path was deleted. See ADR 0011.
 
 ---
 
