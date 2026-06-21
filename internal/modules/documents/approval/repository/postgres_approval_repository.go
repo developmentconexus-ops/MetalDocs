@@ -1130,15 +1130,20 @@ func (r *postgresApprovalRepository) LoadActiveDocumentContentHash(ctx context.C
 
 // ResolveEligibleActors returns the user_ids of all users who hold required_role
 // in area_code for the given tenant as of now. Returns empty slice (never nil).
+//
+// Reads iam's PUBLISHED active-membership view metaldocs.v_active_user_areas
+// (M3/F3.3, ADR-0039 D3a) — the view encodes active-now (effective_to IS NULL,
+// ADR 0037 D1), so this consumer states no temporal predicate. Under ADR-0037
+// Model A this is the identical set the prior interval form selected (effective_from
+// is never future; effective_to > now() is empty), retiring the Model-B interval
+// leak (ADR 0037 D2). H-PRE-1 preserved: still a plain, non-recording in-tx SELECT.
 func (r *postgresApprovalRepository) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
 	rows, err := tx.QueryContext(ctx,
 		`SELECT user_id
-		   FROM metaldocs.user_process_areas
+		   FROM metaldocs.v_active_user_areas
 		  WHERE tenant_id = $1::uuid
 		    AND area_code = $2
-		    AND role      = $3
-		    AND effective_from <= now()
-		    AND (effective_to IS NULL OR effective_to > now())`,
+		    AND role      = $3`,
 		tenantID, areaCode, requiredRole,
 	)
 	if err != nil {

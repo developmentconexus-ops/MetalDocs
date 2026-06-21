@@ -102,7 +102,9 @@ var hgPendingRemediation = []hgSite{
 	// C1+C2 ported (M3/F3.2): controlleddocuments List + CanRead read iam's published
 	// metaldocs.v_active_user_areas view (ADR-0039 D3a); the raw user_process_areas
 	// reads were deleted.
-	{"documents/approval/repository/postgres_approval_repository.go", "user_process_areas"}, // C3
+	// C3 ported (M3/F3.3): documents/approval ResolveEligibleActors reads the same
+	// published view in-tx (H-PRE-1 preserved); the interval-predicate read of
+	// metaldocs.user_process_areas was deleted.
 	// Category C4 — search visibility-contract redesign (M4)
 	{"search/infrastructure/v2documents/reader.go", "documents"},                       // C4a
 	{"search/infrastructure/v2documents/reader.go", "controlled_documents"},            // C4b
