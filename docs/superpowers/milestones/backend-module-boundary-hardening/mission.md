@@ -247,10 +247,14 @@ tools. Model policy: sonnet analysis/review, haiku mechanical, never fable worke
 
 ## 12. End-state / reconciliation
 
-Fill only when the last milestone has passed and the terminal gate is green:
-- [ ] Every planned feature (M0..M4) has a complete evidence row.
-- [ ] Zero unplanned scope merged; anything added is recorded with rationale.
-- [ ] Every bounded defer has a written trigger and an owner.
-- [ ] Terminal acceptance (§8) passed — link `qa/mission-validation.md`.
-- [ ] Parent `grade-a-completion` Grade-A sign-off unblocked and presented to operator.
+Completed 2026-06-21 (HEAD `44b83071`, local — not merged, not pushed):
+- [x] Every planned feature (M0..M4) has a complete evidence row. All milestones validator PASS + HS-1 approved.
+- [x] Zero unplanned scope merged; anything added is recorded with rationale (N1 row 16 → M2; X1–X8 → ADR-0039
+      D3(d)–(f) via HS-6; F2.5/F4.5 HS-4 validator-fix features). See README close-out.
+- [x] Every bounded defer has a written trigger and an owner (raw-base-DSN `_Live` integration re-point;
+      `fillin_authz.go` `DoReadOnly` TODO). See README close-out.
+- [x] Terminal acceptance (§8) passed — `qa/mission-validation.md` **VERDICT PASS** (independent
+      `mission-validator`, re-audit `wf_6fd45429-eb4` →
+      `wiki/backend/_artifacts/architecture-re-audit-2026-06-21-post-boundary-hardening.md`).
+- [x] Parent `grade-a-completion` Grade-A sign-off **unblocked** and presented to operator (D2 gate met).
 - [ ] Operator sign-off: <date / name>

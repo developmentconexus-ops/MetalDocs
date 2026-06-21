@@ -1,7 +1,7 @@
 # Program: Backend Module-Boundary Hardening
 
 > **Governing spec:** `./mission.md`
-> **Status:** All milestones PASSED + HS-1-approved — M0 + M1 + M2 + M3 + **M4** (all validator PASS + operator HS-1; M0/M1 2026-06-20, M2/M3/M4 2026-06-21; not merged, not pushed). **M4 HS-1 approved 2026-06-21** → H-G debt ledger is **EMPTY**. **Next: mission terminal acceptance (mission.md §8) via `mission-validator` in a fresh session.**
+> **Status:** ✅ **MISSION COMPLETE — terminal acceptance PASSED 2026-06-21** (HEAD `44b83071`; not merged, not pushed). All milestones M0–M4 validator PASS + HS-1 approved (M0/M1 2026-06-20; M2/M3/M4 2026-06-21); H-G debt ledger **EMPTY**. F5.1 10-dimension re-audit: module-boundaries **B+→A**, no dimension below post-M9 floor, 0 skeptic-confirmed Critical/Major; independent `mission-validator` **PASS** ([qa/mission-validation.md](qa/mission-validation.md)). **Parent `grade-a-completion` Grade-A sign-off now UNBLOCKED — awaiting operator.**
 > **Owner / operator:** leandrotca
 
 Eliminate the pre-existing cross-module raw-SQL debt (~20 sites in 3 categories — see
@@ -34,15 +34,23 @@ a validator **PASS** *and* operator HS-1 approval.
 
 ## Program close-out / reconciliation
 
-Fill in only when the last milestone has passed:
+Completed 2026-06-21 (HEAD `44b83071`, local — not merged, not pushed):
 
-- [ ] Every planned feature has a complete evidence row.
-- [ ] Zero unplanned scope (anything added is recorded with rationale).
-- [ ] Every bounded defer has a written trigger and an owner.
-- [ ] **Terminal acceptance:** main session re-runs the F5.1 10-dimension re-audit from clean state →
-      captures `wiki/backend/_artifacts/architecture-re-audit-<date>-post-boundary-hardening.md` → **dispatch
-      `mission-validator`** to judge it against `mission.md` §8 and write `qa/mission-validation.md`. (This
-      line is the durable trigger for the terminal gate — do not skip it once this planning session is gone.)
-- [ ] Terminal acceptance passed — link `qa/mission-validation.md`.
-- [ ] Parent `grade-a-completion` Grade-A sign-off unblocked and presented to operator.
+- [x] Every planned feature (M0–M4) has a complete evidence row. All milestones validator PASS + HS-1 approved.
+- [x] Zero unplanned scope; everything added is recorded with rationale. Adds: N1 (§5 row 16, templates read,
+      folded into M2) + X1–X8 exemptions (ADR-0039 D3(d)–(f)) via the M0/F0.2 **HS-6** ruling; F2.5 and F4.5
+      were **HS-4** validator-fix features (read-port parity + F4.1–F4.3 live parity proof). All documented.
+- [x] Every bounded defer has a written trigger and an owner. Open defers: (a) re-point the raw-base-DSN
+      `*_Live` integration tests at the testdb template clone so a full `-tags integration` run is green
+      (trigger: any integration-CI hardening pass; owner: backend; recorded in F4.3 evidence + the re-audit §7);
+      (b) `fillin_authz.go:22` `runner.Do`→`DoReadOnly` for the read-only authz gate (TODO, operator-deferred).
+- [x] **Terminal acceptance:** main session re-ran the F5.1 10-dimension re-audit (`wf_6fd45429-eb4`) from
+      clean state → captured
+      [architecture-re-audit-2026-06-21-post-boundary-hardening.md](../../../../wiki/backend/_artifacts/architecture-re-audit-2026-06-21-post-boundary-hardening.md)
+      → dispatched `mission-validator`, which independently re-ran every §8 check and wrote the verdict.
+- [x] **Terminal acceptance passed** — [qa/mission-validation.md](qa/mission-validation.md): **VERDICT PASS**
+      (module-boundaries = A; H-G = 0 under both readings; cilint guard exit 0; 0 skeptic-confirmed
+      Critical/Major; build + unit + testdb-parity green; raw-base-DSN `_Live` tests recorded HS-3 not-run).
+- [x] Parent `grade-a-completion` Grade-A sign-off **UNBLOCKED** and presented to operator (the held gate —
+      D2 — is the boundary-hardening terminal PASS, now achieved). See that program's README close-out.
 - [ ] Operator sign-off: <date / name>

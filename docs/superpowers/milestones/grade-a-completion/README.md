@@ -2,7 +2,11 @@
 
 > **Governing spec:** `./mission.md`
 > **Evidence base:** `./discovery-brief.md`
-> **Status:** Planning (mission specced + scaffolded; M0 not yet started)
+> **Status:** ✅ **Grade-A bar MET — awaiting operator sign-off.** M0–M9 complete; post-M9 terminal acceptance
+> met-on-bar PASS (HEAD `d7d53590`, §6-grep convention). Grade-A was operator-**HELD** pending the sibling
+> gating mission `backend-module-boundary-hardening`, which **PASSED its terminal gate 2026-06-21** (HEAD
+> `44b83071`; module-boundaries B+→A, H-G=0 under both readings, independent `mission-validator` PASS). The
+> hold is now cleared — Grade-A is unblocked and presented for operator sign-off (local; not merged, not pushed).
 > **Owner / operator:** leandrotca.work
 > **Parent program:** `../grade-a-architecture-remediation/` — this mission **is** that program's F5.2
 > remediation under M5/HS-5; its terminal acceptance closes the parent's M5 and is the basis for Grade-A sign-off.
@@ -95,6 +99,18 @@ Mission stays open.
       via `DocumentFinalizeResult`. F9.1–F9.4 closed; **milestone-validator VERDICT PASS 2026-06-20**
       (`milestone-9-hs5-contract-typegate/qa/milestone-qa.md`); commits `2e3c8a8b` + `9248d715` (local).
       HS-1 operator gate pending; on approval, re-run post-M9 F5.1 re-audit + re-dispatch `mission-validator`.
-- [ ] Terminal acceptance passed — link the new `qa/mission-validation.md` + the new re-audit report.
+- [x] **Post-M9 terminal acceptance met-on-bar PASS** (2026-06-20, HEAD `d7d53590`): all four §8 checks pass
+      under the §6-grep convention §8 nominates (`qa/mission-validation.md`,
+      `wiki/backend/_artifacts/architecture-re-audit-2026-06-20-post-m9.md`). **But** the re-audit surfaced
+      pre-existing cross-module raw-SQL base-table debt the §8 gate never measured (broad-sweep H-G=14,
+      module-boundaries strict B+). **Operator HELD Grade-A** and spawned a sibling **gating** mission to
+      eliminate that debt before sign-off.
+- [x] **Gating mission `backend-module-boundary-hardening` PASSED its terminal gate** (2026-06-21, HEAD
+      `44b83071`): module-boundaries **B+→A**, **H-G=0 under BOTH readings**, cilint H-G guard exit 0, 0
+      skeptic-confirmed Critical/Major, no dimension below post-M9 floor; independent `mission-validator`
+      **VERDICT PASS** (`../backend-module-boundary-hardening/qa/mission-validation.md`,
+      `wiki/backend/_artifacts/architecture-re-audit-2026-06-21-post-boundary-hardening.md`). **The Grade-A
+      hold is cleared.**
 - [ ] Parent program M5 closed; `../grade-a-architecture-remediation/README.md` updated.
-- [ ] Operator Grade-A sign-off: <date / name>
+- [ ] **Operator Grade-A sign-off: <date / name>** ← unblocked; awaiting operator. (Both gating conditions met:
+      post-M9 §8 PASS + boundary-hardening terminal PASS. Work is local — not merged, not pushed.)
