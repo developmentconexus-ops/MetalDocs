@@ -14,6 +14,7 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 
 	"metaldocs/internal/modules/iam/authz"
@@ -36,16 +37,23 @@ type Repository struct {
 	db          *sql.DB
 	displayName iamdomain.UserDisplayNameReader
 	cdRead      controlleddocumentsdomain.CDFieldReader
+	areaCatalog taxonomydomain.AreaCatalogReader
 }
 
-// New constructs a Repository. displayName and cdRead are required collaborators
-// — use iamdomain.NoopUserDisplayNameReader{} / controlleddocumentsdomain.
-// NoopCDFieldReader{} for tests or paths that do not exercise them. cdRead is the
-// controlleddocuments-owned read-port for controlled_documents fields (ADR-0039
-// D3(b), M2/F2.1): this module reads profile_code through it instead of issuing
-// raw cross-module SQL. Passing nil will panic at first use.
-func New(db *sql.DB, displayName iamdomain.UserDisplayNameReader, cdRead controlleddocumentsdomain.CDFieldReader) *Repository {
-	return &Repository{db: db, displayName: displayName, cdRead: cdRead}
+// New constructs a Repository. displayName, cdRead and areaCatalog are required
+// collaborators — use iamdomain.NoopUserDisplayNameReader{} /
+// controlleddocumentsdomain.NoopCDFieldReader{} / taxonomydomain.
+// NoopAreaCatalogReader{} for tests or paths that do not exercise them. cdRead is
+// the controlleddocuments-owned read-port for controlled_documents fields
+// (ADR-0039 D3(b), M2/F2.1); areaCatalog is the taxonomy-owned read-port for
+// document_process_areas (ADR-0039 D3(b), M2/F2.3) — this module reads the area
+// name through it (in-tx, non-recording) instead of issuing raw cross-module
+// SQL. A nil areaCatalog is defaulted to the Noop reader.
+func New(db *sql.DB, displayName iamdomain.UserDisplayNameReader, cdRead controlleddocumentsdomain.CDFieldReader, areaCatalog taxonomydomain.AreaCatalogReader) *Repository {
+	if areaCatalog == nil {
+		areaCatalog = taxonomydomain.NoopAreaCatalogReader{}
+	}
+	return &Repository{db: db, displayName: displayName, cdRead: cdRead, areaCatalog: areaCatalog}
 }
 
 // mustSQLTx asserts a db.Tx to *sql.Tx. All callers of this repository pass
@@ -154,10 +162,18 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.D
 		createdByDisplayName = sql.NullString{String: rawDisplayName, Valid: true}
 	}
 
+	// M2/F2.3: read the area name through the taxonomy-owned AreaCatalogReader
+	// port (ADR-0039 D3(b)) instead of raw cross-module SQL. tx is passed so the
+	// read runs inside this create tx and stays non-recording (HS-PRE-1); found
+	// == false reproduces the prior sql.ErrNoRows branch (NULL area_name_snapshot).
 	var areaName sql.NullString
 	if d.ProcessAreaCodeSnapshot != nil && *d.ProcessAreaCodeSnapshot != "" {
-		if err := tx.QueryRowContext(ctx, `SELECT name FROM metaldocs.document_process_areas WHERE tenant_id=$1::uuid AND code=$2`, d.TenantID, *d.ProcessAreaCodeSnapshot).Scan(&areaName); err != nil && err != sql.ErrNoRows {
+		name, found, err := r.areaCatalog.AreaName(ctx, tx, d.TenantID, *d.ProcessAreaCodeSnapshot)
+		if err != nil {
 			return "", "", "", fmt.Errorf("create document: lookup area name: %w", err)
+		}
+		if found {
+			areaName = sql.NullString{String: name, Valid: true}
 		}
 	}
 

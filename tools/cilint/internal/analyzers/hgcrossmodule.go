@@ -83,7 +83,6 @@ var hgPendingRemediation = []hgSite{
 	// Category B — foreign point-reads → owner read-ports (M2)
 	// B1 ported (M2/F2.1): documents/repository reads profile_code via
 	// controlleddocuments/domain.CDFieldReader (ADR-0039 D3(b)); raw read deleted.
-	{"documents/repository/repository.go", "document_process_areas"},                 // B7
 	// B2/B3/B4 ported (M2/F2.2): GetActiveInstance reads the active/published
 	// documents + in-progress approval_instances projection through the
 	// documents-owned ActiveInstanceReader port (ADR-0039 D3(b)); the inline
@@ -92,8 +91,10 @@ var hgPendingRemediation = []hgSite{
 	// controlleddocuments/domain.CDFieldReader (tx-aware); LEFT JOIN deleted.
 	// B6 ported (M2/F2.1): loadInstanceAreaCode resolves the CD area via
 	// controlleddocuments/domain.CDFieldReader (tx-aware); LEFT JOIN deleted.
-	{"iam/infrastructure/postgres/area_catalog_reader.go", "document_process_areas"}, // B8
-	{"documents/application/fillin_service.go", "templates_template_version"},        // N1 (M0/HS-6 → M2)
+	// B7/B8 ported (M2/F2.3): documents (in-tx area name) and iam (off-tx area
+	// existence) read metaldocs.document_process_areas through the taxonomy-owned
+	// AreaCatalogReader port (ADR-0039 D3(b)); both raw reads were deleted.
+	{"documents/application/fillin_service.go", "templates_template_version"}, // N1 (M0/HS-6 → M2)
 	// Category C — authz-visibility membership reads → published view (M3)
 	{"controlleddocuments/infrastructure/repository.go", "user_process_areas"},              // C1+C2
 	{"documents/approval/repository/postgres_approval_repository.go", "user_process_areas"}, // C3

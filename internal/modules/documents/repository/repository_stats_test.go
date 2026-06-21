@@ -7,6 +7,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
@@ -17,7 +18,7 @@ func TestStatsByStatus_GroupsCorrectly(t *testing.T) {
 	}
 	defer db.Close()
 
-	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
+	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 	rows := sqlmock.NewRows([]string{"status", "count"}).
 		AddRow("draft", int64(2)).
 		AddRow("under_review", int64(1))
@@ -45,7 +46,7 @@ func TestStatsByArea_GroupsCorrectly(t *testing.T) {
 	}
 	defer db.Close()
 
-	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
+	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 	rows := sqlmock.NewRows([]string{"area", "count"}).
 		AddRow("", int64(1)).
 		AddRow("QA", int64(2))

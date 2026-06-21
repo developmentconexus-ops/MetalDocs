@@ -11,6 +11,7 @@ import (
 
 	"metaldocs/internal/modules/documents/repository"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/tests/integration/testdb"
 )
@@ -49,7 +50,7 @@ func TestCommitUpload_PersistsRevisionAndFormDataSnapshot(t *testing.T) {
 		t.Fatalf("insert pending upload: %v", err)
 	}
 
-	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 	formSnapshot := []byte(`{"field":"value"}`)
 	pageCount := 3
 	pageCountSource := "eigenpal_client"
@@ -146,7 +147,7 @@ func TestCommitUpload_IdempotentReplayReturnsExistingMetadata(t *testing.T) {
 		t.Fatalf("insert pending upload: %v", err)
 	}
 
-	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
+	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 	pageCount := 7
 	pageCountSource := "eigenpal_client"
 	first, err := repo.CommitUpload(ctx, tenantID, sessionID, userID, docID, pendingID, contentHash, []byte(`{"field":"value"}`), 2048, &pageCount, &pageCountSource)

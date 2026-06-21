@@ -11,6 +11,7 @@ import (
 	dhttp "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/ratelimit"
 )
@@ -56,6 +57,10 @@ type Dependencies struct {
 	// module boundary (M2/F2.1; ADR-0039 D3(b)). When nil,
 	// controlleddocumentsdomain.NoopCDFieldReader{} is used automatically.
 	CDFieldReader controlleddocumentsdomain.CDFieldReader
+	// AreaCatalogReader is the taxonomy-owned read-port for document_process_areas
+	// (area name) consumed in-tx without crossing the module boundary (M2/F2.3;
+	// ADR-0039 D3(b)). When nil, taxonomydomain.NoopAreaCatalogReader{} is used.
+	AreaCatalogReader taxonomydomain.AreaCatalogReader
 }
 
 func New(deps Dependencies) *Module {
@@ -70,7 +75,11 @@ func New(deps Dependencies) *Module {
 	if cdFieldReader == nil {
 		cdFieldReader = controlleddocumentsdomain.NoopCDFieldReader{}
 	}
-	repo := repository.New(deps.DB, displayNameReader, cdFieldReader)
+	areaCatalog := deps.AreaCatalogReader
+	if areaCatalog == nil {
+		areaCatalog = taxonomydomain.NoopAreaCatalogReader{}
+	}
+	repo := repository.New(deps.DB, displayNameReader, cdFieldReader, areaCatalog)
 	var svc *application.Service
 	if deps.SnapshotReader != nil {
 		snapSvc := application.NewSnapshotService(deps.SnapshotReader)

@@ -7,13 +7,14 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 func TestListDocuments_ExcludesArchivedByDefault(t *testing.T) {
 	db, mock, _ := sqlmock.New()
 	defer db.Close()
-	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
+	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	mock.ExpectQuery(`archived_at IS NULL`).
 		WithArgs("tenant-1").
@@ -34,7 +35,7 @@ func TestListDocuments_ExcludesArchivedByDefault(t *testing.T) {
 func TestListDocumentsForUser_ExcludesArchivedByDefault(t *testing.T) {
 	db, mock, _ := sqlmock.New()
 	defer db.Close()
-	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{})
+	r := New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	mock.ExpectQuery(`archived_at IS NULL`).
 		WithArgs("tenant-1", "user-1").

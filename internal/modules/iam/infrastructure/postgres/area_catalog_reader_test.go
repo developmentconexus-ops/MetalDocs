@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+
+	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
 )
 
 func TestProcessAreaCatalog_AreaCodeExists(t *testing.T) {
@@ -37,7 +39,7 @@ func TestProcessAreaCatalog_AreaCodeExists(t *testing.T) {
 				expect.WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(tc.exists))
 			}
 
-			got, err := NewProcessAreaCatalog(db).AreaCodeExists(context.Background(), "tenant-1", "welding")
+			got, err := NewProcessAreaCatalog(db, taxonomyinfra.NewAreaCatalogReaderPG()).AreaCodeExists(context.Background(), "tenant-1", "welding")
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("want error, got nil")

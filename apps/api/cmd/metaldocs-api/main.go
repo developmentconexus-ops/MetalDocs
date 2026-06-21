@@ -371,7 +371,7 @@ func main() {
 	// NewPeopleService resolves to the permissive catalog.
 	var areaCatalog iamapp.AreaCatalogReader
 	if deps.SQLDB != nil {
-		areaCatalog = iampg.NewProcessAreaCatalog(deps.SQLDB)
+		areaCatalog = iampg.NewProcessAreaCatalog(deps.SQLDB, taxonomyinfra.NewAreaCatalogReaderPG())
 	}
 	peopleService := iamapp.NewPeopleService(authService, cachedProvider, deps.RoleAdminRepo, membershipService, areaCatalog, cachedProvider)
 	// H-3b Site 3: wire atomic PatchAtomic (UpdateUserTx + ReplaceUserRolesTx + RecordTx).
@@ -440,6 +440,9 @@ func main() {
 	// profile_code read and the area-grade authz checks in the approval services.
 	cdReader := cdinfra.NewCDFieldReaderPG()
 	docDeps.CDFieldReader = cdReader
+	// areaCatalog is the taxonomy-owned read-port for document_process_areas
+	// (M2/F2.3; ADR-0039 D3(b)). documents reads the area name through it in-tx.
+	docDeps.AreaCatalogReader = taxonomyinfra.NewAreaCatalogReaderPG()
 	if deps.PDFConverter != nil {
 		docDeps.ExportDocgen = deps.PDFConverter
 	}
