@@ -20,7 +20,7 @@ program's terminal PASS.
 | 1 | `milestone-1-category-a-constants` | Typed status constants in `controlleddocuments/domain/resolution.go` (no SQL) | passed | [PASS](milestone-1-category-a-constants/qa/milestone-qa.md) + HS-1 approved 2026-06-20 |
 | 2 | `milestone-2-category-b-read-ports` | 9 clean foreign point-reads → owner-published read-ports (parity-before-delete) | passed | [PASS](milestone-2-category-b-read-ports/qa/milestone-qa.md) (validator 2026-06-21; F2.1–F2.4 + F2.5 HS-4 fix) + HS-1 approved 2026-06-21 |
 | 3 | `milestone-3-category-c-membership-view` | iam publishes active-membership view; CD list/CanRead + approval (H-PRE-1) consume it | passed | [PASS](milestone-3-category-c-membership-view/qa/milestone-qa.md) (validator 2026-06-21; F3.1 view + F3.2 CD C1+C2 + F3.3 approval C3) + HS-1 approved 2026-06-21 |
-| 4 | `milestone-4-search-visibility-contract` | search consumes a CD-published visibility contract (risk-isolated, last) | planned | — |
+| 4 | `milestone-4-search-visibility-contract` | search consumes a CD-published visibility contract (risk-isolated, last) | in-progress | — (spec approved 2026-06-21; 4-feature decomposition) |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) / `blocked` (hard-stop open).
 The **Gate result** column links the milestone-validator's verdict (`qa/milestone-qa.md`); `passed` requires
