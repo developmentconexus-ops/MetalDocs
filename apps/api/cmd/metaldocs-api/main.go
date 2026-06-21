@@ -443,6 +443,10 @@ func main() {
 	// areaCatalog is the taxonomy-owned read-port for document_process_areas
 	// (M2/F2.3; ADR-0039 D3(b)). documents reads the area name through it in-tx.
 	docDeps.AreaCatalogReader = taxonomyinfra.NewAreaCatalogReaderPG()
+	// TemplateVersionPort is the templates-owned read-port (ADR-0030; extended
+	// M2/F2.4): documents reads fill-in placeholder schema through it instead of
+	// joining templates_template_version to its own table.
+	docDeps.TemplateVersionPort = templatesinfra.NewTemplateVersionReader(deps.SQLDB)
 	if deps.PDFConverter != nil {
 		docDeps.ExportDocgen = deps.PDFConverter
 	}

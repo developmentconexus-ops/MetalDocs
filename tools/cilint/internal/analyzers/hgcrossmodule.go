@@ -94,7 +94,10 @@ var hgPendingRemediation = []hgSite{
 	// B7/B8 ported (M2/F2.3): documents (in-tx area name) and iam (off-tx area
 	// existence) read metaldocs.document_process_areas through the taxonomy-owned
 	// AreaCatalogReader port (ADR-0039 D3(b)); both raw reads were deleted.
-	{"documents/application/fillin_service.go", "templates_template_version"}, // N1 (M0/HS-6 → M2)
+	// N1 ported (M2/F2.4): LoadFillInSchema resolves template_version_id on the
+	// documents-owned table, then reads templates_template_version.placeholder_schema
+	// through the templates-owned TemplateVersionPort (ADR-0030 extended; ADR-0039
+	// D3(b)); the cross-module JOIN was deleted.
 	// Category C — authz-visibility membership reads → published view (M3)
 	{"controlleddocuments/infrastructure/repository.go", "user_process_areas"},              // C1+C2
 	{"documents/approval/repository/postgres_approval_repository.go", "user_process_areas"}, // C3

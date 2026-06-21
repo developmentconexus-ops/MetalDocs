@@ -16,4 +16,11 @@ type TemplateVersionPort interface {
 	// (e.g. controlled-documents override resolution) depend on; IsPublished is
 	// the derived published-or-not predicate.
 	GetTemplateVersionState(ctx context.Context, tenantID, versionID string) (*string, string, error)
+
+	// PlaceholderSchema returns templates_template_version.placeholder_schema as
+	// raw JSON for versionID, scoped to tenantID via the owning template. Returns
+	// (nil, nil) when the version is absent or the column is NULL — the caller
+	// treats nil as "no schema". Lets documents read fill-in schema (M2/F2.4;
+	// ADR-0039 D3(b)) without joining templates_template_version to its own table.
+	PlaceholderSchema(ctx context.Context, tenantID, versionID string) ([]byte, error)
 }

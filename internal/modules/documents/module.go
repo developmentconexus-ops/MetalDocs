@@ -12,6 +12,7 @@ import (
 	"metaldocs/internal/modules/documents/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/ratelimit"
 )
@@ -61,6 +62,12 @@ type Dependencies struct {
 	// (area name) consumed in-tx without crossing the module boundary (M2/F2.3;
 	// ADR-0039 D3(b)). When nil, taxonomydomain.NoopAreaCatalogReader{} is used.
 	AreaCatalogReader taxonomydomain.AreaCatalogReader
+	// TemplateVersionPort is the templates-owned read-port for template version
+	// state + placeholder schema (ADR-0030; extended M2/F2.4, ADR-0039 D3(b)).
+	// documents reads fill-in placeholder schema through it instead of joining
+	// templates_template_version to its own table. When nil, the template-schema
+	// fill-in reader is not attached (matching the prior absent-reader behavior).
+	TemplateVersionPort templatesdomain.TemplateVersionPort
 }
 
 func New(deps Dependencies) *Module {
@@ -108,8 +115,10 @@ func New(deps Dependencies) *Module {
 	fillInRepo := repository.NewFillInRepository(deps.DB)
 	fillInSvc := application.NewFillInService(db.NewTxRunner(deps.DB), application.NewSnapshotSchemaReader(deps.DB), fillInRepo).
 		WithReader(fillInRepo).
-		WithTemplateSchemaReader(application.NewTemplateVersionSchemaReader(deps.DB)).
 		WithCDFieldReader(cdFieldReader)
+	if deps.TemplateVersionPort != nil {
+		fillInSvc.WithTemplateSchemaReader(application.NewTemplateVersionSchemaReader(deps.DB, deps.TemplateVersionPort))
+	}
 	fillInHandler := dhttp.NewFillInHandler(fillInSvc)
 	placeholderOptionsHandler := dhttp.NewPlaceholderOptionsHandler(
 		application.NewSnapshotSchemaReader(deps.DB),

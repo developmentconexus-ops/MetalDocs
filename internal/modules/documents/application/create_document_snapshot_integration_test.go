@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/modules/documents/application"
 	docrepo "metaldocs/internal/modules/documents/repository"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
@@ -114,7 +115,7 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 		docgenv2.NewTemplatesSnapshotReader(db),
 	)
 	svc := application.NewServiceWithSnapshot(
-		docrepo.New(db, iampg.NewUserDisplayNameRepository(db), controlleddocumentsdomain.NoopCDFieldReader{}),
+		docrepo.New(db, iampg.NewUserDisplayNameRepository(db), controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{}),
 		nil,
 		docgenv2.NewTemplatesTemplateReader(db),
 		fakeFormVal{valid: true},

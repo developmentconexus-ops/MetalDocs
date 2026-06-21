@@ -69,3 +69,27 @@ func (r *TemplateVersionReader) GetTemplateVersionState(ctx context.Context, ten
 	state := status.String
 	return &state, docTypeCode.String, nil
 }
+
+const templatePlaceholderSchemaQuery = `
+	SELECT v.placeholder_schema
+	FROM templates_template_version v
+	JOIN templates_template t ON t.id = v.template_id
+	WHERE v.id = $1
+	  AND t.tenant_id = $2::uuid
+`
+
+// PlaceholderSchema returns the version's placeholder_schema as raw JSON, scoped
+// to tenantID via the owning template. (nil, nil) when the version is absent in
+// that tenant or the column is NULL — mirroring the documents fill-in reader's
+// prior sql.ErrNoRows-tolerant behavior (M2/F2.4; ADR-0039 D3(b)).
+func (r *TemplateVersionReader) PlaceholderSchema(ctx context.Context, tenantID, versionID string) ([]byte, error) {
+	var schema []byte
+	err := r.db.QueryRowContext(ctx, templatePlaceholderSchemaQuery, versionID, tenantID).Scan(&schema)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return schema, nil
+}

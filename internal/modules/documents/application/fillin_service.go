@@ -221,27 +221,37 @@ type FillInReader interface {
 
 // TemplateVersionSchemaReader reads fill-in schema from the template version
 // referenced by the document. Works for draft documents without snapshots.
+//
+// M2/F2.4: documents resolves the version id from its OWN documents table, then
+// reads templates_template_version.placeholder_schema through the templates-owned
+// TemplateVersionPort (ADR-0030/ADR-0039 D3(b)) — no cross-module JOIN into the
+// templates base table.
 type TemplateVersionSchemaReader struct {
-	db *sql.DB
+	db          *sql.DB
+	tplVersions templatesdomain.TemplateVersionPort
 }
 
-func NewTemplateVersionSchemaReader(db *sql.DB) *TemplateVersionSchemaReader {
-	return &TemplateVersionSchemaReader{db: db}
+func NewTemplateVersionSchemaReader(db *sql.DB, tplVersions templatesdomain.TemplateVersionPort) *TemplateVersionSchemaReader {
+	return &TemplateVersionSchemaReader{db: db, tplVersions: tplVersions}
 }
 
 func (r *TemplateVersionSchemaReader) LoadFillInSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error) {
-	var pRaw []byte
-	err := r.db.QueryRowContext(ctx, `
-		SELECT tv.placeholder_schema
-		  FROM templates_template_version tv
-		  JOIN documents d ON d.template_version_id = tv.id
-		 WHERE d.id = $1::uuid AND d.tenant_id = $2::uuid`,
+	// Resolve the document's template version on the documents-owned table.
+	var versionID string
+	err := r.db.QueryRowContext(ctx,
+		`SELECT template_version_id FROM documents WHERE id = $1::uuid AND tenant_id = $2::uuid`,
 		docID, tenantID,
-	).Scan(&pRaw)
+	).Scan(&versionID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
+		return nil, err
+	}
+
+	// Read the placeholder schema through the templates owner port.
+	pRaw, err := r.tplVersions.PlaceholderSchema(ctx, tenantID, versionID)
+	if err != nil {
 		return nil, err
 	}
 	var placeholders []templatesdomain.Placeholder
