@@ -1,7 +1,7 @@
 # ADR 0039 — Cross-module read boundary: a non-owner may read another module's **published view / read-port**, never its **base table** (H-G definition)
 
 > **Status:** Accepted 2026-06-20 (amended 2026-06-20 — M0/F0.2 HS-6 ruling added exemptions D3(d)–(f) for platform-sink / parent-ADR-dispositioned-auth / worker-layer reads; see Amendment section)
-> **Last verified:** 2026-06-20
+> **Last verified:** 2026-06-21
 > **Deciders:** leandrotca.work (operator), MetalDocs backend
 > **Context window:** Mission `backend-module-boundary-hardening` · Milestone M0 · Feature F0.1. This mission GATES the parent `grade-a-completion` Grade-A sign-off (met-on-bar, Grade-A HELD).
 > **Supersedes:** none.
