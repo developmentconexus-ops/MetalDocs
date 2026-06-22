@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -133,8 +134,22 @@ func TestSeedRegistryParity_SeededNotInRegistry(t *testing.T) {
 func TestSeedRegistryParity_RegistryNotSeeded(t *testing.T) {
 	dir := t.TempDir()
 	// Omit one real cap from the seed -> (b) must fire for exactly that cap.
+	// AllCapabilities() iterates a map (randomized order), and checkSeedRegistryParity
+	// legitimately exempts deferred caps — so picking caps[0] blindly flakes whenever
+	// the random first element is a deferred cap (omitting it yields zero violations).
+	// Sort + skip deferredCaps to choose a stable, guaranteed-firing capability.
 	caps := iamdomain.AllCapabilities()
-	missing := string(caps[0])
+	sort.Slice(caps, func(i, j int) bool { return caps[i] < caps[j] })
+	var missing string
+	for _, c := range caps {
+		if _, deferred := deferredCaps[c]; !deferred {
+			missing = string(c)
+			break
+		}
+	}
+	if missing == "" {
+		t.Fatal("no non-deferred capability available to omit")
+	}
 	writeFile(t, dir, "db/reference-data/0001_product_reference_data.sql", fullSeed(nil, map[string]bool{missing: true}))
 	got, err := checkSeedRegistryParity(dir, false)
 	if err != nil {
