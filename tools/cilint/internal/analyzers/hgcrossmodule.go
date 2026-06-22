@@ -63,6 +63,8 @@ var hgOwnerByTable = map[string]string{
 	// jobs
 	"idempotency_keys": "jobs",
 	"job_leases":       "jobs",
+	// notifications
+	"notifications": "notifications",
 }
 
 // hgSite is a (file-suffix, table) allowlist key. The suffix is matched against
