@@ -6,7 +6,6 @@ package infrastructure
 import (
 	"context"
 	"database/sql"
-	"sort"
 	"testing"
 
 	"metaldocs/tests/integration/testdb"
@@ -126,10 +125,24 @@ func TestObligatedReaders_CompanyCD_AllActiveTenantUsers(t *testing.T) {
 	db, _ := testdb.Open(t)
 	sc := seedCDVisibility(t, db)
 
+	// Anchor the expected company-scope cardinality to the fixture's actual active-user
+	// count (read from the upstream contract metaldocs.v_active_user_areas) so a future
+	// seedCDVisibility change that adds active members surfaces as a setup-drift error
+	// rather than a silent set-size mismatch.
+	var activeUsers int
+	if err := db.QueryRowContext(context.Background(),
+		`SELECT count(DISTINCT user_id) FROM metaldocs.v_active_user_areas WHERE tenant_id = $1`,
+		sc.tenantID).Scan(&activeUsers); err != nil {
+		t.Fatalf("active users count: %v", err)
+	}
+	if activeUsers != 1 {
+		t.Fatalf("fixture drift: seedCDVisibility now produces %d active tenant users; this test was authored against exactly 1 (areaMember) — re-read the fixture before asserting", activeUsers)
+	}
+
 	got := obligatedSet(t, db, sc.tenantID, sc.cdCompany)
 
-	if len(got) != 1 {
-		t.Fatalf("company obligated set size: got %d want 1 (rows=%+v)", len(got), got)
+	if len(got) != activeUsers {
+		t.Fatalf("company obligated set size: got %d want %d (rows=%+v)", len(got), activeUsers, got)
 	}
 	r := got[0]
 	if r.UserID != sc.areaMember {
@@ -175,9 +188,8 @@ func TestObligatedReaders_ViewShape(t *testing.T) {
 	if len(got) != len(want) {
 		t.Fatalf("column count: got %d want %d (got=%+v)", len(got), len(want), got)
 	}
-	sortCols := func(s []col) { sort.SliceStable(s, func(i, j int) bool { return s[i].name < s[j].name }) }
-	sortCols(got)
-	sortCols(want)
+	// Compare in ordinal_position order (no sort) — the declared column order is part of
+	// the published contract; reordering would surface as a real drift, not silent re-pass.
 	for i := range want {
 		if got[i] != want[i] {
 			t.Fatalf("column %d drift: got %+v want %+v", i, got[i], want[i])
