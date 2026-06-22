@@ -32,24 +32,6 @@
   margin-bottom: 4px;
 }
 
-.valueDanger {
-  color: var(--danger);
-}
-
-.progressTrack {
-  height: 4px;
-  background: var(--surface-3);
-  border-radius: var(--r-pill);
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-
-.progressFill {
-  height: 100%;
-  background: var(--success);
-  transition: width 0.3s ease-out;
-}
-
 .sub {
   font-size: var(--font-size-xs);
   color: var(--text-muted);

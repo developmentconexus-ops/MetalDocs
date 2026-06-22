@@ -62,6 +62,16 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "documents placeholder update", method: http.MethodPut, path: "/api/v1/documents/d1/placeholders/p1", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents patch", method: http.MethodPatch, path: "/api/v1/documents/d1", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
+		// --- Permission-guarded: distribution (M2) ---
+		// These GET routes MUST resolve to CapDistributionRead, NOT be shadowed by the
+		// generic GET /api/v1/documents → CapDocumentView catch-all. Without these rows a
+		// future reorder of routeRules could silently broaden distribution to document.view
+		// (a privilege broadening) with a green suite. Mirrors the CapAuditRead/CapRouteManage
+		// "more-specific cap must win over the generic block" precedent.
+		{name: "distribution summary resolves to distribution.read", method: http.MethodGet, path: "/api/v1/documents/d1/distribution", wantCap: iamdomain.CapDistributionRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "distribution recipients resolves to distribution.read", method: http.MethodGet, path: "/api/v1/documents/d1/distribution/recipients", wantCap: iamdomain.CapDistributionRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "distribution coverage resolves to distribution.read", method: http.MethodGet, path: "/api/v1/documents/d1/distribution/coverage", wantCap: iamdomain.CapDistributionRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+
 		// --- Permission-guarded: templates ---
 		{name: "templates list", method: http.MethodGet, path: "/api/v1/templates", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates create", method: http.MethodPost, path: "/api/v1/templates", wantCap: iamdomain.CapTemplateCreate, wantVisibility: iamdelivery.VisibilityPermissionGuarded},

@@ -23,6 +23,7 @@ vi.mock('../api/distribution', () => ({
 }));
 
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
+import { getDistributionSummary } from '../api/distribution';
 
 const baseDoc = {
   id: 'doc-dist-1',
@@ -143,6 +144,23 @@ describe('DocumentDistributionPage', () => {
       // Title references the parked mission instead of "Em breve"
       expect(btn.getAttribute('title')).toContain('distribuição');
     }
+  });
+
+  it('shows em-dash (never a fabricated 0) when the summary query errors', async () => {
+    vi.mocked(useDocumentDetailQuery).mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: baseDoc,
+      refetch: vi.fn(),
+    } as never);
+    // Only the denominator (total_targets) producer fails; doc identity still loads.
+    vi.mocked(getDistributionSummary).mockRejectedValueOnce(new Error('boom'));
+
+    render(<DocumentDistributionPage />, { wrapper: wrap() });
+
+    // Honest "—", not a fake 0, on the "Alvos totais" KPI cell.
+    expect(await screen.findAllByText('—')).not.toHaveLength(0);
+    expect(screen.queryByText(/^0$/)).toBeNull();
   });
 
   it('renders the heading "Distribuição & cobertura de leitura"', () => {
