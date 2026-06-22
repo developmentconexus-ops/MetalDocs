@@ -32,6 +32,8 @@ tags:
     description: Document authoring, sessions, autosave, comments, placeholders, and exports.
   - name: distribution
     description: Controlled-document distribution coverage — the obligated audience (denominator only; numerator parked, ADR-0042).
+  - name: notifications
+    description: Per-recipient notification inbox — read surface (list / unread-count / mark-read). Projected from governance_events for the document-lifecycle bundle (ADR-0043). Self-scope.
   - name: approval
     description: Approval routes, instances, sign-offs, and document lifecycle transitions.
   - name: search
@@ -3776,6 +3778,71 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /notifications:
+    get:
+      summary: List the caller's notifications (self-scope), newest first
+      tags: [notifications]
+      operationId: listNotifications
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [PENDING, SENT, READ] } }
+        - name: cursor
+          in: query
+          description: Opaque forward keyset cursor from a prior page's page.next_cursor.
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationsListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /notifications/unread-count:
+    get:
+      summary: Count the caller's unread (PENDING/SENT) notifications
+      tags: [notifications]
+      operationId: getNotificationsUnreadCount
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCountResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /notifications/{id}/read:
+    post:
+      summary: Mark one of the caller's notifications read (idempotent)
+      tags: [notifications]
+      operationId: markNotificationRead
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204':
+          description: marked read
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
 components:
   securitySchemes:
@@ -4117,6 +4184,53 @@ components:
           type: integer
           minimum: 0
           description: Active members of this area obligated via area_grant. The sum across areas need not equal total_targets (user_grant-only and company_scope users belong to no area; multi-area users count once per area). Empty array for company-scope documents.
+    Notification:
+      type: object
+      required: [id, recipient_user_id, event_type, resource_type, resource_id, title, message, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        recipient_user_id:
+          type: string
+        event_type:
+          type: string
+          description: Open string. M3 emits document_published / document_superseded / document_obsoleted / signoff_recorded / signoff.rejected; the parked emitter mission adds more additively (ADR-0043). Not a closed enum.
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, SENT, READ]
+        created_at:
+          type: string
+          format: date-time
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+    NotificationsListResponse:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+        page:
+          $ref: '#/components/schemas/CursorPage'
+    UnreadCountResponse:
+      type: object
+      required: [count]
+      properties:
+        count:
+          type: integer
+          minimum: 0
     ListUsersResponse:
       type: object
       required: [items, page]

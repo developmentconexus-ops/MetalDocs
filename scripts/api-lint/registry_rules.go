@@ -37,8 +37,13 @@ import (
 //	distribution.read — minted in mission frontend-screen-completion M2/F2.1c
 //	(ADR-0042). Sensitive coverage surface; deliberately NOT seeded to any
 //	tenant role by the agent — the operator grants it to roles separately.
+//
+//	notification.read — minted in mission frontend-screen-completion M3/F3.1
+//	(ADR-0043). Self-scope inbox read; deliberately NOT seeded to any tenant
+//	role by the agent — the operator grants it to roles separately.
 var deferredCaps = map[iamdomain.Capability]struct{}{
 	iamdomain.CapDistributionRead: {},
+	iamdomain.CapNotificationRead: {},
 }
 
 // wikiAuthzDocs is the fixed set of authorization docs scanned for `cap:`

@@ -132,6 +132,7 @@ var capabilityDescriptions = map[Capability]string{
 	CapAuditRead:                   "Visualizar trilha de auditoria",
 	CapSessionManage:               "Gerenciar sessões (force-logout)",
 	CapDistributionRead:            "Visualizar cobertura de distribuição de documentos controlados",
+	CapNotificationRead:            "Visualizar as próprias notificações",
 }
 
 // CapabilityCatalog returns one CapabilityDescriptor per Capability const,

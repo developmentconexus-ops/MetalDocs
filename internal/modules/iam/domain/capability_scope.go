@@ -67,6 +67,10 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	CapAuditRead:        ScopeTenant,
 	CapSessionManage:    ScopeTenant,
 	CapDistributionRead: ScopeTenant,
+	// Tenant-grade in this enum (no area filter). Own-rows "self-scope" is
+	// enforced by the SQL predicate (recipient_user_id = caller) in F3.2, not by
+	// the area-vs-tenant grade declared here (ADR-0043).
+	CapNotificationRead: ScopeTenant,
 }
 
 // ScopeOf returns the declared scope of a capability and whether it is

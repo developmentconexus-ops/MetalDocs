@@ -631,6 +631,7 @@ func TestEveryCapSeededOrDeferred(t *testing.T) {
 	// the operator grants it to roles separately.
 	deferred := map[iamdomain.Capability]struct{}{
 		iamdomain.CapDistributionRead: {},
+		iamdomain.CapNotificationRead: {},
 	}
 
 	seeded := seededCaps(t)

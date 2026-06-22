@@ -1990,6 +1990,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the caller's notifications (self-scope), newest first */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Count the caller's unread (PENDING/SENT) notifications */
+        get: operations["getNotificationsUnreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark one of the caller's notifications read (idempotent) */
+        post: operations["markNotificationRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2137,6 +2188,30 @@ export interface components {
             area_name: string;
             /** @description Active members of this area obligated via area_grant. The sum across areas need not equal total_targets (user_grant-only and company_scope users belong to no area; multi-area users count once per area). Empty array for company-scope documents. */
             total: number;
+        };
+        Notification: {
+            /** Format: uuid */
+            id: string;
+            recipient_user_id: string;
+            /** @description Open string. M3 emits document_published / document_superseded / document_obsoleted / signoff_recorded / signoff.rejected; the parked emitter mission adds more additively (ADR-0043). Not a closed enum. */
+            event_type: string;
+            resource_type: string;
+            resource_id: string;
+            title: string;
+            message: string;
+            /** @enum {string} */
+            status: "PENDING" | "SENT" | "READ";
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            read_at?: string | null;
+        };
+        NotificationsListResponse: {
+            items: components["schemas"]["Notification"][];
+            page: components["schemas"]["CursorPage"];
+        };
+        UnreadCountResponse: {
+            count: number;
         };
         ListUsersResponse: {
             items: components["schemas"]["ManagedUserCore"][];
@@ -7057,6 +7132,82 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DistributionAreaCoverage"][];
                 };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: {
+                status?: "PENDING" | "SENT" | "READ";
+                /** @description Opaque forward keyset cursor from a prior page's page.next_cursor. */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsListResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getNotificationsUnreadCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCountResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    markNotificationRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description marked read */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
