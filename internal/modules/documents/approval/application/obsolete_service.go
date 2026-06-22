@@ -7,6 +7,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
+
+	docapp "metaldocs/internal/modules/documents/application"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
@@ -16,9 +19,15 @@ import (
 
 // ObsoleteService marks a document as obsolete (end-of-life).
 type ObsoleteService struct {
-	repo    repository.ApprovalRepository
-	emitter EventEmitter
-	clock   Clock
+	repo              repository.ApprovalRepository
+	emitter           EventEmitter
+	clock             Clock
+	lifecycleEnqueuer docsdomain.LifecycleEventEnqueuer
+}
+
+func (s *ObsoleteService) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *ObsoleteService {
+	s.lifecycleEnqueuer = e
+	return s
 }
 
 // ErrInvalidObsoleteSource is returned when the document is not in a state
@@ -135,6 +144,27 @@ func (s *ObsoleteService) MarkObsolete(ctx context.Context, runner db.TxRunner, 
 		}
 		if err := s.emitter.Emit(ctx, tx, event); err != nil {
 			return fmt.Errorf("markObsolete: emit event: %w", err)
+		}
+
+		// Additive in-tx domain-event enqueue (ADR-0044; F3.3). Reader event.
+		if s.lifecycleEnqueuer != nil {
+			cdID, err := docapp.LoadDocumentControlledDocumentID(ctx, tx, req.TenantID, req.DocumentID)
+			if err != nil {
+				return fmt.Errorf("markObsolete: load cd id for lifecycle event: %w", err)
+			}
+			obsoletedAt := s.clock.Now()
+			largs := docsdomain.LifecycleEventArgs{
+				EventID:              uuid.NewString(),
+				TenantID:             req.TenantID,
+				EventType:            docsdomain.EventTypeDocumentObsoleted,
+				ResourceType:         "document",
+				ResourceID:           req.DocumentID,
+				ControlledDocumentID: cdID,
+				OccurredAt:           obsoletedAt,
+			}
+			if err := s.lifecycleEnqueuer.EnqueueLifecycleEventTx(ctx, tx, largs); err != nil {
+				return fmt.Errorf("markObsolete: enqueue lifecycle event: %w", err)
+			}
 		}
 
 		result = MarkObsoleteResult{PriorStatus: priorStatus}

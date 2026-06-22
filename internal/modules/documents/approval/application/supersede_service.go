@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
+
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
 	docsdomain "metaldocs/internal/modules/documents/domain"
@@ -17,10 +19,16 @@ import (
 
 // SupersedeService marks a published document as superseded by a newer revision.
 type SupersedeService struct {
-	repo    repository.ApprovalRepository
-	emitter EventEmitter
-	clock   Clock
-	cdRead  controlleddocumentsdomain.CDFieldReader
+	repo              repository.ApprovalRepository
+	emitter           EventEmitter
+	clock             Clock
+	cdRead            controlleddocumentsdomain.CDFieldReader
+	lifecycleEnqueuer docsdomain.LifecycleEventEnqueuer
+}
+
+func (s *SupersedeService) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *SupersedeService {
+	s.lifecycleEnqueuer = e
+	return s
 }
 
 // SupersedeRequest carries all inputs for PublishSuperseding.
@@ -139,6 +147,26 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, runner db.TxR
 		}
 		if err := s.emitter.Emit(ctx, tx, event); err != nil {
 			return fmt.Errorf("publishSuperseding: emit event: %w", err)
+		}
+
+		// Additive in-tx domain-event enqueue (ADR-0044; F3.3). Reader event for new doc's CD.
+		if s.lifecycleEnqueuer != nil {
+			cdID, err := docapp.LoadDocumentControlledDocumentID(ctx, tx, req.TenantID, req.NewDocumentID)
+			if err != nil {
+				return fmt.Errorf("publishSuperseding: load cd id for lifecycle event: %w", err)
+			}
+			largs := docsdomain.LifecycleEventArgs{
+				EventID:              uuid.NewString(),
+				TenantID:             req.TenantID,
+				EventType:            docsdomain.EventTypeDocumentSuperseded,
+				ResourceType:         "document",
+				ResourceID:           req.NewDocumentID,
+				ControlledDocumentID: cdID,
+				OccurredAt:           now,
+			}
+			if err := s.lifecycleEnqueuer.EnqueueLifecycleEventTx(ctx, tx, largs); err != nil {
+				return fmt.Errorf("publishSuperseding: enqueue lifecycle event: %w", err)
+			}
 		}
 
 		result = SupersedeResult{

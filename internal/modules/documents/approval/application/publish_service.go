@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
 	docsdomain "metaldocs/internal/modules/documents/domain"
@@ -25,6 +27,7 @@ type PublishService struct {
 	clock                    Clock
 	scheduledPublishEnqueuer ScheduledPublishEnqueuer
 	cdRead                   controlleddocumentsdomain.CDFieldReader
+	lifecycleEnqueuer        docsdomain.LifecycleEventEnqueuer
 }
 
 // ErrInstanceNotApproved is returned when PublishApproved is called on an
@@ -138,6 +141,26 @@ func (s *PublishService) PublishApproved(ctx context.Context, runner db.TxRunner
 			return fmt.Errorf("publishApproved: emit event: %w", err)
 		}
 
+		// Additive in-tx domain-event enqueue (ADR-0044; F3.3). After audit emit.
+		if s.lifecycleEnqueuer != nil {
+			cdID, err := docapp.LoadDocumentControlledDocumentID(ctx, tx, req.TenantID, instance.DocumentID)
+			if err != nil {
+				return fmt.Errorf("publishApproved: load cd id for lifecycle event: %w", err)
+			}
+			largs := docsdomain.LifecycleEventArgs{
+				EventID:              uuid.NewString(),
+				TenantID:             req.TenantID,
+				EventType:            docsdomain.EventTypeDocumentPublished,
+				ResourceType:         "document",
+				ResourceID:           instance.DocumentID,
+				ControlledDocumentID: cdID,
+				OccurredAt:           now,
+			}
+			if err := s.lifecycleEnqueuer.EnqueueLifecycleEventTx(ctx, tx, largs); err != nil {
+				return fmt.Errorf("publishApproved: enqueue lifecycle event: %w", err)
+			}
+		}
+
 		result = PublishResult{DocumentID: instance.DocumentID, NewStatus: string(docsdomain.DocStatusPublished)}
 		return nil
 	})
@@ -170,6 +193,11 @@ type SchedulePublishResult struct {
 
 func (s *PublishService) WithScheduledPublishEnqueuer(enqueuer ScheduledPublishEnqueuer) *PublishService {
 	s.scheduledPublishEnqueuer = enqueuer
+	return s
+}
+
+func (s *PublishService) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *PublishService {
+	s.lifecycleEnqueuer = e
 	return s
 }
 

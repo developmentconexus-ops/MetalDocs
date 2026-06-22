@@ -6,6 +6,7 @@ import (
 	"time"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/platform/db"
 )
@@ -71,6 +72,27 @@ func NewServices(repo repository.ApprovalRepository, emitter EventEmitter, clock
 func (s *Services) WithScheduledPublishEnqueuer(enqueuer ScheduledPublishEnqueuer) *Services {
 	if s != nil && s.Publish != nil {
 		s.Publish = s.Publish.WithScheduledPublishEnqueuer(enqueuer)
+	}
+	return s
+}
+
+// WithLifecycleEnqueuer wires the F3.3 domain-event enqueuer to all four emit
+// services (Publish, Supersede, Obsolete, Decision). Call after NewServices.
+func (s *Services) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *Services {
+	if s == nil {
+		return s
+	}
+	if s.Publish != nil {
+		s.Publish = s.Publish.WithLifecycleEnqueuer(e)
+	}
+	if s.Supersede != nil {
+		s.Supersede = s.Supersede.WithLifecycleEnqueuer(e)
+	}
+	if s.Obsolete != nil {
+		s.Obsolete = s.Obsolete.WithLifecycleEnqueuer(e)
+	}
+	if s.Decision != nil {
+		s.Decision = s.Decision.WithLifecycleEnqueuer(e)
 	}
 	return s
 }

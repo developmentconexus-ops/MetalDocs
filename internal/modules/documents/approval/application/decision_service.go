@@ -16,6 +16,7 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/infrastructure/signature"
 	"metaldocs/internal/modules/documents/approval/repository"
@@ -63,8 +64,9 @@ type DecisionService struct {
 	pdfOutbox     PDFOutboxEnqueuer
 	// sigRegistry verifies the e-signature credential before a sign-off is
 	// recorded. nil only in tests that exercise non-reauth methods.
-	sigRegistry *signature.Registry
-	cdRead      controlleddocumentsdomain.CDFieldReader
+	sigRegistry       *signature.Registry
+	cdRead            controlleddocumentsdomain.CDFieldReader
+	lifecycleEnqueuer docsdomain.LifecycleEventEnqueuer
 }
 
 func NewDecisionService(
@@ -105,6 +107,11 @@ func (s *DecisionService) WithPinInvoker(invoker PinInvoker) *DecisionService {
 // the acting user before a password_reauth sign-off is recorded.
 func (s *DecisionService) WithSignatureRegistry(registry *signature.Registry) *DecisionService {
 	s.sigRegistry = registry
+	return s
+}
+
+func (s *DecisionService) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *DecisionService {
+	s.lifecycleEnqueuer = e
 	return s
 }
 
@@ -507,6 +514,30 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		}
 		if err := s.emitter.Emit(ctx, tx, event); err != nil {
 			return fmt.Errorf("recordSignoff: emit event: %w", err)
+		}
+
+		// Additive in-tx domain-event enqueue (ADR-0044; F3.3). Author events — terminal transitions only.
+		if s.lifecycleEnqueuer != nil {
+			var lifecycleEventType string
+			if result.InstanceApproved {
+				lifecycleEventType = docsdomain.EventTypeDocumentApproved
+			} else if result.InstanceRejected {
+				lifecycleEventType = docsdomain.EventTypeDocumentRejected
+			}
+			if lifecycleEventType != "" {
+				largs := docsdomain.LifecycleEventArgs{
+					EventID:      uuid.NewString(),
+					TenantID:     req.TenantID,
+					EventType:    lifecycleEventType,
+					ResourceType: "approval_instance",
+					ResourceID:   req.InstanceID,
+					SubmittedBy:  instance.SubmittedBy,
+					OccurredAt:   now,
+				}
+				if err := s.lifecycleEnqueuer.EnqueueLifecycleEventTx(ctx, tx, largs); err != nil {
+					return fmt.Errorf("recordSignoff: enqueue lifecycle event: %w", err)
+				}
+			}
 		}
 
 		// Step 13: enqueue PDF dispatch inside tx (transactional outbox).
