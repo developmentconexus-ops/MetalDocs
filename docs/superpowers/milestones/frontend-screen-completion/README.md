@@ -12,7 +12,7 @@ Finish every remaining/partial frontend screen to Professional-SaaS, industry-gr
 |---|-----------|----------------------|--------|-------------|
 | 0 | `milestone-0-truth-reset` | Honest routed app: 1 index route, no dead stubs, correct tracker, per-screen DoD written | passed | [PASS](milestone-0-truth-reset/qa/milestone-qa.md) |
 | 1 | `milestone-1-dashboard-real-data` | Home screen renders 100% live data (kill MOCK_STATS/MOCK_ACTIVITY) | passed | [PASS](milestone-1-dashboard-real-data/qa/milestone-qa.md) |
-| 2 | `milestone-2-distribuicao` | Distribuição coverage-scope (derive-on-read): Grade-A read-only endpoint serves the real obligated-reader set via two new owner-published views (CD + taxonomy) + distribution module; numerator honestly "tracking pending" (parked mission) | in-progress — re-decomposed (HS-6, 2026-06-21); execution restarts in fresh `/milestone` session | — |
+| 2 | `milestone-2-distribuicao` | Distribuição coverage-scope (derive-on-read): Grade-A read-only endpoint serves the real obligated-reader set via two new owner-published views (CD + taxonomy) + distribution module; numerator honestly "tracking pending" (parked mission) | in-progress — validator **PASS** (2026-06-22), awaiting operator HS-1 | [PASS](milestone-2-distribuicao/qa/milestone-qa.md) |
 | 3 | `milestone-3-notifications` | Notifications center real end-to-end (new backend + wired screen) | planned | — |
 | 4 | `milestone-4-publicado-obsoleto` | Publicado "em breve" gaps closed + Documento Obsoleto variant built | planned | — |
 | 5 | `milestone-5-signoff-taxonomy` | Detalhe Signoff screen built + Taxonomy Admin restyled to tokens (net-new/polish, last) | planned | — |
