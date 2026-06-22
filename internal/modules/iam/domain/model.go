@@ -119,6 +119,7 @@ const (
 	CapMetricsView                 Capability = "metrics.view"
 	CapAuditRead                   Capability = "audit.read"
 	CapSessionManage               Capability = "session.manage"
+	CapDistributionRead            Capability = "distribution.read"
 )
 
 // ADR 0022 Phase 10 (F2) — the four caps Phase 8 minted (doc.edit_draft,
@@ -159,6 +160,7 @@ var validCapabilities = map[Capability]struct{}{
 	CapMetricsView:                 {},
 	CapAuditRead:                   {},
 	CapSessionManage:               {},
+	CapDistributionRead:            {},
 }
 
 func IsValidCapability(cap Capability) bool {

@@ -613,9 +613,15 @@ func TestEveryCapSeededOrDeferred(t *testing.T) {
 	// Routed-but-unseeded write caps enforced only by the system_admin bypass.
 	// ADR 0022 Phase 1 deferred doc.publish/doc.obsolete/doc.supersede/template.archive
 	// here; Phase 2 (migration 0225 + reference-data mirror) seeds all four to
-	// real tenant roles, so the allow-list is now empty. A future routed-but-
-	// unseeded cap goes here with a documented deferral.
-	deferred := map[iamdomain.Capability]struct{}{}
+	// real tenant roles. A future routed-but-unseeded cap goes here with a
+	// documented deferral. Mirrors deferredCaps in scripts/api-lint/registry_rules.go.
+	//
+	// distribution.read — minted in mission frontend-screen-completion M2/F2.1c
+	// (ADR-0042). Deliberately NOT seeded to any tenant role by the agent —
+	// the operator grants it to roles separately.
+	deferred := map[iamdomain.Capability]struct{}{
+		iamdomain.CapDistributionRead: {},
+	}
 
 	seeded := seededCaps(t)
 

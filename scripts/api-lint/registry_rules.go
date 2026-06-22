@@ -31,10 +31,15 @@ import (
 // deferredCaps lists registry capabilities intentionally seeded to no tenant
 // role (enforced today only via the system_admin tier-2 bypass). Mirrors the
 // allow-list in apps/api/cmd/metaldocs-api/permissions_test.go
-// (TestEveryCapSeededOrDeferred). Empty since ADR 0022 Phase 2 seeded all four
-// document-lifecycle write caps. A future routed-but-unseeded cap goes here with
-// a documented deferral.
-var deferredCaps = map[iamdomain.Capability]struct{}{}
+// (TestEveryCapSeededOrDeferred). A routed-but-unseeded cap goes here with a
+// documented deferral.
+//
+//	distribution.read — minted in mission frontend-screen-completion M2/F2.1c
+//	(ADR-0042). Sensitive coverage surface; deliberately NOT seeded to any
+//	tenant role by the agent — the operator grants it to roles separately.
+var deferredCaps = map[iamdomain.Capability]struct{}{
+	iamdomain.CapDistributionRead: {},
+}
 
 // wikiAuthzDocs is the fixed set of authorization docs scanned for `cap:`
 // markers. Adding a new authz doc that asserts capability grants? List it here.
