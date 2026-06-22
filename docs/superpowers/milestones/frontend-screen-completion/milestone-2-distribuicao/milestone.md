@@ -173,9 +173,14 @@ enforces for this milestone:
   - **authz:** new tenant-scope cap `CapDistributionRead` registered in
     `internal/modules/iam/domain/model.go` + scoped in `capability_scope.go` + added to
     `scripts/api-lint/registry_rules.go:37 deferredCaps` (operator grants to roles separately —
-    never pre-granted by the agent). Handlers gate with `authz.Require` + the
-    `trg_require_cap_asserted` tripwire. **H-PRE-1** respected — non-tx reads only, no authz-recording
-    read inside a lock-holding atomic tx.
+    never pre-granted by the agent). **Reads are gated by a tier-1 middleware row** in
+    `apps/api/cmd/metaldocs-api/permissions.go` (`GET …/distribution*` → `CapDistributionRead`,
+    `VisibilityPermissionGuarded`) — canonical for a tenant-grade GET per `wiki/concepts/authz-tiers.md`
+    + ADR-0007 ("route guards = tier 1"), matching the `CapAuditRead` precedent. **Corrected
+    2026-06-22 (operator):** the prior text mandated `authz.Require` + `trg_require_cap_asserted`,
+    which is the **write** pattern — the tripwire fires writes-only and `v_cd_obligated_readers` is
+    security-definer, so an in-tx read-guard has no DB-enforcement backing here. **H-PRE-1** respected —
+    non-tx reads only, no authz-recording read inside a lock-holding atomic tx.
   - **Design system is consumed, not redesigned:** use `tokens.css` + existing primitives; changing a
     shared primitive trips HS-2.
   - Reads stay live (no caching workaround); **no merge / no push by the agent** (commits allowed
