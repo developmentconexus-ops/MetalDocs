@@ -30,6 +30,8 @@ tags:
     description: Controlled-document lifecycle and code allocation.
   - name: documents
     description: Document authoring, sessions, autosave, comments, placeholders, and exports.
+  - name: distribution
+    description: Controlled-document distribution coverage — the obligated audience (denominator only; numerator parked, ADR-0042).
   - name: approval
     description: Approval routes, instances, sign-offs, and document lifecycle transitions.
   - name: search
@@ -3697,6 +3699,83 @@ paths:
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /documents/{id}/distribution:
+    get:
+      summary: Distribution coverage summary — total obligated audience for a controlled document
+      tags: [distribution]
+      operationId: getDocumentDistribution
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionSummaryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /documents/{id}/distribution/recipients:
+    get:
+      summary: Obligated audience for a controlled document (denominator only)
+      tags: [distribution]
+      operationId: listDocumentDistributionRecipients
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - name: cursor
+          in: query
+          description: Opaque forward keyset cursor from a prior page's page.next_cursor.
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionRecipientsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /documents/{id}/distribution/coverage:
+    get:
+      summary: By-area obligated totals for a controlled document (denominator only)
+      tags: [distribution]
+      operationId: getDocumentDistributionCoverage
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DistributionAreaCoverage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
 components:
   securitySchemes:
@@ -3987,6 +4066,57 @@ components:
           nullable: true
         has_more:
           type: boolean
+    DistributionSummaryResponse:
+      type: object
+      required: [total_targets]
+      properties:
+        total_targets:
+          type: integer
+          minimum: 0
+          description: Distinct count of users obligated by the controlled document — the coverage denominator. The numerator is out of M2 scope (ADR-0042).
+    DistributionRecipient:
+      type: object
+      required: [user_id, name, area_code, area_name, source]
+      properties:
+        user_id:
+          type: string
+        name:
+          type: string
+          description: User display name, resolved via the iam UserDisplayNameReader port (ADR-0029).
+        area_code:
+          type: string
+          nullable: true
+          description: Granting area code; null unless source is area_grant.
+        area_name:
+          type: string
+          nullable: true
+          description: Area label resolved via metaldocs.v_process_area_name (ADR-0041); null unless source is area_grant.
+        source:
+          type: string
+          enum: [area_grant, user_grant, company_scope]
+          description: How the user became obligated. Distinct-by-user precedence user_grant > area_grant > company_scope (ADR-0040 / ADR-0042).
+    DistributionRecipientsResponse:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DistributionRecipient'
+        page:
+          $ref: '#/components/schemas/CursorPage'
+    DistributionAreaCoverage:
+      type: object
+      required: [area_code, area_name, total]
+      properties:
+        area_code:
+          type: string
+        area_name:
+          type: string
+        total:
+          type: integer
+          minimum: 0
+          description: Active members of this area obligated via area_grant. The sum across areas need not equal total_targets (user_grant-only and company_scope users belong to no area; multi-area users count once per area). Empty array for company-scope documents.
     ListUsersResponse:
       type: object
       required: [items, page]
