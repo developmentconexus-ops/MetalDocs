@@ -124,7 +124,7 @@ SQL, no read-source wiring** — that is F2.2.
 
 - [x] **Durable decision made** → ADR-0042 (new `distribution` module + `CapDistributionRead`
   tenant-scoped + denominator-only contract + additive-extension commitment for the parked mission +
-  recipient distinct/`source` precedence rule + omit `role`). Link: _wiki/decisions/0042-distribution-module-and-cap.md (to be authored during execution)_.
+  recipient distinct/`source` precedence rule + omit `role`). Link: [wiki/decisions/0042-distribution-module-and-cap.md](../../../../../../wiki/decisions/0042-distribution-module-and-cap.md).
   Companion ADRs ADR-0040 (F2.1a) + ADR-0041 (F2.1b) declare the read sources this feature's contract
   composes over.
 
