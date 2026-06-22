@@ -86,6 +86,16 @@ type ApprovalInstance struct {
 	Status     string
 }
 
+type Notification struct {
+	ID              string
+	TenantID        string
+	RecipientUserID string
+	EventType       string
+	ResourceType    string
+	ResourceID      string
+	Status          string
+}
+
 // ---------------------------------------------------------------------------
 // Functional options (shared Spec so the generic With* names work across
 // builders; each builder reads the fields it cares about)
@@ -107,6 +117,11 @@ type Spec struct {
 	Status            string
 	Code              string
 	ProfileCode       string
+
+	RecipientUserID string
+	EventType       string
+	ResourceType    string
+	ResourceID      string
 
 	RevisionNumber     int
 	RevisionVersion    int
@@ -135,6 +150,10 @@ func WithStatus(status string) Opt        { return func(s *Spec) { s.Status = st
 func WithCode(code string) Opt            { return func(s *Spec) { s.Code = code } }
 func WithProfile(code string) Opt         { return func(s *Spec) { s.ProfileCode = code } }
 func WithRevisionNumber(n int) Opt        { return func(s *Spec) { s.RevisionNumber = n } }
+func WithRecipient(userID string) Opt     { return func(s *Spec) { s.RecipientUserID = userID } }
+func WithEventType(t string) Opt          { return func(s *Spec) { s.EventType = t } }
+func WithResourceType(t string) Opt       { return func(s *Spec) { s.ResourceType = t } }
+func WithResourceID(id string) Opt        { return func(s *Spec) { s.ResourceID = id } }
 
 func WithRevisionVersion(n int) Opt {
 	return func(s *Spec) { s.RevisionVersion = n; s.hasRevisionVersion = true }
@@ -496,6 +515,54 @@ func NewApprovalInstance(t *testing.T, db *sql.DB, opts ...Opt) ApprovalInstance
 	})
 
 	return ApprovalInstance{ID: id, TenantID: doc.TenantID, DocumentID: doc.ID, RouteID: route.ID, Status: status}
+}
+
+// NewNotification seeds a metaldocs.notifications row (no tripwire). Auto-wires a
+// tenant and a recipient user when not supplied. status defaults to 'PENDING'.
+// source_event_id is left NULL (the partial unique index does not constrain NULLs),
+// so multiple fixture rows for one recipient never collide.
+func NewNotification(t *testing.T, db *sql.DB, opts ...Opt) Notification {
+	t.Helper()
+	s := newSpec(opts)
+
+	tenantID := s.TenantID
+	if tenantID == "" {
+		tenantID = NewTenant(t, db).ID
+	}
+	recipient := s.RecipientUserID
+	if recipient == "" {
+		recipient = NewUser(t, db, WithTenant(tenantID)).ID
+	}
+	id := uuid.NewString()
+	eventType := s.EventType
+	if eventType == "" {
+		eventType = "document_published"
+	}
+	resourceType := s.ResourceType
+	if resourceType == "" {
+		resourceType = "document"
+	}
+	resourceID := s.ResourceID
+	if resourceID == "" {
+		resourceID = uuid.NewString()
+	}
+	status := s.Status
+	if status == "" {
+		status = "PENDING"
+	}
+
+	exec(t, db,
+		`INSERT INTO metaldocs.notifications
+		   (id, tenant_id, recipient_user_id, event_type, resource_type, resource_id, title, message, status)
+		 VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9)`,
+		id, tenantID, recipient, eventType, resourceType, resourceID,
+		"Novo documento controlado para leitura", "Um documento foi publicado.", status,
+	)
+
+	return Notification{
+		ID: id, TenantID: tenantID, RecipientUserID: recipient,
+		EventType: eventType, ResourceType: resourceType, ResourceID: resourceID, Status: status,
+	}
 }
 
 func profileForCD(t *testing.T, db *sql.DB, controlledDocID string) string {
