@@ -32,6 +32,12 @@ export const QK = {
     detail: (id: string) => ['documents', 'detail', id] as const,
     revisionHistory: (id: string) => ['documents', 'revision-history', id] as const,
     comments: (id: string) => ['documents', 'comments', id] as const,
+    distribution: {
+      summary: (id: string) => ['documents', 'distribution', 'summary', id] as const,
+      recipients: (id: string, params: Record<string, unknown> = {}) =>
+        ['documents', 'distribution', 'recipients', id, params] as const,
+      coverage: (id: string) => ['documents', 'distribution', 'coverage', id] as const,
+    },
   },
   inbox: (params: InboxParams = {}) =>
     ['approval', 'inbox', params] as const,

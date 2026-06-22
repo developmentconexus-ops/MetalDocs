@@ -9,6 +9,9 @@ import { CoverageByArea } from '../components/distribution/CoverageByArea';
 import { TimelineCard } from '../components/distribution/TimelineCard';
 import { RecipientsCard } from '../components/distribution/RecipientsCard';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
+import { useDistributionSummaryQuery } from '../queries/useDistributionSummaryQuery';
+import { useDistributionRecipientsQuery } from '../queries/useDistributionRecipientsQuery';
+import { useDistributionCoverageQuery } from '../queries/useDistributionCoverageQuery';
 import { formatRevisionCode } from '../lib/documentDetailMeta';
 import styles from './DocumentDistributionPage.module.css';
 
@@ -34,19 +37,14 @@ function SectionHeader({
   );
 }
 
-function IllustrativeBlock({ children }: { children: React.ReactNode }) {
-  return (
-    <div className={styles.illustrative} aria-hidden="true">
-      <div className={styles.illustrativeWatermark}>Dados ilustrativos · Em breve</div>
-      <div className={styles.illustrativeBody}>{children}</div>
-    </div>
-  );
-}
-
 export function DocumentDistributionPage() {
   const { documentId: rawDocumentId } = useParams<{ documentId: string }>();
   const documentId = rawDocumentId ?? '';
+
   const docQuery = useDocumentDetailQuery(documentId);
+  const summaryQuery = useDistributionSummaryQuery(documentId);
+  const recipientsQuery = useDistributionRecipientsQuery(documentId);
+  const coverageQuery = useDistributionCoverageQuery(documentId);
 
   if (docQuery.isLoading) {
     return (
@@ -74,6 +72,20 @@ export function DocumentDistributionPage() {
   const docName = doc.name;
   const versionLabel = formatRevisionCode(doc.revision_number);
 
+  // Show EM_DASH when summary errored so we never display a fabricated 0
+  const totalTargets = summaryQuery.isError
+    ? EM_DASH
+    : (summaryQuery.data?.total_targets ?? EM_DASH);
+  const summaryLoading = summaryQuery.isLoading;
+
+  // Flatten all pages of recipients into a single list
+  const allRecipients = recipientsQuery.data?.pages.flatMap((p) => p.items) ?? [];
+  const hasMoreRecipients = recipientsQuery.hasNextPage ?? false;
+  const recipientsLoading = recipientsQuery.isLoading || recipientsQuery.isFetchingNextPage;
+
+  const coverageRows = coverageQuery.data ?? [];
+  const coverageLoading = coverageQuery.isLoading;
+
   return (
     <div className={styles.page}>
       <DocumentHero
@@ -96,26 +108,45 @@ export function DocumentDistributionPage() {
             <span className={styles.codeBadge}>
               {code} · {versionLabel}
             </span>
-            <span className={styles.soonBadge}>Em breve</span>
           </>
         }
         title="Distribuição & cobertura de leitura"
         subtitle={<span>{docName ?? code}</span>}
         actions={
           <>
-            <button type="button" aria-disabled="true" title="Em breve" className={styles.ctaDisabled}>
+            <button
+              type="button"
+              aria-disabled="true"
+              title="Ação disponível na missão de distribuição (wiki/backlog/document-distribution-mission.md)"
+              className={styles.ctaDisabled}
+            >
               <Icon name="mail" size={15} />
               Lembrete em massa
             </button>
-            <button type="button" aria-disabled="true" title="Em breve" className={styles.ctaDisabled}>
+            <button
+              type="button"
+              aria-disabled="true"
+              title="Ação disponível na missão de distribuição (wiki/backlog/document-distribution-mission.md)"
+              className={styles.ctaDisabled}
+            >
               <Icon name="download" size={13} />
               Exportar relatório
             </button>
-            <button type="button" aria-disabled="true" title="Em breve" className={styles.ctaDisabled}>
+            <button
+              type="button"
+              aria-disabled="true"
+              title="Ação disponível na missão de distribuição (wiki/backlog/document-distribution-mission.md)"
+              className={styles.ctaDisabled}
+            >
               <Icon name="users" size={13} />
               Adicionar destinatários
             </button>
-            <button type="button" aria-disabled="true" title="Em breve" className={styles.ctaDisabled}>
+            <button
+              type="button"
+              aria-disabled="true"
+              title="Ação disponível na missão de distribuição (wiki/backlog/document-distribution-mission.md)"
+              className={styles.ctaDisabled}
+            >
               <Icon name="cog" size={13} />
               Política de fanout
             </button>
@@ -124,36 +155,23 @@ export function DocumentDistributionPage() {
       />
 
       <main className={styles.main}>
-        <div className={styles.banner} role="note">
-          <Icon name="users" size={18} className={styles.bannerIcon} />
-          <div className={styles.bannerBody}>
-            <strong>Distribuição & cobertura de leitura — em breve.</strong>{' '}
-            O rastreamento de leitura e o fanout ainda não estão disponíveis no
-            backend. O layout abaixo é a previsão visual da tela; todos os números,
-            áreas e pessoas exibidos são <em>ilustrativos</em> e não refletem dados
-            reais de <strong>{docName ?? code}</strong>.
-          </div>
-        </div>
-
-        <IllustrativeBlock>
-          <KPIStrip />
-        </IllustrativeBlock>
+        <KPIStrip totalTargets={totalTargets} loading={summaryLoading} />
 
         <section className={styles.section}>
           <SectionHeader kicker="01 · Status" title="Cobertura geral e detalhes da distribuição" />
-          <IllustrativeBlock>
-            <div className={styles.twoCol}>
-              <DonutCard />
-              <DistributionFacts />
-            </div>
-          </IllustrativeBlock>
+          <div className={styles.twoCol}>
+            <DonutCard />
+            <DistributionFacts />
+          </div>
         </section>
 
         <section className={styles.section}>
-          <SectionHeader kicker="02 · Por área" title="Onde está a pendência" />
-          <IllustrativeBlock>
-            <CoverageByArea />
-          </IllustrativeBlock>
+          <SectionHeader kicker="02 · Por área" title="Destinatários por área" />
+          <CoverageByArea
+            rows={coverageRows}
+            loading={coverageLoading}
+            error={coverageQuery.isError}
+          />
         </section>
 
         <section className={styles.section}>
@@ -161,16 +179,18 @@ export function DocumentDistributionPage() {
             kicker="03 · Linha do tempo"
             title="Curva de adoção desde a publicação"
           />
-          <IllustrativeBlock>
-            <TimelineCard />
-          </IllustrativeBlock>
+          <TimelineCard />
         </section>
 
         <section className={styles.section}>
           <SectionHeader kicker="04 · Destinatários" title="Lista detalhada" />
-          <IllustrativeBlock>
-            <RecipientsCard />
-          </IllustrativeBlock>
+          <RecipientsCard
+            items={allRecipients}
+            hasMore={hasMoreRecipients}
+            onLoadMore={() => void recipientsQuery.fetchNextPage()}
+            loading={recipientsLoading}
+            error={recipientsQuery.isError}
+          />
         </section>
       </main>
     </div>

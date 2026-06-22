@@ -21,42 +21,6 @@
   color: var(--text-muted);
 }
 
-.legend {
-  display: flex;
-  gap: 14px;
-  font-size: 10.5px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.legendChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.legendSwatch {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--r-1);
-  flex-shrink: 0;
-}
-
-.legendSwatchAck {
-  background: var(--success);
-}
-
-.legendSwatchRead {
-  background: var(--brand);
-  opacity: 0.22;
-}
-
-.legendSwatchGoal {
-  border: 1px dashed var(--text-faint);
-  background: transparent;
-  border-radius: 0;
-}
-
 /* Area list */
 .rows {
   padding: var(--sp-5);
@@ -67,7 +31,7 @@
 
 .areaRow {
   display: grid;
-  grid-template-columns: 180px 1fr 100px;
+  grid-template-columns: 1fr auto;
   gap: 16px;
   align-items: center;
 }
@@ -84,53 +48,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.areaSub {
-  font-size: 10.5px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  letter-spacing: 0.04em;
-}
-
-/* Bullet bar */
-.barWrap {
-  position: relative;
-}
-
-.barTrack {
-  position: relative;
-  height: 22px;
-  background: var(--surface-3);
-  border-radius: var(--r-1);
-  overflow: hidden;
-}
-
-.barRead {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  background: var(--brand);
-  opacity: 0.22;
-  transition: width 1.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.barAck {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  background: var(--success);
-  transition: width 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s;
-}
-
-.goalMarker {
-  position: absolute;
-  top: -3px;
-  bottom: -3px;
-  left: 92%;
-  border-left: 1.5px dashed var(--text-faint);
 }
 
 /* Pct label */

@@ -45,21 +45,6 @@
   letter-spacing: 0.04em;
 }
 
-.soonBadge {
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  padding: 0 10px;
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-  background: var(--surface-3);
-  color: var(--text-muted);
-  border-radius: var(--r-pill);
-  font-family: var(--font-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
 /* ── Disabled hero CTAs ─────────────────────────────────── */
 .ctaDisabled {
   display: inline-flex;
@@ -88,35 +73,6 @@
   display: flex;
   flex-direction: column;
   gap: 36px;
-}
-
-/* ── Em-breve banner ────────────────────────────────────── */
-.banner {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-3);
-  padding: var(--sp-4) var(--sp-5);
-  background: var(--warning-bg, var(--surface-2));
-  border: 1px solid var(--warning, var(--border));
-  border-radius: var(--r-2);
-  color: var(--text);
-}
-
-.bannerIcon {
-  flex-shrink: 0;
-  margin-top: 2px;
-  color: var(--warning, var(--text-muted));
-}
-
-.bannerBody {
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  color: var(--text);
-}
-
-.bannerBody em {
-  font-style: italic;
-  color: var(--text-muted);
 }
 
 /* ── Section header ─────────────────────────────────────── */
@@ -163,54 +119,4 @@
   gap: var(--sp-5);
 }
 
-/* ── Illustrative wrapper (design scaffolding) ──────────── */
-.illustrative {
-  position: relative;
-  border-radius: var(--r-3);
-  isolation: isolate;
-}
 
-.illustrative::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    135deg,
-    transparent 0,
-    transparent 18px,
-    color-mix(in oklab, var(--text-muted) 6%, transparent) 18px,
-    color-mix(in oklab, var(--text-muted) 6%, transparent) 19px
-  );
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.illustrativeWatermark {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  padding: 0 10px;
-  background: var(--surface);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-weight: 500;
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
-  pointer-events: none;
-}
-
-.illustrativeBody {
-  pointer-events: none;
-  user-select: none;
-  filter: saturate(0.85);
-  opacity: 0.92;
-}

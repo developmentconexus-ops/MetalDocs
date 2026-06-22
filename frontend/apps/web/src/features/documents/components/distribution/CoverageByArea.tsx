@@ -1,63 +1,62 @@
+import type { DistributionAreaCoverage } from '../../api/distribution';
 import styles from './CoverageByArea.module.css';
-import { MOCK_DISTRIBUTION } from '../../lib/distributionMeta';
 
-// sorted by lowest ack coverage first (mirrors design sort order)
-const SORTED_AREAS = [...MOCK_DISTRIBUTION.byArea].sort(
-  (a, b) => a.ack / a.total - b.ack / b.total,
-);
+export interface CoverageByAreaProps {
+  rows: DistributionAreaCoverage[];
+  loading?: boolean;
+  error?: boolean;
+}
 
-export function CoverageByArea() {
+export function CoverageByArea({ rows, loading = false, error = false }: CoverageByAreaProps) {
+  if (error) {
+    return (
+      <div className={styles.card}>
+        <div className={styles.header} role="alert">
+          <span className={styles.headerNote}>Não foi possível carregar a cobertura por área.</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className={styles.card}>
+        <div className={styles.header} role="status" aria-live="polite">
+          <span className={styles.headerNote}>Carregando cobertura por área…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className={styles.card}>
+        <div className={styles.header}>
+          <span className={styles.headerNote}>Nenhuma área registrada.</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.card}>
       <div className={styles.header}>
         <span className={styles.headerNote}>
-          Áreas ordenadas por menor cobertura primeiro · linha tracejada = meta de 92%
+          Áreas ordenadas por nome · total de destinatários obrigatórios
         </span>
-        <div className={styles.legend}>
-          <span className={styles.legendChip}>
-            <span className={`${styles.legendSwatch} ${styles.legendSwatchAck}`} />
-            Reconheceu
-          </span>
-          <span className={styles.legendChip}>
-            <span className={`${styles.legendSwatch} ${styles.legendSwatchRead}`} />
-            Apenas leu
-          </span>
-          <span className={styles.legendChip}>
-            <span className={`${styles.legendSwatch} ${styles.legendSwatchGoal}`} />
-            Meta 92%
-          </span>
-        </div>
       </div>
       <div className={styles.rows}>
-        {SORTED_AREAS.map((a) => {
-          const pctAck  = Math.round((a.ack  / a.total) * 100);
-          const pctRead = Math.round((a.read / a.total) * 100);
-          return (
-            <div key={a.area} className={styles.areaRow}>
-              <div className={styles.areaLabel}>
-                <div className={styles.areaName}>{a.area}</div>
-                <div className={styles.areaSub}>{a.ack}/{a.total} reconheceram</div>
-              </div>
-              <div className={styles.barWrap}>
-                <div className={styles.barTrack}>
-                  <div
-                    className={styles.barRead}
-                    style={{ width: `${pctRead}%` }}
-                  />
-                  <div
-                    className={styles.barAck}
-                    style={{ width: `${pctAck}%` }}
-                  />
-                </div>
-                <div className={styles.goalMarker} />
-              </div>
-              <div className={styles.pctWrap}>
-                <span className={styles.pctValue}>{pctAck}%</span>
-                <span className={styles.pctLabel}>ack</span>
-              </div>
+        {rows.map((a) => (
+          <div key={a.area_code} className={styles.areaRow}>
+            <div className={styles.areaLabel}>
+              <div className={styles.areaName}>{a.area_name}</div>
             </div>
-          );
-        })}
+            <div className={styles.pctWrap}>
+              <span className={styles.pctValue}>{a.total}</span>
+              <span className={styles.pctLabel}>destinatários</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

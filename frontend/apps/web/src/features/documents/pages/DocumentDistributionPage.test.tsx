@@ -1,5 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 import { DocumentDistributionPage } from './DocumentDistributionPage';
 
@@ -9,6 +11,15 @@ vi.mock('react-router-dom', () => ({
 
 vi.mock('../queries/useDocumentDetailQuery', () => ({
   useDocumentDetailQuery: vi.fn(),
+}));
+
+vi.mock('../api/distribution', () => ({
+  getDistributionSummary: vi.fn().mockResolvedValue({ total_targets: 0 }),
+  listDistributionRecipients: vi.fn().mockResolvedValue({
+    items: [],
+    page: { next_cursor: null, has_more: false },
+  }),
+  getDistributionCoverage: vi.fn().mockResolvedValue([]),
 }));
 
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
@@ -39,6 +50,12 @@ const baseDoc = {
   current_revision_page_count_source: 'server_renderer',
 };
 
+function wrap() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return ({ children }: { children: React.ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: qc }, children);
+}
+
 describe('DocumentDistributionPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -52,7 +69,7 @@ describe('DocumentDistributionPage', () => {
       refetch: vi.fn(),
     } as never);
 
-    render(<DocumentDistributionPage />);
+    render(<DocumentDistributionPage />, { wrapper: wrap() });
 
     expect(screen.getByText(/Carregando documento/)).toBeInTheDocument();
   });
@@ -66,7 +83,7 @@ describe('DocumentDistributionPage', () => {
       refetch,
     } as never);
 
-    render(<DocumentDistributionPage />);
+    render(<DocumentDistributionPage />, { wrapper: wrap() });
 
     expect(screen.getByRole('alert')).toHaveTextContent(/não encontrado/);
     screen.getByRole('button', { name: /Tentar novamente/ }).click();
@@ -81,22 +98,19 @@ describe('DocumentDistributionPage', () => {
       refetch: vi.fn(),
     } as never);
 
-    render(<DocumentDistributionPage />);
+    render(<DocumentDistributionPage />, { wrapper: wrap() });
 
     // Real code + version label from the API payload
     expect(screen.getAllByText(/POP-GENERAL-014/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/REV03/).length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: /Distribuição & cobertura de leitura/ })).toBeInTheDocument();
 
-    // The hardcoded LOTO identity must NOT appear in the live (non-illustrative)
-    // hero / breadcrumb / DocRefCard. (It MAY still appear inside the
-    // aria-hidden illustrative scaffolding — that's intentional design preview.)
-    const liveBanner = screen.getByRole('note');
-    expect(within(liveBanner).queryByText(/PR-EHS-014/)).toBeNull();
-    expect(within(liveBanner).queryByText(/LOTO/)).toBeNull();
+    // No hardcoded LOTO/PR-EHS identity anywhere
+    expect(screen.queryByText(/PR-EHS-014/)).toBeNull();
+    expect(screen.queryByText(/LOTO/)).toBeNull();
   });
 
-  it('renders the em-breve banner above the illustrative scaffolding', () => {
+  it('has no illustrative watermark or Em-breve banner', () => {
     vi.mocked(useDocumentDetailQuery).mockReturnValue({
       isLoading: false,
       isError: false,
@@ -104,16 +118,15 @@ describe('DocumentDistributionPage', () => {
       refetch: vi.fn(),
     } as never);
 
-    render(<DocumentDistributionPage />);
+    render(<DocumentDistributionPage />, { wrapper: wrap() });
 
-    const banner = screen.getByRole('note');
-    expect(banner).toHaveTextContent(/em breve/i);
-    expect(banner).toHaveTextContent(/ilustrativos/i);
-    // Banner names the real document — proves identity flows into the message
-    expect(banner).toHaveTextContent(/Procedimento Distribuído/);
+    // The old watermarks must be gone
+    expect(screen.queryByText(/Dados ilustrativos · Em breve/)).toBeNull();
+    // No "ilustrativos" banner
+    expect(screen.queryByText(/todos os números.*são.*ilustrativos/i)).toBeNull();
   });
 
-  it('marks every illustrative section with the "Dados ilustrativos · Em breve" watermark and aria-hidden', () => {
+  it('hero CTAs remain disabled with deferred trigger note', () => {
     vi.mocked(useDocumentDetailQuery).mockReturnValue({
       isLoading: false,
       isError: false,
@@ -121,32 +134,27 @@ describe('DocumentDistributionPage', () => {
       refetch: vi.fn(),
     } as never);
 
-    render(<DocumentDistributionPage />);
-
-    const watermarks = screen.getAllByText(/Dados ilustrativos · Em breve/);
-    // 5 scaffolded blocks: KPIStrip, Donut+Facts, CoverageByArea, Timeline, Recipients
-    expect(watermarks.length).toBe(5);
-    for (const wm of watermarks) {
-      const illustrative = wm.parentElement;
-      expect(illustrative?.getAttribute('aria-hidden')).toBe('true');
-    }
-  });
-
-  it('hero CTAs remain disabled with the "Em breve" affordance', () => {
-    vi.mocked(useDocumentDetailQuery).mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: baseDoc,
-      refetch: vi.fn(),
-    } as never);
-
-    render(<DocumentDistributionPage />);
+    render(<DocumentDistributionPage />, { wrapper: wrap() });
 
     const ctaLabels = ['Lembrete em massa', 'Exportar relatório', 'Adicionar destinatários', 'Política de fanout'];
     for (const label of ctaLabels) {
       const btn = screen.getByRole('button', { name: new RegExp(label) });
       expect(btn.getAttribute('aria-disabled')).toBe('true');
-      expect(btn.getAttribute('title')).toBe('Em breve');
+      // Title references the parked mission instead of "Em breve"
+      expect(btn.getAttribute('title')).toContain('distribuição');
     }
+  });
+
+  it('renders the heading "Distribuição & cobertura de leitura"', () => {
+    vi.mocked(useDocumentDetailQuery).mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: baseDoc,
+      refetch: vi.fn(),
+    } as never);
+
+    render(<DocumentDistributionPage />, { wrapper: wrap() });
+
+    expect(screen.getByRole('heading', { name: /Distribuição & cobertura de leitura/ })).toBeInTheDocument();
   });
 });
