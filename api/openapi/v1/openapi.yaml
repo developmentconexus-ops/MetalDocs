@@ -3705,7 +3705,7 @@ paths:
       tags: [distribution]
       operationId: getDocumentDistribution
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
         '200':
           description: ok
@@ -3727,7 +3727,7 @@ paths:
       tags: [distribution]
       operationId: listDocumentDistributionRecipients
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - name: cursor
           in: query
           description: Opaque forward keyset cursor from a prior page's page.next_cursor.
@@ -3758,7 +3758,7 @@ paths:
       tags: [distribution]
       operationId: getDocumentDistributionCoverage
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
         '200':
           description: ok
