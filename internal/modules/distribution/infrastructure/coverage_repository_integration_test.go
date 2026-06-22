@@ -6,12 +6,14 @@ package distributioninfra_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 
 	distributioninfra "metaldocs/internal/modules/distribution/infrastructure"
+	distributiondomain "metaldocs/internal/modules/distribution/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/tests/integration/testdb"
@@ -119,7 +121,7 @@ func TestDistributionCoverage(t *testing.T) {
 			t.Fatalf("Recipients: %v", err)
 		}
 
-		byUser := make(map[string]distributioninfra.RecipientRow)
+		byUser := make(map[string]distributiondomain.RecipientRow)
 		for _, r := range res.Items {
 			byUser[r.UserID] = r
 		}
@@ -212,8 +214,82 @@ func TestDistributionCoverage(t *testing.T) {
 		if err == nil {
 			t.Fatal("want error for bad cursor, got nil")
 		}
-		if !isInvalidCursorErr(err) {
+		if !errors.Is(err, pagination.ErrInvalidCursor) {
 			t.Errorf("want ErrInvalidCursor-like error, got %v", err)
+		}
+	})
+
+	// recipients_pagination_null_bucket: proves the NULL-area-name cursor round-trips.
+	// Seeds ≥3 obligated users that ALL have NULL area_name (direct user_grants only,
+	// no area_grant), then pages through with limit=1.  Each intermediate NextCursor
+	// must be non-empty AND feeding it back must NOT error; the union of all pages must
+	// equal the full seeded set with no duplicates and no skips; the final page must
+	// have HasMore=false.
+	//
+	// Before the fix this sub-test FAILS on the second request because DecodeCursor
+	// rejects a token whose first part is "" — which is exactly what the pre-fix code
+	// encodes for NULL area_name.
+	t.Run("recipients_pagination_null_bucket", func(t *testing.T) {
+		// Seed a fresh tenant + 3 users, each with a direct user_grant → NULL area_name.
+		nbTenant := testdb.NewTenant(t, db)
+		nbCD := testdb.NewControlledDoc(t, db, testdb.WithTenant(nbTenant.ID))
+
+		var nbUserIDs []string
+		for i := 0; i < 3; i++ {
+			u := testdb.NewUser(t, db, testdb.WithTenant(nbTenant.ID))
+			nbUserIDs = append(nbUserIDs, u.ID)
+			if _, err := db.ExecContext(ctx,
+				`INSERT INTO public.controlled_document_user_grants
+				   (tenant_id, controlled_document_id, user_id)
+				 VALUES ($1::uuid, $2::uuid, $3)
+				 ON CONFLICT DO NOTHING`,
+				nbTenant.ID, nbCD.ID, u.ID,
+			); err != nil {
+				t.Fatalf("recipients_pagination_null_bucket: seed user_grant user %d: %v", i, err)
+			}
+		}
+
+		nbRepo := distributioninfra.NewCoverageRepository(db, iamdomain.NoopUserDisplayNameReader{})
+
+		// Collect all pages by following the cursor chain with limit=1.
+		seen := make(map[string]int) // userID → page index seen
+		cursor := ""
+		pageIdx := 0
+		for {
+			page, err := nbRepo.Recipients(ctx, nbTenant.ID, nbCD.ID, cursor, 1)
+			if err != nil {
+				t.Fatalf("recipients_pagination_null_bucket: page %d with cursor %q: %v", pageIdx, cursor, err)
+			}
+			if len(page.Items) == 0 {
+				t.Fatalf("recipients_pagination_null_bucket: page %d returned 0 items (want 1)", pageIdx)
+			}
+			for _, item := range page.Items {
+				if prevPage, dup := seen[item.UserID]; dup {
+					t.Errorf("recipients_pagination_null_bucket: duplicate user_id %s on pages %d and %d", item.UserID, prevPage, pageIdx)
+				}
+				seen[item.UserID] = pageIdx
+				// Every item must have NULL area_name (user_grant source).
+				if item.AreaName != nil {
+					t.Errorf("recipients_pagination_null_bucket: page %d item %s: want nil area_name, got %q", pageIdx, item.UserID, *item.AreaName)
+				}
+			}
+			if !page.HasMore {
+				break
+			}
+			if page.NextCursor == "" {
+				t.Fatal("recipients_pagination_null_bucket: HasMore=true but NextCursor is empty")
+			}
+			cursor = page.NextCursor
+			pageIdx++
+		}
+
+		if len(seen) != len(nbUserIDs) {
+			t.Errorf("recipients_pagination_null_bucket: want %d distinct users across pages, got %d (seen: %v)", len(nbUserIDs), len(seen), seen)
+		}
+		for _, uid := range nbUserIDs {
+			if _, ok := seen[uid]; !ok {
+				t.Errorf("recipients_pagination_null_bucket: seeded user %s never appeared in any page", uid)
+			}
 		}
 	})
 
@@ -305,6 +381,7 @@ func TestDistributionCoverage(t *testing.T) {
 
 		// Save the real view DDL so we can restore it in cleanup.
 		// We recreate the real view verbatim from migration 0245.
+		// MUST match migration 0245 / metaldocs.v_cd_obligated_readers exactly — keep in sync.
 		const realViewDDL = `
 			CREATE VIEW metaldocs.v_cd_obligated_readers AS
 			WITH legs AS (
@@ -392,32 +469,6 @@ func TestDistributionCoverage(t *testing.T) {
 			t.Errorf("fail_closed: want error containing 'unknown source value', got: %v", err)
 		}
 	})
-}
-
-// isInvalidCursorErr returns true when the error wraps pagination.ErrInvalidCursor.
-func isInvalidCursorErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	if err == pagination.ErrInvalidCursor {
-		return true
-	}
-	return isErrWrapping(err, pagination.ErrInvalidCursor)
-}
-
-func isErrWrapping(err, target error) bool {
-	for err != nil {
-		if err == target {
-			return true
-		}
-		type unwrapper interface{ Unwrap() error }
-		u, ok := err.(unwrapper)
-		if !ok {
-			return false
-		}
-		err = u.Unwrap()
-	}
-	return false
 }
 
 // seedCompanyScopeCD creates a company-scope controlled document (visibility_scope='company')

@@ -13,33 +13,18 @@ import (
 	"errors"
 	"fmt"
 
+	distributiondomain "metaldocs/internal/modules/distribution/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/pagination"
 )
 
-// RecipientRow is the flat representation returned by Recipients. It carries the
-// view columns plus the display name resolved via the iam port.
-type RecipientRow struct {
-	UserID   string
-	Name     string
-	AreaCode *string
-	AreaName *string
-	Source   string
-}
-
-// RecipientsPage is the result of a paginated Recipients call.
-type RecipientsPage struct {
-	Items      []RecipientRow
-	HasMore    bool
-	NextCursor string
-}
-
-// AreaCoverageRow is one row returned by Coverage.
-type AreaCoverageRow struct {
-	AreaCode string
-	AreaName string
-	Total    int
-}
+// nullAreaCursorSentinel is the sort-value token used to encode a NULL area_name
+// into a keyset cursor. A NUL byte (\x00) never appears in a taxonomy area label
+// (labels are human-readable UTF-8 strings), it survives base64 round-trip
+// unchanged, and — critically — it is non-empty so pagination.DecodeCursor
+// accepts it (DecodeCursor rejects "" as its first part).  The decode branch
+// converts it back to the NULL-bucket SQL path.
+const nullAreaCursorSentinel = "\x00"
 
 // CoverageRepository reads distribution data from the published views.
 type CoverageRepository struct {
@@ -79,11 +64,11 @@ func (r *CoverageRepository) Summary(ctx context.Context, tenantID, cdID string)
 // (user_id is unique per row in the view). Display names are resolved in one batch
 // call to the iam port after row fetch (no N+1). An empty cursor string starts the
 // first page. A malformed cursor returns pagination.ErrInvalidCursor.
-func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cursor string, limit int) (RecipientsPage, error) {
+func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cursor string, limit int) (distributiondomain.RecipientsPage, error) {
 	limit = pagination.ClampLimit(limit)
 
 	var (
-		sortValue string // decoded cursor: area_name (may be empty for NULL)
+		sortValue string // decoded cursor: area_name sentinel or actual value
 		cursorID  string // decoded cursor: user_id tiebreaker
 	)
 
@@ -91,7 +76,7 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 		var err error
 		sortValue, cursorID, err = pagination.DecodeCursor(cursor)
 		if err != nil {
-			return RecipientsPage{}, pagination.ErrInvalidCursor
+			return distributiondomain.RecipientsPage{}, pagination.ErrInvalidCursor
 		}
 	}
 
@@ -109,9 +94,10 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 	//   - NULLS LAST means NULLs sort after all non-NULL values.
 	//   - Tuple comparison: NULL > non-NULL is treated here via explicit IS NULL checks.
 	//
-	// Cursor encoding: NULL area_name is stored as empty string "". On decode,
-	// sortValue="" means "first page" (no filter) OR "cursor pointing to a NULL area_name row".
-	// We disambiguate by also checking cursorID: empty cursorID = first page.
+	// Cursor encoding: NULL area_name is stored as nullAreaCursorSentinel ("\x00").
+	// This sentinel is non-empty, so pagination.DecodeCursor accepts it (it rejects "").
+	// On decode: cursorID=="" → first page; sortValue==nullAreaCursorSentinel → NULL bucket;
+	// else → non-NULL area_name bucket.
 	if cursorID == "" {
 		// First page: no keyset filter.
 		const q = `
@@ -129,11 +115,12 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 			 LIMIT $3
 		`
 		rows, err = r.db.QueryContext(ctx, q, tenantID, cdID, limit+1)
-	} else if sortValue == "" {
+	} else if sortValue == nullAreaCursorSentinel {
 		// Cursor points to a NULL area_name row: next page is rows with NULL area_name
 		// and user_id > cursorID (since NULL NULLS LAST means all non-NULLs came first).
 		// There are no non-NULL area_name rows after a NULL area_name row, so we only
 		// need to filter within the NULL area_name bucket.
+		// sortValue is the routing-only sentinel; it is NOT passed to SQL.
 		const q = `
 			SELECT v.user_id,
 			       v.area_code,
@@ -180,7 +167,7 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 		rows, err = r.db.QueryContext(ctx, q, tenantID, cdID, sortValue, cursorID, limit+1)
 	}
 	if err != nil {
-		return RecipientsPage{}, fmt.Errorf("distribution.Recipients query: %w", err)
+		return distributiondomain.RecipientsPage{}, fmt.Errorf("distribution.Recipients query: %w", err)
 	}
 	defer rows.Close()
 
@@ -195,15 +182,15 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 	for rows.Next() {
 		var rr rawRow
 		if err := rows.Scan(&rr.userID, &rr.areaCode, &rr.source, &rr.areaName); err != nil {
-			return RecipientsPage{}, fmt.Errorf("distribution.Recipients scan: %w", err)
+			return distributiondomain.RecipientsPage{}, fmt.Errorf("distribution.Recipients scan: %w", err)
 		}
 		if err := validateSource(rr.source); err != nil {
-			return RecipientsPage{}, err
+			return distributiondomain.RecipientsPage{}, err
 		}
 		raw = append(raw, rr)
 	}
 	if err := rows.Err(); err != nil {
-		return RecipientsPage{}, fmt.Errorf("distribution.Recipients rows: %w", err)
+		return distributiondomain.RecipientsPage{}, fmt.Errorf("distribution.Recipients rows: %w", err)
 	}
 
 	hasMore := len(raw) > limit
@@ -218,10 +205,10 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 	}
 	nameMap, err := r.names.DisplayNames(ctx, tenantID, userIDs)
 	if err != nil {
-		return RecipientsPage{}, fmt.Errorf("distribution.Recipients display names: %w", err)
+		return distributiondomain.RecipientsPage{}, fmt.Errorf("distribution.Recipients display names: %w", err)
 	}
 
-	items := make([]RecipientRow, len(raw))
+	items := make([]distributiondomain.RecipientRow, len(raw))
 	for i, rr := range raw {
 		name := nameMap[rr.userID]
 		if name == "" {
@@ -237,7 +224,7 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 			v := rr.areaName.String
 			areaName = &v
 		}
-		items[i] = RecipientRow{
+		items[i] = distributiondomain.RecipientRow{
 			UserID:   rr.userID,
 			Name:     name,
 			AreaCode: areaCode,
@@ -249,16 +236,18 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 	var nextCursor string
 	if hasMore && len(items) > 0 {
 		last := items[len(items)-1]
-		// Encode (area_name, user_id). area_name nil → encode as "" so DecodeCursor
-		// returns ("", userID) and the next-page query branches on the NULL bucket.
-		sortVal := ""
+		// Encode (area_name, user_id). NULL area_name → use nullAreaCursorSentinel so
+		// DecodeCursor returns ("\x00", userID); the next-page query branches on the NULL
+		// bucket.  We must NOT encode "" here — DecodeCursor rejects a token whose first
+		// part is empty (cursor.go:64).
+		sortVal := nullAreaCursorSentinel
 		if last.AreaName != nil {
 			sortVal = *last.AreaName
 		}
 		nextCursor = pagination.EncodeCursor(sortVal, last.UserID)
 	}
 
-	return RecipientsPage{
+	return distributiondomain.RecipientsPage{
 		Items:      items,
 		HasMore:    hasMore,
 		NextCursor: nextCursor,
@@ -268,7 +257,7 @@ func (r *CoverageRepository) Recipients(ctx context.Context, tenantID, cdID, cur
 // Coverage returns per-area counts of area_grant obligated readers for a controlled
 // document. Returns an empty slice for company-scope documents (no area_grant rows).
 // Results are ordered by area_name (ascending). Non-transactional pool read.
-func (r *CoverageRepository) Coverage(ctx context.Context, tenantID, cdID string) ([]AreaCoverageRow, error) {
+func (r *CoverageRepository) Coverage(ctx context.Context, tenantID, cdID string) ([]distributiondomain.AreaCoverageRow, error) {
 	const q = `
 		SELECT v.area_code,
 		       pan.area_name,
@@ -289,9 +278,9 @@ func (r *CoverageRepository) Coverage(ctx context.Context, tenantID, cdID string
 	}
 	defer rows.Close()
 
-	var result []AreaCoverageRow
+	var result []distributiondomain.AreaCoverageRow
 	for rows.Next() {
-		var row AreaCoverageRow
+		var row distributiondomain.AreaCoverageRow
 		if err := rows.Scan(&row.AreaCode, &row.AreaName, &row.Total); err != nil {
 			return nil, fmt.Errorf("distribution.Coverage scan: %w", err)
 		}
@@ -301,7 +290,7 @@ func (r *CoverageRepository) Coverage(ctx context.Context, tenantID, cdID string
 		return nil, fmt.Errorf("distribution.Coverage rows: %w", err)
 	}
 	if result == nil {
-		result = []AreaCoverageRow{}
+		result = []distributiondomain.AreaCoverageRow{}
 	}
 	return result, nil
 }

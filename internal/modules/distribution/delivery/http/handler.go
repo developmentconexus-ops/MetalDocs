@@ -11,7 +11,7 @@ import (
 	"net/http"
 
 	distributionapi "metaldocs/internal/modules/distribution/api"
-	distributioninfra "metaldocs/internal/modules/distribution/infrastructure"
+	distributiondomain "metaldocs/internal/modules/distribution/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/problem"
@@ -21,8 +21,8 @@ import (
 // Repository is the minimal surface the handler needs from the infrastructure layer.
 type Repository interface {
 	Summary(ctx context.Context, tenantID, cdID string) (int, error)
-	Recipients(ctx context.Context, tenantID, cdID, cursor string, limit int) (distributioninfra.RecipientsPage, error)
-	Coverage(ctx context.Context, tenantID, cdID string) ([]distributioninfra.AreaCoverageRow, error)
+	Recipients(ctx context.Context, tenantID, cdID, cursor string, limit int) (distributiondomain.RecipientsPage, error)
+	Coverage(ctx context.Context, tenantID, cdID string) ([]distributiondomain.AreaCoverageRow, error)
 }
 
 // Handler implements distributionapi.StrictServerInterface.
@@ -94,6 +94,7 @@ func (h *Handler) ListDocumentDistributionRecipients(
 	if req.Params.Limit != nil && *req.Params.Limit > 0 {
 		limit = *req.Params.Limit
 	}
+	limit = pagination.ClampLimit(limit)
 
 	page, err := h.repo.Recipients(ctx, tenantID, cdID, cursor, limit)
 	if err != nil {
