@@ -43,6 +43,8 @@ import (
 	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	controlleddocuments "metaldocs/internal/modules/controlleddocuments"
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
+	distributionhttp "metaldocs/internal/modules/distribution/delivery/http"
+	distributioninfra "metaldocs/internal/modules/distribution/infrastructure"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
@@ -532,6 +534,13 @@ func main() {
 	approvalServices = approvalServices.WithRouteAdminIdempStore(routeAdminIdempStore)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore, displayNameRepo)
 	approvalHandler.RegisterRoutes(mux)
+
+	// M2/F2.2: distribution module — read-only delivery + repository layer.
+	// Reuses displayNameRepo (constructed above at line ~418); no new DB handle.
+	distributionRepo := distributioninfra.NewCoverageRepository(deps.SQLDB, displayNameRepo)
+	distributionHandler := distributionhttp.NewHandler(distributionRepo)
+	distributionhttp.RegisterRoutes(distributionHandler, mux)
+
 	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {
 		e2etest.RegisterE2EHandlers(m, deps.SQLDB, nil)
 		// Runtime probe for REQ-MW-1: a deliberate handler panic that the
