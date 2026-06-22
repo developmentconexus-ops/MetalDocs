@@ -1,6 +1,6 @@
 # Decisions
 
-> **Last verified:** 2026-06-21 (frontend-screen-completion M2/F2.1a — added ADR 0040 row for `v_cd_obligated_readers`)
+> **Last verified:** 2026-06-22 (frontend-screen-completion M2/F2.1c — added ADR 0042 row)
 > **Scope:** Durable ADRs and consequential technical decisions.
 
 | # | Title | Status | Superseded by | Current relevance |
