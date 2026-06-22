@@ -6,6 +6,7 @@ package distributioninfra_test
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -251,7 +252,7 @@ func TestDistributionCoverage(t *testing.T) {
 		}
 	})
 
-	t.Run("fail_closed", func(t *testing.T) {
+	t.Run("unknown_document_empty", func(t *testing.T) {
 		// An unknown tenant+CD produces an empty result without error (fail-closed: no
 		// data returned for unauthorized/unknown resource). The repo must not panic or
 		// produce a misleading result.
@@ -260,26 +261,135 @@ func TestDistributionCoverage(t *testing.T) {
 
 		res, err := repo.Recipients(ctx, badTenantID, badCDID, "", 10)
 		if err != nil {
-			t.Fatalf("fail_closed: empty tenant/cd should not error, got %v", err)
+			t.Fatalf("unknown_document_empty: empty tenant/cd should not error, got %v", err)
 		}
 		if len(res.Items) != 0 {
-			t.Errorf("fail_closed: want 0 items for unknown tenant/cd, got %d", len(res.Items))
+			t.Errorf("unknown_document_empty: want 0 items for unknown tenant/cd, got %d", len(res.Items))
 		}
 
 		total, err := repo.Summary(ctx, badTenantID, badCDID)
 		if err != nil {
-			t.Fatalf("fail_closed: Summary for unknown tenant/cd should not error, got %v", err)
+			t.Fatalf("unknown_document_empty: Summary for unknown tenant/cd should not error, got %v", err)
 		}
 		if total != 0 {
-			t.Errorf("fail_closed: want total=0 for unknown tenant/cd, got %d", total)
+			t.Errorf("unknown_document_empty: want total=0 for unknown tenant/cd, got %d", total)
 		}
 
 		cov, err := repo.Coverage(ctx, badTenantID, badCDID)
 		if err != nil {
-			t.Fatalf("fail_closed: Coverage for unknown tenant/cd should not error, got %v", err)
+			t.Fatalf("unknown_document_empty: Coverage for unknown tenant/cd should not error, got %v", err)
 		}
 		if len(cov) != 0 {
-			t.Errorf("fail_closed: want 0 coverage rows for unknown tenant/cd, got %d", len(cov))
+			t.Errorf("unknown_document_empty: want 0 coverage rows for unknown tenant/cd, got %d", len(cov))
+		}
+	})
+
+	// fail_closed: G5 / interview #7 — the repo must REJECT a row whose source
+	// value is outside the published enum {user_grant, area_grant, company_scope}.
+	// The production view is a fixed UNION of 3 hard-coded source literals, so an
+	// unknown source is unreachable through the real view by construction. We prove
+	// the guard fires by temporarily replacing the view with a one-row literal that
+	// carries source='future_grant' for a freshly-seeded tenant/CD/user, calling
+	// repo.Recipients, and asserting the unknown-source error.
+	//
+	// The real view is restored in t.Cleanup before this sub-test exits. All other
+	// sub-tests are already complete at this point (sub-tests run sequentially and
+	// fail_closed is last), but the cleanup is correct regardless of ordering.
+	//
+	// Proof: this test goes RED if validateSource is removed from coverage_repository.go.
+	t.Run("fail_closed", func(t *testing.T) {
+		// Seed a fresh tenant, user, and CD whose IDs we will embed in the fake view.
+		fcTenant := testdb.NewTenant(t, db)
+		fcUser := testdb.NewUser(t, db, testdb.WithTenant(fcTenant.ID))
+		fcCD := testdb.NewControlledDoc(t, db, testdb.WithTenant(fcTenant.ID))
+
+		// Save the real view DDL so we can restore it in cleanup.
+		// We recreate the real view verbatim from migration 0245.
+		const realViewDDL = `
+			CREATE VIEW metaldocs.v_cd_obligated_readers AS
+			WITH legs AS (
+			  SELECT cdug.tenant_id,
+			         cdug.controlled_document_id,
+			         cdug.user_id,
+			         NULL::text          AS area_code,
+			         'user_grant'::text  AS source,
+			         1                   AS source_rank
+			    FROM public.controlled_document_user_grants cdug
+			  UNION ALL
+			  SELECT cdag.tenant_id,
+			         cdag.controlled_document_id,
+			         upa.user_id,
+			         upa.area_code       AS area_code,
+			         'area_grant'::text  AS source,
+			         2                   AS source_rank
+			    FROM public.controlled_document_area_grants cdag
+			    JOIN metaldocs.v_active_user_areas upa
+			      ON upa.tenant_id = cdag.tenant_id
+			     AND upa.area_code = cdag.area_code
+			  UNION ALL
+			  SELECT f.tenant_id,
+			         f.controlled_document_id,
+			         tu.user_id,
+			         NULL::text             AS area_code,
+			         'company_scope'::text  AS source,
+			         3                      AS source_rank
+			    FROM metaldocs.v_cd_search_facts f
+			    JOIN (SELECT DISTINCT tenant_id, user_id FROM metaldocs.v_active_user_areas) tu
+			      ON tu.tenant_id = f.tenant_id
+			   WHERE f.is_company
+			)
+			SELECT DISTINCT ON (tenant_id, controlled_document_id, user_id)
+			       tenant_id,
+			       controlled_document_id,
+			       user_id,
+			       area_code,
+			       source
+			  FROM legs
+			 ORDER BY tenant_id, controlled_document_id, user_id, source_rank, area_code NULLS LAST`
+
+		// Replace the view with a synthetic one that emits one row carrying an
+		// unknown source for our specific tenant/CD/user. The view is narrowed to
+		// that pair so it does not interfere with the real data already seeded by
+		// the other sub-tests.
+		if _, err := db.ExecContext(ctx, `DROP VIEW metaldocs.v_cd_obligated_readers`); err != nil {
+			t.Fatalf("fail_closed: drop real view: %v", err)
+		}
+		t.Cleanup(func() {
+			if _, err := db.ExecContext(ctx, `DROP VIEW IF EXISTS metaldocs.v_cd_obligated_readers`); err != nil {
+				t.Logf("fail_closed cleanup: drop synthetic view: %v", err)
+			}
+			if _, err := db.ExecContext(ctx, realViewDDL); err != nil {
+				t.Logf("fail_closed cleanup: restore real view: %v", err)
+			}
+		})
+
+		fakeViewDDL := `
+			CREATE VIEW metaldocs.v_cd_obligated_readers AS
+			SELECT $1::uuid AS tenant_id,
+			       $2::uuid AS controlled_document_id,
+			       $3       AS user_id,
+			       NULL::text AS area_code,
+			       'future_grant'::text AS source`
+		// PostgreSQL views cannot use query parameters; embed the UUIDs as literals.
+		fakeViewDDL = `
+			CREATE VIEW metaldocs.v_cd_obligated_readers AS
+			SELECT '` + fcTenant.ID + `'::uuid AS tenant_id,
+			       '` + fcCD.ID + `'::uuid AS controlled_document_id,
+			       '` + fcUser.ID + `'       AS user_id,
+			       NULL::text               AS area_code,
+			       'future_grant'::text     AS source`
+		if _, err := db.ExecContext(ctx, fakeViewDDL); err != nil {
+			t.Fatalf("fail_closed: create synthetic view: %v", err)
+		}
+
+		// Now call Recipients for the seeded tenant+CD. The scan will hit
+		// 'future_grant', validateSource will reject it, and repo must return an error.
+		_, err := repo.Recipients(ctx, fcTenant.ID, fcCD.ID, "", 10)
+		if err == nil {
+			t.Fatal("fail_closed: want error for unknown source 'future_grant', got nil — validateSource guard is not firing")
+		}
+		if !strings.Contains(err.Error(), "unknown source value") {
+			t.Errorf("fail_closed: want error containing 'unknown source value', got: %v", err)
 		}
 	})
 }
