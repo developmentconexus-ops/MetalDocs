@@ -1939,6 +1939,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/documents/{id}/distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Distribution coverage summary — total obligated audience for a controlled document */
+        get: operations["getDocumentDistribution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents/{id}/distribution/recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Obligated audience for a controlled document (denominator only) */
+        get: operations["listDocumentDistributionRecipients"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents/{id}/distribution/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** By-area obligated totals for a controlled document (denominator only) */
+        get: operations["getDocumentDistributionCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2058,6 +2109,34 @@ export interface components {
         CursorPage: {
             next_cursor: string | null;
             has_more: boolean;
+        };
+        DistributionSummaryResponse: {
+            /** @description Distinct count of users obligated by the controlled document — the coverage denominator. The numerator is out of M2 scope (ADR-0042). */
+            total_targets: number;
+        };
+        DistributionRecipient: {
+            user_id: string;
+            /** @description User display name, resolved via the iam UserDisplayNameReader port (ADR-0029). */
+            name: string;
+            /** @description Granting area code; null unless source is area_grant. */
+            area_code: string | null;
+            /** @description Area label resolved via metaldocs.v_process_area_name (ADR-0041); null unless source is area_grant. */
+            area_name: string | null;
+            /**
+             * @description How the user became obligated. Distinct-by-user precedence user_grant > area_grant > company_scope (ADR-0040 / ADR-0042).
+             * @enum {string}
+             */
+            source: "area_grant" | "user_grant" | "company_scope";
+        };
+        DistributionRecipientsResponse: {
+            items: components["schemas"]["DistributionRecipient"][];
+            page: components["schemas"]["CursorPage"];
+        };
+        DistributionAreaCoverage: {
+            area_code: string;
+            area_name: string;
+            /** @description Active members of this area obligated via area_grant. The sum across areas need not equal total_targets (user_grant-only and company_scope users belong to no area; multi-area users count once per area). Empty array for company-scope documents. */
+            total: number;
         };
         ListUsersResponse: {
             items: components["schemas"]["ManagedUserCore"][];
@@ -6899,6 +6978,89 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getDocumentDistribution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistributionSummaryResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listDocumentDistributionRecipients: {
+        parameters: {
+            query?: {
+                /** @description Opaque forward keyset cursor from a prior page's page.next_cursor. */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistributionRecipientsResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getDocumentDistributionCoverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistributionAreaCoverage"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };
