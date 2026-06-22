@@ -84,11 +84,23 @@ clean).
 
 ### 5 — Module ownership & the contract boundary
 
-Domain-event type definitions (the typed River job args + a stable `event_type` string) live in the
-**owning module**. The notifications module **subscribes** (registers the worker) — it does not read
-approval/CD/documents base tables. The event is the cross-module contract. `event_type` stays an **open
-string** (ADR-0043 §2) evolved **additively** (new fields optional/defaulted; breaking change ⇒ new
-`type` name) per CloudEvents-style forward-compatibility.
+Domain-event type definitions (the typed River job args + a stable `event_type` string + the producer's
+enqueuer port) live in the **owning module**, specifically in its **top-level `domain` package**
+(`internal/modules/<owner>/domain`). This is mandated by the `module-boundaries` guard
+(`scripts/check-module-boundaries.ps1`): a cross-module import is legal **only** when the imported path
+is exactly `<module>/domain` — deeper layers (`.../application`, `.../jobs`, even a nested
+`.../approval/domain`) are violations. So a consumer module legally imports only the producer's
+top-level `domain` (the architecture's sanctioned contract surface — `documents/domain` is imported 47×,
+`iam/domain` 140× today). The args struct stays **infra-free** (satisfies `river.JobArgs` via a `Kind()`
+string method with **no `river` import** in the `domain` file); the `river`/`*sql.Tx` coupling lives in
+the producer's infra adapter (mirroring `RiverScheduledPublishEnqueuer`). The args/port use `db.Tx`, not
+`*sql.Tx`, at the boundary — the concrete-tx assertion is isolated to that one adapter. A neutral
+`internal/platform/...` package is **rejected** for the event contract: `platform` is module-agnostic
+infrastructure (the `platformboundary` guard), so domain vocabulary does not belong there. The
+notifications module **subscribes** (registers the worker) — it does not read approval/CD/documents base
+tables. The event is the cross-module contract. `event_type` stays an **open string** (ADR-0043 §2)
+evolved **additively** (new fields optional/defaulted; breaking change ⇒ new `type` name) per
+CloudEvents-style forward-compatibility.
 
 ### 6 — Incremental, strangler-fig rollout (the operator's "redesign, not fully")
 
