@@ -133,6 +133,9 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "approval routes create", method: http.MethodPost, path: "/api/v1/approval/routes", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval routes update", method: http.MethodPut, path: "/api/v1/approval/routes/r-1", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval routes deactivate", method: http.MethodPost, path: "/api/v1/approval/routes/r-1/deactivate", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "notifications list", method: http.MethodGet, path: "/api/v1/notifications", wantCap: iamdomain.CapNotificationRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "notifications unread-count", method: http.MethodGet, path: "/api/v1/notifications/unread-count", wantCap: iamdomain.CapNotificationRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "notifications mark-read", method: http.MethodPost, path: "/api/v1/notifications/3f2504e0-4f89-11d3-9a0c-0305e82c3301/read", wantCap: iamdomain.CapNotificationRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "audit events", method: http.MethodGet, path: "/api/v1/audit/events", wantCap: iamdomain.CapAuditRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "metrics", method: http.MethodGet, path: "/api/v1/metrics", wantCap: iamdomain.CapMetricsView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 	}
