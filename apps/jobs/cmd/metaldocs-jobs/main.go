@@ -18,6 +18,7 @@ import (
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/observability"
@@ -39,7 +40,9 @@ func run(ctx context.Context) error {
 		displayNameRepo := iampg.NewUserDisplayNameRepository(db)
 		repo := approvalrepo.NewPostgresApprovalRepository(db, displayNameRepo)
 		services := approvalapp.NewServices(repo, approvalapp.NewSQLEmitter(), approvalapp.RealClock{}, cdinfra.NewCDFieldReaderPG())
-		return approvaljobs.NewWorkers(services.Scheduler, db), nil
+		workers := approvaljobs.NewWorkers(services.Scheduler, db)
+		river.AddWorker(workers, notificationsinfra.NewNotificationsFanoutWorker(db))
+		return workers, nil
 	})
 	if err != nil {
 		return fmt.Errorf("build jobs dependencies: %w", err)

@@ -492,6 +492,7 @@ func main() {
 			os.Exit(1)
 		}
 		approvalServices.WithScheduledPublishEnqueuer(approvaljobs.NewScheduledPublishEnqueuer(riverBundle.Client))
+		approvalServices.WithLifecycleEnqueuer(approvaljobs.NewLifecycleEventEnqueuer(riverBundle.Client))
 	}
 	if fanoutCfg.freezeService == nil {
 		slog.Error("approval runtime requires configured freeze service")
