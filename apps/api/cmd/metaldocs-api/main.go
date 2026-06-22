@@ -45,6 +45,8 @@ import (
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	distributionhttp "metaldocs/internal/modules/distribution/delivery/http"
 	distributioninfra "metaldocs/internal/modules/distribution/infrastructure"
+	notificationshttp "metaldocs/internal/modules/notifications/delivery/http"
+	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
@@ -540,6 +542,12 @@ func main() {
 	distributionRepo := distributioninfra.NewCoverageRepository(deps.SQLDB, displayNameRepo)
 	distributionHandler := distributionhttp.NewHandler(distributionRepo)
 	distributionhttp.RegisterRoutes(distributionHandler, mux)
+
+	// M3/F3.2: notifications module — read surface (list / unread-count / mark-read).
+	// Self-scoped by CapNotificationRead (tier-1) + recipient_user_id SQL predicate.
+	notificationsRepo := notificationsinfra.NewNotificationsRepository(deps.SQLDB)
+	notificationsHandler := notificationshttp.NewHandler(notificationsRepo)
+	notificationshttp.RegisterRoutes(notificationsHandler, mux)
 
 	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {
 		e2etest.RegisterE2EHandlers(m, deps.SQLDB, nil)
