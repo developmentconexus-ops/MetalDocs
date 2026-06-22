@@ -1,7 +1,7 @@
 # Feature F3.3 — Spec (lifecycle-emitter / domain-event pattern)
 
 > **Milestone:** 3 — Notifications (full-stack; surface + document-lifecycle emitters)  ·  **Folder:** `f3.3-lifecycle-emitter`
-> **Status:** **DRAFT — awaiting operator approval (pre-code).** Per the milestone gate, code may begin only after the operator approves this contract.
+> **Status:** **Approved (pre-code) — 2026-06-22 / leandrotca.** Design challenges (contract placement, `db.Tx` boundary) resolved with guard + precedent evidence in the interview record. `plan.md` + TDD execution to run in a **fresh `/milestone` session** (operator directive, token-lean).
 > **Governing decision:** [ADR-0044](../../../../../wiki/decisions/0044-domain-event-pattern-and-river-dispatch.md) (domain-event pattern, River dispatch; supersedes ADR-0043 §6). Evidence: `research-and-design.md`.
 
 > This is the feature's **contract**, written and approved **before any code**. It defines what the
