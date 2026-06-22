@@ -140,9 +140,9 @@ var routeRules = []routeRule{
 	// Distribution — GET-only endpoints; must precede the generic documents GET catch-all
 	// so CapDistributionRead is enforced at tier-1 (mirrors CapAuditRead precedent).
 	// Three suffix variants in specificity order (most specific first).
-	{method: http.MethodGet, pathPrefix: "/api/v1/documents/", pathSuffix: "/distribution/recipients", capability: iamdomain.CapDistributionRead, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodGet, pathPrefix: "/api/v1/documents/", pathSuffix: "/distribution/coverage", capability: iamdomain.CapDistributionRead, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodGet, pathPrefix: "/api/v1/documents/", pathSuffix: "/distribution", capability: iamdomain.CapDistributionRead, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/documents", pathSuffix: "/distribution/recipients", capability: iamdomain.CapDistributionRead, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/documents", pathSuffix: "/distribution/coverage", capability: iamdomain.CapDistributionRead, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/documents", pathSuffix: "/distribution", capability: iamdomain.CapDistributionRead, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Documents — order preserves the original switch semantics (more specific suffixes/contains first).
 	{method: http.MethodGet, pathPrefix: "/api/v1/documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
