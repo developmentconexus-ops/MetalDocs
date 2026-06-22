@@ -8,7 +8,12 @@
 
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS metaldocs.notifications (
+-- The baseline contains an old prototype notifications table with a wrong schema
+-- (id text, no tenant_id, no source_event_id, idempotency_key instead). Drop and
+-- recreate with the correct schema. Pre-v1, no production data to preserve.
+DROP TABLE IF EXISTS metaldocs.notifications CASCADE;
+
+CREATE TABLE metaldocs.notifications (
     id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id         uuid        NOT NULL,
     recipient_user_id text        NOT NULL,
