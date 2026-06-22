@@ -134,10 +134,15 @@ func TestProcessAreaName_ViewShape(t *testing.T) {
 		}
 		got = append(got, c)
 	}
+	// PostgreSQL reports is_nullable = 'YES' for view columns in
+	// information_schema.columns even when the underlying base-table columns are
+	// NOT NULL — the DB does not track nullability constraints at the view level.
+	// The shape contract (column names + types + count) is the meaningful gate
+	// here; nullability is intentionally relaxed to match PG's actual report.
 	want := []col{
-		{"tenant_id", "uuid", "NO"},
-		{"area_code", "text", "NO"},
-		{"area_name", "text", "NO"},
+		{"tenant_id", "uuid", "YES"},
+		{"area_code", "text", "YES"},
+		{"area_name", "text", "YES"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("column count: got %d want %d (got=%+v)", len(got), len(want), got)
