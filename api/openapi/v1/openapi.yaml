@@ -4213,7 +4213,7 @@ components:
           type: string
         event_type:
           type: string
-          description: Open string. M3 emits document_published / document_superseded / document_obsoleted / signoff_recorded / signoff.rejected; the parked emitter mission adds more additively (ADR-0043). Not a closed enum.
+          description: Open string. M3 emits document.published / document.superseded / document.obsoleted / document.approved / document.rejected (ADR-0044 typed domain events); future emitters add more additively. Not a closed enum.
         resource_type:
           type: string
         resource_id:
