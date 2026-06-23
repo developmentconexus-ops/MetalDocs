@@ -37,7 +37,7 @@ bulk endpoint. Producer matches the **consumer contract** in `spec.md` (consumer
   `components/AppShellHeader.tsx`, `useNotifications.ts`; `AppRouter.tsx` route entry; `NotificationItem`
   from `lib/types/index.ts`. Tracker updated (`wiki/implementation/screen-redesign-tracker.md`).
 
-Commit: see `git log` (committed this session; sha recorded at close).
+Commit: `d9c70e5c feat(M3/F3.4): notifications menu — top-bar bell + popover + spotlight; additive read-all endpoint`.
 
 ## Verification
 
