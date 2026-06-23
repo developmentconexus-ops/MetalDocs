@@ -11,6 +11,11 @@ vi.mock('../components/ReviewDocumentCanvas', () => ({
   ReviewDocumentCanvas: (_props: unknown) => <div data-testid="review-canvas" />,
 }));
 
+vi.mock('../../../store/auth.store', () => ({
+  useAuthStore: (selector: (s: { user: { displayName: string } }) => unknown) =>
+    selector({ user: { displayName: 'Ana Revisora' } }),
+}));
+
 function makeDoc(overrides: Partial<documentsApi.DocumentDetail> = {}) {
   return {
     id: 'doc-1',

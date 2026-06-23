@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 
 import { CodeChip, StatusPill } from '../../../components/ui';
 import { formatDateTime } from '../../../lib/formatDate';
+import { useAuthStore } from '../../../store/auth.store';
 import { useDocumentCommentsQuery } from '../../documents/queries/useDocumentCommentsQuery';
 import { useDocumentDetailQuery } from '../../documents/queries/useDocumentDetailQuery';
 import { ControlledDocumentDetailPanel } from '../components/ControlledDocumentDetailPanel';
@@ -27,6 +28,8 @@ export function SignoffDetailPage() {
 
   const [tab, setTab] = useState<Tab>('documento');
   const canvasRef = useRef<ReviewDocumentCanvasRef>(null);
+
+  const currentUser = useAuthStore((s) => s.user);
 
   const docQuery = useDocumentDetailQuery(documentId);
   const doc = docQuery.data ?? null;
@@ -92,7 +95,7 @@ export function SignoffDetailPage() {
                   documentId={documentId}
                   currentRevisionId={doc.current_revision_id}
                   status={doc.status}
-                  approverDisplay={String(doc.created_by ?? '')}
+                  approverDisplay={currentUser?.displayName ?? ''}
                 />
               ) : (
                 <div className={styles.a4State}>Este documento ainda não possui conteúdo para revisão.</div>
