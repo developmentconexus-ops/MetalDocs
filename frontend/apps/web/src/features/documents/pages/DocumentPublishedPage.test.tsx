@@ -49,15 +49,40 @@ vi.mock('../../controlled-documents/api/controlledDocuments', () => ({
   createRevision: vi.fn(),
 }));
 
+vi.mock('../queries/useDistributionSummaryQuery', () => ({
+  useDistributionSummaryQuery: vi.fn(),
+}));
+
+vi.mock('../api/exports', () => ({
+  exportPDF: vi.fn(),
+}));
+
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
 import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
 import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
 import { createRevision } from '../../controlled-documents/api/controlledDocuments';
+import { useDistributionSummaryQuery } from '../queries/useDistributionSummaryQuery';
+import { exportPDF } from '../api/exports';
+import { ApiError } from '../../../lib/api';
 
 describe('DocumentPublishedPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useDistributionSummaryQuery).mockReturnValue({
+      data: { total_targets: 12 },
+      isError: false,
+      isLoading: false,
+    } as never);
+    vi.mocked(exportPDF).mockResolvedValue({
+      storage_key: 'k',
+      signed_url: 'https://signed.example/doc.pdf',
+      composite_hash: 'h',
+      size_bytes: 2048,
+      cached: false,
+      revision_id: 'rev-1',
+    } as never);
+    vi.stubGlobal('open', vi.fn());
     vi.mocked(useDocumentDetailQuery).mockReturnValue({
       isLoading: false,
       isError: false,
@@ -622,6 +647,156 @@ describe('DocumentPublishedPage', () => {
     rerender(<DocumentPublishedPage />);
 
     expect(screen.getByRole('button', { name: 'Publicar / Agendar' })).toBeTruthy();
+  });
+
+  describe('F4.1 — backend-available placeholders wired', () => {
+    it('renders the live obligated-audience count from the distribution summary (no fabricated %)', () => {
+      vi.mocked(useDistributionSummaryQuery).mockReturnValue({
+        data: { total_targets: 12 },
+        isError: false,
+        isLoading: false,
+      } as never);
+
+      render(<DocumentPublishedPage />);
+
+      expect(screen.getAllByText('12').length).toBeGreaterThan(0);
+      expect(screen.queryAllByText(/em breve/i).length).toBe(0);
+      // No fabricated percentage and no progress bar for the parked numerator
+      expect(screen.queryByText(/%/)).toBeNull();
+      expect(screen.queryByRole('progressbar')).toBeNull();
+    });
+
+    it('shows EM_DASH for coverage when the summary query errors (never a fabricated 0/%)', () => {
+      vi.mocked(useDistributionSummaryQuery).mockReturnValue({
+        data: undefined,
+        isError: true,
+        isLoading: false,
+      } as never);
+
+      render(<DocumentPublishedPage />);
+
+      expect(screen.queryByText(/%/)).toBeNull();
+      expect(screen.queryAllByText(/em breve/i).length).toBe(0);
+    });
+
+    it('enables Baixar PDF and triggers the real export, opening the signed url', async () => {
+      render(<DocumentPublishedPage />);
+
+      const pdfButton = screen.getByRole('button', { name: /Baixar PDF/i }) as HTMLButtonElement;
+      expect(pdfButton.getAttribute('aria-disabled')).not.toBe('true');
+
+      fireEvent.click(pdfButton);
+
+      await waitFor(() => {
+        expect(exportPDF).toHaveBeenCalledWith('doc-published-1', { paper_size: 'A4' });
+      });
+      await waitFor(() => {
+        expect(window.open).toHaveBeenCalledWith('https://signed.example/doc.pdf', '_blank', 'noopener');
+      });
+    });
+
+    it('handles a 429 rate-limit on PDF export with a role=alert and a disabled button', async () => {
+      vi.mocked(exportPDF).mockRejectedValue(
+        new ApiError({ code: 'too_many_requests', status: 429, title: 'rate limited' }),
+      );
+
+      render(<DocumentPublishedPage />);
+
+      const pdfButton = screen.getByRole('button', { name: /Baixar PDF/i }) as HTMLButtonElement;
+      fireEvent.click(pdfButton);
+
+      await waitFor(() => {
+        expect(exportPDF).toHaveBeenCalled();
+      });
+      expect(window.open).not.toHaveBeenCalled();
+      // Rate-limit is surfaced (role=alert), not swallowed; button is held disabled.
+      await waitFor(() => {
+        expect(screen.getByRole('alert').textContent).toMatch(/Limite de exportações/i);
+      });
+      expect((screen.getByRole('button', { name: /Baixar PDF/i }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('surfaces a non-429 PDF export failure as an inline alert instead of swallowing it', async () => {
+      vi.mocked(exportPDF).mockRejectedValue(
+        new ApiError({ code: 'pdf.render_failed', status: 502, title: 'render failed' }),
+      );
+
+      render(<DocumentPublishedPage />);
+
+      const pdfButton = screen.getByRole('button', { name: /Baixar PDF/i }) as HTMLButtonElement;
+      fireEvent.click(pdfButton);
+
+      await waitFor(() => {
+        expect(exportPDF).toHaveBeenCalled();
+      });
+      expect(window.open).not.toHaveBeenCalled();
+      // The failure is reported to the user (role=alert), never silently dropped.
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toBeTruthy();
+      });
+      // Button recovers to usable (not stuck disabled) after a non-rate-limit error.
+      expect((screen.getByRole('button', { name: /Baixar PDF/i }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('renders Páginas from current_revision_page_count when present', () => {
+      render(<DocumentPublishedPage />);
+
+      const paginasCell = screen.getByText('Páginas').parentElement;
+      expect(paginasCell?.textContent).toContain('1');
+      expect(paginasCell?.textContent?.toLowerCase()).not.toContain('em breve');
+    });
+
+    it('renders an honest absent state for Páginas when page count is null', () => {
+      vi.mocked(useDocumentDetailQuery).mockReturnValue({
+        isLoading: false,
+        isError: false,
+        data: {
+          id: 'doc-published-1',
+          tenant_id: 'tenant-1',
+          template_version_id: 'template-1',
+          name: 'E2E Approval Flow 2026-05-19',
+          status: 'published',
+          form_data_json: {},
+          current_revision_id: 'rev-1',
+          revision_version: 2,
+          active_session_id: '',
+          values_frozen_at: null,
+          archived_at: null,
+          created_at: '2026-05-19T00:00:00.000Z',
+          updated_at: '2026-05-19T00:00:00.000Z',
+          created_by: 'admin-user',
+          revision_number: 1,
+          controlled_document_id: 'cd-1',
+          revision_title: 'E2E Approval Flow 2026-05-19',
+          profile_code_snapshot: 'pop',
+          process_area_code_snapshot: 'general',
+          code: 'POP-GENERAL-014',
+          current_revision_file_size_bytes: null,
+          current_revision_page_count: null,
+        },
+        refetch: vi.fn(),
+      } as never);
+
+      render(<DocumentPublishedPage />);
+
+      const paginasCell = screen.getByText('Páginas').parentElement;
+      expect(paginasCell?.textContent?.toLowerCase()).not.toContain('em breve');
+      expect(paginasCell?.textContent).toContain('—');
+
+      // spec gate row 6: Tamanho null → honest em-dash, never "em breve"
+      const tamanhoCell = screen.getByText('Tamanho').parentElement;
+      expect(tamanhoCell?.textContent?.toLowerCase()).not.toContain('em breve');
+      expect(tamanhoCell?.textContent).toContain('—');
+    });
+
+    it('renders a formatted Tamanho from current_revision_file_size_bytes when present', () => {
+      render(<DocumentPublishedPage />);
+
+      const tamanhoCell = screen.getByText('Tamanho').parentElement;
+      // 1024 bytes → "1 KB"
+      expect(tamanhoCell?.textContent).toMatch(/1\s*KB/);
+      expect(tamanhoCell?.textContent?.toLowerCase()).not.toContain('em breve');
+    });
   });
 });
 

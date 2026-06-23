@@ -1,5 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { displayRevisionTitle, formatRevisionCode } from './documentDetailMeta';
+import { displayRevisionTitle, formatRevisionCode, formatFileSize, formatPageCount } from './documentDetailMeta';
+
+describe('formatFileSize', () => {
+  it('formats binary units with pt-BR text', () => {
+    expect(formatFileSize(0)).toBe('0 B');
+    expect(formatFileSize(512)).toBe('512 B');
+    expect(formatFileSize(1024)).toBe('1 KB');
+    expect(formatFileSize(1536)).toBe('1,5 KB');
+    expect(formatFileSize(1024 * 1024)).toBe('1 MB');
+    expect(formatFileSize(5 * 1024 * 1024)).toBe('5 MB');
+  });
+
+  it('returns em-dash for null/undefined/negative/NaN', () => {
+    expect(formatFileSize(null)).toBe('—');
+    expect(formatFileSize(undefined)).toBe('—');
+    expect(formatFileSize(-1)).toBe('—');
+    expect(formatFileSize(Number.NaN)).toBe('—');
+  });
+});
+
+describe('formatPageCount', () => {
+  it('renders the integer when present', () => {
+    expect(formatPageCount(1)).toBe('1');
+    expect(formatPageCount(42)).toBe('42');
+  });
+
+  it('returns em-dash for null/undefined/negative/NaN', () => {
+    expect(formatPageCount(null)).toBe('—');
+    expect(formatPageCount(undefined)).toBe('—');
+    expect(formatPageCount(-3)).toBe('—');
+    expect(formatPageCount(Number.NaN)).toBe('—');
+  });
+});
 
 describe('formatRevisionCode', () => {
   it('formats governed revision numbers as zero-based REV labels', () => {

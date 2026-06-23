@@ -3,16 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
 import { Avatar } from '../../../components/ui/Avatar';
 import { CodeChip } from '../../../components/ui/CodeChip';
-import { resolveQueryError } from '../../../lib/api';
+import { resolveQueryError, ApiError, resolveErrorMessage } from '../../../lib/api';
 import { DocumentHero } from '../components/DocumentHero';
 import { DocumentVersionTimeline } from '../components/DocumentVersionTimeline';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
 import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
 import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
+import { useDistributionSummaryQuery } from '../queries/useDistributionSummaryQuery';
 import { useAreasQuery } from '../queries/useAreasQuery';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { createRevision } from '../../controlled-documents/api/controlledDocuments';
+import { exportPDF } from '../api/exports';
 import { SupersedePublishDialog } from '../../approval/components/SupersedePublishDialog';
 import { useAuthStore } from '../../../store/auth.store';
 import {
@@ -20,6 +22,8 @@ import {
   formatRevisionCode,
   formatSignedAt,
   formatShortDate,
+  formatFileSize,
+  formatPageCount,
   resolveAreaLabel,
   resolveProfileLabel,
 } from '../lib/documentDetailMeta';
@@ -141,6 +145,7 @@ export function DocumentPublishedPage() {
   });
   const areasQuery = useAreasQuery();
   const profilesQuery = useProfilesQuery();
+  const distributionSummaryQuery = useDistributionSummaryQuery(documentId);
   const activeDocument = activeDocumentQuery.data ?? null;
 
   const [linkCopied, setLinkCopied] = useState(false);
@@ -149,6 +154,31 @@ export function DocumentPublishedPage() {
   const [revisionError, setRevisionError] = useState('');
   const [isCreatingRevision, setIsCreatingRevision] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
+  // PDF export: mirrors ExportMenu.handlePDF (POST → open signed_url; 429 = rate-limited).
+  const [pdfStatus, setPdfStatus] = useState<
+    | { kind: 'idle' }
+    | { kind: 'pending' }
+    | { kind: 'rate_limited'; retryAfterSec: number }
+    | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
+
+  const handleDownloadPDF = async () => {
+    setPdfStatus({ kind: 'pending' });
+    try {
+      const res = await exportPDF(documentId, { paper_size: 'A4' });
+      window.open(res.signed_url, '_blank', 'noopener');
+      setPdfStatus({ kind: 'idle' });
+    } catch (e: unknown) {
+      // 429 is rate-limited (retry_after_seconds is not in the Problem schema → fallback).
+      // Every other failure surfaces an inline alert; never swallowed silently.
+      const err = e instanceof ApiError ? e : null;
+      if (err?.status === 429) {
+        setPdfStatus({ kind: 'rate_limited', retryAfterSec: 60 });
+        return;
+      }
+      setPdfStatus({ kind: 'error', message: resolveErrorMessage(e) });
+    }
+  };
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (docQuery.isLoading) {
@@ -191,6 +221,16 @@ export function DocumentPublishedPage() {
   const profileCode = doc.profile_code_snapshot ?? '';
   const areaLabel = areaCode ? resolveAreaLabel(areaCode, areasQuery.data ?? []) : '—';
   const profileLabel = profileCode ? resolveProfileLabel(profileCode, profilesQuery.data ?? []) : '—';
+
+  // Coverage denominator (obligated audience) — M2 distribution summary. Numerator
+  // (% read) is parked (ADR-0042); show the count + parked label, never a fabricated %.
+  // EM_DASH on error/missing so we never render a fabricated 0.
+  const obligatedCount = distributionSummaryQuery.isError
+    ? '—'
+    : (distributionSummaryQuery.data?.total_targets ?? '—');
+  // File metadata — already on DocumentResponse (nullable → honest em-dash when absent).
+  const pageCountLabel = formatPageCount(doc.current_revision_page_count);
+  const fileSizeLabel = formatFileSize(doc.current_revision_file_size_bytes);
 
   // Approval completion is the only lifecycle timestamp currently exposed on
   // the canonical document detail payload.
@@ -376,11 +416,33 @@ export function DocumentPublishedPage() {
               <Icon name="eye" size={15} />
               Visualizar documento
             </button>
-            {/* TODO(backlog): wire PDF download — GET /api/v1/documents/:id/pdf */}
-            <button className="btn" type="button" aria-disabled="true" title="Em breve">
+            <button
+              className="btn"
+              type="button"
+              aria-label="Baixar PDF"
+              onClick={handleDownloadPDF}
+              disabled={pdfStatus.kind === 'pending' || pdfStatus.kind === 'rate_limited'}
+              title={
+                pdfStatus.kind === 'rate_limited'
+                  ? `Limite de exportações atingido — tente novamente em ${pdfStatus.retryAfterSec}s`
+                  : 'Baixar PDF'
+              }
+            >
               <Icon name="download" size={13} />
-              Baixar PDF
+              {pdfStatus.kind === 'pending'
+                ? 'Gerando PDF…'
+                : pdfStatus.kind === 'rate_limited'
+                  ? 'Aguarde…'
+                  : 'Baixar PDF'}
             </button>
+            {pdfStatus.kind === 'rate_limited' && (
+              <span role="alert" className={styles.pdfAlert}>
+                Limite de exportações atingido — tente novamente em {pdfStatus.retryAfterSec}s.
+              </span>
+            )}
+            {pdfStatus.kind === 'error' && (
+              <span role="alert" className={styles.pdfAlert}>{pdfStatus.message}</span>
+            )}
             {isApproved ? (
               <button
                 className="btn"
@@ -495,8 +557,9 @@ export function DocumentPublishedPage() {
       {/* Content area */}
       <div className={styles.content}>
 
-        {/* KPI strip — 4 cells. Cobertura/Próxima revisão/Páginas show em-breve placeholders until backend lands.
-            See wiki/backlog/documento-publicado.md for endpoint contracts. */}
+        {/* KPI strip — 4 cells. Cobertura + Páginas are wired to real data (M2 distribution
+            denominator + DocumentResponse file metadata). Próxima revisão is a tracked defer
+            (no backend field) — see wiki/backlog/documento-publicado.md. */}
         <div className={styles.kpiStrip}>
           <div className={styles.kpiCell}>
             <div className={styles.kpiLabel}>Versão atual</div>
@@ -513,17 +576,17 @@ export function DocumentPublishedPage() {
             onClick={() => navigate('/distribution')}
           >
             <div className={styles.kpiLabel}>Cobertura</div>
-            <div className={styles.kpiValuePlaceholder}>em breve</div>
-            <div className={styles.kpiHint}>abrir fanout →</div>
+            <div className={styles.kpiValue}>{obligatedCount}</div>
+            <div className={styles.kpiHint}>destinatários obrigados · abrir fanout →</div>
           </button>
           <div className={styles.kpiCell}>
             <div className={styles.kpiLabel}>Próxima revisão</div>
-            <div className={styles.kpiValuePlaceholder}>em breve</div>
-            <div className={styles.kpiHint}>definido na criação</div>
+            <div className={styles.kpiValue}>—</div>
+            <div className={styles.kpiHint}>sem data de revisão definida</div>
           </div>
           <div className={styles.kpiCell}>
             <div className={styles.kpiLabel}>Páginas</div>
-            <div className={styles.kpiValuePlaceholder}>em breve</div>
+            <div className={styles.kpiValue}>{pageCountLabel}</div>
             <div className={styles.kpiHint}>metadado do arquivo</div>
           </div>
         </div>
@@ -570,9 +633,7 @@ export function DocumentPublishedPage() {
                   </div>
                   <div className={styles.factContent}>
                     <div className={styles.factLabel}>Vigente desde</div>
-                    <div className={styles.factValue}>
-                      {sinceDateHint !== '—' ? sinceDateHint : 'em breve'}
-                    </div>
+                    <div className={styles.factValue}>{sinceDateHint}</div>
                   </div>
                 </div>
                 <div className={styles.factCell}>
@@ -581,7 +642,7 @@ export function DocumentPublishedPage() {
                   </div>
                   <div className={styles.factContent}>
                     <div className={styles.factLabel}>Próxima revisão</div>
-                    <div className={styles.factValue}>em breve</div>
+                    <div className={styles.factValue}>—</div>
                   </div>
                 </div>
                 <div className={styles.factCell}>
@@ -590,32 +651,34 @@ export function DocumentPublishedPage() {
                   </div>
                   <div className={styles.factContent}>
                     <div className={styles.factLabel}>Tamanho</div>
-                    <div className={styles.factValue}>em breve</div>
+                    <div className={styles.factValue}>{fileSizeLabel}</div>
                   </div>
                 </div>
-                {/* TODO(backlog): wire confidentiality field when added to DocumentResponse */}
+                {/* DEFER: confidentiality classification — no field on DocumentResponse yet.
+                    Tracked in wiki/backlog/documento-publicado.md (trigger: classification field). */}
                 <div className={styles.factCell}>
                   <div className={styles.factIcon}>
                     <Icon name="shield" size={14} />
                   </div>
                   <div className={styles.factContent}>
                     <div className={styles.factLabel}>Classificação</div>
-                    <div className={styles.factValue}>em breve</div>
+                    <div className={styles.factValue}>—</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Coverage side card — shell only; fanout/read-tracking API not built.
-                See wiki/backlog/documento-publicado.md. */}
+            {/* Coverage side card — obligated-audience denominator (M2 distribution summary).
+                The read numerator (% lido) is parked per ADR-0042; show the count + an explicit
+                parked label, never a fabricated %. See wiki/backlog/documento-publicado.md. */}
             <aside className={styles.coverageCard}>
               <div className={styles.coverageCardHeader}>
                 <div className={styles.kpiLabel}>Cobertura</div>
               </div>
               <div className={styles.coverageCardBody}>
-                <div className={styles.kpiValue}>—%</div>
-                <div className={styles.coverageCardBar} role="progressbar" aria-valuenow={0} aria-valuemin={0} aria-valuemax={100} />
-                <div className={styles.kpiHint}>de — destinatários · — pendentes</div>
+                <div className={styles.kpiValue}>{obligatedCount}</div>
+                <div className={styles.kpiHint}>destinatários obrigados</div>
+                <div className={styles.kpiHint}>leitura em acompanhamento (ADR-0042)</div>
               </div>
               <div className={styles.coverageCardFooter}>
                 <button
@@ -717,7 +780,7 @@ export function DocumentPublishedPage() {
               <div className={styles.sectionKicker}>04 · Referências</div>
               <h2 className={styles.sectionTitle}>Documentos relacionados</h2>
             </div>
-            <span className={styles.sectionAside}>em breve</span>
+            <span className={styles.sectionAside}>não disponível</span>
           </div>
           <div className={styles.signoffEmpty}>
             O modelo de relacionamentos entre documentos ainda não está disponível.
@@ -731,7 +794,7 @@ export function DocumentPublishedPage() {
               <div className={styles.sectionKicker}>05 · Discussão interna</div>
               <h2 className={styles.sectionTitle}>Comentários</h2>
             </div>
-            <span className={styles.sectionAside}>em breve</span>
+            <span className={styles.sectionAside}>não disponível</span>
           </div>
           <div className={styles.signoffEmpty}>
             Comentários de exibição ainda não estão disponíveis para este documento.

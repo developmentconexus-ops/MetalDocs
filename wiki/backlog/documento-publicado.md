@@ -1,6 +1,6 @@
 # Backlog: Documento Publicado screen (`/documents/:id`)
 
-> Last updated: 2026-05-29 (QA `qa/documents-detail`: area/profile snapshot fields resolved + mock related/comments replaced with honest em-breve)
+> Last updated: 2026-06-23 (M4/F4.1: PDF download + Cobertura denominator + Páginas + Tamanho WIRED; Próxima revisão / Classificação / Documentos relacionados / Comentários are explicit defers-with-trigger; coverage numerator parked ADR-0042)
 
 ---
 
@@ -62,7 +62,7 @@ Backend: implement list endpoint returning `[{ revision_id, version_num, created
 
 No related-documents relationship model in the backend. Needs design + backend work before frontend.
 
-**Frontend (2026-05-29):** mock `PLACEHOLDER_RELATED` array removed. Section now renders honest "em breve" empty state. Re-wire grid once endpoint + relationship model land.
+**Frontend (2026-05-29):** mock `PLACEHOLDER_RELATED` array removed. **DEFER (M4/F4.1, 2026-06-23):** section renders an honest "não disponível" empty state. **Trigger:** a related-documents relationship model + read endpoint. Re-wire grid once both land.
 
 ---
 
@@ -75,19 +75,28 @@ Decide:
 2. Separate `display_comments` table with plain-text content
 3. Reply threading UX (parent_library_id is present but UX not designed)
 
-**Frontend (2026-05-29):** mock `PLACEHOLDER_COMMENTS` array + reply-box shell removed. Section now renders honest "em breve" empty state. Re-wire once display-side architecture is decided.
+**Frontend (2026-05-29):** mock `PLACEHOLDER_COMMENTS` array + reply-box shell removed. **DEFER (M4/F4.1, 2026-06-23):** section renders an honest "não disponível" empty state. **Trigger:** a decided display-comments architecture (reuse editor comments via `extractPlainText`, or a separate `display_comments` model). Re-wire once decided.
 
 ---
 
-### PDF download — `GET /api/v1/documents/:id/pdf`
+### ~~PDF download~~ — RESOLVED 2026-06-23 (M4/F4.1)
 
-No PDF generation endpoint. "Baixar PDF" button is `aria-disabled` pending this.
+**Resolved.** The endpoint is `POST /api/v1/documents/:id/export/pdf` (operationId `exportDocumentPDF`,
+returns `{ signed_url, size_bytes, cached, … }`, rate-limited 20/min) — it already shipped; the old
+backlog line (`GET …/pdf`, "no endpoint") was stale. "Baixar PDF" now calls the existing `exportPDF`
+client (`features/documents/api/exports.ts`), shows a pending state, opens the `signed_url`, and handles
+429 — mirroring `ExportMenu.handlePDF`.
 
 ---
 
-### Coverage KPI — fanout read coverage API
+### Coverage KPI — RESOLVED-partial 2026-06-23 (M4/F4.1); numerator parked (ADR-0042)
 
-Requires fanout/read-tracking API. No endpoint today. "Cobertura" KPI shows `—`.
+**Denominator wired.** "Cobertura" KPI + side card now render the obligated-audience count from
+`GET /documents/:id/distribution` (`DistributionSummaryResponse.total_targets`) via the M2
+`useDistributionSummaryQuery` hook; EM_DASH on error (never a fabricated 0). **Trigger (remaining):** the
+read **numerator** (% lido) is parked per **ADR-0042** — when a read-tracking API lands, replace the
+"leitura em acompanhamento (ADR-0042)" label with the real percentage. Until then the card shows the
+denominator + parked label only — **no fabricated %**.
 
 ---
 
@@ -97,15 +106,26 @@ Requires fanout/read-tracking API. No endpoint today. "Cobertura" KPI shows `—
 
 ---
 
-### KPI: Próxima revisão
+### KPI: Próxima revisão — DEFER (no backend field)
 
-No review-due-date field in the document or controlled-document model.
+**Trigger:** a review-due-date field on the document or controlled-document model. None exists today.
+The KPI + "Próxima revisão" fact render an honest em-dash ("sem data de revisão definida"), not a
+placeholder. Wire when the field lands.
 
----
+### Classificação (confidentiality) — DEFER (no backend field)
 
-### KPI: Páginas
+**Trigger:** a confidentiality/classification field on `DocumentResponse`. None exists today — and the
+classification taxonomy itself (public/internal/restricted?) is an unmade governance decision, not just
+a missing column. The "Classificação" fact renders an honest em-dash. Wire when the field + taxonomy land.
 
-No page count or file size field in API response.
+### ~~KPI: Páginas / Tamanho~~ — RESOLVED 2026-06-23 (M4/F4.1)
+
+**Resolved.** The old claim ("no page count or file size field in API response") was **stale**.
+`DocumentResponse` already returns `current_revision_page_count` (`int ≥ 1 | null`) and
+`current_revision_file_size_bytes` (`int64 ≥ 0 | null`) — verified at openapi.yaml:4832/4837 and generated
+FE types `lib/api-types/index.d.ts:2540-2541`. Both are now wired on the published screen via the existing
+`useDocumentDetailQuery` data, formatted by `formatPageCount` / `formatFileSize` (`lib/documentDetailMeta.ts`,
+binary units + pt-BR, em-dash on null).
 
 ---
 

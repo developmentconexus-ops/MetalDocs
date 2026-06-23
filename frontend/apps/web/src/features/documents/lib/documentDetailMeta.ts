@@ -65,6 +65,26 @@ export function formatSignedAt(input: string | null | undefined): string {
   return d ? dateTimeFmt.format(d) : EM_DASH;
 }
 
+// "1 KB" / "2,5 MB" — published-doc Tamanho fact. Binary units (1 KB = 1024 B),
+// pt-BR decimal comma, em-dash fallback when the API returns null/undefined.
+export function formatFileSize(bytes: number | null | undefined): string {
+  if (bytes == null || Number.isNaN(bytes) || bytes < 0) return EM_DASH;
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const exp = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, exp);
+  // Whole numbers render without decimals; otherwise one pt-BR decimal place.
+  const rounded = exp === 0 ? value : Math.round(value * 10) / 10;
+  const text = Number.isInteger(rounded) ? String(rounded) : rounded.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  return `${text} ${units[exp]}`;
+}
+
+// "12 páginas" → just the integer; em-dash when the API returns null/undefined.
+export function formatPageCount(count: number | null | undefined): string {
+  if (count == null || Number.isNaN(count) || count < 0) return EM_DASH;
+  return String(count);
+}
+
 // Resolves profile code snapshot → human label using profiles list
 export function resolveProfileLabel(code: string, profiles: Array<{ code: string; name: string }>): string {
   return profiles.find((p) => p.code === code)?.name ?? code;

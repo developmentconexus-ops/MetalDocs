@@ -117,5 +117,5 @@ Aggregate code diff `4be6479c..0a99fa73`: 64 files, +4169/−262 (excluding docs
 - Handed back to the main session to flip status and present the HS-1 operator gate.
 
 > **Main-session actions (post-verdict, NOT the validator's):**
-> - Operator gate (HS-1): pending
-> - Status flipped in `README.md`: no — only on PASS + operator HS-1
+> - Operator gate (HS-1): APPROVED 2026-06-23 / leandrotca
+> - Status flipped in `README.md`: yes — M3 → passed (2026-06-23)
