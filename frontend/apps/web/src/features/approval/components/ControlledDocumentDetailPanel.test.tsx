@@ -53,8 +53,7 @@ function deferred<T>() {
 
 describe('ControlledDocumentDetailPanel', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
-    MockSignoffDialog.mockImplementation(signoffDialogImpl);
+    vi.clearAllMocks();
     etagCache.clear();
     vi.mocked(approvalApi.getInstance).mockResolvedValue(makeInstance());
     vi.mocked(routeAdminApi.listRoutes).mockResolvedValue({ routes: [], total: 0 });
@@ -200,8 +199,7 @@ describe('ControlledDocumentDetailPanel', () => {
 
 describe('ControlledDocumentDetailPanel auto-open signoff', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
-    MockSignoffDialog.mockImplementation(signoffDialogImpl);
+    vi.clearAllMocks();
     etagCache.clear();
     vi.mocked(approvalApi.getInstance).mockResolvedValue(makeInstance());
     vi.mocked(routeAdminApi.listRoutes).mockResolvedValue({ routes: [], total: 0 });
