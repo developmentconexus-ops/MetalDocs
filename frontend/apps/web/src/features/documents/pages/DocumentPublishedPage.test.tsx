@@ -57,6 +57,10 @@ vi.mock('../api/exports', () => ({
   exportPDF: vi.fn(),
 }));
 
+vi.mock('../../iam/hooks/useHasCapability', () => ({
+  useHasCapability: vi.fn(() => false),
+}));
+
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
 import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
@@ -65,6 +69,7 @@ import { createRevision } from '../../controlled-documents/api/controlledDocumen
 import { useDistributionSummaryQuery } from '../queries/useDistributionSummaryQuery';
 import { exportPDF } from '../api/exports';
 import { ApiError } from '../../../lib/api';
+import { useHasCapability } from '../../iam/hooks/useHasCapability';
 
 describe('DocumentPublishedPage', () => {
   beforeEach(() => {
@@ -796,6 +801,100 @@ describe('DocumentPublishedPage', () => {
       // 1024 bytes → "1 KB"
       expect(tamanhoCell?.textContent).toMatch(/1\s*KB/);
       expect(tamanhoCell?.textContent?.toLowerCase()).not.toContain('em breve');
+    });
+  });
+
+  describe('F4.2 — obsolete variant', () => {
+    const OBSOLETE_DOC = {
+      id: 'doc-published-1',
+      tenant_id: 'tenant-1',
+      template_version_id: 'template-1',
+      name: 'Procedimento descontinuado',
+      status: 'obsolete',
+      form_data_json: {},
+      current_revision_id: 'rev-1',
+      revision_version: 2,
+      active_session_id: '',
+      values_frozen_at: null,
+      archived_at: null,
+      created_at: '2026-05-19T00:00:00.000Z',
+      updated_at: '2026-05-19T00:00:00.000Z',
+      created_by: 'admin-user',
+      revision_number: 1,
+      controlled_document_id: 'cd-1',
+      revision_title: 'Procedimento descontinuado',
+      profile_code_snapshot: 'pop',
+      process_area_code_snapshot: 'general',
+      code: 'POP-GENERAL-014',
+      current_revision_file_size_bytes: 1024,
+      current_revision_page_count: 1,
+    };
+
+    function mockObsolete() {
+      vi.mocked(useDocumentDetailQuery).mockReturnValue({
+        isLoading: false,
+        isError: false,
+        data: OBSOLETE_DOC,
+        refetch: vi.fn(),
+      } as never);
+    }
+
+    it('renders the OBSOLETO watermark and obsolete status presentation when status is obsolete', () => {
+      mockObsolete();
+      render(<DocumentPublishedPage />);
+
+      expect(screen.getByText('OBSOLETO')).toBeTruthy();
+      expect(screen.getByText(/obsoleto após publicação/i)).toBeTruthy();
+    });
+
+    it('applies the page-wide dim treatment to the root only when obsolete', () => {
+      mockObsolete();
+      const { container } = render(<DocumentPublishedPage />);
+      expect((container.firstChild as HTMLElement).className).toMatch(/rootObsolete/);
+    });
+
+    it('does NOT dim the root for a non-obsolete (published) document', () => {
+      const { container } = render(<DocumentPublishedPage />);
+      expect((container.firstChild as HTMLElement).className).not.toMatch(/rootObsolete/);
+    });
+
+    it('hides the "vigente" status pill when obsolete', () => {
+      mockObsolete();
+      render(<DocumentPublishedPage />);
+      // The version·status pill (e.g. "REV01 · obsoleto") is not rendered when obsolete.
+      expect(screen.queryByText(/REV01\s*·\s*obsoleto/)).toBeNull();
+    });
+
+    it('shows the version·status pill for a published document (negative control)', () => {
+      render(<DocumentPublishedPage />);
+      expect(screen.getByText(/REV01\s*·\s*publicado/)).toBeTruthy();
+    });
+
+    it('enables Visualizar on an obsolete doc when the user has the document.obsolete capability', () => {
+      vi.mocked(useHasCapability).mockReturnValue(true);
+      mockObsolete();
+      render(<DocumentPublishedPage />);
+
+      const visualizar = screen.getByRole('button', { name: /Visualizar documento/i }) as HTMLButtonElement;
+      expect(visualizar.disabled).toBe(false);
+    });
+
+    it('disables Visualizar on an obsolete doc when the user lacks the document.obsolete capability', () => {
+      vi.mocked(useHasCapability).mockReturnValue(false);
+      mockObsolete();
+      render(<DocumentPublishedPage />);
+
+      const visualizar = screen.getByRole('button', { name: /Visualizar documento/i }) as HTMLButtonElement;
+      expect(visualizar.disabled).toBe(true);
+    });
+
+    it('disables Baixar PDF and Copiar link when obsolete', () => {
+      vi.mocked(useHasCapability).mockReturnValue(true);
+      mockObsolete();
+      render(<DocumentPublishedPage />);
+
+      expect((screen.getByRole('button', { name: /Baixar PDF/i }) as HTMLButtonElement).disabled).toBe(true);
+      expect((screen.getByRole('button', { name: /Copiar link/i }) as HTMLButtonElement).disabled).toBe(true);
     });
   });
 });

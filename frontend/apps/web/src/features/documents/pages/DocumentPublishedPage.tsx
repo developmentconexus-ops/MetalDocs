@@ -17,6 +17,7 @@ import { createRevision } from '../../controlled-documents/api/controlledDocumen
 import { exportPDF } from '../api/exports';
 import { SupersedePublishDialog } from '../../approval/components/SupersedePublishDialog';
 import { useAuthStore } from '../../../store/auth.store';
+import { useHasCapability } from '../../iam/hooks/useHasCapability';
 import {
   formatPublishedAt,
   formatRevisionCode,
@@ -126,6 +127,9 @@ export function DocumentPublishedPage() {
   const { documentId: rawDocumentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  // Obsolete docs stay viewable only for users who manage obsoletion (UX hint;
+  // backend document.view is the real boundary — wiki/concepts/authz-tiers.md).
+  const canViewObsolete = useHasCapability('document.obsolete');
 
   // Route declaration `/documents/:documentId` makes this non-empty in practice.
   // Coerce to string and let the early return below handle the unreachable empty case
@@ -368,7 +372,7 @@ export function DocumentPublishedPage() {
   };
 
   return (
-    <div className={styles.root}>
+    <div className={`${styles.root}${isObsolete ? ` ${styles.rootObsolete}` : ''}`}>
       {/* ObsoleteBanner — only rendered when status is obsolete */}
       {isObsolete && (
         <div className={styles.obsoleteBanner} role="alert" aria-label="Documento obsoleto">
@@ -401,10 +405,12 @@ export function DocumentPublishedPage() {
         badges={
           <>
             <CodeChip className={styles.codeChip}>{code}</CodeChip>
-            <span className={styles.vigenteBadge}>
-              <span className={styles.vigenteDot} />
-              {versionLabel} · {statusPresentation.badgeLabel}
-            </span>
+            {!isObsolete && (
+              <span className={styles.vigenteBadge}>
+                <span className={styles.vigenteDot} />
+                {versionLabel} · {statusPresentation.badgeLabel}
+              </span>
+            )}
             <span className={styles.typeLabel}>{profileLabel}</span>
           </>
         }
@@ -412,7 +418,17 @@ export function DocumentPublishedPage() {
         subtitle={statusPresentation.subtitle ? <span>{statusPresentation.subtitle}</span> : null}
         actions={
           <div className={styles.heroActions}>
-            <button className="btn btn-primary btn-lg" type="button" onClick={handleView}>
+            <button
+              className="btn btn-primary btn-lg"
+              type="button"
+              onClick={handleView}
+              disabled={isObsolete && !canViewObsolete}
+              title={
+                isObsolete && !canViewObsolete
+                  ? 'Sua sessão não inclui a capacidade para visualizar documentos obsoletos.'
+                  : undefined
+              }
+            >
               <Icon name="eye" size={15} />
               Visualizar documento
             </button>
@@ -421,7 +437,7 @@ export function DocumentPublishedPage() {
               type="button"
               aria-label="Baixar PDF"
               onClick={handleDownloadPDF}
-              disabled={pdfStatus.kind === 'pending' || pdfStatus.kind === 'rate_limited'}
+              disabled={isObsolete || pdfStatus.kind === 'pending' || pdfStatus.kind === 'rate_limited'}
               title={
                 pdfStatus.kind === 'rate_limited'
                   ? `Limite de exportações atingido — tente novamente em ${pdfStatus.retryAfterSec}s`
@@ -484,7 +500,7 @@ export function DocumentPublishedPage() {
               {activeSiblingCtaLabel}
             </button>
             )}
-            <button className="btn btn-ghost" type="button" onClick={handleCopyLink}>
+            <button className="btn btn-ghost" type="button" onClick={handleCopyLink} disabled={isObsolete}>
               <Icon name={linkCopied ? 'check' : 'link'} size={13} />
               {linkCopied ? 'Link copiado!' : 'Copiar link'}
             </button>

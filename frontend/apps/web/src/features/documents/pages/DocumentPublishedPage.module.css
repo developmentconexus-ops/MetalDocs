@@ -9,6 +9,13 @@
   background: var(--bg);
 }
 
+/* Obsolete state — page-wide superseded treatment (design-source/documento-obsoleto:
+   PublicadoV5 obsolete={true} → grayscale(0.65) + opacity 0.85 on the root container). */
+.rootObsolete {
+  filter: grayscale(0.65);
+  opacity: 0.85;
+}
+
 /* ─── Loading / Error states ────────────────────────────────────────────── */
 
 .stateLoading,
