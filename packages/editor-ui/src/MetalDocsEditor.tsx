@@ -58,7 +58,8 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
       props.onChange?.();
     };
 
-    const libMode = props.mode === 'readonly' ? 'viewing' : 'editing';
+    const libMode =
+      props.mode === 'readonly' ? 'viewing' : props.mode === 'review' ? 'suggesting' : 'editing';
     const blankDocument = useMemo(
       () => (!props.documentBuffer && props.mode !== 'readonly' ? createEmptyDocument() : undefined),
       [props.documentBuffer, props.mode],

@@ -3,7 +3,9 @@ import type { Comment } from '@eigenpal/docx-editor-core/types/content';
 import type { EditorPlugin } from '@eigenpal/docx-editor-react/plugin-api';
 import type { SidebarModel } from './plugins/sidebarModelData';
 
-export type EditorMode = 'template-draft' | 'document-edit' | 'readonly';
+export type { BlockContent, Paragraph, Table } from '@eigenpal/docx-editor-core/types/document';
+
+export type EditorMode = 'template-draft' | 'document-edit' | 'readonly' | 'review';
 
 export interface MetalDocsEditorProps {
   documentId?: string;
