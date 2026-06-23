@@ -47,6 +47,27 @@ if (typeof document !== 'undefined') {
   };
 }
 
+// localStorage / sessionStorage — Node v26 defines these globals as undefined (experimental
+// Storage API without --localstorage-file). vitest's populateGlobal skips them because they
+// already exist in the Node global. Re-patch from the jsdom instance so tests can use them.
+// vitest sets `globalThis.jsdom` to the JSDOM instance in its jsdom environment setup.
+const _jsdomInstance = (globalThis as unknown as Record<string, unknown>)['jsdom'] as { window: Window & typeof globalThis } | undefined;
+if (_jsdomInstance?.window) {
+  const _jsdomWindow = _jsdomInstance.window;
+  if (typeof globalThis.localStorage === 'undefined' || globalThis.localStorage === null) {
+    Object.defineProperty(globalThis, 'localStorage', {
+      get: () => _jsdomWindow.localStorage,
+      configurable: true,
+    });
+  }
+  if (typeof globalThis.sessionStorage === 'undefined' || globalThis.sessionStorage === null) {
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      get: () => _jsdomWindow.sessionStorage,
+      configurable: true,
+    });
+  }
+}
+
 // Clipboard API is used by CK5 clipboard pipeline.
 if (typeof navigator !== 'undefined' && !navigator.clipboard) {
   Object.defineProperty(navigator, 'clipboard', {

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -55,8 +56,8 @@ describe('InboxPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     navigateMock.mockReset();
-    // Default localStorage clear
-    localStorage.removeItem('md.inbox.v');
+    // Default localStorage clear — use window.localStorage to avoid Node v26 global shadowing
+    window.localStorage.removeItem('md.inbox.v');
   });
 
   it('loading state shows Carregando', () => {
@@ -101,7 +102,7 @@ describe('InboxPage', () => {
   });
 
   it('invalid persisted view falls back to stack', async () => {
-    localStorage.setItem('md.inbox.v', 'deadline-mock');
+    window.localStorage.setItem('md.inbox.v', 'deadline-mock');
 
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem()], total: 1 },
@@ -148,7 +149,7 @@ describe('InboxPage', () => {
     const timelineBtn = screen.getByText('Linha do tempo');
     fireEvent.click(timelineBtn);
 
-    expect(localStorage.getItem('md.inbox.v')).toBe('timeline');
+    expect(window.localStorage.getItem('md.inbox.v')).toBe('timeline');
   });
 
   it('next/prev navigation updates counter', async () => {
@@ -268,7 +269,7 @@ describe('InboxPage', () => {
     expect(navigateMock).not.toHaveBeenCalledWith('/controlled-documents/cd-fail');
   });
 
-  it('approve action opens signoff flow only when active-document context is complete', async () => {
+  it('approve action navigates to the signoff cockpit with decision=approve', async () => {
     vi.mocked(getActiveDocumentContext).mockResolvedValue({
       document_id: 'doc-1',
       content_hash: 'hash-1',
@@ -286,9 +287,10 @@ describe('InboxPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Aprovar e assinar/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeTruthy();
-      expect(screen.getByText(/Assinar/)).toBeTruthy();
+      expect(getActiveDocumentContext).toHaveBeenCalledWith('cd-123');
+      expect(navigateMock).toHaveBeenCalledWith('/approvals/doc-1?decision=approve');
     });
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('approve action shows alert when active-document lookup fails', async () => {
@@ -310,35 +312,26 @@ describe('InboxPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('refreshes the modern inbox after signoff without redirecting to legacy controlled-document screens', async () => {
-    const refetchSpy = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(signoff).mockResolvedValue(undefined as never);
+  it('reject action navigates to the cockpit with decision=reject', async () => {
     vi.mocked(getActiveDocumentContext).mockResolvedValue({
-      document_id: 'doc-1',
-      content_hash: 'hash-1',
-      approval_instance_id: 'inst-1',
-      revision_version: 0,
+      document_id: 'doc-9',
+      content_hash: 'hash-9',
+      approval_instance_id: 'inst-9',
+      revision_version: 2,
     } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
     vi.mocked(useInboxQuery).mockReturnValue({
-      data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
+      data: { items: [makeItem({ controlled_document_id: 'cd-9' })], total: 1 },
       isLoading: false,
       isError: false,
-      refetch: refetchSpy,
+      refetch: vi.fn(),
     } as unknown as ReturnType<typeof useInboxQuery>);
 
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: /Aprovar e assinar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Devolver/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeTruthy();
+      expect(navigateMock).toHaveBeenCalledWith('/approvals/doc-9?decision=reject');
     });
-
-    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'password' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
-
-    await waitFor(() => expect(vi.mocked(signoff)).toHaveBeenCalled());
-    await waitFor(() => expect(refetchSpy).toHaveBeenCalledTimes(1), { timeout: 3000 });
-    expect(navigateMock).not.toHaveBeenCalledWith(expect.stringContaining('/controlled-documents'));
   });
 });
 

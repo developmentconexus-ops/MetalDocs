@@ -6,7 +6,6 @@ import { useInboxQuery } from '../queries/useInboxQuery';
 import { InboxStack } from '../components/InboxStack';
 import { InboxTimeline } from '../components/InboxTimeline';
 import { InboxToolbar } from '../components/InboxToolbar';
-import { SignoffDialog } from '../components/SignoffDialog';
 import styles from './InboxPage.module.css';
 
 type ViewType = 'stack' | 'timeline';
@@ -25,15 +24,8 @@ export function InboxPage() {
   const [view, setView] = useState<ViewType>(() => readStoredView());
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [dialogState, setDialogState] = useState<{
-    documentId: string;
-    contentHash: string;
-    instanceId: string;
-    revisionVersion: number;
-    initialDecision: 'approve' | 'reject';
-  } | null>(null);
 
-  const { data, isLoading, isError, refetch } = useInboxQuery();
+  const { data, isLoading, isError } = useInboxQuery();
   const items = data?.items ?? [];
 
   function handleViewChange(v: ViewType) {
@@ -67,27 +59,15 @@ export function InboxPage() {
     }
   }
 
-  async function openDecisionFlow(item: InboxItem, initialDecision: 'approve' | 'reject') {
+  async function openDecisionFlow(item: InboxItem, decision: 'approve' | 'reject') {
     setActionError(null);
     try {
       const active = await getActiveDocumentContext(item.controlled_document_id);
-      if (
-        !active?.document_id ||
-        !active?.content_hash ||
-        !active?.approval_instance_id ||
-        active?.revision_version == null
-      ) {
+      if (!active?.document_id) {
         setActionError('Fluxo de aprovação indisponível para este documento no momento.');
         return;
       }
-
-      setDialogState({
-        documentId: active.document_id,
-        contentHash: active.content_hash,
-        instanceId: active.approval_instance_id,
-        revisionVersion: active.revision_version,
-        initialDecision,
-      });
+      navigate(`/approvals/${active.document_id}?decision=${decision}`);
     } catch {
       setActionError('Fluxo de aprovação indisponível para este documento no momento.');
     }
@@ -134,20 +114,6 @@ export function InboxPage() {
           }}
         />
       )}
-      {dialogState ? (
-        <SignoffDialog
-          documentId={dialogState.documentId}
-          contentHash={dialogState.contentHash}
-          instanceId={dialogState.instanceId}
-          revisionVersion={dialogState.revisionVersion}
-          initialDecision={dialogState.initialDecision}
-          onClose={() => setDialogState(null)}
-          onSuccess={() => {
-            setDialogState(null);
-            void refetch();
-          }}
-        />
-      ) : null}
     </div>
   );
 }
