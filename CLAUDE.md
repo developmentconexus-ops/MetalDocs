@@ -34,12 +34,10 @@ architecture contradictions instead of patching around them.
 | QA/close-out | `wiki/quality/qa-operating-system.md` and relevant `wiki/quality/*-checklist.md` |
 | Test framework discipline | `wiki/quality/test-discipline.md`, ADR `wiki/decisions/0034-integration-test-fixture-framework.md` |
 | Program/milestone work | `.claude/skills/mission/SKILL.md` or `.claude/skills/milestone/SKILL.md` |
-| GitNexus-heavy exploration | `.claude/skills/gitnexus/*/SKILL.md` |
 | Docs governance/wiki sync | `wiki/standards/documentation-governance.md`, `.claude/agents/wiki-curator.md` |
 
 ## Workflow
 - Load only the docs needed for the task boundary.
 - Prefer the wiki domain indexes over global file dumps.
-- Use GitNexus only for high-risk, unfamiliar, cross-module, rename, refactor, or blast-radius work.
 - Use Context7 for current library/framework/API docs.
 - For prerequisite failures in startup, auth/session, target route, or contract/generated alignment, stop local feature work and repair the prerequisite first.
