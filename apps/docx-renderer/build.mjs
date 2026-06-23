@@ -1,4 +1,5 @@
 import { build } from 'esbuild';
+import { writeFileSync } from 'node:fs';
 
 // Bundle our own source + @metaldocs/* workspace libraries into one ESM file.
 //
@@ -25,7 +26,7 @@ const externalizeNodeModules = {
   },
 };
 
-await build({
+const result = await build({
   entryPoints: ['src/index.ts'],
   bundle: true,
   platform: 'node',
@@ -33,6 +34,8 @@ await build({
   format: 'esm',
   outfile: 'dist/index.js',
   sourcemap: true,
+  metafile: true,
   logLevel: 'info',
   plugins: [externalizeNodeModules],
 });
+writeFileSync('dist/meta.json', JSON.stringify(result.metafile));
