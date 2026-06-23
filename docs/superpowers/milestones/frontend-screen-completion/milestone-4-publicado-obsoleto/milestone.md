@@ -1,7 +1,7 @@
 # Milestone 4 — Documento Publicado completion + Documento Obsoleto
 
 > **Program:** frontend-screen-completion  ·  **Governing spec:** `../mission.md` (§7 M4, §5 inventory rows 11–12, §8 terminal acceptance)
-> **Status:** Spec approved
+> **Status:** Validator PASS 2026-06-23 (`qa/milestone-qa.md`) — F4.1 + F4.2 closed; awaiting operator HS-1
 > **Authored:** 2026-06-23 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** this milestone is, **which
