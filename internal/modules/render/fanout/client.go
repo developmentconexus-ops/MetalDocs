@@ -24,6 +24,25 @@ type FanoutResponse struct {
 	UnreplacedVars []string `json:"unreplaced_vars"`
 }
 
+// RenderError is a classified failure returned by the docx-renderer.
+type RenderError struct {
+	Status   int
+	Kind     string
+	Message  string
+	Variable string
+}
+
+func (e *RenderError) Error() string {
+	if e.Variable != "" {
+		return fmt.Sprintf("render failed (%s, status %d): %s [variable=%s]", e.Kind, e.Status, e.Message, e.Variable)
+	}
+	return fmt.Sprintf("render failed (%s, status %d): %s", e.Kind, e.Status, e.Message)
+}
+
+// Retryable reports whether the worker should retry. Template defects (4xx) are
+// permanent; unknown/5xx failures are transient.
+func (e *RenderError) Retryable() bool { return e.Status >= 500 }
+
 type Client struct {
 	baseURL      string
 	serviceToken string
@@ -57,7 +76,21 @@ func (c *Client) Fanout(ctx context.Context, req FanoutRequest) (FanoutResponse,
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		errBody, _ := io.ReadAll(resp.Body)
-		return FanoutResponse{}, fmt.Errorf("fanout status %d: %s", resp.StatusCode, string(errBody))
+		var classified struct {
+			Kind     string `json:"kind"`
+			Message  string `json:"message"`
+			Variable string `json:"variable"`
+		}
+		if json.Unmarshal(errBody, &classified) == nil && classified.Kind != "" {
+			return FanoutResponse{}, &RenderError{
+				Status:   resp.StatusCode,
+				Kind:     classified.Kind,
+				Message:  classified.Message,
+				Variable: classified.Variable,
+			}
+		}
+		// Unclassified (e.g. infra error / non-JSON body): treat as unknown, retryable.
+		return FanoutResponse{}, &RenderError{Status: resp.StatusCode, Kind: "unknown", Message: string(errBody)}
 	}
 	var out FanoutResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
