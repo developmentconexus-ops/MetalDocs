@@ -387,6 +387,8 @@ func (n *noopAudit) WriteTx(_ context.Context, _ db.Tx, _, _, action, _ string, 
 
 func TestAcquireSession_Readonly_WhenTaken(t *testing.T) {
 	repo := &fakeRepo{
+		docReturn:   &domain.Document{ID: "doc_1", TenantID: "tenant_1", Status: domain.DocStatusDraft},
+		ownerReturn: true, // actor is owner; satisfies mayWriteWorkingContent draft gate
 		acquireSess: &domain.Session{ID: "sess_taken", DocumentID: "doc_1", UserID: "other"},
 		acquireErr:  domain.ErrSessionTaken,
 	}
@@ -405,7 +407,11 @@ func TestAcquireSession_Readonly_WhenTaken(t *testing.T) {
 }
 
 func TestAcquireSession_Success_RecordsAudit(t *testing.T) {
-	repo := &fakeRepo{acquireSess: &domain.Session{ID: "sess_1", DocumentID: "doc_1", UserID: "user_1"}}
+	repo := &fakeRepo{
+		docReturn:   &domain.Document{ID: "doc_1", TenantID: "tenant_1", Status: domain.DocStatusDraft},
+		ownerReturn: true, // actor is owner; satisfies mayWriteWorkingContent draft gate
+		acquireSess: &domain.Session{ID: "sess_1", DocumentID: "doc_1", UserID: "user_1"},
+	}
 	audit := &noopAudit{}
 	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, audit)
 
@@ -463,7 +469,8 @@ func TestRenameDocument_InvalidName(t *testing.T) {
 
 func TestCommitAutosave_ForwardsArtifactMetadata(t *testing.T) {
 	repo := &fakeRepo{
-		docReturn: &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft},
+		docReturn:   &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft},
+		ownerReturn: true, // actor is owner; satisfies mayWriteWorkingContent draft gate
 		pendingMeta: &application.PendingCommitMeta{
 			ExpectedContentHash: "h1",
 			StorageKey:          "tenants/t/documents/d/revisions/h1.docx",
@@ -514,14 +521,15 @@ func TestCommitAutosave_InvalidPageCount(t *testing.T) {
 
 func TestCommitAutosave_LogsCleanupFailureOnHashMismatch(t *testing.T) {
 	repo := &fakeRepo{
-		docReturn: &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft},
+		docReturn:   &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft},
+		ownerReturn: true, // actor is owner; satisfies mayWriteWorkingContent draft gate
 		pendingMeta: &application.PendingCommitMeta{
 			ExpectedContentHash: "h1",
 			StorageKey:          "tenants/t/documents/d/revisions/h1.docx",
 		},
 	}
 	presigner := &fakePresigner{
-		hashReturn: "WRONG",          // forces hash mismatch path
+		hashReturn: "WRONG",               // forces hash mismatch path
 		deleteErr:  errors.New("s3 down"), // forces delete to fail → WARN fires
 	}
 
@@ -574,6 +582,7 @@ func TestSyncArtifactMetadata_ForwardsArtifactMetadata(t *testing.T) {
 			Status:            domain.DocStatusDraft,
 			CurrentRevisionID: "rev_1",
 		},
+		ownerReturn: true, // actor is owner; satisfies mayWriteWorkingContent draft gate
 		revisionReturn: &domain.Revision{
 			ID:         "rev_1",
 			DocumentID: "doc_1",

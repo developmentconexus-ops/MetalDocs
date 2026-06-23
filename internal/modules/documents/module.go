@@ -95,6 +95,7 @@ func New(deps Dependencies) *Module {
 		svc = application.NewService(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ProfileDefaults)
 	}
 	svc.WithRunner(db.NewTxRunner(deps.DB))
+	svc.WithEligibility(repo)
 	svc.WithControlledDocumentDuplicator(deps.ControlledDocumentDuplicator)
 	h := dhttp.NewHandlerWithSubmit(svc, deps.DB, deps.SubmitSvc).WithCaps(deps.Caps)
 

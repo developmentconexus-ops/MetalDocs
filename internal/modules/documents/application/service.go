@@ -117,11 +117,47 @@ type Service struct {
 	profileTemplates             ProfileDefaultTemplateReader
 	snapshotSvc                  *SnapshotService
 	runner                       db.TxRunner
+	eligibility                  domain.ApproverEligibilityReader
 }
 
 func (s *Service) WithRunner(runner db.TxRunner) *Service {
 	s.runner = runner
 	return s
+}
+
+// WithEligibility wires the ApproverEligibilityReader used by
+// mayWriteWorkingContent. Typically called with repo, which already implements
+// the interface. Must be called before any autosave or session-acquire path is
+// exercised under under_review status.
+func (s *Service) WithEligibility(r domain.ApproverEligibilityReader) *Service {
+	s.eligibility = r
+	return s
+}
+
+// mayWriteWorkingContent decides whether actorID may write the working-content
+// revision chain of doc. Calls IsDocumentOwner / IsEligibleApprover as plain
+// reads — these MUST be called outside any lock-holding or write transaction
+// (advisory-lock-deadlock-constraint).
+func (s *Service) mayWriteWorkingContent(ctx context.Context, tenantID, docID, actorID string, doc *domain.Document) (bool, error) {
+	switch doc.Status {
+	case domain.DocStatusDraft:
+		owner, err := s.repo.IsDocumentOwner(ctx, tenantID, docID, actorID)
+		if err != nil {
+			return false, err
+		}
+		return domain.CanWriteWorkingContent(string(doc.Status), owner, false), nil
+	case domain.DocStatusUnderReview:
+		if s.eligibility == nil {
+			return false, nil
+		}
+		eligible, err := s.eligibility.IsEligibleApprover(ctx, tenantID, docID, actorID)
+		if err != nil {
+			return false, err
+		}
+		return domain.CanWriteWorkingContent(string(doc.Status), false, eligible), nil
+	default:
+		return false, nil
+	}
 }
 
 // Deprecated: use NewService.
@@ -482,7 +518,11 @@ func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (
 	if err != nil {
 		return nil, err
 	}
-	if doc.Status != domain.DocStatusDraft {
+	mayWrite, err := s.mayWriteWorkingContent(ctx, cmd.TenantID, cmd.DocumentID, cmd.ActorUserID, doc)
+	if err != nil {
+		return nil, err
+	}
+	if !mayWrite {
 		return nil, domain.ErrInvalidStateTransition
 	}
 	url, storageKey, err := s.presigner.PresignRevisionPUT(ctx, cmd.TenantID, cmd.DocumentID, cmd.ContentHash)
@@ -517,7 +557,11 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 	if err != nil {
 		return nil, err
 	}
-	if doc.Status != domain.DocStatusDraft {
+	mayWrite, err := s.mayWriteWorkingContent(ctx, cmd.TenantID, cmd.DocumentID, cmd.ActorUserID, doc)
+	if err != nil {
+		return nil, err
+	}
+	if !mayWrite {
 		return nil, domain.ErrInvalidStateTransition
 	}
 	meta, err := s.repo.GetPendingForCommit(ctx, cmd.TenantID, cmd.PendingUploadID)
@@ -581,7 +625,11 @@ func (s *Service) SyncArtifactMetadata(ctx context.Context, cmd SyncArtifactMeta
 	if err != nil {
 		return nil, err
 	}
-	if doc.Status != domain.DocStatusDraft {
+	mayWrite, err := s.mayWriteWorkingContent(ctx, cmd.TenantID, cmd.DocumentID, cmd.ActorUserID, doc)
+	if err != nil {
+		return nil, err
+	}
+	if !mayWrite {
 		return nil, domain.ErrInvalidStateTransition
 	}
 	if strings.TrimSpace(doc.CurrentRevisionID) == "" {
@@ -617,6 +665,17 @@ func (s *Service) SyncArtifactMetadata(ctx context.Context, cmd SyncArtifactMeta
 }
 
 func (s *Service) AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, bool, error) {
+	doc, err := s.repo.GetDocument(ctx, tenantID, docID)
+	if err != nil {
+		return nil, false, err
+	}
+	mayWrite, err := s.mayWriteWorkingContent(ctx, tenantID, docID, userID, doc)
+	if err != nil {
+		return nil, false, err
+	}
+	if !mayWrite {
+		return nil, false, domain.ErrInvalidStateTransition
+	}
 	sess, err := s.repo.AcquireSession(ctx, tenantID, docID, userID)
 	if errors.Is(err, domain.ErrSessionTaken) {
 		return sess, true, nil
