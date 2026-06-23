@@ -9,8 +9,21 @@ import { ControlledDocumentDetailPanel } from './ControlledDocumentDetailPanel';
 
 vi.mock('../api/approvalApi');
 vi.mock('../api/routeAdminApi');
+
+// Spy-able mock: renders role="dialog" and captures initialDecision as a data attr.
+// Defined as a module-level spy so tests can inspect calls and rendered output.
+// NOTE: do NOT use vi.resetAllMocks() for this spy — use mockClear() only.
+const signoffDialogImpl = ({ initialDecision }: { initialDecision?: string }) => (
+  <div role="dialog" data-testid="signoff-dialog" data-initial-decision={initialDecision ?? ''}>
+    SignoffDialogMock
+  </div>
+);
+const MockSignoffDialog = vi.fn(signoffDialogImpl);
+
 vi.mock('./SignoffDialog', () => ({
-  SignoffDialog: () => <div>SignoffDialogMock</div>,
+  get SignoffDialog() {
+    return MockSignoffDialog;
+  },
 }));
 vi.mock('./SupersedePublishDialog', () => ({
   SupersedePublishDialog: () => <div>SupersedePublishDialogMock</div>,
@@ -41,6 +54,7 @@ function deferred<T>() {
 describe('ControlledDocumentDetailPanel', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    MockSignoffDialog.mockImplementation(signoffDialogImpl);
     etagCache.clear();
     vi.mocked(approvalApi.getInstance).mockResolvedValue(makeInstance());
     vi.mocked(routeAdminApi.listRoutes).mockResolvedValue({ routes: [], total: 0 });
@@ -181,5 +195,54 @@ describe('ControlledDocumentDetailPanel', () => {
 
     expect(await screen.findByText('Submetido')).toBeTruthy();
     expect(document.querySelector('#approval-timeline')).toBeTruthy();
+  });
+});
+
+describe('ControlledDocumentDetailPanel auto-open signoff', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    MockSignoffDialog.mockImplementation(signoffDialogImpl);
+    etagCache.clear();
+    vi.mocked(approvalApi.getInstance).mockResolvedValue(makeInstance());
+    vi.mocked(routeAdminApi.listRoutes).mockResolvedValue({ routes: [], total: 0 });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('auto-opens the SignoffDialog when autoOpenSignoff is set and threads initialDecision', async () => {
+    render(
+      <ControlledDocumentDetailPanel
+        documentId="doc-1"
+        approvalState="under_review"
+        contentHash="abcdef1234567890"
+        revisionVersion={3}
+        lockedByInstanceId="inst-1"
+        autoOpenSignoff={true}
+        initialSignoffDecision="reject"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeTruthy();
+    });
+    const dialog = screen.getByTestId('signoff-dialog');
+    expect(dialog.getAttribute('data-initial-decision')).toBe('reject');
+  });
+
+  it('does not auto-open when autoOpenSignoff is absent', async () => {
+    render(
+      <ControlledDocumentDetailPanel
+        documentId="doc-1"
+        approvalState="under_review"
+        contentHash="abcdef1234567890"
+        revisionVersion={3}
+        lockedByInstanceId="inst-1"
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Assinar' })).toBeTruthy();
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

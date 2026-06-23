@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { cancel, getInstance, submit } from '../api/approvalApi';
 import { etagCache } from '../api/etagCache';
@@ -23,6 +23,10 @@ interface ControlledDocumentDetailPanelProps {
   effectiveFrom?: string;
   effectiveTo?: string;
   publishedDocumentId?: string;
+  /** When true, open the SignoffDialog automatically once the instance loads (queue triage). */
+  autoOpenSignoff?: boolean;
+  /** Preselect the decision in the auto-opened SignoffDialog. */
+  initialSignoffDecision?: 'approve' | 'reject';
 }
 
 interface TransitionPolicy {
@@ -116,6 +120,8 @@ export function ControlledDocumentDetailPanel({
   effectiveFrom,
   effectiveTo,
   publishedDocumentId,
+  autoOpenSignoff,
+  initialSignoffDecision,
 }: ControlledDocumentDetailPanelProps) {
   const [instance, setInstance] = useState<ApprovalInstance | null>(null);
   const [loading, setLoading] = useState(true);
@@ -132,6 +138,7 @@ export function ControlledDocumentDetailPanel({
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [showSignoffDialog, setShowSignoffDialog] = useState(false);
+  const autoOpenedRef = useRef(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -166,6 +173,19 @@ export function ControlledDocumentDetailPanel({
     }, 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (
+      autoOpenSignoff &&
+      !autoOpenedRef.current &&
+      instance &&
+      TRANSITION_POLICY[toApprovalState(approvalState)].actions.signoff &&
+      lockedByInstanceId
+    ) {
+      autoOpenedRef.current = true;
+      setShowSignoffDialog(true);
+    }
+  }, [autoOpenSignoff, instance, approvalState, lockedByInstanceId]);
 
   const isStale = useMemo(() => {
     if (lastFetchedAt == null) {
@@ -404,6 +424,7 @@ export function ControlledDocumentDetailPanel({
           contentHash={contentHash}
           instanceId={instance.id}
           revisionVersion={revisionVersion}
+          initialDecision={initialSignoffDecision}
           onClose={() => setShowSignoffDialog(false)}
           onSuccess={() => void fetchInstance()}
         />
