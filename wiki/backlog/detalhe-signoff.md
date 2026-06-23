@@ -5,9 +5,7 @@ Deferred-with-trigger items surfaced while building the Detalhe Signoff cockpit
 
 | Item | Why deferred | Unblock trigger | Owner |
 |------|--------------|-----------------|-------|
-| "Mudanças vs versão anterior" diff tab | No document-diff backend exists. `GET /documents/{id}/view` returns a single rendered PDF pointer; there is no endpoint that compares the under-review revision against the previously published one. Rendering a fabricated diff would violate the honesty rule. | A backend diff endpoint (e.g. `GET /documents/{id}/diff?against={revision}`) returning structured added/removed/changed regions or a diff artifact. When it ships, wire the tab to it. | Frontend (consume) + Backend (produce) |
-
-Until then the tab renders an honest explanation and no invented data.
+| Tracked-changes summary list (extractTrackedChanges) | Two-tab diff design retired (2026-06-23). Review redline now lives inline in the suggesting-mode editor via `@eigenpal/docx-editor-react@1.9.0` tracked changes. A future enhancement would extract these changes via Eigenpal's `extractTrackedChanges` API and render a summary list for quick inspection. | Eigenpal exports a stable `extractTrackedChanges(document)` function; FE wires it into a summary panel in the cockpit. Or, a design decision to omit the summary and keep track-changes inspection in-doc only. | Frontend |
 
 ## Pre-existing shared-component debt (surfaced by F5.1 reviewers, NOT introduced here)
 

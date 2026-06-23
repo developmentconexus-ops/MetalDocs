@@ -1,7 +1,7 @@
 # Frontend module: approval
 
-> **Last verified:** 2026-06-02 (PR-5 structural sweep: RouteAdminPage anchor repaired for post-PR-4 layout)
-> **Scope:** Inbox (caixa-de-aprovação), signoff dialog, approval-route admin. Frontend slice of the backend [`approval`](../approval.md) module.
+> **Last verified:** 2026-06-23 (F5.1 cockpit closed: editor mount + save-on-decision flow; review redline via @eigenpal/docx-editor-react@1.9.0 suggesting mode; prior: 2026-06-02)
+> **Scope:** Inbox (caixa-de-aprovação), signoff dialog, approval-route admin, detalhe signoff cockpit. Frontend slice of the backend [`approval`](../approval.md) module.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/approval.md`](../approval.md)
 
 ## 1. Purpose
@@ -19,6 +19,18 @@ Renders the approver inbox, drives the signoff flow with `If-Match` revision pre
 - [`frontend/apps/web/src/features/approval/api/etagCache.ts:3`](../../../frontend/apps/web/src/features/approval/api/etagCache.ts) — per-resource ETag cache.
 - [`frontend/apps/web/src/features/approval/components/SignoffDialog.tsx`](../../../frontend/apps/web/src/features/approval/components/SignoffDialog.tsx) — approve/reject with password reauth.
 - [`frontend/apps/web/src/features/approval/components/InboxStack.tsx`](../../../frontend/apps/web/src/features/approval/components/InboxStack.tsx), [`InboxTimeline.tsx`](../../../frontend/apps/web/src/features/approval/components/InboxTimeline.tsx), [`ApprovalTimelinePanel.tsx`](../../../frontend/apps/web/src/features/approval/components/ApprovalTimelinePanel.tsx).
+- [`frontend/apps/web/src/features/approval/pages/DetailheSignoffPage.tsx`](../../../frontend/apps/web/src/features/approval/pages/DetailheSignoffPage.tsx) — Detalhe Signoff cockpit (F5.1, 2026-06-23). Mounts `MetalDocsEditor` in `review`-mode (Eigenpal `suggesting`) for inline redline viewing. On user decision (approve/reject via `SignoffDialog`), saves the document buffer and commits metadata in a single transaction.
+
+## 2.1 Detalhe Signoff Cockpit (F5.1)
+
+The cockpit (`/approvals/:documentId`) unifies review, redline, and signoff in a single page:
+
+- **Document mount:** `MetalDocsEditor` (from `packages/editor-ui/`) renders the under-review DOCX in `review` mode, which maps to Eigenpal's `suggesting` mode. This shows tracked changes (additions, deletions, formatting shifts) as inline redlines, replacing the prior two-tab diff design. The document is read-only to the reviewer.
+- **Sidebar:** Timeline of prior approvals, comments (unresolved counted), and decision buttons.
+- **Save-on-decision flow:** When reviewer clicks approve or reject, `SignoffDialog` collects the decision + optional password reauth, then the cockpit saves the reviewer's own edits (if any) via the captured `documentBuffer` from the editor, and commits the signoff metadata in a single backend transaction. This enforces "buffer state at signoff time must match what the reviewer saw."
+- **Tracked changes:** Inline redlines live in the document itself (sourced from Eigenpal). A future enhancement (deferred item in `wiki/backlog/detalhe-signoff.md`) would extract and summarize them via Eigenpal's `extractTrackedChanges` API.
+
+**Source of truth for redlines:** When a document enters review, the backend (documents module) returns DOCX with tracked changes embedded. Eigenpal renders these as visible redlines in suggesting mode. No fabricated two-buffer diff; all changes come from the DOCX itself.
 
 ## 3. Routes
 
