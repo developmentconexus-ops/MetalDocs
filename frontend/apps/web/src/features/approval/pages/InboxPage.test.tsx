@@ -5,7 +5,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getNextSelectedIdx, InboxPage } from './InboxPage';
 import type { InboxItem } from '../api/approvalTypes';
-import { getActiveDocumentContext, signoff } from '../api/approvalApi';
+import { getActiveDocumentContext } from '../api/approvalApi';
 
 const navigateMock = vi.fn();
 
@@ -22,7 +22,6 @@ vi.mock('../api/approvalApi', async () => {
   return {
     ...actual,
     getActiveDocumentContext: vi.fn(),
-    signoff: vi.fn(),
   };
 });
 
