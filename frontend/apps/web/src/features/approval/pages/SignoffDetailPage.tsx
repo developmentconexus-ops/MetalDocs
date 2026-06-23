@@ -67,6 +67,8 @@ export function SignoffDetailPage() {
               key={t.id}
               type="button"
               role="tab"
+              id={`tab-${t.id}`}
+              aria-controls={`panel-${t.id}`}
               aria-selected={tab === t.id}
               className={`${styles.tab} ${tab === t.id ? styles.tabActive : ''}`}
               onClick={() => setTab(t.id)}
@@ -76,7 +78,13 @@ export function SignoffDetailPage() {
           ))}
         </nav>
 
-        <div className={styles.body}>
+        <div
+          className={styles.body}
+          role="tabpanel"
+          id={`panel-${tab}`}
+          aria-labelledby={`tab-${tab}`}
+          tabIndex={0}
+        >
           {tab === 'documento' ? (
             <div className={styles.a4}>
               {pdf.status === 'ready' && pdf.url ? (

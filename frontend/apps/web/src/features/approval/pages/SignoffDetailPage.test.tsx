@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -92,5 +92,45 @@ describe('SignoffDetailPage', () => {
     renderAt();
     const frame = await screen.findByTitle('Pré-visualização do documento');
     expect(frame.getAttribute('src')).toBe('https://cdn.example/doc-1.pdf');
+  });
+
+  it('shows the sidebar error state when the active-document-context query errors', async () => {
+    vi.spyOn(approvalApi, 'getActiveDocumentContext').mockRejectedValue(
+      new Error('context boom'),
+    );
+    renderAt();
+    await waitFor(() => {
+      expect(
+        screen.getByText('Não foi possível carregar os dados de aprovação.'),
+      ).toBeTruthy();
+    });
+  });
+
+  it('renders flattened comment text on the Comentários tab', async () => {
+    vi.spyOn(documentsApi, 'listComments').mockResolvedValue([
+      {
+        id: 'cmt-1',
+        library_comment_id: 'lib-1',
+        parent_library_id: null,
+        author: 'João Silva',
+        author_id: 'u-1',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'Revisar' }] },
+          { type: 'paragraph', content: [{ type: 'text', text: 'a seção 3.' }] },
+        ],
+        done: false,
+        created_at: '2026-04-14T10:00:00.000Z',
+        updated_at: '2026-04-14T10:00:00.000Z',
+        resolved_at: null,
+      },
+    ] as unknown as Awaited<ReturnType<typeof documentsApi.listComments>>);
+    renderAt();
+    await waitFor(() => {
+      expect(screen.getByText('POP Limpeza de Linha')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole('tab', { name: 'Comentários' }));
+    await waitFor(() => {
+      expect(screen.getByText('Revisar a seção 3.')).toBeTruthy();
+    });
   });
 });
