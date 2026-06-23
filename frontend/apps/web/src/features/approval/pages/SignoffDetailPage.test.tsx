@@ -1,0 +1,96 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { SignoffDetailPage } from './SignoffDetailPage';
+import * as approvalApi from '../api/approvalApi';
+import * as documentsApi from '../../documents/api/documents';
+import * as pdfHook from '../../documents/hooks/editor/useDocumentPdfStatus';
+
+function makeDoc(overrides: Partial<documentsApi.DocumentDetail> = {}) {
+  return {
+    id: 'doc-1',
+    code: 'POP-QUA-0148',
+    name: 'POP Limpeza de Linha',
+    status: 'under_review',
+    revision_version: 3,
+    controlled_document_id: 'cd-1',
+    ...overrides,
+  } as documentsApi.DocumentDetail;
+}
+
+function makeContext() {
+  return {
+    document_id: 'doc-1',
+    approval_state: 'under_review',
+    content_hash: 'hash-abc',
+    revision_version: 3,
+    approval_instance_id: 'inst-1',
+  } as Awaited<ReturnType<typeof approvalApi.getActiveDocumentContext>>;
+}
+
+function renderAt(url = '/approvals/doc-1') {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={[url]}>
+        <Routes>
+          <Route path="/approvals/:documentId" element={<SignoffDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe('SignoffDetailPage', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc());
+    vi.spyOn(approvalApi, 'getActiveDocumentContext').mockResolvedValue(makeContext());
+    vi.spyOn(approvalApi, 'getInstance').mockResolvedValue({
+      id: 'inst-1',
+      document_id: 'doc-1',
+      route_id: 'r1',
+      tenant_id: 't1',
+      status: 'in_progress',
+      submitted_by: 'maria',
+      submitted_at: '2026-04-14T10:00:00.000Z',
+      stages: [],
+      etag: '"v3"',
+    } as Awaited<ReturnType<typeof approvalApi.getInstance>>);
+    vi.spyOn(documentsApi, 'listComments').mockResolvedValue([]);
+    vi.spyOn(pdfHook, 'useDocumentPdfStatus').mockReturnValue({ status: 'pending', retry: vi.fn() });
+  });
+
+  it('renders the document header from getDocument', async () => {
+    renderAt();
+    await waitFor(() => {
+      expect(screen.getByText('POP Limpeza de Linha')).toBeTruthy();
+      expect(screen.getByText('POP-QUA-0148')).toBeTruthy();
+    });
+  });
+
+  it('mounts the decision panel (Assinar present for under_review)', async () => {
+    renderAt();
+    await waitFor(() => { expect(screen.getByText('Assinar')).toBeTruthy(); });
+  });
+
+  it('shows an honest A4 pending state while the PDF is generating', async () => {
+    renderAt();
+    await waitFor(() => {
+      expect(screen.getByText('Gerando visualização do documento…')).toBeTruthy();
+    });
+  });
+
+  it('embeds the rendered PDF when ready', async () => {
+    vi.spyOn(pdfHook, 'useDocumentPdfStatus').mockReturnValue({
+      status: 'ready',
+      url: 'https://cdn.example/doc-1.pdf',
+      retry: vi.fn(),
+    });
+    renderAt();
+    const frame = await screen.findByTitle('Pré-visualização do documento');
+    expect(frame.getAttribute('src')).toBe('https://cdn.example/doc-1.pdf');
+  });
+});
