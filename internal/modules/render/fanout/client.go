@@ -81,16 +81,13 @@ func (c *Client) Fanout(ctx context.Context, req FanoutRequest) (FanoutResponse,
 			Message  string `json:"message"`
 			Variable string `json:"variable"`
 		}
-		if json.Unmarshal(errBody, &classified) == nil && classified.Kind != "" {
-			return FanoutResponse{}, &RenderError{
-				Status:   resp.StatusCode,
-				Kind:     classified.Kind,
-				Message:  classified.Message,
-				Variable: classified.Variable,
-			}
+		_ = json.Unmarshal(errBody, &classified)
+		return FanoutResponse{}, &RenderError{
+			Status:   resp.StatusCode,
+			Kind:     classified.Kind,
+			Message:  classified.Message,
+			Variable: classified.Variable,
 		}
-		// Unclassified (e.g. infra error / non-JSON body): treat as unknown, retryable.
-		return FanoutResponse{}, &RenderError{Status: resp.StatusCode, Kind: "unknown", Message: string(errBody)}
 	}
 	var out FanoutResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
