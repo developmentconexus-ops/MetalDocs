@@ -27,6 +27,8 @@ interface ControlledDocumentDetailPanelProps {
   autoOpenSignoff?: boolean;
   /** Preselect the decision in the auto-opened SignoffDialog. */
   initialSignoffDecision?: 'approve' | 'reject';
+  /** Optional async hook called before the sign-off dialog opens. If it rejects, the dialog is suppressed and an error is shown. */
+  beforeDecision?: () => Promise<void>;
 }
 
 interface TransitionPolicy {
@@ -122,6 +124,7 @@ export function ControlledDocumentDetailPanel({
   publishedDocumentId,
   autoOpenSignoff,
   initialSignoffDecision,
+  beforeDecision,
 }: ControlledDocumentDetailPanelProps) {
   const [instance, setInstance] = useState<ApprovalInstance | null>(null);
   const [loading, setLoading] = useState(true);
@@ -250,6 +253,18 @@ export function ControlledDocumentDetailPanel({
     }
   };
 
+  const handleAssinar = async () => {
+    if (beforeDecision) {
+      try {
+        await beforeDecision();
+      } catch {
+        setError('Não foi possível salvar as alterações antes de registrar a decisão.');
+        return;
+      }
+    }
+    setShowSignoffDialog(true);
+  };
+
   const handleCancelInstance = async () => {
     const reason = window.prompt('Motivo do cancelamento da instância:');
     if (!reason || !reason.trim()) {
@@ -341,7 +356,7 @@ export function ControlledDocumentDetailPanel({
             <button
               type="button"
               className={styles.actionButton}
-              onClick={() => setShowSignoffDialog(true)}
+              onClick={() => void handleAssinar()}
               disabled={!instance}
             >
               Assinar

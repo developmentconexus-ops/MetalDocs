@@ -146,6 +146,7 @@ export function SignoffDetailPage() {
             publishedDocumentId={context.published_document_id}
             autoOpenSignoff={Boolean(initialSignoffDecision)}
             initialSignoffDecision={initialSignoffDecision}
+            beforeDecision={async () => { await canvasRef.current?.flushSave(); }}
           />
         ) : (
           <div className={styles.state}>

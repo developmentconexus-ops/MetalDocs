@@ -197,6 +197,74 @@ describe('ControlledDocumentDetailPanel', () => {
   });
 });
 
+describe('ControlledDocumentDetailPanel beforeDecision', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    etagCache.clear();
+    vi.mocked(approvalApi.getInstance).mockResolvedValue(makeInstance());
+    vi.mocked(routeAdminApi.listRoutes).mockResolvedValue({ routes: [], total: 0 });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('Case A: awaits beforeDecision before signoff dialog opens', async () => {
+    const callOrder: string[] = [];
+    const beforeDecision = vi.fn(async () => {
+      callOrder.push('beforeDecision');
+    });
+
+    render(
+      <ControlledDocumentDetailPanel
+        documentId="doc-1"
+        approvalState="under_review"
+        contentHash="abcdef1234567890"
+        revisionVersion={3}
+        lockedByInstanceId="inst-1"
+        beforeDecision={beforeDecision}
+      />,
+    );
+
+    const assinarBtn = await screen.findByRole('button', { name: 'Assinar' });
+    fireEvent.click(assinarBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeTruthy();
+    });
+
+    expect(beforeDecision).toHaveBeenCalledTimes(1);
+    expect(callOrder).toEqual(['beforeDecision']);
+  });
+
+  it('Case B: if beforeDecision rejects, signoff dialog does NOT open and error UX shows', async () => {
+    const beforeDecision = vi.fn(async () => {
+      throw new Error('flush failed');
+    });
+
+    render(
+      <ControlledDocumentDetailPanel
+        documentId="doc-1"
+        approvalState="under_review"
+        contentHash="abcdef1234567890"
+        revisionVersion={3}
+        lockedByInstanceId="inst-1"
+        beforeDecision={beforeDecision}
+      />,
+    );
+
+    const assinarBtn = await screen.findByRole('button', { name: 'Assinar' });
+    fireEvent.click(assinarBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeTruthy();
+    });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByText('Não foi possível salvar as alterações antes de registrar a decisão.')).toBeTruthy();
+  });
+});
+
 describe('ControlledDocumentDetailPanel auto-open signoff', () => {
   beforeEach(() => {
     vi.clearAllMocks();
