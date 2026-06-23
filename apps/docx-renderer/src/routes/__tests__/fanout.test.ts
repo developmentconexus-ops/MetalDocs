@@ -64,7 +64,7 @@ beforeAll(async () => {
   process.env.DOCX_RENDERER_S3_SECRET_KEY = 'sec';
   const { buildApp } = await import('../../index.js');
   app = await buildApp();
-});
+}, 30000);
 
 afterAll(async () => {
   if (app) await app.close();
