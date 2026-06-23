@@ -26,6 +26,7 @@ export const ReviewDocumentCanvas = forwardRef<ReviewDocumentCanvasRef, ReviewDo
 
     // Buffer state: undefined = loading, null = error/not-found, ArrayBuffer = ready
     const [buffer, setBuffer] = useState<ArrayBuffer | null | undefined>(undefined);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     // ---------------------------------------------------------------------------
     // Session — enabled only while document is under_review so this component
@@ -63,6 +64,7 @@ export const ReviewDocumentCanvas = forwardRef<ReviewDocumentCanvasRef, ReviewDo
 
       let cancelled = false;
       setBuffer(undefined);
+      setLoadError(null);
 
       void (async () => {
         try {
@@ -76,8 +78,11 @@ export const ReviewDocumentCanvas = forwardRef<ReviewDocumentCanvasRef, ReviewDo
           }
           const ab = await fileRes.arrayBuffer();
           if (!cancelled) setBuffer(ab);
-        } catch {
-          if (!cancelled) setBuffer(null);
+        } catch (err) {
+          if (!cancelled) {
+            setBuffer(null);
+            setLoadError(err instanceof Error ? err.message : 'Documento indisponível.');
+          }
         }
       })();
 
@@ -117,12 +122,8 @@ export const ReviewDocumentCanvas = forwardRef<ReviewDocumentCanvasRef, ReviewDo
     // ---------------------------------------------------------------------------
     // Render
     // ---------------------------------------------------------------------------
-    const canMount = buffer !== undefined && buffer !== null;
-
-    if (!canMount) {
-      // While loading or on error, render nothing (the cockpit provides shell UI)
-      return null;
-    }
+    if (buffer === undefined) return <div>Carregando documento…</div>;
+    if (loadError || buffer === null) return <div role="alert">{loadError ?? 'Documento indisponível.'}</div>;
 
     return (
       <MetalDocsEditor
