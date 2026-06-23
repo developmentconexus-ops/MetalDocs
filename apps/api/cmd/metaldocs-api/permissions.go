@@ -235,9 +235,10 @@ var routeRules = []routeRule{
 	{method: http.MethodPut, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodDelete, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// Notifications — self-scoped read surface (M3/F3.2). CapNotificationRead at tier-1
-	// (mirrors CapAuditRead). Most specific first: unread-count (exact) and /read (suffix)
-	// precede the bare collection GET.
+	// Notifications — self-scoped read surface (M3/F3.2, F3.4). CapNotificationRead at tier-1
+	// (mirrors CapAuditRead). Most specific first: read-all (exact) and unread-count (exact)
+	// and /read (suffix) precede the bare collection GET.
+	{method: http.MethodPost, pathExact: "/api/v1/notifications/read-all", capability: iamdomain.CapNotificationRead, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/notifications/unread-count", capability: iamdomain.CapNotificationRead, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/notifications/", pathSuffix: "/read", capability: iamdomain.CapNotificationRead, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/notifications", capability: iamdomain.CapNotificationRead, visibility: iamdelivery.VisibilityPermissionGuarded},

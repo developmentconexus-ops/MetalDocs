@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
+import { NotificationBell } from '../../notifications/components/NotificationBell';
 import { useAuthStore } from '../../../store/auth.store';
 import styles from './AppToolbar.module.css';
 
@@ -35,17 +36,15 @@ export function AppToolbar() {
       <div className={styles.spacer} />
 
       {user && (
-        <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }}>
+        <span className={styles.userName}>
           {user.displayName || user.email}
         </span>
       )}
 
-      <button className={styles.bellBtn} aria-label="Notificações" title="Notificações">
-        <Icon name="bell" size={16} />
-        {/* Notification badge — wired in Library/Dashboard blocks */}
-      </button>
+      <NotificationBell />
 
       <button
+        type="button"
         className={styles.newDocBtn}
         onClick={() => navigate('/documents/new')}
         aria-label="Novo documento"

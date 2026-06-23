@@ -28,6 +28,7 @@ type Repository interface {
 	List(ctx context.Context, tenantID, recipientUserID, statusFilter, cursor string, limit int) (notificationsdomain.NotificationsPage, error)
 	UnreadCount(ctx context.Context, tenantID, recipientUserID string) (int, error)
 	MarkRead(ctx context.Context, tenantID, notificationID, recipientUserID string) error
+	MarkAllRead(ctx context.Context, tenantID, recipientUserID string) (int, error)
 }
 
 // Handler implements notificationsapi.StrictServerInterface.
@@ -161,6 +162,37 @@ func (h *Handler) MarkNotificationRead(
 	}
 
 	return notificationsapi.MarkNotificationRead204Response{}, nil
+}
+
+// MarkAllNotificationsRead handles POST /notifications/read-all. Idempotent,
+// self-scoped: marks every one of the caller's PENDING/SENT rows READ and
+// returns how many were transitioned.
+func (h *Handler) MarkAllNotificationsRead(
+	ctx context.Context,
+	req notificationsapi.MarkAllNotificationsReadRequestObject,
+) (notificationsapi.MarkAllNotificationsReadResponseObject, error) {
+	tenantID, userID, ok := extractTenantAndUser(ctx)
+	if !ok {
+		return notificationsapi.MarkAllNotificationsRead500ApplicationProblemPlusJSONResponse{
+			InternalServerErrorApplicationProblemPlusJSONResponse: notificationsapi.InternalServerErrorApplicationProblemPlusJSONResponse(
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+			),
+		}, nil
+	}
+
+	updated, err := h.repo.MarkAllRead(ctx, tenantID, userID)
+	if err != nil {
+		slog.Error("notifications.MarkAllNotificationsRead", "error", err)
+		return notificationsapi.MarkAllNotificationsRead500ApplicationProblemPlusJSONResponse{
+			InternalServerErrorApplicationProblemPlusJSONResponse: notificationsapi.InternalServerErrorApplicationProblemPlusJSONResponse(
+				toProblem(problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Internal server error")),
+			),
+		}, nil
+	}
+
+	return notificationsapi.MarkAllNotificationsRead200JSONResponse{
+		Updated: updated,
+	}, nil
 }
 
 // toAPINotification maps a stored row to the generated wire shape.

@@ -147,4 +147,55 @@ func TestNotifications(t *testing.T) {
 			t.Fatalf("want owner's row still unread (1), got %d", n)
 		}
 	})
+
+	t.Run("mark_all_read_flips_only_callers_unread_and_idempotent", func(t *testing.T) {
+		ten := testdb.NewTenant(t, db)
+		userA := testdb.NewUser(t, db, testdb.WithTenant(ten.ID))
+		userB := testdb.NewUser(t, db, testdb.WithTenant(ten.ID))
+		// A: 2 unread (PENDING + SENT) + 1 already READ; B: 1 PENDING (must not be touched).
+		pending := testdb.NewNotification(t, db, testdb.WithTenant(ten.ID), testdb.WithRecipient(userA.ID), testdb.WithStatus("PENDING"))
+		sent := testdb.NewNotification(t, db, testdb.WithTenant(ten.ID), testdb.WithRecipient(userA.ID), testdb.WithStatus("SENT"))
+		testdb.NewNotification(t, db, testdb.WithTenant(ten.ID), testdb.WithRecipient(userA.ID), testdb.WithStatus("READ"))
+		testdb.NewNotification(t, db, testdb.WithTenant(ten.ID), testdb.WithRecipient(userB.ID), testdb.WithStatus("PENDING"))
+		// The two rows MarkAllRead must transition (and stamp read_at on).
+		transitioned := map[string]bool{pending.ID: true, sent.ID: true}
+
+		updated, err := repo.MarkAllRead(ctx, ten.ID, userA.ID)
+		if err != nil {
+			t.Fatalf("MarkAllRead: %v", err)
+		}
+		if updated != 2 { // only A's PENDING + SENT, not the already-READ one
+			t.Fatalf("want updated=2, got %d", updated)
+		}
+		// A is fully read; the previously-READ row keeps its read_at (no double-flip).
+		if n, _ := repo.UnreadCount(ctx, ten.ID, userA.ID); n != 0 {
+			t.Fatalf("want A unread=0 after MarkAllRead, got %d", n)
+		}
+		page, err := repo.List(ctx, ten.ID, userA.ID, "READ", "", 10)
+		if err != nil {
+			t.Fatalf("List A after MarkAllRead: %v", err)
+		}
+		if len(page.Items) != 3 {
+			t.Fatalf("want A to have 3 READ rows, got %d", len(page.Items))
+		}
+		// Every row MarkAllRead transitioned must have read_at stamped; the
+		// already-READ seed row is not required to (it was never transitioned).
+		for _, it := range page.Items {
+			if transitioned[it.ID] && it.ReadAt == nil {
+				t.Errorf("transitioned READ row %s has nil read_at", it.ID)
+			}
+		}
+		// Self-scope: B is untouched.
+		if n, _ := repo.UnreadCount(ctx, ten.ID, userB.ID); n != 1 {
+			t.Fatalf("self-scope leak: want B unread=1 (untouched), got %d", n)
+		}
+		// Idempotent: a second call affects 0 rows, no error.
+		again, err := repo.MarkAllRead(ctx, ten.ID, userA.ID)
+		if err != nil {
+			t.Fatalf("MarkAllRead idempotent re-run: %v", err)
+		}
+		if again != 0 {
+			t.Fatalf("want updated=0 on idempotent re-run, got %d", again)
+		}
+	})
 }

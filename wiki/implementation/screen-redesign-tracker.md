@@ -33,7 +33,7 @@ listed for completeness. "Milestone" = the `frontend-screen-completion` mileston
 | IAM Admin Center | `/admin/*` (+ overview/people/roles/memberships/audit/sessions/usage tabs) | `iam/pages/AdminCenterPage.tsx` | done | done | Owns metrics/audit/sessions (D7 — why Operations/Audit stubs are deleted). |
 | Approval Inbox | `/approvals` | `approval/pages/InboxPage.tsx` | done | done | Foco/Linha-do-tempo views; deferred items in `wiki/backlog/caixa-aprovacao.md`. |
 | Route Admin | `/approval-routes` | `approval/pages/route-admin/RouteAdminPage.tsx` | done | done | Capability-gated (`route.manage`). |
-| Notifications | `/notifications` | `notifications/pages/NotificationsPage.tsx` | stub | M3 | Empty stub; `notifications.ts` returns empty arrays, stream noop; **no notification backend** (finding 10–11). |
+| Notifications | — (no route; top-bar bell) | `notifications/components/NotificationBell.tsx` (+`NotificationsSpotlight`, `NotificationRow`) | done | done (M3 / F3.4) | **Page+route removed** (M3/F3.4): replaced the empty `/notifications` page with a top-bar bell → unread-badge → popover → "Mostrar todas" spotlight. Real backend (F3.1–F3.3) + additive `POST /notifications/read-all`; generated types, TanStack Query, CSS-Module. Legacy `NotificationsPage`/`NotificationsPanel`/`useNotifications` + `NotificationItem` retired. |
 | Content Builder | `/content-builder` | `content-builder/pages/ContentBuilderPage.tsx` | partial | out-of-scope | Thin wrapper delegating to a shared view; not a target screen. HS-6 if it proves a real gap. |
 | Change Password | `/change-password` | `password-change/pages/PasswordChangeRoutePage.tsx` | done | done | |
 | Auth route | — (`authRoutes` **not** mounted in `AppRouter.tsx`) | `auth/pages/AuthRoutePage.tsx` | not-started | out-of-scope | Exported but unmounted dead route; `/login` is the live public auth entry. Recorded as truth; not in M0 delete scope (D7 = Operations/Audit only). |
@@ -43,9 +43,11 @@ listed for completeness. "Milestone" = the `frontend-screen-completion` mileston
 | `catalogo-slots` | — | (none) | cut | cut (D3) | Design-source slug, no NOTES/route/product intent. CUT. |
 
 > **Evidence base:** verified router read of `src/app/AppRouter.tsx` + every `features/**/routes.tsx`,
-> `ls` of every live-presented page file (the 18 routed pages after M0/F0.3 deleted Operations + Audit —
+> `ls` of every live-presented page file (18 routed pages after M0/F0.3 deleted Operations + Audit;
+> **17 after M3/F3.4 removed the `/notifications` route** in favor of the top-bar bell —
 > the two `cut` rows cite their now-deleted files for lineage only, marked *(deleted)*), mission §5
-> inventory, and `discovery-brief.md` findings 1–16, reconciled to post-F0.3 reality on 2026-06-21.
+> inventory, and `discovery-brief.md` findings 1–16, reconciled to post-F0.3 reality on 2026-06-21
+> (notifications row updated 2026-06-22).
 
 ---
 

@@ -46,34 +46,10 @@
   flex: 1;
 }
 
-.bellBtn {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-2);
-  border: 1px solid transparent;
-  background: transparent;
+.userName {
+  font-size: var(--font-size-xs);
   color: var(--text-muted);
-  cursor: pointer;
-}
-
-.bellBtn:hover {
-  background: var(--surface-2);
-  color: var(--text);
-}
-
-.badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: 1.5px solid var(--surface);
+  font-family: var(--font-sans);
 }
 
 .newDocBtn {
@@ -86,7 +62,7 @@
   font-weight: 500;
   font-family: var(--font-sans);
   background: var(--brand);
-  color: white;
+  color: var(--text-on-brand);
   border: none;
   border-radius: var(--r-2);
   cursor: pointer;

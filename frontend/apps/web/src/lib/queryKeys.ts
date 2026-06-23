@@ -99,5 +99,7 @@ export const QK = {
   },
   notifications: {
     unreadCount: () => ['notifications', 'unread-count'] as const,
+    list: (params: { status?: string; limit?: number } = {}) =>
+      ['notifications', 'list', params] as const,
   },
 } as const;

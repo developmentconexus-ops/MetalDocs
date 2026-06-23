@@ -5,7 +5,6 @@ import { contentBuilderRoutes } from '../features/content-builder/routes';
 import { dashboardRoutes } from '../features/dashboard/routes';
 import { documentsRoutes } from '../features/documents/routes';
 import { iamRoutes } from '../features/iam/routes';
-import { notificationsRoutes } from '../features/notifications/routes';
 import { passwordChangeRoutes } from '../features/password-change/routes';
 import { taxonomyRoutes } from '../features/taxonomy/routes';
 import { templatesRoutes } from '../features/templates/routes';
@@ -31,7 +30,6 @@ export const router = createBrowserRouter([
           ...taxonomyRoutes,
           ...iamRoutes,
           ...approvalRoutes,
-          ...notificationsRoutes,
           ...contentBuilderRoutes,
           ...passwordChangeRoutes,
           { path: '*', element: <Navigate to="/" replace /> },

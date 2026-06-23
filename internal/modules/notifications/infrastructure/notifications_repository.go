@@ -174,3 +174,31 @@ func (r *NotificationsRepository) MarkRead(ctx context.Context, tenantID, notifi
 	}
 	return nil
 }
+
+// MarkAllRead marks every one of the caller's unread (PENDING/SENT) notifications
+// READ in a single statement and returns the number of rows transitioned.
+// Self-scoped and idempotent: the predicate requires rows to belong to
+// recipientUserID in tenantID; a second call affects 0 rows (all already READ)
+// and returns 0 — no error, no existence leak. Mirrors MarkRead's predicate at
+// collection scope (no id filter).
+//
+// Authz: same as MarkRead — tier-1 CapNotificationRead route guard plus this
+// self-scope predicate; the repository method holds no authz.Require.
+func (r *NotificationsRepository) MarkAllRead(ctx context.Context, tenantID, recipientUserID string) (int, error) {
+	const q = `
+		UPDATE metaldocs.notifications
+		   SET status = 'READ', read_at = now()
+		 WHERE tenant_id = $1::uuid
+		   AND recipient_user_id = $2
+		   AND status IN ('PENDING', 'SENT')
+	`
+	res, err := r.db.ExecContext(ctx, q, tenantID, recipientUserID)
+	if err != nil {
+		return 0, fmt.Errorf("notifications.MarkAllRead: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("notifications.MarkAllRead rows: %w", err)
+	}
+	return int(n), nil
+}

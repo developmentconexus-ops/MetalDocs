@@ -3843,6 +3843,24 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /notifications/read-all:
+    post:
+      summary: Mark all of the caller's unread (PENDING/SENT) notifications read (idempotent, self-scope)
+      tags: [notifications]
+      operationId: markAllNotificationsRead
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkAllReadResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
 components:
   securitySchemes:
@@ -4231,6 +4249,14 @@ components:
         count:
           type: integer
           minimum: 0
+    MarkAllReadResponse:
+      type: object
+      required: [updated]
+      properties:
+        updated:
+          type: integer
+          minimum: 0
+          description: Number of the caller's notifications transitioned to READ by this call.
     ListUsersResponse:
       type: object
       required: [items, page]

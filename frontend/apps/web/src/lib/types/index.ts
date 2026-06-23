@@ -175,19 +175,6 @@ export interface DocumentTemplateSnapshotItem {
   definition: Record<string, unknown>;
 }
 
-export interface NotificationItem {
-  id: string;
-  recipientUserId: string;
-  eventType: string;
-  resourceType: string;
-  resourceId: string;
-  title: string;
-  message: string;
-  status: "PENDING" | "SENT" | "READ";
-  createdAt: string;
-  readAt?: string;
-}
-
 export interface AuditEventItem {
   id: string;
   occurredAt: string;
