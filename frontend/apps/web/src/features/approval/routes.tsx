@@ -7,6 +7,14 @@ export const approvalRoutes: RouteObject[] = [
     lazy: () => import("./pages/InboxPage").then((module) => ({ Component: module.InboxPage })),
   },
   {
+    path: "approvals/:documentId",
+    handle: { workspaceView: "approvals" },
+    lazy: () =>
+      import("./pages/SignoffDetailPage").then((module) => ({
+        Component: module.SignoffDetailPage,
+      })),
+  },
+  {
     path: "approval-routes",
     handle: { workspaceView: "approval-routes", requiresCapability: "route.manage" },
     lazy: () =>
