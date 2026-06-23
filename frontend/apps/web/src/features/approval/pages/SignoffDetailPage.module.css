@@ -80,7 +80,7 @@
   min-height: 600px;
   border: 1px solid var(--border, #d6deea);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-paper, #fff);
 }
 
 .a4State,

@@ -142,7 +142,11 @@ export function SignoffDetailPage() {
       <aside className={styles.sidebar} aria-label="Decisão de aprovação">
         {contextQuery.isLoading ? (
           <div className={styles.state}>Carregando dados de aprovação…</div>
-        ) : context && context.content_hash ? (
+        ) : contextQuery.isError ? (
+          <div className={styles.state} role="alert">
+            Não foi possível carregar os dados de aprovação.
+          </div>
+        ) : context && context.content_hash != null ? (
           <ControlledDocumentDetailPanel
             documentId={documentId}
             approvalState={context.approval_state ?? doc.status}
