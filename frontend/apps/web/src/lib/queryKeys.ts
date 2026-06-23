@@ -66,6 +66,10 @@ export const QK = {
   approval: {
     instance: (documentId: string) =>
       ['approval', 'instance', documentId] as const,
+    // Keyed under the 'approval' prefix (not 'controlled-documents') so SignoffDialog's
+    // invalidateQueries(['approval']) refetches the cockpit's approval context post-signoff.
+    activeDocument: (controlledDocumentId: string) =>
+      ['approval', 'active-document', controlledDocumentId] as const,
     routes: {
       list: () => ['approval', 'routes', 'list'] as const,
       detail: (id: string) => ['approval', 'routes', 'detail', id] as const,

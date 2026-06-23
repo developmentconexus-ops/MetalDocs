@@ -1,11 +1,10 @@
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 20px;
+  gap: var(--sp-5, 20px);
   width: 100%;
   height: 100%;
-  padding: 20px;
-  background: var(--surface, #f8fafc);
+  background: var(--surface, #ffffff);
   overflow: hidden;
 }
 
@@ -14,6 +13,8 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  padding: var(--sp-5, 20px);
+  padding-right: 0;
 }
 
 .header {
@@ -28,7 +29,7 @@
 
 .version {
   font-family: var(--font-mono, monospace);
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #8a7575);
   font-size: 13px;
 }
 
@@ -36,27 +37,33 @@
   margin: 8px 0 0;
   font-size: 20px;
   font-weight: 600;
-  color: var(--text, #1f2a3d);
+  color: var(--text, #1a0e0e);
 }
 
 .tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid var(--border, #d6deea);
+  border-bottom: 1px solid var(--border, #e6dcdc);
 }
 
 .tab {
   padding: 8px 14px;
   border: none;
   background: transparent;
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #8a7575);
   cursor: pointer;
   border-bottom: 2px solid transparent;
 }
 
+.tab:focus-visible,
+.retry:focus-visible {
+  outline: 2px solid var(--accent, #c8364a);
+  outline-offset: 2px;
+}
+
 .tabActive {
-  color: var(--text, #1f2a3d);
-  border-bottom-color: var(--accent, #0b66e4);
+  color: var(--text, #1a0e0e);
+  border-bottom-color: var(--brand, #6b1f2a);
   font-weight: 600;
 }
 
@@ -78,31 +85,31 @@
   max-width: 794px;
   height: 100%;
   min-height: 600px;
-  border: 1px solid var(--border, #d6deea);
+  border: 1px solid var(--border, #e6dcdc);
   border-radius: 8px;
-  background: var(--surface-paper, #fff);
+  background: var(--surface, #ffffff);
 }
 
 .a4State,
 .deferred,
 .commentsState,
 .state {
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #8a7575);
   padding: 16px;
 }
 
 .deferred h2 {
   font-size: 15px;
-  color: var(--text, #1f2a3d);
+  color: var(--text, #1a0e0e);
   margin: 0 0 8px;
 }
 
 .retry {
   margin-top: 8px;
   padding: 6px 12px;
-  border: 1px solid var(--border, #d6deea);
+  border: 1px solid var(--border, #e6dcdc);
   border-radius: 6px;
-  background: var(--surface, #f8fafc);
+  background: var(--surface, #ffffff);
   cursor: pointer;
 }
 
@@ -120,7 +127,7 @@
 }
 
 .comment {
-  border: 1px solid var(--border, #d6deea);
+  border: 1px solid var(--border, #e6dcdc);
   border-radius: 8px;
   padding: 12px;
 }
@@ -133,22 +140,23 @@
 }
 
 .commentDate {
-  color: var(--text-muted, #64748b);
+  color: var(--text-muted, #8a7575);
 }
 
 .resolved {
   margin-left: auto;
   font-size: 11px;
-  color: var(--success, #16a34a);
+  color: var(--success, #1a6b35);
 }
 
 .commentBody {
   margin: 6px 0 0;
-  color: var(--text, #1f2a3d);
+  color: var(--text, #1a0e0e);
   white-space: pre-wrap;
 }
 
 .sidebar {
   min-width: 0;
   overflow: auto;
+  padding: var(--sp-5, 20px) var(--sp-5, 20px) var(--sp-5, 20px) 0;
 }
