@@ -43,7 +43,7 @@ Template runtime pages consume `@metaldocs/editor-ui`; no production page mounts
 
 ## docx-renderer OUT-edge
 
-`apps/docx-renderer/package.json` declares `@eigenpal/docx-editor-core` (server-side headless substitution via `processTemplateDetailed` from `@eigenpal/docx-editor-core/headless`). That is OUT of the editor-ui package scope but shares the same npm-registry dependency — no longer coupled via the vendored tarball (tarball retired 2026-06-23).
+`apps/docx-renderer/package.json` declares `@eigenpal/docx-editor-react` (server-side headless substitution via `processTemplateDetailed` from `@eigenpal/docx-editor-core/headless`). `@eigenpal/docx-editor-core` is pulled only **transitively** through `@eigenpal/docx-editor-react` — it is a phantom dep tracked by ADR 0046; no direct declaration exists. That is OUT of the editor-ui package scope but shares the same npm-registry dependency — no longer coupled via the vendored tarball (tarball retired 2026-06-23).
 
 ## Build wiring
 
