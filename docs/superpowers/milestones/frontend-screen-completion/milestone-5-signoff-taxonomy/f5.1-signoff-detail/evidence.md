@@ -20,6 +20,8 @@ Implementation spans `43343c8c` … `d75ee94d` on `main` (base before feature: `
 | `de19ad31` → `829db6b9` | T6 | inbox approve/reject navigates to cockpit, in-inbox modal retired; **fix**: drop dead `signoff` import/mock |
 | `2ca9514c` | T7 | backlog row for deferred diff tab |
 | `6a0da2fb`, `d75ee94d` | T8 | review fixes — `QK.approval.activeDocument`, wine tokens, full-bleed layout, NOTES audit, spacing/radius tokens, defer backlog |
+| `f0cec18d` | T8 | this close-out evidence |
+| `840154e0` | close-out | final whole-impl review fixes — complete tab ARIA triad (M4), cover context-error + populated-comments branches (M6) |
 
 ## Validation Gate (spec.md §"Validation Gate") — every row proven
 
@@ -35,7 +37,7 @@ Implementation spans `43343c8c` … `d75ee94d` on `main` (base before feature: `
 | No forked timeline/decision/sign-off; generated types consumed directly | Grep (above) → only canonical files; `tsc --noEmit` clean | **PASS** | grep + `tsc` |
 | Visual parity with `detalhe-signoff.html` | `frontend-screen-reviewer` (re-review after fixes) | **APPROVE** (with non-blocking nits) — see below | real (reviewer) |
 | Architecture / maintainability | `frontend-code-reviewer` | **APPROVE** (with nits) — see below | real (reviewer) |
-| Type + test health | `tsc --noEmit`; `vitest run` new + touched suites; broader approval suite | **PASS** — tsc EXIT=0; new+touched **31/31**; approval suite **103/103** | real |
+| Type + test health | `tsc --noEmit`; `vitest run` new + touched suites; broader approval suite | **PASS** — tsc EXIT=0; new+touched **33/33** (page suite 6/6 after M6); approval suite **105/105** | real |
 
 ## Reviewer verdicts (on record)
 
@@ -100,8 +102,20 @@ cd frontend/apps/web && pnpm.cmd vitest run \
 cd frontend/apps/web && pnpm.cmd vitest run src/features/approval   # 103/103
 ```
 
+## Final whole-implementation review (close-out gate)
+
+`frontend-code-reviewer` over the full feature diff (`4f8e5c3b..f0cec18d`): **APPROVE**, no Criticals.
+Majors M1/M2/M3/M5 = pre-existing shared-component / codebase-wide debt, correctly attributed in
+`wiki/backlog/detalhe-signoff.md` with triggers (no regression introduced). Two net-new F5.1 gaps —
+**M4** (incomplete ARIA tab pattern — `role="tablist"`/`tab` present but no `tabpanel`/`aria-controls`
+linkage) and **M6** (uncovered `contextQuery.isError` + populated-comments branches) — were **fixed,
+not deferred** (`840154e0`): full `tab`→`tabpanel` ARIA triad + `aria-labelledby` + `tabIndex={0}`;
+two added tests (context-error `role="alert"`, populated Comentários via `commentPlainText`). Re-verified:
+tsc EXIT=0; `SignoffDetailPage` suite **6/6**; approval suite **105/105**, 0 failures.
+
 ## Disposition
 
-All Validation-Gate rows **PASS**; both reviewers **APPROVE**; honest defers recorded with triggers;
-no fabricated data; no fork; scope held to consumer-side assembly + additive props. **Ready for the
-HS-1 operator gate.** Not pushed.
+All Validation-Gate rows **PASS**; per-feature reviewers + final whole-impl reviewer **APPROVE**;
+the two net-new gaps the final review surfaced are **fixed and re-verified**; honest defers recorded
+with triggers; no fabricated data; no fork; scope held to consumer-side assembly + additive props.
+**Ready for the HS-1 operator gate.** Not pushed.
