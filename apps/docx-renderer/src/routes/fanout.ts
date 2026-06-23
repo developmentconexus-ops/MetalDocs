@@ -4,6 +4,7 @@ import type { Client } from 'minio';
 import type { Env } from '../env.js';
 import { getObjectBuffer, putObjectBuffer } from '../s3.js';
 import { fanout } from '../render/fanout.js';
+import { RenderError, type RenderErrorKind } from '@metaldocs/eigenpal-adapter';
 
 const BodySchema = z.object({
   body_docx_s3_key: z.string().min(1),
@@ -23,6 +24,28 @@ const DOCX_MIME =
 
 function frozenDocxKey(tenantId: string, revisionId: string): string {
   return `tenants/${tenantId}/revisions/${revisionId}/frozen.docx`;
+}
+
+const KIND_TO_STATUS: Record<RenderErrorKind, number> = {
+  template_parse: 400,
+  undefined_variable: 400,
+  template_render: 422,
+  unknown: 500,
+};
+
+export function renderErrorToHttp(e: RenderError): {
+  status: number;
+  body: { error: 'render_failed'; kind: RenderErrorKind; message: string; variable?: string };
+} {
+  return {
+    status: KIND_TO_STATUS[e.kind],
+    body: {
+      error: 'render_failed',
+      kind: e.kind,
+      message: e.message,
+      ...(e.variable ? { variable: e.variable } : {}),
+    },
+  };
 }
 
 export function registerFanoutRoute(
@@ -55,12 +78,22 @@ export function registerFanoutRoute(
       body_docx_s3_key,
     );
 
-    const result = await fanout({
-      bodyDocx: new Uint8Array(bodyBuf),
-      placeholderValues: placeholder_values,
-      compositionConfig: composition_config,
-      resolvedValues: resolved_values,
-    });
+    let result;
+    try {
+      result = await fanout({
+        bodyDocx: new Uint8Array(bodyBuf),
+        placeholderValues: placeholder_values,
+        compositionConfig: composition_config,
+        resolvedValues: resolved_values,
+      });
+    } catch (err) {
+      if (err instanceof RenderError) {
+        const { status, body } = renderErrorToHttp(err);
+        req.log.warn({ kind: body.kind, variable: body.variable }, 'render failed');
+        return reply.code(status).send(body);
+      }
+      throw err;
+    }
 
     await putObjectBuffer(
       client,

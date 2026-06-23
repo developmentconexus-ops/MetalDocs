@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { processTemplateDetailed } from '@eigenpal/docx-editor-core/headless';
+import { eigenpalTemplateProcessor } from '@metaldocs/eigenpal-adapter';
 import { SubBlockRegistry } from './subblocks/registry.js';
 import { registerV1Builtins } from './subblocks/builtins.js';
 
@@ -51,7 +51,7 @@ export async function fanout(input: FanoutInput): Promise<FanoutResult> {
     __footer_composition__: footerOoxml,
   };
 
-  const result = processTemplateDetailed(
+  const result = eigenpalTemplateProcessor.processTemplate(
     input.bodyDocx.buffer.slice(
       input.bodyDocx.byteOffset,
       input.bodyDocx.byteOffset + input.bodyDocx.byteLength,
@@ -60,11 +60,11 @@ export async function fanout(input: FanoutInput): Promise<FanoutResult> {
     { nullGetter: 'empty' },
   );
 
-  const buf = new Uint8Array(result.buffer);
+  const buf = result.buffer;
   const contentHash = createHash('sha256').update(buf).digest('hex');
   return {
     buffer: buf,
     contentHash,
-    unreplacedVars: result.unreplacedVariables ?? [],
+    unreplacedVars: result.unreplacedVariables,
   };
 }

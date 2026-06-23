@@ -78,7 +78,9 @@ describe('POST /render/fanout', () => {
       url: '/render/fanout',
       headers,
       payload: {
-        body_docx_key: 'templates/x.docx',
+        body_docx_s3_key: 'templates/x.docx',
+        tenant_id: 'tenant-1',
+        revision_id: 'rev-001',
         placeholder_values: { doc_code: 'ABC-001' },
         composition_config: {
           header_sub_blocks: [],
@@ -86,16 +88,15 @@ describe('POST /render/fanout', () => {
           sub_block_params: {},
         },
         resolved_values: {},
-        output_key: 'output/fanout-001.docx',
       },
     });
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.content_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(body.final_docx_s3_key).toBe('output/fanout-001.docx');
+    expect(body.final_docx_s3_key).toBe('tenants/tenant-1/revisions/rev-001/frozen.docx');
     expect(Array.isArray(body.unreplaced_vars)).toBe(true);
-    expect(uploadedKey).toBe('output/fanout-001.docx');
+    expect(uploadedKey).toBe('tenants/tenant-1/revisions/rev-001/frozen.docx');
     expect(uploadedSize).toBeGreaterThan(0);
   });
 
