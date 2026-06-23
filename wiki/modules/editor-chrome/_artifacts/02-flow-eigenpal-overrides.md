@@ -9,7 +9,7 @@
 |---|---|---|
 | Wrapper class | `.wrapper` | `EditorChrome.module.css:9` |
 | Override scope prefix | `.wrapper :global(.ep-root ...)` | `EditorChrome.module.css:160–242` |
-| Eigenpal DOM root | `.ep-root` (data attribute / class set by eigenpal `DocxEditor`) | `@eigenpal/docx-js-editor` (vendored at `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`) |
+| Eigenpal DOM root | `.ep-root` (data attribute / class set by eigenpal `DocxEditor`) | `@eigenpal/docx-editor-react@1.9.0` (npm registry) |
 | Eigenpal anchors targeted | `[data-testid=*]` / `[role=*]` / SVG path fills | see §1.7 of `01-surface.md` |
 
 ### 2. Call chain
@@ -50,13 +50,13 @@ n/a.
 
 - **Coupling fragility:** every selector at `EditorChrome.module.css:160–225` is anchored to eigenpal-internal selectors (`[data-testid="title-bar"]`, `[data-testid="formatting-bar"]`, `[data-testid="font-size-display"]`, `[data-testid="font-size-input"]`, `.docx-advanced-color-picker-dropdown`) or to hardcoded SVG fill hex values (`svg path[fill="#cbd5e1"]`, `svg path[fill="#94a3b8"]`). If eigenpal renames an attribute, ships a different doc-icon palette, or changes the formatting-bar geometry, overrides silently no-op. No version-check, no CI guard, no runtime assertion.
 
-- **Eigenpal version pin:** controlled fork is `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. Override compatibility is implicit in the pin. ADR 0001 + `references/eigenpal-controlled-package.md` cover the refresh process.
+- **Eigenpal version pin:** `@eigenpal/docx-editor-react@1.9.0` from npm registry (vendored tarball retired 2026-06-23). Override compatibility is implicit in the version pin. ADR 0001 amendment + `references/eigenpal-controlled-package.md` cover the refresh process.
 
 - **Bug-fix as comment, not code:** the `overflow: hidden !important` on `[data-testid="formatting-bar"]` at line 178 is paired with a code-comment explanation at lines 170–173 noting that `overflow-x:hidden` alone would force `overflow-y:auto` and create a scroll container that closes eigenpal's font-size dropdown on capture-phase scroll events. The fix is documented in CSS, not in a test or eigenpal-side patch.
 
 - **`!important` density:** every line from 161 to 225 ends with `!important` (counted: 31 occurrences). Removing wrapper scoping or eigenpal stylesheet changes will not let cascade resolve naturally — every property is forced.
 
-- **No JS coupling:** the module imports nothing from `@eigenpal/docx-js-editor`. Coupling is exclusively via CSS descendant selectors and DOM containment. Consumers (pages) import eigenpal; the chrome module does not.
+- **No JS coupling:** the module imports nothing from `@eigenpal/docx-editor-react`. Coupling is exclusively via CSS descendant selectors and DOM containment. Consumers (pages) import eigenpal via `@metaldocs/editor-ui`; the chrome module does not.
 
 - **Audit log emission:** n/a.
 

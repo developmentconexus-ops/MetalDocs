@@ -17,17 +17,17 @@
 - **React + TypeScript + Vite** — `frontend/apps/web/`.
 - **TanStack Query** — server state.
 - **Material UI / styled-components** (verify) — UI primitives.
-- **eigenpal docx-js-editor** — controlled package wrapping ProseMirror for DOCX editing. Vendored + patched (see `references/eigenpal-controlled-package.md`).
+- **eigenpal docx-editor-react** — `@eigenpal/docx-editor-react@1.9.0` from npm registry; wraps ProseMirror for DOCX editing. ACL wrapper in `packages/editor-ui/` (see `references/eigenpal-controlled-package.md`).
 
 ## Auxiliary apps
 
-- `apps/docx-renderer/` — TypeScript Node service. Runs eigenpal headless for token substitution. Calls Gotenberg.
+- `apps/docx-renderer/` — TypeScript Node service. Runs `@eigenpal/docx-editor-core/headless` for token substitution (`processTemplateDetailed`). Calls Gotenberg.
 
 ## Dev infra
 
 - Docker Compose (Postgres, MinIO, Gotenberg, API, docx-renderer).
 - pnpm workspaces (frontend monorepo).
-- pnpm patch protocol for vendoring eigenpal.
+- eigenpal consumed from npm registry (`@eigenpal/docx-editor-react@1.9.0`); vendored tarball era closed 2026-06-23.
 
 ## See also
 

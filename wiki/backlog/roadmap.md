@@ -5,7 +5,7 @@
 > **not** plan from this file. Its one still-open item (**Plan 12** — 7-screen finalization)
 > is carried forward in the canonical roadmap. Body retained below as the historical record.
 
-> **Last verified:** 2026-06-14 (eigenpal vendor path updated to third_party/eigenpal/; Plan 12 prep correction)
+> **Last verified:** 2026-06-23 (eigenpal migration: vendored tarball retired, `@eigenpal/docx-editor-react@1.9.0` from npm; Plan 11/Plan 3 touch-points updated)
 > **Scope:** Ordered sequence of cross-module refactor sub-plans from current state → professional structured architecture. Each sub-plan = one fresh implementation session = one PR series.
 > **Out of scope:** Implementation detail. Sub-plans are written one-at-a-time in their own session under `docs/superpowers/specs/` and linked back here.
 > **Source evidence:** Every `Closes` row cites a T-NNN (tech-debt) or R-NNN (refactor backlog) in `wiki/modules/<m>-tech-debt.md` / `wiki/backlog/<m>-refactor.md`.
@@ -47,7 +47,7 @@
 ## Plan 3 · Supply-chain unblock + tenant resolution platform fix
 
 - **Goal:** Fresh `npm install` works. Tenant identity sourced from authenticated session, not `X-Tenant-ID` header.
-- **Touches:** `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (restore; relocated from `vendor/eigenpal/` 2026-06-14); `internal/platform/tenant`; `internal/modules/templates/delivery/http/handler.go:83`; `internal/modules/taxonomy/delivery/http/routes_profiles.go:230`; `internal/modules/registry/delivery/http/routes.go:488`.
+- **Touches:** `third_party/eigenpal/` (vendored tarball era: restored 2026-05-11, relocated 2026-06-14, retired 2026-06-23 — now `@eigenpal/docx-editor-react@1.9.0` from npm registry); `internal/platform/tenant`; `internal/modules/templates/delivery/http/handler.go:83`; `internal/modules/taxonomy/delivery/http/routes_profiles.go:230`; `internal/modules/registry/delivery/http/routes.go:488`.
 - **Closes:** editor-ui-eigenpal T-001 / R-001; templates T-003 / R-003; taxonomy T-001 / R-001; registry T-005 / R-005, T-006 / R-006.
 - **Critical rows closed:** 4 (editor-ui-eigenpal T-001, templates T-003, taxonomy T-001, + registry tenant side).
 - **Blockers:** none.
@@ -64,7 +64,7 @@
 
 ## Plan 11 · Editor frontend stabilization (parallel to Plan 4)
 
-- **Goal:** ACL wrapper enforced (no direct `@eigenpal/docx-js-editor` imports outside `packages/editor-ui/`). Editor-chrome tested, token-driven, a11y-correct.
+- **Goal:** ACL wrapper enforced (no direct `@eigenpal/docx-editor-react` imports outside `packages/editor-ui/`). Editor-chrome tested, token-driven, a11y-correct.
 - **Touches:** `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:4` (migrate to `MetalDocsEditor`); `packages/editor-ui/test/templatePlugin.wiring.test.tsx` (rewrite for current gating); `frontend/apps/web/src/features/shared/components/editor-chrome/` (tests + token gaps + aria-live + autosave 7-state widening); `packages/editor-ui/src/index.ts` (drop dormant exports).
 - **Closes:** editor-ui-eigenpal T-002/R-002, T-003/R-003, R-004..R-010; editor-chrome R-001..R-009.
 - **Critical rows closed:** 0.

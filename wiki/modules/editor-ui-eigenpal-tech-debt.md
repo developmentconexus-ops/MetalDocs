@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/editor-ui-eigenpal.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/editor-ui-eigenpal-refactor.md`.
 
-**Last verified:** 2026-06-14
+**Last verified:** 2026-06-23
 
 ## Severity scale
 
@@ -16,19 +16,19 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. Trigg
 
 ### T-001 · Vendored eigenpal tarball absent from `main` — **RESOLVED Plan 3**
 - **Severity:** critical → **resolved**
-- **Surface:** `packages/editor-ui/package.json:29`, `apps/docgen-v2/package.json:15`, `frontend/apps/web/package.json:17` — each references `file:../../[…]/third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`.
-- **Resolution (2026-05-11):** Tarball restored at `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (blob `0e35c089`) and `vendor/eigenpal/README.md` (blob `4ec632f0`) from git history. Fresh `pnpm install` resolves the dep. ADR 0001 pin is intact. **2026-06-14:** tarball relocated to `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (root `vendor/` is Go-owned); all three `package.json` `file:` refs and lockfiles updated. R-009 (wiki refresh for ADR 0001 + eigenpal-controlled-package) closed by this path-token refresh.
-- **Evidence:** `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` present; `third_party/eigenpal/README.md` does not currently exist at the new path.
+- **Surface:** previously `packages/editor-ui/package.json`, `apps/docgen-v2/package.json`, `frontend/apps/web/package.json` — each referenced `file:../../[…]/third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`.
+- **Resolution (2026-05-11):** Tarball restored at `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` from git history. **2026-06-14:** tarball relocated to `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. **2026-06-23:** vendored tarball fully retired; `@eigenpal/docx-editor-react@1.9.0` now installed from npm registry. Tarball path `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` deleted; `third_party/eigenpal/NOTICE` present. All `package.json` `file:` refs replaced with npm registry refs.
+- **Evidence:** `@eigenpal/docx-editor-react@1.9.0` in `package.json` dependencies; `third_party/eigenpal/NOTICE` present.
 - **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-001` (closed)
 - **Linked ADR:** `wiki/decisions/0001-eigenpal-adoption.md`
 
 ### T-002 · TemplateEditorPage bypasses the `MetalDocsEditor` wrapper — **RESOLVED 2026-05-11**
 - **Severity:** major → **resolved**
-- **Surface:** `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — previously imported `DocxEditor` directly from `@eigenpal/docx-js-editor/react`.
-- **Resolution (2026-05-11, commit `60fa5473`):** `TemplateEditorPage` migrated to `MetalDocsEditor`. Direct `@eigenpal/docx-js-editor` imports removed; `useRef<MetalDocsEditorRef>` now used. Repo-wide grep `@eigenpal/docx-js-editor` in `frontend/apps/web/src` returns zero outside type-only positions. Anti-Corruption Layer now holds for both consumer pages.
+- **Surface:** `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — previously imported `DocxEditor` directly from `@eigenpal/docx-editor-react`.
+- **Resolution (2026-05-11, commit `60fa5473`):** `TemplateEditorPage` migrated to `MetalDocsEditor`. Direct `@eigenpal/docx-editor-react` imports removed; `useRef<MetalDocsEditorRef>` now used. Repo-wide grep `@eigenpal/docx-editor-react` in `frontend/apps/web/src` returns zero outside type-only positions. Anti-Corruption Layer now holds for both consumer pages.
 - **Evidence:** `_artifacts/03-deps.md` IN-edges table (updated).
 - **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-002` (closed)
-- **Linked ADR:** missing-ADR (see T-008 — the rule still lacks its own ADR)
+- **Linked ADR:** missing-ADR (see T-008 — the wrapper-only rule still lacks its own ADR; the package rename from `@eigenpal/docx-js-editor` to `@eigenpal/docx-editor-react` 2026-06-23 is covered by the ADR 0001 amendment)
 
 ### T-003 · `templatePlugin.wiring.test.tsx` asserts pre-gating contract — **RESOLVED 2026-05-11**
 - **Severity:** major → **resolved**
@@ -73,7 +73,7 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. Trigg
 ### T-008 · No ADR for Anti-Corruption Layer / wrapper-only consumption rule
 - **Severity:** minor
 - **Surface:** `packages/editor-ui/` as a whole; rule implied by ADR 0001 § Consequences ("All editor-related code consolidates in `packages/editor-ui/`"), `wiki/references/eigenpal-controlled-package.md` § "What belongs in MetalDocs docs".
-- **Observation:** No ADR explicitly mandates that all `@eigenpal/docx-js-editor` access in `frontend/apps/web` goes through `@metaldocs/editor-ui`. T-002 (TemplateEditorPage bypass) was a consequence of this gap — now resolved; the rule still lacks a formal decision record.
+- **Observation:** No ADR explicitly mandates that all `@eigenpal/docx-editor-react` access in `frontend/apps/web` goes through `@metaldocs/editor-ui`. T-002 (TemplateEditorPage bypass) was a consequence of this gap — now resolved; the rule still lacks a formal decision record.
 - **Evidence:** `_artifacts/03-deps.md` direct-eigenpal IN-edges table.
 - **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-008`
 - **Linked ADR:** missing-ADR

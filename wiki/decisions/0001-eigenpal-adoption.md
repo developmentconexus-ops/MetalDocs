@@ -1,7 +1,7 @@
 # ADR 0001: Adopt eigenpal as the document editor
 
-> **Status:** Accepted
-> **Last verified:** 2026-06-14
+> **Status:** Accepted (amended 2026-06-23 — v1.9.0 adoption, vendored fork retired)
+> **Last verified:** 2026-06-23
 > **Date:** ~2026-04 (verify from git log)
 > **Scope:** Editor library choice for MetalDocs WYSIWYG.
 
@@ -10,15 +10,24 @@
 We needed a DOCX-native WYSIWYG editor in the browser. Candidates:
 - **CKEditor 5** — mature but HTML-first, requires DOCX↔HTML conversion (lossy)
 - **BlockNote** — modern but block-model, mismatch with DOCX paragraph model
-- **eigenpal/docx-js-editor** — native DOCX, ProseMirror under the hood, MS-Word-like UX
+- **eigenpal/docx-editor-react** — native DOCX, ProseMirror under the hood, MS-Word-like UX (published as `@eigenpal/docx-editor-react`; at spike time referenced as `@eigenpal/docx-js-editor`)
 
 ## Decision
 
 **Adopt `@eigenpal/docx-js-editor` as the MetalDocs DOCX editor.**
 
-As of 2026-05-01, MetalDocs consumes a controlled EigenPal package artifact from `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. This keeps the application dependency deterministic while EigenPal fixes are maintained in the fork and prepared for upstream/published-package consolidation.
+As of 2026-05-01, MetalDocs consumed a controlled EigenPal package artifact from `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. This kept the application dependency deterministic while EigenPal fixes were maintained in the fork and prepared for upstream/published-package consolidation.
 
-> **Resolution (2026-06-14):** The tarball now lives at the canonical, app-neutral, Go-safe home `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. All three consumers (`apps/docx-renderer`, `packages/editor-ui`, `frontend/apps/web`) reference it via `file:` and both lockfiles were regenerated. A fresh checkout installs cleanly. HS-2 closed. See `docs/superpowers/specs/2026-06-14-eigenpal-vendor-path-design.md`.
+> **Resolution (2026-06-14):** The tarball lived at the canonical, app-neutral, Go-safe home `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. All three consumers (`apps/docx-renderer`, `packages/editor-ui`, `frontend/apps/web`) referenced it via `file:` and both lockfiles were regenerated. A fresh checkout installed cleanly. HS-2 closed. See `docs/superpowers/specs/2026-06-14-eigenpal-vendor-path-design.md`.
+
+> **Amendment (2026-06-23 — v1.9.0 adoption):** The vendored fork has been retired. MetalDocs now consumes the upstream published package `@eigenpal/docx-editor-react@1.9.0` directly from the npm registry. The tarball `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` has been deleted; `third_party/eigenpal/NOTICE` records the transition. Import layout changed:
+> - Main API (`DocxEditor`, `DocxEditorRef`, `createEmptyDocument`, `EditorMode`): `from '@eigenpal/docx-editor-react'`
+> - Plugin API (`PluginHost`, `templatePlugin`, `EditorPlugin`, `ReactSidebarItem`): `from '@eigenpal/docx-editor-react/plugin-api'`
+> - CSS: `@eigenpal/docx-editor-react/styles.css`
+> - `Comment` type: `from '@eigenpal/docx-editor-core/types/content'`
+> - Headless (docx-renderer): `processTemplateDetailed` from `@eigenpal/docx-editor-core/headless`
+>
+> The ACL still holds: wrapper is `packages/editor-ui/`; all consumers import from `@metaldocs/editor-ui` only. Refresh procedure simplified: bump version in `package.json` and reinstall from registry — no tarball management.
 
 ## Reasoning
 
@@ -40,7 +49,7 @@ As of 2026-05-01, MetalDocs consumes a controlled EigenPal package artifact from
 
 - All editor-related code consolidates in `packages/editor-ui/`
 - EigenPal implementation details stay in the EigenPal fork; MetalDocs only documents the integration contract.
-- Dependency refreshes must update `third_party/eigenpal/`, package manifests, and both lockfiles together.
+- Dependency refreshes must update `@eigenpal/docx-editor-react` version in `package.json` files and lockfiles together (no tarball management required as of 2026-06-23).
 - CKEditor + BlockNote deps removed (purge plan: see `decisions/0002-zone-purge.md` companion notes)
 - Future work: leverage native eigenpal capabilities instead of reinventing
 - ProseMirror DOM access patterns documented for tests/debugging

@@ -1,6 +1,6 @@
 # docx-renderer — TypeScript DOCX Substitution Service
 
-> **Last verified:** 2026-06-14
+> **Last verified:** 2026-06-23
 > **Scope:** `apps/docx-renderer/` — the TypeScript/Node.js sidecar binary that owns DOCX token substitution and composition-block injection. This page covers the service as a deployed binary: entrypoint, HTTP API, security, eigenpal integration, MinIO I/O, build, and Dockerfile. How the Go worker calls it and where it fits in the full pipeline is in [../flows/render-pipeline.md](../flows/render-pipeline.md).
 > **Key files:**
 > - `apps/docx-renderer/src/index.ts`
@@ -93,7 +93,7 @@ The `fanout()` function is the rendering core. It:
 1. Builds a `SubBlockRegistry` with all 5 built-in composition-block renderers (`registerV1Builtins`).
 2. Renders header and footer sub-blocks concurrently via `Promise.all` (`render/fanout.ts:27-46`), using `compositionConfig` to select which sub-block key goes in each slot.
 3. Merges rendered OOXML sub-block strings with `placeholderValues` into a single `variables` map.
-4. Calls `processTemplateDetailed(docxBuffer, variables)` from `@eigenpal/docx-js-editor` (vendored) — synchronous DOCX template substitution; blocks the Node.js event loop for the duration.
+4. Calls `processTemplateDetailed(docxBuffer, variables)` from `@eigenpal/docx-editor-core/headless` — synchronous DOCX template substitution; blocks the Node.js event loop for the duration.
 5. Computes SHA-256 of the resulting buffer via `node:crypto.createHash('sha256')`.
 6. Returns `{ buffer, contentHash, unreplacedVars }`.
 
@@ -191,9 +191,9 @@ Multi-stage build:
 
 ### eigenpal dependency
 
-`@eigenpal/docx-js-editor@0.2.0` is vendored as `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` and installed locally via `package.json`. It is not pulled from a registry. This is the only external DOCX processing dependency.
+`@eigenpal/docx-editor-core` (from npm registry, included as part of the `@eigenpal/docx-editor-react@1.9.0` package family) provides `processTemplateDetailed` via the `@eigenpal/docx-editor-core/headless` subpath. Vendored tarball `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` deleted 2026-06-23; dependency is now pulled from the npm registry.
 
-Direct runtime dependencies: `fastify@4.26.2`, `minio@^7.1.3`, `zod@3.23.8`, `jszip@3.10.1` (direct dependency, declared in `package.json:19`), `ajv@^8.16.0`, `@metaldocs/shared-tokens`, `node:crypto` (stdlib). `@eigenpal/docx-js-editor@0.2.0` is a separate direct dependency (vendored tarball).
+Direct runtime dependencies: `fastify@4.26.2`, `minio@^7.1.3`, `zod@3.23.8`, `jszip@3.10.1` (direct dependency, declared in `package.json:19`), `ajv@^8.16.0`, `@metaldocs/shared-tokens`, `node:crypto` (stdlib). `@eigenpal/docx-editor-core` (headless subpath) is a separate direct dependency.
 
 ---
 
@@ -201,7 +201,7 @@ Direct runtime dependencies: `fastify@4.26.2`, `minio@^7.1.3`, `zod@3.23.8`, `js
 
 Fastify runs on Node.js's single-threaded async I/O event loop. The `fanout()` function is `async` and uses `Promise.all` for concurrent sub-block rendering (`render/fanout.ts:27-46`). Sub-block renderers implement `render(ctx): Promise<string>` (typed async in `SubBlockRenderer`; all five built-ins declare `async render`), and the two `Promise.all` fan-outs await them before merging results.
 
-`processTemplateDetailed` (eigenpal) is synchronous and blocks the event loop for the duration of DOCX processing. Under concurrent load, requests queue behind each other at the eigenpal call.
+`processTemplateDetailed` (from `@eigenpal/docx-editor-core/headless`) is synchronous and blocks the event loop for the duration of DOCX processing. Under concurrent load, requests queue behind each other at the eigenpal call.
 
 ---
 
@@ -211,7 +211,7 @@ Fastify runs on Node.js's single-threaded async I/O event loop. The `fanout()` f
 |---|---|---|
 | `DOCX_RENDERER_GOTENBERG_URL` declared but not consumed | `src/env.ts:13` | Env var declared in Zod schema; no route handler reads it; Gotenberg was removed from the TS side; dead configuration risks operator confusion |
 | `processTemplateDetailed` blocks the event loop | `src/render/fanout.ts` | Synchronous call from eigenpal; sub-block rendering is async (awaited via `Promise.all`) but the eigenpal substitution step itself is synchronous; throughput limited by single-threaded execution at that call |
-| Vendored eigenpal tarball at `0.2.0` | `third_party/eigenpal/` | No registry; upgrade requires manual tarball replacement; version pinned in perpetuity until manually updated |
+| eigenpal at `1.9.0` from npm registry | `package.json` | Upgrade requires version bump in `package.json` + `pnpm install`; vendored tarball era closed 2026-06-23 |
 
 See also [../_artifacts/stage1/synthesis-legacy.md](../_artifacts/stage1/synthesis-legacy.md) for the full cross-cutting legacy register.
 

@@ -1,11 +1,10 @@
 # EigenPal Controlled Package
 
-> **Last verified:** 2026-06-14
-> **Scope:** What MetalDocs needs to know about the controlled EigenPal package.
-> **Out of scope:** Internal EigenPal implementation details; keep those in the fork docs.
+> **Last verified:** 2026-06-23
+> **Scope:** What MetalDocs needs to know about the EigenPal package adoption.
+> **Out of scope:** Internal EigenPal implementation details.
 > **Key files:**
-> - `third_party/eigenpal/README.md` - artifact source, fork branch, pack command (file does not currently exist at this path — see note below)
-> - `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` - vendored package artifact
+> - `third_party/eigenpal/NOTICE` - records the transition from vendored tarball to published npm package
 > - `packages/editor-ui/src/MetalDocsEditor.tsx` - React wrapper used by MetalDocs
 > - `apps/docx-renderer/package.json` - server-side docgen dependency
 > - `packages/editor-ui/package.json` - editor-ui dependency
@@ -15,23 +14,24 @@
 
 ## Current state
 
-MetalDocs consumes a controlled EigenPal package:
+MetalDocs consumes the upstream published EigenPal package:
 
 ```text
-@eigenpal/docx-js-editor -> third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz
+@eigenpal/docx-editor-react@1.9.0  (npm registry)
+@eigenpal/docx-editor-core          (npm registry, for headless + type subpaths)
 ```
 
-This artifact is built from the MetalDocs-controlled EigenPal fork, then vendored into this repository for deterministic installs.
+The vendored fork era ended 2026-06-23: `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` was deleted; `third_party/eigenpal/NOTICE` records the transition. All `package.json` `file:` references have been replaced with npm registry version pins.
 
-## Why vendored
+## Why no longer vendored
 
-The EigenPal source is a monorepo. The package MetalDocs needs is produced from the EigenPal React package, not from the repository root. A vendored tarball keeps MetalDocs stable until the fork is published as a package or the upstream PR series is accepted.
+The upstream PR series landed and `@eigenpal/docx-editor-react@1.9.0` was published to the npm registry. MetalDocs can now consume it as a standard dependency, avoiding the tarball management overhead.
 
 ## What belongs in MetalDocs docs
 
-- Which package artifact MetalDocs consumes.
+- Which package versions MetalDocs consumes.
 - Which MetalDocs modules import it.
-- How to refresh/reinstall after a new EigenPal build.
+- How to refresh/reinstall after a new EigenPal release.
 - Which smoke checks prove the integration still works.
 
 ## What does not belong here
@@ -41,12 +41,20 @@ The EigenPal source is a monorepo. The package MetalDocs needs is produced from 
 - DOCX serialization implementation details.
 - Historical debugging notes from the EigenPal lab.
 
-Those details belong in the EigenPal fork docs and the local lab dossier referenced by `third_party/eigenpal/README.md` (file does not currently exist at that path).
+## Import layout
+
+| Import | Symbol(s) | Used in |
+|---|---|---|
+| `@eigenpal/docx-editor-react` | `DocxEditor`, `DocxEditorRef`, `createEmptyDocument`, `EditorMode` | `packages/editor-ui/src/MetalDocsEditor.tsx` |
+| `@eigenpal/docx-editor-react/plugin-api` | `PluginHost`, `templatePlugin`, `EditorPlugin`, `ReactSidebarItem` | `packages/editor-ui/src/MetalDocsEditor.tsx`, plugin files |
+| `@eigenpal/docx-editor-react/styles.css` | CSS stylesheet | `packages/editor-ui/src/MetalDocsEditor.tsx` |
+| `@eigenpal/docx-editor-core/types/content` | `Comment` | `packages/editor-ui/src/index.ts` (re-export) |
+| `@eigenpal/docx-editor-core/headless` | `processTemplateDetailed` | `apps/docx-renderer/src/render/fanout.ts` |
 
 ## Refresh checklist
 
-1. Build/package the EigenPal fork package.
-2. Replace the tarball in `third_party/eigenpal/`.
-3. Reinstall dependencies at the MetalDocs root and in `frontend/apps/web`.
-4. Commit lockfile updates together with the tarball update.
+1. Bump `@eigenpal/docx-editor-react` and `@eigenpal/docx-editor-core` versions in the relevant `package.json` files.
+2. Run `pnpm install` at the MetalDocs root.
+3. Commit lockfile updates together with the version bump.
+4. Verify CSS overrides in `EditorChrome.module.css` still match eigenpal DOM selectors.
 5. Run the editor validation checklist in `wiki/modules/editor-ui-eigenpal.md`.

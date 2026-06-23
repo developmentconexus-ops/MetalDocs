@@ -1,20 +1,21 @@
 # Phase 3 — Cross-deps
 
-> **Last verified:** 2026-06-14
+> **Last verified:** 2026-06-23
 > Scope: imports IN to `packages/editor-ui/`, imports OUT, runtime callers.
 
 ## OUT-edges (runtime)
 
 | Source | Target | Purpose |
 |---|---|---|
-| `MetalDocsEditor.tsx:2` | `@eigenpal/docx-js-editor` — `DocxEditor`, `PluginHost`, `templatePlugin`, `DocxEditorRef`, `EditorPlugin` | Editor surface |
-| `MetalDocsEditor.tsx:3` | `@eigenpal/docx-js-editor/core` - `createEmptyDocument` | Seeds editable no-buffer mounts with an Eigenpal blank document |
-| `MetalDocsEditor.tsx:4` | `@eigenpal/docx-js-editor/styles.css` | Eigenpal stylesheet (consumed once at adapter level) |
-| `sidebarModelBridge.ts:1` | `@eigenpal/docx-js-editor` — `EditorPlugin`, `ReactSidebarItem` | Plugin type |
-| `OutlinePlugin.tsx:2` | `@eigenpal/docx-js-editor` — `EditorPlugin`, `PluginPanelProps` | Plugin type |
+| `MetalDocsEditor.tsx:2` | `@eigenpal/docx-editor-react` — `DocxEditor`, `DocxEditorRef`, `createEmptyDocument`, `EditorMode` | Editor surface + blank-document seed |
+| `MetalDocsEditor.tsx:3` | `@eigenpal/docx-editor-react/plugin-api` — `PluginHost`, `templatePlugin`, `EditorPlugin`, `ReactSidebarItem` | Plugin host + template plugin |
+| `MetalDocsEditor.tsx:4` | `@eigenpal/docx-editor-react/styles.css` | Eigenpal stylesheet (consumed once at adapter level) |
+| `index.ts:3` | `@eigenpal/docx-editor-core/types/content` — `Comment` | Re-exported Comment type for documents module consumers |
+| `sidebarModelBridge.ts:1` | `@eigenpal/docx-editor-react/plugin-api` — `EditorPlugin`, `ReactSidebarItem` | Plugin type |
+| `OutlinePlugin.tsx:2` | `@eigenpal/docx-editor-react/plugin-api` — `EditorPlugin`, `PluginPanelProps` | Plugin type |
 | `mergefieldPlugin.ts:1` | `@metaldocs/shared-tokens` — `diffTokensVsSchema`, `classifyBlacklist`, `ParseError`, `Token` | Token diff math |
 
-Total external runtime deps: 2 (`@eigenpal/docx-js-editor`, `@metaldocs/shared-tokens`).
+Total external runtime deps: 3 (`@eigenpal/docx-editor-react`, `@eigenpal/docx-editor-core`, `@metaldocs/shared-tokens`).
 
 ## IN-edges (consumers of `@metaldocs/editor-ui`)
 
@@ -34,22 +35,26 @@ Total external runtime deps: 2 (`@eigenpal/docx-js-editor`, `@metaldocs/shared-t
 
 | Consumer | Imports | Drift severity |
 |---|---|---|
-| `frontend/apps/web/src/editor-adapters/eigenpal-template-mode.ts:1` | `BlockContent`, `Paragraph`, `Table` from `@eigenpal/docx-js-editor/core` | Type-only adapter spike; not a runtime editor mount |
-| `frontend/apps/web/src/editor-adapters/__spike__/eigenpal-placeholder-spike.test.ts:7` | `createEmptyDocument`, `DocumentAgent`, `parseDocx`, `serializeDocx` from `@eigenpal/docx-js-editor/core` | Test/spike only |
+| ~~`frontend/apps/web/src/editor-adapters/eigenpal-template-mode.ts:1`~~ | ~~`BlockContent`, `Paragraph`, `Table` from `@eigenpal/docx-editor-core/types/document`~~ | **Fixed 2026-06-23** — now imports via `@metaldocs/editor-ui` (re-exported from `packages/editor-ui/src/types.ts`) |
+| `frontend/apps/web/src/editor-adapters/__spike__/eigenpal-placeholder-spike.test.ts:7` | `createEmptyDocument`, `DocumentAgent`, `parseDocx`, `serializeDocx` from `@eigenpal/docx-editor-react` or `@eigenpal/docx-editor-core/headless` | Test/spike only |
 | `frontend/apps/web/src/features/templates/__tests__/template-author-page-convergence.test.tsx` | eigenpal mocks | Test-only |
 
 Template runtime pages consume `@metaldocs/editor-ui`; no production page mounts eigenpal directly.
 
 ## docx-renderer OUT-edge
 
-`apps/docx-renderer/package.json:15` declares `@eigenpal/docx-js-editor` (server-side substitution at freeze). That is OUT of the editor-ui package scope but shares the same vendored tarball — captured as a coupled-dependency risk in tech-debt T-001.
+`apps/docx-renderer/package.json` declares `@eigenpal/docx-editor-core` (server-side headless substitution via `processTemplateDetailed` from `@eigenpal/docx-editor-core/headless`). That is OUT of the editor-ui package scope but shares the same npm-registry dependency — no longer coupled via the vendored tarball (tarball retired 2026-06-23).
 
 ## Build wiring
 
-- `packages/editor-ui/package.json:29` — `@eigenpal/docx-js-editor: file:../../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (relocated to `third_party/eigenpal/` 2026-06-14; path present after Plan 3 restoration)
+- `packages/editor-ui/package.json` — `@eigenpal/docx-editor-react: 1.9.0` (installed from npm registry; vendored tarball retired 2026-06-23)
 - `packages/editor-ui/package.json:5` — `main: ./src/index.ts` (no compile step shipped; consumers compile source via path alias)
 - TS path alias + Vite alias resolve `@metaldocs/editor-ui` to source directly.
 
+## 2026-06-23 sync note
+
+Eigenpal migration: `@eigenpal/docx-js-editor@0.2.0` (vendored tarball) retired. All OUT-edges updated to new package names: main API from `@eigenpal/docx-editor-react`, plugin API from `@eigenpal/docx-editor-react/plugin-api`, `Comment` type from `@eigenpal/docx-editor-core/types/content`. `processTemplateDetailed` (docx-renderer) from `@eigenpal/docx-editor-core/headless`.
+
 ## 2026-05-17 sync note
 
-Blank editable mount behavior adds a new adapter OUT-edge to `@eigenpal/docx-js-editor/core` for `createEmptyDocument`. Affected consumers are both runtime `MetalDocsEditor` mounts; no API, DB, or backend dependency changed.
+Blank editable mount behavior added adapter OUT-edge for `createEmptyDocument`. Now re-exported from `@eigenpal/docx-editor-react` directly (no longer a separate `/core` subpath for this symbol). Affected consumers are both runtime `MetalDocsEditor` mounts; no API, DB, or backend dependency changed.

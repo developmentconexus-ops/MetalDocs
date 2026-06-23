@@ -10,32 +10,32 @@
 - `wiki/modules/editor-chrome.md` (shipped; consumer-side primitive of this adapter).
 - `wiki/concepts/placeholders.md` — fixed 7-token catalog, tokens literal until server freeze.
 - `wiki/concepts/token-syntax.md` — `{name}` eigenpal-native; `{{uuid}}` legacy removed 2026-04-25.
-- `wiki/decisions/0001-eigenpal-adoption.md` — accepted ADR; cites vendored `0.2.0.tgz`.
+- `wiki/decisions/0001-eigenpal-adoption.md` — accepted ADR; updated 2026-06-23 to reflect `@eigenpal/docx-editor-react@1.9.0` from npm registry.
 - `wiki/references/eigenpal-spike.md` — T1–T8 outcomes that seeded plugin selection.
-- `wiki/references/eigenpal-controlled-package.md` — claims `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` artifact (relocated 2026-06-14).
+- `wiki/references/eigenpal-controlled-package.md` — previously described vendored tarball `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (relocated 2026-06-14); updated 2026-06-23 to document `@eigenpal/docx-editor-react@1.9.0` npm adoption.
 
 ## Module shape
 
 - Tiny FE adapter: ~3 source files + 3 plugin files.
 - One public component (`MetalDocsEditor`) + 3 plugin exports (`buildSidebarModelPlugin`, `createOutlinePlugin`, `computeSidebarModel`).
 - No HTTP. No DB. No state machine. No errors surfaced to API (RFC 9457 = n/a).
-- Wraps external lib `@eigenpal/docx-js-editor` as the SEAM.
+- Wraps external lib `@eigenpal/docx-editor-react` as the SEAM.
 
 ## Eigenpal version pin / fork status
 
-- `package.json` (3 places) reference `file:.../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (relocated from `vendor/eigenpal/` 2026-06-14; root `vendor/` is Go-owned).
-- **FINDING — tarball missing from repo (at audit time 2026-05-10):** commit `0ee9160d` (2026-05-04, "chore(vendor): replace custom eigenpal vendor entry with go mod vendor output") deleted both `vendor/eigenpal/README.md` and `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. The three `package.json` `file:` URIs still resolved to the deleted path. Fresh `npm install` would fail. Lockfiles still carried the old integrity hashes so existing checkouts kept working off `node_modules/`. **Resolved:** tarball restored in Plan 3 (2026-05-11); relocated to `third_party/eigenpal/` (2026-06-14).
-- Fork status: controlled fork (per ADR 0001 + `vendor/eigenpal/README.md` reference, also deleted by the same commit). Upstream consolidation deferred. Lab-side source: `non_git/eigenpal-isolated-lab/analysis/eigenpal-upstream-source/`.
+- `package.json` files now reference `@eigenpal/docx-editor-react@1.9.0` from npm registry (vendored tarball `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` retired 2026-06-23; `third_party/eigenpal/NOTICE` present).
+- **FINDING — tarball missing from repo (at audit time 2026-05-10):** commit `0ee9160d` (2026-05-04, "chore(vendor): replace custom eigenpal vendor entry with go mod vendor output") deleted both `vendor/eigenpal/README.md` and `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. The three `package.json` `file:` URIs still resolved to the deleted path. **Resolved:** tarball restored in Plan 3 (2026-05-11); relocated to `third_party/eigenpal/` (2026-06-14); **vendored tarball fully retired 2026-06-23** — replaced by `@eigenpal/docx-editor-react@1.9.0` from npm registry.
+- Fork status: upstream published package adopted 2026-06-23 (`@eigenpal/docx-editor-react@1.9.0`). Controlled fork era closed.
 
 ## IN-edges (consumers) — verified
 
 - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:241` — uses `MetalDocsEditor` with `mode='document-edit'|'readonly'`. **Sole real consumer of the wrapper.**
-- `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:4` — **bypasses the wrapper**: imports `DocxEditor` directly from `@eigenpal/docx-js-editor/react`. Existing wiki claims this page is a `MetalDocsEditor` consumer. **STALE.**
+- `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:4` — migrated to `MetalDocsEditor` wrapper (2026-05-11); no longer imports eigenpal directly. (Was stale at 2026-05-10 audit time — now resolved.)
 - Type-only imports: `useDocumentComments.ts` etc. import `type { Comment }` from `@metaldocs/editor-ui` (re-exported pass-through).
 
 ## OUT-edges
 
-- `@eigenpal/docx-js-editor` — sole runtime dependency (peer: react 18.2).
+- `@eigenpal/docx-editor-react` + `@eigenpal/docx-editor-core` — runtime dependencies (peer: react 18.2).
 - `@metaldocs/shared-tokens` — feeds `computeSidebarModel`.
 
 ## Carry-forward gaps (debt seeds)
