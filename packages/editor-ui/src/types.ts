@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import type { Comment, EditorPlugin } from '@eigenpal/docx-js-editor';
+import type { Comment } from '@eigenpal/docx-editor-core/types/content';
+import type { EditorPlugin } from '@eigenpal/docx-editor-react/plugin-api';
 import type { SidebarModel } from './plugins/sidebarModelData';
 
 export type EditorMode = 'template-draft' | 'document-edit' | 'readonly';

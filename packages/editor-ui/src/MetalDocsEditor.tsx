@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
-import { DocxEditor, PluginHost, templatePlugin, type DocxEditorRef, type EditorPlugin } from '@eigenpal/docx-js-editor';
-import { createEmptyDocument } from '@eigenpal/docx-js-editor/core';
-import '@eigenpal/docx-js-editor/styles.css';
+import { DocxEditor, createEmptyDocument, type DocxEditorRef } from '@eigenpal/docx-editor-react';
+import { PluginHost, templatePlugin, type EditorPlugin } from '@eigenpal/docx-editor-react/plugin-api';
+import '@eigenpal/docx-editor-react/styles.css';
 import type { MetalDocsEditorProps, MetalDocsEditorRef } from './types';
 import { buildSidebarModelPlugin } from './plugins/sidebarModelBridge';
 
@@ -95,7 +95,6 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
           showRuler={props.showRuler ?? true}
           showMarginGuides={props.showRuler ?? true}
           showOutlineButton
-          showPrintButton
           showZoomControl
           onChange={handleChange}
         />

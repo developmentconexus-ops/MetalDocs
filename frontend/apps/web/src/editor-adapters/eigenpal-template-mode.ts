@@ -1,4 +1,4 @@
-import type { BlockContent, Paragraph, Table } from "@eigenpal/docx-js-editor/core";
+import type { BlockContent, Paragraph, Table } from "@eigenpal/docx-editor-core/types/document";
 
 export type PlaceholderRun = {
   type: "placeholder";
@@ -76,7 +76,7 @@ export function runToPlaceholder(node: EigenpalInlineRunNode): PlaceholderRun | 
     node.properties.alias?.trim() ||
     node.content
       .flatMap((child) =>
-        child.type === "run" ? child.content : child.children.flatMap((nested) => (nested.type === "run" ? nested.content : [])),
+        child.type === "run" ? child.content : ('children' in child && Array.isArray((child as {children: unknown[]}).children) ? (child as {children: EigenpalInlineRunNode[]}).children.flatMap((nested) => nested.type === "run" ? nested.content : []) : []),
       )
       .filter((content) => content.type === "text")
       .map((content) => content.text)

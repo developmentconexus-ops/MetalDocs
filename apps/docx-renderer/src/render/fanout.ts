@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { processTemplateDetailed } from '@eigenpal/docx-js-editor/headless';
+import { processTemplateDetailed } from '@eigenpal/docx-editor-core/headless';
 import { SubBlockRegistry } from './subblocks/registry.js';
 import { registerV1Builtins } from './subblocks/builtins.js';
 

@@ -1,4 +1,4 @@
-import type { EditorPlugin, ReactSidebarItem } from '@eigenpal/docx-js-editor';
+import type { EditorPlugin, ReactSidebarItem } from '@eigenpal/docx-editor-react/plugin-api';
 import { createElement } from 'react';
 import type { SidebarModel } from './sidebarModelData';
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { DocxEditorProps } from '@eigenpal/docx-js-editor';
+import type { DocxEditorProps } from '@eigenpal/docx-editor-react';
 import type { MetalDocsEditorProps } from '../src/types';
 
 type SharedPropKeys =

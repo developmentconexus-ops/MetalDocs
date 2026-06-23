@@ -13,10 +13,10 @@ const baseSchemas: TemplateSchemas = {
   composition: { headerSubBlocks: [], footerSubBlocks: [], subBlockParams: {} },
 };
 
-vi.mock('@eigenpal/docx-js-editor/styles.css', () => ({}));
+vi.mock('@eigenpal/docx-editor-react/styles.css', () => ({}));
 vi.mock('prosemirror-view/style/prosemirror.css', () => ({}));
-vi.mock('@eigenpal/docx-js-editor/core', () => ({ createEmptyDocument: () => ({ type: 'empty-doc' }) }));
-vi.mock('@eigenpal/docx-js-editor/react', () => ({
+vi.mock('@eigenpal/docx-editor-react', () => ({
+  createEmptyDocument: () => ({ type: 'empty-doc' }),
   DocxEditor: React.forwardRef(({ onChange }: { onChange?: () => void }, ref) => {
     React.useImperativeHandle(ref, () => ({
       save: () => Promise.resolve(new ArrayBuffer(1)),

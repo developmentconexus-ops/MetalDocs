@@ -6,7 +6,12 @@ import { MetalDocsEditor } from '../src/MetalDocsEditor';
 
 afterEach(cleanup);
 
-vi.mock('@eigenpal/docx-js-editor', () => ({
+vi.mock('@eigenpal/docx-editor-react', () => ({
+  createEmptyDocument: () => ({ type: 'empty-doc' }),
+  DocxEditor: React.forwardRef((_props, _ref) => <div data-testid="docx-editor-mock" />),
+}));
+
+vi.mock('@eigenpal/docx-editor-react/plugin-api', () => ({
   templatePlugin: { name: 'template', id: 'template' },
   PluginHost: ({
     plugins,
@@ -23,7 +28,6 @@ vi.mock('@eigenpal/docx-js-editor', () => ({
       {children}
     </div>
   ),
-  DocxEditor: React.forwardRef((_props, _ref) => <div data-testid="docx-editor-mock" />),
 }));
 
 describe('template plugin wiring', () => {

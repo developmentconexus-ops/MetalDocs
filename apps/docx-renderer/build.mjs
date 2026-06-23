@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 //
 // Every real node_modules dependency is left EXTERNAL so it loads natively at
 // runtime in its own module format. This is the load-bearing decision: fastify
-// is CommonJS, @eigenpal/docx-js-editor is dual-format and relies on
+// is CommonJS, @eigenpal/docx-editor-react is dual-format and relies on
 // import.meta.url. Bundling them into a single file forces incompatible module
 // systems together (the "Dynamic require" / "import.meta.url undefined" errors).
 // Externalizing them keeps our entry as clean ESM and lets Node resolve each

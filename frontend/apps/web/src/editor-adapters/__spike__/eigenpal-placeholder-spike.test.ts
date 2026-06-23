@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { createEmptyDocument } from "@eigenpal/docx-editor-react";
 import {
-  createEmptyDocument,
   DocumentAgent,
   parseDocx,
   serializeDocx,
-} from "@eigenpal/docx-js-editor/core";
+} from "@eigenpal/docx-editor-core/headless";
 
 import {
   placeholderToRun,
