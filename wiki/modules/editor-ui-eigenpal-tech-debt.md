@@ -54,6 +54,22 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. Trigg
 - **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-008`
 - **Linked ADR:** ADR 0046 — decision recorded; implementation in Phase 3
 
+### T-009 · Worker retry not wired on `*RenderError.Retryable()`
+- **Severity:** major
+- **Surface:** `internal/modules/render/freeze_service.go` and `internal/modules/render/fanout/reconstruction.go` — both call `fanout.Client.Fanout(...)` and propagate the returned `error` without consulting `*RenderError.Retryable()`. A `template_parse` defect (permanent, 4xx) is indistinguishable from a transient 5xx from the worker's retry logic, so the worker may retry a permanently-broken template indefinitely.
+- **Observation:** `*RenderError.Retryable()` is implemented in `internal/modules/render/fanout/client.go`. Wiring `errors.As(&RenderError{})` + retry/permanent-fail branching is the missing step. Deferred from Phase 3A; planned for Phase 3B or a standalone follow-up.
+- **Evidence:** `internal/modules/render/fanout/client.go` (Retryable method); absence of `errors.As` in `freeze_service.go` and `reconstruction.go`.
+- **Linked backlog row:** (not yet filed)
+- **Linked ADR:** none
+
+### T-010 · Renderer OTel exporter absent (REQ-OBS-3 / RF-1 deferred)
+- **Severity:** minor
+- **Surface:** `apps/docx-renderer/src/render/fanout.ts` — `processTemplate` accepts `traceparent` and logs structured error fields, but the renderer emits no OpenTelemetry spans and the worker→renderer hop has no `otelhttp` transport.
+- **Observation:** Trace-ready instrumentation exists in the adapter (`traceparent` option, `req.log.warn` structured fields) but no OTel exporter is configured in the renderer. The worker→renderer HTTP hop is invisible in distributed traces. Deferred to RF-1 per spec §4.
+- **Evidence:** `packages/eigenpal-adapter/src/index.ts` (`ProcessTemplateOptions.traceparent`); `apps/docx-renderer/src/routes/fanout.ts` (`req.log.warn` call); no `opentelemetry` package in `apps/docx-renderer/package.json`.
+- **Linked backlog row:** (not yet filed)
+- **Linked ADR:** none
+
 ---
 
 ## Coverage stats (computed at compose time)
