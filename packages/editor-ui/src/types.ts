@@ -1,8 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Comment } from '@eigenpal/docx-editor-core/types/content';
-import type { EditorPlugin } from '@eigenpal/docx-editor-react/plugin-api';
-import type { SidebarModel } from './plugins/sidebarModelData';
-
+import type { EditorComment } from './comment-mapping';
 
 export type EditorMode = 'template-draft' | 'document-edit' | 'readonly' | 'review';
 
@@ -14,21 +11,14 @@ export interface MetalDocsEditorProps {
   documentName?: string;
   documentNameEditable?: boolean;
   onDocumentNameChange?: (name: string) => void;
-  comments?: Comment[];
-  onCommentsChange?: (comments: Comment[]) => void;
-  onCommentAdd?: (c: Comment) => void;
-  onCommentResolve?: (c: Comment) => void;
-  onCommentDelete?: (c: Comment) => void;
-  onCommentReply?: (reply: Comment, parent: Comment) => void;
+  comments?: EditorComment[];
+  onCommentsChange?: (comments: EditorComment[]) => void;
+  onCommentAdd?: (c: EditorComment) => void;
+  onCommentResolve?: (c: EditorComment) => void;
+  onCommentDelete?: (c: EditorComment) => void;
+  onCommentReply?: (reply: EditorComment, parent: EditorComment) => void;
   renderTitleBarRight?: () => ReactNode;
-  sidebarModel?: SidebarModel;
-  externalPlugins?: EditorPlugin[];
   onAutoSave?: (buf: ArrayBuffer) => Promise<void>;
-  /**
-   * Called synchronously on every editor change event (before the autosave
-   * debounce fires). Use for lightweight side-effects (placeholder sync,
-   * outline refresh). Do NOT trigger heavy async work here.
-   */
   onChange?: () => void;
   showRuler?: boolean;
 }

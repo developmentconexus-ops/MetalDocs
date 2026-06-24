@@ -3,7 +3,8 @@ import { DocxEditor, createEmptyDocument, type DocxEditorRef } from '@eigenpal/d
 import { PluginHost, templatePlugin, type EditorPlugin } from '@eigenpal/docx-editor-react/plugin-api';
 import '@eigenpal/docx-editor-react/styles.css';
 import type { MetalDocsEditorProps, MetalDocsEditorRef } from './types';
-import { buildSidebarModelPlugin } from './plugins/sidebarModelBridge';
+import { filterTransactionGuard } from './plugins/filter-transaction-guard';
+import { toEigenpalComment, fromEigenpalComment } from './comment-mapping';
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -70,9 +71,9 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
     // the sidebar stays empty (no chips, canvas centered) when there are also
     // no comments to display. See wiki/modules/editor-ui-eigenpal.md.
     const plugins: EditorPlugin[] = [
-      ...(props.mode === 'template-draft' ? [templatePlugin] : []),
-      ...(props.sidebarModel ? [buildSidebarModelPlugin(props.sidebarModel)] : []),
-      ...(props.externalPlugins ?? []),
+      ...(props.mode === 'template-draft'
+        ? [templatePlugin, { id: 'filter-transaction-guard', name: 'filter-transaction-guard', proseMirrorPlugins: [filterTransactionGuard()] }]
+        : []),
     ];
 
     return (
@@ -86,12 +87,26 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
           documentName={props.documentName}
           documentNameEditable={props.documentNameEditable ?? (libMode === 'editing')}
           onDocumentNameChange={props.onDocumentNameChange}
-          comments={props.comments}
-          onCommentsChange={props.onCommentsChange}
-          onCommentAdd={props.onCommentAdd}
-          onCommentResolve={props.onCommentResolve}
-          onCommentDelete={props.onCommentDelete}
-          onCommentReply={props.onCommentReply}
+          comments={props.comments?.map(toEigenpalComment)}
+          onCommentsChange={
+            props.onCommentsChange
+              ? (cs) => props.onCommentsChange!(cs.map(fromEigenpalComment))
+              : undefined
+          }
+          onCommentAdd={
+            props.onCommentAdd ? (c) => props.onCommentAdd!(fromEigenpalComment(c)) : undefined
+          }
+          onCommentResolve={
+            props.onCommentResolve ? (c) => props.onCommentResolve!(fromEigenpalComment(c)) : undefined
+          }
+          onCommentDelete={
+            props.onCommentDelete ? (c) => props.onCommentDelete!(fromEigenpalComment(c)) : undefined
+          }
+          onCommentReply={
+            props.onCommentReply
+              ? (reply, parent) => props.onCommentReply!(fromEigenpalComment(reply), fromEigenpalComment(parent))
+              : undefined
+          }
           renderTitleBarRight={props.renderTitleBarRight}
           showRuler={props.showRuler ?? true}
           showMarginGuides={props.showRuler ?? true}
