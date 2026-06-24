@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
-import type { Comment } from '@metaldocs/editor-ui';
+import type { EditorComment } from '@metaldocs/editor-ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ApiError, resolveErrorMessage, apiFetch } from '../../../lib/api';
@@ -465,10 +465,10 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 author={authorDisplay}
                 comments={commentsHook.comments}
                 onCommentsChange={commentsHook.setComments}
-                onCommentAdd={(c: Comment) => { if (canUseComments) void commentsHook.add(c); }}
-                onCommentResolve={(c: Comment) => { if (canUseComments) void (c.done ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
-                onCommentDelete={(c: Comment) => { if (canUseComments) void commentsHook.remove(c); }}
-                onCommentReply={(reply: Comment, parent: Comment) => { if (canUseComments) void commentsHook.reply(reply, parent); }}
+                onCommentAdd={(c: EditorComment) => { if (canUseComments) void commentsHook.add(c); }}
+                onCommentResolve={(c: EditorComment) => { if (canUseComments) void (c.done ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
+                onCommentDelete={(c: EditorComment) => { if (canUseComments) void commentsHook.remove(c); }}
+                onCommentReply={(reply: EditorComment, parent: EditorComment) => { if (canUseComments) void commentsHook.reply(reply, parent); }}
                 onAutoSave={handleSave}
                 onChange={handleEditorChange}
                 onDocumentNameChange={handleRename}
