@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Comment } from '@metaldocs/editor-ui';
+import type { EditorComment } from '@metaldocs/editor-ui';
 import { QK } from '../../../lib/queryKeys';
 import {
   createComment,
@@ -12,30 +12,19 @@ import {
 
 type DocumentCommentContent = DocumentCommentCreateRequest['content'];
 
-function toInitials(author: string): string {
-  return author
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((token) => token[0]?.toUpperCase() ?? '')
-    .join('')
-    .slice(0, 2);
-}
-
-export function rowToLibraryComment(row: DocumentComment): Comment {
+export function rowToEditorComment(row: DocumentComment): EditorComment {
   return {
     id: row.library_comment_id,
     parentId: row.parent_library_id ?? undefined,
     author: row.author,
-    initials: toInitials(row.author),
-    date: row.created_at,
-    content: row.content as unknown as Comment['content'],
-    done: row.done,
+    createdAt: row.created_at,
+    body: row.content as unknown,
+    resolved: row.done,
   };
 }
 
-function libraryCommentToPayloadContent(comment: Comment): DocumentCommentContent {
-  return comment.content as unknown as DocumentCommentContent;
+function libraryCommentToPayloadContent(comment: EditorComment): DocumentCommentContent {
+  return comment.body as unknown as DocumentCommentContent;
 }
 
 export function useDocumentCommentsQuery(documentID: string) {
@@ -58,7 +47,7 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
   };
 
   const addMutation = useMutation({
-    mutationFn: (comment: Comment) => createComment(documentID, {
+    mutationFn: (comment: EditorComment) => createComment(documentID, {
       library_comment_id: comment.id,
       author_display: authorDisplay,
       content: libraryCommentToPayloadContent(comment) as DocumentCommentCreateRequest['content'],
@@ -75,10 +64,10 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
           author: comment.author,
           author_id: '',
           content: libraryCommentToPayloadContent(comment),
-          done: Boolean(comment.done),
-          created_at: comment.date ?? new Date().toISOString(),
-          updated_at: comment.date ?? new Date().toISOString(),
-          resolved_at: comment.done ? new Date().toISOString() : null,
+          done: Boolean(comment.resolved),
+          created_at: comment.createdAt ?? new Date().toISOString(),
+          updated_at: comment.createdAt ?? new Date().toISOString(),
+          resolved_at: comment.resolved ? new Date().toISOString() : null,
         },
       ]);
       return { previous };
@@ -93,7 +82,7 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
   });
 
   const replyMutation = useMutation({
-    mutationFn: ({ reply, parent }: { reply: Comment; parent: Comment }) => createComment(documentID, {
+    mutationFn: ({ reply, parent }: { reply: EditorComment; parent: EditorComment }) => createComment(documentID, {
       library_comment_id: reply.id,
       parent_library_id: parent.id,
       author_display: authorDisplay,
@@ -108,7 +97,7 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
   });
 
   const resolveMutation = useMutation({
-    mutationFn: (comment: Comment) => patchComment(documentID, comment.id, { done: true }),
+    mutationFn: (comment: EditorComment) => patchComment(documentID, comment.id, { done: true }),
     onSuccess: replaceComment,
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey });
@@ -116,7 +105,7 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
   });
 
   const reopenMutation = useMutation({
-    mutationFn: (comment: Comment) => patchComment(documentID, comment.id, { done: false }),
+    mutationFn: (comment: EditorComment) => patchComment(documentID, comment.id, { done: false }),
     onSuccess: replaceComment,
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey });
@@ -124,7 +113,7 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (comment: Comment) => deleteComment(documentID, comment.id),
+    mutationFn: (comment: EditorComment) => deleteComment(documentID, comment.id),
     onSuccess: (_void, comment) => {
       queryClient.setQueryData<DocumentComment[]>(queryKey, (rows = []) =>
         rows.filter((row) => row.library_comment_id !== comment.id && row.parent_library_id !== comment.id),

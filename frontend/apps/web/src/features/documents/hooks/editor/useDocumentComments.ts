@@ -1,49 +1,37 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { Comment } from '@metaldocs/editor-ui';
+import type { EditorComment } from '@metaldocs/editor-ui';
 import { toast } from 'sonner';
 import {
-  rowToLibraryComment,
+  rowToEditorComment,
   useDocumentCommentMutations,
   useDocumentCommentsQuery,
 } from '../../queries/useDocumentCommentsQuery';
 import { resolveQueryError } from '../../../../lib/api';
 
-export function partitionByMarkers(comments: Comment[], markerIds: Set<number>): { live: Comment[]; orphans: Comment[] } {
-  const live: Comment[] = [];
-  const orphans: Comment[] = [];
-  for (const comment of comments) {
-    if (markerIds.has(comment.id)) live.push(comment);
-    else orphans.push(comment);
-  }
-  return { live, orphans };
-}
-
 export function useDocumentComments(documentID: string, authorDisplay: string): {
-  comments: Comment[];
-  orphans: Comment[];
+  comments: EditorComment[];
   loading: boolean;
   loadError: string | null;
-  add: (c: Comment) => Promise<void>;
-  resolve: (c: Comment) => Promise<void>;
-  reopen: (c: Comment) => Promise<void>;
-  remove: (c: Comment) => Promise<void>;
-  reply: (replyC: Comment, parent: Comment) => Promise<void>;
+  add: (c: EditorComment) => Promise<void>;
+  resolve: (c: EditorComment) => Promise<void>;
+  reopen: (c: EditorComment) => Promise<void>;
+  remove: (c: EditorComment) => Promise<void>;
+  reply: (replyC: EditorComment, parent: EditorComment) => Promise<void>;
   retry: () => Promise<void>;
-  setComments: Dispatch<SetStateAction<Comment[]>>;
+  setComments: Dispatch<SetStateAction<EditorComment[]>>;
 } {
   const query = useDocumentCommentsQuery(documentID);
   const mutations = useDocumentCommentMutations(documentID, authorDisplay);
-  const [localComments, setLocalComments] = useState<Comment[] | null>(null);
+  const [localComments, setLocalComments] = useState<EditorComment[] | null>(null);
   const lastErrorMessage = useRef<string | null>(null);
 
   const serverComments = useMemo(
-    () => (query.data ?? []).map(rowToLibraryComment),
+    () => (query.data ?? []).map(rowToEditorComment),
     [query.data],
   );
   const comments = localComments ?? serverComments;
-  const orphans = useMemo(() => [] as Comment[], []);
   const loadError = useMemo(
-    () => (query.isError ? resolveQueryError(query.error, 'Falha ao carregar comentários.') : null),
+    () => (query.isError ? resolveQueryError(query.error, 'Falha ao carregar comentÃ¡rios.') : null),
     [query.error, query.isError],
   );
 
@@ -59,7 +47,7 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
     toast.error(loadError);
   }, [loadError]);
 
-  const add = useCallback(async (c: Comment) => {
+  const add = useCallback(async (c: EditorComment) => {
     try {
       await mutations.addMutation.mutateAsync(c);
       setLocalComments(null);
@@ -68,7 +56,7 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
     }
   }, [mutations.addMutation]);
 
-  const resolve = useCallback(async (c: Comment) => {
+  const resolve = useCallback(async (c: EditorComment) => {
     try {
       await mutations.resolveMutation.mutateAsync(c);
       setLocalComments(null);
@@ -77,7 +65,7 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
     }
   }, [mutations.resolveMutation]);
 
-  const reopen = useCallback(async (c: Comment) => {
+  const reopen = useCallback(async (c: EditorComment) => {
     try {
       await mutations.reopenMutation.mutateAsync(c);
       setLocalComments(null);
@@ -86,7 +74,7 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
     }
   }, [mutations.reopenMutation]);
 
-  const remove = useCallback(async (c: Comment) => {
+  const remove = useCallback(async (c: EditorComment) => {
     try {
       await mutations.deleteMutation.mutateAsync(c);
       setLocalComments(null);
@@ -95,7 +83,7 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
     }
   }, [mutations.deleteMutation]);
 
-  const reply = useCallback(async (replyC: Comment, parent: Comment) => {
+  const reply = useCallback(async (replyC: EditorComment, parent: EditorComment) => {
     try {
       await mutations.replyMutation.mutateAsync({ reply: replyC, parent });
       setLocalComments(null);
@@ -104,7 +92,7 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
     }
   }, [mutations.replyMutation]);
 
-  const setComments: Dispatch<SetStateAction<Comment[]>> = useCallback((next) => {
+  const setComments: Dispatch<SetStateAction<EditorComment[]>> = useCallback((next) => {
     setLocalComments((prev) => {
       const base = prev ?? serverComments;
       return typeof next === 'function' ? next(base) : next;
@@ -117,7 +105,6 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
 
   return {
     comments,
-    orphans,
     loading: query.isLoading,
     loadError,
     add,

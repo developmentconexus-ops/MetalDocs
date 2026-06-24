@@ -1,6 +1,6 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Comment } from '@metaldocs/editor-ui';
+import type { EditorComment } from '@metaldocs/editor-ui';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
@@ -12,14 +12,13 @@ vi.mock('sonner', () => ({
   },
 }));
 
-function makeComment(id: number): Comment {
+function makeComment(id: number): EditorComment {
   return {
     id,
     author: 'Alice Doe',
-    initials: 'AD',
-    date: '2026-04-19T10:00:00Z',
-    content: [{ type: 'paragraph' }] as unknown as Comment['content'],
-    done: false,
+    createdAt: '2026-04-19T10:00:00Z',
+    body: [{ type: 'paragraph' }] as unknown,
+    resolved: false,
   };
 }
 
