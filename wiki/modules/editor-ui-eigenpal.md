@@ -336,7 +336,71 @@ Top 3 (by severity, then by blast-radius):
 
 ---
 
-## 12. Glossary
+## 12. Neutral comment seam (Phase 3B)
+
+**Last verified:** 2026-06-23
+
+### 12.1 Two-door ACL diagram
+
+The editor-ui package enforces a vendor-sealed boundary:
+
+```
+app (frontend/apps/web)
+ └─ @metaldocs/editor-ui   ← the wall (vendor-type-free public surface)
+     └─ @eigenpal/docx-editor-*   ← sealed vendor
+```
+
+Consumers of the app import only from `@metaldocs/editor-ui`. The wrapper's public surface (`index.ts` and `types.ts`) contains no `@eigenpal` string references.
+
+### 12.2 EditorComment type
+
+The only comment type the app sees. Defined in `@eigenpal/docx-editor-core/types/content` and re-exported by the adapter.
+
+**Fields:**
+- `id: number` — unique comment ID
+- `parentId?: number` — reply-to comment ID (optional)
+- `author: string` — comment author name
+- `createdAt?: string` — ISO-8601 timestamp (optional)
+- `body: unknown` — opaque ProseMirror Paragraph[] content
+- `resolved: boolean` — comment state (resolved or open)
+
+**Mapping source:** `packages/editor-ui/src/comment-mapping.ts`
+
+### 12.3 filterTransactionGuard
+
+Internal to the package; not exported. Mode-driven filter that restricts editor transactions based on `EditorMode`.
+
+**Modes:**
+- `template-draft` — allows template-specific edits
+- Other modes — standard editing constraints apply
+
+**Source:** `packages/editor-ui/src/plugins/filter-transaction-guard.ts`
+
+Note: The app no longer supplies plugins via `externalPlugins` prop.
+
+### 12.4 Public-surface guard test
+
+Regression test: `packages/editor-ui/test/public-surface.test.ts`
+
+Asserts that `index.ts` and `types.ts` contain no `@eigenpal` string. Fails on future vendor leaks, enforcing the ACL wall.
+
+### 12.5 Accepted limitations (NOT built in Phase 3B)
+
+The following are deferred to the backend approval gate:
+
+| Limitation | Issue | Resolution |
+|---|---|---|
+| Comment orphan reconciliation | Anchor deleted in editor body but thread row remains in comment state | Backend returns HTTP 409 `approval.unresolved_comments` if any unresolved comment exists |
+| Add/save atomicity | Creating a comment and persisting it are not atomic at the document level | Backend approval gate validates document + comment state consistency |
+| Published-artifact staleness | A published snapshot may show resolved comments that are still unresolved in the live document | Operator-gated via document approval process; background reconciliation task is future work |
+
+**Backend enforcement:** Decision service `T-011` in `internal/modules/documents/.../decision_service.go` returns HTTP 409 if any comment is unresolved at approval time.
+
+**Related:** `wiki/modules/documents-tech-debt.md` (comment-related future work and constraints).
+
+---
+
+## 13. Glossary
 
 | Term | Definition |
 |---|---|
@@ -348,7 +412,7 @@ Top 3 (by severity, then by blast-radius):
 
 ---
 
-## Failure modes
+## 14. Failure modes
 
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
