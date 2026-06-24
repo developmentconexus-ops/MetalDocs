@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
-import { filterTransactionGuard } from '../../../editor-adapters/filter-transaction-guard';
 import { type TemplateSchemas, type VersionDTO, submitForReview } from '../api/templates';
 import { useTemplateDraft } from '../hooks/useTemplateDraft';
 import { useTemplateAutosave } from '../hooks/useTemplateAutosave';
@@ -64,14 +63,6 @@ export function TemplateEditorPage({
   const schemaSnapshotRef = useRef<string | null>(null);
   const variableSyncTimerRef = useRef<number | null>(null);
   const outlineSyncTimerRef = useRef<number | null>(null);
-  // filterTransactionGuard is a raw ProseMirror plugin; wrap in EditorPlugin shell so
-  // MetalDocsEditor can register it via PluginHost (proseMirrorPlugins field).
-  const editorPlugins = useMemo(() => [{
-    id: 'filter-transaction-guard',
-    name: 'filter-transaction-guard',
-    proseMirrorPlugins: [filterTransactionGuard()],
-  }], []);
-
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [importing, setImporting] = useState(false);
@@ -354,7 +345,6 @@ export function TemplateEditorPage({
               documentBuffer={draft.docxBytes ?? undefined}
               onAutoSave={async (buf) => { autosave.queueDocx(buf); }}
               onChange={handleEditorChange}
-              externalPlugins={editorPlugins}
               showRuler
             />
           </EditorChrome>
