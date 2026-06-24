@@ -19,11 +19,6 @@ vi.mock('@eigenpal/docx-editor-react/plugin-api', () => ({
 
 vi.mock('@eigenpal/docx-editor-react/styles.css', () => ({}));
 
-// Mock the sidebarModelBridge plugin used internally
-vi.mock('./plugins/sidebarModelBridge', () => ({
-  buildSidebarModelPlugin: () => ({}),
-}));
-
 import { MetalDocsEditor } from './MetalDocsEditor';
 
 describe('MetalDocsEditor mode mapping', () => {
