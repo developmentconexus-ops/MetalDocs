@@ -30,7 +30,7 @@
    - `wiki/decisions/0001-eigenpal-adoption.md` — exists.
    - `wiki/concepts/placeholders.md` — exists.
    - `wiki/architecture/frontend-structure.md` — exists.
-   - `wiki/references/eigenpal-controlled-package.md` — exists.
+   - `wiki/references/eigenpal-controlled-package.md` — exists (updated 2026-06-23 for new package name).
    - `wiki/modules/editor-ui-eigenpal.md`, `templates.md`, `templates.md`, `documents.md` — all exist.
    - `wiki/modules/editor-chrome-tech-debt.md`, `wiki/backlog/editor-chrome-refactor.md` — created in this commit.
 

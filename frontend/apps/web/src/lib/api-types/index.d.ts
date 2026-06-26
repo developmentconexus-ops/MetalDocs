@@ -717,40 +717,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/signed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Redirect to presigned GET URL for a stored object */
-        get: operations["redirectSignedUrl"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/templates/{id}/versions/{n}/draft": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Save draft (CAS via expected_lock_version) */
-        put: operations["saveTemplateDraft"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/templates/{id}/versions/{n}/publish": {
         parameters: {
             query?: never;
@@ -2210,7 +2176,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             recipient_user_id: string;
-            /** @description Open string. M3 emits document_published / document_superseded / document_obsoleted / signoff_recorded / signoff.rejected; the parked emitter mission adds more additively (ADR-0043). Not a closed enum. */
+            /** @description Open string. M3 emits document.published / document.superseded / document.obsoleted / document.approved / document.rejected (ADR-0044 typed domain events); future emitters add more additively. Not a closed enum. */
             event_type: string;
             resource_type: string;
             resource_id: string;
@@ -2898,7 +2864,7 @@ export interface components {
             obsoleted_at?: string | null;
             /**
              * Format: int32
-             * @description Optimistic-concurrency token. Increments on every successful write to the version row. Clients must echo the last-seen value back via `expected_lock_version` on PUT .../schema and PUT .../draft. A mismatch yields HTTP 412 with code `stale_lock_version`.
+             * @description Optimistic-concurrency token. Increments on every successful write to the version row. Clients must echo the last-seen value back via `expected_lock_version` on PUT .../schema. A mismatch yields HTTP 412 with code `stale_lock_version`.
              */
             lock_version?: number;
             /** Format: date-time */
@@ -4571,64 +4537,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
-            500: components["responses"]["InternalServerError"];
-        };
-    };
-    redirectSignedUrl: {
-        parameters: {
-            query: {
-                key: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description redirect */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    saveTemplateDraft: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                n: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_lock_version: number;
-                    docx_storage_key: string;
-                    schema_storage_key: string;
-                    docx_content_hash: string;
-                    schema_content_hash: string;
-                };
-            };
-        };
-        responses: {
-            /** @description ok */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            412: components["responses"]["PreconditionFailed"];
             500: components["responses"]["InternalServerError"];
         };
     };

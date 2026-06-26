@@ -42,6 +42,7 @@ type Dependencies struct {
 	Caps                         application.CapabilityChecker
 	ProfileDefaults              application.ProfileDefaultTemplateReader
 	SnapshotReader               application.SnapshotTemplateReader
+	ViewPresign                  application.ViewPresigner
 	ExportPresign                application.ExportPresigner
 	ExportDocgen                 application.DocgenPDFClient
 	DocgenVer                    string
@@ -95,6 +96,7 @@ func New(deps Dependencies) *Module {
 		svc = application.NewService(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ProfileDefaults)
 	}
 	svc.WithRunner(db.NewTxRunner(deps.DB))
+	svc.WithEligibility(repo)
 	svc.WithControlledDocumentDuplicator(deps.ControlledDocumentDuplicator)
 	h := dhttp.NewHandlerWithSubmit(svc, deps.DB, deps.SubmitSvc).WithCaps(deps.Caps)
 
@@ -126,8 +128,8 @@ func New(deps Dependencies) *Module {
 	)
 
 	var viewHandler *dhttp.ViewHandler
-	if deps.Presign != nil && deps.DB != nil {
-		viewSvc := application.NewViewService(db.NewTxRunner(deps.DB), deps.Presign, nil)
+	if deps.ViewPresign != nil && deps.DB != nil {
+		viewSvc := application.NewViewService(db.NewTxRunner(deps.DB), deps.ViewPresign, nil)
 		viewHandler = dhttp.NewViewHandler(viewSvc)
 	}
 

@@ -400,7 +400,7 @@ func main() {
 
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
-	docPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
+	docPresigner := objectstore.NewVerifiedStore(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
 	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
 
 	// Fanout/eigenpal client — enabled when METALDOCS_FANOUT_URL is set.
@@ -432,6 +432,7 @@ func main() {
 		FormVal:                      formval.NewGojsonschema(),
 		Audit:                        wiring.NewDocumentsAuditSink(deps.AuditWriter),
 		ExportPresign:                docPresigner,
+		ViewPresign:                  docPresigner,
 		ControlledDocumentDuplicator: controlledDocumentDuplicator,
 		Caps:                         wiring.NewCapabilityChecker(capabilityService),
 		ProfileDefaults:              wiring.NewProfileDefaults(profileRepo, templatesinfra.NewTemplateVersionReader(deps.SQLDB)),
@@ -746,7 +747,7 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 	if capabilityService == nil {
 		return nil, errors.New("templates capability service is required")
 	}
-	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
+	templatesPresigner := objectstore.NewVerifiedStore(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
 	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, wiring.Clock{}, wiring.UUIDGen{}).WithRunner(db.NewTxRunner(deps.SQLDB))
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())

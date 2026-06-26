@@ -1,21 +1,21 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { CodeChip, StatusPill } from '../../../components/ui';
 import { formatDateTime } from '../../../lib/formatDate';
+import { useAuthStore } from '../../../store/auth.store';
 import { useDocumentCommentsQuery } from '../../documents/queries/useDocumentCommentsQuery';
 import { useDocumentDetailQuery } from '../../documents/queries/useDocumentDetailQuery';
-import { useDocumentPdfStatus } from '../../documents/hooks/editor/useDocumentPdfStatus';
 import { ControlledDocumentDetailPanel } from '../components/ControlledDocumentDetailPanel';
+import { ReviewDocumentCanvas, type ReviewDocumentCanvasRef } from '../components/ReviewDocumentCanvas';
 import { commentPlainText } from '../lib/commentPlainText';
 import { useActiveDocumentContextQuery } from '../queries/useActiveDocumentContextQuery';
 import styles from './SignoffDetailPage.module.css';
 
-type Tab = 'documento' | 'mudancas' | 'comentarios';
+type Tab = 'documento' | 'comentarios';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'documento', label: 'Documento' },
-  { id: 'mudancas', label: 'Mudanças vs versão anterior' },
   { id: 'comentarios', label: 'Comentários' },
 ];
 
@@ -27,6 +27,9 @@ export function SignoffDetailPage() {
     decisionParam === 'approve' || decisionParam === 'reject' ? decisionParam : undefined;
 
   const [tab, setTab] = useState<Tab>('documento');
+  const canvasRef = useRef<ReviewDocumentCanvasRef>(null);
+
+  const currentUser = useAuthStore((s) => s.user);
 
   const docQuery = useDocumentDetailQuery(documentId);
   const doc = docQuery.data ?? null;
@@ -35,7 +38,6 @@ export function SignoffDetailPage() {
   const contextQuery = useActiveDocumentContextQuery(controlledDocumentId);
   const context = contextQuery.data ?? null;
 
-  const pdf = useDocumentPdfStatus(documentId, tab === 'documento');
   const commentsQuery = useDocumentCommentsQuery(documentId);
 
   if (docQuery.isLoading) {
@@ -87,34 +89,17 @@ export function SignoffDetailPage() {
         >
           {tab === 'documento' ? (
             <div className={styles.a4}>
-              {pdf.status === 'ready' && pdf.url ? (
-                <iframe
-                  title="Pré-visualização do documento"
-                  src={pdf.url}
-                  className={styles.pdfFrame}
+              {doc.current_revision_id ? (
+                <ReviewDocumentCanvas
+                  ref={canvasRef}
+                  documentId={documentId}
+                  currentRevisionId={doc.current_revision_id}
+                  status={doc.status}
+                  approverDisplay={currentUser?.displayName ?? ''}
                 />
-              ) : pdf.status === 'failed' ? (
-                <div className={styles.a4State} role="alert">
-                  <p>Falha ao gerar a pré-visualização.</p>
-                  <button type="button" className={styles.retry} onClick={pdf.retry}>
-                    Tentar novamente
-                  </button>
-                </div>
               ) : (
-                <div className={styles.a4State}>Gerando visualização do documento…</div>
+                <div className={styles.a4State}>Este documento ainda não possui conteúdo para revisão.</div>
               )}
-            </div>
-          ) : null}
-
-          {tab === 'mudancas' ? (
-            <div className={styles.deferred}>
-              <h2>Comparação de versões</h2>
-              <p>
-                A comparação visual entre revisões depende de um endpoint de diff de documentos que
-                ainda não existe. Esta aba será habilitada quando o backend expuser o diff — veja
-                o backlog (<code>wiki/backlog/detalhe-signoff.md</code>). Nenhum diff é exibido aqui
-                para não apresentar dados inventados.
-              </p>
             </div>
           ) : null}
 
@@ -164,6 +149,7 @@ export function SignoffDetailPage() {
             publishedDocumentId={context.published_document_id}
             autoOpenSignoff={Boolean(initialSignoffDecision)}
             initialSignoffDecision={initialSignoffDecision}
+            beforeDecision={async () => { await canvasRef.current?.flushSave(); }}
           />
         ) : (
           <div className={styles.state}>

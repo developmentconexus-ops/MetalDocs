@@ -11,6 +11,7 @@ import (
 
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/objectstore"
 )
 
 func TestPresignAutosave_Happy(t *testing.T) {
@@ -43,7 +44,7 @@ func TestPresignAutosave_Happy(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected non-nil result")
 	}
-	if got.UploadURL != "https://presigned/put/templates/tpl-1/versions/3.docx" {
+	if got.UploadURL != "https://example/put" {
 		t.Fatalf("unexpected upload url: %q", got.UploadURL)
 	}
 	if got.StorageKey != "templates/tpl-1/versions/3.docx" {
@@ -82,7 +83,7 @@ func TestPresignAutosave_NonDraft(t *testing.T) {
 	}
 }
 
-func TestPresignTemplateUpload_IgnoresCallerStorageKey(t *testing.T) {
+func TestPresignTemplateUpload_UsesDBStorageKey(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{
 		ID:       "tpl-1",
@@ -103,13 +104,12 @@ func TestPresignTemplateUpload_IgnoresCallerStorageKey(t *testing.T) {
 		ActorUserID:   "user-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
-		StorageKey:    "templates/other-tenant/versions/1.docx",
 	})
 	if err != nil {
 		t.Fatalf("PresignTemplateUpload returned error: %v", err)
 	}
 	if got.StorageKey != "templates/tpl-1/versions/1.docx" {
-		t.Fatalf("expected server-derived storage key, got %q", got.StorageKey)
+		t.Fatalf("expected DB-sourced storage key, got %q", got.StorageKey)
 	}
 	if len(presigner.PutKeys) != 1 || presigner.PutKeys[0] != "templates/tpl-1/versions/1.docx" {
 		t.Fatalf("unexpected presign keys: %v", presigner.PutKeys)
@@ -129,7 +129,7 @@ func TestCommitAutosave_Happy(t *testing.T) {
 		Status:         domain.VersionStatusDraft,
 		DocxStorageKey: "templates/tpl-1/versions/7.docx",
 	}
-	presigner := &fakePresigner{HeadResult: "hash_abc"}
+	presigner := &fakePresigner{}
 	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
 
 	got, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
@@ -159,9 +159,6 @@ func TestCommitAutosave_Happy(t *testing.T) {
 	if !ok || detailHash != "hash_abc" {
 		t.Fatalf("expected details content_hash=hash_abc, got %v", audit.Details)
 	}
-	if presigner.DeleteCalled != 0 {
-		t.Fatalf("expected DeleteCalled 0, got %d", presigner.DeleteCalled)
-	}
 }
 
 func TestCommitAutosave_WithDBSetsTemplateEditAuthz(t *testing.T) {
@@ -183,7 +180,7 @@ func TestCommitAutosave_WithDBSetsTemplateEditAuthz(t *testing.T) {
 		Status:         domain.VersionStatusDraft,
 		DocxStorageKey: "templates/tpl-1/versions/7.docx",
 	}
-	svc := application.New(repo, &fakePresigner{HeadResult: "hash_abc"}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
 
 	mock.ExpectBegin()
 	expectTemplateEditAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")
@@ -217,7 +214,7 @@ func TestCommitAutosave_HashMismatch(t *testing.T) {
 		Status:         domain.VersionStatusDraft,
 		DocxStorageKey: "templates/tpl-1/versions/2.docx",
 	}
-	presigner := &fakePresigner{HeadResult: "hash_actual"}
+	presigner := &fakePresigner{confirmErr: objectstore.ErrHashMismatch}
 	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
@@ -230,12 +227,9 @@ func TestCommitAutosave_HashMismatch(t *testing.T) {
 	if !errors.Is(err, domain.ErrContentHashMismatch) {
 		t.Fatalf("expected ErrContentHashMismatch, got %v", err)
 	}
-	if presigner.DeleteCalled != 1 {
-		t.Fatalf("expected DeleteCalled 1, got %d", presigner.DeleteCalled)
-	}
 }
 
-func TestCommitAutosave_HashMismatchReturnsDeleteError(t *testing.T) {
+func TestCommitAutosave_HashMismatchMapsToDomainError(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
@@ -245,8 +239,8 @@ func TestCommitAutosave_HashMismatchReturnsDeleteError(t *testing.T) {
 		Status:         domain.VersionStatusDraft,
 		DocxStorageKey: "templates/tpl-1/versions/2.docx",
 	}
-	deleteErr := errors.New("delete failed")
-	presigner := &fakePresigner{HeadResult: "hash_actual", DeleteErr: deleteErr}
+	// Confirm handles mismatch internally (quiet delete); port maps kernel error to domain error.
+	presigner := &fakePresigner{confirmErr: objectstore.ErrHashMismatch}
 	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
@@ -258,9 +252,6 @@ func TestCommitAutosave_HashMismatchReturnsDeleteError(t *testing.T) {
 	})
 	if !errors.Is(err, domain.ErrContentHashMismatch) {
 		t.Fatalf("expected ErrContentHashMismatch, got %v", err)
-	}
-	if !errors.Is(err, deleteErr) {
-		t.Fatalf("expected delete error to be returned, got %v", err)
 	}
 }
 
@@ -277,7 +268,7 @@ func TestCommitAutosave_UploadMissing(t *testing.T) {
 		Status:         domain.VersionStatusDraft,
 		DocxStorageKey: "templates/tpl-1/versions/4.docx",
 	}
-	presigner := &fakePresigner{HeadErr: domain.ErrUploadMissing}
+	presigner := &fakePresigner{confirmErr: objectstore.ErrObjectMissing}
 	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
@@ -290,12 +281,9 @@ func TestCommitAutosave_UploadMissing(t *testing.T) {
 	if !errors.Is(err, domain.ErrUploadMissing) {
 		t.Fatalf("expected ErrUploadMissing, got %v", err)
 	}
-	if presigner.DeleteCalled != 0 {
-		t.Fatalf("expected DeleteCalled 0, got %d", presigner.DeleteCalled)
-	}
 }
 
-func TestSaveTemplateDraft_StaleLockVersion(t *testing.T) {
+func TestCommitAutosave_UploadTooLarge(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{
 		ID:       "tpl-1",
@@ -304,70 +292,22 @@ func TestSaveTemplateDraft_StaleLockVersion(t *testing.T) {
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:             "ver-1",
 		TemplateID:     "tpl-1",
-		VersionNumber:  1,
+		VersionNumber:  5,
 		Status:         domain.VersionStatusDraft,
-		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+		DocxStorageKey: "templates/tpl-1/versions/5.docx",
 	}
-	repo.lockVersions["ver-1"] = 2
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+	presigner := &fakePresigner{confirmErr: objectstore.ErrObjectTooLarge}
+	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{})
 
-	err := svc.SaveTemplateDraft(context.Background(), application.SaveTemplateDraftCmd{
+	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
 		TenantID:            "tenant-a",
 		ActorUserID:         "user-a",
 		TemplateID:          "tpl-1",
-		VersionNumber:       1,
-		ExpectedLockVersion: 1,
-		DocxStorageKey:      "templates/tpl-1/versions/1.docx",
-		SchemaStorageKey:    "templates/tpl-1/versions/1.schema.json",
-		DocxContentHash:     "hash_new",
-		SchemaContentHash:   "schema_hash",
+		VersionNumber:       5,
+		ExpectedContentHash: "hash_abc",
 	})
-	if !errors.Is(err, domain.ErrStaleLockVersion) {
-		t.Fatalf("expected ErrStaleLockVersion, got %v", err)
-	}
-}
-
-func TestSaveTemplateDraft_WithDBSetsTemplateEditAuthz(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("sqlmock.New: %v", err)
-	}
-	defer db.Close()
-
-	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{
-		ID:       "tpl-1",
-		TenantID: "11111111-1111-1111-1111-111111111111",
-	}
-	repo.versions["ver-1"] = &domain.TemplateVersion{
-		ID:             "ver-1",
-		TemplateID:     "tpl-1",
-		VersionNumber:  1,
-		Status:         domain.VersionStatusDraft,
-		DocxStorageKey: "templates/tpl-1/versions/1.docx",
-	}
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
-
-	mock.ExpectBegin()
-	expectTemplateEditAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")
-	mock.ExpectCommit()
-
-	err = svc.SaveTemplateDraft(context.Background(), application.SaveTemplateDraftCmd{
-		TenantID:            "11111111-1111-1111-1111-111111111111",
-		ActorUserID:         "user-a",
-		TemplateID:          "tpl-1",
-		VersionNumber:       1,
-		ExpectedLockVersion: 0,
-		DocxStorageKey:      "templates/tpl-1/versions/1.docx",
-		SchemaStorageKey:    "templates/tpl-1/versions/1.schema.json",
-		DocxContentHash:     "hash_new",
-		SchemaContentHash:   "schema_hash",
-	})
-	if err != nil {
-		t.Fatalf("SaveTemplateDraft returned error: %v", err)
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("sqlmock expectations: %v", err)
+	if !errors.Is(err, domain.ErrUploadTooLarge) {
+		t.Fatalf("expected ErrUploadTooLarge, got %v", err)
 	}
 }
 

@@ -1,0 +1,7 @@
+@eigenpal/docx-editor-react
+Copyright (c) Eigenpal
+Licensed under the Apache License, Version 2.0.
+Source: https://github.com/eigenpal/docx-editor
+This product depends on @eigenpal/docx-editor-react@1.9.0, obtained from the
+public npm registry. No source modifications are made; it is consumed as a
+published dependency.

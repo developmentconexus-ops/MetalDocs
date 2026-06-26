@@ -2,16 +2,19 @@
   "name": "metaldocs-monorepo",
   "private": true,
   "version": "0.0.0",
-  "workspaces": [
-    "apps/docx-renderer",
-    "packages/*"
-  ],
+  "packageManager": "pnpm@11.8.0",
   "scripts": {
-    "build:docx-v2": "npm -ws --if-present run build",
-    "test:docx-v2": "npm -ws --if-present run test",
-    "typecheck:docx-v2": "npm -ws --if-present run typecheck"
+    "build:docx-v2": "pnpm -r run build",
+    "test:docx-v2": "pnpm -r run test",
+    "typecheck:docx-v2": "pnpm -r run typecheck",
+    "lint": "eslint ."
   },
   "engines": {
     "node": ">=20.11.0"
+  },
+  "devDependencies": {
+    "eslint": "^10.5.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "typescript-eslint": "^8.62.0"
   }
 }

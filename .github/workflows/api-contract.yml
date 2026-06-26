@@ -7,7 +7,8 @@ on:
       - '**/api.gen.go'
       - 'frontend/apps/web/src/lib/api-types/**'
       - 'frontend/apps/web/package.json'
-      - 'frontend/apps/web/package-lock.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
       - 'go.mod'
       - 'go.sum'
       - '.github/workflows/api-contract.yml'
@@ -37,15 +38,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
       - uses: actions/setup-node@v4
-        with: { node-version: 20.11.0, cache: npm, cache-dependency-path: frontend/apps/web/package-lock.json }
-      - run: npm ci
-        working-directory: frontend/apps/web
+        with: { node-version: 20.11.0, cache: pnpm, cache-dependency-path: pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
       - name: API codegen drift check (frontend)
         run: |
           cd frontend/apps/web
-          npm run gen:api
-          git diff --exit-code -- src/lib/api-types/ || (echo "::error::Run 'npm run gen:api' in frontend/apps/web and commit"; exit 1)
+          pnpm run gen:api
+          git diff --exit-code -- src/lib/api-types/ || (echo "::error::Run 'pnpm run gen:api' in frontend/apps/web and commit"; exit 1)
 
   openapi-lint:
     runs-on: ubuntu-latest

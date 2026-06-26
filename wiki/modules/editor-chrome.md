@@ -3,7 +3,7 @@
 > Living architecture doc. Arc42 (12 sections) + C4 Container/Component diagrams.
 > Supersedes the prior stub (slot-API note, eigenpal-overrides bullet list).
 
-**Last verified:** 2026-06-14 (P2 consolidation: §3 C4 fragment tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-11) | **Owner:** unassigned (frontend) | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-06-23 (eigenpal package rename: `@eigenpal/docx-js-editor` → `@eigenpal/docx-editor-react@1.9.0`; vendored tarball retired; prior: 2026-06-14) | **Owner:** unassigned (frontend) | **Status:** active | **Maturity:** L2
 
 > **Scope:** Shared React primitive that wraps an eigenpal editor canvas, projects a custom toolbar via 3 absolute overlays, and applies MetalDocs visual contract to eigenpal DOM via scoped `:global(.ep-root ...)` CSS overrides. Mounted by `TemplateEditorPage` and `DocumentEditorPage`.
 > **Out of scope:** Eigenpal internals (see [modules/editor-ui-eigenpal.md](editor-ui-eigenpal.md)), template authoring business logic (see [modules/templates.md](templates.md) and [modules/templates.md](templates.md)), document editor business logic (see [modules/documents.md](documents.md)), placeholder rendering (see [concepts/placeholders.md](../concepts/placeholders.md)).
@@ -51,8 +51,8 @@ editor-chrome is the visual shell that two editor pages share. Before its extrac
 
 - React 18 + TypeScript + Vite + CSS Modules â€” per `wiki/architecture/frontend-structure.md`.
 - Lives under `features/shared/components/` â€” `metaldocs-frontend` skill rule "used by 2+ features â‡’ shared".
-- Coupling to eigenpal is CSS-only (`:global(.ep-root ...)` descendant selectors). No JS import from `@eigenpal/docx-js-editor` in this module.
-- Eigenpal pinned to `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` per `wiki/references/eigenpal-controlled-package.md`. Overrides are implicit version contract — see T-003.
+- Coupling to eigenpal is CSS-only (`:global(.ep-root ...)` descendant selectors). No JS import from `@eigenpal/docx-editor-react` in this module.
+- Eigenpal at `@eigenpal/docx-editor-react@1.9.0` (npm registry) per `wiki/references/eigenpal-controlled-package.md`. CSS overrides are implicit version contract — see T-003.
 - Design tokens consumed via `var(--...)` from `frontend/apps/web/src/styles/tokens.css`. No hardcoded hex colors; **but** font sizes/weights, button heights, and durations remain hardcoded (see T-005).
 - No HTTP, no SQL, no observability sink. Presentation-only.
 
@@ -72,7 +72,7 @@ C4Context
         System(dpage, "DocumentEditorPage", "consumes chrome (document-edit / readonly)")
         System(tokens, "styles/tokens.css", "global design tokens")
     }
-    System_Ext(ep, "@eigenpal/docx-js-editor", "vendored 0.2.0; DOCX WYSIWYG")
+    System_Ext(ep, "@eigenpal/docx-editor-react", "npm 1.9.0; DOCX WYSIWYG")
     Rel(user, tpage, "uses")
     Rel(user, dpage, "uses")
     Rel(tpage, chrome, "mounts <EditorChrome>")
@@ -111,7 +111,7 @@ C4Component
         Component(css, "EditorChrome.module.css", "CSS Module", "wrapper, overlays, button/text primitives, 17 :global eigenpal overrides")
     }
     System_Ext(tok, "styles/tokens.css", "design tokens")
-    System_Ext(ep, "eigenpal DOM (.ep-root)", "vendored 0.2.0")
+    System_Ext(ep, "eigenpal DOM (.ep-root)", "npm 1.9.0")
     Rel(ec, css, "imports styles")
     Rel(ec, tok, "var(--...) via CSS")
     Rel(css, ep, ":global(.ep-root ...) descendant selectors")
@@ -263,7 +263,7 @@ Coupling is exclusively CSS via `:global(.ep-root ...)` descendant selectors. Th
 
 | Goal | Scenario | Pass criteria |
 |---|---|---|
-| Visual contract holds | Render `TemplateEditorPage` + `DocumentEditorPage` against eigenpal 0.2.0 | overlay positions match design-source mockups; wine formatting bar tinted; gradient scrollbar visible |
+| Visual contract holds | Render `TemplateEditorPage` + `DocumentEditorPage` against eigenpal 1.9.0 | overlay positions match design-source mockups; wine formatting bar tinted; gradient scrollbar visible |
 | Domain-agnostic API | Chrome accepts `ReactNode` slots only | `EditorChromeProps` does not import any template/document type â€” verified by `_artifacts/01-surface.md Â§2` |
 | Autosave state visible | All 7 states passed through directly; `AutosaveStatus` renders each with distinct icon/label | manual: trigger save, observe pulsing dot then check; 7-state union resolved as of T-001 closure (2026-05-11) |
 
@@ -291,7 +291,7 @@ Top 3 (by severity, then by blast-radius):
 | chrome | The non-content frame around an editor â€” title bar, action bar, status indicators. Distinct from "Google Chrome". |
 | slot | A `ReactNode` prop reserved for caller-provided JSX, rendered into a fixed layout position. |
 | overlay | An absolutely-positioned `<div>` inside `.wrapper` that floats above eigenpal's title bar. |
-| eigenpal | `@eigenpal/docx-js-editor`, the DOCX WYSIWYG editor MetalDocs vendors at 0.2.0. |
+| eigenpal | `@eigenpal/docx-editor-react`, the DOCX WYSIWYG editor MetalDocs uses at 1.9.0 (npm registry). |
 | `:global(...)` | CSS Modules escape hatch â€” selector inside is unscoped and matches eigenpal DOM. |
 
 ---
@@ -300,7 +300,7 @@ Top 3 (by severity, then by blast-radius):
 
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
-| Eigenpal upgrade breaks `:global(.ep-root)` selector | Toolbar overlays misaligned / styled wrong | Visual QA after vendored bump; chrome RTL test suite (`EditorChrome.test.tsx`) does not cover CSS | Pin eigenpal version (vendored 0.2.0 — see ADR 0001); re-audit overrides on bump |
+| Eigenpal upgrade breaks `:global(.ep-root)` selector | Toolbar overlays misaligned / styled wrong | Visual QA after version bump; chrome RTL test suite (`EditorChrome.test.tsx`) does not cover CSS | Re-audit CSS overrides on bump; see ADR 0001 amendment for refresh process |
 | `AutosaveStatus` receives unknown state | Indicator shows nothing or default fallback | Type-check failure at consumer; runtime `else` branch in component | Add explicit case to the 7-state union; do not silently coerce |
 | Overlay swallows eigenpal title-bar clicks | Title bar becomes uninteractive | Manual: clicking title bar does nothing | Confirm overlay container omits `pointer-events`; T-007 tracks the opt-in escape hatch |
 | Token var unresolved (`var(--…)` not defined) | Brand color or spacing falls back to CSS default | Stylelint / visual QA | Add missing token to `styles/tokens.css`; chrome must not hardcode hex |

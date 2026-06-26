@@ -21,7 +21,7 @@ if (-not $WebOnly) {
 }
 
 if (-not $ApiOnly) {
-  $webCommand = "Set-Location `"$root/frontend/apps/web`"; npm run dev"
+  $webCommand = "Set-Location `"$root/frontend/apps/web`"; pnpm run dev"
   Start-Process powershell -ArgumentList "-NoExit", "-Command", $webCommand -WorkingDirectory $root | Out-Null
 }
 

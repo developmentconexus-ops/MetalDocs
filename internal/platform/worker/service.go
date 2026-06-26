@@ -106,6 +106,14 @@ func (s *Service) markFailure(ctx context.Context, event messaging.Event, handle
 	if errors.Is(handleErr, errUnsupportedEventType) {
 		attempt = s.cfg.MaxAttempts
 	}
+	// A renderer-classified permanent failure (e.g. template defect, 4xx) will never
+	// succeed on retry — fast-fail it straight to the DLQ instead of burning the full
+	// retry budget. Matched structurally so platform/worker stays decoupled from the
+	// render module (no import inversion).
+	var classified interface{ Retryable() bool }
+	if errors.As(handleErr, &classified) && !classified.Retryable() {
+		attempt = s.cfg.MaxAttempts
+	}
 
 	failure := messaging.FailedEvent{
 		EventID:   event.EventID,

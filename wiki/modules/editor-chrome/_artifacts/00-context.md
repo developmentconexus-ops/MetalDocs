@@ -8,9 +8,9 @@
 
 - `wiki/README.md` — index. editor-chrome listed under Modules; stub entry exists.
 - `wiki/modules/editor-chrome.md` — existing stub (175 lines). Already has slot API, parts, eigenpal overrides, consumers. Living doc upgrade target.
-- `wiki/modules/editor-ui-eigenpal.md` — sibling module: `MetalDocsEditor` wrapper around `@eigenpal/docx-js-editor`. editor-chrome wraps its output.
+- `wiki/modules/editor-ui-eigenpal.md` — sibling module: `MetalDocsEditor` wrapper around `@eigenpal/docx-editor-react`. editor-chrome wraps its output.
 - `wiki/concepts/placeholders.md` — fixed 7-token catalog; tokens stay literal in editor; substitution at freeze. editor-chrome surfaces tokens via the eigenpal canvas, not its own UI.
-- `wiki/decisions/0001-eigenpal-adoption.md` — ADR for adopting eigenpal. editor-chrome is downstream consequence.
+- `wiki/decisions/0001-eigenpal-adoption.md` — ADR for adopting eigenpal; amended 2026-06-23 for `@eigenpal/docx-editor-react@1.9.0`. editor-chrome is downstream consequence.
 
 ## Module shape (preview from glob)
 

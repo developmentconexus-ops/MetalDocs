@@ -28,7 +28,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $root "non_git") | Out-Null
 powershell -ExecutionPolicy Bypass -File scripts/dev-local.ps1
 
 $apiProcess = Start-Process powershell -ArgumentList "-ExecutionPolicy", "Bypass", "-File", "scripts/dev-api.ps1" -WorkingDirectory $root -RedirectStandardOutput $apiLog -RedirectStandardError $apiErr -PassThru
-$webCommand = "`$env:VITE_API_PROXY_TARGET='$proxyTarget'; cd frontend/apps/web; & 'C:\Program Files\nodejs\npm.cmd' run dev -- --host 127.0.0.1 --port 4173"
+$webCommand = "`$env:VITE_API_PROXY_TARGET='$proxyTarget'; cd frontend/apps/web; pnpm run dev -- --host 127.0.0.1 --port 4173"
 $webProcess = Start-Process powershell -ArgumentList "-Command", $webCommand -WorkingDirectory $root -RedirectStandardOutput $webLog -RedirectStandardError $webErr -PassThru
 
 try {
@@ -55,7 +55,7 @@ try {
   }
 
   powershell -ExecutionPolicy Bypass -File scripts/e2e-seed.ps1
-  & 'C:\Program Files\nodejs\npm.cmd' --prefix frontend/apps/web run e2e:smoke
+  pnpm --filter @metaldocs/web run e2e:smoke
 }
 finally {
   if ($apiProcess -and -not $apiProcess.HasExited) {

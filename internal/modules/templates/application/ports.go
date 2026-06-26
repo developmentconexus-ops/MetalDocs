@@ -6,6 +6,7 @@ import (
 
 	"metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/objectstore"
 )
 
 type Repository interface {
@@ -23,8 +24,6 @@ type Repository interface {
 	GetVersionByID(ctx context.Context, tenantID, id string) (*domain.TemplateVersion, error)
 	UpdateVersion(ctx context.Context, tenantID string, v *domain.TemplateVersion) error
 	UpdateVersionTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion) error
-	UpdateVersionDraftCAS(ctx context.Context, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error
-	UpdateVersionDraftCASTx(ctx context.Context, tx db.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error
 	UpdateVersionSchemaCAS(ctx context.Context, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error
 	UpdateVersionSchemaCASTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error
 	ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error
@@ -40,9 +39,9 @@ type Repository interface {
 }
 
 type Presigner interface {
-	PresignPUT(ctx context.Context, key string, expires time.Duration) (url string, err error)
-	PresignGET(ctx context.Context, key string, expires time.Duration) (url string, err error)
-	HeadContentHash(ctx context.Context, key string) (string, error)
+	PresignPut(ctx context.Context, tenantID, key string, ttl time.Duration) (url string, err error)
+	PresignGet(ctx context.Context, key string, ttl time.Duration) (url string, err error)
+	Confirm(ctx context.Context, tenantID, key, expectedHash string) (objectstore.VerifiedPointer, error)
 	Delete(ctx context.Context, key string) error
 }
 

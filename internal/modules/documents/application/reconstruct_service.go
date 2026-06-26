@@ -28,7 +28,10 @@ func NewReconstructionService(txRunner db.TxRunner, runner ReconstructionRunner,
 
 func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID, actorID, docID string) (fanout.ReconstructionEntry, error) {
 	ctx = authz.WithCapCache(ctx)
-	var entry fanout.ReconstructionEntry
+
+	// Authz runs in a short read-only tx; the renderer HTTP round-trip must NOT hold
+	// a DB connection open across the network call, so it runs after the tx closes
+	// (mirrors the materialize runner, which calls the renderer off-tx too).
 	if err := s.txRunner.DoReadOnly(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 			return err
@@ -41,17 +44,13 @@ func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID,
 		}
 		// ADR 0022 Phase 10 (F2): the redundant doc.reconstruct cap was merged into
 		// the canonical CapDocumentEdit — identical grant set, same area-grade check.
-		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
-			return err
-		}
-
-		var reconstructErr error
-		entry, reconstructErr = s.runner.Reconstruct(ctx, tenantID, docID)
-		if reconstructErr != nil {
-			return reconstructErr
-		}
-		return nil
+		return authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode)
 	}); err != nil {
+		return fanout.ReconstructionEntry{}, err
+	}
+
+	entry, err := s.runner.Reconstruct(ctx, tenantID, docID)
+	if err != nil {
 		return fanout.ReconstructionEntry{}, err
 	}
 	return entry, nil

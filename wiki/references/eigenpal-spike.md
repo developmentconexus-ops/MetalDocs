@@ -12,7 +12,7 @@
 
 ## Why the spike existed
 
-Pre-decision: should we adopt `@eigenpal/docx-js-editor` to replace CKEditor / BlockNote? Spike validated each capability we needed before committing.
+Pre-decision: should we adopt `@eigenpal/docx-js-editor` (now published as `@eigenpal/docx-editor-react`) to replace CKEditor / BlockNote? Spike validated each capability we needed before committing.
 
 ## Tests
 
@@ -47,7 +47,7 @@ Single-brace, semantic names. **This is the truth** for what eigenpal expects. T
 ## What MetalDocs took
 
 **Adopted directly:**
-- `@eigenpal/docx-js-editor` as the only editor (no CKEditor / BlockNote)
+- `@eigenpal/docx-js-editor` (now `@eigenpal/docx-editor-react@1.9.0`) as the only editor (no CKEditor / BlockNote)
 - ProseMirror underpinning
 - Eigenpal's autosave callback pattern → wrapped with debounce in `MetalDocsEditor`
 - T7 outline plugin (with the singleton-bug fix)
@@ -62,7 +62,7 @@ Single-brace, semantic names. **This is the truth** for what eigenpal expects. T
 
 ## Drift watch
 
-The spike repo is FROZEN reference. If we update eigenpal version in MetalDocs and the API changes, the spike won't catch it — re-validate against current `@eigenpal/docx-js-editor` types in `frontend/apps/web/node_modules/@eigenpal/docx-js-editor/dist/*.d.ts`.
+The spike repo is FROZEN reference. It was written against the pre-publication fork API (`@eigenpal/docx-js-editor`). MetalDocs now uses `@eigenpal/docx-editor-react@1.9.0` from the npm registry — re-validate against current types in `frontend/apps/web/node_modules/@eigenpal/docx-editor-react/dist/*.d.ts` if spike API references are needed.
 
 ## Cross-refs
 

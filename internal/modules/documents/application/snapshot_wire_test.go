@@ -68,7 +68,7 @@ func TestCloneIntoTx_SnapshotPopulated(t *testing.T) {
 
 	svc := application.NewServiceWithSnapshot(
 		repo,
-		&fakePresigner{hashReturn: "h_init"},
+		&fakePresigner{},
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},

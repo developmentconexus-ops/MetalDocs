@@ -1,11 +1,7 @@
 import { SubBlockRenderer, SubBlockContext } from "./registry";
+import { xmlText as str } from "./xml";
 
 type Approver = { user_id: unknown; display_name: unknown; signed_at: unknown };
-
-function str(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  return String(v);
-}
 
 function cell(text: string): string {
   return `<w:tc><w:p><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p></w:tc>`;

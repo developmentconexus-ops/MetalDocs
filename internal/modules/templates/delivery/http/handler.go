@@ -41,13 +41,11 @@ func (h *Handler) Register(mux *http.ServeMux) {
 		},
 	}
 
-	mux.HandleFunc("GET /api/v1/signed", generated.RedirectSignedUrl)
-	mux.HandleFunc("GET /api/v1/templates", generated.ListTemplates)
+mux.HandleFunc("GET /api/v1/templates", generated.ListTemplates)
 	mux.Handle("POST /api/v1/templates", h.idempotent("POST /api/v1/templates", generated.CreateTemplate))
 	mux.HandleFunc("GET /api/v1/templates/{id}/versions/{n}", generated.GetTemplateVersion)
 	mux.HandleFunc("POST /api/v1/templates/{id}/versions/{n}/docx-upload-url", generated.PresignTemplateDocxUploadUrl)
 	mux.HandleFunc("POST /api/v1/templates/{id}/versions/{n}/schema-upload-url", generated.PresignTemplateSchemaUploadUrl)
-	mux.HandleFunc("PUT /api/v1/templates/{id}/versions/{n}/draft", generated.SaveTemplateDraft)
 	mux.Handle("POST /api/v1/templates/{id}/versions/{n}/publish", h.idempotent("POST /api/v1/templates/{id}/versions/{n}/publish", generated.PublishTemplateVersion))
 
 	mux.HandleFunc("POST /api/v1/templates/{id}/versions", generated.CreateTemplateVersion)

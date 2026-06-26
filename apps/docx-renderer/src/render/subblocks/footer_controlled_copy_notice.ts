@@ -1,11 +1,7 @@
 import { SubBlockRenderer, SubBlockContext } from "./registry";
+import { xmlText as str } from "./xml";
 
 const DEFAULT_NOTICE = "CONTROLLED COPY — WHEN PRINTED";
-
-function str(v: unknown): string {
-  if (v === null || v === undefined) return "";
-  return String(v);
-}
 
 export const FooterControlledCopyNotice: SubBlockRenderer = {
   key: "footer_controlled_copy_notice",

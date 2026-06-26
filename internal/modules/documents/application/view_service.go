@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
@@ -12,9 +13,11 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+const viewDownloadTTL = 15 * time.Minute
+
 // ViewPresigner is implemented by objectstore helpers that presign a GET URL.
 type ViewPresigner interface {
-	PresignObjectGET(ctx context.Context, storageKey string) (string, error)
+	PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error)
 }
 
 // PDFOutboxStateReader returns the latest pdf_outbox state for a revision/document.
@@ -77,7 +80,7 @@ func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID s
 		}
 
 		if pdfKey.Valid && pdfKey.String != "" {
-			url, err := s.presigner.PresignObjectGET(ctx, pdfKey.String)
+			url, err := s.presigner.PresignGet(ctx, pdfKey.String, viewDownloadTTL)
 			if err != nil {
 				return fmt.Errorf("view: presign: %w", err)
 			}

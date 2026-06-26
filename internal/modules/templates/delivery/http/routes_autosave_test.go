@@ -157,7 +157,7 @@ func TestCommitAutosave_HashMismatch(t *testing.T) {
 		Status:         domain.VersionStatusDraft,
 		DocxStorageKey: "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
 	}
-	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+	mux := newMuxWithPresigner(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo, mismatchPresigner{})
 
 	raw, _ := json.Marshal(map[string]any{"expected_content_hash": "hash_expected"})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/autosave/commit", bytes.NewReader(raw))

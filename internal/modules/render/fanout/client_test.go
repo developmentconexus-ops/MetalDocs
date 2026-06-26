@@ -3,6 +3,7 @@ package fanout
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -69,5 +70,42 @@ func TestClient_Fanout_Non200(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "500") {
 		t.Errorf("err should mention status: %v", err)
+	}
+}
+
+func TestFanout_ClassifiesTemplateDefectAsNonRetryable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"render_failed","kind":"undefined_variable","message":"no var","variable":"foo"}`))
+	}))
+	defer srv.Close()
+
+	_, err := NewClient(srv.URL, "", srv.Client()).Fanout(context.Background(), FanoutRequest{})
+	var re *RenderError
+	if !errors.As(err, &re) {
+		t.Fatalf("want *RenderError, got %T (%v)", err, err)
+	}
+	if re.Kind != "undefined_variable" || re.Variable != "foo" || re.Status != http.StatusBadRequest {
+		t.Fatalf("unexpected classification: %+v", re)
+	}
+	if re.Retryable() {
+		t.Fatalf("template defect must not be retryable")
+	}
+}
+
+func TestFanout_ClassifiesUnknownAsRetryable(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"render_failed","kind":"unknown","message":"boom"}`))
+	}))
+	defer srv.Close()
+
+	_, err := NewClient(srv.URL, "", srv.Client()).Fanout(context.Background(), FanoutRequest{})
+	var re *RenderError
+	if !errors.As(err, &re) {
+		t.Fatalf("want *RenderError, got %T", err)
+	}
+	if !re.Retryable() {
+		t.Fatalf("unknown/5xx must be retryable")
 	}
 }

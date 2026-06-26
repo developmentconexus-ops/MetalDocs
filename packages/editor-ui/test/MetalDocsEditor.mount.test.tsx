@@ -7,7 +7,7 @@ import type { MetalDocsEditorRef } from '../src/types';
 afterEach(cleanup);
 import { MetalDocsEditor } from '../src/MetalDocsEditor';
 
-vi.mock('@eigenpal/docx-js-editor', async () => {
+vi.mock('@eigenpal/docx-editor-react', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
   type MockProps = {
     documentBuffer?: ArrayBuffer;
@@ -17,8 +17,7 @@ vi.mock('@eigenpal/docx-js-editor', async () => {
   };
 
   return {
-    templatePlugin: { id: 'template', name: 'template' },
-    PluginHost: ({ children }: { children: ReactNode }) => <>{children}</>,
+    createEmptyDocument: () => ({ type: 'empty-doc' }),
     DocxEditor: React.forwardRef<unknown, MockProps>(({
       documentBuffer,
       document,
@@ -43,8 +42,9 @@ vi.mock('@eigenpal/docx-js-editor', async () => {
   };
 });
 
-vi.mock('@eigenpal/docx-js-editor/core', () => ({
-  createEmptyDocument: () => ({ type: 'empty-doc' }),
+vi.mock('@eigenpal/docx-editor-react/plugin-api', () => ({
+  templatePlugin: { id: 'template', name: 'template' },
+  PluginHost: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 describe('MetalDocsEditor', () => {

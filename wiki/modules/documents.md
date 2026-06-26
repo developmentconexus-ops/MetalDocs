@@ -44,7 +44,7 @@
 - Language / runtime: Go 1.25.
 - Persistence: Postgres only; row-level multi-tenancy via `tenant_id` on every owned table (`wiki/architecture/persistence.md`).
 - Authz: two-tier per `wiki/decisions/0007-two-tier-authz.md`. Tripwire enforcer reads `metaldocs.asserted_caps` GUC.
-- DOCX editor: `@eigenpal/docx-js-editor` from `third_party/eigenpal/` (`wiki/decisions/0001-eigenpal-adoption.md`).
+- DOCX editor: `@eigenpal/docx-editor-react@1.9.0` from npm registry (`wiki/decisions/0001-eigenpal-adoption.md`).
 - API contract: OpenAPI 3.0.3 via oapi-codegen (`wiki/decisions/0012-contract-first-api.md`) â€” spec-mounted via `documentsapi.HandlerWithOptions` + `ServerInterfaceWrapper` (see `internal/modules/documents/module.go:116-127`). Legacy `mux.HandleFunc` routes still exist for the small set of non-spec endpoints (fillin, view, reconstruct) and are wired beneath the generated boundary via `NewGeneratedServerAdapter`.
 - Error envelope target: RFC 9457 Problem Details â€” current code emits legacy `{error:{code,message,â€¦}}` (T-001, mid-migration).
 

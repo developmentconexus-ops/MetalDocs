@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"testing"
+	"time"
 
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
@@ -63,17 +64,13 @@ type fakeExportPresigner struct {
 	sizeBytes int64
 }
 
-func (f *fakeExportPresigner) PresignObjectGET(_ context.Context, storageKey string) (string, error) {
-	return "https://example.local/" + storageKey, nil
+func (f *fakeExportPresigner) PresignGet(_ context.Context, key string, _ time.Duration) (string, error) {
+	return "https://example/get/" + key, nil
 }
 
-func (f *fakeExportPresigner) HeadObject(_ context.Context, _ string) (bool, error) {
-	return f.headFound, nil
-}
+func (f *fakeExportPresigner) Exists(_ context.Context, _ string) (bool, error) { return f.headFound, nil }
 
-func (f *fakeExportPresigner) SizeObject(_ context.Context, _ string) (int64, error) {
-	return f.sizeBytes, nil
-}
+func (f *fakeExportPresigner) Size(_ context.Context, _ string) (int64, error) { return f.sizeBytes, nil }
 
 type fakePDFClient struct {
 	calls int

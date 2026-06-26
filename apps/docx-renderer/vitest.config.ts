@@ -3,11 +3,11 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    // Force @eigenpal/docx-js-editor (and its deep deps) through Vite's
+    // Force @eigenpal/docx-editor-react (and its deep deps) through Vite's
     // transform pipeline so that CSS side-effect imports don't crash Node.
     server: {
       deps: {
-        inline: [/@eigenpal\/docx-js-editor/],
+        inline: [/@eigenpal\//],
       },
     },
   },

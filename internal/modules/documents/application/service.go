@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"metaldocs/internal/modules/documents/repository"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -65,14 +65,18 @@ type Repository interface {
 	GetFinalizePrereqs(ctx context.Context, tenantID, docID string) (*domain.FinalizePrereqs, error)
 }
 
+const (
+	revisionUploadTTL = 15 * time.Minute
+	objectDownloadTTL = 15 * time.Minute
+)
+
 type Presigner interface {
-	PresignRevisionPUT(ctx context.Context, tenantID, docID, contentHash string) (url, storageKey string, err error)
-	PresignObjectGET(ctx context.Context, storageKey string) (url string, err error)
-	AdoptTempObject(ctx context.Context, tmpKey, finalKey string) error
-	DeleteObject(ctx context.Context, key string) error
-	HashObject(ctx context.Context, key string) (string, error)
-	SizeObject(ctx context.Context, key string) (int64, error)
-	Exists(ctx context.Context, storageKey string) (bool, error)
+	PresignPut(ctx context.Context, tenantID, key string, ttl time.Duration) (url string, err error)
+	PresignGet(ctx context.Context, key string, ttl time.Duration) (url string, err error)
+	Confirm(ctx context.Context, tenantID, key, expectedHash string) (objectstore.VerifiedPointer, error)
+	Exists(ctx context.Context, key string) (bool, error)
+	Size(ctx context.Context, key string) (int64, error)
+	Delete(ctx context.Context, key string) error
 }
 
 type TemplateReader interface {
@@ -117,11 +121,47 @@ type Service struct {
 	profileTemplates             ProfileDefaultTemplateReader
 	snapshotSvc                  *SnapshotService
 	runner                       db.TxRunner
+	eligibility                  domain.ApproverEligibilityReader
 }
 
 func (s *Service) WithRunner(runner db.TxRunner) *Service {
 	s.runner = runner
 	return s
+}
+
+// WithEligibility wires the ApproverEligibilityReader used by
+// mayWriteWorkingContent. Typically called with repo, which already implements
+// the interface. Must be called before any autosave or session-acquire path is
+// exercised under under_review status.
+func (s *Service) WithEligibility(r domain.ApproverEligibilityReader) *Service {
+	s.eligibility = r
+	return s
+}
+
+// mayWriteWorkingContent decides whether actorID may write the working-content
+// revision chain of doc. Calls IsDocumentOwner / IsEligibleApprover as plain
+// reads — these MUST be called outside any lock-holding or write transaction
+// (advisory-lock-deadlock-constraint).
+func (s *Service) mayWriteWorkingContent(ctx context.Context, tenantID, docID, actorID string, doc *domain.Document) (bool, error) {
+	switch doc.Status {
+	case domain.DocStatusDraft:
+		owner, err := s.repo.IsDocumentOwner(ctx, tenantID, docID, actorID)
+		if err != nil {
+			return false, err
+		}
+		return domain.CanWriteWorkingContent(string(doc.Status), owner, false), nil
+	case domain.DocStatusUnderReview:
+		if s.eligibility == nil {
+			return false, nil
+		}
+		eligible, err := s.eligibility.IsEligibleApprover(ctx, tenantID, docID, actorID)
+		if err != nil {
+			return false, err
+		}
+		return domain.CanWriteWorkingContent(string(doc.Status), false, eligible), nil
+	default:
+		return false, nil
+	}
 }
 
 // Deprecated: use NewService.
@@ -482,14 +522,19 @@ func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (
 	if err != nil {
 		return nil, err
 	}
-	if doc.Status != domain.DocStatusDraft {
-		return nil, domain.ErrInvalidStateTransition
-	}
-	url, storageKey, err := s.presigner.PresignRevisionPUT(ctx, cmd.TenantID, cmd.DocumentID, cmd.ContentHash)
+	mayWrite, err := s.mayWriteWorkingContent(ctx, cmd.TenantID, cmd.DocumentID, cmd.ActorUserID, doc)
 	if err != nil {
 		return nil, err
 	}
-	expiresAt := time.Now().Add(15 * time.Minute)
+	if !mayWrite {
+		return nil, domain.ErrInvalidStateTransition
+	}
+	storageKey := documentRevisionKey(cmd.TenantID, cmd.DocumentID, cmd.ContentHash)
+	url, err := s.presigner.PresignPut(ctx, cmd.TenantID, storageKey, revisionUploadTTL)
+	if err != nil {
+		return nil, err
+	}
+	expiresAt := time.Now().Add(revisionUploadTTL)
 	pendingID, err := s.repo.PresignReserve(ctx, cmd.TenantID, cmd.SessionID, cmd.ActorUserID, cmd.DocumentID, cmd.BaseRevisionID, cmd.ContentHash, storageKey, expiresAt)
 	if err != nil {
 		return nil, err
@@ -517,7 +562,11 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 	if err != nil {
 		return nil, err
 	}
-	if doc.Status != domain.DocStatusDraft {
+	mayWrite, err := s.mayWriteWorkingContent(ctx, cmd.TenantID, cmd.DocumentID, cmd.ActorUserID, doc)
+	if err != nil {
+		return nil, err
+	}
+	if !mayWrite {
 		return nil, domain.ErrInvalidStateTransition
 	}
 	meta, err := s.repo.GetPendingForCommit(ctx, cmd.TenantID, cmd.PendingUploadID)
@@ -525,25 +574,21 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 		return nil, err
 	}
 
-	serverHash, err := s.presigner.HashObject(ctx, meta.StorageKey)
+	vp, err := s.presigner.Confirm(ctx, cmd.TenantID, meta.StorageKey, meta.ExpectedContentHash)
 	if err != nil {
-		if errors.Is(err, domain.ErrUploadMissing) {
+		switch {
+		case errors.Is(err, objectstore.ErrObjectMissing):
 			return nil, domain.ErrUploadMissing
+		case errors.Is(err, objectstore.ErrHashMismatch):
+			return nil, domain.ErrContentHashMismatch
+		case errors.Is(err, objectstore.ErrObjectTooLarge):
+			return nil, domain.ErrUploadTooLarge
+		default:
+			return nil, fmt.Errorf("confirm s3 object: %w", err)
 		}
-		return nil, fmt.Errorf("hash s3 object: %w", err)
 	}
-	if serverHash != meta.ExpectedContentHash {
-		if err := s.presigner.DeleteObject(ctx, meta.StorageKey); err != nil {
-			slog.WarnContext(ctx, "commit autosave: orphaned object cleanup failed after content-hash mismatch",
-				"storage_key", meta.StorageKey, "document_id", cmd.DocumentID, "err", err)
-		}
-		return nil, domain.ErrContentHashMismatch
-	}
-
-	fileSizeBytes, err := s.presigner.SizeObject(ctx, meta.StorageKey)
-	if err != nil {
-		return nil, fmt.Errorf("size s3 object: %w", err)
-	}
+	serverHash := vp.ContentHash
+	fileSizeBytes := vp.SizeBytes
 
 	var pageCountSource *string
 	if cmd.PageCount != nil {
@@ -581,7 +626,11 @@ func (s *Service) SyncArtifactMetadata(ctx context.Context, cmd SyncArtifactMeta
 	if err != nil {
 		return nil, err
 	}
-	if doc.Status != domain.DocStatusDraft {
+	mayWrite, err := s.mayWriteWorkingContent(ctx, cmd.TenantID, cmd.DocumentID, cmd.ActorUserID, doc)
+	if err != nil {
+		return nil, err
+	}
+	if !mayWrite {
 		return nil, domain.ErrInvalidStateTransition
 	}
 	if strings.TrimSpace(doc.CurrentRevisionID) == "" {
@@ -593,7 +642,7 @@ func (s *Service) SyncArtifactMetadata(ctx context.Context, cmd SyncArtifactMeta
 		return nil, err
 	}
 
-	fileSizeBytes, err := s.presigner.SizeObject(ctx, revision.StorageKey)
+	fileSizeBytes, err := s.presigner.Size(ctx, revision.StorageKey)
 	if err != nil {
 		return nil, fmt.Errorf("size current revision object: %w", err)
 	}
@@ -617,6 +666,17 @@ func (s *Service) SyncArtifactMetadata(ctx context.Context, cmd SyncArtifactMeta
 }
 
 func (s *Service) AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, bool, error) {
+	doc, err := s.repo.GetDocument(ctx, tenantID, docID)
+	if err != nil {
+		return nil, false, err
+	}
+	mayWrite, err := s.mayWriteWorkingContent(ctx, tenantID, docID, userID, doc)
+	if err != nil {
+		return nil, false, err
+	}
+	if !mayWrite {
+		return nil, false, domain.ErrInvalidStateTransition
+	}
 	sess, err := s.repo.AcquireSession(ctx, tenantID, docID, userID)
 	if errors.Is(err, domain.ErrSessionTaken) {
 		return sess, true, nil
@@ -705,7 +765,7 @@ func (s *Service) SignedRevisionURL(ctx context.Context, tenantID, docID, revID 
 	if err != nil {
 		return "", err
 	}
-	return s.presigner.PresignObjectGET(ctx, rev.StorageKey)
+	return s.presigner.PresignGet(ctx, rev.StorageKey, objectDownloadTTL)
 }
 
 // GetFinalizePrereqs delegates to the repository for the data required by

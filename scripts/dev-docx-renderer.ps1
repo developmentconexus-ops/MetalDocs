@@ -17,4 +17,4 @@ Get-Content $envFile | ForEach-Object {
 
 Write-Host "[dev-docx-renderer] Starting docx-renderer on port $env:DOCX_RENDERER_PORT ..."
 Set-Location (Join-Path $root "apps/docx-renderer")
-npm.cmd run dev
+pnpm run dev

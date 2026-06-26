@@ -10,6 +10,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/objectstore"
 )
 
 const autosaveUploadTTL = 10 * time.Minute
@@ -28,7 +29,6 @@ type PresignAutosaveResult struct {
 type PresignTemplateUploadCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	VersionNumber                     int
-	StorageKey                        string
 }
 
 func (s *Service) PresignTemplateUpload(ctx context.Context, cmd PresignTemplateUploadCmd) (*PresignAutosaveResult, error) {
@@ -42,10 +42,32 @@ func (s *Service) PresignTemplateUpload(ctx context.Context, cmd PresignTemplate
 	if version.Status != domain.VersionStatusDraft {
 		return nil, domain.ErrInvalidStateTransition
 	}
-	key := version.DocxStorageKey
-	url, err := s.presign.PresignPUT(ctx, key, autosaveUploadTTL)
+	url, err := s.presign.PresignPut(ctx, cmd.TenantID, version.DocxStorageKey, autosaveUploadTTL)
 	if err != nil {
 		return nil, fmt.Errorf("templates presign upload: presign put: %w", err)
+	}
+	return &PresignAutosaveResult{
+		UploadURL:  url,
+		StorageKey: version.DocxStorageKey,
+		ExpiresAt:  s.clock.Now().Add(autosaveUploadTTL),
+	}, nil
+}
+
+func (s *Service) PresignTemplateSchemaUpload(ctx context.Context, cmd PresignTemplateUploadCmd) (*PresignAutosaveResult, error) {
+	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
+		return nil, wrapAppErr("templates presign schema upload: get template", err)
+	}
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
+	if err != nil {
+		return nil, wrapAppErr("templates presign schema upload: get version", err)
+	}
+	if version.Status != domain.VersionStatusDraft {
+		return nil, domain.ErrInvalidStateTransition
+	}
+	key := templateSchemaKey(cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
+	url, err := s.presign.PresignPut(ctx, cmd.TenantID, key, autosaveUploadTTL)
+	if err != nil {
+		return nil, fmt.Errorf("templates presign schema upload: presign put: %w", err)
 	}
 	return &PresignAutosaveResult{
 		UploadURL:  url,
@@ -67,7 +89,7 @@ func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (
 		return nil, domain.ErrInvalidStateTransition
 	}
 
-	url, err := s.presign.PresignPUT(ctx, version.DocxStorageKey, autosaveUploadTTL)
+	url, err := s.presign.PresignPut(ctx, cmd.TenantID, version.DocxStorageKey, autosaveUploadTTL)
 	if err != nil {
 		return nil, fmt.Errorf("templates presign autosave: presign put: %w", err)
 	}
@@ -85,61 +107,6 @@ type CommitAutosaveCmd struct {
 	ExpectedContentHash               string
 }
 
-type SaveTemplateDraftCmd struct {
-	TenantID, ActorUserID, TemplateID string
-	VersionNumber                     int
-	ExpectedLockVersion               int
-	DocxStorageKey                    string
-	SchemaStorageKey                  string
-	DocxContentHash                   string
-	SchemaContentHash                 string
-}
-
-func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCmd) error {
-	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
-		return wrapAppErr("templates save draft: get template", err)
-	}
-	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
-	if err != nil {
-		return wrapAppErr("templates save draft: get version", err)
-	}
-	if version.Status != domain.VersionStatusDraft {
-		return domain.ErrInvalidStateTransition
-	}
-	audit, err := newAuditEvent(
-		cmd.TenantID,
-		cmd.TemplateID,
-		cmd.ActorUserID,
-		&version.ID,
-		domain.AuditSaved,
-		map[string]any{
-			"docx_content_hash":   cmd.DocxContentHash,
-			"schema_content_hash": cmd.SchemaContentHash,
-			"schema_storage_key":  cmd.SchemaStorageKey,
-			"expected_lock":       cmd.ExpectedLockVersion,
-		},
-		s.clock.Now(),
-	)
-	if err != nil {
-		return err
-	}
-	return s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return fmt.Errorf("templates save draft: set authz context: %w", err)
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
-			return fmt.Errorf("templates save draft: authz: %w", err)
-		}
-		if err := s.repo.UpdateVersionDraftCASTx(ctx, tx, cmd.TenantID, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
-			return wrapAppErr("templates save draft: update draft", err)
-		}
-		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-			return wrapAppErr("templates save draft: append audit", err)
-		}
-		return nil
-	})
-}
-
 func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*domain.TemplateVersion, error) {
 	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return nil, wrapAppErr("templates commit autosave: get template", err)
@@ -153,22 +120,22 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 		return nil, domain.ErrInvalidStateTransition
 	}
 
-	actualHash, err := s.presign.HeadContentHash(ctx, version.DocxStorageKey)
+	vp, err := s.presign.Confirm(ctx, cmd.TenantID, version.DocxStorageKey, cmd.ExpectedContentHash)
 	if err != nil {
-		if errors.Is(err, domain.ErrUploadMissing) {
+		switch {
+		case errors.Is(err, objectstore.ErrObjectMissing):
 			return nil, domain.ErrUploadMissing
+		case errors.Is(err, objectstore.ErrHashMismatch):
+			return nil, domain.ErrContentHashMismatch
+		case errors.Is(err, objectstore.ErrObjectTooLarge):
+			return nil, domain.ErrUploadTooLarge
+		default:
+			return nil, fmt.Errorf("templates commit autosave: confirm: %w", err)
 		}
-		return nil, fmt.Errorf("templates commit autosave: head content hash: %w", err)
-	}
-	if actualHash != cmd.ExpectedContentHash {
-		if err := s.presign.Delete(ctx, version.DocxStorageKey); err != nil {
-			return nil, errors.Join(domain.ErrContentHashMismatch, fmt.Errorf("delete mismatched upload: %w", err))
-		}
-		return nil, domain.ErrContentHashMismatch
 	}
 
-	version.ContentHash = actualHash
-	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditSaved, map[string]any{"content_hash": actualHash}, s.clock.Now())
+	version.ContentHash = vp.ContentHash
+	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditSaved, map[string]any{"content_hash": vp.ContentHash}, s.clock.Now())
 	if err != nil {
 		return nil, err
 	}

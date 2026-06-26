@@ -18,6 +18,7 @@ import (
 	tmplhttp "metaldocs/internal/modules/templates/delivery/http"
 	"metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -211,25 +212,6 @@ func (r *fakeRepo) UpdateVersion(_ context.Context, _ string, v *domain.Template
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, _ string, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	v, ok := r.versions[versionID]
-	if !ok {
-		return domain.ErrNotFound
-	}
-	current := r.lockVersions[versionID]
-	if current != expectedLockVersion {
-		return domain.ErrStaleLockVersion
-	}
-	v.DocxStorageKey = docxStorageKey
-	v.ContentHash = docxContentHash
-	r.lockVersions[versionID] = current + 1
-	return nil
-}
-
-func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ db.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	return r.UpdateVersionDraftCAS(context.Background(), tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
-}
-
 func (r *fakeRepo) UpdateVersionSchemaCAS(_ context.Context, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
 	stored, ok := r.versions[v.ID]
 	if !ok {
@@ -330,28 +312,40 @@ func (u *fakeUUID) New() string {
 
 type fakePresigner struct{}
 
-func (fakePresigner) PresignPUT(_ context.Context, key string, _ time.Duration) (string, error) {
+func (fakePresigner) PresignPut(_ context.Context, _ string, key string, _ time.Duration) (string, error) {
 	return "https://presigned/put/" + key, nil
 }
 
-func (fakePresigner) PresignGET(_ context.Context, key string, _ time.Duration) (string, error) {
+func (fakePresigner) PresignGet(_ context.Context, key string, _ time.Duration) (string, error) {
 	return "https://presigned/get/" + key, nil
 }
 
-func (fakePresigner) HeadContentHash(_ context.Context, _ string) (string, error) {
-	return "hash_abc", nil
+func (fakePresigner) Confirm(_ context.Context, _, key, expected string) (objectstore.VerifiedPointer, error) {
+	return objectstore.VerifiedPointer{StorageKey: key, ContentHash: expected, SizeBytes: 1}, nil
 }
 
 func (fakePresigner) Delete(_ context.Context, _ string) error { return nil }
 
 func newMux(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo) *http.ServeMux {
 	t.Helper()
+	return newMuxWithPresigner(t, authz, repo, fakePresigner{})
+}
+
+func newMuxWithPresigner(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo, p application.Presigner) *http.ServeMux {
+	t.Helper()
 	db := newPermissiveMockDB(t)
-	svc := application.New(repo, fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
+	svc := application.New(repo, p, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
 	h := tmplhttp.New(svc, authz, db)
 	mux := http.NewServeMux()
 	h.Register(mux)
 	return mux
+}
+
+// mismatchPresigner always returns ErrHashMismatch from Confirm.
+type mismatchPresigner struct{ fakePresigner }
+
+func (mismatchPresigner) Confirm(_ context.Context, _, _ string, _ string) (objectstore.VerifiedPointer, error) {
+	return objectstore.VerifiedPointer{}, objectstore.ErrHashMismatch
 }
 
 func TestNew_PanicsWithoutAuthz(t *testing.T) {

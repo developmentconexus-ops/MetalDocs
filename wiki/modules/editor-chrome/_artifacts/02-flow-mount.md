@@ -11,7 +11,7 @@
 | Route | `/templates/:id/versions/:n` | (verify in `features/templates/routes.tsx`) |
 | Page component | `TemplateEditorPage` | `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` |
 | Editor primitive | `EditorChrome` | `frontend/apps/web/src/features/shared/components/editor-chrome/EditorChrome.tsx:31` |
-| Editor canvas | `DocxEditor` (eigenpal native) | `@eigenpal/docx-js-editor` |
+| Editor canvas | `DocxEditor` (eigenpal native) | `@eigenpal/docx-editor-react` |
 
 ### 2. Call chain
 

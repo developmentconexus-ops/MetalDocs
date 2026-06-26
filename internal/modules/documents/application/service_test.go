@@ -1,12 +1,10 @@
 package application_test
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"testing"
 	"time"
 
@@ -16,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/objectstore"
 )
 
 // newPermissiveMockDB returns a *sql.DB that satisfies Begin/Commit/Exec calls
@@ -293,46 +292,25 @@ func (f *fakeRepo) MarkArchived(_ context.Context, _, _, _ string) error { retur
 func (f *fakeRepo) MarkArchivedTx(_ context.Context, _ db.Tx, _, _, _ string) error { return nil }
 
 type fakePresigner struct {
-	hashReturn  string
-	hashErr     error
-	sizeReturn  int64
-	sizeErr     error
-	adoptErr    error
-	deleteCalls int
-	deleteErr   error
-	exists      bool
-	existsErr   error
+	confirmErr error
+	size       int64
+	exists     bool
+	existsErr  error
 }
 
-func (f *fakePresigner) PresignRevisionPUT(_ context.Context, _, _, _ string) (string, string, error) {
-	return "https://example/upload", "documents/doc_1/revisions/rev_1.docx", nil
+func (f *fakePresigner) PresignPut(_ context.Context, _, key string, _ time.Duration) (string, error) {
+	return "https://example/put/" + key, nil
 }
 
-func (f *fakePresigner) HashObject(_ context.Context, _ string) (string, error) {
-	if f.hashErr != nil {
-		return "", f.hashErr
+func (f *fakePresigner) PresignGet(_ context.Context, key string, _ time.Duration) (string, error) {
+	return "https://example/get/" + key, nil
+}
+
+func (f *fakePresigner) Confirm(_ context.Context, _, key, expected string) (objectstore.VerifiedPointer, error) {
+	if f.confirmErr != nil {
+		return objectstore.VerifiedPointer{}, f.confirmErr
 	}
-	return f.hashReturn, nil
-}
-
-func (f *fakePresigner) SizeObject(_ context.Context, _ string) (int64, error) {
-	if f.sizeErr != nil {
-		return 0, f.sizeErr
-	}
-	return f.sizeReturn, nil
-}
-
-func (f *fakePresigner) AdoptTempObject(_ context.Context, _, _ string) error {
-	return f.adoptErr
-}
-
-func (f *fakePresigner) DeleteObject(_ context.Context, _ string) error {
-	f.deleteCalls++
-	return f.deleteErr
-}
-
-func (f *fakePresigner) PresignObjectGET(_ context.Context, storageKey string) (string, error) {
-	return "https://example/get/" + storageKey, nil
+	return objectstore.VerifiedPointer{StorageKey: key, ContentHash: expected, SizeBytes: f.size}, nil
 }
 
 func (f *fakePresigner) Exists(_ context.Context, _ string) (bool, error) {
@@ -341,6 +319,10 @@ func (f *fakePresigner) Exists(_ context.Context, _ string) (bool, error) {
 	}
 	return f.exists, nil
 }
+
+func (f *fakePresigner) Size(_ context.Context, _ string) (int64, error) { return f.size, nil }
+
+func (f *fakePresigner) Delete(_ context.Context, _ string) error { return nil }
 
 type fakeTplReader struct {
 	err error
@@ -387,6 +369,8 @@ func (n *noopAudit) WriteTx(_ context.Context, _ db.Tx, _, _, action, _ string, 
 
 func TestAcquireSession_Readonly_WhenTaken(t *testing.T) {
 	repo := &fakeRepo{
+		docReturn:   &domain.Document{ID: "doc_1", TenantID: "tenant_1", Status: domain.DocStatusDraft},
+		ownerReturn: true, // actor is owner; satisfies mayWriteWorkingContent draft gate
 		acquireSess: &domain.Session{ID: "sess_taken", DocumentID: "doc_1", UserID: "other"},
 		acquireErr:  domain.ErrSessionTaken,
 	}
@@ -405,7 +389,11 @@ func TestAcquireSession_Readonly_WhenTaken(t *testing.T) {
 }
 
 func TestAcquireSession_Success_RecordsAudit(t *testing.T) {
-	repo := &fakeRepo{acquireSess: &domain.Session{ID: "sess_1", DocumentID: "doc_1", UserID: "user_1"}}
+	repo := &fakeRepo{
+		docReturn:   &domain.Document{ID: "doc_1", TenantID: "tenant_1", Status: domain.DocStatusDraft},
+		ownerReturn: true, // actor is owner; satisfies mayWriteWorkingContent draft gate
+		acquireSess: &domain.Session{ID: "sess_1", DocumentID: "doc_1", UserID: "user_1"},
+	}
 	audit := &noopAudit{}
 	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, audit)
 
@@ -463,14 +451,15 @@ func TestRenameDocument_InvalidName(t *testing.T) {
 
 func TestCommitAutosave_ForwardsArtifactMetadata(t *testing.T) {
 	repo := &fakeRepo{
-		docReturn: &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft},
+		docReturn:   &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft},
+		ownerReturn: true, // actor is owner; satisfies mayWriteWorkingContent draft gate
 		pendingMeta: &application.PendingCommitMeta{
 			ExpectedContentHash: "h1",
 			StorageKey:          "tenants/t/documents/d/revisions/h1.docx",
 		},
 		commitResult: &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2},
 	}
-	presigner := &fakePresigner{hashReturn: "h1", sizeReturn: 1304}
+	presigner := &fakePresigner{size: 1304}
 	svc := application.New(repo, presigner, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 	pageCount := 3
 
@@ -512,23 +501,18 @@ func TestCommitAutosave_InvalidPageCount(t *testing.T) {
 	}
 }
 
-func TestCommitAutosave_LogsCleanupFailureOnHashMismatch(t *testing.T) {
+func TestCommitAutosave_HashMismatchReturnsErrContentHashMismatch(t *testing.T) {
 	repo := &fakeRepo{
-		docReturn: &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft},
+		docReturn:   &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft},
+		ownerReturn: true,
 		pendingMeta: &application.PendingCommitMeta{
 			ExpectedContentHash: "h1",
 			StorageKey:          "tenants/t/documents/d/revisions/h1.docx",
 		},
 	}
 	presigner := &fakePresigner{
-		hashReturn: "WRONG",          // forces hash mismatch path
-		deleteErr:  errors.New("s3 down"), // forces delete to fail → WARN fires
+		confirmErr: objectstore.ErrHashMismatch,
 	}
-
-	var buf bytes.Buffer
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
 
 	_, err := application.New(repo, presigner, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{}).
 		CommitAutosave(context.Background(), application.CommitAutosaveCmd{
@@ -540,30 +524,8 @@ func TestCommitAutosave_LogsCleanupFailureOnHashMismatch(t *testing.T) {
 			FormDataSnapshot: []byte(`{"ok":true}`),
 		})
 
-	// G1: behavior unchanged — still returns ErrContentHashMismatch
 	if !errors.Is(err, domain.ErrContentHashMismatch) {
 		t.Fatalf("expected ErrContentHashMismatch, got %v", err)
-	}
-	// G2: delete was still attempted
-	if presigner.deleteCalls != 1 {
-		t.Fatalf("expected 1 delete call, got %d", presigner.deleteCalls)
-	}
-	// G3: WARN with context was emitted
-	logged := buf.String()
-	if logged == "" {
-		t.Fatal("expected WARN log output, got empty buffer")
-	}
-	// Assert every attribute the impl promises to log — key names and values — so a
-	// regression dropping document_id or err from the WarnContext call fails the test.
-	for _, want := range []string{
-		"level=WARN",
-		"storage_key", "tenants/t/documents/d/revisions/h1.docx",
-		"document_id", "doc_1",
-		"err", "s3 down",
-	} {
-		if !bytes.Contains([]byte(logged), []byte(want)) {
-			t.Fatalf("WARN log missing %q; got: %s", want, logged)
-		}
 	}
 }
 
@@ -574,6 +536,7 @@ func TestSyncArtifactMetadata_ForwardsArtifactMetadata(t *testing.T) {
 			Status:            domain.DocStatusDraft,
 			CurrentRevisionID: "rev_1",
 		},
+		ownerReturn: true, // actor is owner; satisfies mayWriteWorkingContent draft gate
 		revisionReturn: &domain.Revision{
 			ID:         "rev_1",
 			DocumentID: "doc_1",
@@ -581,7 +544,7 @@ func TestSyncArtifactMetadata_ForwardsArtifactMetadata(t *testing.T) {
 		},
 		commitResult: &application.CommitResult{RevisionID: "rev_1"},
 	}
-	presigner := &fakePresigner{sizeReturn: 1304}
+	presigner := &fakePresigner{size: 1304}
 	svc := application.New(repo, presigner, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 	pageCount := 3
 

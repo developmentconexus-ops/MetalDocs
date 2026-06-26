@@ -65,7 +65,7 @@ describe('useDocumentComments load', () => {
     expect(fetchSpy).toHaveBeenCalledWith('/api/v1/documents/doc-1/comments', undefined);
     expect(typeof result.current.comments[0].id).toBe('number');
     expect(result.current.comments[1].parentId).toBe(42);
-    expect(typeof result.current.comments[1].done).toBe('boolean');
+    expect(typeof result.current.comments[1].resolved).toBe('boolean');
   });
 
   it('shows a toast when the comments query fails', async () => {

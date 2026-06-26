@@ -1,6 +1,6 @@
 # Stage-1 Audit Artifact — Render Pipeline
 
-> **Produced:** 2026-06-10 | **Path tokens updated:** 2026-06-14 (eigenpal tarball relocated to third_party/eigenpal/)
+> **Produced:** 2026-06-10 | **Path tokens updated:** 2026-06-23 (eigenpal migrated from vendored tarball `@eigenpal/docx-js-editor@0.2.0` to npm `@eigenpal/docx-editor-react@1.9.0`; prior: 2026-06-14 tarball relocated to third_party/eigenpal/)
 > **Scope:** `internal/modules/render`, `internal/platform/render`, `internal/platform/docgenv2`, `apps/docx-renderer`
 > **Read-only snapshot.** No redesign proposals; all claims anchored to file:line.
 
@@ -8,7 +8,7 @@
 
 ## 1. Identity & Purpose
 
-The render pipeline is responsible for converting a document revision's DOCX template and its resolved placeholder values into a frozen, immutable DOCX artifact and then a PDF. It spans two processes: the Go API/worker binary and the TypeScript `docx-renderer` sidecar service. The Go side owns placeholder resolution (via a registry of `ComputedResolver` implementations), freeze coordination (via `FreezeService`), outbox-based async dispatch, and Gotenberg-based PDF conversion. The TypeScript `docx-renderer` owns the actual DOCX token substitution and composition-block injection through the `@eigenpal/docx-js-editor` headless API, writing the resulting frozen DOCX to MinIO directly. The pipeline is split into two asynchronous phases following ADR 0015: a synchronous "Pin" phase (in-transaction, no network calls) and an async "Materialize" phase (worker → docx-renderer HTTP → MinIO → PDF outbox).
+The render pipeline is responsible for converting a document revision's DOCX template and its resolved placeholder values into a frozen, immutable DOCX artifact and then a PDF. It spans two processes: the Go API/worker binary and the TypeScript `docx-renderer` sidecar service. The Go side owns placeholder resolution (via a registry of `ComputedResolver` implementations), freeze coordination (via `FreezeService`), outbox-based async dispatch, and Gotenberg-based PDF conversion. The TypeScript `docx-renderer` owns the actual DOCX token substitution and composition-block injection through the `@eigenpal/docx-editor-core/headless` API (`processTemplateDetailed`), writing the resulting frozen DOCX to MinIO directly. The pipeline is split into two asynchronous phases following ADR 0015: a synchronous "Pin" phase (in-transaction, no network calls) and an async "Materialize" phase (worker → docx-renderer HTTP → MinIO → PDF outbox).
 
 There is no "docgen v1" remnant in the codebase. The `internal/platform/docgenv2` package name is a historical artifact of the v2 naming era; the service it references is now called `docx-renderer`. The event type constant `EventTypePDFConvert = "docgen_v2_pdf"` carries the v2 name string on the wire.
 
@@ -91,7 +91,7 @@ There is no "docgen v1" remnant in the codebase. The `internal/platform/docgenv2
 | `src/s3.ts` | `makeS3Client` — builds `minio.Client` from env; `getObjectBuffer`/`putObjectBuffer` helpers |
 | `src/routes/index.ts` | Route registration entry: only registers fanout route |
 | `src/routes/fanout.ts` | `POST /render/fanout` handler: validates body with Zod schema, fetches body DOCX from S3, calls `fanout()`, uploads frozen DOCX to `tenants/{tenantId}/revisions/{revisionId}/frozen.docx`, returns `{content_hash, final_docx_s3_key, unreplaced_vars, size_bytes}` |
-| `src/render/fanout.ts` | `fanout()` function: builds `SubBlockRegistry`, renders header/footer sub-blocks via `compositionConfig`, merges with `placeholderValues` into `variables`, calls `processTemplateDetailed` from eigenpal, SHA-256s result, returns `{buffer, contentHash, unreplacedVars}` |
+| `src/render/fanout.ts` | `fanout()` function: builds `SubBlockRegistry`, renders header/footer sub-blocks via `compositionConfig`, merges with `placeholderValues` into `variables`, calls `processTemplateDetailed` from `@eigenpal/docx-editor-core/headless`, SHA-256s result, returns `{buffer, contentHash, unreplacedVars}` |
 | `src/render/subblocks/registry.ts` | `SubBlockRegistry` class: `register`, `render`, `keys` — throws on unknown sub-block key |
 | `src/render/subblocks/builtins.ts` | `registerV1Builtins` — registers 5 built-in sub-block renderers |
 | `src/render/subblocks/doc_header_standard.ts` | `DocHeaderStandard` (`doc_header_standard`) — OOXML table with title, doc code, effective date, revision number |
@@ -102,9 +102,9 @@ There is no "docgen v1" remnant in the codebase. The `internal/platform/docgenv2
 | `build.mjs` | esbuild bundle script |
 | `tsconfig.json` | TypeScript config |
 | `vitest.config.ts` | Vitest test config |
-| `package.json` | npm manifest; depends on vendored `@eigenpal/docx-js-editor@0.2.0` |
+| `package.json` | npm manifest; depends on `@eigenpal/docx-editor-core` (from npm registry; vendored tarball retired 2026-06-23) |
 | `Dockerfile` | Multi-stage build: `node:20.11-alpine` builder → runtime; healthcheck on `/health`; exposes 3100; runs as `node` user |
-| `third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` | Vendored eigenpal tarball |
+| `third_party/eigenpal/NOTICE` | Records transition from vendored tarball to published npm package (tarball `eigenpal-docx-js-editor-0.2.0.tgz` deleted 2026-06-23) |
 | `src/render/subblocks/__tests__/*.test.ts` | Unit tests for each sub-block renderer (7 files) |
 | `src/render/__tests__/fanout.test.ts` | Unit tests for `fanout()` function |
 | `src/routes/__tests__/fanout.test.ts` | Unit tests for the HTTP route handler |
@@ -181,7 +181,7 @@ The primary production path. Triggered when an approval signoff completes.
    - Extracts `MaterializeFanoutPayload` (`worker/materialize_job_runner.go:59`).
    - Calls `MaterializeInvoker.Materialize` (implemented by `materializeInvokerAdapter.Materialize` → `FreezeService.Materialize`) outside a transaction (`materialize_job_runner.go:68`).
    - `FreezeService.Materialize` (`freeze_service.go:225`): reads snapshot, loads existing placeholder values, maps placeholder IDs to names, calls `fanout.Client.Fanout` (HTTP POST to docx-renderer) (`freeze_service.go:278`).
-   - docx-renderer fetches body DOCX from MinIO, runs eigenpal `processTemplateDetailed`, uploads frozen DOCX to `tenants/{tenant}/revisions/{rev}/frozen.docx`, returns `{content_hash, final_docx_s3_key}`.
+   - docx-renderer fetches body DOCX from MinIO, runs `processTemplateDetailed` from `@eigenpal/docx-editor-core/headless`, uploads frozen DOCX to `tenants/{tenant}/revisions/{rev}/frozen.docx`, returns `{content_hash, final_docx_s3_key}`.
    - Back in `MaterializeJobRunner.Handle`, opens DB transaction, calls `WriteFinalDocxInTx` + `pdfOutbox.Enqueue` atomically (`materialize_job_runner.go:74-87`), commits.
 5. **PDF outbox worker** (`fanout/pdf_outbox_worker.go:54`): polls every 5s, claims rows, publishes `docgen_v2_pdf` events.
 6. **PDF job runner** (`platform/worker/pdf_job_runner.go:68`): calls `GotenbergPDFClient.ConvertPDF` (`servicebus/gotenberg_pdf.go:70`): opens frozen DOCX from MinIO, POSTs to Gotenberg LibreOffice route (`/forms/libreoffice/convert`), SHA-256s result, saves PDF to MinIO at `tenants/{tenant}/revisions/{rev}/final.pdf`, calls `PDFPersister.WritePDF` to persist `final_pdf_s3_key` + PDF hash.
@@ -255,7 +255,7 @@ Triggered by `POST /api/v1/documents/{id}/reconstruct`.
 - `metaldocs/internal/modules/documents/domain` — `TemplateSnapshot`, `ErrSnapshotTemplateNotFound`
 
 **`apps/docx-renderer`**
-- `@eigenpal/docx-js-editor` (vendored `0.2.0.tgz`) — `processTemplateDetailed` headless DOCX substitution
+- `@eigenpal/docx-editor-core/headless` (npm registry, `1.9.0`) — `processTemplateDetailed` headless DOCX substitution
 - `fastify@4.26.2` — HTTP server
 - `minio@^7.1.3` — MinIO client
 - `zod@3.23.8` — env + request body validation

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/platform/servicebus"
@@ -17,10 +18,12 @@ type ExportRepo interface {
 	GetExportByHash(ctx context.Context, documentID string, compositeHash []byte) (*domain.Export, error)
 }
 
+const exportDownloadTTL = 15 * time.Minute
+
 type ExportPresigner interface {
-	PresignObjectGET(ctx context.Context, storageKey string) (url string, err error)
-	HeadObject(ctx context.Context, key string) (bool, error)
-	SizeObject(ctx context.Context, key string) (int64, error)
+	PresignGet(ctx context.Context, key string, ttl time.Duration) (url string, err error)
+	Exists(ctx context.Context, key string) (bool, error)
+	Size(ctx context.Context, key string) (int64, error)
 }
 
 type DocgenPDFClient interface {
@@ -82,7 +85,7 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 		return nil, err
 	}
 
-	headFound, err := s.presigner.HeadObject(ctx, storageKey)
+	headFound, err := s.presigner.Exists(ctx, storageKey)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +103,7 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 		}
 	}
 
-	sizeBytes, err := s.presigner.SizeObject(ctx, storageKey)
+	sizeBytes, err := s.presigner.Size(ctx, storageKey)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +123,7 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 }
 
 func (s *ExportService) SignExportURL(ctx context.Context, storageKey string) (string, error) {
-	return s.presigner.PresignObjectGET(ctx, storageKey)
+	return s.presigner.PresignGet(ctx, storageKey, exportDownloadTTL)
 }
 
 func (s *ExportService) GetDocumentSummary(ctx context.Context, tenantID, documentID string) (*domain.Document, error) {
@@ -141,7 +144,7 @@ func (s *ExportService) SignedDocxURL(ctx context.Context, tenantID, userID, doc
 		return "", err
 	}
 
-	url, err := s.presigner.PresignObjectGET(ctx, rev.StorageKey)
+	url, err := s.presigner.PresignGet(ctx, rev.StorageKey, exportDownloadTTL)
 	if err != nil {
 		return "", err
 	}

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm.cmd tsc --noEmit -p tsconfig.build.json && vite build",
+    "build": "tsc --noEmit -p tsconfig.build.json && vite build",
     "preview": "vite preview",
     "e2e:smoke": "playwright test --workers=1",
     "e2e:template-admin": "playwright test tests/e2e/template-admin-editor.spec.ts tests/e2e/template-admin-list-actions.spec.ts --project=chrome --workers=1",
@@ -14,11 +14,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@eigenpal/docx-js-editor": "file:../../../third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz",
     "@fontsource/dm-mono": "^5.2.7",
     "@fontsource/dm-sans": "^5.2.8",
-    "@metaldocs/editor-ui": "file:../../../packages/editor-ui",
-    "@metaldocs/shared-tokens": "file:../../../packages/shared-tokens",
+    "@metaldocs/editor-ui": "workspace:*",
+    "@metaldocs/shared-tokens": "workspace:*",
     "@tanstack/react-query": "^5.100.9",
     "@tiptap/core": "2.27.2",
     "@tiptap/extension-color": "^2.11.5",

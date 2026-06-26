@@ -34,14 +34,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: [
         { find: '@metaldocs/editor-ui', replacement: resolve(__dirname, '../../../packages/editor-ui/src/index.ts') },
-        { find: '@metaldocs/mddm-layout-tokens', replacement: resolve(__dirname, '../../../shared/mddm-layout-tokens/index.ts') },
-        { find: '@metaldocs/mddm-pagination-types', replacement: resolve(__dirname, '../../../shared/mddm-pagination-types/index.ts') },
         { find: '@metaldocs/shared-tokens', replacement: resolve(__dirname, '../../../packages/shared-tokens/src/index.ts') },
-        { find: /^@eigenpal\/docx-js-editor\/styles\.css$/, replacement: resolve(__dirname, 'node_modules/@eigenpal/docx-js-editor/dist/styles.css') },
-        { find: /^@eigenpal\/docx-js-editor\/react$/, replacement: resolve(__dirname, 'node_modules/@eigenpal/docx-js-editor/dist/react.mjs') },
-        { find: /^@eigenpal\/docx-js-editor\/ui$/, replacement: resolve(__dirname, 'node_modules/@eigenpal/docx-js-editor/dist/ui.mjs') },
-        { find: /^@eigenpal\/docx-js-editor\/core$/, replacement: resolve(__dirname, 'node_modules/@eigenpal/docx-js-editor/dist/core-reexport.mjs') },
-        { find: /^@eigenpal\/docx-js-editor$/, replacement: resolve(__dirname, 'node_modules/@eigenpal/docx-js-editor/dist/index.mjs') },
         { find: 'jszip', replacement: resolve(__dirname, 'node_modules/jszip') },
         { find: 'fast-xml-parser', replacement: resolve(__dirname, 'node_modules/fast-xml-parser') },
       ],

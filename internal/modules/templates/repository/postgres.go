@@ -430,60 +430,9 @@ func (r *Repository) UpdateVersionTx(ctx context.Context, tx db.Tx, tenantID str
 	return updateVersion(ctx, tx, tenantID, v)
 }
 
-func (r *Repository) UpdateVersionDraftCAS(ctx context.Context, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	return updateVersionDraftCAS(ctx, r.db, tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
-}
-
-func (r *Repository) UpdateVersionDraftCASTx(ctx context.Context, tx db.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	return updateVersionDraftCAS(ctx, tx, tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
-}
-
 type draftCASExecutor interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 	QueryRowContext(context.Context, string, ...any) *sql.Row
-}
-
-func updateVersionDraftCAS(ctx context.Context, db draftCASExecutor, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	const q = `
-UPDATE templates_template_version
-SET
-	docx_storage_key = $3,
-	content_hash = $4,
-	lock_version = lock_version + 1
-WHERE id = $1
-  AND EXISTS (
-    SELECT 1 FROM templates_template t
-    WHERE t.id = templates_template_version.template_id
-      AND t.tenant_id = $5::uuid
-  )
-  AND lock_version = $2`
-	res, err := db.ExecContext(ctx, q, versionID, expectedLockVersion, docxStorageKey, docxContentHash, tenantID)
-	if err != nil {
-		return err
-	}
-	n, err := rowsAffected(res)
-	if err != nil {
-		return err
-	}
-	if n > 0 {
-		return nil
-	}
-
-	var exists bool
-	if err := db.QueryRowContext(ctx, `
-SELECT EXISTS (
-  SELECT 1
-  FROM templates_template_version v
-  JOIN templates_template t ON t.id = v.template_id
-  WHERE v.id = $1
-    AND t.tenant_id = $2::uuid
-)`, versionID, tenantID).Scan(&exists); err != nil {
-		return err
-	}
-	if !exists {
-		return domain.ErrNotFound
-	}
-	return domain.ErrStaleLockVersion
 }
 
 func (r *Repository) UpdateVersionSchemaCAS(ctx context.Context, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {

@@ -34,7 +34,7 @@ packages/editor-ui/
 | `MetalDocsEditorProps` | type | Adapter contract surface |
 | `MetalDocsEditorRef` | type | `{ getDocumentBuffer, focus }` |
 | `EditorMode` | type | `'template-draft' \| 'document-edit' \| 'readonly'` |
-| `Comment` | type re-export | from `@eigenpal/docx-js-editor` |
+| `Comment` | type re-export | from `@eigenpal/docx-editor-core/types/content` (re-exported via wrapper) |
 | `computeSidebarModel` | function | Diffs tokens vs schema → `SidebarModel` |
 | `SidebarModel` | type | `{ used, missing, orphans, bannerError, errorCategories }` |
 | `buildSidebarModelPlugin` | function | Builds `EditorPlugin` from `SidebarModel` |
@@ -86,8 +86,12 @@ None. No persistence.
 
 ## Eigenpal symbols imported
 
-From `@eigenpal/docx-js-editor`:
-- `DocxEditor` (component) · `PluginHost` (component) · `templatePlugin` (instance)
-- Types: `DocxEditorRef`, `EditorPlugin`, `Comment`, `ReactSidebarItem`, `PluginPanelProps`, `DocxEditorProps`
+From `@eigenpal/docx-editor-react`:
+- `DocxEditor` (component) · `DocxEditorRef` · `createEmptyDocument` · `EditorMode`
 
-No imports from `/core` or `/react` subpaths from inside the package (TemplateEditorPage uses those directly, bypassing the wrapper).
+From `@eigenpal/docx-editor-react/plugin-api`:
+- `PluginHost` (component) · `templatePlugin` (instance)
+- Types: `EditorPlugin`, `ReactSidebarItem`, `PluginPanelProps`
+
+From `@eigenpal/docx-editor-core/types/content`:
+- `Comment` (type, re-exported via `packages/editor-ui/src/index.ts:3`)

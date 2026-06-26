@@ -1770,3 +1770,25 @@ func (r *Repository) GetFinalizePrereqs(ctx context.Context, tenantID, docID str
 	}
 	return prereqs, nil
 }
+
+// IsEligibleApprover reports whether actorUserID is listed in the
+// eligible_actor_ids of the currently-open (pending) approval stage for the
+// document's active (in_progress) approval instance.
+func (r *Repository) IsEligibleApprover(ctx context.Context, tenantID, documentID, actorUserID string) (bool, error) {
+	const q = `
+		SELECT EXISTS (
+			SELECT 1
+			  FROM approval_stage_instances asi
+			  JOIN approval_instances ai ON ai.id = asi.approval_instance_id
+			 WHERE ai.tenant_id   = $1::uuid
+			   AND ai.document_id = $2::uuid
+			   AND ai.status      = 'in_progress'
+			   AND asi.status     = 'pending'
+			   AND asi.eligible_actor_ids @> to_jsonb(ARRAY[$3::text])
+		)`
+	var ok bool
+	if err := r.db.QueryRowContext(ctx, q, tenantID, documentID, actorUserID).Scan(&ok); err != nil {
+		return false, fmt.Errorf("documents: is-eligible-approver: %w", err)
+	}
+	return ok, nil
+}

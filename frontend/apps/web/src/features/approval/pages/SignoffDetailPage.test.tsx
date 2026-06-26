@@ -6,7 +6,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignoffDetailPage } from './SignoffDetailPage';
 import * as approvalApi from '../api/approvalApi';
 import * as documentsApi from '../../documents/api/documents';
-import * as pdfHook from '../../documents/hooks/editor/useDocumentPdfStatus';
+
+vi.mock('../components/ReviewDocumentCanvas', () => ({
+  ReviewDocumentCanvas: (_props: unknown) => <div data-testid="review-canvas" />,
+}));
+
+vi.mock('../../../store/auth.store', () => ({
+  useAuthStore: (selector: (s: { user: { displayName: string } }) => unknown) =>
+    selector({ user: { displayName: 'Ana Revisora' } }),
+}));
 
 function makeDoc(overrides: Partial<documentsApi.DocumentDetail> = {}) {
   return {
@@ -16,6 +24,8 @@ function makeDoc(overrides: Partial<documentsApi.DocumentDetail> = {}) {
     status: 'under_review',
     revision_version: 3,
     controlled_document_id: 'cd-1',
+    current_revision_id: 'rev-1',
+    created_by: 'user-approver-1',
     ...overrides,
   } as documentsApi.DocumentDetail;
 }
@@ -60,7 +70,6 @@ describe('SignoffDetailPage', () => {
       etag: '"v3"',
     } as Awaited<ReturnType<typeof approvalApi.getInstance>>);
     vi.spyOn(documentsApi, 'listComments').mockResolvedValue([]);
-    vi.spyOn(pdfHook, 'useDocumentPdfStatus').mockReturnValue({ status: 'pending', retry: vi.fn() });
   });
 
   it('renders the document header from getDocument', async () => {
@@ -76,22 +85,22 @@ describe('SignoffDetailPage', () => {
     await waitFor(() => { expect(screen.getByText('Assinar')).toBeTruthy(); });
   });
 
-  it('shows an honest A4 pending state while the PDF is generating', async () => {
+  it('tab list has exactly two tabs: documento and comentarios', async () => {
     renderAt();
     await waitFor(() => {
-      expect(screen.getByText('Gerando visualização do documento…')).toBeTruthy();
+      expect(screen.getByText('POP Limpeza de Linha')).toBeTruthy();
     });
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0].textContent).toBe('Documento');
+    expect(tabs[1].textContent).toBe('Comentários');
   });
 
-  it('embeds the rendered PDF when ready', async () => {
-    vi.spyOn(pdfHook, 'useDocumentPdfStatus').mockReturnValue({
-      status: 'ready',
-      url: 'https://cdn.example/doc-1.pdf',
-      retry: vi.fn(),
-    });
+  it('renders ReviewDocumentCanvas with documentId and currentRevisionId on documento tab', async () => {
     renderAt();
-    const frame = await screen.findByTitle('Pré-visualização do documento');
-    expect(frame.getAttribute('src')).toBe('https://cdn.example/doc-1.pdf');
+    await waitFor(() => {
+      expect(screen.getByTestId('review-canvas')).toBeTruthy();
+    });
   });
 
   it('shows the sidebar error state when the active-document-context query errors', async () => {

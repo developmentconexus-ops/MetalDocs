@@ -95,7 +95,7 @@ func (h *Handler) GetTemplateVersion(w http.ResponseWriter, r *http.Request, id 
 }
 
 func (h *Handler) PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
-	url, key, ok := h.presignTemplateUpload(w, r, id, n, "")
+	url, key, ok := h.presignTemplateUpload(w, r, id, n)
 	if !ok {
 		return
 	}
@@ -106,22 +106,36 @@ func (h *Handler) PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Re
 }
 
 func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
-	url, key, ok := h.presignTemplateUpload(w, r, id, n, "templates/"+id+"/versions/"+intString(n)+".schema.json")
-	if !ok {
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	actorID := userIDFromReq(r)
+	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
+		writeMappedErr(w, err)
+		return
+	}
+	res, err := h.svc.PresignTemplateSchemaUpload(r.Context(), application.PresignTemplateUploadCmd{
+		TenantID:      tenantID,
+		ActorUserID:   actorID,
+		TemplateID:    id,
+		VersionNumber: n,
+	})
+	if err != nil {
+		writeMappedErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, templatesapi.PresignTemplateSchemaUploadUrl200JSONResponse{
-		Url:        &url,
-		StorageKey: &key,
+		Url:        &res.UploadURL,
+		StorageKey: &res.StorageKey,
 	})
 }
 
-// presignTemplateUpload runs the shared authz + service flow and returns the
-// presigned URL and storage key. Each caller writes the op-specific generated
-// 200 type so each route is pinned to its strict-server response contract
-// (M5/F5.3 H-D remediation; M1/F1.3 declared-fields-only). On error this writes
-// the problem+json response and returns ok=false.
-func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, id string, n int, storageKey string) (string, string, bool) {
+// presignTemplateUpload runs the shared authz + service flow for docx uploads
+// and returns the presigned URL and storage key. On error writes the problem+json
+// response and returns ok=false.
+func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, id string, n int) (string, string, bool) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
@@ -138,7 +152,6 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 		ActorUserID:   actorID,
 		TemplateID:    id,
 		VersionNumber: n,
-		StorageKey:    storageKey,
 	})
 	if err != nil {
 		writeMappedErr(w, err)
@@ -147,74 +160,6 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 	return res.UploadURL, res.StorageKey, true
 }
 
-func (h *Handler) RedirectSignedUrl(w http.ResponseWriter, r *http.Request, params templatesapi.RedirectSignedUrlParams) {
-	key := strings.TrimSpace(params.Key)
-	if key == "" {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidRequest, "key query parameter is required")
-		return
-	}
-	url, err := h.svc.PresignStoredObject(r.Context(), key)
-	if err != nil {
-		writeMappedErr(w, err)
-		return
-	}
-	http.Redirect(w, r, url, http.StatusFound)
-}
-
-func (h *Handler) SaveTemplateDraft(w http.ResponseWriter, r *http.Request, id string, n int) {
-	tenantID, err := tenantIDFromReq(r)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
-		return
-	}
-	actorID := userIDFromReq(r)
-	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
-		writeMappedErr(w, err)
-		return
-	}
-
-	var req templatesapi.SaveTemplateDraftJSONRequestBody
-	if err := readStrictJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
-		return
-	}
-	if field := missingSaveTemplateDraftField(req); field != "" {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "field "+field+" is required")
-		return
-	}
-
-	err = h.svc.SaveTemplateDraft(r.Context(), application.SaveTemplateDraftCmd{
-		TenantID:            tenantID,
-		ActorUserID:         actorID,
-		TemplateID:          id,
-		VersionNumber:       n,
-		ExpectedLockVersion: req.ExpectedLockVersion,
-		DocxStorageKey:      strings.TrimSpace(req.DocxStorageKey),
-		SchemaStorageKey:    strings.TrimSpace(req.SchemaStorageKey),
-		DocxContentHash:     strings.TrimSpace(req.DocxContentHash),
-		SchemaContentHash:   strings.TrimSpace(req.SchemaContentHash),
-	})
-	if err != nil {
-		writeMappedErr(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func missingSaveTemplateDraftField(req templatesapi.SaveTemplateDraftJSONRequestBody) string {
-	switch {
-	case strings.TrimSpace(req.DocxStorageKey) == "":
-		return "docx_storage_key"
-	case strings.TrimSpace(req.SchemaStorageKey) == "":
-		return "schema_storage_key"
-	case strings.TrimSpace(req.DocxContentHash) == "":
-		return "docx_content_hash"
-	case strings.TrimSpace(req.SchemaContentHash) == "":
-		return "schema_content_hash"
-	default:
-		return ""
-	}
-}
 
 func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionParams) {
 	tenantID, err := tenantIDFromReq(r)
