@@ -78,15 +78,32 @@ rejected (leaves a known-lie in the DB).
   one-line column change.
 - The verified `CommitAutosave` (§3) becomes the writer of a non-null key.
 
-### 5.2 Close the second, unverified writer (Major, reviewer)
+### 5.2 Delete the second, unverified writer (Major, reviewer)
 - `SaveTemplateDraft` (`autosave.go:98-141`, route `PUT .../versions/{n}/draft`,
   `handler.go:50`) writes `docx_storage_key` + client-supplied `content_hash` via
   `UpdateVersionDraftCASTx` with **no** Stat — a live path that can set a non-empty
-  hash for a non-existent object, falsely satisfying the publish gate (§5.4). The
-  frontend uses the verified `commit` path, not `/draft`.
-  **Decision:** retire `/draft` (remove the endpoint + handler + service method), or,
-  if a consumer is found, bring it under the same `HeadContentHash` discipline. This
-  is the storage-side twin of Crack A's "two coexisting styles."
+  hash for a non-existent object, falsely satisfying the publish gate (§5.4). It is
+  the storage-side twin of Crack A's "two coexisting styles."
+- **Decision (approved 2026-06-26): DELETE it.** Verified dead — no frontend caller
+  (editor uses `presign`+`commit`), the `schema_storage_key`/`schema_content_hash`
+  fields it carries exist nowhere else (schema saves go through `PUT .../schema`),
+  and its repo methods have no other caller. Full removal scope:
+  - **OpenAPI:** remove the `PUT /templates/{id}/versions/{n}/draft` path; drop the
+    `.../draft` references in the `lock_version` description; `go generate ./...` to
+    regenerate `api.gen.go` (drops the handler iface, `SaveTemplateDraftJSONBody`,
+    and the `schema_*` request fields).
+  - **Delivery:** `routes_generated.go:164 SaveTemplateDraft` + `missingSaveTemplateDraftField`;
+    route mount `handler.go:50`.
+  - **Application:** `SaveTemplateDraft` + `SaveTemplateDraftCmd` (`autosave.go:88-141`).
+  - **Repository:** `UpdateVersionDraftCAS` + `UpdateVersionDraftCASTx`
+    (`postgres.go:433,437`) and the two `ports.go:26-27` interface methods (no other
+    caller).
+  - **Tests:** `TestSaveTemplateDraft_*` (`autosave_test.go:298-367`) and the
+    `UpdateVersionDraftCAS*` fakes (`fakes_test.go`, `routes_create_test.go`).
+  - **Frontend:** the `saveDraft` shim (`templates.ts:220`) — already slated for
+    deletion in Workstream A (it only forwards to `commitAutosave`).
+  - Low deploy risk: removing an unused endpoint; forward-only contract change, no
+    client depends on it (mission §3).
 
 ### 5.3 Document instance create/clone path (Critical, reviewer — elevated into scope)
 - `service.go:264 cloneIntoTx` reads the template's published key
@@ -144,7 +161,8 @@ rejected (leaves a known-lie in the DB).
    error (the Go-type cascade is resolved).
 2. No persisted non-null key can reference a non-existent object: the only writer of
    a non-null key is the Stat-verified commit (§5.1); the `/draft` second writer is
-   retired or brought under Stat (§5.2).
+   fully deleted (§5.2) — endpoint, handler, service, repo methods, and tests gone,
+   `go build`/`go test` green without them.
 3. Publish is gated such that a published version always has a non-null verified key
    (§5.4); document clone inherits only verified keys (§5.3).
 4. Presign GET on a missing/unverified object fails closed with a typed response
