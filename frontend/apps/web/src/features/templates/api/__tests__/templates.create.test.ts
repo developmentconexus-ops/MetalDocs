@@ -104,12 +104,12 @@ describe('templates.createTemplate', () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock
       .mockResolvedValueOnce(
+        // Contract TemplatePresignAutosaveResponse is a FLAT body (no { data }
+        // envelope), and apiFetch returns res.json() verbatim. Mock must match.
         makeResponse({
-          data: {
-            upload_url: 'https://minio/upload/docx',
-            storage_key: 'templates/tpl_123/versions/1.docx',
-            expires_at: '2026-01-01T00:10:00Z',
-          },
+          upload_url: 'https://minio/upload/docx',
+          storage_key: 'templates/tpl_123/versions/1.docx',
+          expires_at: '2026-01-01T00:10:00Z',
         }),
       )
       .mockResolvedValueOnce(makeResponse({}, 200))
