@@ -2,14 +2,11 @@
   "name": "metaldocs-monorepo",
   "private": true,
   "version": "0.0.0",
-  "workspaces": [
-    "apps/docx-renderer",
-    "packages/*"
-  ],
+  "packageManager": "pnpm@11.8.0",
   "scripts": {
-    "build:docx-v2": "npm -ws --if-present run build",
-    "test:docx-v2": "npm -ws --if-present run test",
-    "typecheck:docx-v2": "npm -ws --if-present run typecheck"
+    "build:docx-v2": "pnpm -r run build",
+    "test:docx-v2": "pnpm -r run test",
+    "typecheck:docx-v2": "pnpm -r run typecheck"
   },
   "engines": {
     "node": ">=20.11.0"
