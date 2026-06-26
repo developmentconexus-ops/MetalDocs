@@ -466,7 +466,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 comments={commentsHook.comments}
                 onCommentsChange={commentsHook.setComments}
                 onCommentAdd={(c: EditorComment) => { if (canUseComments) void commentsHook.add(c); }}
-                onCommentResolve={(c: EditorComment) => { if (canUseComments) void (c.done ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
+                onCommentResolve={(c: EditorComment) => { if (canUseComments) void (c.resolved ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
                 onCommentDelete={(c: EditorComment) => { if (canUseComments) void commentsHook.remove(c); }}
                 onCommentReply={(reply: EditorComment, parent: EditorComment) => { if (canUseComments) void commentsHook.reply(reply, parent); }}
                 onAutoSave={handleSave}

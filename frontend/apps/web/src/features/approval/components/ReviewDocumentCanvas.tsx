@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { MetalDocsEditor, type MetalDocsEditorRef, type Comment } from '@metaldocs/editor-ui';
+import { MetalDocsEditor, type MetalDocsEditorRef, type EditorComment } from '@metaldocs/editor-ui';
 import { apiFetch } from '../../../lib/api';
 import { signedRevisionURL } from '../../documents/api/documents';
 import { useDocumentSession } from '../../documents/hooks/editor/useDocumentSession';
@@ -133,10 +133,10 @@ export const ReviewDocumentCanvas = forwardRef<ReviewDocumentCanvasRef, ReviewDo
         author={approverDisplay}
         comments={commentsHook.comments}
         onCommentsChange={commentsHook.setComments}
-        onCommentAdd={(c: Comment) => void commentsHook.add(c)}
-        onCommentResolve={(c: Comment) => void (c.done ? commentsHook.resolve(c) : commentsHook.reopen(c))}
-        onCommentDelete={(c: Comment) => void commentsHook.remove(c)}
-        onCommentReply={(reply: Comment, parent: Comment) => void commentsHook.reply(reply, parent)}
+        onCommentAdd={(c: EditorComment) => void commentsHook.add(c)}
+        onCommentResolve={(c: EditorComment) => void (c.resolved ? commentsHook.resolve(c) : commentsHook.reopen(c))}
+        onCommentDelete={(c: EditorComment) => void commentsHook.remove(c)}
+        onCommentReply={(reply: EditorComment, parent: EditorComment) => void commentsHook.reply(reply, parent)}
         onAutoSave={handleAutoSave}
         showRuler={false}
       />
