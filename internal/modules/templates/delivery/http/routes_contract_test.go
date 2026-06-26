@@ -47,8 +47,7 @@ func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
 		{name: "getTemplateVersion", method: http.MethodGet, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1", want: http.StatusOK},
 		{name: "presignTemplateDocxUploadUrl", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/docx-upload-url", want: http.StatusOK},
 		{name: "presignTemplateSchemaUploadUrl", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/schema-upload-url", want: http.StatusOK},
-		{name: "redirectSignedUrl", method: http.MethodGet, path: "/api/v1/signed?key=templates/11111111-1111-1111-1111-111111111111/versions/1.docx", want: http.StatusFound},
-		{name: "updateTemplateSchema", method: http.MethodPut, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/schema", body: jsonBody(t, map[string]any{
+{name: "updateTemplateSchema", method: http.MethodPut, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/schema", body: jsonBody(t, map[string]any{
 			"metadata_schema":       map[string]any{"retention_days": 1},
 			"placeholder_schema":    []any{},
 			"expected_lock_version": 0,
@@ -176,8 +175,7 @@ func TestGeneratedTemplatesRoutes_RejectValidation(t *testing.T) {
 		{name: "getTemplateVersion invalid version", method: http.MethodGet, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int"},
 		{name: "presignTemplateDocxUploadUrl invalid version", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int/docx-upload-url"},
 		{name: "presignTemplateSchemaUploadUrl invalid version", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int/schema-upload-url"},
-		{name: "redirectSignedUrl missing key", method: http.MethodGet, path: "/api/v1/signed"},
-		{name: "publishTemplateVersion missing docx key", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{"schema_key":"s"}`},
+{name: "publishTemplateVersion missing docx key", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{"schema_key":"s"}`},
 	}
 
 	for _, tt := range tests {

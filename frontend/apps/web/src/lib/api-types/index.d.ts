@@ -717,23 +717,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/signed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Redirect to presigned GET URL for a stored object */
-        get: operations["redirectSignedUrl"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/templates/{id}/versions/{n}/publish": {
         parameters: {
             query?: never;
@@ -4555,26 +4538,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
-        };
-    };
-    redirectSignedUrl: {
-        parameters: {
-            query: {
-                key: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description redirect */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
         };
     };
     publishTemplateVersion: {

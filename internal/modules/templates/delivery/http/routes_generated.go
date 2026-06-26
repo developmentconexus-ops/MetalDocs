@@ -147,19 +147,6 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 	return res.UploadURL, res.StorageKey, true
 }
 
-func (h *Handler) RedirectSignedUrl(w http.ResponseWriter, r *http.Request, params templatesapi.RedirectSignedUrlParams) {
-	key := strings.TrimSpace(params.Key)
-	if key == "" {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidRequest, "key query parameter is required")
-		return
-	}
-	url, err := h.svc.PresignStoredObject(r.Context(), key)
-	if err != nil {
-		writeMappedErr(w, err)
-		return
-	}
-	http.Redirect(w, r, url, http.StatusFound)
-}
 
 func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionParams) {
 	tenantID, err := tenantIDFromReq(r)

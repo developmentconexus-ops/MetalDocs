@@ -1256,16 +1256,6 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /signed:
-    get:
-      summary: Redirect to presigned GET URL for a stored object
-      tags: [templates]
-      operationId: redirectSignedUrl
-      security: []
-      parameters:
-        - { in: query, name: key, required: true, schema: { type: string } }
-      responses:
-        '302': { description: redirect }
   /templates/{id}/versions/{n}/publish:
     post:
       summary: Publish draft (validates template tokens)
