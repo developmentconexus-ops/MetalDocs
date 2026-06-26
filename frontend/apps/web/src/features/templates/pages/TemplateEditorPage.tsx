@@ -57,7 +57,7 @@ export function TemplateEditorPage({
 }: TemplateEditorPageProps) {
   const draft = useTemplateDraft(templateId, versionNum);
   const autosave = useTemplateAutosave(templateId, versionNum);
-  const schemaState = useTemplateSchemas(templateId, versionNum);
+  const schemaState = useTemplateSchemas(templateId, versionNum, draft.version);
   const editorRef = useRef<MetalDocsEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const schemaSnapshotRef = useRef<string | null>(null);

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  getTemplateSchemas,
+  deriveTemplateSchemas,
   putTemplateSchemas,
   StaleLockVersionError,
   type TemplateSchemas,
+  type VersionDTO,
 } from '../api/templates';
 
 interface UseTemplateSchemasResult {
@@ -13,66 +14,46 @@ interface UseTemplateSchemasResult {
   save: (s: TemplateSchemas) => Promise<void>;
   saving: boolean;
   staleConflict: boolean;
-  refetch: () => Promise<void>;
 }
 
-export function useTemplateSchemas(templateId: string, versionNum: number): UseTemplateSchemasResult {
-  const [schemas, setSchemas] = useState<TemplateSchemas | null>(null);
-  const [lockVersion, setLockVersion] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+/**
+ * Editor schema state derived from the version that `useTemplateDraft` already
+ * loaded — no second fetch of the same `/versions/{n}` resource. The version GET
+ * is the single source of truth; this hook only owns the write path (optimistic
+ * lock CAS via putTemplateSchemas). Recovery from a stale-lock 412 is a parent
+ * concern: reload the draft (draft.refetch) and the fresh version re-seeds the
+ * lock token and clears the conflict here.
+ */
+export function useTemplateSchemas(
+  templateId: string,
+  versionNum: number,
+  version: VersionDTO | null,
+): UseTemplateSchemasResult {
+  const derived = useMemo(() => (version ? deriveTemplateSchemas(version) : null), [version]);
+  const [lockVersion, setLockVersion] = useState(0);
   const [saving, setSaving] = useState(false);
   const [staleConflict, setStaleConflict] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { schemas: s, lockVersion: lv } = await getTemplateSchemas(templateId, versionNum);
-      setSchemas(s);
-      setLockVersion(lv);
-      setStaleConflict(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [templateId, versionNum]);
-
+  // A freshly loaded version is server truth: re-seed the lock token and clear
+  // any prior save conflict/error.
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+    if (!derived) return;
+    setLockVersion(derived.lockVersion);
+    setStaleConflict(false);
     setError(null);
-    getTemplateSchemas(templateId, versionNum)
-      .then(({ schemas: s, lockVersion: lv }) => {
-        if (cancelled) return;
-        setSchemas(s);
-        setLockVersion(lv);
-        setStaleConflict(false);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [templateId, versionNum]);
+  }, [derived]);
 
   const save = useCallback(
     async (s: TemplateSchemas) => {
       setSaving(true);
       try {
         const { lockVersion: next } = await putTemplateSchemas(templateId, versionNum, s, lockVersion);
-        setSchemas(s);
         setLockVersion(next);
         setStaleConflict(false);
       } catch (e) {
-        if (e instanceof StaleLockVersionError) {
-          setStaleConflict(true);
-        }
+        if (e instanceof StaleLockVersionError) setStaleConflict(true);
+        else setError(e instanceof Error ? e.message : String(e));
         throw e;
       } finally {
         setSaving(false);
@@ -81,5 +62,12 @@ export function useTemplateSchemas(templateId: string, versionNum: number): UseT
     [templateId, versionNum, lockVersion],
   );
 
-  return { schemas, loading, error, save, saving, staleConflict, refetch: load };
+  return {
+    schemas: derived?.schemas ?? null,
+    loading: version == null,
+    error,
+    save,
+    saving,
+    staleConflict,
+  };
 }

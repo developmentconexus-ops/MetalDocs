@@ -47,7 +47,10 @@ export type VersionDTO = Omit<
   obsoleted_at: string | null;
   pending_approver_role: string | null;
   pending_reviewer_role: string | null;
-  placeholder_schema: Record<string, unknown> | null;
+  // ADR 0035 / F1.2: backend always emits the placeholder schema as an ordered
+  // array. The generated DTO already types it as an array; this override keeps
+  // the precise element shape instead of widening it back to an object.
+  placeholder_schema: WirePlaceholder[] | null;
   published_at: string | null;
   reviewed_at: string | null;
   reviewer_id: string | null;
@@ -311,25 +314,19 @@ export class StaleLockVersionError extends Error {
   }
 }
 
-export async function getTemplateSchemas(
-  templateId: string,
-  versionNum: number,
-): Promise<{ schemas: TemplateSchemas; lockVersion: number }> {
-  const body = await apiFetch<{
-    data: {
-      version: VersionDTO & {
-        placeholder_schema: WirePlaceholder[] | null;
-        lock_version?: number;
-      };
-    };
-  }>(`/api/v1/templates/${templateId}/versions/${versionNum}`);
-  const v = body.data.version;
+// Project the editor's schema view from a version already loaded via getVersion.
+// The version GET is the single source of truth (ADR 0035 flat body); deriving
+// here avoids a second round-trip and removes any chance of response-shape drift.
+export function deriveTemplateSchemas(
+  version: VersionDTO,
+): { schemas: TemplateSchemas; lockVersion: number } {
+  const ph = version.placeholder_schema;
   return {
     schemas: {
-      placeholders: Array.isArray(v.placeholder_schema) ? v.placeholder_schema.map(placeholderFromWire) : [],
+      placeholders: Array.isArray(ph) ? ph.map(placeholderFromWire) : [],
       composition: null,
     },
-    lockVersion: typeof v.lock_version === 'number' ? v.lock_version : 0,
+    lockVersion: typeof version.lock_version === 'number' ? version.lock_version : 0,
   };
 }
 
