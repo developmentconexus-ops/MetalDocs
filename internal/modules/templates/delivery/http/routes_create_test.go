@@ -211,25 +211,6 @@ func (r *fakeRepo) UpdateVersion(_ context.Context, _ string, v *domain.Template
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, _ string, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	v, ok := r.versions[versionID]
-	if !ok {
-		return domain.ErrNotFound
-	}
-	current := r.lockVersions[versionID]
-	if current != expectedLockVersion {
-		return domain.ErrStaleLockVersion
-	}
-	v.DocxStorageKey = docxStorageKey
-	v.ContentHash = docxContentHash
-	r.lockVersions[versionID] = current + 1
-	return nil
-}
-
-func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ db.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	return r.UpdateVersionDraftCAS(context.Background(), tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
-}
-
 func (r *fakeRepo) UpdateVersionSchemaCAS(_ context.Context, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
 	stored, ok := r.versions[v.ID]
 	if !ok {

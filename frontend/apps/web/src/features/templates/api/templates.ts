@@ -217,20 +217,6 @@ export async function presignSchemaUpload(
   return { url: r.upload_url, storage_key: r.storage_key };
 }
 
-export async function saveDraft(
-  templateId: string,
-  versionNum: number,
-  body: {
-    expected_lock_version: number;
-    docx_storage_key: string;
-    schema_storage_key: string;
-    docx_content_hash: string;
-    schema_content_hash: string;
-  },
-): Promise<void> {
-  await commitAutosave(templateId, versionNum, body.docx_content_hash || body.schema_content_hash);
-}
-
 export async function getDocxURL(templateId: string, versionNum: number): Promise<string> {
   const body = await apiFetch<{ data: { url: string } }>(
     `/api/v1/templates/${templateId}/versions/${versionNum}/docx-url`,

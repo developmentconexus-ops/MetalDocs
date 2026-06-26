@@ -23,8 +23,6 @@ type Repository interface {
 	GetVersionByID(ctx context.Context, tenantID, id string) (*domain.TemplateVersion, error)
 	UpdateVersion(ctx context.Context, tenantID string, v *domain.TemplateVersion) error
 	UpdateVersionTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion) error
-	UpdateVersionDraftCAS(ctx context.Context, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error
-	UpdateVersionDraftCASTx(ctx context.Context, tx db.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error
 	UpdateVersionSchemaCAS(ctx context.Context, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error
 	UpdateVersionSchemaCASTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error
 	ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error

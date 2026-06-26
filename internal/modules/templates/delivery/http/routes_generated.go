@@ -161,61 +161,6 @@ func (h *Handler) RedirectSignedUrl(w http.ResponseWriter, r *http.Request, para
 	http.Redirect(w, r, url, http.StatusFound)
 }
 
-func (h *Handler) SaveTemplateDraft(w http.ResponseWriter, r *http.Request, id string, n int) {
-	tenantID, err := tenantIDFromReq(r)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
-		return
-	}
-	actorID := userIDFromReq(r)
-	if err := h.authz(r, tenantID, "*", string(iamdomain.CapTemplateEdit)); err != nil {
-		writeMappedErr(w, err)
-		return
-	}
-
-	var req templatesapi.SaveTemplateDraftJSONRequestBody
-	if err := readStrictJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
-		return
-	}
-	if field := missingSaveTemplateDraftField(req); field != "" {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "field "+field+" is required")
-		return
-	}
-
-	err = h.svc.SaveTemplateDraft(r.Context(), application.SaveTemplateDraftCmd{
-		TenantID:            tenantID,
-		ActorUserID:         actorID,
-		TemplateID:          id,
-		VersionNumber:       n,
-		ExpectedLockVersion: req.ExpectedLockVersion,
-		DocxStorageKey:      strings.TrimSpace(req.DocxStorageKey),
-		SchemaStorageKey:    strings.TrimSpace(req.SchemaStorageKey),
-		DocxContentHash:     strings.TrimSpace(req.DocxContentHash),
-		SchemaContentHash:   strings.TrimSpace(req.SchemaContentHash),
-	})
-	if err != nil {
-		writeMappedErr(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func missingSaveTemplateDraftField(req templatesapi.SaveTemplateDraftJSONRequestBody) string {
-	switch {
-	case strings.TrimSpace(req.DocxStorageKey) == "":
-		return "docx_storage_key"
-	case strings.TrimSpace(req.SchemaStorageKey) == "":
-		return "schema_storage_key"
-	case strings.TrimSpace(req.DocxContentHash) == "":
-		return "docx_content_hash"
-	case strings.TrimSpace(req.SchemaContentHash) == "":
-		return "schema_content_hash"
-	default:
-		return ""
-	}
-}
-
 func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

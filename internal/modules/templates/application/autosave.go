@@ -85,61 +85,6 @@ type CommitAutosaveCmd struct {
 	ExpectedContentHash               string
 }
 
-type SaveTemplateDraftCmd struct {
-	TenantID, ActorUserID, TemplateID string
-	VersionNumber                     int
-	ExpectedLockVersion               int
-	DocxStorageKey                    string
-	SchemaStorageKey                  string
-	DocxContentHash                   string
-	SchemaContentHash                 string
-}
-
-func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCmd) error {
-	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
-		return wrapAppErr("templates save draft: get template", err)
-	}
-	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
-	if err != nil {
-		return wrapAppErr("templates save draft: get version", err)
-	}
-	if version.Status != domain.VersionStatusDraft {
-		return domain.ErrInvalidStateTransition
-	}
-	audit, err := newAuditEvent(
-		cmd.TenantID,
-		cmd.TemplateID,
-		cmd.ActorUserID,
-		&version.ID,
-		domain.AuditSaved,
-		map[string]any{
-			"docx_content_hash":   cmd.DocxContentHash,
-			"schema_content_hash": cmd.SchemaContentHash,
-			"schema_storage_key":  cmd.SchemaStorageKey,
-			"expected_lock":       cmd.ExpectedLockVersion,
-		},
-		s.clock.Now(),
-	)
-	if err != nil {
-		return err
-	}
-	return s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return fmt.Errorf("templates save draft: set authz context: %w", err)
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
-			return fmt.Errorf("templates save draft: authz: %w", err)
-		}
-		if err := s.repo.UpdateVersionDraftCASTx(ctx, tx, cmd.TenantID, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
-			return wrapAppErr("templates save draft: update draft", err)
-		}
-		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
-			return wrapAppErr("templates save draft: append audit", err)
-		}
-		return nil
-	})
-}
-
 func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*domain.TemplateVersion, error) {
 	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return nil, wrapAppErr("templates commit autosave: get template", err)
