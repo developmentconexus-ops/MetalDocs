@@ -35,7 +35,6 @@ apps/docgen/node_modules/
 apps/docgen/dist/
 apps/docx-renderer/node_modules/
 apps/docx-renderer/dist/
-shared/schemas/node_modules/
 
 .worktrees/
 .pnpm-store/

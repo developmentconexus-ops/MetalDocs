@@ -2,4 +2,3 @@ packages:
   - 'frontend/apps/web'
   - 'packages/*'
   - 'apps/*'
-  - 'shared/*'

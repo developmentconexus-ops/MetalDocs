@@ -34,8 +34,6 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: [
         { find: '@metaldocs/editor-ui', replacement: resolve(__dirname, '../../../packages/editor-ui/src/index.ts') },
-        { find: '@metaldocs/mddm-layout-tokens', replacement: resolve(__dirname, '../../../shared/mddm-layout-tokens/index.ts') },
-        { find: '@metaldocs/mddm-pagination-types', replacement: resolve(__dirname, '../../../shared/mddm-pagination-types/index.ts') },
         { find: '@metaldocs/shared-tokens', replacement: resolve(__dirname, '../../../packages/shared-tokens/src/index.ts') },
         { find: 'jszip', replacement: resolve(__dirname, 'node_modules/jszip') },
         { find: 'fast-xml-parser', replacement: resolve(__dirname, 'node_modules/fast-xml-parser') },
