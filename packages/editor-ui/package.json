@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@eigenpal/docx-editor-react": "1.9.0",
-    "@metaldocs/shared-tokens": "file:../shared-tokens",
+    "@metaldocs/shared-tokens": "workspace:*",
     "@tiptap/pm": "2.27.2"
   }
 }
