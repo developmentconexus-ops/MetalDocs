@@ -29,7 +29,6 @@ type PresignAutosaveResult struct {
 type PresignTemplateUploadCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	VersionNumber                     int
-	StorageKey                        string
 }
 
 func (s *Service) PresignTemplateUpload(ctx context.Context, cmd PresignTemplateUploadCmd) (*PresignAutosaveResult, error) {
@@ -43,13 +42,32 @@ func (s *Service) PresignTemplateUpload(ctx context.Context, cmd PresignTemplate
 	if version.Status != domain.VersionStatusDraft {
 		return nil, domain.ErrInvalidStateTransition
 	}
-	key := version.DocxStorageKey
-	if cmd.StorageKey != "" {
-		key = cmd.StorageKey
-	}
-	url, err := s.presign.PresignPut(ctx, cmd.TenantID, key, autosaveUploadTTL)
+	url, err := s.presign.PresignPut(ctx, cmd.TenantID, version.DocxStorageKey, autosaveUploadTTL)
 	if err != nil {
 		return nil, fmt.Errorf("templates presign upload: presign put: %w", err)
+	}
+	return &PresignAutosaveResult{
+		UploadURL:  url,
+		StorageKey: version.DocxStorageKey,
+		ExpiresAt:  s.clock.Now().Add(autosaveUploadTTL),
+	}, nil
+}
+
+func (s *Service) PresignTemplateSchemaUpload(ctx context.Context, cmd PresignTemplateUploadCmd) (*PresignAutosaveResult, error) {
+	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
+		return nil, wrapAppErr("templates presign schema upload: get template", err)
+	}
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
+	if err != nil {
+		return nil, wrapAppErr("templates presign schema upload: get version", err)
+	}
+	if version.Status != domain.VersionStatusDraft {
+		return nil, domain.ErrInvalidStateTransition
+	}
+	key := templateSchemaKey(cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
+	url, err := s.presign.PresignPut(ctx, cmd.TenantID, key, autosaveUploadTTL)
+	if err != nil {
+		return nil, fmt.Errorf("templates presign schema upload: presign put: %w", err)
 	}
 	return &PresignAutosaveResult{
 		UploadURL:  url,

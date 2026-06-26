@@ -83,7 +83,7 @@ func TestPresignAutosave_NonDraft(t *testing.T) {
 	}
 }
 
-func TestPresignTemplateUpload_IgnoresCallerStorageKey(t *testing.T) {
+func TestPresignTemplateUpload_UsesDBStorageKey(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{
 		ID:       "tpl-1",
@@ -104,13 +104,12 @@ func TestPresignTemplateUpload_IgnoresCallerStorageKey(t *testing.T) {
 		ActorUserID:   "user-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
-		StorageKey:    "templates/other-tenant/versions/1.docx",
 	})
 	if err != nil {
 		t.Fatalf("PresignTemplateUpload returned error: %v", err)
 	}
 	if got.StorageKey != "templates/tpl-1/versions/1.docx" {
-		t.Fatalf("expected server-derived storage key, got %q", got.StorageKey)
+		t.Fatalf("expected DB-sourced storage key, got %q", got.StorageKey)
 	}
 	if len(presigner.PutKeys) != 1 || presigner.PutKeys[0] != "templates/tpl-1/versions/1.docx" {
 		t.Fatalf("unexpected presign keys: %v", presigner.PutKeys)
