@@ -1351,6 +1351,8 @@ func mapErr(err error) (int, problem.Code) {
 		return http.StatusGone, problem.CodeUploadExpired
 	case errors.Is(err, domain.ErrUploadMissing):
 		return http.StatusGone, problem.CodeUploadMissing
+	case errors.Is(err, domain.ErrUploadTooLarge):
+		return http.StatusRequestEntityTooLarge, problem.CodeRequestBodyTooLarge
 	case errors.Is(err, domain.ErrContentHashMismatch):
 		return http.StatusUnprocessableEntity, problem.CodeValidationError
 	case errors.Is(err, domain.ErrSessionTaken),

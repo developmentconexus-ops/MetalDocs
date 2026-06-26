@@ -32,6 +32,7 @@ func TestCommitAutosave_RejectionBranches(t *testing.T) {
 		{name: "pending_not_found", pendingErr: domain.ErrPendingNotFound, wantErr: domain.ErrPendingNotFound},
 		{name: "upload_missing", confirmErr: objectstore.ErrObjectMissing, wantErr: domain.ErrUploadMissing},
 		{name: "content_hash_mismatch", confirmErr: objectstore.ErrHashMismatch, wantErr: domain.ErrContentHashMismatch},
+		{name: "upload_too_large", confirmErr: objectstore.ErrObjectTooLarge, wantErr: domain.ErrUploadTooLarge},
 		{name: "misbound_session", commitErr: domain.ErrMisbound, wantErr: domain.ErrMisbound},
 		{name: "already_consumed_replay", commitResult: &application.CommitResult{AlreadyConsumed: true}, wantErr: nil},
 		{name: "expired_upload", commitErr: domain.ErrExpiredUpload, wantErr: domain.ErrExpiredUpload},

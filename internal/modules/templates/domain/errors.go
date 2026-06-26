@@ -6,6 +6,7 @@ var ErrISOSegregationViolation = errors.New("templates: iso_segregation_violatio
 var ErrForbidden = errors.New("templates: forbidden")
 var ErrForbiddenRole = errors.New("templates: forbidden_role")
 var ErrUploadMissing = errors.New("templates: upload_missing")
+var ErrUploadTooLarge = errors.New("templates: upload_too_large")
 var ErrInvalidApprovalConfig = errors.New("templates: invalid_approval_config")
 var ErrPlaceholderIDEmpty = errors.New("placeholder id empty")
 var ErrDuplicatePlaceholderID = errors.New("duplicate placeholder id")

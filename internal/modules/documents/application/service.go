@@ -581,6 +581,8 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 			return nil, domain.ErrUploadMissing
 		case errors.Is(err, objectstore.ErrHashMismatch):
 			return nil, domain.ErrContentHashMismatch
+		case errors.Is(err, objectstore.ErrObjectTooLarge):
+			return nil, domain.ErrUploadTooLarge
 		default:
 			return nil, fmt.Errorf("confirm s3 object: %w", err)
 		}

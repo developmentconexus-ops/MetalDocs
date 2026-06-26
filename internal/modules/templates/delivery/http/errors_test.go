@@ -25,6 +25,7 @@ func TestMapErr(t *testing.T) {
 		{name: "stale lock version", err: domain.ErrStaleLockVersion, wantStatus: http.StatusPreconditionFailed, wantCode: problem.CodeConcurrentModification},
 		{name: "content hash mismatch", err: domain.ErrContentHashMismatch, wantStatus: http.StatusConflict, wantCode: problem.CodeConflict},
 		{name: "upload missing", err: domain.ErrUploadMissing, wantStatus: http.StatusConflict, wantCode: problem.CodeUploadMissing},
+		{name: "upload too large", err: domain.ErrUploadTooLarge, wantStatus: http.StatusRequestEntityTooLarge, wantCode: problem.CodeRequestBodyTooLarge},
 		{name: "iso segregation violation", err: domain.ErrISOSegregationViolation, wantStatus: http.StatusForbidden, wantCode: problem.CodeISOSegregationViolation},
 		{name: "forbidden role", err: domain.ErrForbiddenRole, wantStatus: http.StatusForbidden, wantCode: problem.CodeForbiddenCapability},
 		{name: "forbidden", err: domain.ErrForbidden, wantStatus: http.StatusForbidden, wantCode: problem.CodeAuthForbidden},

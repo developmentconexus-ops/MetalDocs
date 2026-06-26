@@ -284,6 +284,34 @@ func TestCommitAutosave_UploadMissing(t *testing.T) {
 	}
 }
 
+func TestCommitAutosave_UploadTooLarge(t *testing.T) {
+	repo := newFakeRepo()
+	repo.templates["tpl-1"] = &domain.Template{
+		ID:       "tpl-1",
+		TenantID: "tenant-a",
+	}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     "tpl-1",
+		VersionNumber:  5,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/tpl-1/versions/5.docx",
+	}
+	presigner := &fakePresigner{confirmErr: objectstore.ErrObjectTooLarge}
+	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
+		TenantID:            "tenant-a",
+		ActorUserID:         "user-a",
+		TemplateID:          "tpl-1",
+		VersionNumber:       5,
+		ExpectedContentHash: "hash_abc",
+	})
+	if !errors.Is(err, domain.ErrUploadTooLarge) {
+		t.Fatalf("expected ErrUploadTooLarge, got %v", err)
+	}
+}
+
 func expectTemplateEditAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
 	mock.ExpectExec(regexp.QuoteMeta(`
 SELECT

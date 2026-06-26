@@ -17,6 +17,7 @@ const (
 	codeTplStaleLockVersion       = problem.CodeConcurrentModification
 	codeTplContentHashMismatch    = problem.CodeConflict
 	codeTplUploadMissing          = problem.CodeUploadMissing
+	codeTplUploadTooLarge         = problem.CodeRequestBodyTooLarge
 	codeTplISOSegregation         = problem.CodeISOSegregationViolation
 	codeTplForbiddenRole          = problem.CodeForbiddenCapability
 	codeTplForbidden              = problem.CodeAuthForbidden
@@ -50,6 +51,8 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 		return http.StatusConflict, codeTplContentHashMismatch
 	case errors.Is(err, domain.ErrUploadMissing):
 		return http.StatusConflict, codeTplUploadMissing
+	case errors.Is(err, domain.ErrUploadTooLarge):
+		return http.StatusRequestEntityTooLarge, codeTplUploadTooLarge
 	case errors.Is(err, domain.ErrISOSegregationViolation):
 		return http.StatusForbidden, codeTplISOSegregation
 	case errors.As(err, new(iamauthz.ErrCapDenied)):
