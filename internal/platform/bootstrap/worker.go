@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	miniogo "github.com/minio/minio-go/v7"
@@ -47,15 +45,21 @@ func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig)
 
 	consumer := outboxpg.NewConsumer(db, workerClaimLease(workerCfg))
 
-	fanoutURL := strings.TrimSpace(os.Getenv("METALDOCS_FANOUT_URL"))
-	fanoutToken := strings.TrimSpace(os.Getenv("METALDOCS_DOCX_RENDERER_SERVICE_TOKEN"))
+	// Reuse the shared loader so the worker enforces the same URL⇒token invariant
+	// as the API (fail-fast if the renderer URL is set without an auth token),
+	// instead of reading the env raw and silently building a tokenless client.
+	fanoutCfg, err := config.LoadFanoutConfig()
+	if err != nil {
+		_ = closeDB(db)
+		return WorkerDependencies{}, fmt.Errorf("load fanout config: %w", err)
+	}
 
 	return WorkerDependencies{
 		Consumer:     consumer,
 		PDFConverter: pdfConverter,
 		SQLDB:        db,
-		FanoutURL:    fanoutURL,
-		FanoutToken:  fanoutToken,
+		FanoutURL:    fanoutCfg.URL,
+		FanoutToken:  fanoutCfg.ServiceToken,
 		Cleanup:      func() { _ = closeDB(db) },
 	}, nil
 }

@@ -4,7 +4,6 @@ import type { EditorComment } from './comment-mapping';
 export type EditorMode = 'template-draft' | 'document-edit' | 'readonly' | 'review';
 
 export interface MetalDocsEditorProps {
-  documentId?: string;
   documentBuffer?: ArrayBuffer;
   mode: EditorMode;
   author?: string;
@@ -21,6 +20,7 @@ export interface MetalDocsEditorProps {
   onAutoSave?: (buf: ArrayBuffer) => Promise<void>;
   onChange?: () => void;
   showRuler?: boolean;
+  showMarginGuides?: boolean;
 }
 
 export interface MetalDocsEditorRef {

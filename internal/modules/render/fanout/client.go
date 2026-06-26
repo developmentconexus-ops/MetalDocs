@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 type FanoutRequest struct {
@@ -82,10 +83,17 @@ func (c *Client) Fanout(ctx context.Context, req FanoutRequest) (FanoutResponse,
 			Variable string `json:"variable"`
 		}
 		_ = json.Unmarshal(errBody, &classified)
+		message := classified.Message
+		if classified.Kind == "" && message == "" {
+			// Unclassified body (non-JSON, or a shape we don't model): keep the raw
+			// payload as the message instead of dropping it, so the failure is
+			// diagnosable rather than an empty "render failed (, status 5xx):".
+			message = strings.TrimSpace(string(errBody))
+		}
 		return FanoutResponse{}, &RenderError{
 			Status:   resp.StatusCode,
 			Kind:     classified.Kind,
-			Message:  classified.Message,
+			Message:  message,
 			Variable: classified.Variable,
 		}
 	}

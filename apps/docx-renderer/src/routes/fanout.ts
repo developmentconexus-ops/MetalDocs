@@ -72,11 +72,25 @@ export function registerFanoutRoute(
     const output_key = frozenDocxKey(tenant_id, revision_id);
 
     const client = s3Factory();
-    const bodyBuf = await getObjectBuffer(
-      client,
-      env.DOCX_RENDERER_S3_BUCKET,
-      body_docx_s3_key,
-    );
+    let bodyBuf: Buffer;
+    try {
+      bodyBuf = await getObjectBuffer(
+        client,
+        env.DOCX_RENDERER_S3_BUCKET,
+        body_docx_s3_key,
+      );
+    } catch (err) {
+      // A missing/unreadable body key is a caller error (bad input), not a server
+      // fault — classify it instead of leaking a raw minio 500.
+      const code = (err as { code?: string })?.code;
+      if (code === 'NoSuchKey' || code === 'NotFound') {
+        req.log.warn({ body_docx_s3_key }, 'body docx not found');
+        return reply
+          .code(404)
+          .send({ error: 'body_docx_not_found', key: body_docx_s3_key });
+      }
+      throw err;
+    }
 
     let result;
     try {

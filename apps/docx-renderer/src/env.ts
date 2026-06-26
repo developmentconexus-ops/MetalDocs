@@ -10,7 +10,6 @@ const EnvSchema = z.object({
   DOCX_RENDERER_S3_SECRET_KEY: z.string().min(3),
   DOCX_RENDERER_S3_BUCKET: z.string().default('metaldocs-docx-v2'),
   DOCX_RENDERER_S3_USE_SSL: z.enum(['true', 'false', '1', '0']).transform(v => v === 'true' || v === '1').default('false'),
-  DOCX_RENDERER_GOTENBERG_URL: z.string().url().default('http://gotenberg:3000'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

@@ -17,22 +17,23 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
 
     onAutoSaveRef.current = props.onAutoSave;
 
-    useImperativeHandle(ref, () => ({
-      async getDocumentBuffer() {
-        if (!inner.current) return null;
-        return (await inner.current.save()) ?? null;
-      },
-      async saveNow() {
-        if (!inner.current) return null;
-        return (await inner.current.save()) ?? null;
-      },
-      getPageCount() {
-        if (!inner.current) return null;
-        const total = inner.current.getTotalPages();
-        return Number.isInteger(total) && total > 0 ? total : null;
-      },
-      focus() {},
-    }), []);
+    useImperativeHandle(ref, () => {
+      // getDocumentBuffer and saveNow are the same operation under two names the
+      // app uses interchangeably — one impl, no drift.
+      const save = async () => (inner.current ? ((await inner.current.save()) ?? null) : null);
+      return {
+        getDocumentBuffer: save,
+        saveNow: save,
+        getPageCount() {
+          if (!inner.current) return null;
+          const total = inner.current.getTotalPages();
+          return Number.isInteger(total) && total > 0 ? total : null;
+        },
+        focus() {
+          inner.current?.focus();
+        },
+      };
+    }, []);
 
     useEffect(() => () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -109,7 +110,10 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
           }
           renderTitleBarRight={props.renderTitleBarRight}
           showRuler={props.showRuler ?? true}
-          showMarginGuides={props.showRuler ?? true}
+          // Margin guides are a capability distinct from the ruler; default to the
+          // ruler's resolved value for backward compatibility, but allow callers to
+          // control them independently.
+          showMarginGuides={props.showMarginGuides ?? props.showRuler ?? true}
           showOutlineButton
           showZoomControl
           onChange={handleChange}

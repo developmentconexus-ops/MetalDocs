@@ -38,8 +38,11 @@ export default tseslint.config(
       '**/build/**',
       '**/.vite/**',
       '**/.claude/**',
-      // Test-runner config legitimately aliases the vendor for the test env.
-      '**/*.config.*',
+      // The two test-runner configs that name the vendor in `server.deps.inline`
+      // regexes (not imports) for the test env. Scoped to the exact files instead
+      // of a `**/*.config.*` wildcard, which would let any config bypass the guard.
+      'apps/docx-renderer/vitest.config.ts',
+      'packages/editor-ui/vitest.config.ts',
     ],
   },
   {
