@@ -201,22 +201,6 @@ export async function importTemplateDocx(
   return commitAutosave(templateId, versionNum, hash);
 }
 
-export async function presignDocxUpload(
-  templateId: string,
-  versionNum: number,
-): Promise<{ url: string; storage_key: string }> {
-  const r = await presignAutosave(templateId, versionNum);
-  return { url: r.upload_url, storage_key: r.storage_key };
-}
-
-export async function presignSchemaUpload(
-  templateId: string,
-  versionNum: number,
-): Promise<{ url: string; storage_key: string }> {
-  const r = await presignAutosave(templateId, versionNum);
-  return { url: r.upload_url, storage_key: r.storage_key };
-}
-
 export async function getDocxURL(templateId: string, versionNum: number): Promise<string> {
   const body = await apiFetch<{ data: { url: string } }>(
     `/api/v1/templates/${templateId}/versions/${versionNum}/docx-url`,
