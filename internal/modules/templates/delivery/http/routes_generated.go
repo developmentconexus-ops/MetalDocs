@@ -106,7 +106,13 @@ func (h *Handler) PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Re
 }
 
 func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
-	url, key, ok := h.presignTemplateUpload(w, r, id, n, "templates/"+id+"/versions/"+intString(n)+".schema.json")
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
+		return
+	}
+	schemaKey := application.TemplateSchemaKey(tenantID, id, n)
+	url, key, ok := h.presignTemplateUpload(w, r, id, n, schemaKey)
 	if !ok {
 		return
 	}
