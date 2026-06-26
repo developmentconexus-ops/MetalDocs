@@ -14,7 +14,7 @@ if (-not $SkipInfra) {
 Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-File", "$PSScriptRoot/dev-api.ps1" -WorkingDirectory $root | Out-Null
 Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-File", "$PSScriptRoot/dev-docgen.ps1" -WorkingDirectory $root | Out-Null
 
-$webCommand = "Set-Location `"$root/frontend/apps/web`"; npm run dev"
+$webCommand = "Set-Location `"$root/frontend/apps/web`"; pnpm run dev"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $webCommand -WorkingDirectory $root | Out-Null
 
 Write-Host ""

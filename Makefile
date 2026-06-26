@@ -13,11 +13,11 @@ logs:
 
 # Frontend tests — must run from the app directory so vitest picks up the
 # correct vite.config / vitest.config and its React plugin transform pipeline.
-# Running `vitest run` from the repo root uses the global npx vitest which
-# cannot resolve the Vite plugin chain and causes STACK_TRACE_ERROR on some
-# tests. Always use `make test` or `cd frontend/apps/web && npx vitest run`.
+# Running `vitest run` from the repo root can resolve the wrong vitest and
+# cause STACK_TRACE_ERROR on some tests. Always use `make test` or
+# `cd frontend/apps/web && pnpm exec vitest run`.
 test:
-	cd frontend/apps/web && npx vitest run
+	cd frontend/apps/web && pnpm exec vitest run
 
 test-watch:
-	cd frontend/apps/web && npx vitest
+	cd frontend/apps/web && pnpm exec vitest
