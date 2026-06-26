@@ -6,9 +6,15 @@
   "scripts": {
     "build:docx-v2": "pnpm -r run build",
     "test:docx-v2": "pnpm -r run test",
-    "typecheck:docx-v2": "pnpm -r run typecheck"
+    "typecheck:docx-v2": "pnpm -r run typecheck",
+    "lint": "eslint ."
   },
   "engines": {
     "node": ">=20.11.0"
+  },
+  "devDependencies": {
+    "eslint": "^10.5.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "typescript-eslint": "^8.62.0"
   }
 }

@@ -12,7 +12,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@eigenpal/docx-editor-react": "1.9.0",
     "@metaldocs/eigenpal-adapter": "workspace:*",
     "@metaldocs/shared-tokens": "workspace:*",
     "ajv": "^8.16.0",

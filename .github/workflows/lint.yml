@@ -1,0 +1,28 @@
+name: lint
+
+# Eigenpal Anti-Corruption Layer boundary guard (ADR 0046 §Enforcement).
+# Fails the build if @eigenpal/* is imported outside the two ACL walls
+# (packages/eigenpal-adapter, packages/editor-ui).
+
+on:
+  pull_request:
+    paths:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - 'eslint.config.mjs'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/lint.yml'
+  push:
+    branches: [main]
+
+jobs:
+  eslint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20.11.0, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
