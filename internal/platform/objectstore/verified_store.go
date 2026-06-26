@@ -79,13 +79,6 @@ func (s *VerifiedStore) Confirm(ctx context.Context, tenantID, key, expectedHash
 	}
 	defer obj.Close()
 
-	if _, err := obj.Stat(); err != nil {
-		if isNoSuchKeyErr(err) {
-			return VerifiedPointer{}, ErrObjectMissing
-		}
-		return VerifiedPointer{}, fmt.Errorf("objectstore: confirm stat: %w", err)
-	}
-
 	h := sha256.New()
 	n, err := io.Copy(h, io.LimitReader(obj, s.maxSizeBytes+1))
 	if err != nil {
