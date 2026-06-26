@@ -401,8 +401,6 @@ func main() {
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
 	docPresigner := objectstore.NewVerifiedStore(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
-	// legacyDocPresigner retains ExportPresigner until Task 7 migrates that port to the kernel.
-	legacyDocPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
 	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
 
 	// Fanout/eigenpal client — enabled when METALDOCS_FANOUT_URL is set.
@@ -433,7 +431,8 @@ func main() {
 		),
 		FormVal:                      formval.NewGojsonschema(),
 		Audit:                        wiring.NewDocumentsAuditSink(deps.AuditWriter),
-		ExportPresign:                legacyDocPresigner,
+		ExportPresign:                docPresigner,
+		ViewPresign:                  docPresigner,
 		ControlledDocumentDuplicator: controlledDocumentDuplicator,
 		Caps:                         wiring.NewCapabilityChecker(capabilityService),
 		ProfileDefaults:              wiring.NewProfileDefaults(profileRepo, templatesinfra.NewTemplateVersionReader(deps.SQLDB)),
