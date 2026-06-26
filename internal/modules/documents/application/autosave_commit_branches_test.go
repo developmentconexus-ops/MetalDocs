@@ -8,6 +8,7 @@ import (
 
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
+	"metaldocs/internal/platform/objectstore"
 )
 
 func TestCommitAutosave_RejectionBranches(t *testing.T) {
@@ -21,18 +22,16 @@ func TestCommitAutosave_RejectionBranches(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                string
-		pendingErr          error
-		hashErr             error
-		hashReturn          string
-		commitResult        *application.CommitResult
-		commitErr           error
-		wantErr             error
-		assertOrphanDeleted bool
+		name         string
+		pendingErr   error
+		confirmErr   error
+		commitResult *application.CommitResult
+		commitErr    error
+		wantErr      error
 	}{
 		{name: "pending_not_found", pendingErr: domain.ErrPendingNotFound, wantErr: domain.ErrPendingNotFound},
-		{name: "upload_missing", hashErr: domain.ErrUploadMissing, wantErr: domain.ErrUploadMissing},
-		{name: "content_hash_mismatch", hashReturn: "wronghash", wantErr: domain.ErrContentHashMismatch, assertOrphanDeleted: true},
+		{name: "upload_missing", confirmErr: objectstore.ErrObjectMissing, wantErr: domain.ErrUploadMissing},
+		{name: "content_hash_mismatch", confirmErr: objectstore.ErrHashMismatch, wantErr: domain.ErrContentHashMismatch},
 		{name: "misbound_session", commitErr: domain.ErrMisbound, wantErr: domain.ErrMisbound},
 		{name: "already_consumed_replay", commitResult: &application.CommitResult{AlreadyConsumed: true}, wantErr: nil},
 		{name: "expired_upload", commitErr: domain.ErrExpiredUpload, wantErr: domain.ErrExpiredUpload},
@@ -59,11 +58,7 @@ func TestCommitAutosave_RejectionBranches(t *testing.T) {
 				commitErr:    tc.commitErr,
 			}
 			presigner := &fakePresigner{
-				hashReturn: "h_expected",
-				hashErr:    tc.hashErr,
-			}
-			if tc.hashReturn != "" {
-				presigner.hashReturn = tc.hashReturn
+				confirmErr: tc.confirmErr,
 			}
 			svc := application.New(repo, presigner, nil, nil, &noopAudit{})
 
@@ -82,14 +77,6 @@ func TestCommitAutosave_RejectionBranches(t *testing.T) {
 				}
 			} else if !errors.Is(err, tc.wantErr) {
 				t.Fatalf("expected error %v, got %v", tc.wantErr, err)
-			}
-
-			if tc.assertOrphanDeleted {
-				if presigner.deleteCalls != 1 {
-					t.Fatalf("expected orphan delete call, got %d", presigner.deleteCalls)
-				}
-			} else if presigner.deleteCalls != 0 {
-				t.Fatalf("unexpected orphan delete calls: %d", presigner.deleteCalls)
 			}
 
 			if tc.name == "already_consumed_replay" {

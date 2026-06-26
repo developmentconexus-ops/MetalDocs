@@ -24,8 +24,7 @@ func (f *fakeEligibilityReader) IsEligibleApprover(_ context.Context, _, _, _ st
 // and a minimal presigner/audit so the autosave paths can run.
 func newSvcWithEligibility(repo *fakeRepo, eligibility *fakeEligibilityReader) *application.Service {
 	return application.New(repo, &fakePresigner{
-		hashReturn: "h_ok",
-		sizeReturn: 512,
+		size: 512,
 	}, nil, nil, &noopAudit{}).WithEligibility(eligibility)
 }
 

@@ -17,6 +17,7 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -26,6 +27,7 @@ import (
 	"metaldocs/internal/modules/documents/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/objectstore"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -103,11 +105,9 @@ func TestReviewWriteRoundTrip(t *testing.T) {
 		taxonomydomain.NoopAreaCatalogReader{},
 	)
 	const contentHash = "roundtrip-hash-abc123"
-	const storageKey = "tenants/test/documents/roundtrip/revisions/roundtrip-hash-abc123.docx"
 	presigner := &rtFakePresigner{
 		hashReturn: contentHash,
 		sizeReturn: 2048,
-		storageKey: storageKey,
 	}
 
 	svc := application.New(repo, presigner, nil, nil, &noopAudit{}).
@@ -322,36 +322,31 @@ func rtSeedSessionAndRevision(t *testing.T, ctx context.Context, db *sql.DB, ten
 }
 
 // rtFakePresigner satisfies application.Presigner without contacting S3.
-// HashObject returns the pre-agreed hash so CommitAutosave's content-hash
+// Confirm returns the pre-agreed hash so CommitAutosave's content-hash
 // verification passes deterministically.
 type rtFakePresigner struct {
 	hashReturn string
 	sizeReturn int64
-	storageKey string
 }
 
-func (p *rtFakePresigner) PresignRevisionPUT(_ context.Context, _, _, _ string) (string, string, error) {
-	return "https://fake-s3/upload", p.storageKey, nil
+func (p *rtFakePresigner) PresignPut(_ context.Context, _, key string, _ time.Duration) (string, error) {
+	return "https://fake-s3/put/" + key, nil
 }
 
-func (p *rtFakePresigner) HashObject(_ context.Context, _ string) (string, error) {
-	return p.hashReturn, nil
-}
-
-func (p *rtFakePresigner) SizeObject(_ context.Context, _ string) (int64, error) {
-	return p.sizeReturn, nil
-}
-
-func (p *rtFakePresigner) AdoptTempObject(_ context.Context, _, _ string) error { return nil }
-
-func (p *rtFakePresigner) DeleteObject(_ context.Context, _ string) error { return nil }
-
-func (p *rtFakePresigner) PresignObjectGET(_ context.Context, key string) (string, error) {
+func (p *rtFakePresigner) PresignGet(_ context.Context, key string, _ time.Duration) (string, error) {
 	return "https://fake-s3/get/" + key, nil
 }
 
-func (p *rtFakePresigner) Exists(_ context.Context, _ string) (bool, error) {
-	return true, nil
+func (p *rtFakePresigner) Confirm(_ context.Context, _, key, expected string) (objectstore.VerifiedPointer, error) {
+	return objectstore.VerifiedPointer{StorageKey: key, ContentHash: expected, SizeBytes: p.sizeReturn}, nil
 }
+
+func (p *rtFakePresigner) Exists(_ context.Context, _ string) (bool, error) { return true, nil }
+
+func (p *rtFakePresigner) Size(_ context.Context, _ string) (int64, error) {
+	return p.sizeReturn, nil
+}
+
+func (p *rtFakePresigner) Delete(_ context.Context, _ string) error { return nil }
 
 var _ application.Presigner = (*rtFakePresigner)(nil)

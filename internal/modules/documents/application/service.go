@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"metaldocs/internal/modules/documents/repository"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -65,14 +65,18 @@ type Repository interface {
 	GetFinalizePrereqs(ctx context.Context, tenantID, docID string) (*domain.FinalizePrereqs, error)
 }
 
+const (
+	revisionUploadTTL = 15 * time.Minute
+	objectDownloadTTL = 15 * time.Minute
+)
+
 type Presigner interface {
-	PresignRevisionPUT(ctx context.Context, tenantID, docID, contentHash string) (url, storageKey string, err error)
-	PresignObjectGET(ctx context.Context, storageKey string) (url string, err error)
-	AdoptTempObject(ctx context.Context, tmpKey, finalKey string) error
-	DeleteObject(ctx context.Context, key string) error
-	HashObject(ctx context.Context, key string) (string, error)
-	SizeObject(ctx context.Context, key string) (int64, error)
-	Exists(ctx context.Context, storageKey string) (bool, error)
+	PresignPut(ctx context.Context, tenantID, key string, ttl time.Duration) (url string, err error)
+	PresignGet(ctx context.Context, key string, ttl time.Duration) (url string, err error)
+	Confirm(ctx context.Context, tenantID, key, expectedHash string) (objectstore.VerifiedPointer, error)
+	Exists(ctx context.Context, key string) (bool, error)
+	Size(ctx context.Context, key string) (int64, error)
+	Delete(ctx context.Context, key string) error
 }
 
 type TemplateReader interface {
@@ -525,11 +529,12 @@ func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (
 	if !mayWrite {
 		return nil, domain.ErrInvalidStateTransition
 	}
-	url, storageKey, err := s.presigner.PresignRevisionPUT(ctx, cmd.TenantID, cmd.DocumentID, cmd.ContentHash)
+	storageKey := documentRevisionKey(cmd.TenantID, cmd.DocumentID, cmd.ContentHash)
+	url, err := s.presigner.PresignPut(ctx, cmd.TenantID, storageKey, revisionUploadTTL)
 	if err != nil {
 		return nil, err
 	}
-	expiresAt := time.Now().Add(15 * time.Minute)
+	expiresAt := time.Now().Add(revisionUploadTTL)
 	pendingID, err := s.repo.PresignReserve(ctx, cmd.TenantID, cmd.SessionID, cmd.ActorUserID, cmd.DocumentID, cmd.BaseRevisionID, cmd.ContentHash, storageKey, expiresAt)
 	if err != nil {
 		return nil, err
@@ -569,25 +574,19 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 		return nil, err
 	}
 
-	serverHash, err := s.presigner.HashObject(ctx, meta.StorageKey)
+	vp, err := s.presigner.Confirm(ctx, cmd.TenantID, meta.StorageKey, meta.ExpectedContentHash)
 	if err != nil {
-		if errors.Is(err, domain.ErrUploadMissing) {
+		switch {
+		case errors.Is(err, objectstore.ErrObjectMissing):
 			return nil, domain.ErrUploadMissing
+		case errors.Is(err, objectstore.ErrHashMismatch):
+			return nil, domain.ErrContentHashMismatch
+		default:
+			return nil, fmt.Errorf("confirm s3 object: %w", err)
 		}
-		return nil, fmt.Errorf("hash s3 object: %w", err)
 	}
-	if serverHash != meta.ExpectedContentHash {
-		if err := s.presigner.DeleteObject(ctx, meta.StorageKey); err != nil {
-			slog.WarnContext(ctx, "commit autosave: orphaned object cleanup failed after content-hash mismatch",
-				"storage_key", meta.StorageKey, "document_id", cmd.DocumentID, "err", err)
-		}
-		return nil, domain.ErrContentHashMismatch
-	}
-
-	fileSizeBytes, err := s.presigner.SizeObject(ctx, meta.StorageKey)
-	if err != nil {
-		return nil, fmt.Errorf("size s3 object: %w", err)
-	}
+	serverHash := vp.ContentHash
+	fileSizeBytes := vp.SizeBytes
 
 	var pageCountSource *string
 	if cmd.PageCount != nil {
@@ -641,7 +640,7 @@ func (s *Service) SyncArtifactMetadata(ctx context.Context, cmd SyncArtifactMeta
 		return nil, err
 	}
 
-	fileSizeBytes, err := s.presigner.SizeObject(ctx, revision.StorageKey)
+	fileSizeBytes, err := s.presigner.Size(ctx, revision.StorageKey)
 	if err != nil {
 		return nil, fmt.Errorf("size current revision object: %w", err)
 	}
@@ -764,7 +763,7 @@ func (s *Service) SignedRevisionURL(ctx context.Context, tenantID, docID, revID 
 	if err != nil {
 		return "", err
 	}
-	return s.presigner.PresignObjectGET(ctx, rev.StorageKey)
+	return s.presigner.PresignGet(ctx, rev.StorageKey, objectDownloadTTL)
 }
 
 // GetFinalizePrereqs delegates to the repository for the data required by
