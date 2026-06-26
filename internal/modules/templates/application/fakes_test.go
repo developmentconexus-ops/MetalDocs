@@ -13,6 +13,7 @@ import (
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/objectstore"
 )
 
 // newPermissiveMockDB returns a *sql.DB backed by sqlmock configured to accept
@@ -298,33 +299,27 @@ func (r *fakeRepo) ListAudit(_ context.Context, tenantID, templateID string, lim
 }
 
 type fakePresigner struct {
-	HeadResult   string
-	HeadErr      error
-	DeleteErr    error
-	DeleteCalled int
-	PutKeys      []string
+	PutKeys    []string
+	confirmErr error
 }
 
-func (p *fakePresigner) PresignPUT(_ context.Context, key string, _ time.Duration) (string, error) {
-	p.PutKeys = append(p.PutKeys, key)
-	return "https://presigned/put/" + key, nil
+func (f *fakePresigner) PresignPut(_ context.Context, _ string, key string, _ time.Duration) (string, error) {
+	f.PutKeys = append(f.PutKeys, key)
+	return "https://example/put", nil
 }
 
-func (p *fakePresigner) PresignGET(_ context.Context, key string, _ time.Duration) (string, error) {
-	return "https://presigned/get/" + key, nil
+func (f *fakePresigner) PresignGet(_ context.Context, key string, _ time.Duration) (string, error) {
+	return "https://example/get/" + key, nil
 }
 
-func (p *fakePresigner) HeadContentHash(_ context.Context, _ string) (string, error) {
-	if p.HeadResult == "" {
-		return "hash_abc", p.HeadErr
+func (f *fakePresigner) Confirm(_ context.Context, _, key, expected string) (objectstore.VerifiedPointer, error) {
+	if f.confirmErr != nil {
+		return objectstore.VerifiedPointer{}, f.confirmErr
 	}
-	return p.HeadResult, p.HeadErr
+	return objectstore.VerifiedPointer{StorageKey: key, ContentHash: expected, SizeBytes: 1}, nil
 }
 
-func (p *fakePresigner) Delete(_ context.Context, _ string) error {
-	p.DeleteCalled++
-	return p.DeleteErr
-}
+func (f *fakePresigner) Delete(_ context.Context, _ string) error { return nil }
 
 type fakeClock struct{}
 

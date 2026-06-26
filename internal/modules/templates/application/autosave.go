@@ -10,6 +10,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/objectstore"
 )
 
 const autosaveUploadTTL = 10 * time.Minute
@@ -43,7 +44,7 @@ func (s *Service) PresignTemplateUpload(ctx context.Context, cmd PresignTemplate
 		return nil, domain.ErrInvalidStateTransition
 	}
 	key := version.DocxStorageKey
-	url, err := s.presign.PresignPUT(ctx, key, autosaveUploadTTL)
+	url, err := s.presign.PresignPut(ctx, cmd.TenantID, key, autosaveUploadTTL)
 	if err != nil {
 		return nil, fmt.Errorf("templates presign upload: presign put: %w", err)
 	}
@@ -67,7 +68,7 @@ func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (
 		return nil, domain.ErrInvalidStateTransition
 	}
 
-	url, err := s.presign.PresignPUT(ctx, version.DocxStorageKey, autosaveUploadTTL)
+	url, err := s.presign.PresignPut(ctx, cmd.TenantID, version.DocxStorageKey, autosaveUploadTTL)
 	if err != nil {
 		return nil, fmt.Errorf("templates presign autosave: presign put: %w", err)
 	}
@@ -98,22 +99,20 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 		return nil, domain.ErrInvalidStateTransition
 	}
 
-	actualHash, err := s.presign.HeadContentHash(ctx, version.DocxStorageKey)
+	vp, err := s.presign.Confirm(ctx, cmd.TenantID, version.DocxStorageKey, cmd.ExpectedContentHash)
 	if err != nil {
-		if errors.Is(err, domain.ErrUploadMissing) {
+		switch {
+		case errors.Is(err, objectstore.ErrObjectMissing):
 			return nil, domain.ErrUploadMissing
+		case errors.Is(err, objectstore.ErrHashMismatch):
+			return nil, domain.ErrContentHashMismatch
+		default:
+			return nil, fmt.Errorf("templates commit autosave: confirm: %w", err)
 		}
-		return nil, fmt.Errorf("templates commit autosave: head content hash: %w", err)
-	}
-	if actualHash != cmd.ExpectedContentHash {
-		if err := s.presign.Delete(ctx, version.DocxStorageKey); err != nil {
-			return nil, errors.Join(domain.ErrContentHashMismatch, fmt.Errorf("delete mismatched upload: %w", err))
-		}
-		return nil, domain.ErrContentHashMismatch
 	}
 
-	version.ContentHash = actualHash
-	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditSaved, map[string]any{"content_hash": actualHash}, s.clock.Now())
+	version.ContentHash = vp.ContentHash
+	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditSaved, map[string]any{"content_hash": vp.ContentHash}, s.clock.Now())
 	if err != nil {
 		return nil, err
 	}

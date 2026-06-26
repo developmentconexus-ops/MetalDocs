@@ -54,9 +54,9 @@ func (s *Service) GetDocxURL(ctx context.Context, cmd GetDocxURLCmd) (string, er
 	if v.DocxStorageKey == "" {
 		return "", domain.ErrUploadMissing
 	}
-	return s.presign.PresignGET(ctx, v.DocxStorageKey, docxDownloadTTL)
+	return s.presign.PresignGet(ctx, v.DocxStorageKey, docxDownloadTTL)
 }
 
 func (s *Service) PresignStoredObject(ctx context.Context, key string) (string, error) {
-	return s.presign.PresignGET(ctx, key, docxDownloadTTL)
+	return s.presign.PresignGet(ctx, key, docxDownloadTTL)
 }

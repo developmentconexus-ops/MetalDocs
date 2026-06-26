@@ -746,7 +746,7 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 	if capabilityService == nil {
 		return nil, errors.New("templates capability service is required")
 	}
-	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
+	templatesPresigner := objectstore.NewVerifiedStore(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
 	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, wiring.Clock{}, wiring.UUIDGen{}).WithRunner(db.NewTxRunner(deps.SQLDB))
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())

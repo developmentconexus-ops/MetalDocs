@@ -6,6 +6,7 @@ import (
 
 	"metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/objectstore"
 )
 
 type Repository interface {
@@ -38,9 +39,9 @@ type Repository interface {
 }
 
 type Presigner interface {
-	PresignPUT(ctx context.Context, key string, expires time.Duration) (url string, err error)
-	PresignGET(ctx context.Context, key string, expires time.Duration) (url string, err error)
-	HeadContentHash(ctx context.Context, key string) (string, error)
+	PresignPut(ctx context.Context, tenantID, key string, ttl time.Duration) (url string, err error)
+	PresignGet(ctx context.Context, key string, ttl time.Duration) (url string, err error)
+	Confirm(ctx context.Context, tenantID, key, expectedHash string) (objectstore.VerifiedPointer, error)
 	Delete(ctx context.Context, key string) error
 }
 
