@@ -65,16 +65,44 @@ Inherits north-star §2. Adds, as the durable root-cause fix:
 - `editor-ui/src/MetalDocsEditor.tsx` `getUsedTokens()` — hand-rolled
   `/\{([A-Za-z0-9_]+)\}/g` over `textBetween` for body + every `getHfPmViews()` band.
   Already depends on `@metaldocs/shared-tokens` (`package.json`) but does not use it.
-- `apps/docx-renderer/src/render/fanout.ts` — real vendor freeze; `FanoutResult` exposes
-  `unreplacedVars`; the adapter also maps `replacedVariables`.
+- `apps/docx-renderer/src/render/fanout.ts` — real vendor freeze. The adapter
+  (`eigenpal-adapter/src/index.ts`) maps **both** `replacedVariables` and
+  `unreplacedVariables`, but `fanout()`'s `FanoutResult` (`fanout.ts:17-21,65-69`)
+  **returns only `unreplacedVars` and discards `replacedVariables`** — so the parity oracle
+  in §4.3 is not buildable from `fanout()` as it stands today (see §4.3 fix).
+- `packages/shared-tokens/package.json` — source-only package (`main`/`types` →
+  `./src/index.ts`), **no `sideEffects` field, no `exports` map**; barrel `index.ts`
+  re-exports `parseDocxTokens` from `parser.ts`, which top-imports `jszip` +
+  `fast-xml-parser`. So importing `detectTokens` via the barrel risks pulling JSZip into the
+  browser bundle (see §4.1 fix).
+- `packages/editor-ui/test/public-surface.test.ts` — ACL guard greps `src/index.ts` +
+  `src/types.ts` for `/@eigenpal/` only. A `shared-tokens`-owned `DetectedToken` on the ref
+  is therefore safe; a vendor type would not be.
 - **No Go token grammar exists** (`internal/modules` has no `{...}` token regex).
 
 ## 4. Design
 
 ### 4.1 Grammar core (`@metaldocs/shared-tokens`)
 
-Add to `grammar.ts` (pure, zero runtime deps — no JSZip / fast-xml-parser, so the
-editor-ui browser bundle stays clean; confirm `package.json` `sideEffects: false`):
+Add to `grammar.ts` (pure, zero runtime deps — no JSZip / fast-xml-parser).
+
+**Browser-bundle safety (resolves the JSZip-via-barrel risk):** `package.json` must add
+**both** (a) `"sideEffects": false`, and (b) an `exports` map with a `./grammar` subpath:
+
+```json
+"exports": {
+  ".":        { "import": "./src/index.ts", "types": "./src/index.ts" },
+  "./grammar": { "import": "./src/grammar.ts", "types": "./src/grammar.ts" }
+},
+"sideEffects": false
+```
+
+editor-ui imports the detector from the subpath — `import { detectTokens } from
+'@metaldocs/shared-tokens/grammar'` — so the JSZip-importing barrel is never in the
+browser graph regardless of tree-shaking. The plan verifies the Vite path-alias
+(`frontend/apps/web/vite.config.ts`, `tsconfig.json`) resolves the subpath; if the
+source-only alias cannot honor `exports` subpaths, fall back to a direct module import of
+`grammar.ts` (still barrel-free). Either way the barrel is not the import path.
 
 ```ts
 export type TokenKind = 'var' | 'section' | 'inverted' | 'closing' | 'partial';
@@ -93,9 +121,17 @@ export function detectTokens(text: string): DetectedToken[];
 - `detectTokens` = `scanText` → keep `kind === 'var'` → annotate `valid`
   (`isValidIdent`) and `reserved` (`isReservedIdent`). **Returns invalid/reserved tokens
   too** (with `valid:false`) — that is what kills the silent under-report.
+- **Trim once, in the core.** `scanText` trims `inner` (matching `parser.ts`'s current
+  `inner.trim()` under `trimValues:false`) so the browser detector and the docx parser treat
+  `{ name }` identically. The core is the only place trimming happens.
 - Refactor `parser.ts` `scanTokens` to consume `scanText` (run-span mapping stays in
-  `parser.ts`; the regex + kind logic moves to the core). No behavior change to
-  `parseDocxTokens` — locked by its existing tests.
+  `parser.ts`; the regex + kind logic moves to the core). **Behavior-preserving caveat:**
+  current `scanTokens` classifies only `#^/` prefixes, so `{>x}` parses as a `var` with ident
+  `">x"` → `malformed_token`. `scanText` adds `>`→`partial`, which would reclassify `{>x}`
+  out of the var path and could drop that error. `parseDocxTokens` MUST keep emitting the
+  same diagnostic for unsupported/partial tags — the plan adds a `{>x}` regression assertion
+  to lock the error path. Token *output* is otherwise unchanged (split-runs, section-depth,
+  trim all stay in `parser.ts`), confirmed against the existing `parser.*.test.ts` suite.
 
 ### 4.2 Detection consumer (`@metaldocs/editor-ui`)
 
@@ -106,32 +142,52 @@ export function detectTokens(text: string): DetectedToken[];
 - returns valid var **names** (`valid && !reserved`) — preserving the existing page
   contract (`TemplateEditorPage` `partitionTokens` still gets `string[]`).
 
-The broad-detect signal (invalid/reserved tokens present) is exposed so the page can warn.
-Minimal surface: either (a) extend the ref with `getDetectedTokens(): DetectedToken[]` and
-let the page derive its own warnings, or (b) keep `getUsedTokens()` and add
-`getInvalidTokens(): string[]`. **Decision (plan):** add `getDetectedTokens()` (richer, one
-call, page owns presentation); keep `getUsedTokens()` as a thin filter over it for the
-existing consumer. No vendor concept leaks across the ACL.
+**Ref contract change (settled — no open options):** add `getDetectedTokens():
+DetectedToken[]` to `MetalDocsEditorRef` in `editor-ui/src/types.ts`, with `DetectedToken`
+**imported/re-exported from `@metaldocs/shared-tokens`** (never a vendor type). `getUsedTokens()`
+becomes a thin filter over `getDetectedTokens()` (`valid && !reserved`, var names) — existing
+`string[]` contract unchanged. Because `types.ts`/`index.ts` name only `@metaldocs/shared-tokens`,
+the `public-surface.test.ts` ACL guard (greps `/@eigenpal/`) stays green. The page consumes
+`getDetectedTokens()` to render the invalid-token warning.
 
 ### 4.3 Parity test (`apps/docx-renderer`)
 
-The only site where the real vendor engine runs server-side. Build a golden `.docx`
-(existing `buildTemplateDocx` pattern) whose body contains a probe set:
+The only site where the real vendor engine runs server-side.
+
+**Prerequisite (resolves B1 — the oracle needs `replacedVars`):** `fanout()` currently
+discards `replacedVariables`. The plan widens `FanoutResult` to
+`{ buffer, contentHash, unreplacedVars, replacedVars }` and surfaces
+`result.replacedVariables` at `fanout.ts:65-69`. This is a **return-shape widening only — no
+change to substitution logic or the frozen bytes** (contentHash is computed over `buffer`,
+untouched). Existing fanout tests stay green (additive field). Alternative considered and
+rejected: calling the adapter directly in the test — rejected because the parity gate should
+exercise the same `fanout()` path production freezes through.
+
+Build a golden `.docx` (existing `buildTemplateDocx` pattern) whose body contains a probe
+set:
 
 ```
 {a_b} {ABC} {x1} {_y}        ← canonical-valid
 {a.b} {a-b} {1n} {a b}       ← canonical-invalid but freeze may act on them
 ```
 
-Provide values for **all** probes. Run the real `fanout()`. Assert the contract:
+Provide values for **all** probes (including space/dotted shapes — keys like `"a b"`,
+`"a.b"` in the value map). Run the real `fanout()`. Assert the contract over the widened
+`FanoutResult`:
 
 1. **No silent loss:** `detectTokens(probeText)` detected-set (var kind, any validity) ⊇
-   freeze's touched-set = `replacedVariables ∪ unreplacedVars`. Anything freeze acts on is
+   freeze's touched-set = `replacedVars ∪ unreplacedVars`. Anything freeze acts on is
    detected.
-2. **Validity ⟺ substitution:** for each probe, `classifyToken`/`isValidIdent` valid ⟺ the
-   probe is in `replacedVariables` (substituted), invalid ⟺ in `unreplacedVars` or
-   not a flat tag. (Documents and pins the vendor's actual charset behavior; if a vendor
-   upgrade shifts it, this test fails loudly — intended alarm.)
+2. **Validity ⟺ substitution:** for each probe, `isValidIdent` valid ⟺ the probe is in
+   `replacedVars` (substituted), invalid ⟺ in `unreplacedVars` or not a flat tag.
+   (Documents and pins the vendor's actual charset behavior; if a vendor upgrade shifts it,
+   this test fails loudly — intended alarm.)
+
+The probe set deliberately includes `{a b}` (internal space): `[^{}]+`-valid for the vendor
+and `scanText`, `isValidIdent`-invalid. The test first asserts the engine **emits it in
+`unreplacedVars` rather than throwing** — if the vendor hard-errors on such a tag, that is a
+finding to record (the spec's `invalid ⟺ unreplacedVars` arm assumes graceful non-substitution),
+not a test to silently weaken.
 
 If the probe reveals the vendor accepts a shape our canonical grammar rejects (or vice
 versa), that is an architecture signal to resolve in the spec, not to paper over in the test.
@@ -152,7 +208,10 @@ versa), that is an architecture signal to resolve in the spec, not to paper over
 - **shared-tokens unit:** `scanText` (control-prefix classification, trims, split braces,
   empty/`{}`), `detectTokens` (valid / invalid-ident / reserved annotation, var-only).
 - **shared-tokens regression:** existing `parseDocxTokens` tests stay green after the
-  `scanText` refactor (no behavior change).
+  `scanText` refactor; **add a `{>x}` assertion** locking the unsupported/partial-tag
+  diagnostic so the prefix reclassification (§4.1) cannot silently drop it.
+- **docx-renderer regression:** existing `fanout.*.test.ts` stay green after the
+  `FanoutResult` widening (additive `replacedVars`).
 - **editor-ui unit** (`MetalDocsEditor.tokens.test.tsx`, extend): `getUsedTokens()` returns
   valid var names across body + HF bands; `getDetectedTokens()` surfaces invalid/reserved.
 - **docx-renderer parity** (new): §4.3 contract.
@@ -167,13 +226,19 @@ versa), that is an architecture signal to resolve in the spec, not to paper over
 - Wiring `parser.ts`/`diff.ts`/`ooxml.ts` into a runtime path.
 - Any Go change.
 
+**In scope, narrowly:** a `FanoutResult` return-shape widening (additive `replacedVars`,
+§4.3) — this is the *only* render-package touch, and it changes no substitution logic or
+frozen bytes.
+
 ## 7. Risks & trade-offs
 
 - **Parity test pins current vendor behavior.** A vendor upgrade that changes the charset
   breaks the test — intended; it is the drift alarm.
-- **Browser bundle weight.** `detectTokens` must stay in dep-free `grammar.ts`; confirm
-  tree-shaking (`sideEffects:false`) so importing `@metaldocs/shared-tokens` does not pull
-  JSZip into `frontend/apps/web`.
+- **Browser bundle weight.** `package.json` today has neither `sideEffects` nor an `exports`
+  map, and the barrel re-exports the JSZip-importing `parser.ts`. Mitigation is **not**
+  "trust tree-shaking" — it is the `./grammar` subpath import + `sideEffects:false` from §4.1,
+  so the barrel is never in the browser graph. Plan verifies the Vite alias honors the
+  subpath.
 - **Snake_case-only forever** rejects dotted/hyphenated keys at the source — deliberate,
   documented; sidesteps docxtemplater nested-property semantics.
 - **Page contract unchanged.** `getUsedTokens(): string[]` stays; the new `getDetectedTokens`
