@@ -2,7 +2,7 @@
 
 > Living architecture doc. Replaces the prior integration stub. Shape: Arc42 (12 sections) + C4 (Context + Container) Mermaid diagrams + ADR links.
 >
-> **Last verified:** 2026-06-23 (eigenpal migration: vendored `@eigenpal/docx-js-editor@0.2.0` tarball retired; now `@eigenpal/docx-editor-react@1.9.0` from npm registry; import paths and version refs updated throughout; prior: 2026-06-14) | **Owner:** unassigned | **Status:** active (FE adapter, two production consumers) | **Maturity:** L2
+> **Last verified:** 2026-06-27 (Task 7–9: section-aware `insertToken`, uniform multi-view `getUsedTokens`, HF-coloring vendor limitation, freeze covers header/footer; prior: 2026-06-23 eigenpal migration: vendored `@eigenpal/docx-js-editor@0.2.0` tarball retired; now `@eigenpal/docx-editor-react@1.9.0` from npm registry; import paths and version refs updated throughout; prior: 2026-06-14) | **Owner:** unassigned | **Status:** active (FE adapter, two production consumers) | **Maturity:** L2
 
 ---
 
@@ -274,6 +274,18 @@ Tokens are literal in writer mode. Source rule: `MetalDocsEditor.tsx` never call
 
 Severity note: the placeholder-escape / XSS concern that motivated severity rubric "Critical for token-syntax drift" does not apply. Legacy `{{uuid}}` tokens were removed 2026-04-25 (one syntax, one path, one detector). There is no live two-syntax window in this adapter today. If `{{uuid}}` resurfaces, escalate to Critical on a per-incident basis â€” captured here so future drift checks know to look.
 
+#### Section-aware token insert (`insertToken(key)`)
+
+`getEditorRef().insertToken(key)` is section-aware: it dispatches the `{key}` transaction into whichever ProseMirror band the author last focused — the body view or a focused header/footer view — falling back to the body when nothing is tracked. Focus tracking is a delegated `focusin` listener on a `display:contents` wrapper that records the closest `.ProseMirror` element on each focus event. Header/footer views are resolved via `getEditorRef().getHfPmViews(): Map<rId, EditorView>`. All of this resolution lives inside `MetalDocsEditor.tsx` behind a module-local `PmView` structural type; no `EditorView` / `@eigenpal` type leaks past the ACL barrel (`index.ts` / `types.ts`), preserving the §12.1 vendor-sealed boundary.
+
+#### Uniform multi-view token detection (`getUsedTokens()`)
+
+`getUsedTokens()` is a uniform, vendor-independent text-parse. It scans `{name}` (regex `/\{([A-Za-z0-9_]+)\}/g`, which excludes docxtemplater control tags `{#..}` / `{/..}` / `{^..}` / `{>..}`) across the body doc and every `getHfPmViews()` doc, deduped first-seen. It no longer relies on the body-only vendor `templatePlugin` / `getTemplatePluginTags`, giving header/footer tokens one source of truth equal to the body's.
+
+#### Freeze covers header/footer
+
+Token substitution at publish covers native header/footer tokens, not just body tokens: `apps/docx-renderer/src/render/fanout.ts` runs docxtemplater over the whole package, so header/footer `{name}` strings substitute at freeze. Proven by `apps/docx-renderer/src/render/__tests__/fanout.headerfooter.test.ts`.
+
 ### 8.5 Logging & Observability
 
 The wrapper emits no logs and no metrics. Eigenpal handles its own console output. Parent pages own status surfacing through `AutosaveStatus` in the `EditorChrome` right slot.
@@ -393,6 +405,7 @@ The following are deferred to the backend approval gate:
 | Comment orphan reconciliation | Anchor deleted in editor body but thread row remains in comment state | Backend returns HTTP 409 `approval.unresolved_comments` if any unresolved comment exists |
 | Add/save atomicity | Creating a comment and persisting it are not atomic at the document level | Backend approval gate validates document + comment state consistency |
 | Published-artifact staleness | A published snapshot may show resolved comments that are still unresolved in the live document | Operator-gated via document approval process; background reconciliation task is future work |
+| Header/footer tokens are uncolored | The vendor `templatePlugin` (amber `.docx-template-tag` decoration + sidebar chips) is installed on the BODY view only (runtime-confirmed: 3 decorations in the body PM, 0 in the HF bands). The unified-HF painter renders header/footer from `state.doc` content, not from ProseMirror decorations, so tokens typed in a header/footer are fully functional — inserted, detected, and substituted at freeze — but NOT colored. Vendor-internal wiring decision, not adapter-fixable without `@eigenpal` changes. | Operator de-scoped coloring; tracked as tech debt. Upstream ask: expose the template decoration set (or install `templatePlugin`) on HF PM views. |
 
 **Backend enforcement:** Decision service `T-011` in `internal/modules/documents/.../decision_service.go` returns HTTP 409 if any comment is unresolved at approval time.
 
@@ -436,6 +449,8 @@ The following are deferred to the backend approval gate:
 - Tech debt: `wiki/modules/editor-ui-eigenpal-tech-debt.md`
 
 ## Changelog (this doc)
+
+- 2026-06-27 — Task 7–9: documented the section-aware `insertToken(key)` (last-focused-band tracking via delegated `focusin`; dispatch into body or focused HF view via `getHfPmViews()`; `PmView` structural type keeps `@eigenpal` off the barrel) and the uniform multi-view `getUsedTokens()` text-parse (vendor-independent `{name}` scan across body + all HF docs; replaces body-only `templatePlugin`/`getTemplatePluginTags`) in §8.4. Recorded the HF-coloring vendor limitation in §12.5 (templatePlugin body-only; HF painter renders from `state.doc` content not decorations; functional-but-uncolored; upstream ask to install/expose decorations on HF PM views; operator de-scoped). Noted freeze covers header/footer via `apps/docx-renderer/src/render/fanout.ts`, proven by `fanout.headerfooter.test.ts`. Last verified bumped to 2026-06-27.
 
 - 2026-06-23 — eigenpal migration: vendored `@eigenpal/docx-js-editor@0.2.0` tarball retired; `@eigenpal/docx-editor-react@1.9.0` adopted from npm registry. Import paths updated: main API from `@eigenpal/docx-editor-react`, plugin API from `@eigenpal/docx-editor-react/plugin-api`, `Comment` type from `@eigenpal/docx-editor-core/types/content`. Tarball at `third_party/eigenpal/` deleted; `third_party/eigenpal/NOTICE` present. §1.1 §2 §3 §3.2 §4 §5 §7 §8.7 §10 §11 Failure modes all updated.
 
