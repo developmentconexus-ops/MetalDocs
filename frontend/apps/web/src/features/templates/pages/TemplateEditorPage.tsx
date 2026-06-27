@@ -7,7 +7,7 @@ import { useTemplateAutosave } from '../hooks/useTemplateAutosave';
 import { useTemplateSchemas } from '../hooks/useTemplateSchemas';
 import { VersionActionPanel } from '../VersionActionPanel';
 import { AvailableTokensPanel } from '../AvailableTokensPanel';
-import { partitionTokens } from '../lib/tokens';
+import { partitionDetected } from '../lib/tokens';
 import { canSubmit, type ActorContext } from '../lib/canActOnVersion';
 import { useAuthStore } from '../../../store/auth.store';
 import { fetchPlaceholderCatalog, type PlaceholderCatalogEntry } from '../api/catalog';
@@ -70,6 +70,7 @@ export function TemplateEditorPage({
   const [catalog, setCatalog] = useState<PlaceholderCatalogEntry[]>([]);
   const [usedKeys, setUsedKeys] = useState<Set<string>>(new Set());
   const [unknownTokens, setUnknownTokens] = useState<string[]>([]);
+  const [invalidTokens, setInvalidTokens] = useState<string[]>([]);
   useEffect(() => { void fetchPlaceholderCatalog().then(setCatalog); }, []);
   const catalogByKey = useMemo(() => new Map(catalog.map((c) => [c.key, c])), [catalog]);
 
@@ -84,10 +85,11 @@ export function TemplateEditorPage({
 
   const refreshTokenUsage = useCallback(() => {
     if (!isDraft) return;
-    const used = editorRef.current?.getUsedTokens() ?? [];
-    const { usedKeys, unknownTokens } = partitionTokens(used, new Set(catalogByKey.keys()));
+    const detected = editorRef.current?.getDetectedTokens() ?? [];
+    const { usedKeys, unknownTokens, invalidTokens } = partitionDetected(detected, new Set(catalogByKey.keys()));
     setUsedKeys(usedKeys);
     setUnknownTokens(unknownTokens);
+    setInvalidTokens(invalidTokens);
   }, [isDraft, catalogByKey]);
 
   const handleEditorChange = useCallback(() => {
@@ -240,6 +242,7 @@ export function TemplateEditorPage({
             catalog={catalog}
             usedKeys={usedKeys}
             unknownTokens={unknownTokens}
+            invalidTokens={invalidTokens}
             onInsert={(key) => editorRef.current?.insertToken(key)}
           />
         )}

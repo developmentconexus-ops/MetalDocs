@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { partitionTokens } from './tokens';
+import { partitionTokens, partitionDetected } from './tokens';
+import type { DetectedToken } from '@metaldocs/shared-tokens';
 
 describe('partitionTokens', () => {
   it('splits used tokens into catalog-known (used) and unknown', () => {
@@ -13,5 +14,17 @@ describe('partitionTokens', () => {
     const result = partitionTokens([], new Set(['doc_code']));
     expect(result.usedKeys.size).toBe(0);
     expect(result.unknownTokens).toEqual([]);
+  });
+});
+
+describe('partitionDetected', () => {
+  const dt = (name: string, valid: boolean): DetectedToken => ({ name, kind: 'var', valid, reserved: false });
+
+  it('splits valid-in-catalog, valid-unknown, and invalid tokens', () => {
+    const detected = [dt('doc_code', true), dt('nope', true), dt('a.b', false)];
+    const r = partitionDetected(detected, new Set(['doc_code']));
+    expect(r.usedKeys).toEqual(new Set(['doc_code']));
+    expect(r.unknownTokens).toEqual(['nope']);
+    expect(r.invalidTokens).toEqual(['a.b']);
   });
 });

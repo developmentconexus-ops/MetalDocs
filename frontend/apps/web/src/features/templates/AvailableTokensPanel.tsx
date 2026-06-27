@@ -6,6 +6,7 @@ export interface AvailableTokensPanelProps {
   catalog: PlaceholderCatalogEntry[];
   usedKeys: Set<string>;
   unknownTokens: string[];
+  invalidTokens: string[];
   onInsert: (key: string) => void;
 }
 
@@ -13,6 +14,7 @@ export function AvailableTokensPanel({
   catalog,
   usedKeys,
   unknownTokens,
+  invalidTokens,
   onInsert,
 }: AvailableTokensPanelProps): React.ReactElement {
   return (
@@ -44,6 +46,18 @@ export function AvailableTokensPanel({
             {unknownTokens.map((t) => (
               <li key={t} data-testid={`unknown-${t}`} className={styles.unknownItem}>
                 <code className={styles.code}>{`{${t}}`}</code> — não será preenchido, verifique o nome
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {invalidTokens.length > 0 && (
+        <div className={styles.unknown} role="status">
+          <p className={styles.unknownTitle}>Tokens inválidos</p>
+          <ul className={styles.unknownList}>
+            {invalidTokens.map((t) => (
+              <li key={t} data-testid={`invalid-${t}`} className={styles.unknownItem}>
+                <code className={styles.code}>{`{${t}}`}</code> — formato inválido (use letras, números e _)
               </li>
             ))}
           </ul>
