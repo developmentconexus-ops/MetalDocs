@@ -13,6 +13,12 @@ architecture contradictions instead of patching around them.
 - Evidence before closure: report commands, outcomes, QA/review disposition, and bounded defers before saying done.
 - Commits are allowed after verified work; never push without explicit permission.
 
+## Global Maximum, Not Local Maximum
+Before improving/fixing/extending anything, judge the foundation first.
+- If the current implementation is legacy, a patch, or a workaround, do NOT optimize inside it — that locks in a local maximum. Improving on a bad base is a defect, not progress.
+- Step back to the whole problem: what would a senior engineer or a proven existing system do here? Propose the global-maximum structure (name it — e.g. a kernel/framework boundary, not a one-off tweak) and state the trade-off.
+- When the better answer crosses the current task boundary, stop and surface it instead of patching around it (ties to the "stop on architecture contradictions" rule above).
+
 ## Commands
 - Start API: `.\scripts\start-api.ps1`
 - Rebuild/start API: `.\scripts\start-api.ps1 -Build`
@@ -21,6 +27,23 @@ architecture contradictions instead of patching around them.
 - Go tests: `go test ./...`
 - Frontend tests: `make test`
 - Docx workspace build/test/typecheck: `npm run build:docx-v2`, `npm run test:docx-v2`, `npm run typecheck:docx-v2`
+
+## System Facts (hold these before planning anything)
+MetalDocs is a **modular monolith**, 4 binaries: `metaldocs-api` (sync + authz, stateless), `metaldocs-worker` (async outbox consumers), `metaldocs-jobs` (recurring janitors), `docx-renderer` (internal only).
+
+**14 bounded-context modules** under `internal/modules/`: audit · auth · controlleddocuments · distribution · docs · documents · iam · jobs · notifications · render · search · security · taxonomy · templates. Cross-module access goes through a module's application service or published Go interface — **never** another module's repository, SQL, or domain internals.
+
+Non-negotiable invariants (violating these is a defect, not a design choice):
+- **AuthZ = capabilities, never roles.** Two-tier PDP: tier-1 route→capability (middleware), tier-2 capability×area in-tx (`authz.Require`), DB tripwire last line. Never reason as "admin/author/editor can X" — reason in capabilities. Governed by ADR 0022.
+- **Fixed request lifecycle.** Middleware chain (panic→trace→obs→cors→rate-limit→authn→tier-1 authz→idempotency→handler) is inherited; new routes don't reinvent auth/validation/errors. Errors are RFC 9457 `problem+json`.
+- **Contract-first.** Routes change ONLY by editing `api/openapi` + `oapi-codegen`. The spec is route truth.
+- **Multi-tenant pooled.** Every tenant table has `tenant_id`; tx-local GUCs only; tenant-namespaced blob keys; cross-tenant URL → 404.
+- **Async = transactional outbox.** State-write + external side effect never share a tx with a network call; consumers idempotent.
+- **DB enforces invariants** (triggers/constraints); app checks are the friendly first line.
+
+Governing target spec (source of truth when this list drifts): `wiki/architecture/backend-target-architecture.md` (REQ IDs; reviews cite them).
+
+**Orientation rule:** before planning any new feature or improvement, state (a) which module(s) own it, (b) which invariants above it must satisfy, (c) read the owning `wiki/modules/<name>.md`. Plan against the whole system, not the code immediately around the change.
 
 ## Context Map
 | Task | Read |
