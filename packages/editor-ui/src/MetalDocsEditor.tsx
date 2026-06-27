@@ -5,6 +5,7 @@ import '@eigenpal/docx-editor-react/styles.css';
 import type { MetalDocsEditorProps, MetalDocsEditorRef } from './types';
 import { filterTransactionGuard } from './plugins/filter-transaction-guard';
 import { toEigenpalComment, fromEigenpalComment } from './comment-mapping';
+import { detectTokens, type DetectedToken } from '@metaldocs/shared-tokens';
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
@@ -53,6 +54,24 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
       // getDocumentBuffer and saveNow are the same operation under two names the
       // app uses interchangeably — one impl, no drift.
       const save = async () => (inner.current ? ((await inner.current.save()) ?? null) : null);
+      // Extracted so getUsedTokens can delegate without a `this` binding issue
+      // (TypeScript cannot infer the return type of the object literal while it
+      // is still being constructed).
+      const getDetectedTokens = (): DetectedToken[] => {
+        const views = collectPmViews(inner.current?.getEditorRef() ?? null);
+        const seen = new Set<string>();
+        const out: DetectedToken[] = [];
+        for (const v of views) {
+          const doc = v.state.doc;
+          const text = doc.textBetween(0, doc.content.size, '\n', '\n');
+          for (const d of detectTokens(text)) {
+            if (seen.has(d.name)) continue;
+            seen.add(d.name);
+            out.push(d);
+          }
+        }
+        return out;
+      };
       return {
         getDocumentBuffer: save,
         saveNow: save,
@@ -82,26 +101,11 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
           view.dispatch(view.state.tr.insertText(`{${key}}`, from, to));
           view.focus();
         },
+        getDetectedTokens,
         getUsedTokens() {
-          const views = collectPmViews(inner.current?.getEditorRef() ?? null);
-          // Variable tokens only: `{name}` — the [A-Za-z0-9_] class excludes
-          // docxtemplater control tags ({#loop} {/loop} {^inv} {>partial}).
-          const re = /\{([A-Za-z0-9_]+)\}/g;
-          const seen = new Set<string>();
-          const out: string[] = [];
-          for (const v of views) {
-            const doc = v.state.doc;
-            const text = doc.textBetween(0, doc.content.size, '\n', '\n');
-            re.lastIndex = 0;
-            let m: RegExpExecArray | null;
-            while ((m = re.exec(text))) {
-              if (!seen.has(m[1])) {
-                seen.add(m[1]);
-                out.push(m[1]);
-              }
-            }
-          }
-          return out;
+          return getDetectedTokens()
+            .filter((d) => d.valid)
+            .map((d) => d.name);
         },
       };
     }, []);

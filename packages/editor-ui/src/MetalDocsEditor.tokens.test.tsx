@@ -34,7 +34,7 @@ vi.mock('@eigenpal/docx-editor-react', async () => {
             ? null
             : {
                 getView: () =>
-                  bodyRef.current ? makeView(bodyRef.current, bodyDispatch, 'Body {doc_code} here') : null,
+                  bodyRef.current ? makeView(bodyRef.current, bodyDispatch, 'Body {doc_code} and {a.b} here') : null,
                 getHfPmViews: () => {
                   const m = new Map<string, ReturnType<typeof makeView>>();
                   if (headerRef.current) m.set('rId2', makeView(headerRef.current, headerDispatch, 'Header {author}'));
@@ -154,6 +154,21 @@ describe('MetalDocsEditor section-aware tokens', () => {
     // ignore it so body edits are not counted twice (vendor onChange owns body).
     fireEvent.input(container.querySelector('[data-band="body"]') as HTMLElement);
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('getUsedTokens returns only valid var names (invalids excluded)', () => {
+    const ref = React.createRef<MetalDocsEditorRef>();
+    render(<MetalDocsEditor ref={ref} mode="template-draft" documentBuffer={new ArrayBuffer(8)} />);
+    // {a.b} is detected but invalid → not in getUsedTokens
+    expect(ref.current!.getUsedTokens()).toEqual(['doc_code', 'author', 'effective_date']);
+  });
+
+  it('getDetectedTokens surfaces invalid tokens across bands (no silent drop)', () => {
+    const ref = React.createRef<MetalDocsEditorRef>();
+    render(<MetalDocsEditor ref={ref} mode="template-draft" documentBuffer={new ArrayBuffer(8)} />);
+    const detected = ref.current!.getDetectedTokens();
+    expect(detected.find((d) => d.name === 'a.b')).toMatchObject({ valid: false });
+    expect(detected.find((d) => d.name === 'doc_code')).toMatchObject({ valid: true });
   });
 
   it('no-ops safely when the vendor editor ref is null', () => {

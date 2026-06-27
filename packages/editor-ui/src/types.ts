@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { EditorComment } from './comment-mapping';
+import type { DetectedToken } from '@metaldocs/shared-tokens';
 
 export type EditorMode = 'template-draft' | 'document-edit' | 'readonly' | 'review';
 
@@ -30,4 +31,8 @@ export interface MetalDocsEditorRef {
   focus(): void;
   insertToken(key: string): void;
   getUsedTokens(): string[];
+  /** Every variable tag across all bands, broad-detected + validity-classified. */
+  getDetectedTokens(): DetectedToken[];
 }
+
+export type { DetectedToken } from '@metaldocs/shared-tokens';
