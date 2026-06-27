@@ -62,3 +62,32 @@ export function scanText(text: string): RawTag[] {
   }
   return out;
 }
+
+export interface DetectedToken {
+  name: string;
+  kind: TokenKind;
+  valid: boolean;
+  reserved: boolean;
+}
+
+/**
+ * Browser-side detection: every variable tag in the text, first-seen-deduped.
+ * Detect broad (any `{ident}`), validate strict (snake_case + not reserved).
+ * Control tags (#/^/>) are not variables and are excluded.
+ */
+export function detectTokens(text: string): DetectedToken[] {
+  const out: DetectedToken[] = [];
+  const seen = new Set<string>();
+  for (const tag of scanText(text)) {
+    if (tag.kind !== 'var') continue;
+    if (seen.has(tag.inner)) continue;
+    seen.add(tag.inner);
+    out.push({
+      name: tag.inner,
+      kind: tag.kind,
+      valid: isValidIdent(tag.inner) && !isReservedIdent(tag.inner),
+      reserved: isReservedIdent(tag.inner),
+    });
+  }
+  return out;
+}
