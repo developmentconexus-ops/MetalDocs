@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { DocxEditor, createEmptyDocument, type DocxEditorRef } from '@eigenpal/docx-editor-react';
-import { PluginHost, templatePlugin, type EditorPlugin } from '@eigenpal/docx-editor-react/plugin-api';
+import { PluginHost, templatePlugin, getTemplatePluginTags, type EditorPlugin } from '@eigenpal/docx-editor-react/plugin-api';
 import '@eigenpal/docx-editor-react/styles.css';
 import type { MetalDocsEditorProps, MetalDocsEditorRef } from './types';
 import { filterTransactionGuard } from './plugins/filter-transaction-guard';
@@ -31,6 +31,20 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
         },
         focus() {
           inner.current?.focus();
+        },
+        insertToken(key: string) {
+          const view = inner.current?.getEditorRef()?.getView();
+          if (!view) return;
+          const { from, to } = view.state.selection;
+          view.dispatch(view.state.tr.insertText(`{${key}}`, from, to));
+          view.focus();
+        },
+        getUsedTokens() {
+          const state = inner.current?.getEditorRef()?.getState();
+          if (!state) return [];
+          return getTemplatePluginTags(state)
+            .filter((t) => t.type === 'variable')
+            .map((t) => t.name);
         },
       };
     }, []);

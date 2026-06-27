@@ -28,4 +28,6 @@ export interface MetalDocsEditorRef {
   saveNow(): Promise<ArrayBuffer | null>;
   getPageCount(): number | null;
   focus(): void;
+  insertToken(key: string): void;
+  getUsedTokens(): string[];
 }
