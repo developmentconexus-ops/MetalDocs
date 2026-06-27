@@ -10,7 +10,7 @@ import { AvailableTokensPanel } from '../AvailableTokensPanel';
 import { partitionDetected } from '../lib/tokens';
 import { canSubmit, type ActorContext } from '../lib/canActOnVersion';
 import { useAuthStore } from '../../../store/auth.store';
-import { fetchPlaceholderCatalog, type PlaceholderCatalogEntry } from '../api/catalog';
+import { usePlaceholderCatalogQuery } from '../queries/usePlaceholderCatalogQuery';
 import {
   EditorChrome,
   editorChromeStyles,
@@ -67,11 +67,12 @@ export function TemplateEditorPage({
   const [liveVersion, setLiveVersion] = useState<VersionDTO | null>(null);
   const [leftActive, setLeftActive] = useState<LeftPanel>('variables');
   const [localSchemas, setLocalSchemas] = useState<TemplateSchemas | null>(null);
-  const [catalog, setCatalog] = useState<PlaceholderCatalogEntry[]>([]);
+  const catalogQuery = usePlaceholderCatalogQuery();
+  const catalog = useMemo(() => catalogQuery.data ?? [], [catalogQuery.data]);
+  const catalogFailed = catalogQuery.isError;
   const [usedKeys, setUsedKeys] = useState<Set<string>>(new Set());
   const [unknownTokens, setUnknownTokens] = useState<string[]>([]);
   const [invalidTokens, setInvalidTokens] = useState<string[]>([]);
-  useEffect(() => { void fetchPlaceholderCatalog().then(setCatalog); }, []);
   const catalogByKey = useMemo(() => new Map(catalog.map((c) => [c.key, c])), [catalog]);
 
   const currentVersion = liveVersion ?? draft.version ?? null;
@@ -85,12 +86,16 @@ export function TemplateEditorPage({
 
   const refreshTokenUsage = useCallback(() => {
     if (!isDraft) return;
+    // No catalog (still loading, or load failed) => we cannot classify tokens.
+    // Skip so we never write phantom "unknown" state for every token; the panel
+    // surfaces the failure via catalogError instead.
+    if (catalogFailed || catalogByKey.size === 0) return;
     const detected = editorRef.current?.getDetectedTokens() ?? [];
     const { usedKeys, unknownTokens, invalidTokens } = partitionDetected(detected, new Set(catalogByKey.keys()));
     setUsedKeys(usedKeys);
     setUnknownTokens(unknownTokens);
     setInvalidTokens(invalidTokens);
-  }, [isDraft, catalogByKey]);
+  }, [isDraft, catalogFailed, catalogByKey]);
 
   const handleEditorChange = useCallback(() => {
     if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
@@ -240,6 +245,7 @@ export function TemplateEditorPage({
         {leftActive === 'variables' && (
           <AvailableTokensPanel
             catalog={catalog}
+            catalogError={catalogFailed}
             usedKeys={usedKeys}
             unknownTokens={unknownTokens}
             invalidTokens={invalidTokens}

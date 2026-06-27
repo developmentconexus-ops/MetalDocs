@@ -4,6 +4,9 @@ import styles from './AvailableTokensPanel.module.css';
 
 export interface AvailableTokensPanelProps {
   catalog: PlaceholderCatalogEntry[];
+  /** True when the placeholder catalog failed to load. With no catalog, every
+   * token would otherwise classify as "unknown"; warn instead of misleading. */
+  catalogError?: boolean;
   usedKeys: Set<string>;
   unknownTokens: string[];
   invalidTokens: string[];
@@ -12,6 +15,7 @@ export interface AvailableTokensPanelProps {
 
 export function AvailableTokensPanel({
   catalog,
+  catalogError = false,
   usedKeys,
   unknownTokens,
   invalidTokens,
@@ -25,6 +29,16 @@ export function AvailableTokensPanel({
           Clique para inserir. O valor é preenchido automaticamente no documento — você não digita.
         </p>
       </header>
+      {catalogError && (
+        <div className={styles.unknown} role="alert" data-testid="catalog-error">
+          <p className={styles.unknownTitle}>Não foi possível carregar os tokens</p>
+          <ul className={styles.unknownList}>
+            <li className={styles.unknownItem}>
+              Recarregue a página. Sem o catálogo, os tokens do documento não podem ser validados.
+            </li>
+          </ul>
+        </div>
+      )}
       <ul className={styles.list}>
         {catalog.map((it) => {
           const used = usedKeys.has(it.key);
@@ -39,7 +53,7 @@ export function AvailableTokensPanel({
           );
         })}
       </ul>
-      {unknownTokens.length > 0 && (
+      {!catalogError && unknownTokens.length > 0 && (
         <div className={styles.unknown} role="status">
           <p className={styles.unknownTitle}>Tokens não reconhecidos</p>
           <ul className={styles.unknownList}>

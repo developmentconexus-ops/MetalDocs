@@ -33,6 +33,22 @@ describe('AvailableTokensPanel', () => {
     expect(screen.getByTestId('invalid-a.b')).toBeTruthy();
   });
 
+  it('warns on catalog load failure and suppresses the misleading unknown-token list', () => {
+    render(
+      <AvailableTokensPanel
+        catalog={[]}
+        catalogError
+        usedKeys={new Set()}
+        unknownTokens={['doc_code', 'author']}
+        invalidTokens={[]}
+        onInsert={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('catalog-error')).toBeTruthy();
+    // Without a catalog every token would falsely classify as unknown - don't show that list.
+    expect(screen.queryByTestId('unknown-doc_code')).toBeNull();
+  });
+
   it('prevents default on token mousedown so the editor keeps focus/caret', () => {
     render(<AvailableTokensPanel catalog={catalog} usedKeys={new Set()} unknownTokens={[]} invalidTokens={[]} onInsert={() => {}} />);
     const btn = screen.getByTestId('token-doc_code').querySelector('button')!;

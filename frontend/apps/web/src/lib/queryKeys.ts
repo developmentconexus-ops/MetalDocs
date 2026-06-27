@@ -62,6 +62,7 @@ export const QK = {
     blank: () => ['templates', 'blank'] as const,
     byProfile: (profileCode: string) =>
       ['templates', 'by-profile', profileCode] as const,
+    placeholderCatalog: () => ['templates', 'placeholder-catalog'] as const,
   },
   approval: {
     instance: (documentId: string) =>
