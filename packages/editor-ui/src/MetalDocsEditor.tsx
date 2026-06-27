@@ -67,7 +67,15 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
         insertToken(key: string) {
           const views = collectPmViews(inner.current?.getEditorRef() ?? null);
           if (views.length === 0) return;
-          const dom = lastFocusedPmRef.current;
+          // Resolve the live caret band fresh: document.activeElement is never
+          // stale (the palette button's mousedown-preventDefault keeps focus in
+          // the band), whereas a cached focusin node can be detached by an HF
+          // painter re-render. Fall back to the tracked node, then the body.
+          const active =
+            (document.activeElement as HTMLElement | null)?.closest?.('.ProseMirror') as
+              | HTMLElement
+              | null;
+          const dom = active ?? lastFocusedPmRef.current;
           const view =
             (dom && views.find((v) => v.dom === dom || v.dom.contains(dom))) || views[0];
           const { from, to } = view.state.selection;
@@ -115,6 +123,10 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
 
     const handleChange = () => {
       if (props.mode === 'readonly') return;
+      // Lightweight change notify is independent of autosave: consumers use it to
+      // refresh derived state (e.g. token usage) and must not be silently coupled
+      // to an onAutoSave callback being present.
+      props.onChange?.();
       if (!onAutoSaveRef.current) return;
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(async () => {
@@ -130,23 +142,25 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
           inFlightRef.current = false;
         }
       }, AUTOSAVE_DEBOUNCE_MS);
-      // Notify consumers of change before debounce fires (for lightweight sync).
-      props.onChange?.();
     };
 
     // The vendor's onChange fires for the body view only — header/footer PM
     // transactions never reach it, so HF edits would silently miss token-usage
     // refresh and autosave. ProseMirror input events bubble out of every band,
-    // so a single delegated `input` listener on the root surfaces edits from all
-    // views uniformly (mirrors collectPmViews detection). The ref keeps the
-    // mount-once listener pointed at the latest closure. See
-    // wiki/modules/editor-ui-eigenpal.md.
+    // so a delegated `input` listener on the root surfaces them. It is scoped to
+    // header/footer bands (their PM parent carries `data-hf-kind`) precisely so
+    // body edits are NOT double-counted — those already arrive via the vendor
+    // onChange prop. The ref keeps the mount-once listener pointed at the latest
+    // closure. See wiki/modules/editor-ui-eigenpal.md.
     const handleChangeRef = useRef(handleChange);
     handleChangeRef.current = handleChange;
     useEffect(() => {
       const root = rootRef.current;
       if (!root) return;
-      const onInput = () => handleChangeRef.current();
+      const onInput = (e: Event) => {
+        const pm = (e.target as HTMLElement | null)?.closest?.('.ProseMirror') as HTMLElement | null;
+        if (pm?.closest('[data-hf-kind]')) handleChangeRef.current();
+      };
       root.addEventListener('input', onInput);
       return () => root.removeEventListener('input', onInput);
     }, []);

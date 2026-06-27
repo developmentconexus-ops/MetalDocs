@@ -49,8 +49,12 @@ vi.mock('@eigenpal/docx-editor-react', async () => {
       return (
         <div>
           <div ref={bodyRef} className="ProseMirror" data-band="body" tabIndex={-1} />
-          <div ref={headerRef} className="ProseMirror" data-band="header" tabIndex={-1} />
-          <div ref={footerRef} className="ProseMirror" data-band="footer" tabIndex={-1} />
+          <div data-hf-kind="header">
+            <div ref={headerRef} className="ProseMirror" data-band="header" tabIndex={-1} />
+          </div>
+          <div data-hf-kind="footer">
+            <div ref={footerRef} className="ProseMirror" data-band="footer" tabIndex={-1} />
+          </div>
         </div>
       );
     }),
@@ -131,6 +135,25 @@ describe('MetalDocsEditor section-aware tokens', () => {
     // token-usage refresh (and autosave) cover non-body views.
     fireEvent.input(container.querySelector('[data-band="footer"]') as HTMLElement);
     expect(onChange).toHaveBeenCalled();
+  });
+
+  it('does NOT double-count body input (body change arrives via vendor onChange)', () => {
+    const onChange = vi.fn();
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    const ref = React.createRef<MetalDocsEditorRef>();
+    const { container } = render(
+      <MetalDocsEditor
+        ref={ref}
+        mode="template-draft"
+        documentBuffer={new ArrayBuffer(8)}
+        onChange={onChange}
+        onAutoSave={onAutoSave}
+      />,
+    );
+    // The body band has no `data-hf-kind`; the delegated input listener must
+    // ignore it so body edits are not counted twice (vendor onChange owns body).
+    fireEvent.input(container.querySelector('[data-band="body"]') as HTMLElement);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('no-ops safely when the vendor editor ref is null', () => {
