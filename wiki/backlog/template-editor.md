@@ -31,7 +31,7 @@ Decide before implementing:
 
 ## outline-future-enhancements
 
-**Phase 3c shipped a read-only outline panel.** Headings derived from `agent.getAgentContext().outline` (eigenpal-filtered `ParagraphOutline[]` with `isHeading` + `headingLevel`). See `lib/readHeadings.ts`.
+**Superseded (SP-0, 2026-06-27):** the custom read-only outline panel (`lib/readHeadings.ts`, `TemplateOutlinePanel.tsx`) was deleted in favor of the eigenpal native `showOutlineButton`. Any future outline enhancement should extend the vendor control, not reintroduce the `getAgent`-based heading reader.
 
 Future iterations:
 - Click a heading to scroll/select that paragraph in the editor (needs `agent.scrollToParagraph(index)` or equivalent surface — verify in eigenpal types).
@@ -52,9 +52,9 @@ If we ever swap eigenpal out, revisit. Until then: do not flag absence of the de
 
 ---
 
-## placeholder-catalog-panel-restyle
+## ~~placeholder-catalog-panel-restyle~~ (resolved, SP-0 2026-06-27)
 
-`PlaceholderCatalogPanel.tsx` still uses inline styles with raw hex/px (predates the tokens-only rule). Functional, but drifts from `wiki/architecture/frontend-structure.md`. Port to a CSS Module + tokens to match `TemplateOutlinePanel.module.css`. No data-shape change, low risk. Defer until next templates iteration.
+`PlaceholderCatalogPanel.tsx` was deleted and replaced by `AvailableTokensPanel.tsx`, which already uses a CSS Module + design tokens. No longer applicable.
 
 ---
 

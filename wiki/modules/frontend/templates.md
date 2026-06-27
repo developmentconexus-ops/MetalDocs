@@ -16,7 +16,7 @@ Lets template authors create, edit, submit for review, and approve template vers
 - [`frontend/apps/web/src/features/templates/pages/TemplateEditorRoutePage.tsx`](../../../frontend/apps/web/src/features/templates/pages/TemplateEditorRoutePage.tsx) → [`TemplateEditorPage.tsx:53`](../../../frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx).
 - [`frontend/apps/web/src/features/templates/api/templates.ts`](../../../frontend/apps/web/src/features/templates/api/templates.ts) — full template surface (`createTemplate`:118, `listTemplates`:144, `getTemplate`:176, `getVersion`:182, `presignAutosave`:188, `commitAutosave`:201, `importTemplateDocx`:220, `saveDraft`:255, `publishVersion`:269, `submitForReview`:299, `reviewVersion`:307, `approveVersion`:336, `getTemplateSchemas`:414, `StaleLockVersionError`:406).
 - [`frontend/apps/web/src/features/templates/queries/useTemplatesQuery.ts:5`](../../../frontend/apps/web/src/features/templates/queries/useTemplatesQuery.ts)
-- [`frontend/apps/web/src/features/templates/TemplateOutlinePanel.tsx`](../../../frontend/apps/web/src/features/templates/TemplateOutlinePanel.tsx), [`PlaceholderCatalogPanel.tsx`](../../../frontend/apps/web/src/features/templates/PlaceholderCatalogPanel.tsx), [`VersionActionPanel.tsx`](../../../frontend/apps/web/src/features/templates/VersionActionPanel.tsx).
+- [`frontend/apps/web/src/features/templates/AvailableTokensPanel.tsx`](../../../frontend/apps/web/src/features/templates/AvailableTokensPanel.tsx) (SP-0; replaced the deleted `TemplateOutlinePanel.tsx` + `PlaceholderCatalogPanel.tsx` — outline is now the eigenpal native `showOutlineButton`), [`VersionActionPanel.tsx`](../../../frontend/apps/web/src/features/templates/VersionActionPanel.tsx).
 
 ## 3. Routes
 
