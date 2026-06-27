@@ -2,7 +2,7 @@
 
 > Living architecture doc. Replaces the prior integration stub. Shape: Arc42 (12 sections) + C4 (Context + Container) Mermaid diagrams + ADR links.
 >
-> **Last verified:** 2026-06-27 (Task 7–9: section-aware `insertToken`, uniform multi-view `getUsedTokens`, HF-coloring vendor limitation, freeze covers header/footer; prior: 2026-06-23 eigenpal migration: vendored `@eigenpal/docx-js-editor@0.2.0` tarball retired; now `@eigenpal/docx-editor-react@1.9.0` from npm registry; import paths and version refs updated throughout; prior: 2026-06-14) | **Owner:** unassigned | **Status:** active (FE adapter, two production consumers) | **Maturity:** L2
+> **Last verified:** 2026-06-27 (Task 7–9: section-aware `insertToken`, uniform multi-view `getUsedTokens`, HF-coloring vendor limitation, freeze covers header/footer; token grammar unification: detectTokens + shared scanText core + parity gate; prior: 2026-06-23 eigenpal migration: vendored `@eigenpal/docx-js-editor@0.2.0` tarball retired; now `@eigenpal/docx-editor-react@1.9.0` from npm registry; import paths and version refs updated throughout; prior: 2026-06-14) | **Owner:** unassigned | **Status:** active (FE adapter, two production consumers) | **Maturity:** L2
 
 ---
 
@@ -278,9 +278,15 @@ Severity note: the placeholder-escape / XSS concern that motivated severity rubr
 
 `getEditorRef().insertToken(key)` is section-aware: it dispatches the `{key}` transaction into whichever ProseMirror band the author last focused — the body view or a focused header/footer view — falling back to the body when nothing is tracked. The target band is resolved fresh at insert time from `document.activeElement.closest('.ProseMirror')` (never stale — the palette button's `mousedown`+`preventDefault` keeps focus in the band), falling back to a delegated `focusin` listener's last-recorded `.ProseMirror`, then the body. The cached `focusin` fallback guards against an HF painter re-render detaching the live node. Header/footer views are resolved via `getEditorRef().getHfPmViews(): Map<rId, EditorView>`. All of this resolution lives inside `MetalDocsEditor.tsx` behind a module-local `PmView` structural type; no `EditorView` / `@eigenpal` type leaks past the ACL barrel (`index.ts` / `types.ts`), preserving the §12.1 vendor-sealed boundary.
 
-#### Uniform multi-view token detection (`getUsedTokens()`)
+#### Uniform multi-view token detection (`getUsedTokens()` / `getDetectedTokens()`)
 
-`getUsedTokens()` is a uniform, vendor-independent text-parse. It scans `{name}` (regex `/\{([A-Za-z0-9_]+)\}/g`, which excludes docxtemplater control tags `{#..}` / `{/..}` / `{^..}` / `{>..}`) across the body doc and every `getHfPmViews()` doc, deduped first-seen. It no longer relies on the body-only vendor `templatePlugin` / `getTemplatePluginTags`, giving header/footer tokens one source of truth equal to the body's.
+Token detection now uses a shared grammar core in `@metaldocs/shared-tokens`. `getDetectedTokens()` calls `detectTokens(text)` (from `@metaldocs/shared-tokens`) across the body doc and every `getHfPmViews()` doc, deduped first-seen. It returns `DetectedToken[]` — every variable tag, broad-detected (regex `/\{([^{}]+)\}/g`), validity-classified (snake_case + not reserved = valid). `getUsedTokens()` is the valid-only filter over `getDetectedTokens()`: it returns the same `string[]` contract as before, but now relies on the shared grammar rather than a local regex.
+
+**Detect broad, validate strict:** Tags like `{a.b}` are detected and classified `valid:false` instead of silently dropped — the detect-broad/validate-strict model. Authors see invalid tokens in the panel (via `partitionDetected` in `frontend/apps/web/src/features/templates/lib/tokens.ts`).
+
+**One grammar core:** `detectTokens` and `parseDocxTokens` (the server-side docx parser) both call `scanText` from `packages/shared-tokens/src/grammar.ts`. A behavioral parity test at `apps/docx-renderer/src/render/__tests__/token-parity.test.ts` runs probe tokens through the REAL vendor freeze (`fanout`) and asserts the detector surfaces everything freeze touches (HARD GATE: detector ⊇ freeze-touched).
+
+`DetectedToken` is exported from the `editor-ui` barrel (`types.ts`) as a re-export from `@metaldocs/shared-tokens` — not from `@eigenpal/`, preserving the ACL wall.
 
 #### Header/footer edits surface as a change signal
 
@@ -453,6 +459,8 @@ The following are deferred to the backend approval gate:
 - Tech debt: `wiki/modules/editor-ui-eigenpal-tech-debt.md`
 
 ## Changelog (this doc)
+
+- 2026-06-27 — Token grammar unification: `getUsedTokens()` / `getDetectedTokens()` now consume `detectTokens()` from `@metaldocs/shared-tokens` (one `scanText` core shared with the docx parser); detect-broad/validate-strict model surfaces `{a.b}`-style invalids instead of silently dropping them; parity gate `apps/docx-renderer/src/render/__tests__/token-parity.test.ts` asserts detector ⊇ freeze-touched tokens; `parseDocxTokens` removed from browser barrel (§4.1 dep-free bundle); `FanoutResult` surfaces `replacedVars`; `partitionDetected` in `frontend/apps/web/src/features/templates/lib/tokens.ts` drives the invalid-token warning in `AvailableTokensPanel`.
 
 - 2026-06-27 — Task 7–9: documented the section-aware `insertToken(key)` (last-focused-band tracking via delegated `focusin`; dispatch into body or focused HF view via `getHfPmViews()`; `PmView` structural type keeps `@eigenpal` off the barrel) and the uniform multi-view `getUsedTokens()` text-parse (vendor-independent `{name}` scan across body + all HF docs; replaces body-only `templatePlugin`/`getTemplatePluginTags`) in §8.4. Recorded the HF-coloring vendor limitation in §12.5 (templatePlugin body-only; HF painter renders from `state.doc` content not decorations; functional-but-uncolored; upstream ask to install/expose decorations on HF PM views; operator de-scoped). Noted freeze covers header/footer via `apps/docx-renderer/src/render/fanout.ts`, proven by `fanout.headerfooter.test.ts`. Last verified bumped to 2026-06-27.
 
