@@ -8,6 +8,32 @@ import { toEigenpalComment, fromEigenpalComment } from './comment-mapping';
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 
+// Structural seam over the vendor's ProseMirror EditorView — declared locally so
+// no `@eigenpal`/`prosemirror` type leaks across the ACL wall (see public-surface
+// guard test). Only the surface the adapter actually touches is modeled.
+type PmView = {
+  dom: HTMLElement;
+  state: {
+    selection: { from: number; to: number };
+    doc: {
+      content: { size: number };
+      textBetween: (from: number, to: number, blockSep: string, leafSep: string) => string;
+    };
+    tr: { insertText: (text: string, from: number, to: number) => unknown };
+  };
+  dispatch: (tr: unknown) => void;
+  focus: () => void;
+};
+
+// Vendor exposes no getActiveView(); the body view plus every header/footer rId
+// view are gathered here so insert + token detection treat all bands uniformly.
+function collectPmViews(editorRef: ReturnType<DocxEditorRef['getEditorRef']>): PmView[] {
+  if (!editorRef) return [];
+  const body = editorRef.getView();
+  const hf = editorRef.getHfPmViews();
+  return [body, ...(hf ? Array.from(hf.values()) : [])].filter(Boolean) as unknown as PmView[];
+}
+
 export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorProps>(
   function MetalDocsEditor(props, ref) {
     const inner = useRef<DocxEditorRef>(null);
@@ -39,37 +65,25 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
           inner.current?.focus();
         },
         insertToken(key: string) {
-          const editorRef = inner.current?.getEditorRef();
-          if (!editorRef) return;
-          const body = editorRef.getView?.() ?? null;
-          const hf = editorRef.getHfPmViews?.();
-          const candidates = [body, ...(hf ? Array.from(hf.values()) : [])].filter(Boolean) as any[];
+          const views = collectPmViews(inner.current?.getEditorRef() ?? null);
+          if (views.length === 0) return;
           const dom = lastFocusedPmRef.current;
           const view =
-            (dom && candidates.find((v) => v.dom === dom || v.dom?.contains?.(dom))) ||
-            body ||
-            candidates[0] ||
-            null;
-          if (!view) return;
+            (dom && views.find((v) => v.dom === dom || v.dom.contains(dom))) || views[0];
           const { from, to } = view.state.selection;
           view.dispatch(view.state.tr.insertText(`{${key}}`, from, to));
           view.focus();
         },
         getUsedTokens() {
-          const editorRef = inner.current?.getEditorRef();
-          if (!editorRef) return [];
-          const body = editorRef.getView?.() ?? null;
-          const hf = editorRef.getHfPmViews?.();
-          const views = [body, ...(hf ? Array.from(hf.values()) : [])].filter(Boolean) as any[];
+          const views = collectPmViews(inner.current?.getEditorRef() ?? null);
           // Variable tokens only: `{name}` — the [A-Za-z0-9_] class excludes
           // docxtemplater control tags ({#loop} {/loop} {^inv} {>partial}).
           const re = /\{([A-Za-z0-9_]+)\}/g;
           const seen = new Set<string>();
           const out: string[] = [];
           for (const v of views) {
-            const doc = v?.state?.doc;
-            if (!doc) continue;
-            const text: string = doc.textBetween(0, doc.content.size, '\n', '\n');
+            const doc = v.state.doc;
+            const text = doc.textBetween(0, doc.content.size, '\n', '\n');
             re.lastIndex = 0;
             let m: RegExpExecArray | null;
             while ((m = re.exec(text))) {
@@ -141,44 +155,44 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
       <div ref={rootRef} style={{ display: 'contents' }}>
         <PluginHost plugins={plugins}>
           <DocxEditor
-          ref={inner}
-          documentBuffer={props.documentBuffer}
-          document={blankDocument}
-          mode={libMode}
-          author={props.author}
-          documentName={props.documentName}
-          documentNameEditable={props.documentNameEditable ?? (libMode === 'editing')}
-          onDocumentNameChange={props.onDocumentNameChange}
-          comments={props.comments?.map(toEigenpalComment)}
-          onCommentsChange={
-            props.onCommentsChange
-              ? (cs) => props.onCommentsChange!(cs.map(fromEigenpalComment))
-              : undefined
-          }
-          onCommentAdd={
-            props.onCommentAdd ? (c) => props.onCommentAdd!(fromEigenpalComment(c)) : undefined
-          }
-          onCommentResolve={
-            props.onCommentResolve ? (c) => props.onCommentResolve!(fromEigenpalComment(c)) : undefined
-          }
-          onCommentDelete={
-            props.onCommentDelete ? (c) => props.onCommentDelete!(fromEigenpalComment(c)) : undefined
-          }
-          onCommentReply={
-            props.onCommentReply
-              ? (reply, parent) => props.onCommentReply!(fromEigenpalComment(reply), fromEigenpalComment(parent))
-              : undefined
-          }
-          renderTitleBarRight={props.renderTitleBarRight}
-          showRuler={props.showRuler ?? true}
-          // Margin guides are a capability distinct from the ruler; default to the
-          // ruler's resolved value for backward compatibility, but allow callers to
-          // control them independently.
-          showMarginGuides={props.showMarginGuides ?? props.showRuler ?? true}
-          showOutlineButton
-          showZoomControl
-          onChange={handleChange}
-        />
+            ref={inner}
+            documentBuffer={props.documentBuffer}
+            document={blankDocument}
+            mode={libMode}
+            author={props.author}
+            documentName={props.documentName}
+            documentNameEditable={props.documentNameEditable ?? (libMode === 'editing')}
+            onDocumentNameChange={props.onDocumentNameChange}
+            comments={props.comments?.map(toEigenpalComment)}
+            onCommentsChange={
+              props.onCommentsChange
+                ? (cs) => props.onCommentsChange!(cs.map(fromEigenpalComment))
+                : undefined
+            }
+            onCommentAdd={
+              props.onCommentAdd ? (c) => props.onCommentAdd!(fromEigenpalComment(c)) : undefined
+            }
+            onCommentResolve={
+              props.onCommentResolve ? (c) => props.onCommentResolve!(fromEigenpalComment(c)) : undefined
+            }
+            onCommentDelete={
+              props.onCommentDelete ? (c) => props.onCommentDelete!(fromEigenpalComment(c)) : undefined
+            }
+            onCommentReply={
+              props.onCommentReply
+                ? (reply, parent) => props.onCommentReply!(fromEigenpalComment(reply), fromEigenpalComment(parent))
+                : undefined
+            }
+            renderTitleBarRight={props.renderTitleBarRight}
+            showRuler={props.showRuler ?? true}
+            // Margin guides are a capability distinct from the ruler; default to the
+            // ruler's resolved value for backward compatibility, but allow callers to
+            // control them independently.
+            showMarginGuides={props.showMarginGuides ?? props.showRuler ?? true}
+            showOutlineButton
+            showZoomControl
+            onChange={handleChange}
+          />
         </PluginHost>
       </div>
     );

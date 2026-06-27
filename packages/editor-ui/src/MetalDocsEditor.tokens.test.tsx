@@ -4,7 +4,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const bodyDispatch = vi.fn();
 const headerDispatch = vi.fn();
+const footerDispatch = vi.fn();
 const focus = vi.fn();
+
+// Toggle to simulate the vendor handing back a null editor ref (no views yet).
+let editorRefNull = false;
 
 const makeView = (dom: HTMLElement, dispatch: typeof bodyDispatch, text: string) => ({
   dom,
@@ -23,16 +27,21 @@ vi.mock('@eigenpal/docx-editor-react', async () => {
     DocxEditor: ReactMod.forwardRef((_props: Record<string, unknown>, ref: React.Ref<unknown>) => {
       const bodyRef = ReactMod.useRef<HTMLDivElement>(null);
       const headerRef = ReactMod.useRef<HTMLDivElement>(null);
+      const footerRef = ReactMod.useRef<HTMLDivElement>(null);
       ReactMod.useImperativeHandle(ref, () => ({
-        getEditorRef: () => ({
-          getView: () =>
-            bodyRef.current ? makeView(bodyRef.current, bodyDispatch, 'Body {doc_code} here') : null,
-          getHfPmViews: () => {
-            const m = new Map<string, ReturnType<typeof makeView>>();
-            if (headerRef.current) m.set('rId2', makeView(headerRef.current, headerDispatch, 'Header {author}'));
-            return m;
-          },
-        }),
+        getEditorRef: () =>
+          editorRefNull
+            ? null
+            : {
+                getView: () =>
+                  bodyRef.current ? makeView(bodyRef.current, bodyDispatch, 'Body {doc_code} here') : null,
+                getHfPmViews: () => {
+                  const m = new Map<string, ReturnType<typeof makeView>>();
+                  if (headerRef.current) m.set('rId2', makeView(headerRef.current, headerDispatch, 'Header {author}'));
+                  if (footerRef.current) m.set('rId3', makeView(footerRef.current, footerDispatch, 'Footer {effective_date}'));
+                  return m;
+                },
+              },
         save: async () => new ArrayBuffer(0),
         getTotalPages: () => 1,
         focus,
@@ -41,6 +50,7 @@ vi.mock('@eigenpal/docx-editor-react', async () => {
         <div>
           <div ref={bodyRef} className="ProseMirror" data-band="body" tabIndex={-1} />
           <div ref={headerRef} className="ProseMirror" data-band="header" tabIndex={-1} />
+          <div ref={footerRef} className="ProseMirror" data-band="footer" tabIndex={-1} />
         </div>
       );
     }),
@@ -61,6 +71,8 @@ import type { MetalDocsEditorRef } from './types';
 beforeEach(() => {
   bodyDispatch.mockClear();
   headerDispatch.mockClear();
+  footerDispatch.mockClear();
+  editorRefNull = false;
 });
 
 describe('MetalDocsEditor section-aware tokens', () => {
@@ -83,9 +95,32 @@ describe('MetalDocsEditor section-aware tokens', () => {
     expect(bodyDispatch).not.toHaveBeenCalled();
   });
 
+  it('insertToken targets the footer band once it gains focus', () => {
+    const ref = React.createRef<MetalDocsEditorRef>();
+    const { container } = render(
+      <MetalDocsEditor ref={ref} mode="template-draft" documentBuffer={new ArrayBuffer(8)} />,
+    );
+    fireEvent.focusIn(container.querySelector('[data-band="footer"]') as HTMLElement);
+    ref.current!.insertToken('effective_date');
+    expect(footerDispatch).toHaveBeenCalledWith({ t: '{effective_date}', from: 2, to: 2 });
+    expect(bodyDispatch).not.toHaveBeenCalled();
+    expect(headerDispatch).not.toHaveBeenCalled();
+  });
+
   it('getUsedTokens unions {name} tokens across body + header/footer views', () => {
     const ref = React.createRef<MetalDocsEditorRef>();
     render(<MetalDocsEditor ref={ref} mode="template-draft" documentBuffer={new ArrayBuffer(8)} />);
-    expect(ref.current!.getUsedTokens()).toEqual(['doc_code', 'author']);
+    expect(ref.current!.getUsedTokens()).toEqual(['doc_code', 'author', 'effective_date']);
+  });
+
+  it('no-ops safely when the vendor editor ref is null', () => {
+    editorRefNull = true;
+    const ref = React.createRef<MetalDocsEditorRef>();
+    render(<MetalDocsEditor ref={ref} mode="template-draft" documentBuffer={new ArrayBuffer(8)} />);
+    expect(ref.current!.getUsedTokens()).toEqual([]);
+    expect(() => ref.current!.insertToken('x')).not.toThrow();
+    expect(bodyDispatch).not.toHaveBeenCalled();
+    expect(headerDispatch).not.toHaveBeenCalled();
+    expect(footerDispatch).not.toHaveBeenCalled();
   });
 });
