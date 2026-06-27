@@ -27,4 +27,12 @@ describe('AvailableTokensPanel', () => {
     render(<AvailableTokensPanel catalog={catalog} usedKeys={new Set()} unknownTokens={['nope']} onInsert={() => {}} />);
     expect(screen.getByTestId('unknown-nope')).toBeTruthy();
   });
+
+  it('prevents default on token mousedown so the editor keeps focus/caret', () => {
+    render(<AvailableTokensPanel catalog={catalog} usedKeys={new Set()} unknownTokens={[]} onInsert={() => {}} />);
+    const btn = screen.getByTestId('token-doc_code').querySelector('button')!;
+    const ev = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    const prevented = !btn.dispatchEvent(ev);
+    expect(prevented).toBe(true);
+  });
 });

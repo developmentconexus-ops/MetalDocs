@@ -28,7 +28,7 @@ export function AvailableTokensPanel({
           const used = usedKeys.has(it.key);
           return (
             <li key={it.key} className={styles.item} data-testid={`token-${it.key}`} data-used={used}>
-              <button type="button" className={styles.insertBtn} onClick={() => onInsert(it.key)}>
+              <button type="button" className={styles.insertBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => onInsert(it.key)}>
                 <code className={styles.code}>{`{${it.key}}`}</code>
                 <span className={styles.label}>{it.label}</span>
                 {used && <span className={styles.usedBadge}>em uso</span>}
