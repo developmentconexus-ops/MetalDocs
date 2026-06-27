@@ -1,4 +1,4 @@
-export type TokenKind = 'var' | 'section' | 'inverted' | 'closing';
+export type TokenKind = 'var' | 'section' | 'inverted' | 'closing' | 'partial';
 
 export interface Token {
   kind: TokenKind;

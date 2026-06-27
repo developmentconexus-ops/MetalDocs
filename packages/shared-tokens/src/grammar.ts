@@ -1,3 +1,5 @@
+import type { TokenKind } from './types';
+
 export const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export const RESERVED_IDENTS = new Set<string>([
@@ -24,3 +26,39 @@ export function isReservedIdent(s: string): boolean {
 }
 
 export const MAX_SECTION_DEPTH = 1;
+
+export interface RawTag {
+  raw: string;
+  kind: TokenKind;
+  inner: string;
+  start: number;
+  end: number;
+}
+
+// The single scan grammar. `[^{}]+` body matches the freeze engine's default
+// docxtemplater tag body; control prefixes are classified, everything else is `var`.
+const SCAN_RE = /\{([#^/>])?([^{}]+)\}/g;
+
+function prefixKind(prefix: string | undefined): TokenKind {
+  switch (prefix) {
+    case '#': return 'section';
+    case '^': return 'inverted';
+    case '/': return 'closing';
+    case '>': return 'partial';
+    default: return 'var';
+  }
+}
+
+/** Every `{...}` tag in a flat string, control-prefix classified, inner trimmed. */
+export function scanText(text: string): RawTag[] {
+  const out: RawTag[] = [];
+  SCAN_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = SCAN_RE.exec(text)) !== null) {
+    const [raw, prefix, body] = m;
+    const inner = body.trim();
+    if (inner === '') continue;
+    out.push({ raw, kind: prefixKind(prefix), inner, start: m.index, end: m.index + raw.length });
+  }
+  return out;
+}
