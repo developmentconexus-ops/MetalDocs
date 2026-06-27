@@ -71,10 +71,12 @@ Inherits north-star §2. Adds, as the durable root-cause fix:
   **returns only `unreplacedVars` and discards `replacedVariables`** — so the parity oracle
   in §4.3 is not buildable from `fanout()` as it stands today (see §4.3 fix).
 - `packages/shared-tokens/package.json` — source-only package (`main`/`types` →
-  `./src/index.ts`), **no `sideEffects` field, no `exports` map**; barrel `index.ts`
-  re-exports `parseDocxTokens` from `parser.ts`, which top-imports `jszip` +
-  `fast-xml-parser`. So importing `detectTokens` via the barrel risks pulling JSZip into the
-  browser bundle (see §4.1 fix).
+  `./src/index.ts`), no `sideEffects` field. Barrel `index.ts` re-exports `parseDocxTokens`
+  from `parser.ts` (the **only** module importing `jszip`/`fast-xml-parser`; `grammar`/`diff`/
+  `ooxml`/`types` are pure). `parseDocxTokens` has no runtime consumer (tests import
+  `../src/parser` directly), so dropping it from the barrel makes the barrel dep-free — see
+  §4.1. The web alias (`vite.config.ts:37`, `tsconfig.json:22`) maps only the bare
+  `@metaldocs/shared-tokens` → `src/index.ts`.
 - `packages/editor-ui/test/public-surface.test.ts` — ACL guard greps `src/index.ts` +
   `src/types.ts` for `/@eigenpal/` only. A `shared-tokens`-owned `DetectedToken` on the ref
   is therefore safe; a vendor type would not be.
@@ -86,23 +88,24 @@ Inherits north-star §2. Adds, as the durable root-cause fix:
 
 Add to `grammar.ts` (pure, zero runtime deps — no JSZip / fast-xml-parser).
 
-**Browser-bundle safety (resolves the JSZip-via-barrel risk):** `package.json` must add
-**both** (a) `"sideEffects": false`, and (b) an `exports` map with a `./grammar` subpath:
+**Browser-bundle safety (resolves the JSZip-via-barrel risk) — by barrel purification, not
+a subpath.** Verified: **only `parser.ts` imports `jszip`/`fast-xml-parser`**;
+`grammar.ts`, `diff.ts`, `ooxml.ts`, `types.ts` are pure. The barrel `index.ts` is heavy
+*solely* because it re-exports `parseDocxTokens`. And `parseDocxTokens` has **no runtime
+consumer** — only `parser.*.test.ts` import it, and they import `../src/parser` directly, not
+the barrel.
 
-```json
-"exports": {
-  ".":        { "import": "./src/index.ts", "types": "./src/index.ts" },
-  "./grammar": { "import": "./src/grammar.ts", "types": "./src/grammar.ts" }
-},
-"sideEffects": false
-```
+So: **remove the `parseDocxTokens` re-export from `index.ts`.** The barrel
+(`@metaldocs/shared-tokens`) then exports only pure modules (grammar/diff/ooxml/types +
+the new `scanText`/`detectTokens`), and editor-ui imports the detector from the **existing**
+bare alias — no JSZip enters the browser graph, and **no vite/tsconfig/exports change is
+needed** (the existing `@metaldocs/shared-tokens` → `src/index.ts` alias just works). This is
+preferred over a `./grammar` subpath, which would collide with the rollup-alias prefix match
+on the existing bare alias.
 
-editor-ui imports the detector from the subpath — `import { detectTokens } from
-'@metaldocs/shared-tokens/grammar'` — so the JSZip-importing barrel is never in the
-browser graph regardless of tree-shaking. The plan verifies the Vite path-alias
-(`frontend/apps/web/vite.config.ts`, `tsconfig.json`) resolves the subpath; if the
-source-only alias cannot honor `exports` subpaths, fall back to a direct module import of
-`grammar.ts` (still barrel-free). Either way the barrel is not the import path.
+Also add `"sideEffects": false` to `package.json` as defense-in-depth. SP-2, when it wires
+the docx parser, imports `parseDocxTokens` from a deep path (`@metaldocs/shared-tokens/src/parser`
+or a future `./docx` export) — server-side only, where JSZip is fine.
 
 ```ts
 export type TokenKind = 'var' | 'section' | 'inverted' | 'closing' | 'partial';
@@ -234,11 +237,10 @@ frozen bytes.
 
 - **Parity test pins current vendor behavior.** A vendor upgrade that changes the charset
   breaks the test — intended; it is the drift alarm.
-- **Browser bundle weight.** `package.json` today has neither `sideEffects` nor an `exports`
-  map, and the barrel re-exports the JSZip-importing `parser.ts`. Mitigation is **not**
-  "trust tree-shaking" — it is the `./grammar` subpath import + `sideEffects:false` from §4.1,
-  so the barrel is never in the browser graph. Plan verifies the Vite alias honors the
-  subpath.
+- **Browser bundle weight.** Mitigation is **barrel purification** (§4.1): drop the lone
+  JSZip-pulling re-export (`parseDocxTokens`) from `index.ts`, leaving an all-pure barrel +
+  `sideEffects:false`. No subpath/alias/tsconfig churn, and no rollup-alias prefix collision.
+  Plan asserts (`detectTokens` resolves clean) via the existing bare alias.
 - **Snake_case-only forever** rejects dotted/hyphenated keys at the source — deliberate,
   documented; sidesteps docxtemplater nested-property semantics.
 - **Page contract unchanged.** `getUsedTokens(): string[]` stays; the new `getDetectedTokens`
