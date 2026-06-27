@@ -113,6 +113,26 @@ describe('MetalDocsEditor section-aware tokens', () => {
     expect(ref.current!.getUsedTokens()).toEqual(['doc_code', 'author', 'effective_date']);
   });
 
+  it('surfaces header/footer edits as a change signal (vendor onChange is body-only)', () => {
+    const onChange = vi.fn();
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    const ref = React.createRef<MetalDocsEditorRef>();
+    const { container } = render(
+      <MetalDocsEditor
+        ref={ref}
+        mode="template-draft"
+        documentBuffer={new ArrayBuffer(8)}
+        onChange={onChange}
+        onAutoSave={onAutoSave}
+      />,
+    );
+    // A ProseMirror edit in the footer band bubbles an `input` event; the
+    // delegated root listener must turn it into a consumer change signal so
+    // token-usage refresh (and autosave) cover non-body views.
+    fireEvent.input(container.querySelector('[data-band="footer"]') as HTMLElement);
+    expect(onChange).toHaveBeenCalled();
+  });
+
   it('no-ops safely when the vendor editor ref is null', () => {
     editorRefNull = true;
     const ref = React.createRef<MetalDocsEditorRef>();

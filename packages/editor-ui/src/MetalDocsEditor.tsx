@@ -134,6 +134,23 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
       props.onChange?.();
     };
 
+    // The vendor's onChange fires for the body view only — header/footer PM
+    // transactions never reach it, so HF edits would silently miss token-usage
+    // refresh and autosave. ProseMirror input events bubble out of every band,
+    // so a single delegated `input` listener on the root surfaces edits from all
+    // views uniformly (mirrors collectPmViews detection). The ref keeps the
+    // mount-once listener pointed at the latest closure. See
+    // wiki/modules/editor-ui-eigenpal.md.
+    const handleChangeRef = useRef(handleChange);
+    handleChangeRef.current = handleChange;
+    useEffect(() => {
+      const root = rootRef.current;
+      if (!root) return;
+      const onInput = () => handleChangeRef.current();
+      root.addEventListener('input', onInput);
+      return () => root.removeEventListener('input', onInput);
+    }, []);
+
     const libMode =
       props.mode === 'readonly' ? 'viewing' : props.mode === 'review' ? 'suggesting' : 'editing';
     const blankDocument = useMemo(
