@@ -6,7 +6,8 @@ import { useTemplateDraft } from '../hooks/useTemplateDraft';
 import { useTemplateAutosave } from '../hooks/useTemplateAutosave';
 import { useTemplateSchemas } from '../hooks/useTemplateSchemas';
 import { VersionActionPanel } from '../VersionActionPanel';
-import { PlaceholderCatalogPanel } from '../PlaceholderCatalogPanel';
+import { AvailableTokensPanel } from '../AvailableTokensPanel';
+import { partitionTokens } from '../lib/tokens';
 import { TemplateOutlinePanel } from '../TemplateOutlinePanel';
 import { canSubmit, type ActorContext } from '../lib/canActOnVersion';
 import { useAuthStore } from '../../../store/auth.store';
@@ -71,7 +72,8 @@ export function TemplateEditorPage({
   const [leftActive, setLeftActive] = useState<LeftPanel>('variables');
   const [localSchemas, setLocalSchemas] = useState<TemplateSchemas | null>(null);
   const [catalog, setCatalog] = useState<PlaceholderCatalogEntry[]>([]);
-  const [detectedVariables, setDetectedVariables] = useState<string[]>([]);
+  const [usedKeys, setUsedKeys] = useState<Set<string>>(new Set());
+  const [unknownTokens, setUnknownTokens] = useState<string[]>([]);
   const [headings, setHeadings] = useState<Heading[]>([]);
 
   useEffect(() => { void fetchPlaceholderCatalog().then(setCatalog); }, []);
@@ -86,26 +88,12 @@ export function TemplateEditorPage({
     : { roles: [], capabilities: [] };
   const submitGate = currentVersion ? canSubmit(currentVersion, actor) : null;
 
-  const syncPlaceholdersFromDocument = useCallback(() => {
+  const refreshTokenUsage = useCallback(() => {
     if (!isDraft) return;
-    // getAgent is a deferred ACL violation - MetalDocsEditorRef does not expose it;
-    // optional chaining returns undefined silently. Follow-up: forward getAgent in the adapter.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawVariables: string[] = (editorRef.current as any)?.getAgent?.()?.getVariables?.() ?? [];
-    const variables = Array.from(new Set(rawVariables));
-    setDetectedVariables(variables.filter((name) => catalogByKey.has(name)));
-    const valid = variables.filter((name) => catalogByKey.has(name));
-    const placeholders = valid.map((name) => {
-      const entry = catalogByKey.get(name)!;
-      return {
-        id: crypto.randomUUID(),
-        name,
-        label: entry.label,
-        type: 'computed' as const,
-        resolverKey: name,
-      };
-    });
-    setLocalSchemas((prev) => (prev ? { ...prev, placeholders } : prev));
+    const used = editorRef.current?.getUsedTokens() ?? [];
+    const { usedKeys, unknownTokens } = partitionTokens(used, new Set(catalogByKey.keys()));
+    setUsedKeys(usedKeys);
+    setUnknownTokens(unknownTokens);
   }, [isDraft, catalogByKey]);
 
   const syncOutline = useCallback(() => {
@@ -115,10 +103,10 @@ export function TemplateEditorPage({
 
   const handleEditorChange = useCallback(() => {
     if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
-    variableSyncTimerRef.current = window.setTimeout(syncPlaceholdersFromDocument, VARIABLE_SYNC_DEBOUNCE_MS);
+    variableSyncTimerRef.current = window.setTimeout(refreshTokenUsage, VARIABLE_SYNC_DEBOUNCE_MS);
     if (outlineSyncTimerRef.current) window.clearTimeout(outlineSyncTimerRef.current);
     outlineSyncTimerRef.current = window.setTimeout(syncOutline, OUTLINE_REFRESH_DEBOUNCE_MS);
-  }, [syncPlaceholdersFromDocument, syncOutline]);
+  }, [refreshTokenUsage, syncOutline]);
 
   useEffect(() => () => {
     if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
@@ -127,16 +115,15 @@ export function TemplateEditorPage({
 
   useEffect(() => { setLiveVersion(draft.version ?? null); }, [draft.version]);
 
-  // Sync detected tokens + outline once catalog + draft content are both ready.
   const editorContentReady = draft.version != null && catalog.length > 0;
   useEffect(() => {
     if (!editorContentReady) return;
     const t = window.setTimeout(() => {
-      syncPlaceholdersFromDocument();
+      refreshTokenUsage();
       syncOutline();
     }, OUTLINE_REFRESH_DEBOUNCE_MS);
     return () => window.clearTimeout(t);
-  }, [editorContentReady, syncPlaceholdersFromDocument, syncOutline]);
+  }, [editorContentReady, refreshTokenUsage, syncOutline]);
 
   useEffect(() => {
     if (!schemaState.schemas) return;
@@ -274,7 +261,12 @@ export function TemplateEditorPage({
         </aside>
 
         {leftActive === 'variables' && (
-          <PlaceholderCatalogPanel detected={detectedVariables} />
+          <AvailableTokensPanel
+            catalog={catalog}
+            usedKeys={usedKeys}
+            unknownTokens={unknownTokens}
+            onInsert={(key) => editorRef.current?.insertToken(key)}
+          />
         )}
         {leftActive === 'outline' && (
           <TemplateOutlinePanel headings={headings} />
