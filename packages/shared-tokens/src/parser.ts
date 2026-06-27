@@ -1,10 +1,9 @@
 import JSZip from 'jszip';
 import { XMLParser } from 'fast-xml-parser';
 import type { ParseError, ParseResult, Token } from './types';
-import { MAX_SECTION_DEPTH, isReservedIdent, isValidIdent } from './grammar';
+import { MAX_SECTION_DEPTH, isReservedIdent, isValidIdent, scanText } from './grammar';
 import { BLACKLIST } from './ooxml';
 
-const TOKEN_RE = /\{([#^/])?([^{}]+)\}/g;
 
 interface Run {
   id: string;
@@ -95,22 +94,25 @@ function scanTokens(runs: Run[], errors: ParseError[]): Token[] {
   const tokens: Token[] = [];
   const openSections: string[] = [];
 
-  TOKEN_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = TOKEN_RE.exec(full)) !== null) {
-    const [raw, prefix, inner] = m;
-    const ident = inner.trim();
-    const start = m.index;
-    const end = start + raw.length;
+  for (const tag of scanText(full)) {
+    const ident = tag.inner;
+    const start = tag.start;
+    const end = tag.end;
 
     const spanningRunIds = runsSpanning(positions, start, end);
     if (spanningRunIds.length > 1) {
-      errors.push({ type: 'split_across_runs', run_ids: spanningRunIds, token_text: raw, auto_fixable: true });
+      errors.push({ type: 'split_across_runs', run_ids: spanningRunIds, token_text: tag.raw, auto_fixable: true });
+      continue;
+    }
+
+    // Partials (`{>x}`) are an unsupported construct for MetalDocs templates.
+    if (tag.kind === 'partial') {
+      errors.push({ type: 'unsupported_construct', element: 'partial', location: `offset=${start}`, auto_fixable: false });
       continue;
     }
 
     if (!isValidIdent(ident)) {
-      errors.push({ type: 'malformed_token', raw, location: `offset=${start}` });
+      errors.push({ type: 'malformed_token', raw: tag.raw, location: `offset=${start}` });
       continue;
     }
     if (isReservedIdent(ident)) {
@@ -118,11 +120,7 @@ function scanTokens(runs: Run[], errors: ParseError[]): Token[] {
       continue;
     }
 
-    let kind: Token['kind'];
-    if (prefix === '#') kind = 'section';
-    else if (prefix === '^') kind = 'inverted';
-    else if (prefix === '/') kind = 'closing';
-    else kind = 'var';
+    const kind = tag.kind; // 'var' | 'section' | 'inverted' | 'closing'
 
     if (kind === 'section' || kind === 'inverted') {
       openSections.push(ident);
