@@ -282,6 +282,10 @@ Severity note: the placeholder-escape / XSS concern that motivated severity rubr
 
 `getUsedTokens()` is a uniform, vendor-independent text-parse. It scans `{name}` (regex `/\{([A-Za-z0-9_]+)\}/g`, which excludes docxtemplater control tags `{#..}` / `{/..}` / `{^..}` / `{>..}`) across the body doc and every `getHfPmViews()` doc, deduped first-seen. It no longer relies on the body-only vendor `templatePlugin` / `getTemplatePluginTags`, giving header/footer tokens one source of truth equal to the body's.
 
+#### Header/footer edits surface as a change signal
+
+The vendor `onChange` fires for the **body view only** — header/footer ProseMirror transactions never reach it. Without a second channel, HF edits silently miss token-usage refresh (`getUsedTokens` re-run) and autosave. `MetalDocsEditor.tsx` adds a single delegated `input` listener on the `display:contents` root (ProseMirror input events bubble out of every band) that routes to the same `handleChange` path, so edits from any view — body or HF — drive `onChange` / autosave uniformly, mirroring `collectPmViews`. Regression: `MetalDocsEditor.tokens.test.tsx` ("surfaces header/footer edits as a change signal").
+
 #### Freeze covers header/footer
 
 Token substitution at publish covers native header/footer tokens, not just body tokens: `apps/docx-renderer/src/render/fanout.ts` runs docxtemplater over the whole package, so header/footer `{name}` strings substitute at freeze. Proven by `apps/docx-renderer/src/render/__tests__/fanout.headerfooter.test.ts`.
@@ -458,6 +462,7 @@ The following are deferred to the backend approval gate:
 
 - 2026-05-17 - Blank-template authoring fix: `MetalDocsEditor` now seeds editable no-buffer mounts with `createEmptyDocument()`, keeping Eigenpal's blank-document contract inside the adapter. Updated requirements, strategy, mode mapping, plugin-registration flow, quality requirements, and dependency facts. Verified with editor-ui tests, editor-ui typecheck, frontend typecheck, and Navegador on a fresh blank template (`a93b9271-470c-4178-b557-a914733de92e`).
 
+- 2026-06-27 — Fix: HF edits now surface as a change signal. Vendor `onChange` is body-only, so header/footer edits missed token-usage refresh + autosave; added a delegated `input` listener on the `display:contents` root routing every band's edits through `handleChange` (§8.4 new subsection). Regression test in `MetalDocsEditor.tokens.test.tsx`.
 - 2026-05-11 â€” Plan 11: T-002 closed â€” `TemplateEditorPage` migrated to `MetalDocsEditor` (commit `60fa5473`); T-003 closed â€” `templatePlugin.wiring.test.tsx` rewritten to 5 correct assertions gated on `template-draft` mode (commit `ce6d809a`). `onChange` prop added to `MetalDocsEditorProps` (commit `cae6da02`). Â§1.2 goal-1 updated; C4 context diagram updated; Â§3.2 IN-edges updated; Â§5.2 surface table extended; Â§8.7 ACL note updated; Â§10 seam-isolation row updated; Â§11 counts + Top 3 recomputed. Consumer anchor `TemplateEditorPage.tsx:334` added.
 - 2026-05-11 â€” Sync pass (Plan 3): bumped Last verified; Â§2 vendor note updated (T-001 resolved â€” tarball restored); Â§11 Top 3 list updated to reflect T-001 closure (T-002 now #1, T-003 #2, T-004 #3).
 - 2026-05-10 â€” Replaced integration stub with Arc42 + C4 living doc. Surfaced 1C/2M/5m debt items; documented vendored-tarball gap (T-001), wrapper-bypass drift (T-002), stale test (T-003). Two missing-ADR rows for the gating rule and the wrapper-only boundary.
