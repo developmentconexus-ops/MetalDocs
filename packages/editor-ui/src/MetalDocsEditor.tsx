@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { DocxEditor, createEmptyDocument, type DocxEditorRef } from '@eigenpal/docx-editor-react';
-import { PluginHost, templatePlugin, getTemplatePluginTags, type EditorPlugin } from '@eigenpal/docx-editor-react/plugin-api';
+import { PluginHost, templatePlugin, type EditorPlugin } from '@eigenpal/docx-editor-react/plugin-api';
 import '@eigenpal/docx-editor-react/styles.css';
 import type { MetalDocsEditorProps, MetalDocsEditorRef } from './types';
 import { filterTransactionGuard } from './plugins/filter-transaction-guard';
@@ -14,6 +14,12 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
     const onAutoSaveRef = useRef(props.onAutoSave);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const inFlightRef = useRef(false);
+    const rootRef = useRef<HTMLDivElement>(null);
+    // The Eigenpal paged editor runs one ProseMirror view per band (body + each
+    // header/footer rId). Vendor exposes no getActiveView(), so the adapter tracks
+    // the last-focused band via a delegated focusin listener and re-resolves the
+    // live view at insert time. See wiki/modules/editor-ui-eigenpal.md.
+    const lastFocusedPmRef = useRef<HTMLElement | null>(null);
 
     onAutoSaveRef.current = props.onAutoSave;
 
@@ -33,24 +39,64 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
           inner.current?.focus();
         },
         insertToken(key: string) {
-          const view = inner.current?.getEditorRef()?.getView();
+          const editorRef = inner.current?.getEditorRef();
+          if (!editorRef) return;
+          const body = editorRef.getView?.() ?? null;
+          const hf = editorRef.getHfPmViews?.();
+          const candidates = [body, ...(hf ? Array.from(hf.values()) : [])].filter(Boolean) as any[];
+          const dom = lastFocusedPmRef.current;
+          const view =
+            (dom && candidates.find((v) => v.dom === dom || v.dom?.contains?.(dom))) ||
+            body ||
+            candidates[0] ||
+            null;
           if (!view) return;
           const { from, to } = view.state.selection;
           view.dispatch(view.state.tr.insertText(`{${key}}`, from, to));
           view.focus();
         },
         getUsedTokens() {
-          const state = inner.current?.getEditorRef()?.getState();
-          if (!state) return [];
-          return getTemplatePluginTags(state)
-            .filter((t) => t.type === 'variable')
-            .map((t) => t.name);
+          const editorRef = inner.current?.getEditorRef();
+          if (!editorRef) return [];
+          const body = editorRef.getView?.() ?? null;
+          const hf = editorRef.getHfPmViews?.();
+          const views = [body, ...(hf ? Array.from(hf.values()) : [])].filter(Boolean) as any[];
+          // Variable tokens only: `{name}` — the [A-Za-z0-9_] class excludes
+          // docxtemplater control tags ({#loop} {/loop} {^inv} {>partial}).
+          const re = /\{([A-Za-z0-9_]+)\}/g;
+          const seen = new Set<string>();
+          const out: string[] = [];
+          for (const v of views) {
+            const doc = v?.state?.doc;
+            if (!doc) continue;
+            const text: string = doc.textBetween(0, doc.content.size, '\n', '\n');
+            re.lastIndex = 0;
+            let m: RegExpExecArray | null;
+            while ((m = re.exec(text))) {
+              if (!seen.has(m[1])) {
+                seen.add(m[1]);
+                out.push(m[1]);
+              }
+            }
+          }
+          return out;
         },
       };
     }, []);
 
     useEffect(() => () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+    }, []);
+
+    useEffect(() => {
+      const root = rootRef.current;
+      if (!root) return;
+      const onFocusIn = (e: FocusEvent) => {
+        const pm = (e.target as HTMLElement | null)?.closest?.('.ProseMirror') as HTMLElement | null;
+        if (pm) lastFocusedPmRef.current = pm;
+      };
+      root.addEventListener('focusin', onFocusIn);
+      return () => root.removeEventListener('focusin', onFocusIn);
     }, []);
 
     const handleChange = () => {
@@ -92,8 +138,9 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
     ];
 
     return (
-      <PluginHost plugins={plugins}>
-        <DocxEditor
+      <div ref={rootRef} style={{ display: 'contents' }}>
+        <PluginHost plugins={plugins}>
+          <DocxEditor
           ref={inner}
           documentBuffer={props.documentBuffer}
           document={blankDocument}
@@ -132,7 +179,8 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
           showZoomControl
           onChange={handleChange}
         />
-      </PluginHost>
+        </PluginHost>
+      </div>
     );
   }
 );
