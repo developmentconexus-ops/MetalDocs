@@ -59,6 +59,8 @@ describe('fanout', () => {
 
     const xml = await extractDocumentXml(result.buffer);
     expect(xml).toContain('ABC-001');
+    expect(result.replacedVars).toContain('doc_code');
+    expect(Array.isArray(result.unreplacedVars)).toBe(true);
   });
 
   test('renders header sub-blocks via resolvedValues', async () => {

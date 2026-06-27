@@ -17,6 +17,7 @@ export interface FanoutInput {
 export interface FanoutResult {
   buffer: Uint8Array;
   contentHash: string;
+  replacedVars: string[];
   unreplacedVars: string[];
 }
 
@@ -65,6 +66,7 @@ export async function fanout(input: FanoutInput): Promise<FanoutResult> {
   return {
     buffer: buf,
     contentHash,
+    replacedVars: result.replacedVariables,
     unreplacedVars: result.unreplacedVariables,
   };
 }
