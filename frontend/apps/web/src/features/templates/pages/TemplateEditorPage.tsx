@@ -8,10 +8,8 @@ import { useTemplateSchemas } from '../hooks/useTemplateSchemas';
 import { VersionActionPanel } from '../VersionActionPanel';
 import { AvailableTokensPanel } from '../AvailableTokensPanel';
 import { partitionTokens } from '../lib/tokens';
-import { TemplateOutlinePanel } from '../TemplateOutlinePanel';
 import { canSubmit, type ActorContext } from '../lib/canActOnVersion';
 import { useAuthStore } from '../../../store/auth.store';
-import { readHeadings, type Heading } from '../lib/readHeadings';
 import { fetchPlaceholderCatalog, type PlaceholderCatalogEntry } from '../api/catalog';
 import {
   EditorChrome,
@@ -32,10 +30,9 @@ export type TemplateEditorPageProps = {
   onBack?: () => void;
 };
 
-type LeftPanel = 'variables' | 'outline' | null;
+type LeftPanel = 'variables' | null;
 
 const VARIABLE_SYNC_DEBOUNCE_MS = 400;
-const OUTLINE_REFRESH_DEBOUNCE_MS = 600;
 
 const AUTOSAVE_LABELS_PT = {
   idle: '',
@@ -63,7 +60,6 @@ export function TemplateEditorPage({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const schemaSnapshotRef = useRef<string | null>(null);
   const variableSyncTimerRef = useRef<number | null>(null);
-  const outlineSyncTimerRef = useRef<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [importing, setImporting] = useState(false);
@@ -74,8 +70,6 @@ export function TemplateEditorPage({
   const [catalog, setCatalog] = useState<PlaceholderCatalogEntry[]>([]);
   const [usedKeys, setUsedKeys] = useState<Set<string>>(new Set());
   const [unknownTokens, setUnknownTokens] = useState<string[]>([]);
-  const [headings, setHeadings] = useState<Heading[]>([]);
-
   useEffect(() => { void fetchPlaceholderCatalog().then(setCatalog); }, []);
   const catalogByKey = useMemo(() => new Map(catalog.map((c) => [c.key, c])), [catalog]);
 
@@ -96,21 +90,13 @@ export function TemplateEditorPage({
     setUnknownTokens(unknownTokens);
   }, [isDraft, catalogByKey]);
 
-  const syncOutline = useCallback(() => {
-    // Cast: MetalDocsEditorRef doesn't expose getAgent; readHeadings guards internally.
-    setHeadings(readHeadings(editorRef as unknown as React.RefObject<{ getAgent?(): unknown }>));
-  }, []);
-
   const handleEditorChange = useCallback(() => {
     if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
     variableSyncTimerRef.current = window.setTimeout(refreshTokenUsage, VARIABLE_SYNC_DEBOUNCE_MS);
-    if (outlineSyncTimerRef.current) window.clearTimeout(outlineSyncTimerRef.current);
-    outlineSyncTimerRef.current = window.setTimeout(syncOutline, OUTLINE_REFRESH_DEBOUNCE_MS);
-  }, [refreshTokenUsage, syncOutline]);
+  }, [refreshTokenUsage]);
 
   useEffect(() => () => {
     if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
-    if (outlineSyncTimerRef.current) window.clearTimeout(outlineSyncTimerRef.current);
   }, []);
 
   useEffect(() => { setLiveVersion(draft.version ?? null); }, [draft.version]);
@@ -120,10 +106,9 @@ export function TemplateEditorPage({
     if (!editorContentReady) return;
     const t = window.setTimeout(() => {
       refreshTokenUsage();
-      syncOutline();
-    }, OUTLINE_REFRESH_DEBOUNCE_MS);
+    }, VARIABLE_SYNC_DEBOUNCE_MS);
     return () => window.clearTimeout(t);
-  }, [editorContentReady, refreshTokenUsage, syncOutline]);
+  }, [editorContentReady, refreshTokenUsage]);
 
   useEffect(() => {
     if (!schemaState.schemas) return;
@@ -217,7 +202,7 @@ export function TemplateEditorPage({
     autosave.status === 'saved' ? 'saved' :
     'idle';
 
-  const togglePanel = (key: 'variables' | 'outline') =>
+  const togglePanel = (key: 'variables') =>
     setLeftActive((prev) => (prev === key ? null : key));
 
   return (
@@ -248,16 +233,6 @@ export function TemplateEditorPage({
             {ICON_BRACES}
             <span className={styles.railTip}>Variáveis</span>
           </button>
-          <button
-            type="button"
-            aria-label="Estrutura"
-            aria-pressed={leftActive === 'outline'}
-            className={`${styles.railBtn} ${leftActive === 'outline' ? styles.isActive : ''}`}
-            onClick={() => togglePanel('outline')}
-          >
-            {ICON_OUTLINE}
-            <span className={styles.railTip}>Estrutura</span>
-          </button>
         </aside>
 
         {leftActive === 'variables' && (
@@ -268,10 +243,6 @@ export function TemplateEditorPage({
             onInsert={(key) => editorRef.current?.insertToken(key)}
           />
         )}
-        {leftActive === 'outline' && (
-          <TemplateOutlinePanel headings={headings} />
-        )}
-
         <main className={styles.canvas}>
           <EditorChrome
             center={
@@ -375,17 +346,6 @@ const ICON_BRACES = (
   <svg {...SVG_BASE}>
     <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1" />
     <path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" />
-  </svg>
-);
-
-const ICON_OUTLINE = (
-  <svg {...SVG_BASE}>
-    <path d="M21 12h-8" />
-    <path d="M21 6h-8" />
-    <path d="M21 18h-8" />
-    <path d="M3 6h.01" />
-    <path d="M3 12h.01" />
-    <path d="M3 18h.01" />
   </svg>
 );
 
