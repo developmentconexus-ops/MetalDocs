@@ -34,6 +34,8 @@ tags:
     description: Controlled-document distribution coverage — the obligated audience (denominator only; numerator parked, ADR-0042).
   - name: notifications
     description: Per-recipient notification inbox — read surface (list / unread-count / mark-read). Projected from governance_events for the document-lifecycle bundle (ADR-0043). Self-scope.
+  - name: tokens
+    description: Tenant token dictionary — author-defined reusable {name} -> value constants. Capability-governed (token.view / token_dictionary.manage). Backend only at SP-1.
   - name: approval
     description: Approval routes, instances, sign-offs, and document lifecycle transitions.
   - name: search
@@ -3815,6 +3817,103 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /tokens:
+    get:
+      summary: List token dictionary entries
+      x-pagination-exempt: true
+      x-pagination-exempt-reason: 'Bounded per-tenant token dictionary returned in full.'
+      tags: [tokens]
+      operationId: listTokens
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListTokenDictionaryEntriesResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    post:
+      summary: Create token dictionary entry
+      tags: [tokens]
+      operationId: createToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTokenDictionaryEntryRequest'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenDictionaryEntry'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+  /tokens/{id}:
+    get:
+      summary: Get token dictionary entry
+      tags: [tokens]
+      operationId: getToken
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenDictionaryEntry'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    put:
+      summary: Update token dictionary entry
+      tags: [tokens]
+      operationId: updateToken
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTokenDictionaryEntryRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenDictionaryEntry'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+    delete:
+      summary: Delete token dictionary entry
+      tags: [tokens]
+      operationId: deleteToken
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204':
+          description: deleted
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalServerError' }
+
 components:
   securitySchemes:
     # Referenced by `security: [- sessionCookie: []]` across the spec. Declared
@@ -5864,4 +5963,39 @@ components:
         routes:
           type: array
           items: { $ref: '#/components/schemas/RouteSummary' }
+    TokenDictionaryEntry:
+      type: object
+      required: [id, name, value, label, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 64 }
+        value: { type: string, minLength: 1, maxLength: 4096 }
+        label: { type: string, minLength: 1, maxLength: 256 }
+        description: { type: string, maxLength: 1024, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ListTokenDictionaryEntriesResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TokenDictionaryEntry'
+    CreateTokenDictionaryEntryRequest:
+      type: object
+      required: [name, value, label]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        value: { type: string, minLength: 1, maxLength: 4096 }
+        label: { type: string, minLength: 1, maxLength: 256 }
+        description: { type: string, maxLength: 1024, nullable: true }
+    UpdateTokenDictionaryEntryRequest:
+      type: object
+      required: [name, value, label]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 64 }
+        value: { type: string, minLength: 1, maxLength: 4096 }
+        label: { type: string, minLength: 1, maxLength: 256 }
+        description: { type: string, maxLength: 1024, nullable: true }
         total: { type: integer, minimum: 0 }
