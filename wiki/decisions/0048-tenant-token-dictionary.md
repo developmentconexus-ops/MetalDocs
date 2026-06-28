@@ -63,7 +63,7 @@ Tenant admins (holders of `token_dictionary.manage`) create, update, and delete 
 
 ### Consequences
 
-- `token_dictionary_entries` table has `tenant_id UUID NOT NULL` with a NULL-permissive RLS policy (ADR 0247 pattern). No FK to the tenants table.
+- `token_dictionary_entries` table has `tenant_id UUID NOT NULL` with a NULL-permissive RLS policy (ADR 0027 pattern). No FK to the tenants table.
 - `(tenant_id, name)` unique index enforces no duplicate names within a tenant.
 - No system seeding of dictionary entries. Tenants start with an empty dictionary.
 - `CapTokenDictionaryManage` and `CapTokenView` are registered in `internal/modules/iam/domain/capability.go` and granted via IAM reference data to the appropriate roles.
@@ -100,5 +100,5 @@ ADR 0008 remains the source of truth for the `{name}` syntax itself and the proh
 - `wiki/concepts/token-syntax.md` — grammar boundary reference
 - `wiki/decisions/0007-two-tier-authz.md` — two-tier authz pattern
 - `wiki/decisions/0022-capabilities-not-roles.md` — capability model
-- `wiki/decisions/0247-rls-null-permissive.md` — RLS pattern used on `token_dictionary_entries`
+- `wiki/decisions/0027-rls-adoption-sequencing.md` — RLS pattern used on `token_dictionary_entries`
 - `internal/modules/tokens/domain/port.go` — `DictionaryReader` (SP-2 published port)

@@ -32,7 +32,7 @@ This module introduces a **new class of token** alongside the computed-token cat
 - **Audited writes** — every Create/Update/Delete records a `tokens.entry.created/updated/deleted` event in `metaldocs.audit_events` via `audit.Writer.RecordTx` inside the same transaction.
 - **Published port for SP-2** — `domain.DictionaryReader` (`GetByName` + `List`, no tx coupling) is implemented by `application.Service` and exported from `Module.Reader`.
 - **Token grammar is Node-owned** — `@metaldocs/shared-tokens` owns the leading-char rule and reserved-word list. Go does anti-corruption storage hygiene only (`^[A-Za-z0-9_]+$`, 1–64 chars). Grammar enforcement lives at the SP-3 UI edge; Go never re-parses token syntax.
-- **Multi-tenant isolation** — `tenant_id UUID NOT NULL` on every row; NULL-permissive RLS per ADR 0247 pattern (migration `0248_token_dictionary_entries.sql`); no FK to the tenants table.
+- **Multi-tenant isolation** — `tenant_id UUID NOT NULL` on every row; NULL-permissive RLS per ADR 0027 pattern (migration `0248_token_dictionary_entries.sql`); no FK to the tenants table.
 
 ### 1.2 Quality Goals
 
@@ -173,7 +173,7 @@ C4Container
 | PUT | `/api/v1/tokens/{id}` | `updateToken` | `h.UpdateToken` | `token_dictionary.manage` | `CapTokenDictionaryManage` |
 | DELETE | `/api/v1/tokens/{id}` | `deleteToken` | `h.DeleteToken` | `token_dictionary.manage` | `CapTokenDictionaryManage` |
 
-All 5 routes aligned: spec `api/openapi/v1/partials/tokens.yaml` → `internal/modules/tokens/api/api.gen.go` → handler.
+All 5 routes aligned: spec `api/openapi/v1/openapi.yaml` → `internal/modules/tokens/api/api.gen.go` → handler.
 
 ---
 
@@ -349,8 +349,8 @@ Go never parses token syntax (this is a binding invariant from `wiki/concepts/to
 |---|---|
 | Two-tier authz | `wiki/decisions/0007-two-tier-authz.md` — tokens module conformant at tier-1 + tier-2; no per-row tripwire trigger (see §8.1) |
 | Capabilities, never roles | ADR 0022 — `CapTokenView` + `CapTokenDictionaryManage`; never "admin can manage tokens" |
-| Contract-first API | ADR 0012 — spec at `api/openapi/v1/partials/tokens.yaml`; oapi-codegen generates router and types |
-| Multi-tenant pooled DB | ADR 0023 — `tenant_id NOT NULL` + NULL-permissive RLS per ADR 0247 pattern |
+| Contract-first API | ADR 0012 — spec at `api/openapi/v1/openapi.yaml`; oapi-codegen generates router and types |
+| Multi-tenant pooled DB | ADR 0023 — `tenant_id NOT NULL` + NULL-permissive RLS per ADR 0027 pattern |
 | Transactional outbox | ADR 0024 — not applicable to token CRUD (no async side effects; audit write is in-tx, not outbox) |
 | Node-owns-grammar / Go-does-hygiene | **ADR 0048** — `wiki/decisions/0048-tenant-token-dictionary.md` |
 | Soft-archive via timestamp | ADR 0010 — not applicable; tokens support hard delete (DELETE route) |
@@ -394,7 +394,7 @@ Top concern: **TD-1** — at SP-2 render time, a dictionary entry `{REVISION}` c
 | Name immutability | `name` is the render key. Once set on create it cannot change; `ErrImmutableName` (422) is returned on any PUT that tries to change it. `value`, `label`, `description` are freely mutable. |
 | Anti-corruption storage hygiene | Go's `nameRe = ^[A-Za-z0-9_]+$` and length limits mirror the DB CHECK constraints. This is not grammar enforcement — the canonical grammar (leading-char rule, reserved words) is Node-owned. |
 | SP-2 | The next sprint: adds render substitution. The `render-fanout` module will consume `Module.Reader` to substitute dictionary values before rendering a document. |
-| NULL-permissive RLS | RLS policy pattern per ADR 0247. The `token_dictionary_entries` table has RLS enabled with a policy that permits rows where `tenant_id` matches the GUC or where the GUC is NULL. This allows system operations (migrations, bootstrap, health checks) that run before the tenant GUC is set. |
+| NULL-permissive RLS | RLS policy pattern per ADR 0027. The `token_dictionary_entries` table has RLS enabled with a policy that permits rows where `tenant_id` matches the GUC or where the GUC is NULL. This allows system operations (migrations, bootstrap, health checks) that run before the tenant GUC is set. |
 
 ---
 
@@ -416,7 +416,7 @@ Top concern: **TD-1** — at SP-2 render time, a dictionary entry `{REVISION}` c
 - Related concepts: `wiki/concepts/token-syntax.md` (grammar boundary, Node ownership), `wiki/concepts/placeholders.md` (full placeholder concept), `wiki/concepts/authz-tiers.md`
 - Cross-module: `wiki/modules/templates.md` (computed token catalog — complementary, not the same), `wiki/modules/audit.md` (RecordTx sink), `wiki/modules/render-fanout.md` (future SP-2 consumer)
 - Tech debt: `wiki/modules/tokens-tech-debt.md`
-- OpenAPI spec: `api/openapi/v1/partials/tokens.yaml`
+- OpenAPI spec: `api/openapi/v1/openapi.yaml`
 
 ## Changelog (this doc)
 
