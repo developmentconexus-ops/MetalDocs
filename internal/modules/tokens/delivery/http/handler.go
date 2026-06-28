@@ -5,7 +5,6 @@ package http
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -20,6 +19,7 @@ import (
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
+	"metaldocs/internal/platform/strictjson"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -96,7 +96,7 @@ func (h *Handler) ListTokens(w http.ResponseWriter, r *http.Request) {
 // CreateToken handles POST /tokens.
 func (h *Handler) CreateToken(w http.ResponseWriter, r *http.Request) {
 	var body tokensapi.CreateTokenJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := strictjson.Decode(r, &body); err != nil {
 		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON payload")
 		return
 	}
@@ -142,7 +142,7 @@ func (h *Handler) GetToken(w http.ResponseWriter, r *http.Request, id openapi_ty
 // UpdateToken handles PUT /tokens/{id}.
 func (h *Handler) UpdateToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var body tokensapi.UpdateTokenJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := strictjson.Decode(r, &body); err != nil {
 		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON payload")
 		return
 	}
@@ -195,7 +195,9 @@ func (h *Handler) writeTokenError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrNotFound):
 		httpresponse.WriteError(w, http.StatusNotFound, CodeTokenNotFound, "token dictionary entry not found")
 	case errors.Is(err, domain.ErrImmutableName):
-		httpresponse.WriteError(w, http.StatusUnprocessableEntity, CodeTokenImmutableField, "name is immutable after creation")
+		_ = problem.Write(w, problem.
+			New(http.StatusUnprocessableEntity, CodeTokenImmutableField, "name is immutable after creation").
+			WithFieldError("name", CodeTokenImmutableField, "name is immutable after creation"))
 	case errors.As(err, &valErr):
 		httpresponse.WriteError(w, http.StatusUnprocessableEntity, problem.CodeValidationError, valErr.Error())
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":

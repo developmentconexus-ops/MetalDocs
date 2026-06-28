@@ -66,7 +66,7 @@ Tenant admins (holders of `token_dictionary.manage`) create, update, and delete 
 - `token_dictionary_entries` table has `tenant_id UUID NOT NULL` with a NULL-permissive RLS policy (ADR 0027 pattern). No FK to the tenants table.
 - `(tenant_id, name)` unique index enforces no duplicate names within a tenant.
 - No system seeding of dictionary entries. Tenants start with an empty dictionary.
-- `CapTokenDictionaryManage` and `CapTokenView` are registered in `internal/modules/iam/domain/capability.go` and granted via IAM reference data to the appropriate roles.
+- `CapTokenDictionaryManage` and `CapTokenView` are registered in the IAM capability catalog (`internal/modules/iam/domain/model.go`, `capability_scope.go`, `catalog.go`) and granted via IAM reference data to the appropriate roles.
 
 ---
 

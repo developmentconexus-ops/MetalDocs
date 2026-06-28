@@ -33,8 +33,8 @@ func buildSvc(db *sql.DB) *application.Service {
 
 // grantSP1Caps seeds a user_process_areas membership for actor in tenant with
 // role=qms_admin. The curated bootstrap loads role_capabilities rows that map
-// qms_admin → token.view and qms_admin → token_dictionary.manage (added in
-// migration 0248). The service passes areaCode="tenant" to authz.Require, which
+// qms_admin → token.view and qms_admin → token_dictionary.manage (seeded via
+// db/reference-data in Task 3). The service passes areaCode="tenant" to authz.Require, which
 // degenerates to a tenant-scope check (skips area filter) so any valid area_code
 // row satisfies the query.
 //

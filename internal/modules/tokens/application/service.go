@@ -119,7 +119,7 @@ func (s *Service) Update(ctx context.Context, cmd UpdateCommand) (*domain.Entry,
 		}
 		// Name is immutable once set. Reject any attempt to change it even if caller
 		// sends the field blank (blank != original name).
-		if cmd.Name != "" && cmd.Name != existing.Name {
+		if cmd.Name != existing.Name {
 			return domain.ErrImmutableName
 		}
 		if err := existing.ApplyUpdate(cmd.Value, cmd.Label, cmd.Description, cmd.ActorID); err != nil {
