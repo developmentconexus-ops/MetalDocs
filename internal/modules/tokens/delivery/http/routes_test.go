@@ -86,6 +86,16 @@ func TestCreate_DuplicateReturns409(t *testing.T) {
 	}
 }
 
+func TestCreate_UnknownFieldReturns400(t *testing.T) {
+	h := tokenshttp.NewHandler(&fakeService{entry: &domain.Entry{}})
+	rr := httptest.NewRecorder()
+	// "extra" is not a known field — strict decode must reject it with 400.
+	h.CreateToken(rr, reqWithTenant(t, http.MethodPost, "/api/v1/tokens", `{"name":"x","value":"v","label":"l","extra":1}`))
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (body=%s)", rr.Code, rr.Body.String())
+	}
+}
+
 func TestCreate_ValidationReturns422(t *testing.T) {
 	h := tokenshttp.NewHandler(&fakeService{createErr: &domain.ValidationError{Field: "name", Message: "bad"}})
 	rr := httptest.NewRecorder()
