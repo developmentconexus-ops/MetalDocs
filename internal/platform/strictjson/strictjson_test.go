@@ -51,3 +51,27 @@ func TestDecode_EmptyBody(t *testing.T) {
 		t.Fatalf("Decode = %v, want ErrEmptyBody", err)
 	}
 }
+
+func TestDecode_BodyTooLarge(t *testing.T) {
+	body := bytes.Repeat([]byte("x"), 64*1024+1)
+	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	var p payload
+	if err := strictjson.Decode(r, &p); err != strictjson.ErrBodyTooLarge {
+		t.Fatalf("Decode = %v, want ErrBodyTooLarge", err)
+	}
+}
+
+func TestDecode_MultipleValues(t *testing.T) {
+	var p payload
+	if err := strictjson.Decode(newReq(t, `{"name":"x"}{"name":"y"}`), &p); err == nil {
+		t.Fatal("Decode = nil, want error for multiple JSON values")
+	}
+}
+
+func TestDecode_MalformedJSON(t *testing.T) {
+	var p payload
+	if err := strictjson.Decode(newReq(t, `{bad json`), &p); err == nil {
+		t.Fatal("Decode = nil, want error for malformed JSON")
+	}
+}
