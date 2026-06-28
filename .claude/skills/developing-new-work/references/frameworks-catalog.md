@@ -10,13 +10,13 @@ framework exists to enforce. For each primitive the work touches, confirm reuse 
 |-----------|-----------------|----------|
 | `TxRunner` (`Do` / `DoReadOnly`) | `internal/platform/db/runner.go:21` | Any DB work. Service depends on the tx port, not `*sql.DB`. Owns the tx boundary; nil tx rejected. |
 | `tenant.FromContext` | `internal/platform/tenant/context.go:27` | Reading the current tenant. Never thread tenant id by hand. |
-| `authz.SeedTxIdentity` | `internal/modules/iam/authz/context.go:58` | Start of every business tx — sets the tx-local GUCs the DB tripwire reads. |
-| `authz.Require(ctx, tx, cap, area)` | pattern `internal/modules/templates/application/create.go:63` | Tier-2 in-tx capability check. The friendly first line before the DB tripwire. |
-| `problem.New` / `problem.Write` | `internal/platform/problem/problem.go:76`; codes `codes.go:9` | Every error response. RFC 9457 `problem+json`. Never bare `http.Error`. |
+| `authz.SeedTxIdentity` | `internal/modules/iam/authz/context.go:48` | Start of every business tx — sets the tx-local GUCs the DB tripwire reads. |
+| `authz.Require(ctx, tx, cap, area)` | sig `internal/modules/iam/authz/authz.go:76`; pattern `internal/modules/templates/application/create.go:67` (ScopeTenant passes areaCode `"tenant"`) | Tier-2 in-tx capability check. The friendly first line before the DB tripwire. |
+| `problem.New` / `problem.Write` | `internal/platform/problem/problem.go:77`; codes `codes.go:9` | Every error response. RFC 9457 `problem+json`. Never bare `http.Error`. |
 | `httpresponse.WriteError` / success helpers | `internal/platform/httpresponse/` | Writing handler responses consistently. |
 | `audit.NewEvent` / `Record` / `RecordTx` | `internal/modules/audit/` | Any state change that must be auditable. `RecordTx` to record inside the business tx. |
 | Outbox repo | `internal/modules/render/fanout/staging_outbox.go:29` | Any external side effect. Enqueue in the business tx; a consumer does the network call idempotently. |
-| `contracts.Decode` | `internal/platform/contracts/` | Strict JSON request decoding (rejects unknown fields). Don't `json.Decode` by hand. |
+| strict JSON decode (`DisallowUnknownFields`) | `internal/modules/documents/approval/http/contracts/strictjson.go` (currently **module-private** — there is no `internal/platform/contracts`) | Strict request decoding. Don't import the documents-private pkg cross-module; promote `strictjson` to `internal/platform/strictjson` (single source) or inline. |
 | `testdb.Open` + factory builders | `tests/integration/testdb/` | Integration tests. `Open(t)`, builders, `SeedWithCaps`, `Qualified`. See `test-qa-gates.md`. |
 
 **Rule of thumb:** if you're about to write code that opens a tx, reads the tenant, checks a

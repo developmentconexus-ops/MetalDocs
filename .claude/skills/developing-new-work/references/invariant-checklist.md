@@ -12,7 +12,7 @@ Anchors are for **targeted verify only** — read an anchor only when an item is
 Two-tier PDP + DB tripwire. Never reason "admin/author can X" — reason in capabilities.
 - tier-1 route→capability (middleware): `apps/api/cmd/metaldocs-api/permissions.go`
 - tier-2 capability×area in-tx: `authz.Require(ctx, tx, cap, areaCode)` after `authz.SeedTxIdentity`;
-  pattern in `internal/modules/templates/application/create.go:63`
+  pattern in `internal/modules/templates/application/create.go:67` (sig `iam/authz/authz.go:76`; ScopeTenant passes areaCode `"tenant"`)
 - DB tripwire is the last line. Governed by ADR 0022.
 - Adding a capability? → full 10-touchpoint walk in `capability-wiring.md`.
 
@@ -26,7 +26,7 @@ Routes change ONLY by editing the spec, then regenerating. The spec is route tru
 Every tenant table has `tenant_id`; tx-local GUCs only; tenant-namespaced blob keys; cross-tenant URL
 → 404 (not 403).
 - read tenant from context: `tenant.FromContext` — `internal/platform/tenant/context.go:27`
-- seed the in-tx identity (sets GUCs): `authz.SeedTxIdentity` — `internal/modules/iam/authz/context.go:58`
+- seed the in-tx identity (sets GUCs): `authz.SeedTxIdentity` — `internal/modules/iam/authz/context.go:48`
 - new tenant table ⇒ `tenant_id` column + the tenant predicate on every query.
 
 ## 4. Async = transactional outbox
@@ -52,7 +52,7 @@ module's application service or published Go interface.
 - **TxRunner**: services depend on the tx port, not `*sql.DB`; nil tx is rejected.
   `internal/platform/db/runner.go:21` (`Do` / `DoReadOnly`).
 - **Errors are RFC 9457 `problem+json`**: never bare `http.Error`.
-  `internal/platform/problem/problem.go:76` (`Write`); codes `internal/platform/problem/codes.go:9`.
+  `internal/platform/problem/problem.go:77` (`Write`); codes `internal/platform/problem/codes.go:9`.
 - **Fixed request lifecycle**: panic→trace→obs→cors→rate-limit→authn→tier-1 authz→idempotency→handler
   is inherited; new routes don't re-wire it. `apps/api/cmd/metaldocs-api/chain.go:25`.
 - **H-PRE-1**: never call an authz-recording read inside a lock-holding atomic tx; hoist it off-tx.

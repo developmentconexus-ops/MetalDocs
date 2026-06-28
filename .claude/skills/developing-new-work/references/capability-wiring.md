@@ -18,7 +18,7 @@ verify only.
    authenticated session.
 
 4. **tier-2 in-tx enforcement** — call `authz.Require(ctx, tx, cap, areaCode)` inside the business tx,
-   after `authz.SeedTxIdentity`. Pattern: `internal/modules/templates/application/create.go:63`.
+   after `authz.SeedTxIdentity`. Pattern: `internal/modules/templates/application/create.go:67` (sig `iam/authz/authz.go:76`; ScopeTenant passes areaCode `"tenant"`).
 
 5. **seed grants** — grant the capability to the roles that should hold it (system_admin bypasses).
    `db/reference-data/0001_product_reference_data.sql:17`.
