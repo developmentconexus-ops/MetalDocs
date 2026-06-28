@@ -43,7 +43,7 @@ Non-negotiable invariants (violating these is a defect, not a design choice):
 
 Governing target spec (source of truth when this list drifts): `wiki/architecture/backend-target-architecture.md` (REQ IDs; reviews cite them).
 
-**Orientation rule:** before planning any new feature or improvement, state (a) which module(s) own it, (b) which invariants above it must satisfy, (c) read the owning `wiki/modules/<name>.md`. Plan against the whole system, not the code immediately around the change.
+**Orientation rule:** before planning any new feature or improvement, state (a) which module(s) own it, (b) which invariants above it must satisfy, (c) read the owning `wiki/modules/<name>.md`. Plan against the whole system, not the code immediately around the change. Operationalized by the `developing-new-work` skill — run it before brainstorming any new module or feature; it emits a written system-impact analysis + Green/Yellow/Red verdict (Red hard-blocks design).
 
 ## Context Map
 | Task | Read |
@@ -56,6 +56,7 @@ Governing target spec (source of truth when this list drifts): `wiki/architectur
 | Database/migration/bootstrap | `wiki/database/index.md` and relevant database docs |
 | QA/close-out | `wiki/quality/qa-operating-system.md` and relevant `wiki/quality/*-checklist.md` |
 | Test framework discipline | `wiki/quality/test-discipline.md`, ADR `wiki/decisions/0034-integration-test-fixture-framework.md` |
+| Starting any new module or feature | `developing-new-work` skill (pre-design system-impact gate; run before brainstorming) |
 | Program/milestone work | `.claude/skills/mission/SKILL.md` or `.claude/skills/milestone/SKILL.md` |
 | Docs governance/wiki sync | `wiki/standards/documentation-governance.md`, `.claude/agents/wiki-curator.md` |
 
