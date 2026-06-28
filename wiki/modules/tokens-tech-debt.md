@@ -45,22 +45,23 @@ The `domain.DictionaryReader` interface is already published and stable; no toke
 ## TD-2: strictjson promotion shim in documents/approval module (active, minor)
 
 **Severity:** Minor
-**Status:** Active (cleanup opportunity; not blocking)
+**Status:** Active — **tokens-handler half resolved**; only the documents/approval shim removal remains
 **Opened:** 2026-06-28 (SP-1 Task 1 observation)
+**Updated:** 2026-06-28 (SP-1 final review + SP-2 cleanup)
 
 ### Problem
 
 Task 1 of SP-1 promoted `internal/platform/strictjson` as the canonical strict-JSON decoder for new handlers. As part of that task, a shim was noted in the documents and/or approval module that re-exports or inline-wraps the strict decoder before the platform package existed. The shim can be removed once the owning module migrates its own JSON decode calls to import `internal/platform/strictjson` directly.
 
-The tokens handler (`delivery/http/handler.go`) does not use `strictjson` — it uses `json.NewDecoder(r.Body).Decode`. This is consistent with the pattern for non-strict decode where unknown fields are acceptable. If the spec requires strict decode for tokens (reject unknown fields), the handler should be updated to use `strictjson.Decode`.
+**Tokens-handler half — RESOLVED.** SP-1's final review switched both decode sites in `internal/modules/tokens/delivery/http/handler.go` to `strictjson.Decode` (`CreateToken` line 99, `UpdateToken` line 145) and removed the `encoding/json` import. The tokens handler now rejects unknown fields (strict decode), and a guard test asserts this (`test(tokens): assert strict decode rejects unknown fields`). This sub-item is closed.
 
 ### Resolution
 
-- Documents/approval module: remove the shim once that module adopts `internal/platform/strictjson`.
-- Tokens handler: evaluate whether strict decode (reject unknown fields) is required for POST/PUT `/tokens`; if so, switch to `strictjson.Decode` in a follow-up.
+- ~~Tokens handler: adopt `strictjson.Decode` (reject unknown fields).~~ **Done (SP-1 review).** Both sites use `strictjson.Decode`; `encoding/json` removed; covered by a strict-decode guard test.
+- Documents/approval module: remove the shim once that module adopts `internal/platform/strictjson`. **Remaining open item.**
 
 ### Files
 
 - `internal/platform/strictjson/` — canonical platform package (SP-1 Task 1)
-- `internal/modules/tokens/delivery/http/handler.go` — uses `json.NewDecoder` (non-strict)
-- `internal/modules/documents/` or `internal/modules/approval/` — shim to be removed
+- `internal/modules/tokens/delivery/http/handler.go` — uses `strictjson.Decode` at both sites (resolved)
+- `internal/modules/documents/` or `internal/modules/approval/` — shim to be removed (remaining)
