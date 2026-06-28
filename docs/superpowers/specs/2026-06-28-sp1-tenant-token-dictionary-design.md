@@ -27,12 +27,14 @@ palette merge (SP-4) are later increments.
 ## 3. Architecture & layering
 
 New bounded-context module `internal/modules/tokens/` with the standard layout
-(`{api, application, domain, delivery/http, infrastructure}`). Exemplars: `taxonomy` (smallest
-complete module, has `module.go`), `templates`.
+(`{api, application, domain, delivery/http, infrastructure}`). Use `taxonomy` as the **layout**
+exemplar only (folders, `module.go`, `RegisterRoutes`, `api/cfg.yaml` + `gen.go`) — taxonomy uses
+module-private `BeginTx`, **not** `TxRunner`. For the `TxRunner.Do` + in-tx `authz` + `audit.RecordTx`
+flow, follow `iam/application/admin_service.go` or `auth/application/service.go`.
 
 ```
 delivery/http (Handler, RegisterRoutes)         generated server iface (oapi-codegen)
-        │  decode (contracts.Decode) → service → problem.Write / httpresponse
+        │  strict JSON decode → service → problem.Write / httpresponse
         ▼
 application.Service  (Create/Get/List/Update/Delete; owns the tx boundary via TxRunner)
         │  authz.SeedTxIdentity → authz.Require → repo → audit.RecordTx
@@ -65,7 +67,8 @@ no existing table modified.
 | `created_at` | TIMESTAMPTZ | NOT NULL DEFAULT now() |
 | `updated_at` | TIMESTAMPTZ | NOT NULL DEFAULT now() |
 
-- `UNIQUE (tenant_id, name)`.
+- `UNIQUE (tenant_id, name)`. This index also serves `GetByName` and (leading-column) `List(tenantID)`
+  — no separate `tenant_id` index needed at SP-1.
 - **The `name` CHECK is anti-corruption storage hygiene, NOT the token grammar.** It rejects the
   genuinely-corrupting set (`{}`, `.`, `-`, whitespace, unicode) so the server is safe at SP-1 when no
   UI exists yet. The *canonical* charset (`IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/`, incl. the
@@ -90,15 +93,21 @@ Pure domain — no SQL, no HTTP.
 `application.Service` with `Create / Get / List / Update / Delete`. `ports.go` declares consumer ports:
 `TxRunner` and `audit.Recorder`.
 
-Both caps are `ScopeTenant` (tenant-wide, not area-scoped), so the tier-2 check is the tenant-wide
-`authz.Require` form — follow the call convention of an existing `ScopeTenant` capability's call site
-(verify the exact signature/area-sentinel at impl; do not pass a real area code).
+Both caps are `ScopeTenant` (tenant-wide, not area-scoped). Tier-2 calls pass the **literal areaCode
+`"tenant"`** — verified convention `templates/application/create.go:67`:
+`authz.Require(ctx, tx, string(cap), "tenant")`. `authz.Require` and `authz.SeedTxIdentity` take the
+concrete `*sql.Tx` the `TxRunner` callback provides.
 
 - **Mutating** (`Create`/`Update`/`Delete`):
-  `TxRunner.Do` → `authz.SeedTxIdentity` → `authz.Require(ctx, tx, CapTokenDictionaryManage, …)`
-  → repo write → `audit.RecordTx` (records actor, action, prior/next state inside the same tx).
+  `TxRunner.Do` → `authz.SeedTxIdentity(ctx, tx, tenantID, actorID)` →
+  `authz.Require(ctx, tx, string(CapTokenDictionaryManage), "tenant")` → repo write →
+  `audit.RecordTx(ctx, tx, event)` (actor, action, prior/next state, same tx).
 - **Read** (`Get`/`List`):
-  `TxRunner.DoReadOnly` → `authz.SeedTxIdentity` → `authz.Require(ctx, tx, CapTokenView, …)` → repo read.
+  `TxRunner.DoReadOnly` → `authz.SeedTxIdentity` → `authz.Require(ctx, tx, string(CapTokenView), "tenant")`
+  → repo read. **Reads are not audited** (platform convention: only state-changing ops are recorded).
+- The audit recorder **consumer port** in `application/ports.go` must declare `tx` as `db.Tx` (audit's
+  real signature `RecordTx(ctx, tx db.Tx, event) error`, `audit/domain/port.go`), **not** `*sql.Tx`;
+  the `*sql.Tx` from `TxRunner` satisfies `db.Tx` structurally — pass it through with no cast.
 - No advisory locks anywhere → **H-PRE-1 satisfied** (no authz-recording read inside a lock-holding tx).
 - `Update` rejects any attempt to change `name` (immutable; §4).
 
@@ -144,8 +153,18 @@ route tagged `tokens`.
 
 DTOs (generated, never hand-written): `TokenDictionaryEntry` (id, name, value, label, description,
 createdAt, updatedAt), `CreateTokenDictionaryEntryRequest` (name, value, label, description),
-`UpdateTokenDictionaryEntryRequest` (value, label, description — no `name`). Decode with
-`contracts.Decode` (strict, rejects unknown fields).
+`UpdateTokenDictionaryEntryRequest` (value, label, description — no `name`).
+
+Strict JSON decode (reject unknown fields). **Note:** the existing strict decoder is module-private
+(`internal/modules/documents/approval/http/contracts/strictjson.go`) — there is **no**
+`internal/platform/contracts` package. Do **not** import the documents-private package (cross-module
+violation, invariant 6). Plan choice: promote `strictjson.Decode` to `internal/platform/strictjson`
+(single source; re-point the existing documents caller) — preferred per reuse-don't-reinvent — or, if
+that promotion is judged out of SP-1 scope at plan time, inline an equivalent `DisallowUnknownFields`
+decoder in `tokens/delivery/http`.
+
+`DELETE` returns **204 No Content**: in the OpenAPI schema declare `204` with a `description` and **no
+`content:` block** (a stray `content: {}` makes `oapi-codegen` emit a broken response struct).
 
 `module.go` `New(Dependencies)` constructor (panic on nil deps; follow `taxonomy`). Wire in the
 composition root `apps/api/cmd/metaldocs-api/main.go`.
@@ -173,7 +192,8 @@ Two new capabilities, both `ScopeTenant`:
 
 `problem.New` / `problem.Write`; never bare `http.Error`.
 - 401 no session · 403 missing capability · 404 not found / cross-tenant (never 403 for cross-tenant)
-- 409 duplicate `(tenant_id, name)` · 422 validation (charset / length / empty / attempted `name` change on PUT).
+- 409 duplicate `(tenant_id, name)` · 422 validation (charset / length / empty); 422 with
+  **`code: immutable_field`** for an attempted `name` change on PUT (distinct from generic validation).
 
 ## 12. Multi-tenant
 
@@ -183,7 +203,8 @@ Two new capabilities, both `ScopeTenant`:
 ## 13. Frameworks reused (no hand-rolled equivalents)
 
 `TxRunner` · `tenant.FromContext` · `authz.SeedTxIdentity`/`Require` · `audit.RecordTx` ·
-`problem.New`/`Write` · `httpresponse` · `contracts.Decode` · `oapi-codegen` (DTOs) · `testdb` factory.
+`problem.New`/`Write` · `httpresponse` · strict JSON decode (promote `strictjson` to platform, or
+inline — see §9) · `oapi-codegen` (DTOs) · `testdb` factory.
 
 ## 14. Testing
 
