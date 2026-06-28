@@ -187,6 +187,12 @@ var routeRules = []routeRule{
 	{method: http.MethodPut, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodDelete, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
+	// Token dictionary (SP-1). F-001 split: GET view, writes manage.
+	{method: http.MethodGet, pathPrefix: "/api/v1/tokens", capability: iamdomain.CapTokenView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathExact: "/api/v1/tokens", capability: iamdomain.CapTokenDictionaryManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/tokens", capability: iamdomain.CapTokenDictionaryManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/tokens", capability: iamdomain.CapTokenDictionaryManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
 	// Controlled documents.
 	{method: http.MethodGet, pathPrefix: "/api/v1/controlled-documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathExact: "/api/v1/controlled-documents", capability: iamdomain.CapControlledDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},

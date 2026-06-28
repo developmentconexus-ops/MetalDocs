@@ -120,6 +120,16 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'document.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.archive', 'Archive a template') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
+-- SP-1 token dictionary capabilities (ADR superseding 0008).
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'token.view', 'Read tenant token dictionary entries') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('author', 'token.view', 'Read tenant token dictionary entries') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('editor', 'token.view', 'Read tenant token dictionary entries') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'token.view', 'Read tenant token dictionary entries') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'token.view', 'Read tenant token dictionary entries') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('viewer', 'token.view', 'Read tenant token dictionary entries') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'token_dictionary.manage', 'Create, update, delete tenant token dictionary entries') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'token_dictionary.manage', 'Create, update, delete tenant token dictionary entries') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+
 -- ADR 0022 Phase 10 (F2): the four redundant phantom caps Phase 8 seeded here
 -- (doc.edit_draft / doc.reconstruct / workflow.instance.cancel / doc.view_published)
 -- were merged into the canonical document.edit / document.view caps — identical
