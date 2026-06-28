@@ -58,11 +58,11 @@ If we ever swap eigenpal out, revisit. Until then: do not flag absence of the de
 
 ---
 
-## convergence-test-rewrite
+## ~~convergence-test-rewrite~~ (resolved, SP-0 follow-up 2026-06-28)
 
-`features/templates/__tests__/template-author-page-convergence.test.tsx` is currently `describe.skip` — pre-existing red on `main` (4/5 fails before rename) because mock paths still pointed at the dissolved `v2/` dir (commit b1e7ae00) and the `useFakeTimers` flow predates the new outline + ApiError effects.
+`features/templates/__tests__/template-author-page-convergence.test.tsx` was rewritten as the SP-0 schema-write regression guard (Major-3 in the Grade-A review). The old `describe.skip` test mocked the dissolved `getAgent().getVariables()` interface and asserted the now-removed schema-corruption write path; it is gone.
 
-Fix: rewrite as a TanStack Query integration test using `QueryClientProvider` + real `fetchPlaceholderCatalog` mocked at the network layer (`vi.spyOn(global, 'fetch')`), drop fake timers, assert on visible DOM via `findByTestId`. Keep the assertions about catalog rendering, detected-token marking, and computed-placeholder save.
+The replacement is a single negative-assertion test under `QueryClientProvider`: it mocks the editor + `useTemplateSchemas`, fires a body `onChange`, lets the 400ms classify debounce settle, then asserts (a) detected tokens flow into the read-only panel (`data-used="true"`) and (b) `schemaState.save` is **never** called. If a future refactor reattaches a schema write to the editor change handler, the test goes red. Runs green on default heap (~0.5s).
 
 ---
 
