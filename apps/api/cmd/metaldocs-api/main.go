@@ -63,6 +63,7 @@ import (
 	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
 	"metaldocs/internal/modules/taxonomy"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
+	"metaldocs/internal/modules/tokens"
 	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/bootstrap"
@@ -353,6 +354,9 @@ func main() {
 
 	taxonomyModule := buildTaxonomyModule(deps)
 	taxonomyModule.RegisterRoutes(mux)
+
+	tokensModule := buildTokensModule(deps)
+	tokensModule.RegisterRoutes(mux)
 
 	controlledDocumentsModule := buildControlledDocumentsModule(deps)
 	controlledDocumentsModule.RegisterRoutes(mux)
@@ -739,6 +743,13 @@ func buildControlledDocumentsModule(deps bootstrap.APIDependencies) *controlledd
 	return controlleddocuments.New(controlleddocuments.Dependencies{
 		DB:          deps.SQLDB,
 		Logger:      slog.Default(),
+		AuditWriter: deps.AuditWriter,
+	})
+}
+
+func buildTokensModule(deps bootstrap.APIDependencies) *tokens.Module {
+	return tokens.New(tokens.Dependencies{
+		DB:          deps.SQLDB,
 		AuditWriter: deps.AuditWriter,
 	})
 }
