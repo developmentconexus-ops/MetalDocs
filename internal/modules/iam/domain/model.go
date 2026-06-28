@@ -121,6 +121,10 @@ const (
 	CapSessionManage               Capability = "session.manage"
 	CapDistributionRead            Capability = "distribution.read"
 	CapNotificationRead            Capability = "notification.read"
+
+	// Token dictionary (SP-1). Both ScopeTenant — tenant-wide, not area-scoped.
+	CapTokenView             Capability = "token.view"
+	CapTokenDictionaryManage Capability = "token_dictionary.manage"
 )
 
 // ADR 0022 Phase 10 (F2) — the four caps Phase 8 minted (doc.edit_draft,
@@ -163,6 +167,8 @@ var validCapabilities = map[Capability]struct{}{
 	CapSessionManage:               {},
 	CapDistributionRead:            {},
 	CapNotificationRead:            {},
+	CapTokenView:                   {},
+	CapTokenDictionaryManage:       {},
 }
 
 func IsValidCapability(cap Capability) bool {

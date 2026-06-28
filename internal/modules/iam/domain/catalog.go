@@ -133,6 +133,8 @@ var capabilityDescriptions = map[Capability]string{
 	CapSessionManage:               "Gerenciar sessões (force-logout)",
 	CapDistributionRead:            "Visualizar cobertura de distribuição de documentos controlados",
 	CapNotificationRead:            "Visualizar as próprias notificações",
+	CapTokenView:                   "Visualizar dicionário de tokens do tenant",
+	CapTokenDictionaryManage:       "Gerenciar entradas do dicionário de tokens do tenant",
 }
 
 // CapabilityCatalog returns one CapabilityDescriptor per Capability const,

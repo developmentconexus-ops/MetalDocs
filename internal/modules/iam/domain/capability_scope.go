@@ -71,6 +71,9 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	// enforced by the SQL predicate (recipient_user_id = caller) in F3.2, not by
 	// the area-vs-tenant grade declared here (ADR-0043).
 	CapNotificationRead: ScopeTenant,
+	// Token dictionary (SP-1) — tenant-wide, not area-scoped.
+	CapTokenView:             ScopeTenant,
+	CapTokenDictionaryManage: ScopeTenant,
 }
 
 // ScopeOf returns the declared scope of a capability and whether it is
