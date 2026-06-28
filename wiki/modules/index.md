@@ -1,6 +1,6 @@
 # Modules
 
-> **Last verified:** 2026-05-27
+> **Last verified:** 2026-06-28
 > **Scope:** Durable per-module knowledge, tech-debt registers, and maturity state.
 
 ## Core product modules
@@ -13,6 +13,7 @@
 - [iam.md](iam.md), [iam-tech-debt.md](iam-tech-debt.md)
 - [taxonomy.md](taxonomy.md), [taxonomy-tech-debt.md](taxonomy-tech-debt.md)
 - [templates.md](templates.md), [templates-tech-debt.md](templates-tech-debt.md)
+- [tokens.md](tokens.md), [tokens-tech-debt.md](tokens-tech-debt.md) — SP-1 per-tenant author-defined `name → value` dictionary; capabilities `token.view` + `token_dictionary.manage`; published `DictionaryReader` port for SP-2 render substitution
 
 ## Frontend-focused modules
 

@@ -1,6 +1,6 @@
-# Token Syntax — `{name}` (docxtemplater native)
+﻿# Token Syntax — `{name}` (docxtemplater native)
 
-> **Last verified:** 2026-06-27
+> **Last verified:** 2026-06-28 (SP-numbering note: tenant dictionary launched in SP-1, not SP-2; SP-2 is render substitution; updated cross-link to tokens.md + ADR 0048) | **Prior:** 2026-06-27
 > **Scope:** Why `{name}` was chosen, what the format implies, comparison with the legacy `{{uuid}}` approach.
 > **Out of scope:** Migration mechanics (see `decisions/0003-token-syntax-migration.md`), placeholder concept overall (see `placeholders.md`).
 > **Key files:**
@@ -64,7 +64,9 @@ Token parsing lives entirely in TypeScript/Node: `@metaldocs/shared-tokens` owns
 
 **Go never parses tokens.** The Go backend validates tokens by catalog/dictionary membership over the `DetectedToken` output surfaced by the editor adapter, and by checking `unreplacedVars` from the renderer. Token syntax is never re-implemented in Go — this is a binding invariant (any Go token parser would be a second grammar that could drift).
 
-For SP-2 (tenant dictionary), the validation flow will be: editor → `detectTokens` → `DetectedToken[]` (valid/invalid) → API carries token names → Go checks names against tenant dictionary → 422 if name not in dictionary. The charset gate happens client-side; the catalog membership gate happens server-side.
+> **SP-numbering note:** The tenant token dictionary (described in this sentence as "SP-2") launched in SP-1. The CRUD dictionary backend (`internal/modules/tokens`, migration 0248, `/api/v1/tokens` routes) is fully implemented and tested as of 2026-06-28. SP-2 adds render substitution (render-fanout consuming `domain.DictionaryReader`). This document will be updated at SP-2. See `wiki/modules/tokens.md` and `wiki/decisions/0048-tenant-token-dictionary.md`.
+
+For SP-1 (tenant dictionary — now live), the CRUD API is at `/api/v1/tokens`. For SP-2 (render substitution), the validation flow will be: editor → `detectTokens` → `DetectedToken[]` (valid/invalid) → API carries token names → Go checks names against tenant dictionary via `DictionaryReader` → 422 if name not in dictionary. The charset gate happens client-side; the catalog membership gate happens server-side.
 
 ## Sections, conditionals, raw — eigenpal extras we miss today
 
