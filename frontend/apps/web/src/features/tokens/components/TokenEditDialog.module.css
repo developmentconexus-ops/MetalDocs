@@ -1,0 +1,43 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.dialog {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 24px;
+  width: 480px;
+  max-width: 92vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+.title { margin: 0 0 16px; font-size: 18px; font-weight: 600; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.field label { font-size: 13px; font-weight: 500; }
+.field input, .field textarea {
+  border: 1px solid var(--border, #d0d0d0);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+}
+.error { color: var(--danger, #c0392b); font-size: 12px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.primary {
+  background: var(--brand-600, #7a1f3d);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.secondary {
+  background: transparent;
+  border: 1px solid var(--border, #d0d0d0);
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
