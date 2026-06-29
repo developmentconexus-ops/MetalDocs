@@ -2,11 +2,12 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { AvailableTokensPanel } from './AvailableTokensPanel';
-import type { PlaceholderCatalogEntry } from './api/catalog';
+import type { Token } from './tokens/tokenCatalog';
 
-const catalog: PlaceholderCatalogEntry[] = [
-  { key: 'doc_code', label: 'Código do documento' } as PlaceholderCatalogEntry,
-  { key: 'author', label: 'Autor' } as PlaceholderCatalogEntry,
+const catalog: Token[] = [
+  { key: 'doc_code', label: 'Código do documento', kind: 'computed' },
+  { key: 'author', label: 'Autor', kind: 'computed' },
+  { key: 'COMPANY_NAME', label: 'Empresa', kind: 'dictionary' },
 ];
 
 describe('AvailableTokensPanel', () => {
@@ -55,5 +56,32 @@ describe('AvailableTokensPanel', () => {
     const ev = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
     const prevented = !btn.dispatchEvent(ev);
     expect(prevented).toBe(true);
+  });
+
+  it('renders computed section heading', () => {
+    render(<AvailableTokensPanel catalog={catalog} usedKeys={new Set()} unknownTokens={[]} invalidTokens={[]} onInsert={() => {}} />);
+    expect(screen.getByText('Preenchido pelo sistema (seguro)')).toBeTruthy();
+    expect(screen.getByTestId('token-doc_code')).toBeTruthy();
+  });
+
+  it('renders dictionary section with its heading and tokens', () => {
+    render(<AvailableTokensPanel catalog={catalog} usedKeys={new Set()} unknownTokens={[]} invalidTokens={[]} onInsert={() => {}} />);
+    expect(screen.getByText('Definido pela sua organização')).toBeTruthy();
+    expect(screen.getByTestId('token-COMPANY_NAME')).toBeTruthy();
+  });
+
+  it('calls onInsert with the dictionary token key on click', () => {
+    const onInsert = vi.fn();
+    render(<AvailableTokensPanel catalog={catalog} usedKeys={new Set()} unknownTokens={[]} invalidTokens={[]} onInsert={onInsert} />);
+    fireEvent.click(screen.getByTestId('token-COMPANY_NAME').querySelector('button')!);
+    expect(onInsert).toHaveBeenCalledWith('COMPANY_NAME');
+  });
+
+  it('does not render dictionary section when no dictionary tokens exist', () => {
+    const computedOnly: Token[] = [
+      { key: 'doc_code', label: 'Código', kind: 'computed' },
+    ];
+    render(<AvailableTokensPanel catalog={computedOnly} usedKeys={new Set()} unknownTokens={[]} invalidTokens={[]} onInsert={() => {}} />);
+    expect(screen.queryByText('Definido pela sua organização')).toBeNull();
   });
 });

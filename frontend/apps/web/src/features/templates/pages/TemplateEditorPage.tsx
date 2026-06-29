@@ -11,6 +11,7 @@ import { partitionDetected } from '../lib/tokens';
 import { canSubmit, type ActorContext } from '../lib/canActOnVersion';
 import { useAuthStore } from '../../../store/auth.store';
 import { usePlaceholderCatalogQuery } from '../queries/usePlaceholderCatalogQuery';
+import type { Token } from '../tokens/tokenCatalog';
 import {
   EditorChrome,
   editorChromeStyles,
@@ -68,7 +69,12 @@ export function TemplateEditorPage({
   const [leftActive, setLeftActive] = useState<LeftPanel>('variables');
   const [localSchemas, setLocalSchemas] = useState<TemplateSchemas | null>(null);
   const catalogQuery = usePlaceholderCatalogQuery();
-  const catalog = useMemo(() => catalogQuery.data ?? [], [catalogQuery.data]);
+  // Task 9 will replace this with the unified catalog (computed + dictionary).
+  // For now, treat all API-catalog entries as computed so the Token[] type is satisfied.
+  const catalog = useMemo<Token[]>(
+    () => (catalogQuery.data ?? []).map((e) => ({ key: e.key, label: e.label, description: e.description, kind: 'computed' as const })),
+    [catalogQuery.data],
+  );
   const catalogFailed = catalogQuery.isError;
   const [usedKeys, setUsedKeys] = useState<Set<string>>(new Set());
   const [unknownTokens, setUnknownTokens] = useState<string[]>([]);

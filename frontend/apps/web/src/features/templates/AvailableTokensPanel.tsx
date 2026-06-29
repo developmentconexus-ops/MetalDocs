@@ -1,9 +1,9 @@
 import React from 'react';
-import type { PlaceholderCatalogEntry } from './api/catalog';
+import type { Token } from './tokens/tokenCatalog';
 import styles from './AvailableTokensPanel.module.css';
 
 export interface AvailableTokensPanelProps {
-  catalog: PlaceholderCatalogEntry[];
+  catalog: Token[];
   /** True when the placeholder catalog failed to load. With no catalog, every
    * token would otherwise classify as "unknown"; warn instead of misleading. */
   catalogError?: boolean;
@@ -11,6 +11,33 @@ export interface AvailableTokensPanelProps {
   unknownTokens: string[];
   invalidTokens: string[];
   onInsert: (key: string) => void;
+}
+
+function TokenList({
+  items,
+  usedKeys,
+  onInsert,
+}: {
+  items: Token[];
+  usedKeys: Set<string>;
+  onInsert: (key: string) => void;
+}): React.ReactElement {
+  return (
+    <ul className={styles.list}>
+      {items.map((it) => {
+        const used = usedKeys.has(it.key);
+        return (
+          <li key={it.key} className={styles.item} data-testid={`token-${it.key}`} data-used={used}>
+            <button type="button" className={styles.insertBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => onInsert(it.key)}>
+              <code className={styles.code}>{`{${it.key}}`}</code>
+              <span className={styles.label}>{it.label}</span>
+              {used && <span className={styles.usedBadge}>em uso</span>}
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 export function AvailableTokensPanel({
@@ -21,6 +48,9 @@ export function AvailableTokensPanel({
   invalidTokens,
   onInsert,
 }: AvailableTokensPanelProps): React.ReactElement {
+  const computed = catalog.filter((t) => t.kind === 'computed');
+  const dictionary = catalog.filter((t) => t.kind === 'dictionary');
+
   return (
     <aside className={styles.panel} aria-label="Tokens disponíveis">
       <header className={styles.head}>
@@ -39,20 +69,18 @@ export function AvailableTokensPanel({
           </ul>
         </div>
       )}
-      <ul className={styles.list}>
-        {catalog.map((it) => {
-          const used = usedKeys.has(it.key);
-          return (
-            <li key={it.key} className={styles.item} data-testid={`token-${it.key}`} data-used={used}>
-              <button type="button" className={styles.insertBtn} onMouseDown={(e) => e.preventDefault()} onClick={() => onInsert(it.key)}>
-                <code className={styles.code}>{`{${it.key}}`}</code>
-                <span className={styles.label}>{it.label}</span>
-                {used && <span className={styles.usedBadge}>em uso</span>}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <TokenList items={computed} usedKeys={usedKeys} onInsert={onInsert} />
+      {dictionary.length > 0 && (
+        <>
+          <header className={styles.head}>
+            <h3 className={styles.title}>Definido pela sua organização</h3>
+            <p className={styles.hint}>
+              Constantes da sua organização — inseridas e preenchidas automaticamente.
+            </p>
+          </header>
+          <TokenList items={dictionary} usedKeys={usedKeys} onInsert={onInsert} />
+        </>
+      )}
       {!catalogError && unknownTokens.length > 0 && (
         <div className={styles.unknown} role="status">
           <p className={styles.unknownTitle}>Tokens não reconhecidos</p>
