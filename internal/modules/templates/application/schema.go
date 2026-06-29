@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
+	"sync"
 	"time"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	renderdomain "metaldocs/internal/modules/render/domain"
 	"metaldocs/internal/modules/templates/domain"
 )
 
@@ -98,9 +100,23 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 
 var placeholderNameRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,49}$`)
 
-var placeholderCatalogSet = map[string]struct{}{
-	"doc_code": {}, "doc_title": {}, "revision_number": {},
-	"author": {}, "effective_date": {}, "approvers": {}, "controlled_by_area": {},
+// placeholderCatalogSet is the set of valid computed-placeholder names.
+// Derived once from render/domain.ComputedCatalog() — single source of truth
+// per ADR 0050. Adding a token to ComputedCatalog automatically unlocks it here.
+var (
+	placeholderCatalogSet     map[string]struct{}
+	placeholderCatalogSetOnce sync.Once
+)
+
+func computedCatalogSet() map[string]struct{} {
+	placeholderCatalogSetOnce.Do(func() {
+		tokens := renderdomain.ComputedCatalog()
+		placeholderCatalogSet = make(map[string]struct{}, len(tokens))
+		for _, t := range tokens {
+			placeholderCatalogSet[t.Key] = struct{}{}
+		}
+	})
+	return placeholderCatalogSet
 }
 
 func ValidatePlaceholders(phs []domain.Placeholder, nativeNames map[string]int) error {
@@ -125,8 +141,8 @@ func ValidatePlaceholders(phs []domain.Placeholder, nativeNames map[string]int) 
 
 			if p.Type == domain.PHDictionary {
 				// SP-2 D5: a dictionary reference name must NOT be a native/computed
-				// token name. Use the resolver registry's keys (8, incl. approval_date),
-				// not the static placeholderCatalogSet (7).
+				// token name. Uses nativeNames (caller-supplied from resolver registry),
+				// which covers all ComputedCatalog() keys including approval_date.
 				if _, isNative := nativeNames[p.Name]; isNative {
 					return fmt.Errorf("placeholder[%s] name %q: %w", p.ID, p.Name, domain.ErrPlaceholderReservedName)
 				}
@@ -135,9 +151,10 @@ func ValidatePlaceholders(phs []domain.Placeholder, nativeNames map[string]int) 
 					return fmt.Errorf("placeholder[%s] name %q: %w", p.ID, p.Name, domain.ErrPlaceholderDictionaryInvalid)
 				}
 			} else {
-				// Existing computed rule (unchanged): a named placeholder must be in the
-				// fixed catalog and be computed with a matching resolver_key.
-				if _, ok := placeholderCatalogSet[p.Name]; !ok {
+				// A named placeholder must be in the computed catalog (derived from
+				// render/domain.ComputedCatalog(), single source per ADR 0050) and be
+				// computed with a matching resolver_key.
+				if _, ok := computedCatalogSet()[p.Name]; !ok {
 					return fmt.Errorf("placeholder[%s] name %q: %w", p.ID, p.Name, domain.ErrPlaceholderNotInCatalog)
 				}
 				if p.Type != domain.PHComputed || p.ResolverKey == nil || *p.ResolverKey != p.Name {
