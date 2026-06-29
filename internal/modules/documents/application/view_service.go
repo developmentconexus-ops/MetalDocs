@@ -47,7 +47,9 @@ var viewableStatuses = map[string]struct{}{
 func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID string) (ViewResult, error) {
 	ctx = authz.WithCapCache(ctx)
 	var result ViewResult
-	if err := s.runner.DoReadOnly(ctx, func(tx *sql.Tx) error {
+	// Read-write tx: authz.Require may audit a system_admin bypass (ADR 0022 F8),
+	// which INSERTs — see the Require INVARIANT note in iam/authz/authz.go.
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 			return err
 		}

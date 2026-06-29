@@ -32,7 +32,9 @@ func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID,
 	// Authz runs in a short read-only tx; the renderer HTTP round-trip must NOT hold
 	// a DB connection open across the network call, so it runs after the tx closes
 	// (mirrors the materialize runner, which calls the renderer off-tx too).
-	if err := s.txRunner.DoReadOnly(ctx, func(tx *sql.Tx) error {
+	// Read-write tx: authz.Require may audit a system_admin bypass (ADR 0022 F8),
+	// which INSERTs — see the Require INVARIANT note in iam/authz/authz.go.
+	if err := s.txRunner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 			return err
 		}

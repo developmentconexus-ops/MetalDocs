@@ -20,10 +20,14 @@ import (
 // longer leak a transaction or forget to commit.
 type TxRunner interface {
 	Do(ctx context.Context, fn func(tx *sql.Tx) error) error
-	// DoReadOnly begins a READ ONLY transaction for authz-gated read paths.
-	// SeedTxIdentity's SET LOCAL GUCs and authz.Require run correctly under
-	// READ ONLY; the flag is a write-guard that documents intent and prevents
-	// accidental DML inside what should be a pure read path.
+	// DoReadOnly begins a READ ONLY transaction for pure read paths. The flag is
+	// a write-guard that documents intent and prevents accidental DML.
+	//
+	// MUST NOT be used for any path that calls authz.Require: the F8 bypass audit
+	// INSERTs on the system_admin/bypass short-circuit (ADR 0022 Phase 11), which
+	// a READ ONLY tx rejects. authz.Require enforces this with a read-only-tx
+	// guard (authz.ErrReadOnlyTx). SeedTxIdentity's SET LOCAL GUCs are RO-safe,
+	// but the Require grant path is not — use Do for authz-gated reads.
 	DoReadOnly(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 

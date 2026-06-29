@@ -19,7 +19,9 @@ import (
 // ADR 0022 Phase 10 (F2): the redundant doc.edit_draft cap was merged into the
 // canonical CapDocumentEdit — identical grant set, same area-grade enforcement.
 func requireDocEditDraft(ctx context.Context, runner db.TxRunner, cdRead controlleddocumentsdomain.CDFieldReader, tenantID, actorID, docID string) error {
-	// NOTE: logically read-only; uses Do (RW) to match the prior BeginTx(ctx,nil). RO-tightening (DoReadOnly) deferred — flagged for operator.
+	// Read-write tx is the canonical contract for any authz.Require path: the
+	// F8 bypass audit may INSERT (ADR 0022 Phase 11), so DoReadOnly is forbidden
+	// here — see the Require INVARIANT note in iam/authz/authz.go.
 	ctx = authz.WithCapCache(ctx)
 	return runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {

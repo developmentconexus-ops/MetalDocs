@@ -172,10 +172,13 @@ func (s *Service) Delete(ctx context.Context, tenantID, actorID, id string) erro
 	})
 }
 
-// Get fetches a single entry by ID. Read operations are not audited.
+// Get fetches a single entry by ID. No business audit event is written, but the
+// authz.Require call may audit a system_admin bypass (ADR 0022 F8) — which
+// INSERTs — so this runs read-write (Do, not DoReadOnly). See the Require
+// INVARIANT note in iam/authz/authz.go.
 func (s *Service) Get(ctx context.Context, tenantID, id string) (*domain.Entry, error) {
 	var out *domain.Entry
-	err := s.runner.DoReadOnly(ctx, func(tx *sql.Tx) error {
+	err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 		actorID := iamdomain.UserIDFromContext(ctx)
 		if err := s.seed(ctx, tx, tenantID, actorID); err != nil {
 			return err
@@ -196,10 +199,11 @@ func (s *Service) Get(ctx context.Context, tenantID, id string) (*domain.Entry, 
 	return out, nil
 }
 
-// GetByName satisfies domain.DictionaryReader. Read operations are not audited.
+// GetByName satisfies domain.DictionaryReader. No business audit event, but the
+// authz.Require bypass audit may INSERT — runs read-write (see Get).
 func (s *Service) GetByName(ctx context.Context, tenantID, name string) (*domain.Entry, error) {
 	var out *domain.Entry
-	err := s.runner.DoReadOnly(ctx, func(tx *sql.Tx) error {
+	err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 		actorID := iamdomain.UserIDFromContext(ctx)
 		if err := s.seed(ctx, tx, tenantID, actorID); err != nil {
 			return err
@@ -220,10 +224,11 @@ func (s *Service) GetByName(ctx context.Context, tenantID, name string) (*domain
 	return out, nil
 }
 
-// List satisfies domain.DictionaryReader. Read operations are not audited.
+// List satisfies domain.DictionaryReader. No business audit event, but the
+// authz.Require bypass audit may INSERT — runs read-write (see Get).
 func (s *Service) List(ctx context.Context, tenantID string) ([]domain.Entry, error) {
 	var out []domain.Entry
-	err := s.runner.DoReadOnly(ctx, func(tx *sql.Tx) error {
+	err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 		actorID := iamdomain.UserIDFromContext(ctx)
 		if err := s.seed(ctx, tx, tenantID, actorID); err != nil {
 			return err

@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-29 (SP-3 UI delivered — capability-gated CRUD screen at templates/tokens; see SP-2 for prior history — creation-time dictionary token pinning; reserved-name guard; `PHDictionary` placeholder type in templates; migration 0249 widens `source` CHECK; ADR 0049) | **Prior:** 2026-06-28 (SP-1 initial publish — module fully implemented: migration 0248, IAM capabilities, OpenAPI + oapi-codegen, domain/application/infrastructure/delivery layers, module assembly, integration tests) | **Owner:** unassigned | **Status:** active (SP-1 + SP-2 feature-complete; SP-3 UI pending) | **Maturity:** L3
+**Last verified:** 2026-06-29 (read-write-tx authz fix — Get/GetByName/List switched `DoReadOnly`→`Do` so the system_admin bypass audit (ADR 0022 F8) can INSERT; new api-lint `authz-require-rw-tx` rule; SP-3 UI delivered — capability-gated CRUD screen at templates/tokens; see SP-2 for prior history — creation-time dictionary token pinning; reserved-name guard; `PHDictionary` placeholder type in templates; migration 0249 widens `source` CHECK; ADR 0049) | **Prior:** 2026-06-28 (SP-1 initial publish — module fully implemented: migration 0248, IAM capabilities, OpenAPI + oapi-codegen, domain/application/infrastructure/delivery layers, module assembly, integration tests) | **Owner:** unassigned | **Status:** active (SP-1 + SP-2 feature-complete; SP-3 UI pending) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/tokens/domain/entry.go` — `Entry` aggregate, `NewEntry`, `ApplyUpdate`, `nameRe`, sentinel errors
@@ -39,7 +39,7 @@ This module introduces a **new class of token** alongside the computed-token cat
 | Rank | Goal | How verified |
 |---|---|---|
 | 1 | Multi-tenant isolation | `(tenant_id, name)` unique index; tenant always read from `tenant.FromContext` (session-bound, not client header); RLS NULL-permissive policy on `token_dictionary_entries` |
-| 2 | Authz on every operation | Tier-1 dispatcher wired; `authz.Require` inside every tx (reads via `DoReadOnly`, writes via `Do`); DB tripwire from `trg_require_cap_asserted` pattern |
+| 2 | Authz on every operation | Tier-1 dispatcher wired; `authz.Require` inside every tx, all via `Do` (read-WRITE — the F8 bypass audit may INSERT, so `DoReadOnly` is banned on authz-gated paths; see [authz-tiers.md](../concepts/authz-tiers.md) Common pitfalls); DB tripwire from `trg_require_cap_asserted` pattern |
 | 3 | Audit completeness | `audit.Writer.RecordTx` called for every state-changing operation inside the same tx; reads not audited per convention |
 | 4 | Published surface stability | `domain.DictionaryReader` is the only inter-module Go contract; it has no tx coupling so SP-2 callers never see the storage implementation |
 
@@ -60,7 +60,7 @@ This module introduces a **new class of token** alongside the computed-token cat
 - Persistence: Postgres; 1 owned table (`metaldocs.token_dictionary_entries`) created by forward migration `0248_token_dictionary_entries.sql`
 - HTTP routing: oapi-codegen generated router (`tokensapi.HandlerWithOptions`); spec at `internal/modules/tokens/api/cfg.yaml` → `api.gen.go`; compile-time `ServerInterface` assertion in `api.gen.go`
 - Error envelope: RFC 9457 `application/problem+json` via `httpresponse.WriteError` → `problem.Write`; domain-specific codes `ALREADY_EXISTS`, `NOT_FOUND`, `immutable_field`
-- Authz: tier-1 path-prefix dispatcher (`permissions.go:190-194`); tier-2 `authz.Require` inside every `txRunner.Do` / `DoReadOnly` call; no direct tier-3 tripwire row in this migration (DB CHECK constraints serve the same enforcement role)
+- Authz: tier-1 path-prefix dispatcher (`permissions.go:190-194`); tier-2 `authz.Require` inside every `txRunner.Do` call (read-WRITE, including reads — the bypass audit may INSERT; `DoReadOnly` is banned on authz-gated paths, enforced by api-lint `authz-require-rw-tx`); no direct tier-3 tripwire row in this migration (DB CHECK constraints serve the same enforcement role)
 - Tenant scoping: `tenant.FromContext` only — never client headers; panics/errors on missing context tenant per platform convention
 - Token grammar: Node-owned (`@metaldocs/shared-tokens`); Go's `nameRe = ^[A-Za-z0-9_]+$` is anti-corruption hygiene, not grammar
 
@@ -108,9 +108,9 @@ No outbound calls to other business modules. This module is a pure provider.
 
 ## 4. Solution Strategy
 
-- **Tx-owner pattern.** The application service (`application.Service`) owns the transaction boundary via `db.TxRunner.Do` / `DoReadOnly`. The repository receives the `*sql.Tx` as a parameter and never opens its own connection or tx. This is consistent with the MetalDocs standard for modules introduced after Wave 2.
+- **Tx-owner pattern.** The application service (`application.Service`) owns the transaction boundary via `db.TxRunner.Do` (read-WRITE for all operations, reads included — `authz.Require` may INSERT a bypass audit, so `DoReadOnly` is not used here). The repository receives the `*sql.Tx` as a parameter and never opens its own connection or tx. This is consistent with the MetalDocs standard for modules introduced after Wave 2.
 - **SeedTxIdentity → authz.Require sequence.** Every tx starts with `authz.SeedTxIdentity(ctx, tx, tenantID, actorID)` (sets tx-local GUCs) followed immediately by `authz.Require(ctx, tx, capability, "tenant")`. Both read and write paths enforce capability before touching data.
-- **Reads use DoReadOnly, not audited.** `Get`, `GetByName`, `List` run under `txRunner.DoReadOnly`. No audit event is emitted for reads; this matches the platform convention and avoids audit log pollution.
+- **Reads are not business-audited, but still run read-WRITE.** `Get`, `GetByName`, `List` run under `txRunner.Do` (not `DoReadOnly`): no business audit event is emitted for reads, but `authz.Require` may INSERT a system_admin bypass audit (ADR 0022 F8), which a read-only tx cannot do. `DoReadOnly` is therefore banned on authz-gated paths (enforced by api-lint `authz-require-rw-tx`).
 - **Name is immutable.** `name` is the render key. `Update` fetches the existing entry first; if the caller sends a non-empty `name` that differs from the stored name, `domain.ErrImmutableName` is returned (422 `immutable_field`). The DB has no trigger for this — the app-layer check is the sole enforcement.
 - **DictionaryReader as the published port.** The application service implements `domain.DictionaryReader` (compile-time proof: `var _ domain.DictionaryReader = (*Service)(nil)`). The module exports `Module.Reader domain.DictionaryReader` so SP-2 callers can inject only this narrow interface without depending on the full service.
 - **Anti-corruption storage hygiene.** `nameRe = ^[A-Za-z0-9_]+$` in the domain is paired with an identical CHECK constraint in the migration. The DB rejects any row the app layer might wrongly admit. The canonical leading-char rule (`^[A-Za-z_]`) lives in Node and is a superset constraint applied at the UI edge.
@@ -187,7 +187,7 @@ sequenceDiagram
     participant C as Client
     participant M as Middleware chain
     participant H as Handler.ListTokens
-    participant S as Service.List (DoReadOnly)
+    participant S as Service.List (Do, read-WRITE)
     participant R as PostgresRepository.List
     participant DB as token_dictionary_entries
 
@@ -196,7 +196,7 @@ sequenceDiagram
     M->>H: pass
     H->>H: tenant.FromContext → tenantID
     H->>S: List(ctx, tenantID)
-    S->>S: DoReadOnly: SeedTxIdentity → authz.Require(token.view)
+    S->>S: Do (read-WRITE): SeedTxIdentity → authz.Require(token.view)
     S->>R: List(ctx, tx, tenantID)
     R->>DB: SELECT ... WHERE tenant_id=$1 ORDER BY name
     DB-->>R: rows
@@ -205,7 +205,7 @@ sequenceDiagram
     H-->>C: 200 {"items":[...]}
 ```
 
-No write; no audit. `DoReadOnly` issues a read-only tx. Tier-2 `authz.Require(CapTokenView)` is still called inside the read tx — this is the belt-and-suspenders pattern for the tokens module.
+No business write; no business audit. The tx runs read-WRITE (`Do`, not `DoReadOnly`) because tier-2 `authz.Require(CapTokenView)` — still called inside the tx as the belt-and-suspenders pattern — may INSERT a system_admin bypass audit (ADR 0022 F8), which a read-only tx cannot do.
 
 ### 6.2 createToken — write path
 
@@ -290,7 +290,7 @@ sequenceDiagram
 - `PUT /api/v1/tokens` (prefix) → `CapTokenDictionaryManage`
 - `DELETE /api/v1/tokens` (prefix) → `CapTokenDictionaryManage`
 
-**Tier 2 (in-tx):** `authz.SeedTxIdentity` + `authz.Require` called at the top of every `txRunner.Do` / `DoReadOnly` callback in `application/service.go`. The seam is injectable (`authzRequireFunc` / `seedTxFunc`) so unit tests run without a real DB.
+**Tier 2 (in-tx):** `authz.SeedTxIdentity` + `authz.Require` called at the top of every `txRunner.Do` callback in `application/service.go` (read and write paths alike — all `Do`, never `DoReadOnly`, since the bypass audit may INSERT). The seam is injectable (`authzRequireFunc` / `seedTxFunc`) so unit tests run without a real DB.
 
 **Postgres tripwire:** The tokens migration does not attach `trg_require_cap_asserted` (the trigger requires a `capabilities_asserted` column which is not part of the standard table schema). DB CHECK constraints (`CHECK (name ~ '^[A-Za-z0-9_]+$')`, `CHECK (length(name) BETWEEN 1 AND 64)`, etc.) enforce data integrity as the last line. The `trg_require_cap_asserted` pattern can be added in a follow-up migration if required.
 
@@ -322,7 +322,7 @@ No pagination. `List` returns all entries for the tenant ordered by `name`. Toke
 
 ### 8.7 Concurrency / Transactions
 
-All operations run inside a single `*sql.Tx` supplied by `db.TxRunner.Do` or `DoReadOnly`. The repository never opens its own connection. The `Update` path fetches the existing entry inside the same tx before applying the update — no optimistic lock (last-write-wins for concurrent updates to the same entry). Duplicate `name` conflicts are serialisation-safe via the unique index `ux_token_dictionary_tenant_name`.
+All operations run inside a single `*sql.Tx` supplied by `db.TxRunner.Do` (read-WRITE for every operation — `DoReadOnly` is not used on authz-gated paths). The repository never opens its own connection. The `Update` path fetches the existing entry inside the same tx before applying the update — no optimistic lock (last-write-wins for concurrent updates to the same entry). Duplicate `name` conflicts are serialisation-safe via the unique index `ux_token_dictionary_tenant_name`.
 
 ### 8.8 Token grammar boundary
 

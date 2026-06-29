@@ -61,7 +61,111 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	}
 	out = append(out, codec...)
 
+	// ADR 0022 — authz.Require must run in a read-WRITE tx (the F8 bypass audit
+	// INSERTs). No DoReadOnly closure may invoke a tier-2 require.
+	rwTx, err := checkAuthzRequireRWTx(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, rwTx...)
+
 	return out, nil
+}
+
+// requireSelectors are the tier-2 enforcement call names a DoReadOnly closure
+// must never contain. "Require"/"RequireAll" cover direct authz.Require calls;
+// the lowercase "require" covers the application-service seam field
+// (authzRequireFunc, e.g. tokens.Service.require) that delegates to authz.Require
+// without naming the package — name-based AST scans would otherwise miss it.
+var requireSelectors = map[string]struct{}{
+	"Require":    {},
+	"RequireAll": {},
+	"require":    {},
+}
+
+// checkAuthzRequireRWTx flags any DoReadOnly(...) call whose closure body invokes
+// a tier-2 require (authz.Require / the require seam). authz.Require's
+// system_admin & BypassSystem short-circuits audit the bypass in-tx with an
+// INSERT (ADR 0022 Phase 11 F8, fail-closed); a Postgres READ ONLY transaction
+// rejects that INSERT, so the path 500s the moment the actor is an admin while
+// staying latent for everyone else. DoReadOnly is the single read-only-tx
+// chokepoint in the tree, so this static guard fully covers the regression
+// surface with zero runtime cost. The fix is always DoReadOnly → Do (or
+// BeginTx(ctx, nil)). Single-file AST scan, matching the other code rules.
+func checkAuthzRequireRWTx(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
+	out := []Violation{}
+	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".claude", "node_modules", "vendor", "testdata":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		lower := strings.ToLower(path)
+		if !strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, "_test.go") || strings.HasSuffix(lower, ".gen.go") {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "DoReadOnly" {
+				return true
+			}
+			for _, arg := range call.Args {
+				lit, ok := arg.(*ast.FuncLit)
+				if !ok || lit.Body == nil {
+					continue
+				}
+				if closureCallsRequire(lit.Body) {
+					out = append(out, Violation{
+						File:    path,
+						Line:    fset.Position(call.Pos()).Line,
+						Rule:    "authz-require-rw-tx",
+						Message: "authz.Require invoked inside a DoReadOnly closure — the F8 bypass audit INSERTs and a READ ONLY tx rejects it (ADR 0022 Phase 11). Open the tx with Do or BeginTx(ctx, nil), not DoReadOnly.",
+					})
+				}
+			}
+			return true
+		})
+		return nil
+	})
+	if walkErr != nil {
+		return nil, walkErr
+	}
+	return out, nil
+}
+
+// closureCallsRequire reports whether a function body contains a tier-2 require
+// call (see requireSelectors).
+func closureCallsRequire(body *ast.BlockStmt) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		if _, hit := requireSelectors[sel.Sel.Name]; hit {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
 }
 
 // paginationCursorFile is the ONE file allowed to name base64.StdEncoding's

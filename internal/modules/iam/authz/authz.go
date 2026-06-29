@@ -73,6 +73,15 @@ func WithCapCache(ctx context.Context) context.Context {
 //
 // Pass areaCode = "tenant" to skip the area filter (degenerates to a tier-1
 // equivalent inside the transaction).
+//
+// INVARIANT — Require MUST run inside a read-WRITE transaction. The
+// system_admin / BypassSystem short-circuit audits the bypass in-tx (ADR 0022
+// Phase 11 F8: every privileged bypass is INSERTed into audit_events,
+// fail-closed). A read-only (DoReadOnly) tx rejects that INSERT, so the path is
+// only reachable as a latent 500 when the actor happens to be an admin — open
+// the tx with TxRunner.Do or BeginTx(ctx, nil), never DoReadOnly. This contract
+// is enforced statically by the api-lint `authz-require-rw-tx` rule (no
+// DoReadOnly closure may call authz.Require); all production call sites are RW.
 func Require(ctx context.Context, tx *sql.Tx, capability, areaCode string) error {
 	actorID, err := MustActorID(ctx, tx)
 	if err != nil {
