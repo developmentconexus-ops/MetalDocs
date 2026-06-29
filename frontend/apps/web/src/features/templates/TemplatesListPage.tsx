@@ -96,7 +96,7 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
           action={
             <>
               {props.onOpenTokenDictionary && (
-                <button type="button" className={styles.newBtn} onClick={() => props.onOpenTokenDictionary?.()}>
+                <button type="button" className={styles.newBtn} onClick={props.onOpenTokenDictionary}>
                   Dicionário de tokens
                 </button>
               )}
