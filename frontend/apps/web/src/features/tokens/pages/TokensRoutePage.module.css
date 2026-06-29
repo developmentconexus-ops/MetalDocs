@@ -1,0 +1,13 @@
+.page { padding: 24px 32px; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.title { margin: 0; font-size: 22px; font-weight: 600; }
+.subtitle { margin: 4px 0 0; color: var(--muted, #666); font-size: 14px; }
+.newBtn {
+  background: var(--brand-600, #7a1f3d);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.state { padding: 32px; text-align: center; color: var(--muted, #666); }
