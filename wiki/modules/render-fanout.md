@@ -67,7 +67,7 @@ a template without the resolver erroring on unpublished documents.
 
 ## Pipeline (high-level)
 
-1. Freeze service substitutes the 7 fixed tokens in the DOCX (eigenpal-native format).
+1. Freeze service substitutes the 8 fixed tokens in the DOCX (eigenpal-native format).
 2. Frozen DOCX uploaded to MinIO.
 3. PDFDispatcher publishes a `docgen_v2_pdf` outbox event with `messaging.PDFConvertPayload`.
 4. PDFJobRunner picks up the typed payload, calls Gotenberg via docx-renderer.
@@ -78,7 +78,7 @@ a template without the resolver erroring on unpublished documents.
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
 | Gotenberg / LibreOffice down | PDF outbox rows accumulate in `pdf_dispatch_outbox` with `pending`; published doc shows `pdf_status=pending` for >SLA | `pdf_outbox_worker` logs HTTP error; `pdf_outbox_repository.ReadState` returns `pending`/`failed` | Restart Gotenberg container; failed rows retried by worker until `max_attempts`, then marked `failed` (see [`render-fanout-tech-debt.md`](render-fanout-tech-debt.md)) |
-| docx-renderer fanout substitution error | Freeze emits `docgen.substitution_failed`; outbox row may be `failed` | `apps/docx-renderer/src/routes/fanout.ts` returns 5xx; `internal/modules/render/fanout/client.go` surfaces error | Inspect docx-renderer logs for token/resolver mismatch; check `concepts/placeholders.md` 7-token catalog drift |
+| docx-renderer fanout substitution error | Freeze emits `docgen.substitution_failed`; outbox row may be `failed` | `apps/docx-renderer/src/routes/fanout.ts` returns 5xx; `internal/modules/render/fanout/client.go` surfaces error | Inspect docx-renderer logs for token/resolver mismatch; check `concepts/placeholders.md` 8-token catalog drift |
 | Resolver returns empty value for required token | Frozen DOCX renders blank placeholder | `internal/modules/render/resolvers/builtins.go` returns `""`; tracked by `concepts/placeholders.md` | Confirm upstream data populated (e.g. controlled-document fields); add resolver coverage |
 | Nil tx passed to `Enqueue` | `Enqueue` returns an error immediately (`"pdf outbox enqueue: tx must not be nil"` / `"materialize outbox enqueue: tx must not be nil"`) — `pdf_outbox_repository.go:31` / `materialize_outbox_repository.go:31` | Error propagates to caller; no outbox row written | Fix caller to pass the business transaction; a nil tx would break the transactional-outbox guarantee (Wave F, commit `f698d1fd2`) |
 | Outbox replay (worker restart mid-dispatch) | Same `(tenant_id, revision_id)` processed twice | `ON CONFLICT (tenant_id, revision_id) DO NOTHING` on outbox INSERT dedupes; consumer is idempotent | Expected; no operator action |
