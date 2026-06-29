@@ -4,6 +4,7 @@ import { useHasCapability } from '../../iam/hooks/useHasCapability';
 import { resolveQueryError } from '../../../lib/api';
 import { TokenList } from '../components/TokenList';
 import { TokenEditDialog } from '../components/TokenEditDialog';
+import { TokenDeleteDialog } from '../components/TokenDeleteDialog';
 import { useTokensQuery } from '../queries/useTokensQuery';
 import { useTokenMutations } from '../queries/useTokenMutations';
 import type { TokenDictionaryEntry } from '../api/tokensTypes';
@@ -21,6 +22,7 @@ export function Component() {
   const catalogQuery = usePlaceholderCatalogQuery();
   const { create, update, remove } = useTokenMutations();
   const [dialog, setDialog] = useState<DialogState>({ open: false });
+  const [deleteTarget, setDeleteTarget] = useState<TokenDictionaryEntry | null>(null);
 
   const computedKeys = useMemo(
     () => (catalogQuery.data ?? []).map((c) => c.key),
@@ -41,8 +43,9 @@ export function Component() {
     }
   }
 
-  function handleDelete(entry: TokenDictionaryEntry) {
-    if (window.confirm(`Excluir o token {${entry.name}}?`)) remove.mutate(entry.id);
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    remove.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) });
   }
 
   return (
@@ -68,9 +71,20 @@ export function Component() {
           entries={tokensQuery.data}
           canManage={canManage}
           onEdit={(entry) => setDialog({ open: true, mode: 'edit', entry })}
-          onDelete={handleDelete}
+          onDelete={setDeleteTarget}
         />
       )}
+
+      <TokenDeleteDialog
+        target={deleteTarget}
+        isPending={remove.isPending}
+        error={remove.error}
+        onConfirm={confirmDelete}
+        onClose={() => {
+          setDeleteTarget(null);
+          remove.reset();
+        }}
+      />
 
       {dialog.open && (
         <TokenEditDialog
