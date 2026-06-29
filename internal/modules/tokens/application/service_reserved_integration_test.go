@@ -4,35 +4,75 @@
 package application_test
 
 import (
-	"errors"
+	"bytes"
+	"database/sql"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
-	"metaldocs/internal/modules/render/resolvers"
-	"metaldocs/internal/modules/tokens/application"
-	"metaldocs/internal/modules/tokens/domain"
+	iamdomain "metaldocs/internal/modules/iam/domain"
+	tokenshttp "metaldocs/internal/modules/tokens/delivery/http"
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
-// buildReservedSet returns a staticReserved containing the 8 native keys from
-// the render resolver registry. Used at the service layer for integration tests
-// that validate the reserved-name guard with production-equivalent wiring without
-// needing a full HTTP stack.
-func buildReservedSet() staticReserved {
-	reg := resolvers.NewRegistry()
-	resolvers.RegisterBuiltins(reg)
-	known := reg.Known()
-	set := make(staticReserved, len(known))
-	for k := range known {
-		set[k] = struct{}{}
+// nativeReservedSet is the hardcoded set of the 8 native/computed token keys the
+// render resolver registry registers. Hardcoded here on purpose: tokens is a leaf
+// and must NOT depend on the render module, even in tests (SP-2 §5.1, §11 — the
+// ReservedNames port + composition-root adapter exist for exactly this reason).
+// The production adapter derives the same keys from the resolver registry; this
+// test proves the guard behavior + HTTP mapping independently of that coupling.
+func nativeReservedSet() staticReserved {
+	return staticReserved{
+		"doc_code":           {},
+		"doc_title":          {},
+		"revision_number":    {},
+		"effective_date":     {},
+		"controlled_by_area": {},
+		"author":             {},
+		"approvers":          {},
+		"approval_date":      {},
 	}
-	return set
 }
 
-// TestCreate_ReservedName_RegistryKey_Rejected verifies that a name matching a
-// native resolver key (e.g. "author") is rejected with ErrReservedName and that
-// the tx never opens (guard fires off-tx). Production wiring: real DB, real
-// registry keys, no stub.
-func TestCreate_ReservedName_RegistryKey_Rejected(t *testing.T) {
+// buildReservedHandler constructs the real production service wired to the test DB
+// with the native reserved set, wrapped in the real HTTP handler. This drives the
+// actual POST /api/v1/tokens path (strict decode -> Create guard -> problem+json).
+func buildReservedHandler(t *testing.T, db *sql.DB) *tokenshttp.Handler {
+	t.Helper()
+	svc := buildSvc(db).WithReservedNames(nativeReservedSet())
+	return tokenshttp.NewHandler(svc)
+}
+
+// postToken issues POST /api/v1/tokens with the given JSON body, carrying the
+// tenant and actor identity the handler reads from context (mirroring the
+// middleware chain). Returns the recorder for status + body assertions.
+func postToken(t *testing.T, h *tokenshttp.Handler, tenantID, actorID, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/tokens", bytes.NewReader([]byte(body)))
+	r.Header.Set("Content-Type", "application/json")
+	ctx := tenant.WithTenantID(r.Context(), tenantID)
+	ctx = iamdomain.WithAuthContext(ctx, actorID, nil)
+	rr := httptest.NewRecorder()
+	h.CreateToken(rr, r.WithContext(ctx))
+	return rr
+}
+
+func problemCode(t *testing.T, b []byte) string {
+	t.Helper()
+	var out struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatalf("decode problem body: %v (body=%s)", err, b)
+	}
+	return out.Code
+}
+
+// TestHTTP_CreateToken_ReservedName_Author_422 verifies POST /api/v1/tokens with
+// a native name ("author") returns HTTP 422 and problem code "reserved_name".
+func TestHTTP_CreateToken_ReservedName_Author_422(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
@@ -40,23 +80,21 @@ func TestCreate_ReservedName_RegistryKey_Rejected(t *testing.T) {
 	user := testdb.NewUser(t, db, testdb.WithTenant(tn.ID))
 	grantSP1Caps(t, db, tn.ID, user.ID)
 
-	svc := buildSvc(db).WithReservedNames(buildReservedSet())
+	h := buildReservedHandler(t, db)
+	rr := postToken(t, h, tn.ID, user.ID, `{"name":"author","value":"v","label":"l"}`)
 
-	_, err := svc.Create(ctxFor(user.ID), application.CreateCommand{
-		TenantID: tn.ID,
-		ActorID:  user.ID,
-		Name:     "author",
-		Value:    "v",
-		Label:    "l",
-	})
-	if !errors.Is(err, domain.ErrReservedName) {
-		t.Fatalf("Create with reserved name 'author' = %v, want ErrReservedName", err)
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422 (body=%s)", rr.Code, rr.Body.String())
+	}
+	if c := problemCode(t, rr.Body.Bytes()); c != string(tokenshttp.CodeTokenReservedName) {
+		t.Fatalf("code = %q, want %q", c, tokenshttp.CodeTokenReservedName)
 	}
 }
 
-// TestCreate_ReservedName_ApprovalDate_Rejected verifies the approval_date key
-// (absent from templates' placeholder catalog) is also blocked — guards SP-2 N1.
-func TestCreate_ReservedName_ApprovalDate_Rejected(t *testing.T) {
+// TestHTTP_CreateToken_ReservedName_ApprovalDate_422 verifies approval_date
+// (registry-only; absent from templates' static placeholder catalog) is also
+// blocked at the HTTP edge with 422 reserved_name (guards SP-2 N1).
+func TestHTTP_CreateToken_ReservedName_ApprovalDate_422(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
@@ -64,23 +102,20 @@ func TestCreate_ReservedName_ApprovalDate_Rejected(t *testing.T) {
 	user := testdb.NewUser(t, db, testdb.WithTenant(tn.ID))
 	grantSP1Caps(t, db, tn.ID, user.ID)
 
-	svc := buildSvc(db).WithReservedNames(buildReservedSet())
+	h := buildReservedHandler(t, db)
+	rr := postToken(t, h, tn.ID, user.ID, `{"name":"approval_date","value":"v","label":"l"}`)
 
-	_, err := svc.Create(ctxFor(user.ID), application.CreateCommand{
-		TenantID: tn.ID,
-		ActorID:  user.ID,
-		Name:     "approval_date",
-		Value:    "v",
-		Label:    "l",
-	})
-	if !errors.Is(err, domain.ErrReservedName) {
-		t.Fatalf("Create with reserved name 'approval_date' = %v, want ErrReservedName", err)
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422 (body=%s)", rr.Code, rr.Body.String())
+	}
+	if c := problemCode(t, rr.Body.Bytes()); c != string(tokenshttp.CodeTokenReservedName) {
+		t.Fatalf("code = %q, want %q", c, tokenshttp.CodeTokenReservedName)
 	}
 }
 
-// TestCreate_NonReservedName_Succeeds verifies that a non-native name (e.g.
-// "company_name") passes the guard and results in a successful creation.
-func TestCreate_NonReservedName_Succeeds(t *testing.T) {
+// TestHTTP_CreateToken_NonReservedName_201 verifies a non-native name
+// ("company_name") passes the guard and is created with HTTP 201.
+func TestHTTP_CreateToken_NonReservedName_201(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
@@ -88,19 +123,19 @@ func TestCreate_NonReservedName_Succeeds(t *testing.T) {
 	user := testdb.NewUser(t, db, testdb.WithTenant(tn.ID))
 	grantSP1Caps(t, db, tn.ID, user.ID)
 
-	svc := buildSvc(db).WithReservedNames(buildReservedSet())
+	h := buildReservedHandler(t, db)
+	rr := postToken(t, h, tn.ID, user.ID, `{"name":"company_name","value":"Acme Corp","label":"Company name"}`)
 
-	entry, err := svc.Create(ctxFor(user.ID), application.CreateCommand{
-		TenantID: tn.ID,
-		ActorID:  user.ID,
-		Name:     "company_name",
-		Value:    "Acme Corp",
-		Label:    "Company name",
-	})
-	if err != nil {
-		t.Fatalf("Create with non-reserved name = %v, want nil", err)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201 (body=%s)", rr.Code, rr.Body.String())
 	}
-	if entry.ID == "" {
-		t.Fatal("Create returned entry with empty ID")
+	var out struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode created body: %v (body=%s)", err, rr.Body.String())
+	}
+	if out.Name != "company_name" {
+		t.Fatalf("created name = %q, want %q", out.Name, "company_name")
 	}
 }
