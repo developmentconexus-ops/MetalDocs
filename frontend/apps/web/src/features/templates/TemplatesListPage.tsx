@@ -11,6 +11,7 @@ import styles from "./TemplatesListPage.module.css";
 export type TemplatesListPageProps = {
   onOpenTemplate: (templateId: string, versionNum: number) => void;
   onCreate: () => void;
+  onOpenTokenDictionary?: () => void;
 };
 
 type TabKey = "all" | "published" | "draft" | "archived";
@@ -93,10 +94,17 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
           title="Layouts reutilizáveis"
           subtitle="Versionados, aprovados, publicados. Vinculados a perfis para clonagem em novos documentos."
           action={
-            <button type="button" className={styles.newBtn} onClick={() => props.onCreate()}>
-              <Icon name="plus" size={13} />
-              Novo template
-            </button>
+            <>
+              {props.onOpenTokenDictionary && (
+                <button type="button" className={styles.newBtn} onClick={() => props.onOpenTokenDictionary?.()}>
+                  Dicionário de tokens
+                </button>
+              )}
+              <button type="button" className={styles.newBtn} onClick={() => props.onCreate()}>
+                <Icon name="plus" size={13} />
+                Novo template
+              </button>
+            </>
           }
         />
 

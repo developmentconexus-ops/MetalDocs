@@ -1,8 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { TemplatesListPage } from "../TemplatesListPage";
+import { useHasCapability } from "../../iam/hooks/useHasCapability";
 
 export function Component() {
   const navigate = useNavigate();
+  const canViewTokens = useHasCapability("token.view");
 
   return (
     <TemplatesListPage
@@ -10,6 +12,7 @@ export function Component() {
         navigate(`/templates/${templateId}/versions/${versionNum}`)
       }
       onCreate={() => navigate("/templates/new")}
+      onOpenTokenDictionary={canViewTokens ? () => navigate("/templates/tokens") : undefined}
     />
   );
 }

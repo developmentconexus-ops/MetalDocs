@@ -61,7 +61,7 @@ export function Component() {
 
       {tokensQuery.isLoading && <div className={styles.state}>Carregando tokens...</div>}
       {tokensQuery.isError && (
-        <div className={styles.state} role="alert">{resolveQueryError(tokensQuery.error)}</div>
+        <div className={styles.state} role="alert">{resolveQueryError(tokensQuery.error, 'Erro ao carregar tokens.')}</div>
       )}
       {tokensQuery.data && (
         <TokenList

@@ -8,6 +8,7 @@ import { iamRoutes } from '../features/iam/routes';
 import { passwordChangeRoutes } from '../features/password-change/routes';
 import { taxonomyRoutes } from '../features/taxonomy/routes';
 import { templatesRoutes } from '../features/templates/routes';
+import { tokenRoutes } from '../features/tokens';
 
 export const router = createBrowserRouter([
   // Public routes — no Rail, no Toolbar
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
           ...dashboardRoutes,
           ...documentsRoutes,
           ...templatesRoutes,
+          ...tokenRoutes,
           ...taxonomyRoutes,
           ...iamRoutes,
           ...approvalRoutes,
