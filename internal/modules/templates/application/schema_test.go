@@ -191,7 +191,7 @@ func TestValidatePlaceholders_DuplicateID_Error(t *testing.T) {
 	err := application.ValidatePlaceholders([]domain.Placeholder{
 		{ID: "p1", Type: domain.PHText},
 		{ID: "p1", Type: domain.PHText},
-	})
+	}, nil)
 	if !errors.Is(err, domain.ErrDuplicatePlaceholderID) {
 		t.Fatalf("expected ErrDuplicatePlaceholderID, got %v", err)
 	}
@@ -200,7 +200,7 @@ func TestValidatePlaceholders_DuplicateID_Error(t *testing.T) {
 func TestValidatePlaceholders_InvalidName_Error(t *testing.T) {
 	err := application.ValidatePlaceholders([]domain.Placeholder{
 		{ID: "p1", Name: "Bad Name!", Type: domain.PHText},
-	})
+	}, nil)
 	if !errors.Is(err, domain.ErrPlaceholderNameInvalid) {
 		t.Fatalf("expected ErrPlaceholderNameInvalid, got %v", err)
 	}
@@ -211,7 +211,7 @@ func TestValidatePlaceholders_DuplicateName_Error(t *testing.T) {
 	err := application.ValidatePlaceholders([]domain.Placeholder{
 		{ID: "p1", Name: "doc_code", Type: domain.PHComputed, Computed: true, ResolverKey: &rk},
 		{ID: "p2", Name: "doc_code", Type: domain.PHComputed, Computed: true, ResolverKey: &rk},
-	})
+	}, nil)
 	if !errors.Is(err, domain.ErrDuplicatePlaceholderName) {
 		t.Fatalf("expected ErrDuplicatePlaceholderName, got %v", err)
 	}
@@ -220,7 +220,7 @@ func TestValidatePlaceholders_DuplicateName_Error(t *testing.T) {
 func TestValidatePlaceholders_EmptyName_Allowed(t *testing.T) {
 	err := application.ValidatePlaceholders([]domain.Placeholder{
 		{ID: "p1", Type: domain.PHText},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -231,7 +231,7 @@ func TestValidatePlaceholders_ValidName_NoError(t *testing.T) {
 	err := application.ValidatePlaceholders([]domain.Placeholder{
 		{ID: "p1", Name: "doc_code", Type: domain.PHComputed, Computed: true, ResolverKey: &rk1},
 		{ID: "p2", Name: "effective_date", Type: domain.PHComputed, Computed: true, ResolverKey: &rk2},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -241,7 +241,7 @@ func TestValidatePlaceholders_InvalidRegex_Error(t *testing.T) {
 	regex := "["
 	err := application.ValidatePlaceholders([]domain.Placeholder{
 		{ID: "p1", Type: domain.PHText, Regex: &regex},
-	})
+	}, nil)
 	if !errors.Is(err, domain.ErrInvalidConstraint) {
 		t.Fatalf("expected ErrInvalidConstraint, got %v", err)
 	}
@@ -252,7 +252,7 @@ func TestValidatePlaceholders_NumberRangeInverted_Error(t *testing.T) {
 	max := 5.0
 	err := application.ValidatePlaceholders([]domain.Placeholder{
 		{ID: "p1", Type: domain.PHNumber, MinNumber: &min, MaxNumber: &max},
-	})
+	}, nil)
 	if !errors.Is(err, domain.ErrInvalidConstraint) {
 		t.Fatalf("expected ErrInvalidConstraint, got %v", err)
 	}
@@ -263,7 +263,7 @@ func TestValidatePlaceholders_DateRangeInverted_Error(t *testing.T) {
 	maxDate := "2026-04-01"
 	err := application.ValidatePlaceholders([]domain.Placeholder{
 		{ID: "p1", Type: domain.PHDate, MinDate: &minDate, MaxDate: &maxDate},
-	})
+	}, nil)
 	if !errors.Is(err, domain.ErrInvalidConstraint) {
 		t.Fatalf("expected ErrInvalidConstraint, got %v", err)
 	}
@@ -272,7 +272,7 @@ func TestValidatePlaceholders_DateRangeInverted_Error(t *testing.T) {
 func TestValidatePlaceholders_ComputedRequiresResolverKey(t *testing.T) {
 	err := application.ValidatePlaceholders([]domain.Placeholder{
 		{ID: "p1", Type: domain.PHComputed, Computed: true},
-	})
+	}, nil)
 	if !errors.Is(err, domain.ErrInvalidConstraint) {
 		t.Fatalf("expected ErrInvalidConstraint, got %v", err)
 	}
@@ -294,7 +294,7 @@ func TestValidatePlaceholders_RejectsNonCatalogName(t *testing.T) {
 	phs := []domain.Placeholder{
 		{ID: "p1", Name: "customer_name", Label: "Customer", Type: domain.PHComputed, Computed: true, ResolverKey: &rk},
 	}
-	err := application.ValidatePlaceholders(phs)
+	err := application.ValidatePlaceholders(phs, nil)
 	if !errors.Is(err, domain.ErrPlaceholderNotInCatalog) {
 		t.Fatalf("err = %v, want ErrPlaceholderNotInCatalog", err)
 	}
@@ -305,7 +305,7 @@ func TestValidatePlaceholders_AcceptsCatalogName(t *testing.T) {
 	phs := []domain.Placeholder{
 		{ID: "p1", Name: "doc_code", Label: "Codigo", Type: domain.PHComputed, Computed: true, ResolverKey: &rk},
 	}
-	if err := application.ValidatePlaceholders(phs); err != nil {
+	if err := application.ValidatePlaceholders(phs, nil); err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
 }
@@ -315,7 +315,7 @@ func TestValidatePlaceholders_RejectsCatalogNameWithWrongShape(t *testing.T) {
 	phs := []domain.Placeholder{
 		{ID: "p1", Name: "doc_code", Label: "X", Type: domain.PHText, ResolverKey: &rk},
 	}
-	if err := application.ValidatePlaceholders(phs); !errors.Is(err, domain.ErrPlaceholderNotComputed) {
+	if err := application.ValidatePlaceholders(phs, nil); !errors.Is(err, domain.ErrPlaceholderNotComputed) {
 		t.Fatalf("err = %v, want ErrPlaceholderNotComputed", err)
 	}
 }
