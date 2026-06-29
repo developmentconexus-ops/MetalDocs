@@ -49,4 +49,8 @@ CREATE POLICY tenant_isolation ON metaldocs.notifications
     OR tenant_id = NULLIF(current_setting('metaldocs.tenant_id', true), '')::uuid
   );
 
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('0247', 'notifications module per-recipient inbox table (M3/F3.2, ADR-0043)')
+ON CONFLICT (version) DO NOTHING;
+
 COMMIT;

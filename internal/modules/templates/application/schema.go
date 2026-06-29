@@ -32,7 +32,11 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 		return nil, domain.ErrInvalidStateTransition
 	}
 
-	if err := ValidatePlaceholders(cmd.PlaceholderSchema); err != nil {
+	var nativeNames map[string]int
+	if s.resolvers != nil {
+		nativeNames = s.resolvers.Known()
+	}
+	if err := ValidatePlaceholders(cmd.PlaceholderSchema, nativeNames); err != nil {
 		return nil, err
 	}
 	metadata, err := domain.NewMetadataSchema(
@@ -44,13 +48,12 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 	if err != nil {
 		return nil, err
 	}
-	if s.resolvers != nil {
-		knownResolvers := s.resolvers.Known()
+	if nativeNames != nil {
 		for _, p := range cmd.PlaceholderSchema {
 			if p.ResolverKey == nil {
 				continue
 			}
-			if _, ok := knownResolvers[*p.ResolverKey]; !ok {
+			if _, ok := nativeNames[*p.ResolverKey]; !ok {
 				return nil, fmt.Errorf("placeholder[%s] resolver_key %q: %w", p.ID, *p.ResolverKey, domain.ErrUnknownResolver)
 			}
 		}
@@ -100,7 +103,7 @@ var placeholderCatalogSet = map[string]struct{}{
 	"author": {}, "effective_date": {}, "approvers": {}, "controlled_by_area": {},
 }
 
-func ValidatePlaceholders(phs []domain.Placeholder) error {
+func ValidatePlaceholders(phs []domain.Placeholder, nativeNames map[string]int) error {
 	seen := make(map[string]struct{}, len(phs))
 	seenNames := make(map[string]struct{}, len(phs))
 	for i, p := range phs {
@@ -119,11 +122,27 @@ func ValidatePlaceholders(phs []domain.Placeholder) error {
 				return fmt.Errorf("duplicate_placeholder_name: %s: %w", p.Name, domain.ErrDuplicatePlaceholderName)
 			}
 			seenNames[p.Name] = struct{}{}
-			if _, ok := placeholderCatalogSet[p.Name]; !ok {
-				return fmt.Errorf("placeholder[%s] name %q: %w", p.ID, p.Name, domain.ErrPlaceholderNotInCatalog)
-			}
-			if p.Type != domain.PHComputed || p.ResolverKey == nil || *p.ResolverKey != p.Name {
-				return fmt.Errorf("placeholder[%s] %q: %w", p.ID, p.Name, domain.ErrPlaceholderNotComputed)
+
+			if p.Type == domain.PHDictionary {
+				// SP-2 D5: a dictionary reference name must NOT be a native/computed
+				// token name. Use the resolver registry's keys (8, incl. approval_date),
+				// not the static placeholderCatalogSet (7).
+				if _, isNative := nativeNames[p.Name]; isNative {
+					return fmt.Errorf("placeholder[%s] name %q: %w", p.ID, p.Name, domain.ErrPlaceholderReservedName)
+				}
+				// A dictionary placeholder is a pure reference: no resolver, not computed.
+				if p.ResolverKey != nil || p.Computed {
+					return fmt.Errorf("placeholder[%s] name %q: %w", p.ID, p.Name, domain.ErrPlaceholderDictionaryInvalid)
+				}
+			} else {
+				// Existing computed rule (unchanged): a named placeholder must be in the
+				// fixed catalog and be computed with a matching resolver_key.
+				if _, ok := placeholderCatalogSet[p.Name]; !ok {
+					return fmt.Errorf("placeholder[%s] name %q: %w", p.ID, p.Name, domain.ErrPlaceholderNotInCatalog)
+				}
+				if p.Type != domain.PHComputed || p.ResolverKey == nil || *p.ResolverKey != p.Name {
+					return fmt.Errorf("placeholder[%s] %q: %w", p.ID, p.Name, domain.ErrPlaceholderNotComputed)
+				}
 			}
 		}
 		if p.Regex != nil {

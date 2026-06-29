@@ -30,7 +30,8 @@ const (
 	PHSelect   PlaceholderType = "select"
 	PHUser     PlaceholderType = "user"
 	PHPicture  PlaceholderType = "picture"
-	PHComputed PlaceholderType = "computed"
+	PHComputed    PlaceholderType = "computed"
+	PHDictionary  PlaceholderType = "dictionary"
 )
 
 type VisibilityOp string

@@ -69,6 +69,10 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 		return http.StatusBadRequest, codeTplInvalidApprovalConfig
 	case errors.Is(err, domain.ErrPlaceholderNameInvalid):
 		return http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid
+	case errors.Is(err, domain.ErrPlaceholderReservedName):
+		return http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid
+	case errors.Is(err, domain.ErrPlaceholderDictionaryInvalid):
+		return http.StatusUnprocessableEntity, codeTplPlaceholderNameInvalid
 	case errors.Is(err, domain.ErrDuplicatePlaceholderName):
 		return http.StatusUnprocessableEntity, codeTplDuplicatePlaceholder
 	default:

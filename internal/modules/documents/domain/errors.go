@@ -3,6 +3,14 @@ package domain
 import "errors"
 
 var ErrValidationFailed = errors.New("placeholder value validation failed")
+
+// ErrPlaceholderNotAuthorEditable signals an author fill-in write targeting a
+// row whose current source is governed (computed/dictionary). Maps to 409 (SP-2 D11).
+var ErrPlaceholderNotAuthorEditable = errors.New("documents: placeholder is not author-editable")
+
+// ErrDictionaryTokenMissing signals a referenced dictionary token has no entry
+// for the tenant at creation time (SP-2 D7). The CD layer maps it to 422.
+var ErrDictionaryTokenMissing = errors.New("documents: referenced dictionary token not found")
 var ErrEffectiveDateMissing = errors.New("effective_date missing")
 
 // ErrDocumentNotDraft is returned when finalizeDocument targets a document that

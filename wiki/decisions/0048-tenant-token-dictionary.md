@@ -74,10 +74,10 @@ Tenant admins (holders of `token_dictionary.manage`) create, update, and delete 
 
 | Sprint | Work | Module |
 |--------|------|--------|
-| SP-2 | Render substitution: `render-fanout` consumes `DictionaryReader.GetByName` / `List` at document generation time. Merge precedence vs. computed tokens must be specified (see tech-debt TD-1). | render-fanout |
+| SP-2 | ~~Render substitution: `render-fanout` consumes `DictionaryReader.GetByName` / `List` at document generation time. Merge precedence vs. computed tokens must be specified (see tech-debt TD-1).~~ **SUPERSEDED by [ADR 0049](0049-tenant-dictionary-token-substitution.md).** Actual delivery: creation-time pinning — dictionary values resolved off-tx at document creation and seeded into `document_placeholder_values` with `source='dictionary'`; render receives pre-resolved values, no catalog merge. TD-1 (collision problem) resolved by reserved-name guard (D4/D5). | documents, controlleddocuments, tokens |
 | SP-3 | UI: Token panel in the document editor; full Node grammar enforcement on the creation form; reserved-word validation at the API call boundary. | Frontend, shared-tokens |
 | SP-4 | Import/export: bulk CSV import for tenant token dictionary; export for backup/transfer. | tokens (new routes) |
-| SP-5 | Computed+dictionary collision reconciliation: formal merge strategy; optionally surface collision warnings at dictionary-write time. | tokens, render-fanout |
+| SP-5 | ~~Computed+dictionary collision reconciliation: formal merge strategy; optionally surface collision warnings at dictionary-write time.~~ **SUPERSEDED by [ADR 0049](0049-tenant-dictionary-token-substitution.md).** Collision is prevented at write-time (D4) and schema-save (D5); no runtime merge strategy needed. | — |
 
 ---
 

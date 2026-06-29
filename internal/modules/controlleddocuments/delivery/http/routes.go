@@ -451,6 +451,8 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		httpresponse.WriteError(w, http.StatusConflict, "OVERRIDE_TEMPLATE_DELETED", "override template deleted")
 	case errors.Is(err, controlleddocumentsdomain.ErrOverrideNotPublished):
 		httpresponse.WriteError(w, http.StatusConflict, "OVERRIDE_TEMPLATE_NOT_PUBLISHED", "override template is not published")
+	case errors.Is(err, controlleddocumentsdomain.ErrDictionaryTokenMissing):
+		httpresponse.WriteError(w, http.StatusUnprocessableEntity, "DICTIONARY_TOKEN_MISSING", "a referenced dictionary token does not exist")
 	case errors.Is(err, controlleddocumentsdomain.ErrTemplateProfileMismatch):
 		_ = problem.Write(w, problem.New(http.StatusUnprocessableEntity, "template_invalid", "template version does not match the document profile"))
 	case errors.Is(err, application.ErrTemplateArtifactMissing):

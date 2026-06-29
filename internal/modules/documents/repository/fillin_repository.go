@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -117,4 +118,61 @@ func (r *FillInRepository) ListValues(ctx context.Context, tenantID, revisionID 
 	}
 
 	return out, rows.Err()
+}
+
+// UpsertAuthorValue writes an author (source='user') fill-in value but ONLY for
+// rows whose CURRENT source is author-editable ('user' or 'default'). The
+// DO UPDATE ... WHERE guard leaves an existing governed row (computed/dictionary)
+// untouched and reports 0 rows affected — the DB enforcement of SP-2 D11. Returns
+// rows affected so the service can reject a blocked write.
+func (r *FillInRepository) UpsertAuthorValue(ctx context.Context, v PlaceholderValue, q ...DBTX) (int64, error) {
+	exec := DBTX(r.db)
+	if len(q) > 0 && q[0] != nil {
+		exec = q[0]
+	}
+	res, err := exec.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s
+		    (tenant_id, revision_id, placeholder_id, value_text, value_typed,
+		     source, computed_from, resolver_version, inputs_hash, validated_at, created_at, updated_at)
+		VALUES ($1::uuid, $2::uuid, $3, $4, NULL, 'user', NULL, NULL, NULL, NOW(), NOW(), NOW())
+		ON CONFLICT (tenant_id, revision_id, placeholder_id) DO UPDATE SET
+			value_text       = EXCLUDED.value_text,
+			value_typed      = NULL,
+			source           = 'user',
+			computed_from    = NULL,
+			resolver_version = NULL,
+			inputs_hash      = NULL,
+			validated_at     = NOW(),
+			updated_at       = NOW()
+		-- NOTE: the DO UPDATE WHERE must reference the conflict target by its BARE
+		-- relation name (Postgres requirement); do NOT schema-qualify it here even
+		-- though the INSERT target is qualified — qualifying it is a parse error.
+		WHERE document_placeholder_values.source IN ('user','default')`,
+		r.table("document_placeholder_values")),
+		v.TenantID, v.RevisionID, v.PlaceholderID, v.ValueText,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// CurrentSource returns the persisted source discriminator for a placeholder
+// value row and whether the row exists. Backs the D11 app-layer friendly
+// rejection before the guarded write is attempted.
+func (r *FillInRepository) CurrentSource(ctx context.Context, tenantID, revisionID, placeholderID string) (string, bool, error) {
+	var source string
+	err := r.db.QueryRowContext(ctx, fmt.Sprintf(`
+		SELECT source FROM %s
+		 WHERE tenant_id=$1::uuid AND revision_id=$2::uuid AND placeholder_id=$3`,
+		r.table("document_placeholder_values")),
+		tenantID, revisionID, placeholderID,
+	).Scan(&source)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return source, true, nil
 }

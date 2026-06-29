@@ -21,8 +21,9 @@ type Module struct {
 
 // Dependencies carries everything the module needs from the composition root.
 type Dependencies struct {
-	DB          *sql.DB
-	AuditWriter auditdomain.Writer
+	DB            *sql.DB
+	AuditWriter   auditdomain.Writer
+	ReservedNames application.ReservedNames
 }
 
 // New assembles the tokens module. Panics on nil required deps so misconfiguration
@@ -34,8 +35,12 @@ func New(deps Dependencies) *Module {
 	if deps.AuditWriter == nil {
 		panic("tokens.module: AuditWriter is required")
 	}
+	if deps.ReservedNames == nil {
+		panic("tokens.module: ReservedNames is required")
+	}
 	repo := infrastructure.NewPostgresRepository()
-	svc := application.NewService(db.NewTxRunner(deps.DB), repo, deps.AuditWriter)
+	svc := application.NewService(db.NewTxRunner(deps.DB), repo, deps.AuditWriter).
+		WithReservedNames(deps.ReservedNames)
 	return &Module{
 		Handler: tokenshttp.NewHandler(svc),
 		Reader:  svc,

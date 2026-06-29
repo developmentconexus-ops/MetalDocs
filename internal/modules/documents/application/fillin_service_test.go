@@ -40,6 +40,22 @@ func (f *fakeFillInWriter) UpsertValue(_ context.Context, v repository.Placehold
 	return nil
 }
 
+// UpsertAuthorValue satisfies the expanded FillInWriter interface; delegates to
+// UpsertValue semantics for test purposes (no governing rows in existing tests).
+func (f *fakeFillInWriter) UpsertAuthorValue(_ context.Context, v repository.PlaceholderValue, _ ...repository.DBTX) (int64, error) {
+	if f.err != nil {
+		return 0, f.err
+	}
+	f.upserts = append(f.upserts, v)
+	return 1, nil
+}
+
+// CurrentSource satisfies the expanded FillInWriter interface; returns no
+// existing row so the guard passes (existing tests don't seed governed rows).
+func (f *fakeFillInWriter) CurrentSource(_ context.Context, _, _, _ string) (string, bool, error) {
+	return "", false, nil
+}
+
 // newPermissiveFillInDB returns a sqlmock *sql.DB that satisfies the
 // requireDocEditDraft authz sequence (BeginTx → SeedTxIdentity GUC EXECs →
 // LoadDocumentAreaCode 2-arg query → authz.Require GUC reads + EXISTS).

@@ -1937,7 +1937,7 @@ CREATE TABLE public.document_placeholder_values (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT document_placeholder_values_inputs_hash_check CHECK (((inputs_hash IS NULL) OR (octet_length(inputs_hash) = 32))),
-    CONSTRAINT document_placeholder_values_source_check CHECK ((source = ANY (ARRAY['user'::text, 'computed'::text, 'default'::text])))
+    CONSTRAINT document_placeholder_values_source_check CHECK ((source = ANY (ARRAY['user'::text, 'computed'::text, 'default'::text, 'dictionary'::text])))
 );
 
 

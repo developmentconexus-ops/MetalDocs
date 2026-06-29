@@ -136,6 +136,8 @@ func mapFillInError(err error) (int, problem.Code) {
 		return http.StatusBadRequest, "not_a_choice_placeholder"
 	case errors.Is(err, v2domain.ErrNotFound):
 		return http.StatusNotFound, "not_found.revision"
+	case errors.Is(err, v2domain.ErrPlaceholderNotAuthorEditable):
+		return http.StatusConflict, "state.placeholder_not_author_editable"
 	case errors.Is(err, v2domain.ErrInvalidStateTransition):
 		return http.StatusConflict, "state.revision_not_draft"
 	case errors.Is(err, v2domain.ErrValidationFailed):

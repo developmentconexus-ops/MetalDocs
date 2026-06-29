@@ -45,4 +45,8 @@ CREATE POLICY tenant_isolation ON metaldocs.token_dictionary_entries
     OR tenant_id = NULLIF(current_setting('metaldocs.tenant_id', true), '')::uuid
   );
 
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('0248', 'token dictionary per-tenant name->value constants table (SP-1)')
+ON CONFLICT (version) DO NOTHING;
+
 COMMIT;

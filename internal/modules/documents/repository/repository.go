@@ -259,6 +259,29 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.D
 	return docID, revID, sessionID, nil
 }
 
+// SeedDictionaryValuesTx pins resolved dictionary placeholder values (keyed by
+// placeholder ID) into document_placeholder_values inside the caller-owned tx,
+// with source='dictionary' (SP-2 D1). Upserts so it overrides any valueless
+// source='default' seed for the same placeholder. Requires migration 0249 (the
+// source CHECK widened to include 'dictionary').
+func (r *Repository) SeedDictionaryValuesTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, values map[string]string) error {
+	for placeholderID, value := range values {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO public.document_placeholder_values
+			    (tenant_id, revision_id, placeholder_id, value_text, source, created_at, updated_at)
+			VALUES ($1::uuid, $2::uuid, $3, $4, 'dictionary', NOW(), NOW())
+			ON CONFLICT (tenant_id, revision_id, placeholder_id) DO UPDATE SET
+				value_text = EXCLUDED.value_text,
+				source     = 'dictionary',
+				updated_at = NOW()`,
+			tenantID, revisionID, placeholderID, value,
+		); err != nil {
+			return fmt.Errorf("seed dictionary placeholder %q: %w", placeholderID, err)
+		}
+	}
+	return nil
+}
+
 func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error) {
 	var d domain.Document
 	var currentFileSize sql.NullInt64

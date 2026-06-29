@@ -330,6 +330,15 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("controlled_documents: resolve initial template version: %w", err)
 		}
+		var dictionaryValues map[string]string
+		if s.docInit != nil {
+			dictionaryValues, err = s.docInit.ResolveDictionaryValues(ctx, cmd.TenantID, resolvedTemplateVersionID)
+			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+				return nil, fmt.Errorf("controlled_documents: resolve dictionary values: %w", err)
+			}
+		}
 		// Auto path: sequence allocation, authz, and persistence run atomically.
 		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 			if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
@@ -435,6 +444,7 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 				if err != nil {
 					return fmt.Errorf("controlled_documents: build clone template request: %w", err)
 				}
+				cloneReq = cloneReq.WithDictionaryValues(dictionaryValues)
 				ref, err := s.docInit.CloneTemplate(ctx, tx, doc, cloneReq)
 				if err != nil {
 					return fmt.Errorf("controlled_documents: clone template for initial revision: %w", err)
@@ -725,6 +735,11 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 		return nil, fmt.Errorf("controlled_documents: resolve revision template version: %w", err)
 	}
 
+	dictionaryValues, err := s.docInit.ResolveDictionaryValues(ctx, cmd.TenantID, resolvedTemplateVersionID)
+	if err != nil {
+		return nil, fmt.Errorf("controlled_documents: resolve revision dictionary values: %w", err)
+	}
+
 	var ref *controlleddocumentsdomain.DocumentRef
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, actorUserID); err != nil {
@@ -740,6 +755,7 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 		if err != nil {
 			return fmt.Errorf("controlled_documents: build revision clone template request: %w", err)
 		}
+		cloneReq = cloneReq.WithDictionaryValues(dictionaryValues)
 		r, err := s.docInit.CloneTemplate(ctx, tx, cd, cloneReq)
 		if err != nil {
 			return fmt.Errorf("controlled_documents: clone template for revision: %w", mapCreateRevisionError(err))

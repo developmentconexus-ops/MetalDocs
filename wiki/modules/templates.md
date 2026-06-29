@@ -416,10 +416,14 @@ Failure modes:
 
 ### 8.8 Placeholder catalog enforcement
 
-- `application.ValidatePlaceholders` (`schema.go:84`) is the only catalog gate. It enforces the `PHType` enum (`PHText/Date/Number/Select/User/Picture/Computed`).
-- For `PHComputed`, the resolver_key string is intended to be checked against `ResolverRegistryReader` Ã¢â‚¬â€ wired `nil` (per `_artifacts/03-deps.md` Ã‚Â§3), so the check is skipped at runtime. See T-008.
-- Template-injection blast radius: a malicious resolver_key on a published template propagates to every document instantiated from that version (per `wiki/modules/documents.md Ã‚Â§8.7` snapshot path).
-
+- `application.ValidatePlaceholders` (`schema.go:84`) is the only catalog gate. It enforces the `PHType` enum (`PHText/Date/Number/Select/User/Picture/Computed/Dictionary`).
+- For `PHComputed`, the resolver_key string is intended to be checked against `ResolverRegistryReader` ÃÂ¢Ã¢âÂ¬Ã¢â¬Â wired `nil` (per `_artifacts/03-deps.md` ÃâÃÂ§3), so the check is skipped at runtime. See T-008.
+- **SP-2: `PHDictionary` ("dictionary") placeholder type** (ADR 0049 D2/D5). A template may declare a dictionary reference with `type: "dictionary"` and a `name` field (the dictionary entry name, `^[A-Za-z0-9_]+$`, 1-64 chars). Validation rules at schema-save:
+  - The `name` must **not** equal any native/computed resolver key (8 keys including `approval_date`). Violation -> `ErrPlaceholderReservedName` (422).
+  - A `PHDictionary` entry must **not** carry `resolver_key` or `computed: true`. Violation -> `ErrPlaceholderDictionaryInvalid` (422).
+  - **No dictionary-existence check at template-save** (D6 from ADR 0049): `templates` remains decoupled from `tokens`. SP-3 UI performs a live `GET /tokens` lookup to surface broken references to authors.
+  - At document creation, `documents`/`controlleddocuments` resolve `PHDictionary` references off-tx via `DictionaryReader` and pin values into `document_placeholder_values` (`source='dictionary'`). Missing entry -> 422 `DICTIONARY_TOKEN_MISSING`.
+- Template-injection blast radius: a malicious resolver_key on a published template propagates to every document instantiated from that version (per `wiki/modules/documents.md ÃâÃÂ§8.7` snapshot path).
 ---
 
 ## 9. Architecture Decisions

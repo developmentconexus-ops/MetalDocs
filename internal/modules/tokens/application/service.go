@@ -34,11 +34,12 @@ type AuditRecorderForTest = auditRecorder
 // Service is the tokens application service. It owns the transaction boundary
 // and wires authz + audit into every state-changing operation.
 type Service struct {
-	runner  txRunner
-	repo    domain.Repository
-	audit   auditRecorder
-	require authzRequireFunc
-	seed    seedTxFunc
+	runner   txRunner
+	repo     domain.Repository
+	audit    auditRecorder
+	require  authzRequireFunc
+	seed     seedTxFunc
+	reserved ReservedNames
 }
 
 // NewService is the production constructor. It pins the real authz primitives.
@@ -52,6 +53,14 @@ func NewService(runner txRunner, repo domain.Repository, audit auditRecorder) *S
 // NewServiceForTest injects stub authz primitives (the real ones need a DB).
 func NewServiceForTest(runner txRunner, repo domain.Repository, audit auditRecorder, require authzRequireFunc, seed seedTxFunc) *Service {
 	return &Service{runner: runner, repo: repo, audit: audit, require: require, seed: seed}
+}
+
+// WithReservedNames injects the native-name guard used by Create to reject
+// dictionary entries colliding with native/computed token names (SP-2 D4). Nil
+// leaves the guard disabled (test convenience); production wiring MUST set it.
+func (s *Service) WithReservedNames(r ReservedNames) *Service {
+	s.reserved = r
+	return s
 }
 
 // Compile-time proof the service satisfies the published DictionaryReader (SP-2 surface).
@@ -81,6 +90,11 @@ func (s *Service) Create(ctx context.Context, cmd CreateCommand) (*domain.Entry,
 	})
 	if err != nil {
 		return nil, err
+	}
+	// SP-2 D4: reject names colliding with native/computed tokens. Pure in-memory
+	// check, off-tx, before the write tx opens.
+	if s.reserved != nil && s.reserved.IsReserved(entry.Name) {
+		return nil, domain.ErrReservedName
 	}
 	var out *domain.Entry
 	err = s.runner.Do(ctx, func(tx *sql.Tx) error {

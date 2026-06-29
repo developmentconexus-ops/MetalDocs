@@ -536,6 +536,10 @@ func (f *fakeDocumentInitializer) ResolveTemplateVersionID(_ context.Context, _,
 	return "00000000-0000-0000-0000-000000000102", nil
 }
 
+func (f *fakeDocumentInitializer) ResolveDictionaryValues(_ context.Context, _, _ string) (map[string]string, error) {
+	return nil, nil
+}
+
 func TestControlledDocumentService_Create_AtomicWithDocument(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
