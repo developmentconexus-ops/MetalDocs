@@ -180,10 +180,24 @@ export function TemplateEditorPage({
     }
   }
 
-  if (draft.loading || (schemaState.loading && !localSchemas)) {
+  // Spinner ONLY while the version itself is loading. schemaState.loading is
+  // derived synchronously from the version (it is just `version == null`), so
+  // ORing it here is what let a fatal draft.error spin forever — the error
+  // branch below was unreachable. Once the draft resolves, fall through to the
+  // error checks, then render.
+  if (draft.loading) {
     return <div className={styles.loading}>Carregando template...</div>;
   }
-  if (draft.error) return <div role="alert" className={styles.error}>{draft.error}</div>;
+  if (draft.error) {
+    return (
+      <div role="alert" className={styles.error}>
+        <span>{draft.error}</span>
+        <button type="button" className={styles.retryBtn} onClick={draft.refetch}>
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
   if (schemaState.error && !localSchemas) {
     return <div role="alert" className={styles.error}>{schemaState.error}</div>;
   }
@@ -308,6 +322,13 @@ export function TemplateEditorPage({
                 </div>
               ) : importErr ? (
                 <div role="alert" className={styles.alertError}>{importErr}</div>
+              ) : draft.docxError ? (
+                <div role="alert" className={styles.alertError}>
+                  <span>{draft.docxError}</span>
+                  <button type="button" className={styles.retryBtn} onClick={draft.refetch}>
+                    Tentar novamente
+                  </button>
+                </div>
               ) : undefined
             }
           >

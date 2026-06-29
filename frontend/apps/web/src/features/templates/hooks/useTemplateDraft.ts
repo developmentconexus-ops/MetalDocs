@@ -7,6 +7,11 @@ type DraftState = {
   template: TemplateDTO | null;
   version: VersionDTO | null;
   docxBytes: ArrayBuffer | null;
+  // Non-fatal: the version loaded but its .docx blob could not be fetched
+  // (storage unreachable, presign expired, 5xx). The editor still opens — this
+  // surfaces a retry banner. A 404 is NOT an error: a blank template has no
+  // object until its first autosave, so it opens empty silently.
+  docxError: string | null;
 };
 
 type TemplateDraft = DraftState & {
@@ -20,6 +25,7 @@ export function useTemplateDraft(templateId: string, versionNum: number): Templa
     template: null,
     version: null,
     docxBytes: null,
+    docxError: null,
   });
   const [tick, setTick] = useState(0);
   const refetch = useCallback(() => setTick((t) => t + 1), []);
@@ -30,12 +36,26 @@ export function useTemplateDraft(templateId: string, versionNum: number): Templa
       try {
         const [template, version] = await Promise.all([getTemplate(templateId), getVersion(templateId, versionNum)]);
 
+        // Loading the .docx blob is SEPARATE from loading the version. A blob
+        // failure must NOT discard the version or blank the whole editor — that
+        // was the masking bug where any storage hiccup became an infinite
+        // "Carregando template..." spinner. The version is the source of truth;
+        // the editor opens regardless, with a retry banner if the blob failed.
         let docxBytes: ArrayBuffer | null = null;
+        let docxError: string | null = null;
         if (version.docx_storage_key) {
-          const url = await getDocxURL(templateId, versionNum);
-          const res = await fetch(url);
-          if (res.ok) {
-            docxBytes = await res.arrayBuffer();
+          try {
+            const url = await getDocxURL(templateId, versionNum);
+            const res = await fetch(url);
+            if (res.ok) {
+              docxBytes = await res.arrayBuffer();
+            } else if (res.status !== 404) {
+              // 404 = blank template, no object until first autosave: open empty,
+              // no error. Anything else (expired presign, 5xx) is a real failure.
+              docxError = `Não foi possível carregar o conteúdo do template (HTTP ${res.status}).`;
+            }
+          } catch (e) {
+            docxError = e instanceof Error ? e.message : String(e);
           }
         }
 
@@ -46,6 +66,7 @@ export function useTemplateDraft(templateId: string, versionNum: number): Templa
             template: template.template,
             version,
             docxBytes,
+            docxError,
           });
         }
       } catch (e) {
