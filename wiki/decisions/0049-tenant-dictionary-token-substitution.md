@@ -137,7 +137,11 @@ The `ReadForReconstruction` path in the documents module does **not** round-trip
 - Storing the dictionary entry name in a `computed_from`-equivalent column for `source='dictionary'` rows, or
 - Adding a forensic reconstruction index table.
 
-**Named post-SP-2 owner:** unassigned (must be resolved before forensic audit features can be certified).
+**Named post-SP-2 owner:** Decoupled from SP-3 (operator decision 2026-06-29). SP-3 is the
+dictionary management CRUD UI and does not read or reconstruct provenance, so it does not
+depend on this fix. Forensic reconstruction (storing the dictionary entry name on
+`source='dictionary'` pinned rows) is owned by the future forensic-audit epic and must be
+resolved before any forensic-audit feature is certified.
 
 ---
 

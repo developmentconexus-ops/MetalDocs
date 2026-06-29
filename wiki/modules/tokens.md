@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-28 (SP-2 delivered — creation-time dictionary token pinning; reserved-name guard; `PHDictionary` placeholder type in templates; migration 0249 widens `source` CHECK; ADR 0049) | **Prior:** 2026-06-28 (SP-1 initial publish — module fully implemented: migration 0248, IAM capabilities, OpenAPI + oapi-codegen, domain/application/infrastructure/delivery layers, module assembly, integration tests) | **Owner:** unassigned | **Status:** active (SP-1 + SP-2 feature-complete; SP-3 UI pending) | **Maturity:** L3
+**Last verified:** 2026-06-29 (SP-3 UI delivered — capability-gated CRUD screen at templates/tokens; see SP-2 for prior history — creation-time dictionary token pinning; reserved-name guard; `PHDictionary` placeholder type in templates; migration 0249 widens `source` CHECK; ADR 0049) | **Prior:** 2026-06-28 (SP-1 initial publish — module fully implemented: migration 0248, IAM capabilities, OpenAPI + oapi-codegen, domain/application/infrastructure/delivery layers, module assembly, integration tests) | **Owner:** unassigned | **Status:** active (SP-1 + SP-2 feature-complete; SP-3 UI pending) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/tokens/domain/entry.go` — `Entry` aggregate, `NewEntry`, `ApplyUpdate`, `nameRe`, sentinel errors
@@ -394,6 +394,7 @@ TD-1 closed: the render-time catalog merge problem is moot because dictionary va
 | Name immutability | `name` is the document-reference key. Once set on create it cannot change; `ErrImmutableName` (422) is returned on any PUT that tries to change it. `value`, `label`, `description` are freely mutable. |
 | Anti-corruption storage hygiene | Go's `nameRe = ^[A-Za-z0-9_]+$` and length limits mirror the DB CHECK constraints. This is not grammar enforcement — the canonical grammar (leading-char rule, reserved words) is Node-owned. |
 | SP-2 | Delivered: creation-time pinning. Dictionary values are resolved off-tx at document creation and seeded into `document_placeholder_values` with `source='dictionary'`. Render transports pre-resolved values. See ADR 0049. |
+| SP-3 | Delivered: Token Dictionary Management UI (`frontend/apps/web/src/features/tokens/`). Capability-gated CRUD screen at `templates/tokens`, gated on `token.view` (route) and `token_dictionary.manage` (write actions). Consumes `GET/POST /tokens`, `GET/PUT/DELETE /tokens/{id}`. Reuses the templates placeholder-catalog query for the D4 collision check. Shipped 2026-06-29. |
 | NULL-permissive RLS | RLS policy pattern per ADR 0027. The `token_dictionary_entries` table has RLS enabled with a policy that permits rows where `tenant_id` matches the GUC or where the GUC is NULL. This allows system operations (migrations, bootstrap, health checks) that run before the tenant GUC is set. |
 
 ---
