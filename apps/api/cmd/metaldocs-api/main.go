@@ -763,7 +763,13 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 		return nil, errors.New("templates capability service is required")
 	}
 	templatesPresigner := objectstore.NewVerifiedStore(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
-	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, wiring.Clock{}, wiring.UUIDGen{}).WithRunner(db.NewTxRunner(deps.SQLDB))
+	// Build a dedicated builtins registry so the D5 reserved-name guard fires in
+	// production. Mirrors the pattern in reserved_names.go (SP-2 §5.1). The 8 static
+	// builtins are cheap; a separate instance here keeps this independent of the
+	// resolverReg built later at the composition root for runtime resolution.
+	templatesResolverReg := resolvers.NewRegistry()
+	resolvers.RegisterBuiltins(templatesResolverReg)
+	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, wiring.Clock{}, wiring.UUIDGen{}, templatesResolverReg).WithRunner(db.NewTxRunner(deps.SQLDB))
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())
 		return capabilityService.CanDo(r.Context(), userID, tenantID, action)

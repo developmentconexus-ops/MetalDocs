@@ -36,6 +36,7 @@ internal/modules/documents/approval/repository/postgres_approval_repository.go|I
 internal/modules/documents/approval/repository/postgres_approval_repository.go|MarkSuperseded
 internal/modules/documents/approval/repository/postgres_approval_repository.go|UpdateInstanceStatus
 internal/modules/documents/approval/repository/postgres_approval_repository.go|UpdateStageStatus
+internal/modules/documents/repository/repository.go|SeedDictionaryValuesTx
 internal/modules/documents/repository/repository.go|DeleteComment
 internal/modules/documents/repository/repository.go|DeleteExpiredPending
 internal/modules/documents/repository/repository.go|HeartbeatSession

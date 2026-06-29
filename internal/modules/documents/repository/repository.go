@@ -269,7 +269,7 @@ func (r *Repository) SeedDictionaryValuesTx(ctx context.Context, tx db.Tx, tenan
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO public.document_placeholder_values
 			    (tenant_id, revision_id, placeholder_id, value_text, source, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, 'dictionary', NOW(), NOW())
+			VALUES ($1::uuid, $2::uuid, $3, $4, 'dictionary', NOW(), NOW())
 			ON CONFLICT (tenant_id, revision_id, placeholder_id) DO UPDATE SET
 				value_text = EXCLUDED.value_text,
 				source     = 'dictionary',
