@@ -300,7 +300,9 @@ func (r *fakeRepo) ListAudit(_ context.Context, tenantID, templateID string, lim
 
 type fakePresigner struct {
 	PutKeys    []string
+	CopyPairs  [][2]string
 	confirmErr error
+	copyErr    error
 }
 
 func (f *fakePresigner) PresignPut(_ context.Context, _ string, key string, _ time.Duration) (string, error) {
@@ -317,6 +319,14 @@ func (f *fakePresigner) Confirm(_ context.Context, _, key, expected string) (obj
 		return objectstore.VerifiedPointer{}, f.confirmErr
 	}
 	return objectstore.VerifiedPointer{StorageKey: key, ContentHash: expected, SizeBytes: 1}, nil
+}
+
+func (f *fakePresigner) Copy(_ context.Context, _ string, srcKey, dstKey string) error {
+	if f.copyErr != nil {
+		return f.copyErr
+	}
+	f.CopyPairs = append(f.CopyPairs, [2]string{srcKey, dstKey})
+	return nil
 }
 
 func (f *fakePresigner) Delete(_ context.Context, _ string) error { return nil }

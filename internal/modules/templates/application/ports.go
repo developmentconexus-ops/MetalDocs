@@ -42,6 +42,7 @@ type Presigner interface {
 	PresignPut(ctx context.Context, tenantID, key string, ttl time.Duration) (url string, err error)
 	PresignGet(ctx context.Context, key string, ttl time.Duration) (url string, err error)
 	Confirm(ctx context.Context, tenantID, key, expectedHash string) (objectstore.VerifiedPointer, error)
+	Copy(ctx context.Context, tenantID, srcKey, dstKey string) error
 	Delete(ctx context.Context, key string) error
 }
 
