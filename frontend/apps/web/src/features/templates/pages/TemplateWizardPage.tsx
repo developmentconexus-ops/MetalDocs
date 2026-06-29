@@ -144,7 +144,7 @@ export function TemplateWizardPage(): JSX.Element {
           return;
         }
       }
-      navigate(`/templates/${templateId}/versions/${versionNumber}`);
+      navigate(`/templates/${templateId}/edit`);
     } catch (err) {
       setSubmitError(mapTemplateCreateError(err));
       setIsSubmitting(false);

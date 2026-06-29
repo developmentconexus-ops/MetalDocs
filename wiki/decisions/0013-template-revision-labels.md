@@ -321,6 +321,18 @@ Live preview drive of all four chip states; capture snapshots under `.qa-reports
 
 ---
 
+## Amendment 2026-06-29 — Editor URL stops leaking version_number (Documents parity)
+
+**Problem (user-reported):** the template editor opened at `/templates/{id}/versions/1` and the docx object lived at `versions/1.docx`, while the chip showed `REV00`. The `1` (1-based `version_number`) sitting next to `REV00` (0-based `revision_number`) read as incoherent.
+
+**Diagnosis — not a model bug.** The two-counter split (D-1, line 79) is deliberate and correct: `version_number` is the internal lifecycle/identity counter; `revision_number` is the human REV label. The Documents module proves the model is sound — it uses the *same* REV labels yet has **zero** incoherence because it never surfaces a numeric counter to a human: its storage key is a content hash (`internal/modules/documents/application/keys.go`) and its editor route is `documents/:documentId/edit` (no version in the URL). The single defect was that Templates **leaked the internal `version_number` into a user-facing surface (the editor URL)** — something Documents deliberately never does.
+
+**Decision (user, Opt 1 — Documents parity).** Align the templates editor URL to the Documents kernel precedent. The editor route becomes **`templates/:templateId/edit`** (mirrors `documents/:documentId/edit`); the working version is resolved from `template.latest_version` inside `TemplateEditorRoutePage` and passed to the editor, which still keys its **API endpoints** (`/api/v1/templates/{id}/versions/{n}/…`), **storage keys** (`templateDocxKey`, `versions/{n}.docx`), FK refs and audit on `version_number` internally — exactly as Documents keeps `version_number` internal in its content hash. The only number a human sees is the `REV{nn}` chip.
+
+**Rejected alternative (1a — rev-keyed segment `/revisions/0`):** preserves version-specific deep-links but (a) still shows a bare `0` in the URL and (b) forces the FE to carry the `revision = version − 1` off-by-one to translate the route param into an API call — the exact FE arithmetic this ADR's Alternative B banned. The deep-link capability it preserves is currently unused (no historical-version browser exists; every navigation targets the working version). A future read-only historical viewer, if built, would be a separate route keyed on **revision** (REV), consistent with this decision.
+
+**Scope (FE-only, no DB/contract-data change):** `routes.tsx` path; `TemplateEditorRoutePage.tsx` resolves the working version + loading/error-retry; inbound navigations in `TemplatesListRoutePage.tsx` and `TemplateWizardPage.tsx` drop the version segment; `TemplatesListPage` `onOpenTemplate` signature drops the now-unused `versionNum`; `__tests__/routes.test.ts` updated. A new working draft spawned by approve/publish keeps the same `/edit` URL and re-points the editor internally. **Verified live (system_admin):** `/edit` resolves the working version and renders the editor; the only identifier shown is `REV00`; list → open lands on `/edit`; console clean.
+
 ## Amendment 2026-06-05 — Schema half landed (drift repair)
 
 The Go layer of this ADR (repository projection in `internal/modules/templates/repository/postgres.go`, scanner in `mappers.go`, domain fields, `api.gen.go`) merged earlier, but the **schema half (D-1) never landed in the curated baseline**. Result: every templates list/fetch returned HTTP 500 — `ERROR: column lv.revision_number does not exist (SQLSTATE 42703)` — breaking `TemplatesListPage` and the new-document wizard blank-template fetch.

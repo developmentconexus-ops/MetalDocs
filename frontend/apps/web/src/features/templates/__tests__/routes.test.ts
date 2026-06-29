@@ -14,8 +14,8 @@ describe("templatesRoutes", () => {
 
   it("keeps the explicit child routes for new and editor screens", () => {
     expect(matchRoutes(templatesRoutes, "/templates/new")?.at(-1)?.route.path).toBe("templates/new");
-    expect(matchRoutes(templatesRoutes, "/templates/abc/versions/2")?.at(-1)?.route.path).toBe(
-      "templates/:templateId/versions/:versionNum",
+    expect(matchRoutes(templatesRoutes, "/templates/abc/edit")?.at(-1)?.route.path).toBe(
+      "templates/:templateId/edit",
     );
   });
 });

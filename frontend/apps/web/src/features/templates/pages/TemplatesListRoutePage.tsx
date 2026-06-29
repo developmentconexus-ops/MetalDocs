@@ -8,9 +8,7 @@ export function Component() {
 
   return (
     <TemplatesListPage
-      onOpenTemplate={(templateId, versionNum) =>
-        navigate(`/templates/${templateId}/versions/${versionNum}`)
-      }
+      onOpenTemplate={(templateId) => navigate(`/templates/${templateId}/edit`)}
       onCreate={() => navigate("/templates/new")}
       onOpenTokenDictionary={canViewTokens ? () => navigate("/templates/tokens") : undefined}
     />

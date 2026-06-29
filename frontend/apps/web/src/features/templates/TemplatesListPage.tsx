@@ -9,7 +9,9 @@ import { formatRevisionCode } from "../../lib/labels/revisionCode";
 import styles from "./TemplatesListPage.module.css";
 
 export type TemplatesListPageProps = {
-  onOpenTemplate: (templateId: string, versionNum: number) => void;
+  // version_number is no longer needed to open a template — the editor URL is
+  // /templates/:templateId/edit and resolves the working version itself (ADR 0013).
+  onOpenTemplate: (templateId: string) => void;
   onCreate: () => void;
   onOpenTokenDictionary?: () => void;
 };
@@ -141,7 +143,7 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
                 status={tpl.status}
                 author={tpl.author}
                 updated={tpl.updated}
-                onClick={() => props.onOpenTemplate(tpl.id, tpl.latestVersion)}
+                onClick={() => props.onOpenTemplate(tpl.id)}
               />
             ))}
           </div>
