@@ -26,8 +26,9 @@ func (ApprovalDateResolver) Resolve(ctx context.Context, in ResolveInput) (Resol
 	if err != nil {
 		return ResolvedValue{}, err
 	}
-	if approvalDate.IsZero() {
-		return ResolvedValue{}, errors.New("approval_date resolver: final approval date is zero")
+	value := "[aguardando aprovação]"
+	if !approvalDate.IsZero() {
+		value = approvalDate.UTC().Format("2006-01-02")
 	}
 
 	inputsHash, err := hashInputs(struct {
@@ -42,7 +43,7 @@ func (ApprovalDateResolver) Resolve(ctx context.Context, in ResolveInput) (Resol
 	}
 
 	return ResolvedValue{
-		Value:       approvalDate.UTC().Format("2006-01-02"),
+		Value:       value,
 		ResolverKey: "approval_date",
 		ResolverVer: 1,
 		InputsHash:  inputsHash,

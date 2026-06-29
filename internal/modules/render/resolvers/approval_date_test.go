@@ -34,7 +34,7 @@ func TestApprovalDateResolver_Resolve(t *testing.T) {
 	}
 }
 
-func TestApprovalDateResolver_ZeroDateReturnsError(t *testing.T) {
+func TestApprovalDateResolver_ZeroDateReturnsPendingSentinel(t *testing.T) {
 	r := ApprovalDateResolver{}
 	in := ResolveInput{
 		TenantID:   "tenant-a",
@@ -43,7 +43,11 @@ func TestApprovalDateResolver_ZeroDateReturnsError(t *testing.T) {
 			finalApprovalDate: time.Time{},
 		},
 	}
-	if _, err := r.Resolve(context.Background(), in); err == nil {
-		t.Fatal("expected error when final approval date is zero")
+	got, err := r.Resolve(context.Background(), in)
+	if err != nil {
+		t.Fatalf("Resolve returned error, want graceful sentinel: %v", err)
+	}
+	if got.Value != "[aguardando aprovação]" {
+		t.Fatalf("Value = %v, want pending sentinel", got.Value)
 	}
 }
