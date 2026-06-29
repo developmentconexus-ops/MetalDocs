@@ -324,6 +324,8 @@ func (fakePresigner) Confirm(_ context.Context, _, key, expected string) (object
 	return objectstore.VerifiedPointer{StorageKey: key, ContentHash: expected, SizeBytes: 1}, nil
 }
 
+func (fakePresigner) Copy(_ context.Context, _, _, _ string) error { return nil }
+
 func (fakePresigner) Delete(_ context.Context, _ string) error { return nil }
 
 func newMux(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo) *http.ServeMux {
