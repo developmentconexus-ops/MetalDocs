@@ -23,6 +23,19 @@
 
 > **Plan 12.4 route truth:** `api/openapi/v1/openapi.yaml`, `internal/modules/templates/api/api.gen.go`, and `frontend/apps/web/src/lib/api-types/index.d.ts` include the mounted template route set, including typed `GET /api/v1/templates/placeholder-catalog`. Several generated methods still delegate to existing internal handler bodies.
 
+### Editor variable palette — unified computed + dictionary catalog (2026-06-29, ADR 0050)
+
+The template-editor "Variáveis" panel surfaces **two kinds** of tokens behind one unified model:
+
+- **Computed** (`Preenchido pelo sistema (seguro)`) — the 8 author-visible tokens from `GET /api/v1/templates/placeholder-catalog` (derived from `render/domain.ComputedCatalog()`, incl. `{approval_date}`).
+- **Dictionary** (`Definido pela sua organização`) — per-tenant constants from `GET /api/v1/tokens` (`tokens` module). Hidden when the tenant has none.
+
+Frontend wiring (all under `frontend/apps/web/src/features/templates/`):
+- `tokens/tokenCatalog.ts` — `Token { key; label; description?; kind: 'computed' | 'dictionary' }` discriminated model + pure `toUnifiedTokens(computed, dictionary)` adapter.
+- `tokens/useTokenCatalog.ts` — composes `usePlaceholderCatalogQuery()` + `useTokensQuery()`; returns `{ tokens, computedFailed, dictionaryFailed }`.
+- `AvailableTokensPanel.tsx` — renders the two kind-tagged sections.
+- `pages/TemplateEditorPage.tsx` — consumes the unified catalog; dictionary keys count as **known** in `lib/tokens.ts` partition, so inserting `{COMPANY_NAME}` is not flagged under "Tokens não reconhecidos".
+
 ---
 
 ## 1. Introduction & Goals
