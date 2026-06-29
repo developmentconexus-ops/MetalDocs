@@ -3,6 +3,10 @@ package domain
 import "errors"
 
 var ErrValidationFailed = errors.New("placeholder value validation failed")
+
+// ErrDictionaryTokenMissing signals a referenced dictionary token has no entry
+// for the tenant at creation time (SP-2 D7). The CD layer maps it to 422.
+var ErrDictionaryTokenMissing = errors.New("documents: referenced dictionary token not found")
 var ErrEffectiveDateMissing = errors.New("effective_date missing")
 
 // ErrDocumentNotDraft is returned when finalizeDocument targets a document that

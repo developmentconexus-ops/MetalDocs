@@ -38,6 +38,17 @@ func (s *SnapshotService) ResolveTemplate(ctx context.Context, tenantID, templat
 	return snap, phs, nil
 }
 
+// ResolveAllPlaceholders loads the FULL placeholder list (not just Required) for a
+// template version. Dictionary resolution (SP-2) must see every PHDictionary
+// reference regardless of the Required filter that ResolveTemplate applies.
+func (s *SnapshotService) ResolveAllPlaceholders(ctx context.Context, tenantID, templateVersionID string) ([]templatesdomain.Placeholder, error) {
+	snap, err := s.templates.LoadForSnapshot(ctx, tenantID, templateVersionID)
+	if err != nil {
+		return nil, err
+	}
+	return parsePlaceholderSchema(snap.PlaceholderSchemaJSON)
+}
+
 // parseRequiredPlaceholders extracts placeholders with Required=true from
 // the placeholder schema JSON blob. Returns empty slice on empty/nil input.
 func parseRequiredPlaceholders(schemaJSON []byte) ([]templatesdomain.Placeholder, error) {

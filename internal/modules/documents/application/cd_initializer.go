@@ -66,6 +66,7 @@ func (i *CDDocumentInitializer) CloneTemplate(ctx context.Context, tx db.Tx, cd 
 		OwnerUserID:               cd.OwnerUserID,
 		Name:                      req.Name(),
 		FormData:                  formData,
+		DictionaryValues:          req.DictionaryValues(),
 	})
 	if err != nil {
 		return nil, err

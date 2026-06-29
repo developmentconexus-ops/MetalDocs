@@ -291,6 +291,10 @@ func (f *fakeRepo) MarkArchived(_ context.Context, _, _, _ string) error { retur
 
 func (f *fakeRepo) MarkArchivedTx(_ context.Context, _ db.Tx, _, _, _ string) error { return nil }
 
+func (f *fakeRepo) SeedDictionaryValuesTx(_ context.Context, _ db.Tx, _, _ string, _ map[string]string) error {
+	return nil
+}
+
 type fakePresigner struct {
 	confirmErr error
 	size       int64

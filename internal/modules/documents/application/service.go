@@ -27,6 +27,7 @@ type RevisionHistoryItem = domain.RevisionHistoryItem
 
 type Repository interface {
 	CreateDocumentTx(ctx context.Context, tx db.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
+	SeedDictionaryValuesTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, values map[string]string) error
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
 	UpdateDocumentName(ctx context.Context, tenantID, actorID, docID, name string) error
 	UpdateDocumentNameTx(ctx context.Context, tx db.Tx, tenantID, actorID, docID, name string) error
@@ -111,6 +112,13 @@ type ProfileDefaultTemplateReader interface {
 	// returns (*templateVersionID, *templateVersionStatus, error)
 }
 
+// DictionaryValueReader resolves a tenant dictionary token name to its current
+// value. The composition root backs it with the tokens module's published
+// DictionaryReader; documents imports NO tokens types (SP-2 §11, invariant #6).
+type DictionaryValueReader interface {
+	Lookup(ctx context.Context, tenantID, name string) (value string, found bool, err error)
+}
+
 type Service struct {
 	repo                         Repository
 	presigner                    Presigner
@@ -122,6 +130,7 @@ type Service struct {
 	snapshotSvc                  *SnapshotService
 	runner                       db.TxRunner
 	eligibility                  domain.ApproverEligibilityReader
+	dictReader                   DictionaryValueReader
 }
 
 func (s *Service) WithRunner(runner db.TxRunner) *Service {
@@ -136,6 +145,44 @@ func (s *Service) WithRunner(runner db.TxRunner) *Service {
 func (s *Service) WithEligibility(r domain.ApproverEligibilityReader) *Service {
 	s.eligibility = r
 	return s
+}
+
+// WithDictionaryReader injects the tenant-dictionary read port used to pin
+// dictionary placeholder values at document creation (SP-2 D1). Nil disables
+// dictionary resolution (feature-off safe).
+func (s *Service) WithDictionaryReader(r DictionaryValueReader) *Service {
+	s.dictReader = r
+	return s
+}
+
+// ResolveDictionaryValues resolves every PHDictionary placeholder in the given
+// template version's schema to its pinned value, keyed by placeholder ID. Runs
+// OFF-TX (the dictionary read is authz-recording on its own tx — H-PRE-1). Returns
+// domain.ErrDictionaryTokenMissing if a referenced token does not exist (D7);
+// authz/infra errors propagate unchanged for the caller to map (403/5xx).
+func (s *Service) ResolveDictionaryValues(ctx context.Context, tenantID, templateVersionID string) (map[string]string, error) {
+	if s.dictReader == nil || s.snapshotSvc == nil {
+		return nil, nil
+	}
+	phs, err := s.snapshotSvc.ResolveAllPlaceholders(ctx, tenantID, templateVersionID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve dictionary values: load schema: %w", err)
+	}
+	out := make(map[string]string)
+	for _, p := range phs {
+		if p.Type != templatesdomain.PHDictionary {
+			continue
+		}
+		val, found, err := s.dictReader.Lookup(ctx, tenantID, p.Name)
+		if err != nil {
+			return nil, err // authz/infra — caller maps to 403/5xx
+		}
+		if !found {
+			return nil, fmt.Errorf("%w: %q", domain.ErrDictionaryTokenMissing, p.Name)
+		}
+		out[p.ID] = val
+	}
+	return out, nil
 }
 
 // mayWriteWorkingContent decides whether actorID may write the working-content
@@ -245,6 +292,7 @@ type cloneIntoTxInput struct {
 	OwnerUserID               string
 	Name                      string
 	FormData                  json.RawMessage
+	DictionaryValues          map[string]string
 }
 
 // cloneIntoTx seeds a document + initial revision + editor session + snapshot
@@ -309,6 +357,11 @@ func (s *Service) cloneIntoTx(ctx context.Context, tx db.Tx, in cloneIntoTxInput
 	docID, revID, sessionID, err = s.repo.CreateDocumentTx(ctx, tx, &doc, contentHash, docxKey, phs)
 	if err != nil {
 		return "", "", "", "", err
+	}
+	if len(in.DictionaryValues) > 0 {
+		if err := s.repo.SeedDictionaryValuesTx(ctx, tx, in.TenantID, revID, in.DictionaryValues); err != nil {
+			return "", "", "", "", fmt.Errorf("seed dictionary values: %w", err)
+		}
 	}
 	return docID, revID, sessionID, contentHash, nil
 }
