@@ -1,8 +1,9 @@
 # public.document_placeholder_values
 
-> **Source:** `db/baseline/0001_current_schema.sql`
+> **Source:** `db/baseline/0001_current_schema.sql` (baseline) + `db/migrations/0249_document_placeholder_values_dictionary_source.sql` (SP-2: added `'dictionary'`)
 > **Schema:** `public`
 > **Owner:** documents
+> **Last verified:** 2026-06-28 (SP-2: `source` CHECK widened to include `'dictionary'`)
 
 ## Purpose
 Current curated-baseline table owned by `documents`. See the owning module wiki and runtime repositories for business behavior.
@@ -41,7 +42,7 @@ tenant_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT document_placeholder_values_inputs_hash_check CHECK (((inputs_hash IS NULL) OR (octet_length(inputs_hash) = 32))),
-    CONSTRAINT document_placeholder_values_source_check CHECK ((source = ANY (ARRAY['user'::text, 'computed'::text, 'default'::text])))
+    CONSTRAINT document_placeholder_values_source_check CHECK ((source = ANY (ARRAY['user'::text, 'computed'::text, 'default'::text, 'dictionary'::text])))
 );
 ```
 
@@ -56,3 +57,14 @@ Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001
 ## Notes and Debt
 
 Retained in `public` because current runtime/baseline truth still uses it. Do not move schemas without an approved migration plan.
+
+## Source column values
+
+| `source` | Meaning | Governed (system-set)? |
+|---|---|---|
+| `default` | System default at document creation | No — overridable by user |
+| `user` | Author fill-in input | No — author-mutable |
+| `computed` | Resolved by the render resolver at creation | Yes — app-layer 409 + DB backstop guard |
+| `dictionary` | Pinned from tenant token dictionary at creation (SP-2, ADR 0049) | Yes — app-layer 409 + DB backstop guard |
+
+Migration `0249_document_placeholder_values_dictionary_source.sql` added `'dictionary'` to the CHECK constraint.

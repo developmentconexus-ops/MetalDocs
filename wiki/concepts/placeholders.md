@@ -3,7 +3,7 @@
 > _Changelog: 2026-04-26 — rewritten for fixed-catalog model (ADR 0008); dropped legacy fill-in workflow content._
 > _Changelog: 2026-04-27 — composition system deprecated, UI removed (Phase 1)._
 >
-> **Last verified:** 2026-06-01
+> **Last verified:** 2026-06-28 (SP-2: added `dictionary` value source and `PHDictionary` placeholder type)
 > **Scope:** What a placeholder is, the fixed 7-entry catalog, how tokens stay literal in the editor, and when substitution occurs.
 > **Out of scope:** Substitution engine internals (see `modules/render-fanout.md`), editor plugin wiring (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
@@ -24,7 +24,7 @@ Tokens use single-brace `{name}` syntax — docxtemplater standard, detected nat
 
 ## The fixed catalog
 
-MetalDocs defines exactly 7 computed tokens. Template authors may only use names from this list. The backend rejects any other name at schema-save time (`ValidatePlaceholders`).
+MetalDocs defines exactly 7 computed tokens. Template authors may only use names from this list for `PHComputed` placeholders. The backend rejects any other name at schema-save time (`ValidatePlaceholders`).
 
 | Token | Resolver source |
 |---|---|
@@ -36,7 +36,26 @@ MetalDocs defines exactly 7 computed tokens. Template authors may only use names
 | `{approvers}` | Approver names joined by `", "`; `"[aguardando aprovação]"` if none |
 | `{controlled_by_area}` | Area name (not code) from the document's taxonomy binding |
 
-All tokens are **computed** — no user input is required. There is no fill-in panel in the document editor.
+All catalog tokens are **computed** — no user input is required. There is no fill-in panel in the document editor.
+
+## Dictionary placeholder source (SP-2)
+
+In addition to the fixed computed catalog, templates may declare **dictionary placeholder references** (`PHDictionary`, `type: "dictionary"`). These reference a per-tenant dictionary entry by `name` (e.g., `{COMPANY_NAME}`).
+
+- A `PHDictionary` entry carries a `name` (the dictionary entry name) and a human-readable `label`. It carries **no value** in the template schema — it is a declared reference.
+- Values are resolved **at document creation** (off-tx via `tokens.DictionaryReader`) and pinned into `document_placeholder_values` with `source='dictionary'`. Render receives pre-resolved values; it does not call the dictionary.
+- Each new document revision re-pins dictionary values at revision-creation time, making each revision immune to later dictionary edits.
+- The `source` column in `document_placeholder_values` now accepts four values: `default`, `user`, `computed`, `dictionary`.
+- Collision prevention: a `PHDictionary` name must not equal any native/computed resolver key (enforced at template-save by `ValidatePlaceholders` and at dictionary-write by `tokens.Service.Create`). See ADR 0049.
+
+## Value sources in `document_placeholder_values`
+
+| `source` | Who sets it | Mutable by author? |
+|---|---|---|
+| `default` | System default at creation | No |
+| `user` | Author input (fill-in panel) | Yes |
+| `computed` | System resolver at creation | No (governed) |
+| `dictionary` | Pinned from tenant dictionary at creation | No (governed) |
 
 ## Authoring workflow
 
@@ -102,6 +121,7 @@ The eigenpal `applyVariables` API (browser-side substitution) is intentionally n
 - [modules/render-fanout.md](../modules/render-fanout.md) — server substitution code
 - [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — fixed catalog ADR
 - [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — token syntax migration ADR
+- [decisions/0049-tenant-dictionary-token-substitution.md](../decisions/0049-tenant-dictionary-token-substitution.md) — SP-2 ADR: creation-time pinning, `PHDictionary`, reserved-name guard, author-overwrite guard
 - [modules/templates.md §8.8](../modules/templates.md) — backend enforcement: `ValidatePlaceholders` rejects non-catalog names at schema save; resolver registry wiring gap (T-008)
 - [modules/controlled-documents.md](../modules/controlled-documents.md) — owns the `controlled_documents` catalog; `{doc_code}` resolver source is the controlled document's `AutoCode` (`{PROFILE}-{AREA}-{NNN}`)
 

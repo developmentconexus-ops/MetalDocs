@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-28 (SP-1 initial publish — module fully implemented: migration 0248, IAM capabilities, OpenAPI + oapi-codegen, domain/application/infrastructure/delivery layers, module assembly, integration tests) | **Owner:** unassigned | **Status:** active (SP-1 feature-complete; SP-2 render substitution pending) | **Maturity:** L3
+**Last verified:** 2026-06-28 (SP-2 delivered — creation-time dictionary token pinning; reserved-name guard; `PHDictionary` placeholder type in templates; migration 0249 widens `source` CHECK; ADR 0049) | **Prior:** 2026-06-28 (SP-1 initial publish — module fully implemented: migration 0248, IAM capabilities, OpenAPI + oapi-codegen, domain/application/infrastructure/delivery layers, module assembly, integration tests) | **Owner:** unassigned | **Status:** active (SP-1 + SP-2 feature-complete; SP-3 UI pending) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/tokens/domain/entry.go` — `Entry` aggregate, `NewEntry`, `ApplyUpdate`, `nameRe`, sentinel errors
@@ -20,9 +20,9 @@
 
 ## 1. Introduction & Goals
 
-`internal/modules/tokens` owns the **per-tenant author-defined token dictionary**: a flat `name → value` constant table that makes tenant-specific strings (e.g., company name, legal entity, standard boilerplate) available as named tokens in documents. At SP-1 this is a pure CRUD dictionary with full authz + audit. SP-2 will wire render substitution by consuming the published `domain.DictionaryReader` port.
+`internal/modules/tokens` owns the **per-tenant author-defined token dictionary**: a flat `name → value` constant table that makes tenant-specific strings (e.g., company name, legal entity, standard boilerplate) available as named tokens in documents. SP-1 delivered the CRUD dictionary with full authz + audit. SP-2 delivered creation-time pinning: dictionary values are resolved off-tx at document creation and pinned in `document_placeholder_values` with `source='dictionary'`; render transports pre-resolved values and does not merge catalogs.
 
-This module introduces a **new class of token** alongside the computed-token catalog owned by `templates`. Dictionary tokens are tenant-governed, mutable at runtime, and require no template schema change to add. Computed tokens are system-defined and driven by template authoring. The two catalogs are complementary and must not collide at render time — collision reconciliation is deferred to SP-2 (see tech-debt TD-1).
+This module introduces a **new class of token** alongside the computed-token catalog owned by `templates`. Dictionary tokens are tenant-governed, mutable at runtime, and require no template schema change to add. Computed tokens are system-defined and driven by template authoring. The two catalogs are complementary. **Collision is prevented by the reserved-name guard (SP-2 D4/D5):** a dictionary entry name cannot equal a native/computed resolver key; `PHDictionary` schema references are validated the same way. TD-1 (collision at render time) is closed — see `wiki/modules/tokens-tech-debt.md`.
 
 ### 1.1 Requirements overview
 
@@ -48,7 +48,7 @@ This module introduces a **new class of token** alongside the computed-token cat
 | Role | Expectation |
 |---|---|
 | Tenant admin / QMS operator | CRUD own token dictionary via `/api/v1/tokens`; use entries in controlled documents |
-| SP-2 render module | Consume `DictionaryReader.GetByName` at render time to substitute dictionary values |
+| documents / controlleddocuments (SP-2) | Consume `DictionaryReader.GetByName` / `List` off-tx at document creation to pin values into `document_placeholder_values` (`source='dictionary'`) |
 | SP-3 UI team | Enforce full Node grammar at the editor edge; surface token panel for authors |
 | Audit / compliance | Every write operation produces a dated, actor-attributed audit event |
 
@@ -76,19 +76,19 @@ C4Context
     Person(admin, "Tenant Admin / QMS Operator", "Web UI")
     System_Boundary(b1, "MetalDocs") {
         System(tokens, "tokens", "Per-tenant name→value dictionary")
-        System_Ext(render, "render-fanout (SP-2)", "Consumes DictionaryReader at render time")
+        System_Ext(docs, "documents / controlleddocuments (SP-2)", "Resolves DictionaryReader off-tx at creation; pins values in document_placeholder_values")
         System_Ext(audit, "audit module", "Receives RecordTx calls for all writes")
     }
     System_Ext(pg, "Postgres", "metaldocs.token_dictionary_entries")
     Rel(admin, tokens, "HTTP /api/v1/tokens")
     Rel(tokens, pg, "SQL via *sql.Tx (txRunner)")
     Rel(tokens, audit, "audit.Writer.RecordTx in-tx")
-    Rel(render, tokens, "Go: domain.DictionaryReader.GetByName / List")
+    Rel(docs, tokens, "Go: domain.DictionaryReader.GetByName / List (off-tx, creation path only)")
 ```
 
 ### 3.1 Business Context
 
-Authors of controlled documents need to embed tenant-specific constant values (company name, legal entity, standard clauses) without editing every template. The token dictionary is that namespace: the admin defines `{COMPANY_NAME} = "Acme Metalurgia"` once; SP-2 render substitutes it at document generation. The naming convention stays with the Node grammar; this module is the backend store.
+Authors of controlled documents need to embed tenant-specific constant values (company name, legal entity, standard clauses) without editing every template. The token dictionary is that namespace: the admin defines `{COMPANY_NAME} = "Acme Metalurgia"` once; SP-2 pins the value at document creation time so each document revision carries its own immutable snapshot. Render receives pre-resolved values — it does not call back into this module. The naming convention stays with the Node grammar; this module is the backend store.
 
 ### 3.2 Technical Context
 
@@ -337,7 +337,7 @@ Go never parses token syntax (this is a binding invariant from `wiki/concepts/to
 
 ### 8.9 Cross-module data contracts
 
-- **SP-2 render module** will consume `domain.DictionaryReader` (`GetByName` + `List`) to substitute dictionary values at document generation time. The interface is already published via `Module.Reader`. No direct SQL access to `token_dictionary_entries` from outside this module — ever.
+- **documents / controlleddocuments (SP-2)** consume `domain.DictionaryReader` (`GetByName` + `List`) off-tx at document creation to pin dictionary values into `document_placeholder_values`. The interface is published via `Module.Reader`. No direct SQL access to `token_dictionary_entries` from outside this module — ever. A composition-root adapter bridges `domain.DictionaryReader` → the consuming modules' `DictionaryValueReader` port (no cross-module type import).
 - **audit module** — `audit.Writer.RecordTx` called inside every write tx. `ResourceType = "token_dictionary_entry"`. Actions: `tokens.entry.created`, `tokens.entry.updated`, `tokens.entry.deleted`.
 - No FK relationship to any other module's tables.
 
@@ -376,10 +376,10 @@ Go never parses token syntax (this is a binding invariant from `wiki/concepts/to
 Pointer-only. Body in `wiki/modules/tokens-tech-debt.md`. Severity rubric: see that file.
 
 - Critical: 0
-- Major: 1 (TD-1: computed-key / dictionary collision — deferred SP-2)
+- Major: 0 (TD-1 closed — resolved by SP-2 reserved-name guard + creation-time pinning; see ADR 0049)
 - Minor: 1 (TD-2: strictjson promotion shim in documents module)
 
-Top concern: **TD-1** — at SP-2 render time, a dictionary entry `{REVISION}` could shadow a computed token `{REVISION}` if both catalogs are merged without a precedence rule. This must be resolved before SP-2 ships render substitution.
+TD-1 closed: the render-time catalog merge problem is moot because dictionary values are pinned at creation time and the reserved-name guard (D4/D5) prevents naming collisions before any document is created. See `wiki/modules/tokens-tech-debt.md`.
 
 ---
 
@@ -390,10 +390,10 @@ Top concern: **TD-1** — at SP-2 render time, a dictionary entry `{REVISION}` c
 | `token_dictionary_entries` | The single Postgres table owned by this module. Columns: `id UUID PK`, `tenant_id UUID NOT NULL`, `name TEXT NOT NULL`, `value TEXT NOT NULL`, `label TEXT NOT NULL`, `description TEXT NULL`, `created_by TEXT`, `updated_by TEXT`, `created_at TIMESTAMPTZ`, `updated_at TIMESTAMPTZ`. Unique index on `(tenant_id, name)`. |
 | `token.view` / `CapTokenView` | IAM capability required for all read operations. ScopeTenant. |
 | `token_dictionary.manage` / `CapTokenDictionaryManage` | IAM capability required for create / update / delete. ScopeTenant. |
-| `DictionaryReader` | The published provider port in `internal/modules/tokens/domain/port.go`. Consumed by SP-2 render module. Two methods: `GetByName(ctx, tenantID, name)` and `List(ctx, tenantID)`. Does not expose the `*sql.Tx` coupling of `domain.Repository`. |
-| Name immutability | `name` is the render key. Once set on create it cannot change; `ErrImmutableName` (422) is returned on any PUT that tries to change it. `value`, `label`, `description` are freely mutable. |
+| `DictionaryReader` | The published provider port in `internal/modules/tokens/domain/port.go`. Consumed by the `documents` / `controlleddocuments` creation path (off-tx) at document creation to resolve and pin dictionary values. Two methods: `GetByName(ctx, tenantID, name)` and `List(ctx, tenantID)`. Does not expose the `*sql.Tx` coupling of `domain.Repository`. |
+| Name immutability | `name` is the document-reference key. Once set on create it cannot change; `ErrImmutableName` (422) is returned on any PUT that tries to change it. `value`, `label`, `description` are freely mutable. |
 | Anti-corruption storage hygiene | Go's `nameRe = ^[A-Za-z0-9_]+$` and length limits mirror the DB CHECK constraints. This is not grammar enforcement — the canonical grammar (leading-char rule, reserved words) is Node-owned. |
-| SP-2 | The next sprint: adds render substitution. The `render-fanout` module will consume `Module.Reader` to substitute dictionary values before rendering a document. |
+| SP-2 | Delivered: creation-time pinning. Dictionary values are resolved off-tx at document creation and seeded into `document_placeholder_values` with `source='dictionary'`. Render transports pre-resolved values. See ADR 0049. |
 | NULL-permissive RLS | RLS policy pattern per ADR 0027. The `token_dictionary_entries` table has RLS enabled with a policy that permits rows where `tenant_id` matches the GUC or where the GUC is NULL. This allows system operations (migrations, bootstrap, health checks) that run before the tenant GUC is set. |
 
 ---
@@ -408,16 +408,17 @@ Top concern: **TD-1** — at SP-2 render time, a dictionary entry `{REVISION}` c
 | DB CHECK violation (bad name chars) | 422 `VALIDATION_ERROR` | PG `23514` | Client bypassed UI grammar gate; fix-forward at UI edge |
 | Token not found (cross-tenant probe) | 404 `NOT_FOUND` | `domain.ErrNotFound` | Correct — cross-tenant ID looks like not-found, never 403 |
 | authz GUC not set (SeedTxIdentity skipped) | authz.Require returns error → 403 or 500 | Auth middleware or test harness misconfiguration | Ensure middleware chain seeds session before handler fires |
-| SP-2 collision (dictionary vs computed token) | Wrong value substituted at render time | Test coverage at SP-2 integration | Blocked by TD-1 — resolve before SP-2 ships |
+| SP-2 collision (dictionary vs computed token) | N/A — collision prevented by reserved-name guard (D4/D5) | Guard enforced at write-time and schema-save | TD-1 closed; see ADR 0049 |
 
 ## Cross-links
 
-- Related ADRs: `wiki/decisions/0007-two-tier-authz.md` (two-tier pattern), `wiki/decisions/0022-capabilities-not-roles.md` (capability model), `wiki/decisions/0048-tenant-token-dictionary.md` (module ADR)
+- Related ADRs: `wiki/decisions/0007-two-tier-authz.md` (two-tier pattern), `wiki/decisions/0022-capabilities-not-roles.md` (capability model), `wiki/decisions/0048-tenant-token-dictionary.md` (module ADR — SP-1), `wiki/decisions/0049-tenant-dictionary-token-substitution.md` (SP-2 ADR — creation-time pinning)
 - Related concepts: `wiki/concepts/token-syntax.md` (grammar boundary, Node ownership), `wiki/concepts/placeholders.md` (full placeholder concept), `wiki/concepts/authz-tiers.md`
-- Cross-module: `wiki/modules/templates.md` (computed token catalog — complementary, not the same), `wiki/modules/audit.md` (RecordTx sink), `wiki/modules/render-fanout.md` (future SP-2 consumer)
+- Cross-module: `wiki/modules/templates.md` (computed token catalog — complementary; `PHDictionary` type added SP-2), `wiki/modules/audit.md` (RecordTx sink), `wiki/modules/documents.md` (SP-2 creation-time pinning consumer), `wiki/modules/render-fanout.md` (render transport — receives pre-resolved values)
 - Tech debt: `wiki/modules/tokens-tech-debt.md`
 - OpenAPI spec: `api/openapi/v1/openapi.yaml`
 
 ## Changelog (this doc)
 
-- 2026-06-28 — Initial publish (SP-1). Module fully implemented: migration 0248, IAM capabilities, OpenAPI + oapi-codegen, domain/application/infrastructure/delivery layers, module assembly, integration tests. REQ-AUTHZ-1 (two-tier), REQ-AUTHZ-2 (capability scoping), REQ-AUTHZ-5 (DB tripwire — partial: CHECK constraints in place, `trg_require_cap_asserted` deferred), REQ-MT-1 (tenant_id on every row + RLS), REQ-CONTRACT-1 (oapi-codegen generated surface).
+- 2026-06-28 — SP-2 delivered (ADR 0049): creation-time pinning; reserved-name guard; composition-root adapter; `PHDictionary` in templates; migration 0249 widens `source` CHECK; TD-1 closed. `DictionaryReader` doc-comment corrected (consumer = documents/controlleddocuments at creation, not render). Updated status, §1, §3 diagram, §8.9, §11, §12, cross-links.
+- 2026-06-28 — Initial publish (SP-1). Module fully implemented: migration 0248, IAM capabilities, OpenAPI + oapi-codegen, domain/application/infrastructure/delivery layers, module assembly, integration tests. REQ-AUTHZ-1 (two-tier), REQ-AUTHZ-2 (capability scoping), REQ-AUTHZ-5 (DB tripwire — partial: CHECK constraints in place, `trg_require_cap_asserted` deferred), REQ-TEN-1 (tenant_id on every row + RLS), REQ-CONTRACT-1 (oapi-codegen generated surface).

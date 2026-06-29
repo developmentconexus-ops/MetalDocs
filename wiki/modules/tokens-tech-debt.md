@@ -1,44 +1,37 @@
 # Tokens Module Tech Debt
 
-> **Last verified:** 2026-06-28
+> **Last verified:** 2026-06-28 (SP-2 update: TD-1 closed)
 > **Scope:** Bounded defers and active minor issues for `internal/modules/tokens`.
 > **Severity rubric:** Critical = blocks correctness guarantee; Major = architectural risk or user-visible data hazard; Minor = cleanup / developer experience.
 
 ---
 
-## TD-1: Computed-token / dictionary collision (deferred to SP-2)
+## TD-1: Computed-token / dictionary collision (CLOSED — SP-2)
 
-**Severity:** Major
-**Status:** Open — deferred to SP-2
+**Severity:** Major → **CLOSED**
+**Status:** Resolved by ADR 0049 (SP-2 creation-time prevention + pinning)
 **Opened:** 2026-06-28 (SP-1 design, spec §8)
+**Closed:** 2026-06-28 (SP-2 delivery)
 
-### Problem
+### Problem (historical)
 
-The `tokens` module introduces a second class of tokens alongside the computed-token catalog owned by `templates`. At SP-1 these two catalogs are independent: dictionary entries live in `token_dictionary_entries`; computed tokens are defined in the template's `placeholder_schema`. Neither consumes the other.
+The `tokens` module introduced a second class of tokens alongside the computed-token catalog owned by `templates`. The concern was that at SP-2 render time both catalogs might be merged into a single substitution map, causing collision if a dictionary entry and a computed placeholder shared the same `name`.
 
-At SP-2 the render-fanout module will merge both catalogs into a single substitution map before rendering a document. If a dictionary entry and a computed placeholder share the same `name` (e.g., both define `REVISION`), the render merge has two options — precedence (one silently shadows the other) or rejection (render fails). Neither has been specified.
+### Resolution
 
-Concrete scenario: author defines `{REVISION}` as a computed placeholder in template v3; a tenant admin later creates a dictionary entry `REVISION = "R1"`. At SP-2 render time both resolve to the token `{REVISION}` — the substitution map has a collision.
+SP-2 chose creation-time pinning (Arch-A, ADR 0049) — the render-time catalog merge never happens:
 
-### Impact
+1. **Reserved-name guard (D4):** `tokens.application.Service.Create` rejects any dictionary entry name that equals a native/computed resolver key (422 `RESERVED_NAME`). A dictionary entry `REVISION` cannot be created if `REVISION` is a computed-resolver key.
+2. **Schema-save defense-in-depth (D5):** `templates.ValidatePlaceholders` rejects a `PHDictionary` reference whose `Name` equals a native/computed key (`ErrPlaceholderReservedName`).
+3. **Creation-time pinning (D1):** Dictionary values are resolved off-tx at document creation and pinned as `source='dictionary'` rows. Render receives pre-resolved `value_text` values from `document_placeholder_values` — it does not merge catalogs.
 
-Incorrect or non-deterministic document content if the render module's merge strategy is not explicit. This cannot be detected at dictionary-write time (the write path has no visibility into template placeholder schemas).
-
-### Deferred resolution (SP-2 contract)
-
-Before the render-fanout module consumes `DictionaryReader`, the SP-2 design must specify:
-
-1. **Merge precedence rule** — e.g. computed tokens always win over dictionary tokens, or vice versa.
-2. **Conflict detection** — whether the render path should detect and reject collisions at render time (422 or 409 to the caller) vs. silently apply precedence.
-3. **Dictionary-write guard (optional)** — whether POST/PUT to `/api/v1/tokens` should check for name collision against the tenant's active placeholder schemas and warn (not block).
-
-The `domain.DictionaryReader` interface is already published and stable; no tokens-module change is needed to implement TD-1 at SP-2 — the fix lives entirely in the render-fanout module.
+There is no render-time merge map; there is therefore no collision to resolve. The precedence question (SP-5 row in ADR 0048) is also moot.
 
 ### Files
 
-- `internal/modules/tokens/domain/port.go` — `DictionaryReader` (the published port SP-2 will consume)
-- `internal/modules/render-fanout/` — SP-2 merge logic (not yet implemented)
-- `wiki/concepts/placeholders.md` — full placeholder concept including computed token catalog
+- `internal/modules/tokens/application/service.go` — `ReservedNames` guard (D4)
+- `internal/modules/templates/application/schema.go` — `PHDictionary` defense-in-depth (D5)
+- `wiki/decisions/0049-tenant-dictionary-token-substitution.md` — governing ADR
 
 ---
 
