@@ -843,3 +843,53 @@ func TestApprove_Accept_AbortsWhenDocxCopyFails(t *testing.T) {
 		t.Fatalf("expected no next-draft row to be created, want 1 version got %d", len(repo.versions))
 	}
 }
+
+func TestPublishTemplateVersion_AbortsWhenDocxCopyFails(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          template.ID,
+		VersionNumber:       1,
+		Status:              domain.VersionStatusDraft,
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver",
+		DocxStorageKey:      "tenants/tenant-a/templates/tpl-1/versions/1.docx",
+		ContentHash:         "live_hash",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+
+	presign := &fakePresigner{copyErr: errors.New("copy boom")}
+	svc := application.New(repo, presign, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		DocxKey:       "tenants/tenant-a/templates/tpl-1/versions/1.docx",
+		SchemaKey:     "tenants/tenant-a/templates/tpl-1/versions/1.schema.json",
+	})
+	if err == nil {
+		t.Fatal("expected PublishTemplateVersion to fail when the docx copy fails")
+	}
+	if len(repo.audit) != 0 {
+		t.Fatalf("expected no audit on aborted spawn (tx never opened), got %d", len(repo.audit))
+	}
+	if len(repo.versions) != 1 {
+		t.Fatalf("expected no next-draft row to be created, want 1 version got %d", len(repo.versions))
+	}
+	// The copy fails PRE-TX, so the source version's persisted state must remain
+	// untouched — the publish-time mutations (Status/PublishedAt) happen on a
+	// GetVersion clone and only commit via UpdateVersionTx inside the tx that
+	// never opened.
+	stored := repo.versions[version.ID]
+	if stored.Status != domain.VersionStatusDraft {
+		t.Fatalf("source version status must stay draft on aborted publish, got %q", stored.Status)
+	}
+	if stored.PublishedAt != nil {
+		t.Fatalf("source version PublishedAt must stay nil on aborted publish, got %v", stored.PublishedAt)
+	}
+}
