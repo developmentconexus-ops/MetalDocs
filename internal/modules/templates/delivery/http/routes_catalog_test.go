@@ -6,10 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	renderdomain "metaldocs/internal/modules/render/domain"
 	"metaldocs/internal/modules/templates/domain"
 )
 
-func TestPlaceholderCatalog_Returns7Entries(t *testing.T) {
+func TestPlaceholderCatalog_MirrorsRenderDomainAuthorVisible(t *testing.T) {
 	repo := newFakeRepo()
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 	req := httptest.NewRequest("GET", "/api/v1/templates/placeholder-catalog", nil)
@@ -30,16 +31,24 @@ func TestPlaceholderCatalog_Returns7Entries(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
-	if len(body.Items) != 7 {
-		t.Fatalf("items len = %d, want 7", len(body.Items))
-	}
-	wantKeys := []string{"doc_code", "doc_title", "revision_number", "author", "effective_date", "approvers", "controlled_by_area"}
-	for i, k := range wantKeys {
-		if body.Items[i].Key != k {
-			t.Errorf("items[%d].Key = %q, want %q", i, body.Items[i].Key, k)
+
+	want := make(map[string]renderdomain.ComputedToken)
+	for _, e := range renderdomain.ComputedCatalog() {
+		if e.AuthorVisible {
+			want[e.Key] = e
 		}
-		if body.Items[i].Label == "" {
-			t.Errorf("items[%d].Label empty", i)
+	}
+	if len(body.Items) != len(want) {
+		t.Fatalf("items len = %d, want %d (render/domain author-visible set)", len(body.Items), len(want))
+	}
+	for _, it := range body.Items {
+		w, ok := want[it.Key]
+		if !ok {
+			t.Errorf("endpoint returned %q not in render/domain author-visible set", it.Key)
+			continue
+		}
+		if it.Label != w.Label || it.Description != w.Description {
+			t.Errorf("token %q label/description mismatch with render/domain", it.Key)
 		}
 	}
 }
