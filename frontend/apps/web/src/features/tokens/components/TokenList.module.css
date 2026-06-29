@@ -1,0 +1,14 @@
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border, #ececec);
+  font-size: 14px;
+  vertical-align: top;
+}
+.table th { font-weight: 600; color: var(--muted, #666); font-size: 12px; text-transform: uppercase; }
+.value { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.code { font-family: var(--mono, monospace); }
+.actions { display: flex; gap: 8px; }
+.link { background: none; border: none; color: var(--brand-600, #7a1f3d); cursor: pointer; padding: 0; font: inherit; }
+.empty { padding: 32px; text-align: center; color: var(--muted, #666); }
