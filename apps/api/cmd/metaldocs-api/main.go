@@ -749,8 +749,9 @@ func buildControlledDocumentsModule(deps bootstrap.APIDependencies) *controlledd
 
 func buildTokensModule(deps bootstrap.APIDependencies) *tokens.Module {
 	return tokens.New(tokens.Dependencies{
-		DB:          deps.SQLDB,
-		AuditWriter: deps.AuditWriter,
+		DB:            deps.SQLDB,
+		AuditWriter:   deps.AuditWriter,
+		ReservedNames: newReservedNamesFromRegistry(),
 	})
 }
 

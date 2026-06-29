@@ -33,6 +33,7 @@ const (
 	CodeTokenAlreadyExists  problem.Code = "ALREADY_EXISTS"
 	CodeTokenNotFound       problem.Code = "NOT_FOUND"
 	CodeTokenImmutableField problem.Code = "immutable_field"
+	CodeTokenReservedName   problem.Code = "reserved_name"
 )
 
 // TokenService is the port the handler depends on. It matches the application
@@ -198,6 +199,10 @@ func (h *Handler) writeTokenError(w http.ResponseWriter, err error) {
 		_ = problem.Write(w, problem.
 			New(http.StatusUnprocessableEntity, CodeTokenImmutableField, "name is immutable after creation").
 			WithFieldError("name", CodeTokenImmutableField, "name is immutable after creation"))
+	case errors.Is(err, domain.ErrReservedName):
+		_ = problem.Write(w, problem.
+			New(http.StatusUnprocessableEntity, CodeTokenReservedName, "name is reserved by a native token").
+			WithFieldError("name", CodeTokenReservedName, "name collides with a built-in token; choose another"))
 	case errors.As(err, &valErr):
 		httpresponse.WriteError(w, http.StatusUnprocessableEntity, problem.CodeValidationError, valErr.Error())
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":

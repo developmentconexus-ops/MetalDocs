@@ -19,6 +19,11 @@ var ErrNotFound = errors.New("tokens: entry not found")
 // code immutable_field, distinct from generic validation.
 var ErrImmutableName = errors.New("tokens: name is immutable")
 
+// ErrReservedName signals an attempt to create a dictionary entry whose name
+// collides with a native/computed token name (the render resolver registry).
+// Maps to 422 reserved_name. Primary collision guard (SP-2 D4).
+var ErrReservedName = errors.New("tokens: name is reserved (native token)")
+
 // ValidationError is a friendly first-line field validation failure. The DB
 // CHECK constraints are the enforcement; this is the app-side mirror.
 type ValidationError struct {
