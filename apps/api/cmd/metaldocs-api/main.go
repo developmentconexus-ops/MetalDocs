@@ -522,6 +522,9 @@ func main() {
 	docDeps.SubmitSvc = approvalServices.Submit
 
 	docMod := documents.New(docDeps)
+	// SP-2: pin tenant dictionary values at document creation. tokensModule was
+	// built at startup (line ~358), before docMod.
+	docMod.Service.WithDictionaryReader(dictionaryValueReaderAdapter{reader: tokensModule.Reader})
 	docMod.RegisterRoutesWithRateLimit(mux, globalLimiter, userIDExtractor)
 
 	// Wire the documents-side adapter back into the controlled-documents service so atomic
