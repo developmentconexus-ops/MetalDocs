@@ -81,7 +81,11 @@ func TestVerifiedStore_Copy_DestOutsideTenant_Rejected(t *testing.T) {
 
 func TestVerifiedStore_Copy_ValidDestNotRejected(t *testing.T) {
 	s := newTestStore(t)
-	err := s.Copy(context.Background(), "tenant-a",
+	// Short deadline so the guard still runs synchronously (passes) but the doomed
+	// minio network call fails fast instead of retrying against an unreachable host.
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	err := s.Copy(ctx, "tenant-a",
 		"tenants/tenant-a/templates/tpl-1/versions/1.docx",
 		"tenants/tenant-a/templates/tpl-1/versions/2.docx")
 	// Guard passes; minio call fails (no live server) — must NOT be ErrKeyOutsideTenant.
