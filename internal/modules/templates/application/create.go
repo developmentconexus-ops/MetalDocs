@@ -137,17 +137,11 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 		}
 	}
 
-	newNum := template.LatestVersion + 1
-	version := domain.NewTemplateVersionDraft(
-		s.uuid.New(),
-		cmd.TemplateID,
-		cmd.ActorUserID,
-		templateDocxKey(cmd.TenantID, cmd.TemplateID, newNum),
-		newNum,
-		cloneMetadataSchema(source.MetadataSchema),
-		clonePlaceholders(source.PlaceholderSchema),
-		s.clock.Now(),
-	)
+	newNum := nextVersionNumber(template.LatestVersion, source.VersionNumber)
+	version, err := s.spawnNextDraft(ctx, cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, newNum, source)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {

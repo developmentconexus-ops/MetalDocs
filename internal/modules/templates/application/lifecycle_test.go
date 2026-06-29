@@ -759,3 +759,87 @@ func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
 		t.Fatalf("expected publish to fail when creating next draft fails")
 	}
 }
+
+func TestApprove_Accept_CopiesSourceDocxToDistinctKey(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 2}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-2",
+		TemplateID:          template.ID,
+		VersionNumber:       2,
+		Status:              domain.VersionStatusInReview,
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver",
+		DocxStorageKey:      "tenants/tenant-a/templates/tpl-1/versions/2.docx",
+		ContentHash:         "live_hash",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+
+	presign := &fakePresigner{}
+	svc := application.New(repo, presign, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	res, err := svc.Approve(context.Background(), application.ApproveCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
+		TemplateID:    template.ID,
+		VersionNumber: 2,
+		Accept:        true,
+	})
+	if err != nil {
+		t.Fatalf("Approve returned error: %v", err)
+	}
+	wantDst := "tenants/tenant-a/templates/tpl-1/versions/3.docx"
+	if res.NextDraft.DocxStorageKey != wantDst {
+		t.Fatalf("next draft docx key = %q, want %q", res.NextDraft.DocxStorageKey, wantDst)
+	}
+	if res.NextDraft.DocxStorageKey == version.DocxStorageKey {
+		t.Fatalf("next draft must NOT share the source key %q", version.DocxStorageKey)
+	}
+	if res.NextDraft.ContentHash != "" {
+		t.Fatalf("next draft ContentHash must be empty so the publish gate still forces an edit, got %q", res.NextDraft.ContentHash)
+	}
+	want := [2]string{version.DocxStorageKey, wantDst}
+	if len(presign.CopyPairs) != 1 || presign.CopyPairs[0] != want {
+		t.Fatalf("expected one copy %v, got %v", want, presign.CopyPairs)
+	}
+}
+
+func TestApprove_Accept_AbortsWhenDocxCopyFails(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          template.ID,
+		VersionNumber:       1,
+		Status:              domain.VersionStatusInReview,
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver",
+		DocxStorageKey:      "tenants/tenant-a/templates/tpl-1/versions/1.docx",
+		ContentHash:         "live_hash",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+
+	presign := &fakePresigner{copyErr: errors.New("copy boom")}
+	svc := application.New(repo, presign, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	_, err := svc.Approve(context.Background(), application.ApproveCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		Accept:        true,
+	})
+	if err == nil {
+		t.Fatal("expected Approve to fail when the docx copy fails")
+	}
+	if len(repo.audit) != 0 {
+		t.Fatalf("expected no audit on aborted spawn (tx never opened), got %d", len(repo.audit))
+	}
+	if len(repo.versions) != 1 {
+		t.Fatalf("expected no next-draft row to be created, want 1 version got %d", len(repo.versions))
+	}
+}

@@ -241,13 +241,13 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 		approvedRev := version.RevisionNumber
 		template.CurrentRevisionNumber = &approvedRev
 
-		// Mirror PublishTemplateVersion: spawn v(n+1) draft in the same tx so
-		// the caller can navigate without a list refetch.
-		nextNum := template.LatestVersion + 1
-		if version.VersionNumber >= nextNum {
-			nextNum = version.VersionNumber + 1
+		// Spawn v(n+1) draft in the same tx so the caller can navigate without a
+		// list refetch. The docx copy runs pre-tx (store-then-reference).
+		nextNum := nextVersionNumber(template.LatestVersion, version.VersionNumber)
+		next, err := s.spawnNextDraft(ctx, cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, nextNum, version)
+		if err != nil {
+			return nil, err
 		}
-		next := s.buildNextDraftVersion(cmd.TemplateID, cmd.ActorUserID, nextNum, version)
 		template.LatestVersion = nextNum
 
 		audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, nil, s.clock.Now())
@@ -385,7 +385,6 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	}
 	now := s.clock.Now()
 	version.Status = domain.VersionStatusPublished
-	version.DocxStorageKey = cmd.DocxKey
 	version.PublishedAt = &now
 	version.ApprovedAt = &now
 	template.PublishedVersionID = &version.ID
@@ -395,8 +394,11 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	publishedRev := version.RevisionNumber
 	template.CurrentRevisionNumber = &publishedRev
 
-	nextNum := template.LatestVersion + 1
-	next := s.buildNextDraftVersion(cmd.TemplateID, cmd.ActorUserID, nextNum, version)
+	nextNum := nextVersionNumber(template.LatestVersion, version.VersionNumber)
+	next, err := s.spawnNextDraft(ctx, cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, nextNum, version)
+	if err != nil {
+		return nil, err
+	}
 	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{"schema_key": cmd.SchemaKey}, now)
 	if err != nil {
 		return nil, err
@@ -434,17 +436,40 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	return &PublishTemplateVersionResult{PublishedVersion: version, NextDraft: next}, nil
 }
 
-func (s *Service) buildNextDraftVersion(templateID, actorID string, nextNum int, published *domain.TemplateVersion) *domain.TemplateVersion {
+// nextVersionNumber allocates the next version slot. The new draft must be
+// numbered above both the template's latest version and the source version it
+// spawns from. Unifies what Approve/Publish/CreateNextVersion previously did
+// inconsistently.
+func nextVersionNumber(latestVersion, sourceVersionNumber int) int {
+	n := latestVersion + 1
+	if sourceVersionNumber >= n {
+		n = sourceVersionNumber + 1
+	}
+	return n
+}
+
+// spawnNextDraft builds the next draft version as a byte-copy of its source at
+// the draft's OWN canonical key (never the source's key — that shared-key bug
+// overwrites the immutable source object). The copy runs PRE-TX (store-then-
+// reference: the object exists before the referencing row commits; the only
+// crash outcome is a safe orphan). ContentHash is left empty (the draft
+// constructor's default) so the publish gate still forces a real edit before the
+// new revision can publish.
+func (s *Service) spawnNextDraft(ctx context.Context, tenantID, templateID, actorID string, nextNum int, source *domain.TemplateVersion) (*domain.TemplateVersion, error) {
+	dstKey := templateDocxKey(tenantID, templateID, nextNum)
+	if err := s.presign.Copy(ctx, tenantID, source.DocxStorageKey, dstKey); err != nil {
+		return nil, fmt.Errorf("templates: copy docx to %s: %w", dstKey, err)
+	}
 	return domain.NewTemplateVersionDraft(
 		s.uuid.New(),
 		templateID,
 		actorID,
-		published.DocxStorageKey,
+		dstKey,
 		nextNum,
-		published.MetadataSchema,
-		published.PlaceholderSchema,
+		cloneMetadataSchema(source.MetadataSchema),
+		clonePlaceholders(source.PlaceholderSchema),
 		s.clock.Now(),
-	)
+	), nil
 }
 
 func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.Template, error) {

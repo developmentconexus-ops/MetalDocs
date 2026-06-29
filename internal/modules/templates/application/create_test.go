@@ -286,6 +286,46 @@ func TestCreateNextVersion_WithDB_UsesTransaction(t *testing.T) {
 	}
 }
 
+func TestCreateNextVersion_CopiesSourceDocxToDistinctKey(t *testing.T) {
+	repo := newFakeRepo()
+	publishedID := "v1"
+	template := &domain.Template{
+		ID:                 "tpl-1",
+		TenantID:           "tenant-a",
+		LatestVersion:      1,
+		PublishedVersionID: &publishedID,
+	}
+	v1 := &domain.TemplateVersion{
+		ID:             publishedID,
+		TemplateID:     template.ID,
+		VersionNumber:  1,
+		Status:         domain.VersionStatusPublished,
+		DocxStorageKey: "tenants/tenant-a/templates/tpl-1/versions/1.docx",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[v1.ID] = v1
+
+	presign := &fakePresigner{}
+	svc := application.New(repo, presign, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	got, err := svc.CreateNextVersion(context.Background(), application.CreateVersionCmd{
+		TenantID:    "tenant-a",
+		ActorUserID: "user-b",
+		TemplateID:  template.ID,
+	})
+	if err != nil {
+		t.Fatalf("CreateNextVersion returned error: %v", err)
+	}
+	wantDst := "tenants/tenant-a/templates/tpl-1/versions/2.docx"
+	if got.DocxStorageKey != wantDst {
+		t.Fatalf("new version docx key = %q, want %q", got.DocxStorageKey, wantDst)
+	}
+	want := [2]string{v1.DocxStorageKey, wantDst}
+	if len(presign.CopyPairs) != 1 || presign.CopyPairs[0] != want {
+		t.Fatalf("expected one copy %v, got %v", want, presign.CopyPairs)
+	}
+}
+
 func strPtr(v string) *string {
 	return &v
 }
