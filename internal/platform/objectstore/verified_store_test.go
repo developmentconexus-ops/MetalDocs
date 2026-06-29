@@ -68,6 +68,16 @@ func TestVerifiedStore_ReadPathAllowsSystemKey(t *testing.T) {
 	}
 }
 
+func TestCopy_DestOutsideTenant_Rejected(t *testing.T) {
+	s := newTestStore(t)
+	err := s.Copy(context.Background(), "tenant-a",
+		"tenants/tenant-a/templates/tpl-1/versions/1.docx",
+		"tenants/OTHER/templates/tpl-1/versions/2.docx")
+	if err != ErrKeyOutsideTenant {
+		t.Fatalf("expected ErrKeyOutsideTenant, got %v", err)
+	}
+}
+
 func mustHost(t *testing.T, raw string) string {
 	t.Helper()
 	u, err := url.Parse(raw)

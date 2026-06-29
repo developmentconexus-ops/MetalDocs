@@ -100,6 +100,29 @@ func (s *VerifiedStore) Confirm(ctx context.Context, tenantID, key, expectedHash
 	return VerifiedPointer{StorageKey: key, ContentHash: actual, SizeBytes: n}, nil
 }
 
+// Copy duplicates an existing object to a new tenant-scoped key, server-side
+// (no bytes stream through the app, so the producer invariant is preserved — no
+// docx is authored by the Go server). The DESTINATION is tenant-prefix guarded,
+// same as the write path; the SOURCE is a DB-sourced / server-trusted key (read
+// path, not guarded). Used by copy-on-spawn so each template version owns a
+// distinct object instead of sharing a key with its source.
+func (s *VerifiedStore) Copy(ctx context.Context, tenantID, srcKey, dstKey string) error {
+	if err := s.assertTenant(tenantID, dstKey); err != nil {
+		return err
+	}
+	_, err := s.client.CopyObject(ctx,
+		minio.CopyDestOptions{Bucket: s.bucket, Object: dstKey},
+		minio.CopySrcOptions{Bucket: s.bucket, Object: srcKey},
+	)
+	if err != nil {
+		if isNoSuchKeyErr(err) {
+			return ErrObjectMissing
+		}
+		return fmt.Errorf("objectstore: copy: %w", err)
+	}
+	return nil
+}
+
 // --- read path (NOT guarded: keys are DB-sourced / server-trusted) ---
 
 func (s *VerifiedStore) PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error) {
