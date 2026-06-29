@@ -61,4 +61,19 @@ func TestMigration0249WidensDocumentPlaceholderValuesSourceCheck(t *testing.T) {
 	if !strings.Contains(sql, "ALTER TABLE public.document_placeholder_values") {
 		t.Fatal("migration must target public.document_placeholder_values")
 	}
+
+	// The migration must self-register in the schema_migrations ledger so the
+	// runner records 0249 as applied and does not re-execute it on every boot
+	// (the runner does not auto-insert; files must include the ledger insert —
+	// see internal/platform/migrate/migrate.go). Convention (0240–0246):
+	// INSERT ... VALUES ('0249', ...) ON CONFLICT (version) DO NOTHING.
+	if !strings.Contains(sql, "INSERT INTO public.schema_migrations") {
+		t.Fatal("migration must insert into public.schema_migrations")
+	}
+	if !strings.Contains(sql, "'0249'") {
+		t.Fatal("migration must record schema_migrations version '0249'")
+	}
+	if !strings.Contains(sql, "ON CONFLICT (version) DO NOTHING") {
+		t.Fatal("schema_migrations insert must be idempotent (ON CONFLICT (version) DO NOTHING)")
+	}
 }
