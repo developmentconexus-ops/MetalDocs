@@ -23,6 +23,8 @@ type SchemaReader interface {
 
 type FillInWriter interface {
 	UpsertValue(ctx context.Context, v repository.PlaceholderValue, q ...repository.DBTX) error
+	UpsertAuthorValue(ctx context.Context, v repository.PlaceholderValue, q ...repository.DBTX) (int64, error)
+	CurrentSource(ctx context.Context, tenantID, revisionID, placeholderID string) (string, bool, error)
 }
 
 type FillInService struct {
@@ -125,16 +127,31 @@ func (s *FillInService) SetPlaceholderValue(ctx context.Context, tenantID, actor
 		return err
 	}
 
-	value := raw
-	if err := s.writer.UpsertValue(ctx, repository.PlaceholderValue{
-		TenantID:        tenantID,
-		RevisionID:      revisionID,
-		PlaceholderID:   placeholderID,
-		ValueText:       &value,
-		Source:          "user",
-		ResolverVersion: nil,
-	}); err != nil {
+	// SP-2 D11: an author may write only rows whose current source is
+	// author-editable ('user'/'default'). Governed rows (computed/dictionary) are
+	// rejected — friendly app check first, DB WHERE-guard backstops.
+	curSource, exists, err := s.writer.CurrentSource(ctx, tenantID, revisionID, placeholderID)
+	if err != nil {
 		return err
+	}
+	if exists && (curSource == "computed" || curSource == "dictionary") {
+		return fmt.Errorf("%w: placeholder %s is governed (%s)", v2domain.ErrPlaceholderNotAuthorEditable, placeholderID, curSource)
+	}
+
+	value := raw
+	affected, err := s.writer.UpsertAuthorValue(ctx, repository.PlaceholderValue{
+		TenantID:      tenantID,
+		RevisionID:    revisionID,
+		PlaceholderID: placeholderID,
+		ValueText:     &value,
+		Source:        "user",
+	})
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		// DB guard rejected (governed row, or a race past the app check).
+		return fmt.Errorf("%w: placeholder %s is governed", v2domain.ErrPlaceholderNotAuthorEditable, placeholderID)
 	}
 	return nil
 }
