@@ -24,8 +24,13 @@ CREATE TABLE IF NOT EXISTS metaldocs.token_dictionary_entries (
     label       text        NOT NULL
                             CHECK (char_length(label) BETWEEN 1 AND 256),
     description text        CHECK (description IS NULL OR char_length(description) <= 1024),
-    created_by  uuid        NOT NULL,
-    updated_by  uuid        NOT NULL,
+    -- Actor identity is TEXT system-wide: iam_users.user_id (PK) is text, and
+    -- every actor column references it as text (audit.actor_id, notifications.
+    -- recipient_user_id, idempotency_keys.actor_user_id, grant_area_membership
+    -- _user_id text, UserIDFromContext -> string). These FK the same identity, so
+    -- they MUST be text too -- a uuid column cannot hold a user_id (e.g. "admin").
+    created_by  text        NOT NULL,
+    updated_by  text        NOT NULL,
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
