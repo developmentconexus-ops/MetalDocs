@@ -319,3 +319,16 @@ func TestValidatePlaceholders_RejectsCatalogNameWithWrongShape(t *testing.T) {
 		t.Fatalf("err = %v, want ErrPlaceholderNotComputed", err)
 	}
 }
+
+// TestValidatePlaceholders_AcceptsApprovalDate guards that {approval_date} validates
+// as a computed placeholder. Regression for commit 49429a89: the old 7-key set
+// (lacking approval_date) would have returned ErrPlaceholderNotInCatalog here.
+func TestValidatePlaceholders_AcceptsApprovalDate(t *testing.T) {
+	rk := "approval_date"
+	phs := []domain.Placeholder{
+		{ID: "p1", Name: "approval_date", Label: "Data de aprovação", Type: domain.PHComputed, Computed: true, ResolverKey: &rk},
+	}
+	if err := application.ValidatePlaceholders(phs, nil); err != nil {
+		t.Fatalf("approval_date must be accepted as computed token, got %v", err)
+	}
+}
