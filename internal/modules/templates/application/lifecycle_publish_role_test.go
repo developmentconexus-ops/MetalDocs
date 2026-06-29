@@ -122,7 +122,6 @@ func TestPublishTemplateVersion_RoleBinding(t *testing.T) {
 				ActorRoles:    tc.setup.actorRoles,
 				TemplateID:    template.ID,
 				VersionNumber: 1,
-				DocxKey:       "templates/tpl-1/versions/1.docx",
 				SchemaKey:     "templates/tpl-1/versions/1.schema.json",
 			})
 

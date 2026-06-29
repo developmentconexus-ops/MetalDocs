@@ -321,7 +321,6 @@ type PublishTemplateVersionCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	ActorRoles                        []string
 	VersionNumber                     int
-	DocxKey                           string
 	SchemaKey                         string
 }
 

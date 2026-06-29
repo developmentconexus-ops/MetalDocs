@@ -4618,7 +4618,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    docx_key: string;
                     schema_key: string;
                 };
             };

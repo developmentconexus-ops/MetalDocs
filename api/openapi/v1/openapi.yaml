@@ -1276,9 +1276,8 @@ paths:
           application/json:
             schema:
               type: object
-              required: [docx_key, schema_key]
+              required: [schema_key]
               properties:
-                docx_key: { type: string }
                 schema_key: { type: string }
       responses:
         '200':

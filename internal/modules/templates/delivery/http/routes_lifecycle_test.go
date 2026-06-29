@@ -435,7 +435,6 @@ func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
 	body, _ := json.Marshal(map[string]any{
-		"docx_key":   "templates/" + templateID + "/versions/1.docx",
 		"schema_key": "templates/" + templateID + "/versions/1.schema.json",
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+templateID+"/versions/1/publish", bytes.NewReader(body))

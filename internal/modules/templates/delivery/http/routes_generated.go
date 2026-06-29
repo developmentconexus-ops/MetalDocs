@@ -189,7 +189,6 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		ActorRoles:    actorRolesFromReq(r),
 		TemplateID:    id,
 		VersionNumber: n,
-		DocxKey:       strings.TrimSpace(req.DocxKey),
 		SchemaKey:     strings.TrimSpace(req.SchemaKey),
 	})
 	if err != nil {
@@ -208,8 +207,6 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 
 func missingPublishTemplateVersionField(req templatesapi.PublishTemplateVersionJSONRequestBody) string {
 	switch {
-	case strings.TrimSpace(req.DocxKey) == "":
-		return "docx_key"
 	case strings.TrimSpace(req.SchemaKey) == "":
 		return "schema_key"
 	default:

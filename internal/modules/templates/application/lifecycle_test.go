@@ -751,7 +751,6 @@ func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
 		ActorRoles:    []string{"approver"},
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		DocxKey:       "templates/tpl-1/versions/1.docx",
 		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
 	})
 	// CreateVersionTx failure must propagate as an error from PublishTemplateVersion.
@@ -869,7 +868,6 @@ func TestPublishTemplateVersion_AbortsWhenDocxCopyFails(t *testing.T) {
 		ActorRoles:    []string{"approver"},
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		DocxKey:       "tenants/tenant-a/templates/tpl-1/versions/1.docx",
 		SchemaKey:     "tenants/tenant-a/templates/tpl-1/versions/1.schema.json",
 	})
 	if err == nil {
