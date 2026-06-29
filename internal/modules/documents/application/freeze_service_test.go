@@ -390,6 +390,123 @@ func TestFreezeService_Freeze_RequiresTx(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// SP-2 D8: dictionary value substitutes via freeze path + values_hash capture
+// ---------------------------------------------------------------------------
+
+// TestFreezeService_Freeze_DictionaryValueSubstitutesByName proves that a
+// placeholder with source='dictionary' (a) substitutes into the fanout request
+// keyed by the placeholder NAME, and (b) participates in values_hash.
+// No DB required; uses in-package fakes only.
+func TestFreezeService_Freeze_DictionaryValueSubstitutesByName(t *testing.T) {
+	schema := []tmpldom.Placeholder{
+		{ID: "p_dict", Name: "company_name", Required: true},
+	}
+	dictVal := "Acme Corp"
+	existing := []repository.PlaceholderValue{
+		{PlaceholderID: "p_dict", ValueText: strPtr(dictVal), Source: "dictionary"},
+	}
+	finalize := &fakeFreezeFinalizer{}
+	fanoutClient := &fakeFanoutClient{resp: fanout.FanoutResponse{
+		ContentHash:    "deadbeef00000000000000000000000000000000000000000000000000000000",
+		FinalDocxS3Key: "final/r.docx",
+		UnreplacedVars: []string{},
+	}}
+	svc := NewFreezeService(
+		fakeSchemaReader{placeholders: schema},
+		&fakeFillInWriter{},
+		&fakeValuesReader{values: existing},
+		resolvers.NewRegistry(),
+		finalize,
+		&fakeResolverContextBuilder{},
+		fakeSnapshotReader{snap: v2dom.TemplateSnapshot{
+			BodyDocxS3Key:   "templates/body.docx",
+			CompositionJSON: []byte(`{}`),
+		}},
+		&fakeFinalDocxWriter{},
+		fanoutClient,
+	)
+
+	if err := svc.Freeze(context.Background(), fakeTx{}, "t", "r", ApproverContext{}); err != nil {
+		t.Fatalf("Freeze error: %v", err)
+	}
+
+	// D8-substitution: fanout request carries the value keyed by NAME.
+	if got := fanoutClient.req.PlaceholderValues["company_name"]; got != dictVal {
+		t.Errorf("substitution: fanout PlaceholderValues[%q] = %q, want %q",
+			"company_name", got, dictVal)
+	}
+
+	// D8-hash: values_hash must capture the dictionary value.
+	wantHash, err := v2dom.ComputeValuesHash(map[string]any{"p_dict": dictVal})
+	if err != nil {
+		t.Fatalf("ComputeValuesHash: %v", err)
+	}
+	if got := bytesToHex(finalize.hash); got != wantHash {
+		t.Errorf("values_hash mismatch: got %s, want %s", got, wantHash)
+	}
+}
+
+// TestFreezeService_Freeze_ValuesHash_DeterministicAndSensitiveToDictionaryValue
+// proves D8 reproducibility:
+//   - two freeze runs with the SAME pinned dictionary value produce identical values_hash;
+//   - a run with a DIFFERENT pinned value produces a different values_hash.
+func TestFreezeService_Freeze_ValuesHash_DeterministicAndSensitiveToDictionaryValue(t *testing.T) {
+	schema := []tmpldom.Placeholder{
+		{ID: "p_dict", Name: "company_name", Required: true},
+	}
+	goodResp := fanout.FanoutResponse{
+		ContentHash:    "deadbeef00000000000000000000000000000000000000000000000000000000",
+		FinalDocxS3Key: "final/r.docx",
+		UnreplacedVars: []string{},
+	}
+	snap := v2dom.TemplateSnapshot{
+		BodyDocxS3Key:   "templates/body.docx",
+		CompositionJSON: []byte(`{}`),
+	}
+
+	buildSvc := func(val string) (*fakeFreezeFinalizer, error) {
+		fin := &fakeFreezeFinalizer{}
+		svc := NewFreezeService(
+			fakeSchemaReader{placeholders: schema},
+			&fakeFillInWriter{},
+			&fakeValuesReader{values: []repository.PlaceholderValue{
+				{PlaceholderID: "p_dict", ValueText: strPtr(val), Source: "dictionary"},
+			}},
+			resolvers.NewRegistry(),
+			fin,
+			&fakeResolverContextBuilder{},
+			fakeSnapshotReader{snap: snap},
+			&fakeFinalDocxWriter{},
+			&fakeFanoutClient{resp: goodResp},
+		)
+		return fin, svc.Freeze(context.Background(), fakeTx{}, "t", "r", ApproverContext{})
+	}
+
+	// Run 1 — "Acme Corp".
+	fin1, err := buildSvc("Acme Corp")
+	if err != nil {
+		t.Fatalf("run1 Freeze: %v", err)
+	}
+	// Run 2 — same value, must produce identical hash (determinism).
+	fin2, err := buildSvc("Acme Corp")
+	if err != nil {
+		t.Fatalf("run2 Freeze: %v", err)
+	}
+	if h1, h2 := bytesToHex(fin1.hash), bytesToHex(fin2.hash); h1 != h2 {
+		t.Errorf("determinism: same value produced different hashes: %s vs %s", h1, h2)
+	}
+
+	// Run 3 — different value "Globex", must produce a different hash (sensitivity).
+	fin3, err := buildSvc("Globex")
+	if err != nil {
+		t.Fatalf("run3 Freeze: %v", err)
+	}
+	if h1, h3 := bytesToHex(fin1.hash), bytesToHex(fin3.hash); h1 == h3 {
+		t.Errorf("sensitivity: different dictionary values produced the same hash %s", h1)
+	}
+}
+
 func containsStr(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {
