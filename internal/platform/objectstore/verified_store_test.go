@@ -2,6 +2,7 @@ package objectstore
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"testing"
 	"time"
@@ -68,13 +69,24 @@ func TestVerifiedStore_ReadPathAllowsSystemKey(t *testing.T) {
 	}
 }
 
-func TestCopy_DestOutsideTenant_Rejected(t *testing.T) {
+func TestVerifiedStore_Copy_DestOutsideTenant_Rejected(t *testing.T) {
 	s := newTestStore(t)
 	err := s.Copy(context.Background(), "tenant-a",
 		"tenants/tenant-a/templates/tpl-1/versions/1.docx",
 		"tenants/OTHER/templates/tpl-1/versions/2.docx")
 	if err != ErrKeyOutsideTenant {
 		t.Fatalf("expected ErrKeyOutsideTenant, got %v", err)
+	}
+}
+
+func TestVerifiedStore_Copy_ValidDestNotRejected(t *testing.T) {
+	s := newTestStore(t)
+	err := s.Copy(context.Background(), "tenant-a",
+		"tenants/tenant-a/templates/tpl-1/versions/1.docx",
+		"tenants/tenant-a/templates/tpl-1/versions/2.docx")
+	// Guard passes; minio call fails (no live server) — must NOT be ErrKeyOutsideTenant.
+	if errors.Is(err, ErrKeyOutsideTenant) {
+		t.Fatalf("valid dst should not be rejected by guard")
 	}
 }
 
