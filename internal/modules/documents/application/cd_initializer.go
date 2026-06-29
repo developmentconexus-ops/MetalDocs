@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	documentsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/platform/db"
 )
 
@@ -41,6 +42,24 @@ func (i *CDDocumentInitializer) ResolveTemplateVersionID(ctx context.Context, te
 		return "", errors.New("documents service not configured")
 	}
 	return i.svc.resolveTemplateVersionID(ctx, tenantID, profileCode, templateVersionID)
+}
+
+// ResolveDictionaryValues resolves PHDictionary placeholder values off-tx for the
+// controlled-document create/revision flow, translating the documents-domain
+// not-found sentinel into the controlleddocuments-domain one the CD HTTP layer
+// maps to 422 (SP-2 D7).
+func (i *CDDocumentInitializer) ResolveDictionaryValues(ctx context.Context, tenantID, templateVersionID string) (map[string]string, error) {
+	if i == nil || i.svc == nil {
+		return nil, errors.New("documents service not configured")
+	}
+	vals, err := i.svc.ResolveDictionaryValues(ctx, tenantID, templateVersionID)
+	if err != nil {
+		if errors.Is(err, documentsdomain.ErrDictionaryTokenMissing) {
+			return nil, controlleddocumentsdomain.ErrDictionaryTokenMissing
+		}
+		return nil, err
+	}
+	return vals, nil
 }
 
 // CloneTemplate threads the caller's tx into Service.cloneIntoTx so the

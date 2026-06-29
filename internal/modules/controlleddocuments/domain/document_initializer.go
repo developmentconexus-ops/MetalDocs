@@ -93,4 +93,10 @@ type DocumentInitializer interface {
 	// clone performs no authz-recording taxonomy read (which would deadlock against
 	// the audit hash-chain advisory lock held by the atomic tx).
 	ResolveTemplateVersionID(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error)
+	// ResolveDictionaryValues resolves every PHDictionary placeholder in the given
+	// template version's schema to its pinned value (keyed by placeholder ID),
+	// OFF-TX before the caller opens its atomic tx (the dictionary read is
+	// authz-recording on its own tx — H-PRE-1). Returns ErrDictionaryTokenMissing
+	// when a referenced token does not exist (SP-2 D7/D10).
+	ResolveDictionaryValues(ctx context.Context, tenantID, templateVersionID string) (map[string]string, error)
 }
