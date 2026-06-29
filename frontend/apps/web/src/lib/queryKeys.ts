@@ -64,6 +64,10 @@ export const QK = {
       ['templates', 'by-profile', profileCode] as const,
     placeholderCatalog: () => ['templates', 'placeholder-catalog'] as const,
   },
+  tokens: {
+    all: ['tokens'] as const,
+    list: () => ['tokens', 'list'] as const,
+  },
   approval: {
     instance: (documentId: string) =>
       ['approval', 'instance', documentId] as const,
