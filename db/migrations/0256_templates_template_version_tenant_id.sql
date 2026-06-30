@@ -69,17 +69,52 @@ END;
 $$;
 
 -- The backfill is a system DDL data-fix, not a user-driven write, but the table
--- carries trg_require_cap_asserted (BEFORE INSERT/UPDATE/DELETE) which would
--- reject the UPDATE for lack of an asserted-caps GUC. Disable that one trigger
--- around the backfill and re-enable it immediately after — the canonical
--- migration-time pattern from 0230_authz_decommission_reviewer_role.sql.
+-- carries TWO BEFORE INSERT/UPDATE triggers that would reject it:
+--   (1) trg_require_cap_asserted (baseline) — rejects writes without an
+--       asserted-caps GUC.
+--   (2) trg_template_version_tenant_consistent (migration 0255) — rejects writes
+--       without the metaldocs.tenant_id GUC, and checks the row's parent-template
+--       tenant against it. The per-row backfill cannot set a single tx-local
+--       tenant GUC that matches every row, so this trigger must also stand down
+--       for the duration of the system data-fix.
+-- Disable both around the backfill and re-enable immediately after — the
+-- canonical migration-time pattern from 0230_authz_decommission_reviewer_role.sql.
+-- Both ENABLEs run inside this migration's BEGIN/COMMIT, so any failure rolls the
+-- whole tx back and can never leave a security trigger disabled. The 0255 trigger
+-- is created by an earlier migration in the same lineage, but it is guarded with
+-- an existence check so this migration stays robust if applied to a DB that never
+-- received 0255 (e.g. a pre-fold environment).
 ALTER TABLE public.templates_template_version DISABLE TRIGGER trg_require_cap_asserted;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_template_version_tenant_consistent'
+      AND tgrelid = 'public.templates_template_version'::regclass
+  ) THEN
+    EXECUTE 'ALTER TABLE public.templates_template_version DISABLE TRIGGER trg_template_version_tenant_consistent';
+  END IF;
+END
+$$;
 
 UPDATE public.templates_template_version v
 SET    tenant_id = t.tenant_id
 FROM   public.templates_template t
 WHERE  t.id = v.template_id
   AND  v.tenant_id IS NULL;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_template_version_tenant_consistent'
+      AND tgrelid = 'public.templates_template_version'::regclass
+  ) THEN
+    EXECUTE 'ALTER TABLE public.templates_template_version ENABLE TRIGGER trg_template_version_tenant_consistent';
+  END IF;
+END
+$$;
 
 ALTER TABLE public.templates_template_version ENABLE TRIGGER trg_require_cap_asserted;
 

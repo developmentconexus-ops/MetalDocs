@@ -205,3 +205,35 @@ func TestMigration0256BackfillBypassesCapTrigger(t *testing.T) {
 		t.Fatal("trigger must be disabled before, and re-enabled after, the backfill UPDATE")
 	}
 }
+
+// TestMigration0256BackfillBypassesTenantConsistencyTrigger asserts the backfill
+// also stands down the 0255 trg_template_version_tenant_consistent trigger around
+// the UPDATE. That trigger requires the metaldocs.tenant_id GUC on every write; a
+// per-row system backfill cannot set a single matching GUC, so a clean sequential
+// apply (0255 before 0256) would otherwise fail at the backfill. The disable/enable
+// is existence-guarded (the 0255 trigger may be absent on a pre-fold DB) and both
+// ends sit inside the migration's BEGIN/COMMIT so a failure can never leave the
+// security trigger disabled.
+func TestMigration0256BackfillBypassesTenantConsistencyTrigger(t *testing.T) {
+	t.Parallel()
+
+	body, err := os.ReadFile("0256_templates_template_version_tenant_id.sql")
+	if err != nil {
+		t.Fatalf("read migration: %v", err)
+	}
+	sql := string(body)
+
+	disIdx := strings.Index(sql, "DISABLE TRIGGER trg_template_version_tenant_consistent")
+	enIdx := strings.Index(sql, "ENABLE TRIGGER trg_template_version_tenant_consistent")
+	if disIdx < 0 || enIdx < 0 {
+		t.Fatal("backfill must DISABLE and re-ENABLE trg_template_version_tenant_consistent (the 0255 trigger) around the UPDATE")
+	}
+	// Existence-guarded so the migration stays robust on a DB that never got 0255.
+	if !strings.Contains(sql, "tgname = 'trg_template_version_tenant_consistent'") {
+		t.Fatal("the 0255 trigger disable/enable must be existence-guarded via pg_trigger lookup")
+	}
+	updIdx := strings.Index(sql, "UPDATE public.templates_template_version v")
+	if !(disIdx < updIdx && updIdx < enIdx) {
+		t.Fatal("the 0255 trigger must be disabled before, and re-enabled after, the backfill UPDATE")
+	}
+}

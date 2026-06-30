@@ -194,7 +194,15 @@ INSERT INTO public.templates_template_version (
   1,
   'published',
   'system/templates/blank.docx',
-  'system-blank-template',
+  -- SHA-256 of the deterministic system blank.docx produced by
+  -- scripts/seed-system-blank-template.ps1 (New-DeterministicBlankDocx: fixed
+  -- 2026-05-17 timestamps, NoCompression, fixed OOXML parts). This is the TRUE
+  -- content hash of the canonical published artifact, satisfying the 0251
+  -- integrity constraints (chk_template_version_content_hash = 64-hex, and
+  -- chk_template_version_content_hash_non_draft requiring a real hash for a
+  -- non-draft version). The former 'system-blank-template' placeholder (21 chars,
+  -- published) violated both CHECKs and made a clean bootstrap fail at 0251.
+  'd368125449f3156f1e970effd8c5e70e92e2908b940a50afd64951cc4e9e5a8e',
   '{}'::jsonb,
   '[]'::jsonb,
   'system',
