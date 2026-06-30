@@ -5503,7 +5503,7 @@ components:
           description: >
             0-based regulated revision counter. REV{nn} = revision_number,
             zero-padded. ADR 0013.
-        status: { type: string, enum: [draft, in_review, approved, published, obsolete] }
+        status: { type: string, enum: [draft, under_review, approved, published, obsolete] }
         docx_storage_key: { type: string, nullable: true }
         content_hash: { type: string, nullable: true }
         metadata_schema: { type: object, nullable: true, additionalProperties: true }

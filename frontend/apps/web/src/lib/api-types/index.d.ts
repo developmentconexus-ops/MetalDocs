@@ -2874,7 +2874,7 @@ export interface components {
              */
             revision_number?: number;
             /** @enum {string} */
-            status: "draft" | "in_review" | "approved" | "published" | "obsolete";
+            status: "draft" | "under_review" | "approved" | "published" | "obsolete";
             docx_storage_key?: string | null;
             content_hash?: string | null;
             metadata_schema?: {
