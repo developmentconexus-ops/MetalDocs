@@ -2456,7 +2456,7 @@ CREATE TABLE public.templates_template_version (
     CONSTRAINT chk_template_version_content_hash CHECK (((content_hash = ''::text) OR (length(content_hash) = 64))),
     CONSTRAINT chk_template_version_content_hash_non_draft CHECK (((status = 'draft'::text) OR (length(content_hash) = 64))),
     CONSTRAINT chk_template_version_number_positive CHECK ((version_number >= 1)),
-    CONSTRAINT chk_template_version_status CHECK ((status = ANY (ARRAY['draft'::text, 'in_review'::text, 'approved'::text, 'published'::text, 'obsolete'::text])))
+    CONSTRAINT chk_template_version_status CHECK ((status = ANY (ARRAY['draft'::text, 'under_review'::text, 'approved'::text, 'published'::text, 'obsolete'::text])))
 );
 
 ALTER TABLE ONLY public.templates_template_version FORCE ROW LEVEL SECURITY;

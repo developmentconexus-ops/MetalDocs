@@ -66,7 +66,7 @@ func TestSubmitForReview_Happy(t *testing.T) {
 		t.Fatalf("decode body: %v", err)
 	}
 	if out.Data.Version.Status != string(domain.VersionStatusInReview) {
-		t.Fatalf("expected status=in_review, got %q", out.Data.Version.Status)
+		t.Fatalf("expected status=under_review, got %q", out.Data.Version.Status)
 	}
 }
 

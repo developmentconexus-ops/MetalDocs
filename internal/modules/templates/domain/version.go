@@ -9,7 +9,7 @@ type VersionStatus string
 
 const (
 	VersionStatusDraft     VersionStatus = "draft"
-	VersionStatusInReview  VersionStatus = "in_review"
+	VersionStatusInReview  VersionStatus = "under_review"
 	VersionStatusApproved  VersionStatus = "approved"
 	VersionStatusPublished VersionStatus = "published"
 	VersionStatusObsolete  VersionStatus = "obsolete"

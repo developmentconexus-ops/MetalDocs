@@ -17,19 +17,19 @@ func TestCanTransition(t *testing.T) {
 		wantErr     error
 	}{
 		{
-			name:        "draft to in_review",
+			name:        "draft to under_review",
 			from:        domain.VersionStatusDraft,
 			next:        domain.VersionStatusInReview,
 			hasReviewer: true,
 		},
 		{
-			name:        "in_review to approved when reviewer required",
+			name:        "under_review to approved when reviewer required",
 			from:        domain.VersionStatusInReview,
 			next:        domain.VersionStatusApproved,
 			hasReviewer: true,
 		},
 		{
-			name:        "in_review to published when reviewer not required",
+			name:        "under_review to published when reviewer not required",
 			from:        domain.VersionStatusInReview,
 			next:        domain.VersionStatusPublished,
 			hasReviewer: false,
@@ -47,7 +47,7 @@ func TestCanTransition(t *testing.T) {
 			hasReviewer: true,
 		},
 		{
-			name:        "in_review to draft reject",
+			name:        "under_review to draft reject",
 			from:        domain.VersionStatusInReview,
 			next:        domain.VersionStatusDraft,
 			hasReviewer: true,
@@ -59,14 +59,14 @@ func TestCanTransition(t *testing.T) {
 			hasReviewer: true,
 		},
 		{
-			name:        "in_review to approved denied when reviewer not required",
+			name:        "under_review to approved denied when reviewer not required",
 			from:        domain.VersionStatusInReview,
 			next:        domain.VersionStatusApproved,
 			hasReviewer: false,
 			wantErr:     domain.ErrInvalidStateTransition,
 		},
 		{
-			name:        "in_review to published denied when reviewer required",
+			name:        "under_review to published denied when reviewer required",
 			from:        domain.VersionStatusInReview,
 			next:        domain.VersionStatusPublished,
 			hasReviewer: true,
@@ -162,8 +162,8 @@ func TestRoleBindingFor(t *testing.T) {
 	}{
 		{"published_returns_approver_when_set", domain.TemplateVersion{PendingApproverRole: "approver-role"}, domain.VersionStatusPublished, "approver-role"},
 		{"published_empty_when_unset", domain.TemplateVersion{}, domain.VersionStatusPublished, ""},
-		{"in_review_returns_reviewer_when_set", domain.TemplateVersion{PendingReviewerRole: &reviewer}, domain.VersionStatusInReview, reviewer},
-		{"in_review_empty_when_nil", domain.TemplateVersion{}, domain.VersionStatusInReview, ""},
+		{"under_review_returns_reviewer_when_set", domain.TemplateVersion{PendingReviewerRole: &reviewer}, domain.VersionStatusInReview, reviewer},
+		{"under_review_empty_when_nil", domain.TemplateVersion{}, domain.VersionStatusInReview, ""},
 		{"approved_returns_reviewer_when_set", domain.TemplateVersion{PendingReviewerRole: &reviewer}, domain.VersionStatusApproved, reviewer},
 		{"draft_has_no_binding", domain.TemplateVersion{PendingApproverRole: "x", PendingReviewerRole: &reviewer}, domain.VersionStatusDraft, ""},
 	}
