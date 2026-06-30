@@ -23,13 +23,13 @@ function setUser(roles: string[], capabilities: string[]) {
   useAuthStore.setState({ user });
 }
 
-function inReviewWithReviewer(): VersionDTO {
+function underReviewWithReviewer(): VersionDTO {
   return {
     id: 'v1',
     template_id: 't1',
     version_number: 1,
     revision_number: 0,
-    status: 'in_review',
+    status: 'under_review',
     docx_storage_key: null,
     content_hash: null,
     metadata_schema: null,
@@ -55,7 +55,7 @@ describe('VersionActionPanel gating', () => {
 
   it('disables Approve Review with tooltip when actor lacks template.review', () => {
     setUser(['reviewer'], []);
-    render(<VersionActionPanel version={inReviewWithReviewer()} onVersionUpdate={() => {}} />);
+    render(<VersionActionPanel version={underReviewWithReviewer()} onVersionUpdate={() => {}} />);
     const acceptBtn = screen.getByRole('button', { name: /aprovar revisão/i });
     expect(acceptBtn).toBeDisabled();
     expect(acceptBtn.getAttribute('title')).toContain('template.review');
@@ -63,7 +63,7 @@ describe('VersionActionPanel gating', () => {
 
   it('disables Approve Review with tooltip when actor lacks pending_reviewer_role', () => {
     setUser(['approver'], ['template.review']);
-    render(<VersionActionPanel version={inReviewWithReviewer()} onVersionUpdate={() => {}} />);
+    render(<VersionActionPanel version={underReviewWithReviewer()} onVersionUpdate={() => {}} />);
     const acceptBtn = screen.getByRole('button', { name: /aprovar revisão/i });
     expect(acceptBtn).toBeDisabled();
     expect(acceptBtn.getAttribute('title')).toContain('reviewer');
@@ -71,7 +71,7 @@ describe('VersionActionPanel gating', () => {
 
   it('enables Approve Review when actor has cap + role', () => {
     setUser(['reviewer'], ['template.review']);
-    render(<VersionActionPanel version={inReviewWithReviewer()} onVersionUpdate={() => {}} />);
+    render(<VersionActionPanel version={underReviewWithReviewer()} onVersionUpdate={() => {}} />);
     const acceptBtn = screen.getByRole('button', { name: /aprovar revisão/i });
     expect(acceptBtn).not.toBeDisabled();
     expect(acceptBtn.getAttribute('title')).toBeFalsy();

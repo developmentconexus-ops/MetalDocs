@@ -374,7 +374,6 @@ td small {
 }
 
 .status-draft { background: rgba(127, 152, 164, 0.2); }
-.status-in_review { background: rgba(233, 180, 76, 0.2); }
 .status-approved { background: rgba(93, 176, 165, 0.22); }
 .status-published { background: rgba(76, 123, 186, 0.24); }
 .status-archived { background: rgba(255, 255, 255, 0.08); }

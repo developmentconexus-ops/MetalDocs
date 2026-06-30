@@ -53,13 +53,13 @@ export function canSubmit(version: VersionDTO, actor: ActorContext): VersionActi
   });
 }
 
-// canReview gates "Approve Review" / "Reject" on an in_review version that
+// canReview gates "Approve Review" / "Reject" on an under_review version that
 // carries a pending_reviewer_role (reviewer-required flow).
 // Backend cap: template.review. Role binding: pending_reviewer_role.
 export function canReview(version: VersionDTO, actor: ActorContext): VersionActionGate {
   const hasReviewerBinding = version.pending_reviewer_role != null;
   return evaluate({
-    statusOk: version.status === 'in_review' && hasReviewerBinding,
+    statusOk: version.status === 'under_review' && hasReviewerBinding,
     capability: 'template.review',
     capabilities: actor.capabilities,
     requiredRole: version.pending_reviewer_role,
@@ -80,7 +80,7 @@ export function canApprove(version: VersionDTO, actor: ActorContext): VersionAct
   });
 }
 
-// canPublish gates the no-reviewer "Publish" button on the in_review state.
+// canPublish gates the no-reviewer "Publish" button on the under_review state.
 // The UI label is "Publish" but the actual call is approveVersion (POST /approve
 // → Service.Approve, which accepts and publishes + spawns next draft in-tx).
 // Backend cap therefore is template.approve, NOT template.publish (template.publish
@@ -89,7 +89,7 @@ export function canApprove(version: VersionDTO, actor: ActorContext): VersionAct
 export function canPublish(version: VersionDTO, actor: ActorContext): VersionActionGate {
   const noReviewerFlow = version.pending_reviewer_role == null;
   return evaluate({
-    statusOk: version.status === 'in_review' && noReviewerFlow,
+    statusOk: version.status === 'under_review' && noReviewerFlow,
     capability: 'template.approve',
     capabilities: actor.capabilities,
     requiredRole: version.pending_approver_role,

@@ -38,7 +38,7 @@ function makeVersion(overrides: Partial<VersionDTO> = {}): VersionDTO {
     template_id: 'tpl-1',
     version_number: 1,
     revision_number: 0,
-    status: 'in_review',
+    status: 'under_review',
     docx_storage_key: null,
     content_hash: null,
     metadata_schema: null,

@@ -216,8 +216,7 @@ export function TemplateEditorPage({
   const versionStatus: DocumentStatus | null = (() => {
     const s = currentVersion?.status;
     if (!s) return null;
-    if (s === 'in_review') return 'under_review';
-    if (s === 'draft' || s === 'approved' || s === 'published') return s;
+    if (s === 'draft' || s === 'under_review' || s === 'approved' || s === 'published') return s;
     return null;
   })();
 
@@ -356,7 +355,7 @@ export function TemplateEditorPage({
         </main>
       </div>
 
-      {currentVersion && ['in_review', 'approved', 'published'].includes(currentVersion.status) && (
+      {currentVersion && ['under_review', 'approved', 'published'].includes(currentVersion.status) && (
         <VersionActionPanel
           version={currentVersion}
           onVersionUpdate={(v) => {

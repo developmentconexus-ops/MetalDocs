@@ -42,7 +42,7 @@ function makeVersion(overrides: Partial<VersionDTO> = {}): VersionDTO {
     template_id: 'tpl-1',
     version_number: 1,
     revision_number: 0,
-    status: 'in_review',
+    status: 'under_review',
     docx_storage_key: null,
     content_hash: null,
     metadata_schema: null,
@@ -69,7 +69,7 @@ beforeEach(() => {
 });
 
 describe('VersionActionPanel — type=button (F-FE5)', () => {
-  it('in_review no-reviewer: Publicar and Rejeitar buttons have type=button', () => {
+  it('under_review no-reviewer: Publicar and Rejeitar buttons have type=button', () => {
     seedActor(['approver'], ['template.approve']);
     render(
       <VersionActionPanel version={makeVersion()} onVersionUpdate={() => {}} />,
@@ -80,7 +80,7 @@ describe('VersionActionPanel — type=button (F-FE5)', () => {
     }
   });
 
-  it('in_review with-reviewer: Aprovar Revisão and Rejeitar buttons have type=button', () => {
+  it('under_review with-reviewer: Aprovar Revisão and Rejeitar buttons have type=button', () => {
     seedActor(['reviewer'], ['template.review']);
     render(
       <VersionActionPanel
@@ -111,7 +111,7 @@ describe('VersionActionPanel — type=button (F-FE5)', () => {
 });
 
 describe('VersionActionPanel — pt-BR labels (F-FE5)', () => {
-  it('in_review no-reviewer: shows pt-BR button labels', () => {
+  it('under_review no-reviewer: shows pt-BR button labels', () => {
     seedActor(['approver'], ['template.approve']);
     render(
       <VersionActionPanel version={makeVersion()} onVersionUpdate={() => {}} />,
@@ -121,7 +121,7 @@ describe('VersionActionPanel — pt-BR labels (F-FE5)', () => {
     expect(screen.getByText('Ações do aprovador')).toBeInTheDocument();
   });
 
-  it('in_review with-reviewer: shows pt-BR button labels and heading', () => {
+  it('under_review with-reviewer: shows pt-BR button labels and heading', () => {
     seedActor(['reviewer'], ['template.review']);
     render(
       <VersionActionPanel

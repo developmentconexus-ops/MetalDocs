@@ -28,7 +28,7 @@ const draftVersion = {
   created_at: '2026-04-20T00:00:00Z',
 };
 
-const inReviewVersion = { ...draftVersion, status: 'in_review', submitted_at: '2026-04-20T01:00:00Z' };
+const inReviewVersion = { ...draftVersion, status: 'under_review', submitted_at: '2026-04-20T01:00:00Z' };
 const approvedVersion = { ...inReviewVersion, status: 'approved', reviewer_id: 'user-1', reviewed_at: '2026-04-20T02:00:00Z' };
 const publishedVersion = { ...approvedVersion, status: 'published', approver_id: 'user-1', published_at: '2026-04-20T03:00:00Z' };
 
@@ -134,7 +134,7 @@ test('golden path: create → author → submit → approve review → publish',
     }
   });
 
-  // Submit → in_review
+  // Submit → under_review
   await page.route(`**/api/v1/templates/${TPL_ID}/versions/1/submit`, (r) =>
     r.fulfill({
       status: 200,
@@ -183,7 +183,7 @@ test('golden path: create → author → submit → approve review → publish',
   await expect(submitBtn).toBeEnabled();
   await submitBtn.click();
 
-  // in_review — reviewer panel visible, submit button gone
+  // under_review — reviewer panel visible, submit button gone
   await expect(page.getByText(/reviewer actions/i)).toBeVisible({ timeout: 5_000 });
   await expect(submitBtn).not.toBeVisible();
 
@@ -206,7 +206,7 @@ test('legacy /templates redirect lands on templates list', async ({ page }) => {
   await expect(page.getByText('E2E Purchase Order')).toBeVisible({ timeout: 10_000 });
 });
 
-test('P10.1a strict-lock: in_review version — no submit button, reviewer actions visible', async ({ page }) => {
+test('P10.1a strict-lock: under_review version — no submit button, reviewer actions visible', async ({ page }) => {
   await mockBaseAPIs(page, inReviewVersion);
 
   await page.goto('/templates');
@@ -215,9 +215,9 @@ test('P10.1a strict-lock: in_review version — no submit button, reviewer actio
   // Open the template from the list
   await page.getByRole('button', { name: /^open$/i }).click();
 
-  // Author page loads in in_review state
+  // Author page loads in under_review state
   await expect(page.getByRole('heading', { name: /E2E Purchase Order/i })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText(/in.?review/i)).toBeVisible();
+  await expect(page.getByText(/em\s*revis/i)).toBeVisible();
 
   // Submit button must NOT appear for non-draft versions
   await expect(page.getByRole('button', { name: /submit for review/i })).not.toBeVisible();

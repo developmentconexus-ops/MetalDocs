@@ -1,11 +1,11 @@
 /**
  * Tests for F-FE3: useTemplateDraft blob-404 guard by version status.
  *
- * draft   + blob 404  → docxError=null, docxBytes=null  (blank canvas, silent)
- * in_review + blob 404 → docxError set                  (retry banner, not blank)
- * approved  + blob 404 → docxError set
- * published + blob 404 → docxError set
- * any status + blob 5xx → docxError set
+ * draft        + blob 404  → docxError=null, docxBytes=null  (blank canvas, silent)
+ * under_review + blob 404 → docxError set                    (retry banner, not blank)
+ * approved     + blob 404 → docxError set
+ * published    + blob 404 → docxError set
+ * any status   + blob 5xx → docxError set
  *
  * Mirrors DocumentEditorPage.tsx:122-129 (every blob failure incl. 404 becomes
  * editorLoadError for non-draft statuses).
@@ -66,7 +66,7 @@ describe('useTemplateDraft — blob 404 guard (F-FE3)', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it.each(['in_review', 'approved', 'published'] as const)(
+  it.each(['under_review', 'approved', 'published'] as const)(
     '%s + 404 → docxError set (retry banner)',
     async (status) => {
       getTemplateMock.mockResolvedValue(TEMPLATE);

@@ -68,7 +68,7 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
     ),
   });
 
-  if (version.status === 'in_review') {
+  if (version.status === 'under_review') {
     const hasReviewer = version.pending_reviewer_role != null;
     const acceptLabel = hasReviewer ? 'Aprovar Revisão' : 'Publicar';
     const acceptGate = hasReviewer ? canReview(version, actor) : canPublish(version, actor);
