@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
@@ -26,12 +25,6 @@ func (h *Handler) CancelHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	actorID := actorIDFromRequest(r)
 	instanceID := r.PathValue("instance_id")
-
-	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
-	if idempKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
-		return
-	}
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {

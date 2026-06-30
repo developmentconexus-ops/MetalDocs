@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	docsdomain "metaldocs/internal/modules/documents/domain"
@@ -36,12 +35,6 @@ func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	actorID := actorIDFromRequest(r)
 	documentID := r.PathValue("id")
-
-	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
-	if idempKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
-		return
-	}
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
@@ -84,12 +77,6 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 	}
 	actorID := actorIDFromRequest(r)
 	documentID := r.PathValue("id")
-
-	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
-	if idempKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
-		return
-	}
 
 	ifMatchVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {

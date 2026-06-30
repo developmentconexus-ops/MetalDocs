@@ -5,6 +5,7 @@ import "errors"
 // Export is an immutable row in document_exports representing one cached PDF.
 type Export struct {
 	ID            string
+	TenantID      string
 	DocumentID    string
 	RevisionID    string
 	CompositeHash []byte // 32 bytes
@@ -35,11 +36,12 @@ var allowedPaperSizes = map[string]struct{}{
 	"Tabloid": {},
 }
 
-func NewExport(documentID, revisionID string, compositeHash []byte, storageKey string, sizeBytes int64, paperSize string, landscape bool, docgenV2Ver string) (*Export, error) {
+func NewExport(tenantID, documentID, revisionID string, compositeHash []byte, storageKey string, sizeBytes int64, paperSize string, landscape bool, docgenV2Ver string) (*Export, error) {
 	if _, ok := allowedPaperSizes[paperSize]; !ok {
 		return nil, ErrInvalidExport
 	}
 	return &Export{
+		TenantID:      tenantID,
 		DocumentID:    documentID,
 		RevisionID:    revisionID,
 		CompositeHash: compositeHash,

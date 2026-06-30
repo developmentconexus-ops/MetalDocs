@@ -15,23 +15,23 @@ func (h *Handler) RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Requ
 	h.SignoffHandler(w, r)
 }
 
-func (h *Handler) PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.PublishDocumentParams) {
 	h.PublishHandler(w, r)
 }
 
-func (h *Handler) ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.ScheduleDocumentPublishParams) {
 	h.SchedulePublishHandler(w, r)
 }
 
-func (h *Handler) SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.SupersedeDocumentParams) {
 	h.SupersedeHandler(w, r)
 }
 
-func (h *Handler) ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.ObsoleteDocumentParams) {
 	h.ObsoleteHandler(w, r)
 }
 
-func (h *Handler) CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID) {
+func (h *Handler) CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, params approvalapi.CancelApprovalInstanceParams) {
 	h.CancelHandler(w, r)
 }
 
@@ -51,7 +51,7 @@ func (h *Handler) RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, 
 	h.SignoffByDocumentHandler(w, r)
 }
 
-func (h *Handler) CancelDocumentApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) CancelDocumentApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.CancelDocumentApprovalParams) {
 	h.CancelByDocumentHandler(w, r)
 }
 

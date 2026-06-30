@@ -331,6 +331,7 @@ func TestApprove_Accept_WithReviewer(t *testing.T) {
 		PendingReviewerRole: &reviewerRole,
 		PendingApproverRole: "approver",
 		ReviewerID:          strPtr("reviewer-1"),
+		ContentHash:         "deadbeef",
 	}
 	repo.templates[template.ID] = template
 	repo.versions[oldPublished.ID] = oldPublished
@@ -396,6 +397,7 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 		AuthorID:            "author-1",
 		PendingReviewerRole: nil,
 		PendingApproverRole: "approver",
+		ContentHash:         "deadbeef",
 	}
 	repo.templates[template.ID] = template
 	repo.versions[version.ID] = version
@@ -434,6 +436,37 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 	}
 	if template.LatestVersion != res.NextDraft.VersionNumber {
 		t.Fatalf("expected template.LatestVersion %d, got %d", res.NextDraft.VersionNumber, template.LatestVersion)
+	}
+}
+
+func TestApprove_Accept_EmptyContentHash_ReturnsContentHashMismatch(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          template.ID,
+		VersionNumber:       1,
+		Status:              domain.VersionStatusInReview,
+		AuthorID:            "author-1",
+		PendingReviewerRole: nil,
+		PendingApproverRole: "approver",
+		ContentHash:         "", // T-004: gate must fire
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	_, err := svc.Approve(context.Background(), application.ApproveCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		Accept:        true,
+	})
+	if !errors.Is(err, domain.ErrContentHashMismatch) {
+		t.Fatalf("expected ErrContentHashMismatch, got %v", err)
 	}
 }
 

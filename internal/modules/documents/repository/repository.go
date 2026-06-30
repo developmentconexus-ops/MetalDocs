@@ -1285,6 +1285,20 @@ func (r *Repository) CreateCheckpoint(ctx context.Context, tenantID, docID, acto
 	}
 	defer tx.Rollback()
 
+	// Tier-2 authz: document.edit is area-grade (ADR 0022); mirrors CommitUpload.
+	// RW tx: the F8 bypass audit may INSERT (ADR 0022 Phase 11).
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
+		return nil, err
+	}
+	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
+	if err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
+		return nil, fmt.Errorf("create checkpoint: authz check: %w", err)
+	}
+
 	var revID string
 	if err := tx.QueryRowContext(ctx,
 		`SELECT current_revision_id::text FROM documents WHERE id=$1 AND tenant_id=$2::uuid FOR UPDATE`, docID, tenantID,

@@ -151,7 +151,13 @@ export function TemplateEditorPage({
     setSubmitMsg(null);
     setSubmitting(true);
     try {
-      if (autosave.hasPending()) await autosave.flush();
+      if (autosave.hasPending()) {
+        const flushed = await autosave.flush();
+        if (!flushed) {
+          setSubmitMsg({ kind: 'error', text: 'Falha ao salvar o conteúdo. Tente novamente antes de submeter.' });
+          return;
+        }
+      }
       const updated = await submitForReview(templateId, versionNum, crypto.randomUUID());
       setLiveVersion(updated);
       setSubmitMsg({ kind: 'success', text: 'Enviado para revisão.' });
@@ -311,7 +317,14 @@ export function TemplateEditorPage({
               </>
             }
             alert={
-              submitMsg ? (
+              schemaState.staleConflict ? (
+                <div role="alert" className={styles.alertError}>
+                  <span>Outro usuário editou os metadados. Recarregue para continuar.</span>
+                  <button type="button" className={styles.retryBtn} onClick={draft.refetch}>
+                    Recarregar
+                  </button>
+                </div>
+              ) : submitMsg ? (
                 <div
                   role={submitMsg.kind === 'error' ? 'alert' : 'status'}
                   className={submitMsg.kind === 'error' ? styles.alertError : styles.alertSuccess}

@@ -95,6 +95,7 @@ func TestLifecycle_TypedResponseShape(t *testing.T) {
 		repo.versions[verID] = &domain.TemplateVersion{
 			ID: verID, TemplateID: tplID, VersionNumber: 1,
 			Status:              domain.VersionStatusApproved,
+			ContentHash:         "deadbeef", // F-T2: publish path now gates on a committed docx
 			AuthorID:            "author-1",
 			PendingReviewerRole: &reviewerRole,
 			PendingApproverRole: "approver",
@@ -130,6 +131,7 @@ func TestLifecycle_TypedResponseShape(t *testing.T) {
 		repo.versions[verID] = &domain.TemplateVersion{
 			ID: verID, TemplateID: tplID, VersionNumber: 1,
 			Status:              domain.VersionStatusApproved,
+			ContentHash:         "deadbeef", // F-T2: publish path now gates on a committed docx
 			AuthorID:            "author-1",
 			PendingReviewerRole: &reviewerRole,
 			PendingApproverRole: "approver",

@@ -211,12 +211,7 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 	}
 	actorID := actorIDFromRequest(r)
 	docID := r.PathValue("id")
-	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 
-	if idempKey == "" {
-		WriteError(w, ErrIdempotencyRequired)
-		return
-	}
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
 		WriteError(w, err)

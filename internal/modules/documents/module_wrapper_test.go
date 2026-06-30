@@ -58,8 +58,12 @@ func (s *moduleTestService) CommitAutosave(context.Context, application.CommitAu
 func (s *moduleTestService) CreateCheckpoint(context.Context, string, string, string, string) (*domain.Checkpoint, error) {
 	return &domain.Checkpoint{ID: "cp_1", VersionNum: 1}, nil
 }
-func (s *moduleTestService) ListCheckpoints(context.Context, string, string) ([]domain.Checkpoint, error) {
+func (s *moduleTestService) ListCheckpoints(context.Context, string, string, string) ([]domain.Checkpoint, error) {
 	return []domain.Checkpoint{{ID: "cp_1", VersionNum: 1}}, nil
+}
+
+func (s *moduleTestService) RequireDocumentView(context.Context, string, string, string) error {
+	return nil
 }
 func (s *moduleTestService) ListRevisionHistory(context.Context, string, string) ([]domain.RevisionHistoryItem, error) {
 	return []domain.RevisionHistoryItem{{DocumentID: "doc_1", RevisionNumber: 0, RevisionTitle: "Criacao", Status: domain.DocStatusDraft, IsCurrent: true}}, nil

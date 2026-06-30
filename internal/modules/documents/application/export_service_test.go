@@ -47,7 +47,7 @@ func (f *fakeExportRepo) InsertExport(_ context.Context, e *domain.Export) (*dom
 	return &inserted, nil
 }
 
-func (f *fakeExportRepo) GetExportByHash(_ context.Context, _ string, compositeHash []byte) (*domain.Export, error) {
+func (f *fakeExportRepo) GetExportByHash(_ context.Context, _, _ string, compositeHash []byte) (*domain.Export, error) {
 	if f.exports == nil {
 		return nil, domain.ErrNotFound
 	}

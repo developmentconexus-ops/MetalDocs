@@ -18,6 +18,7 @@ import (
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	httphandler "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/domain"
+	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/idempotency"
 	platformdb "metaldocs/internal/platform/db"
@@ -56,7 +57,8 @@ type fakeSvc struct {
 	listCheckpointsItems   []domain.Checkpoint
 	createCheckpointResult *domain.Checkpoint
 
-	notOwner bool
+	notOwner  bool // kept for IsDocumentOwner; viewDenied drives RequireDocumentView
+	viewDenied bool
 }
 
 var _ httphandler.Service = (*fakeSvc)(nil)
@@ -124,6 +126,13 @@ func (f *fakeSvc) IsDocumentOwner(_ context.Context, _, _, _ string) (bool, erro
 	return !f.notOwner, nil
 }
 
+func (f *fakeSvc) RequireDocumentView(_ context.Context, _, actorID, _ string) error {
+	if f.viewDenied {
+		return authz.ErrCapDenied{Capability: "document.view", AreaCode: "tenant", ActorID: actorID}
+	}
+	return nil
+}
+
 func (f *fakeSvc) AcquireSession(_ context.Context, _, _, _ string) (*domain.Session, bool, error) {
 	if f.acquireErr != nil {
 		return nil, false, f.acquireErr
@@ -162,7 +171,7 @@ func (f *fakeSvc) CreateCheckpoint(_ context.Context, _, _, _, _ string) (*domai
 	return &domain.Checkpoint{ID: "cp_1", VersionNum: 1}, nil
 }
 
-func (f *fakeSvc) ListCheckpoints(_ context.Context, _, _ string) ([]domain.Checkpoint, error) {
+func (f *fakeSvc) ListCheckpoints(_ context.Context, _, _, _ string) ([]domain.Checkpoint, error) {
 	if f.listCheckpointsItems != nil {
 		return f.listCheckpointsItems, nil
 	}
@@ -500,11 +509,11 @@ func TestAcquireSession_Happy(t *testing.T) {
 	}
 }
 
-// TestAcquireSession_Forbidden now exercises the ownership invariant: a
-// non-admin, non-owner caller is denied (403) by the handler's
-// IsDocumentOwner check.
+// TestAcquireSession_Forbidden exercises the capability invariant: an actor
+// without CapDocumentView is denied (403) by the handler's RequireDocumentView
+// gate (ADR 0022 — authz = capabilities, not ownership).
 func TestAcquireSession_Forbidden(t *testing.T) {
-	mux := newMux(t, &fakeSvc{notOwner: true}) // fakeCaps{admin:false}, not the owner
+	mux := newMux(t, &fakeSvc{viewDenied: true}) // fakeCaps{admin:false}, view cap denied
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/session/acquire", bytes.NewReader([]byte(`{}`)))
 	withAuthHeaders(req, "editor")
@@ -919,5 +928,68 @@ func TestListRevisionHistory_ReturnsGovernedItems(t *testing.T) {
 	}
 	if !body.Items[0].IsCurrent {
 		t.Fatal("expected current revision item")
+	}
+}
+
+// --- F-D1 capability authz tests ---
+
+// TestGetDocument_CapDocumentView_NonOwner_Returns200 proves that a user who
+// holds CapDocumentView (RequireDocumentView returns nil) but is NOT the creator
+// can access the document. Under the old ownership gate this would have returned
+// 403; under capability-based authz (ADR 0022) it must return 200.
+func TestGetDocument_CapDocumentView_NonOwner_Returns200(t *testing.T) {
+	svc := &fakeSvc{
+		notOwner:   true,  // is NOT the document owner
+		viewDenied: false, // but DOES hold CapDocumentView
+	}
+	mux := newMux(t, svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/11111111-1111-4111-8111-111111111111", nil)
+	req.SetPathValue("id", "11111111-1111-4111-8111-111111111111")
+	withAuthHeaders(req, "editor")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("non-owner with CapDocumentView: expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+// TestGetDocument_NoCapDocumentView_Returns403 proves that an actor who is the
+// owner but whose CapDocumentView is revoked is correctly rejected.
+// Under ownership-based authz the owner would receive 200 despite losing the cap;
+// under capability-based authz (ADR 0022) it must return 403.
+func TestGetDocument_NoCapDocumentView_Returns403(t *testing.T) {
+	svc := &fakeSvc{
+		notOwner:   false, // IS the document owner
+		viewDenied: true,  // but has CapDocumentView revoked
+	}
+	mux := newMux(t, svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/11111111-1111-4111-8111-111111111111", nil)
+	req.SetPathValue("id", "11111111-1111-4111-8111-111111111111")
+	withAuthHeaders(req, "editor")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("owner with revoked CapDocumentView: expected 403, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+// TestListCheckpoints_NoCapDocumentView_Returns403 proves that ListCheckpoints
+// is gated by RequireDocumentView (F-D2 ListCheckpoints gate).
+func TestListCheckpoints_NoCapDocumentView_Returns403(t *testing.T) {
+	svc := &fakeSvc{viewDenied: true}
+	mux := newMux(t, svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/11111111-1111-4111-8111-111111111111/checkpoints", nil)
+	req.SetPathValue("id", "11111111-1111-4111-8111-111111111111")
+	withAuthHeaders(req, "editor")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("ListCheckpoints without CapDocumentView: expected 403, got %d body=%s", rr.Code, rr.Body.String())
 	}
 }

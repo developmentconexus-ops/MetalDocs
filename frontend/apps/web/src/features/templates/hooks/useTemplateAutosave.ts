@@ -13,23 +13,31 @@ export function useTemplateAutosave(templateId: string, versionNum: number) {
   const timer = useRef<number | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-  const flush = useCallback(async () => {
-    if (!pendingDocx.current) return;
+  const flush = useCallback(async (): Promise<boolean> => {
+    if (!pendingDocx.current) return true;
     const buf = pendingDocx.current;
     setStatus('saving');
     try {
       const { upload_url, storage_key: _key } = await presignAutosave(templateId, versionNum);
-      await fetch(upload_url, {
+      const uploadRes = await fetch(upload_url, {
         method: 'PUT',
         headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
         body: buf,
       });
+      if (!uploadRes.ok) {
+        throw Object.assign(new Error('autosave upload failed'), {
+          status: uploadRes.status,
+          body: await uploadRes.text(),
+        });
+      }
       const hash = await sha256Hex(buf);
       await commitAutosave(templateId, versionNum, hash);
       pendingDocx.current = null;
       setStatus('saved');
+      return true;
     } catch {
       setStatus('error');
+      return false;
     }
   }, [templateId, versionNum]);
 
@@ -52,11 +60,14 @@ export function useTemplateAutosave(templateId: string, versionNum: number) {
     setStatus('saving');
     try {
       const { upload_url } = await presignAutosave(templateId, versionNum);
-      await fetch(upload_url, {
+      const uploadRes = await fetch(upload_url, {
         method: 'PUT',
         headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
         body: buf,
       });
+      if (!uploadRes.ok) {
+        throw new Error(`Falha ao enviar DOCX: HTTP ${uploadRes.status}`);
+      }
       const hash = await sha256Hex(buf);
       await commitAutosave(templateId, versionNum, hash);
       setStatus('saved');

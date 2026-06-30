@@ -12,6 +12,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -113,6 +114,18 @@ func actorIDFromRequest(r *http.Request) string {
 
 func tenantIDFromReq(r *http.Request) (string, error) {
 	return tenant.FromContext(r.Context())
+}
+
+// idempotent wraps next with the platform idempotency middleware, keyed to
+// routeTemplate (used to scope the replay store, matching the templates sibling
+// pattern). It validates presence + UUID format and provides replay-on-retry;
+// callers no longer need to manually extract or validate the header.
+func (h *Handler) idempotent(routeTemplate string, next http.HandlerFunc) http.Handler {
+	store := idempotency.New(h.db, routeTemplate)
+	return idempotency.Require(store, func(ctx context.Context) (string, string) {
+		tenantID, _ := tenant.FromContext(ctx)
+		return tenantID, iamdomain.UserIDFromContext(ctx)
+	})(http.HandlerFunc(next))
 }
 
 func parseIfMatch(header string) (int, error) {

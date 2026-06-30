@@ -225,6 +225,10 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 
 	now := s.clock.Now()
 	if cmd.Accept {
+		// T-004: content_hash gate — presigned docx must have been committed.
+		if version.ContentHash == "" {
+			return nil, domain.ErrContentHashMismatch
+		}
 		if err := version.CanTransition(domain.VersionStatusPublished, hasReviewer); err != nil {
 			return nil, err
 		}

@@ -8,9 +8,10 @@ type DraftState = {
   version: VersionDTO | null;
   docxBytes: ArrayBuffer | null;
   // Non-fatal: the version loaded but its .docx blob could not be fetched
-  // (storage unreachable, presign expired, 5xx). The editor still opens — this
-  // surfaces a retry banner. A 404 is NOT an error: a blank template has no
-  // object until its first autosave, so it opens empty silently.
+  // (storage unreachable, presign expired, 5xx, or 404 on a non-draft version).
+  // The editor still opens — this surfaces a retry banner. A 404 on a DRAFT is
+  // NOT an error: a blank template has no object until its first autosave, so it
+  // opens empty silently. For in_review/approved/published, 404 IS an error.
   docxError: string | null;
 };
 
@@ -49,9 +50,13 @@ export function useTemplateDraft(templateId: string, versionNum: number): Templa
             const res = await fetch(url);
             if (res.ok) {
               docxBytes = await res.arrayBuffer();
-            } else if (res.status !== 404) {
-              // 404 = blank template, no object until first autosave: open empty,
-              // no error. Anything else (expired presign, 5xx) is a real failure.
+            } else if (res.status === 404 && version.status === 'draft') {
+              // 404 on a draft = blank template, no object until first autosave:
+              // open empty silently. For in_review/approved/published a missing
+              // blob is a real failure — surface the retry banner so eigenpal does
+              // not loop on an empty canvas.
+              // (no-op: docxBytes stays null, docxError stays null)
+            } else {
               docxError = `Não foi possível carregar o conteúdo do template (HTTP ${res.status}).`;
             }
           } catch (e) {

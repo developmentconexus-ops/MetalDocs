@@ -3281,7 +3281,9 @@ paths:
           authz.Require with the area resolved from the document row
           (LoadDocumentAreaCode); never from a request field. Postgres tripwire
           (migration 0142b) is the backstop.
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
       responses:
         '200':
           description: ok
@@ -3310,7 +3312,9 @@ paths:
           authz.Require with the area resolved from the document row
           (LoadDocumentAreaCode); never from a request field. Postgres tripwire
           (migration 0142b) is the backstop.
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
       responses:
         '200':
           description: ok
@@ -3339,7 +3343,9 @@ paths:
           authz.Require with the area resolved from the document row
           (LoadDocumentAreaCode); never from a request field. Postgres tripwire
           (migration 0142b) is the backstop.
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
       responses:
         '200':
           description: ok
@@ -3368,7 +3374,9 @@ paths:
           authz.Require with the area resolved from the document row
           (LoadDocumentAreaCode); never from a request field. Postgres tripwire
           (migration 0142b) is the backstop.
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
       responses:
         '200':
           description: ok
@@ -3389,7 +3397,9 @@ paths:
       summary: Cancel approval instance
       tags: [approval]
       operationId: cancelApprovalInstance
-      parameters: [{ name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
       responses:
         '200':
           description: ok
@@ -3500,7 +3510,9 @@ paths:
       summary: Cancel document approval
       tags: [approval]
       operationId: cancelDocumentApproval
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
       responses:
         '200':
           description: ok

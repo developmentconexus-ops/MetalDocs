@@ -63,6 +63,33 @@ func TestCheckpointAndRevisionQueriesIncludeTenantScope(t *testing.T) {
 	}
 }
 
+// TestCreateCheckpoint_HasAuthzRequire verifies that CreateCheckpoint contains
+// authz.Require (F-D2 fix, mirrors CommitUpload). A missing authz gate is a
+// security defect that must be caught statically.
+func TestCreateCheckpoint_HasAuthzRequire(t *testing.T) {
+	src := readRepositorySource(t)
+	body := repositoryFuncBody(t, src, "CreateCheckpoint", "ListCheckpoints")
+	for _, want := range []string{"authz.SeedTxIdentity", "authz.Require", "CapDocumentEdit"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("CreateCheckpoint must call %s (F-D2: tier-2 authz gate)", want)
+		}
+	}
+}
+
+// TestListCheckpoints_AuthzGatedAtServiceLayer verifies that ListCheckpoints in
+// repository.go does NOT contain authz.Require (the gate is in the Service,
+// per the fix spec for F-D2, mirroring how view-grade reads gate above the repo).
+func TestListCheckpoints_AuthzGatedAtServiceLayer(t *testing.T) {
+	src := readRepositorySource(t)
+	body := repositoryFuncBody(t, src, "ListCheckpoints", "ListRevisionHistory")
+	// The repo-level ListCheckpoints must remain a pure data fetch.
+	// authz.Require inside it would violate the advisory-lock constraint
+	// (memory: authz-require-readonly-tx-conflict).
+	if strings.Contains(body, "authz.Require") {
+		t.Fatalf("repository.ListCheckpoints must NOT contain authz.Require (gate belongs at Service layer, F-D2)")
+	}
+}
+
 func readRepositorySource(t *testing.T) string {
 	t.Helper()
 	src, err := os.ReadFile("repository.go")

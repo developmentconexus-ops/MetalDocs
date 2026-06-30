@@ -15,7 +15,7 @@ type ExportRepo interface {
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
 	GetRevision(ctx context.Context, tenantID, docID, revID string) (*domain.Revision, error)
 	InsertExport(ctx context.Context, e *domain.Export) (*domain.Export, error)
-	GetExportByHash(ctx context.Context, documentID string, compositeHash []byte) (*domain.Export, error)
+	GetExportByHash(ctx context.Context, tenantID, documentID string, compositeHash []byte) (*domain.Export, error)
 }
 
 const exportDownloadTTL = 15 * time.Minute
@@ -76,7 +76,7 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 
 	storageKey := fmt.Sprintf("tenants/%s/documents/%s/exports/%s.pdf", tenantID, documentID, hex.EncodeToString(compositeHash))
 
-	existing, err := s.repo.GetExportByHash(ctx, documentID, compositeHash)
+	existing, err := s.repo.GetExportByHash(ctx, tenantID, documentID, compositeHash)
 	if err == nil {
 		s.audit.Write(ctx, tenantID, userID, "export.pdf_generated", documentID, map[string]any{"cached": true, "storage_key": existing.StorageKey})
 		return &domain.ExportResult{Export: existing, Cached: true}, nil
@@ -108,7 +108,7 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 		return nil, err
 	}
 
-	exportRow, err := domain.NewExport(documentID, rev.ID, compositeHash, storageKey, sizeBytes, opts.PaperSize, opts.LandscapeP, s.docgenVer)
+	exportRow, err := domain.NewExport(tenantID, documentID, rev.ID, compositeHash, storageKey, sizeBytes, opts.PaperSize, opts.LandscapeP, s.docgenVer)
 	if err != nil {
 		return nil, err
 	}

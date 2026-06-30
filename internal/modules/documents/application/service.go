@@ -13,6 +13,8 @@ import (
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/objectstore"
@@ -436,6 +438,20 @@ func (s *Service) GetDocument(ctx context.Context, tenantID, id string) (*domain
 	return s.repo.GetDocument(ctx, tenantID, id)
 }
 
+// RequireDocumentView asserts the actor holds CapDocumentView (tenant-grade) for
+// the given document. document.view is tenant-grade — the "tenant" sentinel keeps
+// the area filter intentionally OFF (ADR 0022 Phase 8, same as ViewService).
+// RW tx is mandatory: the F8 bypass audit may INSERT (ADR 0022 Phase 11).
+func (s *Service) RequireDocumentView(ctx context.Context, tenantID, actorID, _ string) error {
+	ctx = authz.WithCapCache(ctx)
+	return s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+			return err
+		}
+		return authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant")
+	})
+}
+
 func (s *Service) DuplicateDocument(ctx context.Context, tenantID, userID, docID string) (*CreateDocumentResult, error) {
 	if s.controlledDocumentDuplicator == nil {
 		return nil, errControlledDocumentDuplicatorNotConfigured
@@ -778,7 +794,18 @@ func (s *Service) CreateCheckpoint(ctx context.Context, tenantID, docID, actorID
 	return cp, nil
 }
 
-func (s *Service) ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error) {
+func (s *Service) ListCheckpoints(ctx context.Context, tenantID, actorID, docID string) ([]domain.Checkpoint, error) {
+	// Gate: document.view is tenant-grade (ADR 0022 Phase 8); mirrors RequireDocumentView.
+	// RW tx: F8 bypass audit may INSERT.
+	ctx = authz.WithCapCache(ctx)
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+			return err
+		}
+		return authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant")
+	}); err != nil {
+		return nil, err
+	}
 	return s.repo.ListCheckpoints(ctx, tenantID, docID)
 }
 

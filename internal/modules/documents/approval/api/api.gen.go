@@ -269,7 +269,6 @@ type FieldError struct {
 // ListRoutesResponse defines model for ListRoutesResponse.
 type ListRoutesResponse struct {
 	Routes               []RouteSummary         `json:"routes"`
-	Total                int                    `json:"total"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
@@ -378,6 +377,11 @@ type Unauthorized = Problem
 // sessionCookieContextKey is the context key for sessionCookie security scheme
 type sessionCookieContextKey string
 
+// CancelApprovalInstanceParams defines parameters for CancelApprovalInstance.
+type CancelApprovalInstanceParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
 // RecordApprovalStageSignoffParams defines parameters for RecordApprovalStageSignoff.
 type RecordApprovalStageSignoffParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
@@ -407,6 +411,26 @@ type DeactivateApprovalRouteParams struct {
 	IfMatch string `json:"If-Match"`
 }
 
+// CancelDocumentApprovalParams defines parameters for CancelDocumentApproval.
+type CancelDocumentApprovalParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// ObsoleteDocumentParams defines parameters for ObsoleteDocument.
+type ObsoleteDocumentParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// PublishDocumentParams defines parameters for PublishDocument.
+type PublishDocumentParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// ScheduleDocumentPublishParams defines parameters for ScheduleDocumentPublish.
+type ScheduleDocumentPublishParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
 // RecordDocumentSignoffParams defines parameters for RecordDocumentSignoff.
 type RecordDocumentSignoffParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
@@ -419,6 +443,11 @@ type RecordDocumentSignoffParams struct {
 type SubmitDocumentForApprovalParams struct {
 	// IfMatch Expected revision version ETag in the form "v<N>"
 	IfMatch string `json:"If-Match"`
+}
+
+// SupersedeDocumentParams defines parameters for SupersedeDocument.
+type SupersedeDocumentParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
 }
 
 // CreateApprovalRouteJSONRequestBody defines body for CreateApprovalRoute for application/json ContentType.
@@ -623,14 +652,6 @@ func (a *ListRoutesResponse) UnmarshalJSON(b []byte) error {
 		delete(object, "routes")
 	}
 
-	if raw, found := object["total"]; found {
-		err = json.Unmarshal(raw, &a.Total)
-		if err != nil {
-			return fmt.Errorf("error reading 'total': %w", err)
-		}
-		delete(object, "total")
-	}
-
 	if len(object) != 0 {
 		a.AdditionalProperties = make(map[string]interface{})
 		for fieldName, fieldBuf := range object {
@@ -655,11 +676,6 @@ func (a ListRoutesResponse) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'routes': %w", err)
 		}
-	}
-
-	object["total"], err = json.Marshal(a.Total)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling 'total': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -1333,7 +1349,7 @@ type ServerInterface interface {
 	GetApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
 	// Cancel approval instance
 	// (POST /approval/instances/{instance_id}/cancel)
-	CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
+	CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, params CancelApprovalInstanceParams)
 	// Record approval stage signoff
 	// (POST /approval/instances/{instance_id}/stages/{stage_id}/signoffs)
 	RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params RecordApprovalStageSignoffParams)
@@ -1354,16 +1370,16 @@ type ServerInterface interface {
 	GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Cancel document approval
 	// (POST /documents/{id}/cancel)
-	CancelDocumentApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	CancelDocumentApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params CancelDocumentApprovalParams)
 	// Obsolete document
 	// (POST /documents/{id}/obsolete)
-	ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ObsoleteDocumentParams)
 	// Publish document
 	// (POST /documents/{id}/publish)
-	PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params PublishDocumentParams)
 	// Schedule document publish
 	// (POST /documents/{id}/schedule-publish)
-	ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ScheduleDocumentPublishParams)
 	// Record document signoff
 	// (POST /documents/{id}/signoff)
 	RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params RecordDocumentSignoffParams)
@@ -1372,7 +1388,7 @@ type ServerInterface interface {
 	SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SubmitDocumentForApprovalParams)
 	// Supersede document
 	// (POST /documents/{id}/supersede)
-	SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SupersedeDocumentParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -1457,8 +1473,36 @@ func (siw *ServerInterfaceWrapper) CancelApprovalInstance(w http.ResponseWriter,
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CancelApprovalInstanceParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CancelApprovalInstance(w, r, instanceId)
+		siw.Handler.CancelApprovalInstance(w, r, instanceId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1850,8 +1894,36 @@ func (siw *ServerInterfaceWrapper) CancelDocumentApproval(w http.ResponseWriter,
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CancelDocumentApprovalParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CancelDocumentApproval(w, r, id)
+		siw.Handler.CancelDocumentApproval(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1882,8 +1954,36 @@ func (siw *ServerInterfaceWrapper) ObsoleteDocument(w http.ResponseWriter, r *ht
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ObsoleteDocumentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ObsoleteDocument(w, r, id)
+		siw.Handler.ObsoleteDocument(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1914,8 +2014,36 @@ func (siw *ServerInterfaceWrapper) PublishDocument(w http.ResponseWriter, r *htt
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PublishDocumentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PublishDocument(w, r, id)
+		siw.Handler.PublishDocument(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1946,8 +2074,36 @@ func (siw *ServerInterfaceWrapper) ScheduleDocumentPublish(w http.ResponseWriter
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ScheduleDocumentPublishParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ScheduleDocumentPublish(w, r, id)
+		siw.Handler.ScheduleDocumentPublish(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2121,8 +2277,36 @@ func (siw *ServerInterfaceWrapper) SupersedeDocument(w http.ResponseWriter, r *h
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SupersedeDocumentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SupersedeDocument(w, r, id)
+		siw.Handler.SupersedeDocument(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2435,6 +2619,7 @@ func (response GetApprovalInstance500ApplicationProblemPlusJSONResponse) VisitGe
 
 type CancelApprovalInstanceRequestObject struct {
 	InstanceId openapi_types.UUID `json:"instance_id"`
+	Params     CancelApprovalInstanceParams
 }
 
 type CancelApprovalInstanceResponseObject interface {
@@ -3158,7 +3343,8 @@ func (response GetApprovalInstanceByDocument500ApplicationProblemPlusJSONRespons
 }
 
 type CancelDocumentApprovalRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params CancelDocumentApprovalParams
 }
 
 type CancelDocumentApprovalResponseObject interface {
@@ -3270,7 +3456,8 @@ func (response CancelDocumentApproval500ApplicationProblemPlusJSONResponse) Visi
 }
 
 type ObsoleteDocumentRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params ObsoleteDocumentParams
 }
 
 type ObsoleteDocumentResponseObject interface {
@@ -3382,7 +3569,8 @@ func (response ObsoleteDocument500ApplicationProblemPlusJSONResponse) VisitObsol
 }
 
 type PublishDocumentRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params PublishDocumentParams
 }
 
 type PublishDocumentResponseObject interface {
@@ -3494,7 +3682,8 @@ func (response PublishDocument500ApplicationProblemPlusJSONResponse) VisitPublis
 }
 
 type ScheduleDocumentPublishRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params ScheduleDocumentPublishParams
 }
 
 type ScheduleDocumentPublishResponseObject interface {
@@ -3832,7 +4021,8 @@ func (response SubmitDocumentForApproval500ApplicationProblemPlusJSONResponse) V
 }
 
 type SupersedeDocumentRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params SupersedeDocumentParams
 }
 
 type SupersedeDocumentResponseObject interface {
@@ -4075,10 +4265,11 @@ func (sh *strictHandler) GetApprovalInstance(w http.ResponseWriter, r *http.Requ
 }
 
 // CancelApprovalInstance operation middleware
-func (sh *strictHandler) CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID) {
+func (sh *strictHandler) CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, params CancelApprovalInstanceParams) {
 	var request CancelApprovalInstanceRequestObject
 
 	request.InstanceId = instanceId
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CancelApprovalInstance(ctx, request.(CancelApprovalInstanceRequestObject))
@@ -4283,10 +4474,11 @@ func (sh *strictHandler) GetApprovalInstanceByDocument(w http.ResponseWriter, r 
 }
 
 // CancelDocumentApproval operation middleware
-func (sh *strictHandler) CancelDocumentApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) CancelDocumentApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params CancelDocumentApprovalParams) {
 	var request CancelDocumentApprovalRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CancelDocumentApproval(ctx, request.(CancelDocumentApprovalRequestObject))
@@ -4309,10 +4501,11 @@ func (sh *strictHandler) CancelDocumentApproval(w http.ResponseWriter, r *http.R
 }
 
 // ObsoleteDocument operation middleware
-func (sh *strictHandler) ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ObsoleteDocumentParams) {
 	var request ObsoleteDocumentRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ObsoleteDocument(ctx, request.(ObsoleteDocumentRequestObject))
@@ -4335,10 +4528,11 @@ func (sh *strictHandler) ObsoleteDocument(w http.ResponseWriter, r *http.Request
 }
 
 // PublishDocument operation middleware
-func (sh *strictHandler) PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params PublishDocumentParams) {
 	var request PublishDocumentRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.PublishDocument(ctx, request.(PublishDocumentRequestObject))
@@ -4361,10 +4555,11 @@ func (sh *strictHandler) PublishDocument(w http.ResponseWriter, r *http.Request,
 }
 
 // ScheduleDocumentPublish operation middleware
-func (sh *strictHandler) ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ScheduleDocumentPublishParams) {
 	var request ScheduleDocumentPublishRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ScheduleDocumentPublish(ctx, request.(ScheduleDocumentPublishRequestObject))
@@ -4441,10 +4636,11 @@ func (sh *strictHandler) SubmitDocumentForApproval(w http.ResponseWriter, r *htt
 }
 
 // SupersedeDocument operation middleware
-func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SupersedeDocumentParams) {
 	var request SupersedeDocumentRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.SupersedeDocument(ctx, request.(SupersedeDocumentRequestObject))
@@ -4471,76 +4667,77 @@ func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"6SsXdueoPw52c37z/wEAAP//",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

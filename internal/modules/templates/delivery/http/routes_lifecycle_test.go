@@ -260,6 +260,7 @@ func TestApprove_Accept_Happy(t *testing.T) {
 		TemplateID:          "11111111-1111-1111-1111-111111111111",
 		VersionNumber:       1,
 		Status:              domain.VersionStatusApproved,
+		ContentHash:         "deadbeef", // F-T2: publish path now gates on a committed docx
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 		PendingApproverRole: "approver",
@@ -318,6 +319,7 @@ func TestApprove_Reject_NextDraftNull(t *testing.T) {
 		TemplateID:          "11111111-1111-1111-1111-111111111111",
 		VersionNumber:       1,
 		Status:              domain.VersionStatusApproved,
+		ContentHash:         "deadbeef", // F-T2: publish path now gates on a committed docx
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 		PendingApproverRole: "approver",

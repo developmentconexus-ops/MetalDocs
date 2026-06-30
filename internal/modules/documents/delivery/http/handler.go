@@ -18,6 +18,7 @@ import (
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
+	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/httpresponse"
@@ -36,6 +37,9 @@ type documentReader interface {
 	ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts application.ListOptions) ([]*domain.Document, int64, bool, error)
 	DocumentStats(ctx context.Context, tenantID, userID string, opts application.ListOptions) (*application.DocumentStats, error)
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
+	// RequireDocumentView asserts the actor holds CapDocumentView (tenant-grade).
+	// Returns authz.ErrCapDenied when denied (maps to 403 via mapErr).
+	RequireDocumentView(ctx context.Context, tenantID, actorID, docID string) error
 }
 
 // documentLifecycle covers mutation operations on a document's lifecycle.
@@ -44,7 +48,7 @@ type documentLifecycle interface {
 	RenameDocument(ctx context.Context, tenantID, userID, docID, newName string) error
 	Archive(ctx context.Context, tenantID, docID, actorID string) error
 	CreateCheckpoint(ctx context.Context, tenantID, docID, actorID, label string) (*domain.Checkpoint, error)
-	ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error)
+	ListCheckpoints(ctx context.Context, tenantID, actorID, docID string) ([]domain.Checkpoint, error)
 	ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error)
 	RestoreCheckpoint(ctx context.Context, tenantID, docID, actorID string, versionNum int) (*application.RestoreResult, error)
 	SignedRevisionURL(ctx context.Context, tenantID, docID, revID string) (string, error)
@@ -927,12 +931,12 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listCheckpoints(w http.ResponseWriter, r *http.Request) {
 	r = withAdminCtx(r)
 	docID := r.PathValue("id")
-	tenantID, _, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
 	if !ok {
 		return
 	}
 
-	items, err := h.svc.ListCheckpoints(r.Context(), tenantID, docID)
+	items, err := h.svc.ListCheckpoints(r.Context(), tenantID, userID, docID)
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
@@ -1276,6 +1280,11 @@ func decodeCommentContent(raw json.RawMessage) []documentsapi.DocumentCommentCon
 	return nodes
 }
 
+// authorizeDocumentScope asserts CapDocumentView (tenant-grade, ADR 0022) for the
+// actor identified in the request. isSystemAdmin (ADR-0022-permitted admin shortcut
+// via iam_user_roles) bypasses the capability gate when the caps checker is wired.
+// Non-admin actors are gate-checked via RequireDocumentView (SeedTxIdentity +
+// authz.Require(CapDocumentView, "tenant") inside a RW tx), mirroring ViewService.
 func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request, docID string) (tenantID string, userID string, ok bool) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -1292,14 +1301,9 @@ func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request,
 		return tenantID, userID, true
 	}
 
-	owner, err := h.svc.IsDocumentOwner(r.Context(), tenantID, docID, userID)
-	if err != nil {
+	if err := h.svc.RequireDocumentView(r.Context(), tenantID, userID, docID); err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
-		return "", "", false
-	}
-	if !owner {
-		httpErr(w, http.StatusForbidden, problem.CodeAuthForbidden)
 		return "", "", false
 	}
 	return tenantID, userID, true
@@ -1347,6 +1351,8 @@ func mapErr(err error) (int, problem.Code) {
 		return http.StatusBadRequest, problem.CodeValidationError
 	case errors.Is(err, iamapp.ErrCapabilityDenied):
 		return http.StatusForbidden, problem.CodeForbiddenCapability
+	case errors.As(err, &authz.ErrCapDenied{}):
+		return http.StatusForbidden, problem.CodeAuthForbidden
 	case errors.Is(err, domain.ErrExpiredUpload):
 		return http.StatusGone, problem.CodeUploadExpired
 	case errors.Is(err, domain.ErrUploadMissing):
