@@ -12,6 +12,8 @@ const emptyMeta: ArtifactMetaModel = {
   createdAt: null,
   effectiveFrom: null,
   nextReviewAt: null,
+  ownerName: null,
+  ownerDescriptor: null,
 };
 
 describe("ArtifactMetaSidebar", () => {
@@ -42,6 +44,8 @@ describe("ArtifactMetaSidebar", () => {
       createdAt: null,
       effectiveFrom: null,
       nextReviewAt: null,
+      ownerName: null,
+      ownerDescriptor: null,
     };
 
     const lineage: VersionHistoryItem[] = [

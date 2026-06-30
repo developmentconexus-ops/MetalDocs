@@ -43,6 +43,26 @@ export interface ArtifactBadge {
   variant: ArtifactBadgeVariant;
 }
 
+/**
+ * One cell in the artifact KPI strip. Adapters own the full content; the view is
+ * purely presentational and renders a clickable navigation cell when `href` is set,
+ * a static cell otherwise. This keeps every kind-specific KPI rule (e.g. the
+ * document scheduled→published-head "current version" override, the live coverage
+ * denominator) in the adapter, never in the shared view.
+ */
+export interface ArtifactKpiCell {
+  /** Stable React key + test hook (e.g. "currentVersion", "coverage"). */
+  key: string;
+  /** Cell label (e.g. "Versão atual", "Cobertura"). */
+  label: string;
+  /** Primary value text (e.g. "REV08", "12", "—"). Always a string — adapters stringify. */
+  value: string;
+  /** Secondary hint line under the value. Null renders no hint. */
+  hint: string | null;
+  /** When set, the cell is a react-router navigation target (e.g. "/distribution"). */
+  href?: string;
+}
+
 // ---------------------------------------------------------------------------
 // ArtifactHeroModel
 // ---------------------------------------------------------------------------
@@ -87,6 +107,13 @@ export interface ArtifactMetaModel {
   effectiveFrom: string | null;
   /** ISO-8601 next scheduled review date. Null for templates. */
   nextReviewAt: string | null;
+  /** Display name of the artifact owner/creator (resolved by the adapter, with
+   *  current-user displayName fallback). Null when unknown. */
+  ownerName: string | null;
+  /** Governed owner-banner descriptor — DISTINCT from `hero.subtitle`. For documents
+   *  this is the per-status copy (e.g. "substituído · publicado em 19 de maio de 2026").
+   *  Null for kinds with no governed descriptor. */
+  ownerDescriptor: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +244,9 @@ export interface ArtifactViewModel {
   hero: ArtifactHeroModel;
   /** Profile / visibility / file metadata for the sidebar. */
   meta: ArtifactMetaModel;
+  /** KPI strip cells, fully composed by the adapter. The shared view renders these
+   *  in order with zero kind awareness. */
+  kpis: ArtifactKpiCell[];
   /**
    * Ordered list of approval chain signoff slots. Null for templates (which have
    * no approval instance / signoff model — only pending reviewer/approver roles).

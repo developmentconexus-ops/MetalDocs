@@ -1,4 +1,7 @@
-/* DocumentPublishedPage.module.css — Phase 3b style port */
+/* ArtifactDetailView.module.css — shared controlled-artifact detail surface.
+   Ported verbatim from the documents DocumentPublishedPage.module.css (Phase 3b style port).
+   The thin document wrapper imports the action/dialog/composer classes it still needs from
+   this same module — these are presentational classes, not kind logic. */
 
 /* ─── Root ─────────────────────────────────────────────────────────────── */
 

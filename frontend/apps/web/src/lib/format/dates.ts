@@ -16,8 +16,22 @@ const shortDateFmt = new Intl.DateTimeFormat('pt-BR', {
   year: 'numeric',
 });
 
+const dateTimeFmt = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 // "08/05/2026"
 export function formatShortDate(input: string | null | undefined): string {
   const d = parseDate(input);
   return d ? shortDateFmt.format(d) : EM_DASH;
+}
+
+// "08/05/2026 14:36" — used in signoff timestamps
+export function formatSignedAt(input: string | null | undefined): string {
+  const d = parseDate(input);
+  return d ? dateTimeFmt.format(d) : EM_DASH;
 }

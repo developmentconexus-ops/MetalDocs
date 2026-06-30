@@ -506,6 +506,8 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
               createdAt: null,
               effectiveFrom: null,
               nextReviewAt: null,
+              ownerName: null,
+              ownerDescriptor: null,
             }}
             approvalChain={
               docStatus === 'under_review' && approvalInstanceQuery.data

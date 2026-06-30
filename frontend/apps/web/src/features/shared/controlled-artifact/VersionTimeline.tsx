@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import styles from './DocumentVersionTimeline.module.css';
+import { useState } from "react";
+import styles from "./VersionTimeline.module.css";
 
 export type VersionEntry = {
   v: string;
@@ -13,7 +13,13 @@ type Props = {
   versions: VersionEntry[];
 };
 
-export function DocumentVersionTimeline({ versions }: Props) {
+/**
+ * Presentational version-history timeline. Moved verbatim from
+ * `documents/components/DocumentVersionTimeline` into the shared controlled-artifact
+ * layer (no documents-domain imports — purely presentational), so `ArtifactDetailView`
+ * can consume it without crossing the shared → documents layering boundary.
+ */
+export function VersionTimeline({ versions }: Props) {
   const currentIdx = versions.findIndex((v) => v.current);
   const [hovered, setHovered] = useState(currentIdx >= 0 ? currentIdx : versions.length - 1);
 
@@ -41,15 +47,15 @@ export function DocumentVersionTimeline({ versions }: Props) {
                 aria-label={`${v.v} — ${v.when}`}
               >
                 <span
-                  className={`${styles.pinDate} ${active ? styles.pinDateActive : ''}`}
+                  className={`${styles.pinDate} ${active ? styles.pinDateActive : ""}`}
                 >
-                  {v.when.split(' ').slice(0, 2).join(' ')}
+                  {v.when.split(" ").slice(0, 2).join(" ")}
                 </span>
                 <span
-                  className={`${styles.pinDot} ${active ? styles.pinDotActive : ''} ${v.current ? styles.pinDotCurrent : ''}`}
+                  className={`${styles.pinDot} ${active ? styles.pinDotActive : ""} ${v.current ? styles.pinDotCurrent : ""}`}
                 />
                 <span
-                  className={`${styles.pinLabel} ${active ? styles.pinLabelActive : ''} ${v.current ? styles.pinLabelCurrent : ''}`}
+                  className={`${styles.pinLabel} ${active ? styles.pinLabelActive : ""} ${v.current ? styles.pinLabelCurrent : ""}`}
                 >
                   {v.v}
                 </span>

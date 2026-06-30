@@ -1,4 +1,5 @@
-/* DocumentDetailLayout.module.css */
+/* ArtifactDetailLayout.module.css — tabbed shell for the controlled-artifact view layer.
+   Generalized from the documents DocumentDetailLayout.module.css; presentational only. */
 
 .root {
   display: flex;
