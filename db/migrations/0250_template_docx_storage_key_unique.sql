@@ -10,14 +10,25 @@
 --     ("DB enforces invariants"). Friendly first line is the app de-sharing in
 --     internal/modules/templates/application; this is the last line.
 --
+-- KEY FORMAT: the reconstructed string byte-matches templateDocxKey in
+-- internal/modules/templates/application/keys.go (fmt "tenants/%s/templates/%s/
+-- versions/%d.docx"). template_id::text is explicit only for clarity; whether the
+-- column is uuid (uuid::text == Go uuid.String(), lowercase hyphenated) or text
+-- (cast is a no-op), the output matches what the app writes and later looks up.
+--
 -- OBJECT-STORE NOTE (operational, NOT run here): a re-keyed draft row now points
 -- at a key with no object yet; opening it before first autosave 404s (D2-class:
 -- the FE renders "open empty"). If a draft's object had DIVERGED from the source
 -- (corruption already occurred), copying/repairing bytes is a manual operator
 -- step -- SQL cannot move MinIO objects. The affected set is expected to be
--- empty/small (feature is pre-v1). If two PUBLISHED rows share a key (a publish-
--- injection artifact), the UNIQUE index creation below fails loudly -- audit and
--- resolve those before re-running.
+-- empty/small (feature is pre-v1).
+--
+-- UNIQUE-INDEX FAILURE CLASSES (both fail loudly -- audit and resolve before
+-- re-running; re-running does NOT auto-fix either): (a) two PUBLISHED rows share a
+-- key (a publish-injection artifact -- published rows are never re-keyed here); or
+-- (b) a non-published row re-keyed to its canonical key collides with a row that
+-- ALREADY holds that canonical key (its own correct key, so it did not qualify for
+-- the UPDATE above). Both are pre-existing data corruption the index surfaces.
 
 BEGIN;
 
