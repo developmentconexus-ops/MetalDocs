@@ -1332,6 +1332,7 @@ func userIDFromReq(r *http.Request) string {
 }
 
 func mapErr(err error) (int, problem.Code) {
+	var capDenied authz.ErrCapDenied
 	switch {
 	case err == nil:
 		return http.StatusOK, ""
@@ -1349,10 +1350,13 @@ func mapErr(err error) (int, problem.Code) {
 		errors.Is(err, approvalapp.ErrRevisionTitleRequired),
 		errors.Is(err, domain.ErrCommentInvalid):
 		return http.StatusBadRequest, problem.CodeValidationError
+	// Both tier-1 (iamapp.ErrCapabilityDenied) and tier-2 (authz.ErrCapDenied)
+	// denials are the same semantic — "you lack this capability" — so they must
+	// surface the same problem code to clients regardless of which PDP tier denied.
 	case errors.Is(err, iamapp.ErrCapabilityDenied):
 		return http.StatusForbidden, problem.CodeForbiddenCapability
-	case errors.As(err, &authz.ErrCapDenied{}):
-		return http.StatusForbidden, problem.CodeAuthForbidden
+	case errors.As(err, &capDenied):
+		return http.StatusForbidden, problem.CodeForbiddenCapability
 	case errors.Is(err, domain.ErrExpiredUpload):
 		return http.StatusGone, problem.CodeUploadExpired
 	case errors.Is(err, domain.ErrUploadMissing):

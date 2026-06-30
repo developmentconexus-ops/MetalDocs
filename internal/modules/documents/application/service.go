@@ -442,7 +442,13 @@ func (s *Service) GetDocument(ctx context.Context, tenantID, id string) (*domain
 // the given document. document.view is tenant-grade — the "tenant" sentinel keeps
 // the area filter intentionally OFF (ADR 0022 Phase 8, same as ViewService).
 // RW tx is mandatory: the F8 bypass audit may INSERT (ADR 0022 Phase 11).
-func (s *Service) RequireDocumentView(ctx context.Context, tenantID, actorID, _ string) error {
+//
+// docID is part of the published contract but currently unused: the capability is
+// tenant-grade, so the check is identical for every document in the tenant. It is
+// retained in the signature so the gate can become document-scoped (area-grade)
+// without a contract break if document.view is ever reclassified.
+func (s *Service) RequireDocumentView(ctx context.Context, tenantID, actorID, docID string) error {
+	_ = docID // tenant-grade cap: no per-document filtering today (see doc comment).
 	ctx = authz.WithCapCache(ctx)
 	return s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {

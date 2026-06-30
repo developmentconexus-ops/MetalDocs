@@ -57,7 +57,11 @@ type fakeSvc struct {
 	listCheckpointsItems   []domain.Checkpoint
 	createCheckpointResult *domain.Checkpoint
 
-	notOwner  bool // kept for IsDocumentOwner; viewDenied drives RequireDocumentView
+	// notOwner only affects mayWriteWorkingContent (content-write eligibility on
+	// draft docs) — it is NOT on the handler authorization gate path. The gate is
+	// driven by viewDenied (RequireDocumentView / CapDocumentView). Keep the two
+	// distinct so a future content-write test can exercise notOwner in isolation.
+	notOwner   bool
 	viewDenied bool
 }
 

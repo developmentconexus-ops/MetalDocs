@@ -17,6 +17,11 @@ type fakeExportRepo struct {
 	doc     *domain.Document
 	rev     *domain.Revision
 	exports map[string]*domain.Export
+
+	// F-O4: capture the tenant scope threaded into each repo call so tests can
+	// assert tenant isolation is actually forwarded (not silently dropped).
+	lookupTenantIDs []string
+	insertTenantIDs []string
 }
 
 func (f *fakeExportRepo) GetDocument(_ context.Context, _, _ string) (*domain.Document, error) {
@@ -34,6 +39,7 @@ func (f *fakeExportRepo) GetRevision(_ context.Context, _, _, _ string) (*domain
 }
 
 func (f *fakeExportRepo) InsertExport(_ context.Context, e *domain.Export) (*domain.Export, error) {
+	f.insertTenantIDs = append(f.insertTenantIDs, e.TenantID)
 	if f.exports == nil {
 		f.exports = map[string]*domain.Export{}
 	}
@@ -47,7 +53,8 @@ func (f *fakeExportRepo) InsertExport(_ context.Context, e *domain.Export) (*dom
 	return &inserted, nil
 }
 
-func (f *fakeExportRepo) GetExportByHash(_ context.Context, _, _ string, compositeHash []byte) (*domain.Export, error) {
+func (f *fakeExportRepo) GetExportByHash(_ context.Context, tenantID, _ string, compositeHash []byte) (*domain.Export, error) {
+	f.lookupTenantIDs = append(f.lookupTenantIDs, tenantID)
 	if f.exports == nil {
 		return nil, domain.ErrNotFound
 	}
@@ -219,6 +226,34 @@ func TestExportPDF_GotenbergFailure_ReturnsDomainError_NoAudit(t *testing.T) {
 	}
 	if len(audit.events) != 0 {
 		t.Fatalf("expected no audit events, got %d", len(audit.events))
+	}
+}
+
+// F-O4: the caller's tenant scope must reach every export repo call so the
+// tenant-scoped UNIQUE index / RLS predicate are actually exercised. A bug that
+// dropped or substituted the tenant id would leak across tenants.
+func TestExportPDF_ForwardsTenantScopeToRepo(t *testing.T) {
+	svc, repo, _, _, _ := newSvc(false, 1024, nil)
+
+	if _, err := svc.ExportPDF(context.Background(), "tenant_1", "user_1", "doc_1", domain.RenderOptions{PaperSize: "A4"}); err != nil {
+		t.Fatalf("ExportPDF() error = %v", err)
+	}
+
+	if len(repo.lookupTenantIDs) == 0 {
+		t.Fatal("expected GetExportByHash to be called with a tenant id")
+	}
+	for i, tid := range repo.lookupTenantIDs {
+		if tid != "tenant_1" {
+			t.Fatalf("lookup[%d] tenant=%q want=tenant_1", i, tid)
+		}
+	}
+	if len(repo.insertTenantIDs) == 0 {
+		t.Fatal("expected InsertExport to be called with a tenant id")
+	}
+	for i, tid := range repo.insertTenantIDs {
+		if tid != "tenant_1" {
+			t.Fatalf("insert[%d] tenant=%q want=tenant_1", i, tid)
+		}
 	}
 }
 
