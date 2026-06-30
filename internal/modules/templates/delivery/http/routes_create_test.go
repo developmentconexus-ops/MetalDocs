@@ -236,7 +236,7 @@ func (r *fakeRepo) UpdateVersionSchemaCASTx(_ context.Context, _ db.Tx, tenantID
 	return r.UpdateVersionSchemaCAS(context.Background(), tenantID, v, expectedLockVersion)
 }
 
-func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keepVersionID string) error {
+func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, _ string, templateID, keepVersionID string) error {
 	for _, v := range r.versions {
 		if v.TemplateID == templateID && v.Status == domain.VersionStatusPublished && v.ID != keepVersionID {
 			now := time.Now().UTC()
@@ -247,8 +247,8 @@ func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keep
 	return nil
 }
 
-func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ db.Tx, templateID, keepVersionID string) error {
-	return r.ObsoletePreviousPublished(context.Background(), templateID, keepVersionID)
+func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ db.Tx, tenantID, templateID, keepVersionID string) error {
+	return r.ObsoletePreviousPublished(context.Background(), tenantID, templateID, keepVersionID)
 }
 
 func (r *fakeRepo) GetApprovalConfig(_ context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {

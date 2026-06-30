@@ -491,12 +491,21 @@ SELECT EXISTS (
 	return domain.ErrStaleLockVersion
 }
 
-func (r *Repository) ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error {
+func (r *Repository) ObsoletePreviousPublished(ctx context.Context, tenantID, templateID, keepVersionID string) error {
+	// Explicit tenant predicate via JOIN to the parent templates_template row so
+	// the UPDATE cannot cross tenant boundaries even if upstream validation is
+	// bypassed.  This closes the concrete gap identified in F-DB5: previously the
+	// WHERE clause filtered only by template_id+status with no tenant guard.
 	const q = `
-UPDATE templates_template_version
+UPDATE templates_template_version v
 SET status = 'obsolete', obsoleted_at = now()
-WHERE template_id = $1 AND status = 'published' AND id <> $2`
-	res, err := r.db.ExecContext(ctx, q, templateID, keepVersionID)
+FROM templates_template t
+WHERE v.template_id = $1
+  AND v.status = 'published'
+  AND v.id <> $2
+  AND t.id = v.template_id
+  AND t.tenant_id = $3::uuid`
+	res, err := r.db.ExecContext(ctx, q, templateID, keepVersionID, tenantID)
 	if err != nil {
 		return fmt.Errorf("templates repository obsolete previous published: %w", err)
 	}
@@ -506,12 +515,19 @@ WHERE template_id = $1 AND status = 'published' AND id <> $2`
 	return nil
 }
 
-func (r *Repository) ObsoletePreviousPublishedTx(ctx context.Context, tx db.Tx, templateID, keepVersionID string) error {
+func (r *Repository) ObsoletePreviousPublishedTx(ctx context.Context, tx db.Tx, tenantID, templateID, keepVersionID string) error {
+	// Same tenant guard as ObsoletePreviousPublished — applied here because this
+	// path is the primary production path (called inside the publish/approve tx).
 	const q = `
-UPDATE templates_template_version
+UPDATE templates_template_version v
 SET status = 'obsolete', obsoleted_at = now()
-WHERE template_id = $1 AND status = 'published' AND id <> $2`
-	res, err := tx.ExecContext(ctx, q, templateID, keepVersionID)
+FROM templates_template t
+WHERE v.template_id = $1
+  AND v.status = 'published'
+  AND v.id <> $2
+  AND t.id = v.template_id
+  AND t.tenant_id = $3::uuid`
+	res, err := tx.ExecContext(ctx, q, templateID, keepVersionID, tenantID)
 	if err != nil {
 		return fmt.Errorf("templates repository obsolete previous published tx: %w", err)
 	}

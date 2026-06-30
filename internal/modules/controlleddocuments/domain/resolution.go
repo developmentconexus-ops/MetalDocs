@@ -1,9 +1,16 @@
 package domain
 
-import (
-	"errors"
+import "errors"
 
-	templatesdomain "metaldocs/internal/modules/templates/domain"
+// tplVersionPublished and tplVersionObsolete are the wire-string values that
+// controlled-documents compares template version statuses against. They mirror
+// templatesdomain.VersionStatusPublished / VersionStatusObsolete without
+// importing the sibling BC's domain package (BC domain independence rule).
+// A parity test in resolution_test.go asserts they equal the templates-owned
+// constants so a future rename is caught at the boundary.
+const (
+	tplVersionPublished = "published"
+	tplVersionObsolete  = "obsolete"
 )
 
 type TemplateResolutionInput struct {
@@ -43,7 +50,7 @@ func resolveOverrideTemplate(profileCode string, candidate *TemplateVersionCandi
 	if candidate.Status == nil {
 		return TemplateResolutionResult{}, ErrOverrideTemplateDeleted
 	}
-	if *candidate.Status != string(templatesdomain.VersionStatusPublished) {
+	if *candidate.Status != tplVersionPublished {
 		return TemplateResolutionResult{}, ErrOverrideNotPublished
 	}
 	if candidate.ProfileCode != profileCode {
@@ -56,10 +63,10 @@ func resolveDefaultTemplate(candidate *TemplateVersionCandidate) (TemplateResolu
 	if candidate == nil || candidate.Status == nil {
 		return TemplateResolutionResult{}, ErrProfileHasNoDefaultTemplate
 	}
-	if *candidate.Status == string(templatesdomain.VersionStatusObsolete) {
+	if *candidate.Status == tplVersionObsolete {
 		return TemplateResolutionResult{}, ErrDefaultObsolete
 	}
-	if *candidate.Status != string(templatesdomain.VersionStatusPublished) {
+	if *candidate.Status != tplVersionPublished {
 		return TemplateResolutionResult{}, ErrProfileHasNoDefaultTemplate
 	}
 	return TemplateResolutionResult{TemplateVersionID: candidate.ID, Source: "default"}, nil

@@ -198,6 +198,21 @@ func (f *fakeIAMOptionsReader) ListUserOptions(_ context.Context, _ string) ([]U
 	return f.opts, f.err
 }
 
+// TestFillInService_UserPlaceholder_NoIAMReader_FailClosed asserts the
+// fail-closed posture: a PHUser placeholder is REJECTED (not silently accepted)
+// when WithIAMReader was never called. Mirrors the nil-area → deny behaviour of
+// requireDocEditDraft (fillin_authz.go).
+func TestFillInService_UserPlaceholder_NoIAMReader_FailClosed(t *testing.T) {
+	schema := []templatesdomain.Placeholder{{ID: "p-user", Type: templatesdomain.PHUser}}
+	// No WithIAMReader — iam field stays nil.
+	svc := NewFillInService(newTxRunner(newPermissiveFillInDB(t)), fakeSchemaReader{placeholders: schema}, &fakeFillInWriter{})
+
+	err := svc.SetPlaceholderValue(context.Background(), "t", "actor", "r", "p-user", "any-value")
+	if !errors.Is(err, v2domain.ErrValidationFailed) {
+		t.Fatalf("expected ErrValidationFailed (fail-closed), got %v", err)
+	}
+}
+
 func TestFillInService_UserPlaceholder_KnownUser_Accepted(t *testing.T) {
 	schema := []templatesdomain.Placeholder{{ID: "p-user", Type: templatesdomain.PHUser}}
 	iam := &fakeIAMOptionsReader{opts: []UserOption{

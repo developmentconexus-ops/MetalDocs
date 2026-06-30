@@ -26,8 +26,8 @@ type Repository interface {
 	UpdateVersionTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion) error
 	UpdateVersionSchemaCAS(ctx context.Context, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error
 	UpdateVersionSchemaCASTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error
-	ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error
-	ObsoletePreviousPublishedTx(ctx context.Context, tx db.Tx, templateID, keepVersionID string) error
+	ObsoletePreviousPublished(ctx context.Context, tenantID, templateID, keepVersionID string) error
+	ObsoletePreviousPublishedTx(ctx context.Context, tx db.Tx, tenantID, templateID, keepVersionID string) error
 
 	GetApprovalConfig(ctx context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error)
 	UpsertApprovalConfig(ctx context.Context, c *domain.ApprovalConfig) error

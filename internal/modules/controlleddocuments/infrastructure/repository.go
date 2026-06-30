@@ -365,14 +365,12 @@ func (r *PostgresControlledDocumentRepository) CreateTx(ctx context.Context, tx 
 	if tx == nil {
 		return errors.New("nil transaction")
 	}
-	sqlTx, ok := tx.(*sql.Tx)
-	if !ok {
-		return errors.New("controlled_documents: transaction must be *sql.Tx for authz")
-	}
-	// ADR 0022 Phase 7: authorize CD create against its target process area.
-	if err := authz.Require(ctx, sqlTx, string(iamdomain.CapControlledDocumentCreate), doc.ProcessAreaCode); err != nil {
-		return fmt.Errorf("registry: authz check CreateTx: %w", err)
-	}
+	// AuthZ for CD create is the service layer's mandatory gate (ADR 0022 Phase 7).
+	// The service calls authz.Require(ctx, tx, CapControlledDocumentCreate, processAreaCode)
+	// before invoking CreateTx on both the manual-code and auto-code paths; a
+	// redundant Require here would double the DB round-trip on every create with
+	// no correctness benefit (both always agree). The repository is the storage
+	// layer only; capability enforcement must not be split across layers.
 	return r.createWithQueryer(ctx, tx, doc)
 }
 

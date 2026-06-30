@@ -45,6 +45,8 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 		return http.StatusConflict, codeTplInvalidStateTransition
 	case errors.Is(err, domain.ErrStaleBase):
 		return http.StatusConflict, codeTplStaleBase
+	case errors.Is(err, domain.ErrConcurrentTransition):
+		return http.StatusConflict, codeTplInvalidStateTransition
 	case errors.Is(err, domain.ErrStaleLockVersion):
 		return http.StatusPreconditionFailed, codeTplStaleLockVersion
 	case errors.Is(err, domain.ErrContentHashMismatch):

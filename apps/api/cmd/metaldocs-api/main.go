@@ -62,6 +62,7 @@ import (
 	securitydelivery "metaldocs/internal/modules/security/delivery/http"
 	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
 	"metaldocs/internal/modules/taxonomy"
+	taxonomyapp "metaldocs/internal/modules/taxonomy/application"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
 	"metaldocs/internal/modules/tokens"
 	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
@@ -750,10 +751,29 @@ func buildTaxonomyModule(deps bootstrap.APIDependencies) *taxonomy.Module {
 }
 
 func buildControlledDocumentsModule(deps bootstrap.APIDependencies) *controlleddocuments.Module {
+	// Construct sibling-module collaborator concretes here (composition root),
+	// not inside the CD module constructor. Each concrete satisfies the
+	// interface-typed port declared in controlleddocuments.Dependencies (F-CD4).
+	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
+	areaRepo := taxonomyinfra.NewAreaRepository(deps.SQLDB)
 	return controlleddocuments.New(controlleddocuments.Dependencies{
-		DB:          deps.SQLDB,
-		Logger:      slog.Default(),
-		AuditWriter: deps.AuditWriter,
+		DB:     deps.SQLDB,
+		Logger: slog.Default(),
+		// documents-owned active-instance read-port (ADR-0039 D3(b); M2/F2.2).
+		ActiveInstanceReader: docrepo.NewActiveInstanceReaderPG(deps.SQLDB),
+		// Taxonomy profile/area readers: adapters in CD infrastructure wrap the
+		// canonical taxonomy repositories so authz GUC + CapTaxonomyView run on
+		// every lookup (H-1b). The adapters satisfy application.ProfileReader /
+		// application.AreaReader — consumer-defined interfaces.
+		ProfileReader: cdinfra.NewTaxonomyProfileReader(profileRepo),
+		AreaReader:    cdinfra.NewTaxonomyAreaReader(areaRepo),
+		// GovernanceLogger routes governance events to the canonical audit sink
+		// (taxonomy/application.AuditGovernanceAdapter satisfies
+		// taxonomydomain.GovernanceLogger).
+		GovernanceLogger: taxonomyapp.NewAuditGovernanceAdapter(deps.AuditWriter),
+		// TemplateVersionChecker reads template-version state through the
+		// templates-owned port (M4 F4.2 — H-G reach closed).
+		TemplateVersionChecker: templatesinfra.NewTemplateVersionReader(deps.SQLDB),
 	})
 }
 

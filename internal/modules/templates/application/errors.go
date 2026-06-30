@@ -27,6 +27,7 @@ func isDomainErr(err error) bool {
 		errors.Is(err, domain.ErrContentHashMismatch),
 		errors.Is(err, domain.ErrStaleBase),
 		errors.Is(err, domain.ErrStaleLockVersion),
+		errors.Is(err, domain.ErrConcurrentTransition),
 		errors.Is(err, domain.ErrUploadMissing),
 		errors.Is(err, domain.ErrISOSegregationViolation),
 		errors.Is(err, domain.ErrForbidden),

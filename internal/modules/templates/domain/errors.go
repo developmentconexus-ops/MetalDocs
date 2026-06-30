@@ -20,3 +20,7 @@ var ErrPlaceholderNotComputed = errors.New("catalog placeholders must be compute
 var ErrPlaceholderReservedName = errors.New("dictionary placeholder name is reserved (native token)")
 var ErrPlaceholderDictionaryInvalid = errors.New("dictionary placeholder must not set resolver_key or computed")
 var ErrTransactionRequired = errors.New("templates: transaction_required")
+// ErrConcurrentTransition is returned when a status-transition write loses a
+// CAS race against a concurrent transition on the same version.  The caller
+// should retry the full read-modify-write cycle.  HTTP layer maps this to 409.
+var ErrConcurrentTransition = errors.New("templates: concurrent_transition")

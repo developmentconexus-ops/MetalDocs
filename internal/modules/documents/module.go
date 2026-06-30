@@ -117,7 +117,8 @@ func New(deps Dependencies) *Module {
 	fillInRepo := repository.NewFillInRepository(deps.DB)
 	fillInSvc := application.NewFillInService(db.NewTxRunner(deps.DB), application.NewSnapshotSchemaReader(deps.DB), fillInRepo).
 		WithReader(fillInRepo).
-		WithCDFieldReader(cdFieldReader)
+		WithCDFieldReader(cdFieldReader).
+		WithIAMReader(deps.IAMUserOptions)
 	if deps.TemplateVersionPort != nil {
 		fillInSvc.WithTemplateSchemaReader(application.NewTemplateVersionSchemaReader(deps.DB, deps.TemplateVersionPort))
 	}

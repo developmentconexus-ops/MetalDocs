@@ -303,6 +303,8 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			// Closes B2 (F0.2): manual-code creation used to bypass tier-2 because the
 			// branch had no tx/identity, so the repo's authz.Require failed-closed on
 			// the missing actor_id GUC for every non-system-admin caller.
+			// SERVICE IS THE AUTHZ BOUNDARY for CD create: this Require is the single
+			// mandatory gate; the repository layer does not re-check (F-CD6).
 			if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), cmd.ProcessAreaCode); err != nil {
 				return fmt.Errorf("controlled_documents: authz check manual-code create: %w", err)
 			}
@@ -347,6 +349,8 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			// ADR 0022 Phase 7: area-scoped tier-2 — a CD is created INTO a process
 			// area, so authorize against that area (least-privilege; system_admin
 			// still bypasses). cmd.ProcessAreaCode validated active above.
+			// SERVICE IS THE AUTHZ BOUNDARY for CD create: this Require is the single
+			// mandatory gate; the repository layer does not re-check (F-CD6).
 			if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), cmd.ProcessAreaCode); err != nil {
 				return fmt.Errorf("controlled_documents: authz check sequence allocation: %w", err)
 			}

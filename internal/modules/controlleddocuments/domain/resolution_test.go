@@ -7,6 +7,21 @@ import (
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
+// TestTplVersionConsts_ParityWithTemplatesDomain is the BC-boundary parity guard:
+// it asserts that tplVersionPublished and tplVersionObsolete (local domain consts,
+// no sibling import in production code) equal the templates-owned wire values.
+// If templates ever renames a status constant the divergence is caught here.
+func TestTplVersionConsts_ParityWithTemplatesDomain(t *testing.T) {
+	if tplVersionPublished != string(templatesdomain.VersionStatusPublished) {
+		t.Fatalf("tplVersionPublished = %q, want %q (templatesdomain.VersionStatusPublished)",
+			tplVersionPublished, string(templatesdomain.VersionStatusPublished))
+	}
+	if tplVersionObsolete != string(templatesdomain.VersionStatusObsolete) {
+		t.Fatalf("tplVersionObsolete = %q, want %q (templatesdomain.VersionStatusObsolete)",
+			tplVersionObsolete, string(templatesdomain.VersionStatusObsolete))
+	}
+}
+
 // TestResolve_UsesTemplatesVocabulary is a boundary regression guard: it feeds the templates-owned
 // VersionStatus constants directly as Resolve inputs and asserts the resolver agrees with that
 // vocabulary. If the templates published/obsolete wire values ever drift from what resolution.go

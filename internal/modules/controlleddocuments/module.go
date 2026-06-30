@@ -5,14 +5,11 @@ import (
 	"log/slog"
 	"net/http"
 
-	auditdomain "metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/modules/controlleddocuments/application"
 	dhttp "metaldocs/internal/modules/controlleddocuments/delivery/http"
 	"metaldocs/internal/modules/controlleddocuments/infrastructure"
-	docrepo "metaldocs/internal/modules/documents/repository"
-	taxonomyapp "metaldocs/internal/modules/taxonomy/application"
-	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
-	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
+	documentsdomain "metaldocs/internal/modules/documents/domain"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	platformdb "metaldocs/internal/platform/db"
 )
 
@@ -22,37 +19,80 @@ type Module struct {
 	repo    *infrastructure.PostgresControlledDocumentRepository
 }
 
+// Dependencies carries all collaborator ports for the controlleddocuments module.
+// Every sibling-module collaborator is expressed as an interface (never a
+// concrete sibling infra type) — the composition root in main.go constructs the
+// concretes and passes them here.
+//
+// Ports sourced from the sibling module's published domain/application interface:
+//   - ActiveInstanceReader: documents/domain.ActiveInstanceReader (published)
+//   - ProfileReader:        consumer-defined interface (application.ProfileReader)
+//   - AreaReader:           consumer-defined interface (application.AreaReader)
+//   - GovernanceLogger:     taxonomy/domain.GovernanceLogger (published)
+//   - TemplateVersionChecker: consumer-defined interface (application.TemplateVersionChecker)
 type Dependencies struct {
-	DB          *sql.DB
-	Logger      *slog.Logger
-	AuditWriter auditdomain.Writer
+	DB     *sql.DB
+	Logger *slog.Logger
+
+	// ActiveInstanceReader is the documents-owned read-port for the active/
+	// published document projection (ADR-0039 D3(b); M2/F2.2).
+	// When nil, documentsdomain.NoopActiveInstanceReader{} is used.
+	ActiveInstanceReader documentsdomain.ActiveInstanceReader
+
+	// ProfileReader reads taxonomy document profiles without crossing the module
+	// boundary. Satisfies application.ProfileReader. Must not be nil.
+	ProfileReader application.ProfileReader
+
+	// AreaReader reads taxonomy process areas without crossing the module
+	// boundary. Satisfies application.AreaReader. Must not be nil.
+	AreaReader application.AreaReader
+
+	// GovernanceLogger writes governance audit events (taxonomy-owned port).
+	// Must not be nil.
+	GovernanceLogger taxonomydomain.GovernanceLogger
+
+	// TemplateVersionChecker reads template-version state through the
+	// templates-owned port (M4 F4.2). Must not be nil.
+	TemplateVersionChecker application.TemplateVersionChecker
 }
 
 func New(deps Dependencies) *Module {
-	if deps.AuditWriter == nil {
-		panic("controlled_documents: AuditWriter is required (nil provided)")
+	if deps.ProfileReader == nil {
+		panic("controlled_documents: ProfileReader is required (nil provided)")
 	}
-	// documents-owned active-instance read-port (M2/F2.2): CD reads the active/
-	// published documents + in-progress approval instance projection through the
-	// owner's port instead of its own SQL.
-	activeInstance := docrepo.NewActiveInstanceReaderPG(deps.DB)
+	if deps.AreaReader == nil {
+		panic("controlled_documents: AreaReader is required (nil provided)")
+	}
+	if deps.GovernanceLogger == nil {
+		panic("controlled_documents: GovernanceLogger is required (nil provided)")
+	}
+	if deps.TemplateVersionChecker == nil {
+		panic("controlled_documents: TemplateVersionChecker is required (nil provided)")
+	}
+
+	// documents-owned active-instance read-port: use the injected port or the
+	// published Noop default (mirrors documents.New Noop pattern).
+	activeInstance := deps.ActiveInstanceReader
+	if activeInstance == nil {
+		activeInstance = documentsdomain.NoopActiveInstanceReader{}
+	}
+
 	repo := infrastructure.NewPostgresControlledDocumentRepository(deps.DB, activeInstance)
 	seq := infrastructure.NewPostgresSequenceAllocator(deps.DB)
-	// Template-version override state is read through the templates-owned port
-	// (M4 F4.2 — H-G reach closed); the reader satisfies application.TemplateVersionChecker.
-	tplCheck := templatesinfra.NewTemplateVersionReader(deps.DB)
-	// Read profiles/areas through the canonical taxonomy repositories so the
-	// authz GUC and CapTaxonomyView check run on every lookup (H-1b). Every role
-	// that can create a controlled document already holds taxonomy.view, so the
-	// enforced capability is one the request actor already has.
-	profiles := infrastructure.NewTaxonomyProfileReader(taxonomyinfra.NewProfileRepository(deps.DB))
-	areas := infrastructure.NewTaxonomyAreaReader(taxonomyinfra.NewAreaRepository(deps.DB))
-	govLogger := taxonomyapp.NewAuditGovernanceAdapter(deps.AuditWriter)
-	svc := application.NewControlledDocumentService(platformdb.NewTxRunner(deps.DB), repo, seq, tplCheck, profiles, areas, govLogger, nil)
-	h := dhttp.NewHandler(svc, deps.DB)
+	svc := application.NewControlledDocumentService(
+		platformdb.NewTxRunner(deps.DB),
+		repo,
+		seq,
+		deps.TemplateVersionChecker,
+		deps.ProfileReader,
+		deps.AreaReader,
+		deps.GovernanceLogger,
+		nil,
+	)
 	if svc == nil {
 		panic("controlled_documents: service construction returned nil")
 	}
+	h := dhttp.NewHandler(svc, deps.DB)
 	if h == nil {
 		panic("controlled_documents: handler construction returned nil")
 	}

@@ -213,8 +213,11 @@ func validateValue(ctx context.Context, tenantID string, p templatesdomain.Place
 		return fmt.Errorf("%w: %s not in options", v2domain.ErrValidationFailed, p.ID)
 	case templatesdomain.PHUser:
 		if iam == nil {
-			// IAM not wired: skip user validation. Production wiring MUST call WithIAMReader.
-			return nil
+			// Fail-closed: an unconfigured IAM reader must never silently accept any
+			// value. Production wiring MUST call WithIAMReader (module.go); a missing
+			// reader is a misconfiguration, not a permissive default (mirrors the
+			// nil-area → deny posture of requireDocEditDraft in fillin_authz.go).
+			return fmt.Errorf("%w: IAM reader not wired, cannot validate PHUser placeholder %q", v2domain.ErrValidationFailed, p.ID)
 		}
 		opts, err := iam.ListUserOptions(ctx, tenantID)
 		if err != nil {

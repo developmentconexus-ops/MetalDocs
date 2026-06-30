@@ -67,6 +67,10 @@ type fakeRepo struct {
 	lockVersions              map[string]int
 	failCreateVersion         bool
 	getTemplateByKeyErr       error
+
+	// UpdateTemplateTxCalls records the LatestVersion on each UpdateTemplateTx
+	// call.  Tests that assert F-T5 (single template write per tx) inspect this.
+	UpdateTemplateTxCalls []int
 }
 
 func newFakeRepo() *fakeRepo {
@@ -219,6 +223,7 @@ func (r *fakeRepo) CreateTemplateTx(_ context.Context, _ db.Tx, t *domain.Templa
 }
 
 func (r *fakeRepo) UpdateTemplateTx(_ context.Context, _ db.Tx, t *domain.Template) error {
+	r.UpdateTemplateTxCalls = append(r.UpdateTemplateTxCalls, t.LatestVersion)
 	return r.UpdateTemplate(context.Background(), t)
 }
 
@@ -226,7 +231,7 @@ func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ db.Tx, tenantID string, 
 	return r.UpdateVersion(context.Background(), tenantID, v)
 }
 
-func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keepVersionID string) error {
+func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, _ /*tenantID*/ string, templateID, keepVersionID string) error {
 	found := false
 	for _, v := range r.versions {
 		if v.TemplateID != templateID {
@@ -244,8 +249,8 @@ func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keep
 	return nil
 }
 
-func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ db.Tx, templateID, keepVersionID string) error {
-	return r.ObsoletePreviousPublished(context.Background(), templateID, keepVersionID)
+func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ db.Tx, tenantID, templateID, keepVersionID string) error {
+	return r.ObsoletePreviousPublished(context.Background(), tenantID, templateID, keepVersionID)
 }
 
 func (r *fakeRepo) GetApprovalConfig(_ context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {

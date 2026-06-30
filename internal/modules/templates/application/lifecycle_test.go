@@ -715,7 +715,11 @@ func TestArchiveTemplate_UsesTemplateArchiveCapability(t *testing.T) {
 	}
 }
 
-func TestApproveRejectReturnsStaleLockVersionWhenVersionMoved(t *testing.T) {
+// TestApproveRejectReturnsConcurrentTransitionWhenVersionMoved exercises the
+// F-T3 fix: the CAS loser on a status-transition path must receive
+// ErrConcurrentTransition (→ 409) rather than the raw ErrStaleLockVersion
+// (→ 412) that the repository layer emits.
+func TestApproveRejectReturnsConcurrentTransitionWhenVersionMoved(t *testing.T) {
 	repo := newFakeRepo()
 	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
 	reviewerRole := "reviewer"
@@ -738,6 +742,7 @@ func TestApproveRejectReturnsStaleLockVersionWhenVersionMoved(t *testing.T) {
 	}
 	repo.templates[template.ID] = template
 	repo.versions[version.ID] = version
+	// Simulate a concurrent writer having already bumped the lock_version.
 	repo.lockVersions[version.ID] = 1
 
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
@@ -751,8 +756,125 @@ func TestApproveRejectReturnsStaleLockVersionWhenVersionMoved(t *testing.T) {
 		Accept:        false,
 		Reason:        "stale review",
 	})
-	if !errors.Is(err, domain.ErrStaleLockVersion) {
-		t.Fatalf("expected ErrStaleLockVersion, got %v", err)
+	if !errors.Is(err, domain.ErrConcurrentTransition) {
+		t.Fatalf("expected ErrConcurrentTransition (409-class), got %v", err)
+	}
+}
+
+// TestSubmitForReviewReturnsConcurrentTransitionWhenVersionMoved covers the
+// F-T3 remap for the SubmitForReview path.
+func TestSubmitForReviewReturnsConcurrentTransitionWhenVersionMoved(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	version := &domain.TemplateVersion{
+		ID:            "ver-1",
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		Status:        domain.VersionStatusDraft,
+		ContentHash:   "deadbeef",
+		AuthorID:      "author-1",
+		LockVersion:   0,
+	}
+	reviewerRole := "reviewer"
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	repo.approvalConfigs[template.ID] = &domain.ApprovalConfig{
+		TemplateID:   template.ID,
+		ReviewerRole: &reviewerRole,
+		ApproverRole: "approver",
+	}
+	// Simulate concurrent writer ahead of us.
+	repo.lockVersions[version.ID] = 1
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	_, err := svc.SubmitForReview(context.Background(), application.SubmitForReviewCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "author-1",
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+	})
+	if !errors.Is(err, domain.ErrConcurrentTransition) {
+		t.Fatalf("expected ErrConcurrentTransition (409-class), got %v", err)
+	}
+}
+
+// TestReviewReturnsConcurrentTransitionWhenVersionMoved covers the F-T3 remap
+// for the Review path (accept branch via updateVersionWithAuthzAndAudit).
+func TestReviewReturnsConcurrentTransitionWhenVersionMoved(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	reviewerRole := "reviewer"
+	submittedAt := time.Date(2026, 4, 20, 11, 0, 0, 0, time.UTC)
+	version := &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          template.ID,
+		VersionNumber:       1,
+		Status:              domain.VersionStatusInReview,
+		AuthorID:            "author-1",
+		PendingReviewerRole: &reviewerRole,
+		SubmittedAt:         &submittedAt,
+		LockVersion:         0,
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	// Simulate concurrent writer ahead of us.
+	repo.lockVersions[version.ID] = 1
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	_, err := svc.Review(context.Background(), application.ReviewCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "reviewer-1",
+		ActorRoles:    []string{"reviewer"},
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		Accept:        true,
+	})
+	if !errors.Is(err, domain.ErrConcurrentTransition) {
+		t.Fatalf("expected ErrConcurrentTransition (409-class), got %v", err)
+	}
+}
+
+// TestPublishTemplateVersionReturnsConcurrentTransitionWhenVersionMoved covers
+// the F-T3 remap for the PublishTemplateVersion path: a CAS loss on the version
+// row must surface as ErrConcurrentTransition (→ 409) rather than the raw
+// ErrStaleLockVersion (→ 412), since publish is a status transition.
+func TestPublishTemplateVersionReturnsConcurrentTransitionWhenVersionMoved(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{
+		ID:            "tpl-1",
+		TenantID:      "tenant-a",
+		LatestVersion: 2,
+	}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-2",
+		TemplateID:          template.ID,
+		VersionNumber:       2,
+		Status:              domain.VersionStatusDraft,
+		DocxStorageKey:      "tenants/tenant-a/templates/tpl-1/versions/2.docx",
+		ContentHash:         "hash_ok",
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver",
+		LockVersion:         0,
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	// Simulate concurrent writer ahead of us: the stored lock_version is past 0.
+	repo.lockVersions[version.ID] = 1
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
+		TemplateID:    template.ID,
+		VersionNumber: 2,
+		SchemaKey:     "tenants/tenant-a/templates/tpl-1/versions/2.schema.json",
+	})
+	if !errors.Is(err, domain.ErrConcurrentTransition) {
+		t.Fatalf("expected ErrConcurrentTransition (409-class), got %v", err)
 	}
 }
 
@@ -922,5 +1044,57 @@ func TestPublishTemplateVersion_AbortsWhenDocxCopyFails(t *testing.T) {
 	}
 	if stored.PublishedAt != nil {
 		t.Fatalf("source version PublishedAt must stay nil on aborted publish, got %v", stored.PublishedAt)
+	}
+}
+
+// TestPublishTemplateVersion_SingleTemplateTx asserts the F-T5 fix: exactly
+// ONE UpdateTemplateTx call is issued per PublishTemplateVersion, and it
+// carries LatestVersion = nextNum (not the stale pre-spawn value).
+func TestPublishTemplateVersion_SingleTemplateTx(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{
+		ID:            "tpl-1",
+		TenantID:      "tenant-a",
+		LatestVersion: 2,
+	}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-2",
+		TemplateID:          template.ID,
+		VersionNumber:       2,
+		Status:              domain.VersionStatusDraft,
+		DocxStorageKey:      "tenants/tenant-a/templates/tpl-1/versions/2.docx",
+		ContentHash:         "hash_ok",
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	res, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
+		TemplateID:    template.ID,
+		VersionNumber: 2,
+		SchemaKey:     "tenants/tenant-a/templates/tpl-1/versions/2.schema.json",
+	})
+	if err != nil {
+		t.Fatalf("PublishTemplateVersion returned error: %v", err)
+	}
+
+	wantNextNum := 3 // nextVersionNumber(latestVersion=2, sourceVersionNumber=2) = 3
+	if res.NextDraft.VersionNumber != wantNextNum {
+		t.Fatalf("expected NextDraft.VersionNumber %d, got %d", wantNextNum, res.NextDraft.VersionNumber)
+	}
+
+	// F-T5: exactly one UpdateTemplateTx must be issued.
+	if got := len(repo.UpdateTemplateTxCalls); got != 1 {
+		t.Fatalf("F-T5: expected exactly 1 UpdateTemplateTx call, got %d (calls: %v)", got, repo.UpdateTemplateTxCalls)
+	}
+	// The single write must carry LatestVersion = nextNum (not the stale value).
+	if repo.UpdateTemplateTxCalls[0] != wantNextNum {
+		t.Fatalf("F-T5: UpdateTemplateTx called with LatestVersion=%d, want %d", repo.UpdateTemplateTxCalls[0], wantNextNum)
 	}
 }

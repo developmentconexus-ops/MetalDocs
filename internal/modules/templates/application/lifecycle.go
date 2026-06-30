@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -77,6 +78,11 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 			return fmt.Errorf("templates submit: authz: %w", err)
 		}
 		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+			// CAS lost to a concurrent transition; reclassify so the HTTP layer
+			// returns 409 (conflict) rather than 412 (precondition failed).
+			if errors.Is(err, domain.ErrStaleLockVersion) {
+				return domain.ErrConcurrentTransition
+			}
 			return err
 		}
 		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
@@ -265,13 +271,18 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 			if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateApprove), "tenant"); err != nil {
 				return fmt.Errorf("templates approve: authz: %w", err)
 			}
-			if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TemplateID, version.ID); err != nil {
+			if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TenantID, cmd.TemplateID, version.ID); err != nil {
 				return err
 			}
 			if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
 				return err
 			}
 			if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+				// CAS lost to a concurrent transition; reclassify so the HTTP layer
+				// returns 409 (conflict) rather than 412 (precondition failed).
+				if errors.Is(err, domain.ErrStaleLockVersion) {
+					return domain.ErrConcurrentTransition
+				}
 				return err
 			}
 			if err := s.repo.CreateVersionTx(ctx, tx, next); err != nil {
@@ -402,6 +413,9 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	if err != nil {
 		return nil, err
 	}
+	// Mirror Approve: set LatestVersion before the tx so exactly ONE
+	// UpdateTemplateTx carries the final state (F-T5 — eliminates redundant write).
+	template.LatestVersion = nextNum
 	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{"schema_key": cmd.SchemaKey}, now)
 	if err != nil {
 		return nil, err
@@ -413,20 +427,21 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplatePublish), "tenant"); err != nil {
 			return fmt.Errorf("templates publish: authz: %w", err)
 		}
-		if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TemplateID, version.ID); err != nil {
+		if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TenantID, cmd.TemplateID, version.ID); err != nil {
 			return err
 		}
 		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
 			return err
 		}
 		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+			// CAS lost to a concurrent transition; reclassify so the HTTP layer
+			// returns 409 (conflict) rather than 412 (precondition failed).
+			if errors.Is(err, domain.ErrStaleLockVersion) {
+				return domain.ErrConcurrentTransition
+			}
 			return err
 		}
 		if err := s.repo.CreateVersionTx(ctx, tx, next); err != nil {
-			return err
-		}
-		template.LatestVersion = nextNum
-		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
 			return err
 		}
 		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
@@ -518,6 +533,8 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 
 // updateVersionWithAuthzAndAudit runs the authz check and the version update
 // inside a single transaction, then appends the audit event atomically (F-07 / REQ-ASYNC-1).
+// ErrStaleLockVersion from UpdateVersionTx is remapped to ErrConcurrentTransition
+// so that status-transition callers surface a 409 rather than a 412.
 func (s *Service) updateVersionWithAuthzAndAudit(ctx context.Context, tenantID, actorID string, version *domain.TemplateVersion, cap string, audit *domain.AuditEvent) error {
 	return s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
@@ -527,6 +544,11 @@ func (s *Service) updateVersionWithAuthzAndAudit(ctx context.Context, tenantID, 
 			return fmt.Errorf("templates update version: authz: %w", err)
 		}
 		if err := s.repo.UpdateVersionTx(ctx, tx, tenantID, version); err != nil {
+			// CAS lost to a concurrent transition; reclassify so the HTTP layer
+			// returns 409 (conflict) rather than 412 (precondition failed).
+			if errors.Is(err, domain.ErrStaleLockVersion) {
+				return domain.ErrConcurrentTransition
+			}
 			return err
 		}
 		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
