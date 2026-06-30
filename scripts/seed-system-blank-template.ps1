@@ -39,34 +39,127 @@ if ([string]::IsNullOrWhiteSpace($env:MINIO_ROOT_USER) -or [string]::IsNullOrWhi
 $mcImage = "minio/mc:RELEASE.2024-04-18T16-45-29Z"
 $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("metaldocs-system-blank-template-" + [System.Guid]::NewGuid().ToString("N"))
 $docxPath = Join-Path $tempDir "blank.docx"
-$minioContainerId = $null
+# Canonical container name (deploy/compose/docker-compose.yml pins
+# container_name: metaldocs-minio), so we reference it directly for the network
+# namespace instead of a hang-prone `docker compose ps -q` round-trip.
+$minioContainerName = 'metaldocs-minio'
 
-function Resolve-MinioContainerId {
-  $containerId = & docker compose -f $ComposeFile --env-file $EnvFile ps -q minio
-  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($containerId)) {
-    throw "failed to resolve running minio container id from docker compose"
+# Bounded docker invoker: runs the docker CLI inside a background job and
+# enforces a hard timeout, so a stalled daemon or orchestration call (joining a
+# container network namespace, an unresponsive Docker Desktop, etc.) fails fast
+# with a clear message instead of hanging the script. $DockerArgs is passed
+# in-memory to the job; when it carries MinIO creds (-e MC_HOST_local=...) those
+# are never logged — only the docker command's own stdout/stderr is surfaced.
+function Invoke-DockerBounded {
+  param(
+    [Parameter(Mandatory = $true)][string[]]$DockerArgs,
+    [int]$TimeoutSeconds = 30,
+    [string]$Label = 'docker command'
+  )
+
+  $job = Start-Job -ScriptBlock {
+    param($innerArgs)
+    $ErrorActionPreference = 'Continue'
+    $out = & docker @innerArgs 2>&1 | Out-String
+    [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = $out }
+  } -ArgumentList (, $DockerArgs)
+
+  try {
+    if (-not (Wait-Job -Job $job -Timeout $TimeoutSeconds)) {
+      throw "timed out after ${TimeoutSeconds}s on ${Label}; Docker appears stalled (check 'docker ps' and Docker Desktop)"
+    }
+    return Receive-Job -Job $job
+  }
+  finally {
+    Stop-Job -Job $job -ErrorAction SilentlyContinue
+    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+  }
+}
+
+# True only when the canonical metaldocs-minio container exists and is running.
+# Bounded so a stalled daemon cannot hang the probe.
+function Test-MinioRunning {
+  try {
+    $res = Invoke-DockerBounded `
+      -DockerArgs @('inspect', '-f', '{{.State.Running}}', $minioContainerName) `
+      -TimeoutSeconds 10 `
+      -Label "docker inspect $minioContainerName"
+  }
+  catch {
+    Write-Host "[seed-system-blank-template] $($_.Exception.Message)"
+    return $false
   }
 
-  return $containerId.Trim()
+  return ($res.ExitCode -eq 0 -and ([string]$res.Output).Trim() -eq 'true')
+}
+
+# Ensure the minio + minio-init services are up (bounded compose orchestration).
+function Ensure-MinioUp {
+  Write-Host "[seed-system-blank-template] Ensuring MinIO services are available..."
+  $res = Invoke-DockerBounded `
+    -DockerArgs @('compose', '-f', $ComposeFile, '--env-file', $EnvFile, 'up', '-d', 'minio', 'minio-init') `
+    -TimeoutSeconds 120 `
+    -Label 'docker compose up -d minio minio-init'
+  if ($res.Output) { Write-Host $res.Output }
+  if ($res.ExitCode -ne 0) {
+    throw "failed to start minio/minio-init (docker compose up exited $($res.ExitCode))"
+  }
 }
 
 function Invoke-McCommand {
   param(
     [string[]]$Arguments,
-    [string[]]$VolumeArgs = @()
+    [string[]]$VolumeArgs = @(),
+    [int]$TimeoutSeconds = 30,
+    [string]$Label
   )
+
+  if ([string]::IsNullOrWhiteSpace($Label)) {
+    $Label = "mc $($Arguments -join ' ')"
+  }
 
   $dockerArgs = @(
     "run",
     "--rm",
-    "--network", "container:$minioContainerId"
+    "--network", "container:$minioContainerName"
   ) + $VolumeArgs + @(
     "-e", "MC_HOST_local=http://$($env:MINIO_ROOT_USER):$($env:MINIO_ROOT_PASSWORD)@127.0.0.1:9000",
     $mcImage
   ) + $Arguments
 
-  & docker @dockerArgs | Out-Host
-  if ($LASTEXITCODE -ne 0) {
+  $res = Invoke-DockerBounded -DockerArgs $dockerArgs -TimeoutSeconds $TimeoutSeconds -Label $Label
+  if ($res.Output) { Write-Host $res.Output }
+  if ($res.ExitCode -ne 0) {
+    throw "mc command failed: $($Arguments -join ' ')"
+  }
+}
+
+# Read-only mc probe that runs *inside* the already-running minio container via
+# `docker exec`, reusing its network namespace. This avoids the per-call
+# `docker run` container create/destroy + network-namespace-join orchestration
+# (observed at 6-30s and the source of the verify hang); exec lands in ~0.3s.
+# Creds are passed via -e MC_HOST_local and are never logged.
+function Invoke-McExec {
+  param(
+    [string[]]$Arguments,
+    [int]$TimeoutSeconds = 30,
+    [string]$Label
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Label)) {
+    $Label = "mc $($Arguments -join ' ')"
+  }
+
+  $dockerArgs = @(
+    "exec",
+    "-e", "MC_HOST_local=http://$($env:MINIO_ROOT_USER):$($env:MINIO_ROOT_PASSWORD)@127.0.0.1:9000",
+    $minioContainerName,
+    "mc"
+  ) + $Arguments
+
+  $res = Invoke-DockerBounded -DockerArgs $dockerArgs -TimeoutSeconds $TimeoutSeconds -Label $Label
+  if ($res.Output) { Write-Host $res.Output }
+  if ($res.ExitCode -ne 0) {
     throw "mc command failed: $($Arguments -join ' ')"
   }
 }
@@ -130,19 +223,25 @@ function New-DeterministicBlankDocx {
 }
 
 try {
-  Write-Host "[seed-system-blank-template] Ensuring MinIO services are available..."
-  docker compose -f $ComposeFile --env-file $EnvFile up -d minio minio-init | Out-Host
-  if ($LASTEXITCODE -ne 0) {
-    throw "failed to start minio/minio-init"
-  }
-  $minioContainerId = Resolve-MinioContainerId
-
   if ($VerifyOnly) {
+    # Fast, bounded verify: only bring MinIO up when it is not already running,
+    # then probe the object by reusing the running container's network namespace.
+    if (Test-MinioRunning) {
+      Write-Host "[seed-system-blank-template] metaldocs-minio already running; skipping 'compose up'"
+    }
+    else {
+      Write-Host "[seed-system-blank-template] metaldocs-minio not running; bringing MinIO up first"
+      Ensure-MinioUp
+    }
+
     Write-Host "[seed-system-blank-template] Verifying local/$Bucket/$StorageKey"
-    Invoke-McCommand -Arguments @("stat", "local/$Bucket/$StorageKey")
+    Invoke-McExec -Arguments @("stat", "local/$Bucket/$StorageKey") -TimeoutSeconds 30
     Write-Host "[seed-system-blank-template] Verified local/$Bucket/$StorageKey"
     exit 0
   }
+
+  # Seed path always ensures MinIO is up before writing the object.
+  Ensure-MinioUp
 
   Write-Host "[seed-system-blank-template] Generating deterministic blank DOCX at $docxPath"
   New-DeterministicBlankDocx -Path $docxPath
