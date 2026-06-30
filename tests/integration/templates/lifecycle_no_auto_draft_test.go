@@ -159,7 +159,7 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 		t.Fatalf("SubmitForReview: %v", err)
 	}
 	if v1.Status != domain.VersionStatusInReview {
-		t.Fatalf("after submit: status=%q want=in_review", v1.Status)
+		t.Fatalf("after submit: status=%q want=under_review", v1.Status)
 	}
 
 	// ── Step 4: approve → publish ─────────────────────────────────────────
