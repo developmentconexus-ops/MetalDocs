@@ -372,16 +372,14 @@ func TestApprove_Accept_WithReviewer(t *testing.T) {
 	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublished {
 		t.Fatalf("expected one %q audit event, got %v", domain.AuditPublished, repo.audit)
 	}
-	// M1·T2: no auto next-draft; manual CreateNextVersion is the only revision-creation path.
-	if res.NextDraft != nil {
-		t.Fatalf("expected NextDraft nil after approve-publish (auto-spawn removed), got version_number=%d", res.NextDraft.VersionNumber)
-	}
-	// LatestVersion must NOT be bumped by approve (no new draft was allocated).
-	// It stays at whatever the template had before: 0 here (unset default).
+	// M1·T2: no auto next-draft. LatestVersion must NOT be bumped by approve
+	// (no new draft was allocated); it stays at the template's prior value —
+	// 0 here (unset default).
 	if template.LatestVersion != 0 {
 		t.Fatalf("expected template.LatestVersion unchanged (0), got %d", template.LatestVersion)
 	}
 	// Exactly two version rows in total (old published + approved-now-published).
+	// No third row was spawned.
 	if len(repo.versions) != 2 {
 		t.Fatalf("expected 2 version rows (old published + approved), got %d", len(repo.versions))
 	}
@@ -426,12 +424,9 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 	if template.PublishedVersionNumber == nil || *template.PublishedVersionNumber != version.VersionNumber {
 		t.Fatalf("expected PublishedVersionNumber %d, got %v", version.VersionNumber, template.PublishedVersionNumber)
 	}
-	// M1·T2: no auto next-draft; manual CreateNextVersion is the only revision-creation path.
-	if res.NextDraft != nil {
-		t.Fatalf("expected NextDraft nil after approve-publish no-reviewer path (auto-spawn removed), got version_number=%d", res.NextDraft.VersionNumber)
-	}
-	// LatestVersion must NOT be bumped by approve (no new draft was allocated).
-	// It stays at whatever the template had before: 0 here (unset default).
+	// M1·T2: no auto next-draft. LatestVersion must NOT be bumped by approve
+	// (no new draft was allocated); it stays at the template's prior value —
+	// 0 here (unset default).
 	if template.LatestVersion != 0 {
 		t.Fatalf("expected template.LatestVersion unchanged (0), got %d", template.LatestVersion)
 	}
@@ -510,9 +505,6 @@ func TestApprove_Reject(t *testing.T) {
 		t.Fatalf("Approve returned error: %v", err)
 	}
 	got := res.Version
-	if res.NextDraft != nil {
-		t.Fatalf("expected NextDraft nil on reject, got %v", res.NextDraft)
-	}
 	if got.Status != domain.VersionStatusDraft {
 		t.Fatalf("expected status %q, got %q", domain.VersionStatusDraft, got.Status)
 	}
@@ -914,9 +906,6 @@ func TestPublishTemplateVersion_NoAutoNextDraft(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("PublishTemplateVersion returned error: %v", err)
-	}
-	if res.NextDraft != nil {
-		t.Fatalf("expected NextDraft nil (auto-spawn removed), got version_number=%d", res.NextDraft.VersionNumber)
 	}
 	if res.PublishedVersion.Status != domain.VersionStatusPublished {
 		t.Fatalf("expected published status, got %q", res.PublishedVersion.Status)

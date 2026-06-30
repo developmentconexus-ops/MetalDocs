@@ -181,10 +181,8 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 	}
 
 	// ── M1·T2 assertion: NO auto next-draft ───────────────────────────────
-	if approveRes.NextDraft != nil {
-		t.Fatalf("M1·T2 violated: ApproveResult.NextDraft must be nil, got version_number=%d",
-			approveRes.NextDraft.VersionNumber)
-	}
+	// The result struct no longer carries a NextDraft field (dropped in M1·T2);
+	// the absence of an auto-spawned row is proven directly against the DB below.
 
 	// Exactly ONE version row: the published v1. No v2 was auto-created.
 	if n := countVersionRows(t, db, templateID); n != 1 {

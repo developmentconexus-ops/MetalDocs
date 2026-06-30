@@ -188,13 +188,11 @@ type ApproveCmd struct {
 }
 
 // ApproveResult holds the now-published version on the accept path, or
-// the reverted draft on the reject path. NextDraft is always nil:
-// auto-spawning the next revision was removed in M1·T2. Use
-// CreateNextVersion (POST /api/v1/templates/{id}/versions) to start a
-// new draft deliberately.
+// the reverted draft on the reject path. Approve no longer spawns the next
+// revision (M1·T2); use CreateNextVersion (POST
+// /api/v1/templates/{id}/versions) to start a new draft deliberately.
 type ApproveResult struct {
-	Version   *domain.TemplateVersion
-	NextDraft *domain.TemplateVersion // always nil; retained for zero-value safety at call sites
+	Version *domain.TemplateVersion
 }
 
 func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, error) {
@@ -324,13 +322,11 @@ type PublishTemplateVersionCmd struct {
 	SchemaKey                         string
 }
 
-// PublishTemplateVersionResult holds the now-published version. NextDraft is
-// always nil: auto-spawning the next revision was removed in M1·T2. Use
-// CreateNextVersion (POST /api/v1/templates/{id}/versions) to start a new
-// draft deliberately.
+// PublishTemplateVersionResult holds the now-published version. Publish no
+// longer spawns the next revision (M1·T2); use CreateNextVersion (POST
+// /api/v1/templates/{id}/versions) to start a new draft deliberately.
 type PublishTemplateVersionResult struct {
 	PublishedVersion *domain.TemplateVersion
-	NextDraft        *domain.TemplateVersion // always nil; retained for zero-value safety at call sites
 }
 
 func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplateVersionCmd) (*PublishTemplateVersionResult, error) {

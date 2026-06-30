@@ -286,10 +286,6 @@ func TestApprove_Accept_Happy(t *testing.T) {
 				Status        string `json:"status"`
 				VersionNumber int    `json:"version_number"`
 			} `json:"version"`
-			NextDraft *struct {
-				ID            string `json:"id"`
-				VersionNumber int    `json:"version_number"`
-			} `json:"next_draft"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
@@ -298,10 +294,9 @@ func TestApprove_Accept_Happy(t *testing.T) {
 	if out.Data.Version.Status != string(domain.VersionStatusPublished) {
 		t.Fatalf("expected status=published, got %q", out.Data.Version.Status)
 	}
-	// M1·T2: auto next-draft spawn removed; next_draft must be absent/null.
-	if out.Data.NextDraft != nil {
-		t.Fatalf("expected next_draft=null on approve-publish (auto-spawn removed), got version_number=%d", out.Data.NextDraft.VersionNumber)
-	}
+	// M1·T2: the approve-publish response no longer carries a next_draft field;
+	// the strict-decode typed-response tests (routes_typed_response_f53/f61) are
+	// the wire-shape guard. This test asserts the published status only.
 }
 
 func TestApprove_Reject_NextDraftNull(t *testing.T) {
