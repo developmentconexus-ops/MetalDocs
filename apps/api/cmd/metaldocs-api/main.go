@@ -32,6 +32,7 @@ import (
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
 	templatesapp "metaldocs/internal/modules/templates/application"
 	templateshttp "metaldocs/internal/modules/templates/delivery/http"
+	templatejobs "metaldocs/internal/modules/templates/jobs"
 	templatesrepo "metaldocs/internal/modules/templates/repository"
 
 	"metaldocs/apps/api/internal/wiring"
@@ -541,7 +542,7 @@ func main() {
 	// needs ControlledDocumentDuplicator), hence the post-construction setter.
 	controlledDocumentsModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
-	templatesModule, err := buildTemplatesModule(deps, capabilityService)
+	templatesModule, templatesRepo, templatesStore, err := buildTemplatesModule(deps, capabilityService)
 	if err != nil {
 		slog.Error("build templates module", "err", err)
 		deps.Cleanup()
@@ -599,8 +600,14 @@ func main() {
 
 	stopSessions := jobs.StartSessionSweeper(ctx, docMod.Repo(), 60*time.Second)
 	stopOrphans := jobs.StartOrphanPendingSweeper(ctx, docMod.Repo(), time.Hour, 24*time.Hour)
+	// F-T6(a): reconciliation janitor for template objects orphaned when
+	// spawnNextDraft's pre-tx Copy survives a rolled-back publish tx. Mirrors the
+	// documents orphan sweeper above; deletes only aged-out (>24h) objects absent
+	// from the referenced docx∪schema key set.
+	stopTemplateOrphans := templatejobs.StartTemplateOrphanSweeper(ctx, templatesRepo, templatesStore, time.Hour, 24*time.Hour)
 	defer stopSessions()
 	defer stopOrphans()
+	defer stopTemplateOrphans()
 	mux.Handle("/api/v1/metrics", httpObs.MetricsHandler())
 
 	// Audit retention - AUDIT_RETENTION_DAYS=0 disables (default disabled).
@@ -785,9 +792,12 @@ func buildTokensModule(deps bootstrap.APIDependencies) *tokens.Module {
 	})
 }
 
-func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService) (*templateshttp.Handler, error) {
+// buildTemplatesModule returns the templates HTTP handler plus the repository and
+// object store it is built on, so the composition root can wire the background
+// orphan-object sweeper (F-T6) against the same instances the request path uses.
+func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService) (*templateshttp.Handler, *templatesrepo.Repository, *objectstore.VerifiedStore, error) {
 	if capabilityService == nil {
-		return nil, errors.New("templates capability service is required")
+		return nil, nil, nil, errors.New("templates capability service is required")
 	}
 	templatesPresigner := objectstore.NewVerifiedStore(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
 	// Build a dedicated builtins registry so the D5 reserved-name guard fires in
@@ -796,12 +806,13 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 	// resolverReg built later at the composition root for runtime resolution.
 	templatesResolverReg := resolvers.NewRegistry()
 	resolvers.RegisterBuiltins(templatesResolverReg)
-	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, wiring.Clock{}, wiring.UUIDGen{}, templatesResolverReg).WithRunner(db.NewTxRunner(deps.SQLDB))
+	templatesRepo := templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter)
+	templatesSvc := templatesapp.New(templatesRepo, templatesPresigner, wiring.Clock{}, wiring.UUIDGen{}, templatesResolverReg).WithRunner(db.NewTxRunner(deps.SQLDB))
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())
 		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
 	}
-	return templateshttp.New(templatesSvc, templatesAuthzFn, deps.SQLDB), nil
+	return templateshttp.New(templatesSvc, templatesAuthzFn, deps.SQLDB), templatesRepo, templatesPresigner, nil
 }
 
 func requireApprovalRuntimeSupport(fanoutURL string) error {

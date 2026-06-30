@@ -110,7 +110,7 @@ func TestShutdownServer_ContextCancellation(t *testing.T) {
 func TestBuildTemplatesModuleFailsWhenCapabilityServiceMissing(t *testing.T) {
 	t.Parallel()
 
-	_, err := buildTemplatesModule(bootstrap.APIDependencies{}, nil)
+	_, _, _, err := buildTemplatesModule(bootstrap.APIDependencies{}, nil)
 	if err == nil {
 		t.Fatal("expected error for nil capability service")
 	}

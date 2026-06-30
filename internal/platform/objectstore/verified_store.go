@@ -249,3 +249,42 @@ func (s *VerifiedStore) deleteQuiet(ctx context.Context, key string) {
 		slog.WarnContext(ctx, "objectstore: cleanup delete failed", "key", key, "err", err)
 	}
 }
+
+// --- enumeration (tenant-guarded) ---
+
+// ObjectInfo is the minimal metadata an enumeration returns for one stored
+// object. It deliberately exposes only the fields a reconciliation janitor needs
+// (key + last-modified age) and holds no domain knowledge.
+type ObjectInfo struct {
+	Key          string
+	LastModified time.Time
+	SizeBytes    int64
+}
+
+// ListTenantObjects enumerates every object whose key starts with prefix, which
+// MUST reside inside tenantID's namespace (tenants/{tenantID}/…). The prefix is
+// asserted through the same KeyHasTenantPrefix rule that guards the write/read
+// paths, so an enumeration can never escape the tenant boundary — a reconciliation
+// sweeper listing one tenant's prefix can never observe (and therefore never
+// delete) another tenant's objects. Mirrors minio ListObjects with recursive
+// enumeration under the prefix.
+func (s *VerifiedStore) ListTenantObjects(ctx context.Context, tenantID, prefix string) ([]ObjectInfo, error) {
+	if !KeyHasTenantPrefix(tenantID, prefix) {
+		return nil, ErrKeyOutsideTenant
+	}
+	var out []ObjectInfo
+	for obj := range s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	}) {
+		if obj.Err != nil {
+			return nil, fmt.Errorf("objectstore: list: %w", obj.Err)
+		}
+		out = append(out, ObjectInfo{
+			Key:          obj.Key,
+			LastModified: obj.LastModified,
+			SizeBytes:    obj.Size,
+		})
+	}
+	return out, nil
+}

@@ -697,3 +697,66 @@ LIMIT $3 OFFSET $4`
 	}
 	return out, rows.Err()
 }
+
+// TenantIDsWithTemplates returns the distinct tenant_ids that own at least one
+// template. The orphan-object GC sweeper iterates these to bound its per-tenant
+// object-store enumeration to tenants that actually have template objects.
+func (r *Repository) TenantIDsWithTemplates(ctx context.Context) ([]string, error) {
+	const q = `SELECT DISTINCT tenant_id::text FROM templates_template`
+	rows, err := r.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("templates repository tenant ids with templates: %w", err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("templates repository tenant ids with templates scan: %w", err)
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+// ReferencedTemplateObjectRef is one template-version row's identity plus its
+// stored docx object key, as needed to compute the set of object keys a tenant's
+// templates reference. The schema object key is NOT a column — it is derived from
+// (TemplateID, VersionNumber) by the application layer — so the coordinates are
+// returned alongside the stored docx key.
+type ReferencedTemplateObjectRef struct {
+	TemplateID     string
+	VersionNumber  int
+	DocxStorageKey string
+}
+
+// ReferencedTemplateObjectRefs returns every template-version row for tenantID,
+// carrying the stored docx_storage_key plus the (template_id, version_number)
+// coordinates the caller needs to derive the version's schema key. This is the
+// DB source of truth for "which template objects are referenced": the orphan-GC
+// sweeper unions the docx keys with the derived schema keys to form the complete
+// referenced set, then deletes only objects absent from it.
+func (r *Repository) ReferencedTemplateObjectRefs(ctx context.Context, tenantID string) ([]ReferencedTemplateObjectRef, error) {
+	const q = `
+SELECT v.template_id::text, v.version_number, v.docx_storage_key
+FROM templates_template_version v
+JOIN templates_template t ON t.id = v.template_id
+WHERE t.tenant_id = $1::uuid`
+	rows, err := r.db.QueryContext(ctx, q, tenantID)
+	if isInvalidUUID(err) {
+		return nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("templates repository referenced template object refs: %w", err)
+	}
+	defer rows.Close()
+	var out []ReferencedTemplateObjectRef
+	for rows.Next() {
+		var ref ReferencedTemplateObjectRef
+		if err := rows.Scan(&ref.TemplateID, &ref.VersionNumber, &ref.DocxStorageKey); err != nil {
+			return nil, fmt.Errorf("templates repository referenced template object refs scan: %w", err)
+		}
+		out = append(out, ref)
+	}
+	return out, rows.Err()
+}
