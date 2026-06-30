@@ -1445,6 +1445,20 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expected_content_hash]
+              properties:
+                expected_content_hash:
+                  type: string
+                  description: >-
+                    Content hash captured at presign time. The server confirms
+                    the uploaded object's SHA256 matches this value (optimistic
+                    concurrency); a mismatch returns 409.
       responses:
         '200':
           description: ok

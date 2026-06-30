@@ -68,7 +68,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ExpectedContentHash string `json:"expected_content_hash"`
 	}
-	if err := readJSON(r, &req); err != nil {
+	if err := readStrictJSON(r, &req); err != nil {
 		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
 		return
 	}

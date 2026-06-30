@@ -4772,7 +4772,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Content hash captured at presign time. The server confirms the uploaded object's SHA256 matches this value (optimistic concurrency); a mismatch returns 409. */
+                    expected_content_hash: string;
+                };
+            };
+        };
         responses: {
             /** @description ok */
             200: {
