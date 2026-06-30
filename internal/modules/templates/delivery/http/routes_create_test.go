@@ -40,10 +40,10 @@ import (
 // expectation whose arg count matches via attemptArgMatch.  We exploit this to
 // separate the three query shapes so each pool is consumed independently:
 //
-//   • 5-arg pool → idempotency INSERT…RETURNING (returns a non-empty string so
+//   - 5-arg pool → idempotency INSERT…RETURNING (returns a non-empty string so
 //     the middleware treats the request as the "winner")
-//   • 2-arg pool → system_admin EXISTS (returns bool true)
-//   • 0-arg pool (WithoutArgs) → GUC reads: actor_id, tenant_id, asserted_caps
+//   - 2-arg pool → system_admin EXISTS (returns bool true)
+//   - 0-arg pool (WithoutArgs) → GUC reads: actor_id, tenant_id, asserted_caps
 //     (returned in cycles of three; true/true/"" so every 3rd is empty)
 //
 // Used exclusively in delivery/http tests that verify routing and marshalling,
@@ -500,6 +500,81 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 		t.Fatalf("expected error.code=ALREADY_EXISTS, got %q", out.Code)
 	}
 }
+
+// TestCreateTemplate_ApproverReviewerRoleBinding is the glue test for the F-T4
+// approver_role/reviewer_role wiring in CreateTemplate (routes_generated.go:50-71):
+//   - omitted  → approver_role defaults to "approver", reviewer_role stays nil
+//   - blank    → same defaults (whitespace trimmed to empty is treated as absent)
+//   - provided → both pass through verbatim (trimmed) to the created version's
+//     PendingApproverRole/PendingReviewerRole binding.
+func TestCreateTemplate_ApproverReviewerRoleBinding(t *testing.T) {
+	reviewer := "reviewer"
+	blank := "   "
+	custom := "  qms_lead  "
+	customReviewer := "  area_reviewer  "
+
+	tests := []struct {
+		name             string
+		approverRole     *string
+		reviewerRole     *string
+		wantApproverRole string
+		wantReviewerRole *string // nil → expect no reviewer bound
+	}{
+		{name: "omitted defaults", wantApproverRole: "approver", wantReviewerRole: nil},
+		{name: "blank defaults", approverRole: &blank, reviewerRole: &blank, wantApproverRole: "approver", wantReviewerRole: nil},
+		{name: "provided passthrough trimmed", approverRole: &custom, reviewerRole: &customReviewer, wantApproverRole: "qms_lead", wantReviewerRole: ptr("area_reviewer")},
+		{name: "approver only", approverRole: &reviewer, wantApproverRole: "reviewer", wantReviewerRole: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newFakeRepo()
+			mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+			body := map[string]any{
+				"key":         "contract-default",
+				"name":        "Contract Template",
+				"description": "Default contract",
+			}
+			if tt.approverRole != nil {
+				body["approver_role"] = *tt.approverRole
+			}
+			if tt.reviewerRole != nil {
+				body["reviewer_role"] = *tt.reviewerRole
+			}
+			raw, _ := json.Marshal(body)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/templates", bytes.NewReader(raw))
+			withHeaders(req)
+			rr := httptest.NewRecorder()
+			mux.ServeHTTP(rr, req)
+			if rr.Code != http.StatusCreated {
+				t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
+			}
+
+			if len(repo.versions) != 1 {
+				t.Fatalf("expected exactly one created version, got %d", len(repo.versions))
+			}
+			var v *domain.TemplateVersion
+			for _, ver := range repo.versions {
+				v = ver
+			}
+			if v.PendingApproverRole != tt.wantApproverRole {
+				t.Errorf("PendingApproverRole=%q, want %q", v.PendingApproverRole, tt.wantApproverRole)
+			}
+			switch {
+			case tt.wantReviewerRole == nil && v.PendingReviewerRole != nil:
+				t.Errorf("PendingReviewerRole=%q, want nil", *v.PendingReviewerRole)
+			case tt.wantReviewerRole != nil && v.PendingReviewerRole == nil:
+				t.Errorf("PendingReviewerRole=nil, want %q", *tt.wantReviewerRole)
+			case tt.wantReviewerRole != nil && *v.PendingReviewerRole != *tt.wantReviewerRole:
+				t.Errorf("PendingReviewerRole=%q, want %q", *v.PendingReviewerRole, *tt.wantReviewerRole)
+			}
+		})
+	}
+}
+
+func ptr(s string) *string { return &s }
 
 func TestCreateNextVersion_SystemOwnedTemplateImmutable(t *testing.T) {
 	repo := newFakeRepo()
