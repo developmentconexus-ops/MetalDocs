@@ -310,6 +310,7 @@ export function NewDocumentWizardPage(): JSX.Element {
           isBlankTemplateSelected={blankTemplateSelected}
           blankTemplateName={blankTemplate?.name ?? 'Em branco'}
           previewCode={previewCodeQuery.data?.code ?? null}
+          previewCodeLoading={previewCodeQuery.isLoading}
           authorDisplayName={currentUser?.displayName ?? ''}
           createdAt={new Date()}
           consent={state.consent}
