@@ -2,6 +2,7 @@ import { useState } from "react";
 import styles from "./ArtifactMetaSidebar.module.css";
 import { Avatar } from "../../../components/ui/Avatar";
 import { formatShortDate } from "../../../lib/format/dates";
+import { formatFileSize } from "../../../lib/format/fileSize";
 import type { ApprovalChainItem, ArtifactMetaModel, LifecycleStatus, VersionHistoryItem } from "./types";
 
 const APPROVAL_BADGE_LABELS: Record<string, string> = {
@@ -12,18 +13,6 @@ const APPROVAL_BADGE_LABELS: Record<string, string> = {
 };
 
 const MAX_COLLAPSED_HISTORY_ITEMS = 3;
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB"];
-  let value = bytes / 1024;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(value)} ${units[unitIndex]}`;
-}
 
 function formatPageSizeSummary(pageCount: number | null, fileSizeBytes: number | null): string | null {
   const parts: string[] = [];
@@ -162,7 +151,7 @@ export function ArtifactMetaSidebar({
                 <section className={styles.section}>
                   <div className={styles.sectionHeader}>Proximos aprovadores</div>
                   <div className={styles.approverList}>
-                    {approvalChain!.map((item) => {
+                    {approvalChain?.map((item, idx) => {
                       const badgeClassName =
                         item.status === "approved"
                           ? styles.approverBadgeApproved
@@ -172,7 +161,7 @@ export function ArtifactMetaSidebar({
                               ? styles.approverBadgeNext
                               : styles.approverBadgeWait;
                       return (
-                        <div key={`${item.stageIndex}:${item.actorUserId ?? "?"}:${item.status}`} className={styles.approverRow}>
+                        <div key={`${item.stageIndex}:${item.actorUserId ?? `_${idx}`}:${item.status}`} className={styles.approverRow}>
                           <Avatar name={item.actorDisplay ?? ""} size="sm" />
                           <div className={styles.approverInfo}>
                             <span className={styles.approverName}>{item.actorDisplay}</span>

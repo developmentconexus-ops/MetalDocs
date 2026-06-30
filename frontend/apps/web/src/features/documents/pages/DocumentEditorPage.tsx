@@ -19,7 +19,7 @@ import type { DocumentDetail } from '../api/documents';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
 import { ArtifactMetaSidebar } from '../../shared/controlled-artifact/ArtifactMetaSidebar';
-import type { ApprovalChainItem, ArtifactMetaModel, VersionHistoryItem } from '../../shared/controlled-artifact/types';
+import type { VersionHistoryItem } from '../../shared/controlled-artifact/types';
 import {
   EditorChrome,
   editorChromeStyles,
@@ -391,10 +391,11 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const lineage: VersionHistoryItem[] = (revisionHistoryQuery.data?.items ?? []).map((item) => {
     const revisionLabel = formatRevisionCode(item.revision_number);
     return {
+      // API exposes only revision_number; versionNumber shadows it until the schema exposes a separate version counter.
       versionNumber: item.revision_number,
       revisionNumber: item.revision_number,
       revisionLabel,
-      status: item.status as unknown as VersionHistoryItem['status'],
+      status: item.status as VersionHistoryItem['status'],
       title: displayRevisionTitle(item.revision_title, revisionLabel),
       createdAt: item.created_at,
       isCurrent: item.is_current,

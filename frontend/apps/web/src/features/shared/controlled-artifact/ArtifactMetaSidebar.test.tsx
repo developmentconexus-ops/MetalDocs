@@ -91,6 +91,9 @@ describe("ArtifactMetaSidebar", () => {
     expect(screen.getByText("Ajuste operacional")).toBeInTheDocument();
     expect(screen.queryByText(/Draft|Em revis/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Proximos aprovadores")).not.toBeInTheDocument();
+
+    const toggle = screen.getByRole("button", { name: /fechar painel/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
   });
 
   it("renders revision code, title, and date without workflow status text", () => {
@@ -215,5 +218,29 @@ describe("ArtifactMetaSidebar", () => {
     expect(screen.getByText("aprovou")).toBeInTheDocument();
     expect(screen.getByText("proximo")).toBeInTheDocument();
     expect(screen.getByText("aguarda")).toBeInTheDocument();
+  });
+
+  it("renders only the collapsed toggle (no content) when closed", () => {
+    render(
+      <ArtifactMetaSidebar
+        open={false}
+        onToggle={() => {}}
+        code="POP-RH-001"
+        meta={emptyMeta}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: /abrir painel/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Identificacao")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Identificacao do documento")).not.toBeInTheDocument();
+  });
+
+  it("uses the singular page noun for a one-page artifact", () => {
+    const meta: ArtifactMetaModel = { ...emptyMeta, fileSizeBytes: 1304, pageCount: 1 };
+
+    render(<ArtifactMetaSidebar open onToggle={() => {}} meta={meta} lineage={[]} />);
+
+    expect(screen.getByText("1 pagina · 1,3 KB")).toBeInTheDocument();
   });
 });
