@@ -18,7 +18,12 @@ import (
 )
 
 type SchemaReader interface {
-	LoadPlaceholderSchema(ctx context.Context, tenantID, revisionID string) ([]templatesdomain.Placeholder, error)
+	// LoadPlaceholderSchema loads the placeholder schema snapshot for a document.
+	// docID is a documents.id (the snapshot lives on the documents row); the param
+	// was historically misnamed revisionID even though the SQL filters WHERE id=$2
+	// (F-D5, truth-in-naming — sibling TemplateVersionSchemaReader.LoadFillInSchema
+	// uses docID identically).
+	LoadPlaceholderSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error)
 }
 
 type FillInWriter interface {
@@ -67,12 +72,12 @@ func NewSnapshotSchemaReader(db *sql.DB) *SnapshotSchemaReader {
 	return &SnapshotSchemaReader{db: db}
 }
 
-func (r *SnapshotSchemaReader) LoadPlaceholderSchema(ctx context.Context, tenantID, revisionID string) ([]templatesdomain.Placeholder, error) {
+func (r *SnapshotSchemaReader) LoadPlaceholderSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error) {
 	var raw []byte
 	if err := r.db.QueryRowContext(ctx, `
 		SELECT placeholder_schema_snapshot
 		  FROM documents
-		 WHERE tenant_id=$1::uuid AND id=$2::uuid`, tenantID, revisionID).
+		 WHERE tenant_id=$1::uuid AND id=$2::uuid`, tenantID, docID).
 		Scan(&raw); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, v2domain.ErrNotFound

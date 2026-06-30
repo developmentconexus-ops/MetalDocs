@@ -10,7 +10,7 @@ import (
 )
 
 type placeholderOptionsSchemaReader interface {
-	LoadPlaceholderSchema(ctx context.Context, tenantID, revisionID string) ([]templatesdomain.Placeholder, error)
+	LoadPlaceholderSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error)
 }
 
 // UserOptionView is a local view model for user placeholder options.
@@ -42,10 +42,10 @@ func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *h
 		writeFillInError(w, requestID(r), err)
 		return
 	}
-	revisionID := r.PathValue("id")
+	docID := r.PathValue("id")
 	placeholderID := r.PathValue("pid")
 
-	schema, err := h.schema.LoadPlaceholderSchema(r.Context(), tenantID, revisionID)
+	schema, err := h.schema.LoadPlaceholderSchema(r.Context(), tenantID, docID)
 	if err != nil {
 		writeFillInError(w, requestID(r), err)
 		return
