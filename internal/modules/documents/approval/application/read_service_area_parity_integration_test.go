@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 
-	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -127,7 +126,7 @@ func seedInstanceAreaChain(t *testing.T, db *sql.DB, tenantID string, link bool,
 func TestLoadInstanceAreaCode_ParityPrePostPort(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := context.Background()
-	cdReader := cdinfra.NewCDFieldReaderPG()
+	cdReader := testdb.NewCDFieldReader(t)
 	tenant := testdb.NewTenant(t, db)
 
 	valid := func(s string) sql.NullString { return sql.NullString{String: s, Valid: true} }

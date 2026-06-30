@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	cddomain "metaldocs/internal/modules/controlleddocuments/domain"
+	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 )
 
 // factory.go — unified integration-test fixture builders, built ON the testdb
@@ -563,6 +566,19 @@ func NewNotification(t *testing.T, db *sql.DB, opts ...Opt) Notification {
 		ID: id, TenantID: tenantID, RecipientUserID: recipient,
 		EventType: eventType, ResourceType: resourceType, ResourceID: resourceID, Status: status,
 	}
+}
+
+// NewCDFieldReader returns the real Postgres-backed controlleddocuments
+// CDFieldReader (the published cross-module read port, ADR-0039 D3(b)) for use by
+// integration tests that exercise the documents/approval area-resolver COALESCE
+// chains (B5, B6 parity gates). Centralizing the cross-module construction here —
+// the testdb fixture-factory home — keeps the boundary crossing in one place
+// instead of having each consumer test import controlleddocuments/infrastructure
+// directly. The concrete reader is stateless, so the *testing.T is taken only to
+// keep the accessor uniform with the other builders and future-proof for setup.
+func NewCDFieldReader(t *testing.T) cddomain.CDFieldReader {
+	t.Helper()
+	return cdinfra.NewCDFieldReaderPG()
 }
 
 func profileForCD(t *testing.T, db *sql.DB, controlledDocID string) string {

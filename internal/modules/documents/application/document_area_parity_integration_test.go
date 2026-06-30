@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 
-	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -83,7 +82,7 @@ func snapshotArg(s sql.NullString) any {
 func TestLoadDocumentAreaCode_ParityPrePostPort(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := context.Background()
-	cdReader := cdinfra.NewCDFieldReaderPG()
+	cdReader := testdb.NewCDFieldReader(t)
 
 	// A shared tenant; each linked case gets its OWN controlled document because
 	// ux_documents_cd_active permits only one active document per CD.
