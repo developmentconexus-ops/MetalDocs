@@ -8,7 +8,6 @@ import {
 } from '../lib/documentWorkflow';
 import type {
   ApprovalChainItem,
-  ArtifactActionSet,
   ArtifactBadge,
   ArtifactKpiCell,
   ArtifactViewModel,
@@ -252,18 +251,10 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     },
   ];
 
-  // T11: real run() handlers for the document workflow (submit/review/approve/reject/publish)
-  // are dialog-driven and owned by DocumentDetailRoute. This adapter exposes availability only;
-  // run() resolves immediately as a placeholder until T11 wires the handlers through the model.
-  const placeholderRun = async () => {};
-  const actions: ArtifactActionSet = {
-    submit: { available: false, run: placeholderRun },
-    review: { available: false, run: placeholderRun },
-    approve: { available: false, run: placeholderRun },
-    reject: { available: false, run: placeholderRun },
-    publish: { available: canPublish, run: placeholderRun },
-    createVersion: { available: canCreateRevision, run: placeholderRun },
-  };
+  // T11b: real run() handlers (submit/review/approve/reject/publish/createVersion) are
+  // dialog-driven and owned by DocumentDetailRoute — wired in T11b. The detail adapter
+  // emits an empty array; the approval-screen adapter will emit the ordered action list.
+  const actions = [] as ArtifactViewModel['actions'];
 
   const model: ArtifactViewModel = {
     kind: 'document',

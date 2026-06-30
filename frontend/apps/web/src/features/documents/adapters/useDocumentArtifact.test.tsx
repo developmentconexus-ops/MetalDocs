@@ -207,14 +207,10 @@ describe('useDocumentArtifact', () => {
     ]);
   });
 
-  it('exposes the full action set with every key present', () => {
+  it('emits an empty actions array (detail model has no action sidebar)', () => {
     const { model } = renderHook(() => useDocumentArtifact('doc-published-1')).result.current;
 
-    expect(Object.keys(model.actions).sort()).toEqual(
-      ['approve', 'createVersion', 'publish', 'reject', 'review', 'submit'].sort(),
-    );
-    // Published document with no active sibling: createVersion is available.
-    expect(model.actions.createVersion.available).toBe(true);
+    expect(model.actions).toEqual([]);
   });
 
   // ── Governed behavior guards (D1–D3) ────────────────────────────────────────

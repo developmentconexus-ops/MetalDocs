@@ -2,16 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ArtifactDetailView } from "./ArtifactDetailView";
-import type { ArtifactActionSet, ArtifactViewModel } from "./types";
-
-const noopActions: ArtifactActionSet = {
-  submit: { available: false, run: async () => {} },
-  review: { available: false, run: async () => {} },
-  approve: { available: false, run: async () => {} },
-  reject: { available: false, run: async () => {} },
-  publish: { available: false, run: async () => {} },
-  createVersion: { available: false, run: async () => {} },
-};
+import type { ArtifactViewModel } from "./types";
 
 function buildModel(overrides: Partial<ArtifactViewModel> = {}): ArtifactViewModel {
   return {
@@ -79,7 +70,7 @@ function buildModel(overrides: Partial<ArtifactViewModel> = {}): ArtifactViewMod
       { key: "documento", label: "Documento", href: "." },
       { key: "distribuicao", label: "Distribuição", href: "distribution" },
     ],
-    actions: noopActions,
+    actions: [],
     ...overrides,
   };
 }

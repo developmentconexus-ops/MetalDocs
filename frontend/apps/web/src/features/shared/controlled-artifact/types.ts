@@ -189,34 +189,30 @@ export interface ArtifactTab {
 }
 
 // ---------------------------------------------------------------------------
-// ArtifactActionSet
+// ArtifactAction
 // ---------------------------------------------------------------------------
 
+/** Visual emphasis for a decision-sidebar action button. */
+export type ArtifactActionVariant = "primary" | "secondary" | "danger";
+
 /**
- * The complete set of workflow actions available on an artifact. Every key is
- * always present; availability is expressed via `available` + optional `reason`,
- * not by omitting keys. This keeps the decision sidebar dumb — it renders all
- * known actions and shows a disabled reason when `available` is false.
- *
- * The adapter owns backend specifics (ETag/If-Match for documents, reviewer /
- * approver role for templates). These types do not leak those details.
+ * One contextual workflow action rendered in the approval decision sidebar.
+ * Adapters emit only the actions that apply in the current state, in display
+ * order. The shared sidebar renders each as a button, disables it when
+ * `available` is false (surfacing `reason` as the disabled tooltip), and calls
+ * `run` on click. `run` typically opens a route-owned dialog or fires a
+ * mutation — the shell owns none of that behavior.
  */
-export type ArtifactActionKind =
-  | "submit"
-  | "review"
-  | "approve"
-  | "reject"
-  | "publish"
-  | "createVersion";
-
 export interface ArtifactAction {
+  /** Stable key + test hook (e.g. "submit", "signoff", "publish", "createVersion"). */
+  key: string;
+  label: string;
+  variant: ArtifactActionVariant;
   available: boolean;
-  /** Human-readable reason shown when `available` is false (e.g. "Documento já aprovado"). */
+  /** Shown as the disabled-button tooltip / inline reason when `available` is false. */
   reason?: string;
-  run: () => Promise<void>;
+  run: () => void | Promise<void>;
 }
-
-export type ArtifactActionSet = Record<ArtifactActionKind, ArtifactAction>;
 
 // ---------------------------------------------------------------------------
 // ArtifactViewModel — root normalized view-model
@@ -264,6 +260,10 @@ export interface ArtifactViewModel {
    * Templates: "Documento" only.
    */
   tabs: ArtifactTab[];
-  /** Full action set; every key always present, gated by `available`. */
-  actions: ArtifactActionSet;
+  /**
+   * Ordered list of contextual workflow actions for the approval decision sidebar.
+   * Empty when no actions apply (e.g. read-only states) — the detail view does not
+   * render these.
+   */
+  actions: ArtifactAction[];
 }

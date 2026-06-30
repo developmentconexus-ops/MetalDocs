@@ -1,0 +1,186 @@
+/* ArtifactApprovalScreen.module.css — shared controlled-artifact approval surface.
+   Two-column layout: a main content region (document canvas / template preview) and
+   a fixed-width decision sidebar. Reuses the same design tokens as ArtifactDetailView. */
+
+/* ─── Root ─────────────────────────────────────────────────────────────── */
+
+.root {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Body — two columns ────────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  min-height: 0;
+}
+
+/* ─── Main region ───────────────────────────────────────────────────────── */
+
+.main {
+  min-width: 0;
+  overflow: auto;
+  padding: var(--sp-7) var(--sp-9) 5rem;
+}
+
+/* ─── Decision sidebar ──────────────────────────────────────────────────── */
+
+.aside {
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: var(--sp-6);
+  gap: var(--sp-6);
+}
+
+.asideSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.asideSectionTitle {
+  font-size: 0.59375rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ─── Action buttons ────────────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.actionBtn {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border-radius: var(--r-2);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: var(--font-sans, inherit);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.actionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.actionBtnPrimary {
+  background: var(--brand);
+  color: var(--text-on-brand);
+  border-color: var(--brand-deep);
+}
+
+.actionBtnPrimary:hover:not(:disabled) {
+  background: var(--brand-deep);
+}
+
+.actionBtnSecondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.actionBtnSecondary:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.actionBtnDanger {
+  background: var(--error-bg, #fff0f0);
+  color: var(--error, #c0392b);
+  border-color: var(--error-border, #f5c6cb);
+}
+
+.actionBtnDanger:hover:not(:disabled) {
+  background: var(--error-bg-hover, #ffe0e0);
+}
+
+/* ─── Approval chain ────────────────────────────────────────────────────── */
+
+.chainList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.chainItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: 0.75rem 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+
+.chainItemLabel {
+  font-size: 0.59375rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.chainItemActor {
+  font-size: 0.8125rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.chainItemMeta {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ─── Responsive ────────────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr) 18rem;
+  }
+
+  .main {
+    padding: var(--sp-6) var(--sp-6) 4rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+
+  .aside {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .main {
+    padding: var(--sp-5) var(--sp-4) 3rem;
+  }
+}
