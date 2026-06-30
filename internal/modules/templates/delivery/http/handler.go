@@ -18,6 +18,16 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// AuthzFunc is the tier-1 route→capability check for template routes.
+//
+// All template call-sites pass area "*" (area-agnostic) on purpose: every
+// CapTemplate* capability is ScopeTenant per ADR 0022, and the wired
+// implementation (apps/api/cmd/metaldocs-api/main.go) deliberately ignores the
+// area argument for these tenant-grade caps, resolving them with CanDo at
+// tenant scope. The "*" is therefore an intentional "no narrower area applies"
+// marker, not a missing area — passing "tenant" here would be equivalent. The
+// real area check is the in-tx tier-2 authz.Require in the application layer.
+// (F-T6 part b: documents the deliberate area mismatch flagged by the audit.)
 type AuthzFunc func(r *http.Request, tenantID, area string, action string) error
 
 type Handler struct {
