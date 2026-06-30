@@ -464,7 +464,11 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 
 	// Governance events are best-effort; document creation is already committed.
 	// Multi-leg Create has no single outer tx (no-db path + potential tx branch above),
-	// so post-commit best-effort logging is accepted here by design (item 2.11).
+	// and govLogger.Log issues an authz-recording read — which under H-PRE-1 must
+	// never run inside a tx still holding the audit hash-chain advisory lock (see
+	// the seedTxIdentity note at ~:320 / ~:734). Folding the event into the create
+	// tx would therefore risk the advisory-lock deadlock, so post-commit best-effort
+	// logging is accepted here by design (audit F-CD8 / item 2.11).
 	for _, event := range events {
 		if err := s.govLogger.Log(ctx, event); err != nil { //cilint:allow-post-commit-audit
 			slog.WarnContext(ctx, "controlled documents governance event logging failed", "tenant_id", event.TenantID, "actor_user_id", event.ActorUserID, "event_type", event.EventType, "resource_id", event.ResourceID, "error", err)
