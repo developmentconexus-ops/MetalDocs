@@ -105,7 +105,7 @@ func main() {
 		freezeSvc := docapp.NewFreezeService(
 			schemaReader, fillInRepo, fillInRepo,
 			resolverReg, snapRepo, nil,
-			snapRepo, snapRepo, fanoutClient,
+			snapRepo, fanoutClient,
 		)
 
 		pdfOutboxRepo := fanoutpkg.NewPDFOutboxRepository(deps.SQLDB)

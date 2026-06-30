@@ -55,7 +55,7 @@ func TestFreezeService_Pin_NoNetworkCall(t *testing.T) {
 	fanoutClient := &fakeFanoutClient{}
 	materializeOutbox := &fakeMaterializeOutboxEnqueuer{}
 
-	svc := NewFreezeService(fakeSchemaReader{placeholders: schema}, writer, valuesRead, reg, finalize, ctxBuilder, snapReader, &fakeFinalDocxWriter{}, fanoutClient).
+	svc := NewFreezeService(fakeSchemaReader{placeholders: schema}, writer, valuesRead, reg, finalize, ctxBuilder, snapReader, fanoutClient).
 		WithMaterializeOutbox(materializeOutbox)
 
 	if err := svc.Pin(context.Background(), fakeTx{}, "t", "r", ApproverContext{}); err != nil {
@@ -98,7 +98,6 @@ func TestFreezeService_Pin_IdempotentWhenAlreadyFrozen(t *testing.T) {
 			snap:           v2dom.TemplateSnapshot{BodyDocxS3Key: "body.docx"},
 			valuesFrozenAt: &frozenAt,
 		},
-		&fakeFinalDocxWriter{},
 		&fakeFanoutClient{},
 	).WithMaterializeOutbox(materializeOutbox)
 
@@ -126,7 +125,6 @@ func TestFreezeService_Pin_FailsWithoutMaterializeOutbox(t *testing.T) {
 		&fakeFreezeFinalizer{},
 		&fakeResolverContextBuilder{},
 		fakeSnapshotReader{snap: v2dom.TemplateSnapshot{BodyDocxS3Key: "body.docx"}},
-		&fakeFinalDocxWriter{},
 		&fakeFanoutClient{},
 	)
 
@@ -164,7 +162,6 @@ func TestFreezeService_Materialize_CallsFanoutAndReturnsResult(t *testing.T) {
 		&fakeFreezeFinalizer{},
 		&fakeResolverContextBuilder{},
 		snapReader,
-		&fakeFinalDocxWriter{},
 		fanoutClient,
 	)
 
@@ -192,7 +189,6 @@ func TestFreezeService_Materialize_ErrorsWhenNotPinned(t *testing.T) {
 		&fakeFreezeFinalizer{},
 		&fakeResolverContextBuilder{},
 		fakeSnapshotReader{snap: v2dom.TemplateSnapshot{BodyDocxS3Key: "body.docx"}},
-		&fakeFinalDocxWriter{},
 		&fakeFanoutClient{},
 	)
 
@@ -212,7 +208,6 @@ func TestFreezeService_Materialize_ErrorsWithoutFanoutClient(t *testing.T) {
 		&fakeFreezeFinalizer{},
 		&fakeResolverContextBuilder{},
 		fakeSnapshotReader{valuesFrozenAt: &frozenAt},
-		&fakeFinalDocxWriter{},
 		nil,
 	)
 
@@ -237,7 +232,6 @@ func TestFreezeService_Pin_OutboxEnqueueError_Returns(t *testing.T) {
 		&fakeFreezeFinalizer{},
 		&fakeResolverContextBuilder{},
 		fakeSnapshotReader{snap: v2dom.TemplateSnapshot{BodyDocxS3Key: "body.docx"}},
-		&fakeFinalDocxWriter{},
 		&fakeFanoutClient{},
 	).WithMaterializeOutbox(materializeOutbox)
 
@@ -256,7 +250,6 @@ func TestFreezeService_Pin_RequiresTx(t *testing.T) {
 		&fakeFreezeFinalizer{},
 		&fakeResolverContextBuilder{},
 		fakeSnapshotReader{},
-		&fakeFinalDocxWriter{},
 		&fakeFanoutClient{},
 	).WithMaterializeOutbox(&fakeMaterializeOutboxEnqueuer{})
 	err := svc.Pin(context.Background(), nil, "t", "r", ApproverContext{})

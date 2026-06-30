@@ -520,7 +520,7 @@ func TestRecordSignoff_ApprovePath_QuorumMet(t *testing.T) {
 	}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: signedAt}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, freezeInvoker: &fakeFreezeInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -598,7 +598,7 @@ func TestRecordSignoff_ApprovePath_QuorumNotYetMet(t *testing.T) {
 	}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: signedAt}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, freezeInvoker: &fakeFreezeInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -645,7 +645,7 @@ func TestRecordSignoff_ContentHashEchoesInstanceSubmitHash(t *testing.T) {
 		repo:          repo,
 		emitter:       &MemoryEmitter{},
 		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
-		freezeInvoker: &fakeFreezeInvoker{},
+		pinInvoker: &fakePinInvoker{},
 	}
 	db := newDecisionTestDB(t, conn)
 
@@ -688,7 +688,7 @@ func TestRecordSignoff_ThreadsActorDisplayNameFromRepo(t *testing.T) {
 		repo:          repo,
 		emitter:       &MemoryEmitter{},
 		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
-		freezeInvoker: &fakeFreezeInvoker{},
+		pinInvoker: &fakePinInvoker{},
 	}
 	db := newDecisionTestDB(t, conn)
 
@@ -740,7 +740,7 @@ func TestRecordSignoff_ContentHashMismatchFailsBeforePersisting(t *testing.T) {
 		repo:          repo,
 		emitter:       &MemoryEmitter{},
 		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
-		freezeInvoker: &fakeFreezeInvoker{},
+		pinInvoker: &fakePinInvoker{},
 	}
 	db := newDecisionTestDB(t, conn)
 
@@ -806,7 +806,7 @@ func TestRecordSignoff_RejectPath(t *testing.T) {
 	}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: signedAt}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, freezeInvoker: &fakeFreezeInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -890,7 +890,7 @@ func TestRecordSignoff_SoDViolation(t *testing.T) {
 	repo := &fakeDecisionRepo{instance: inst}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, freezeInvoker: &fakeFreezeInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -936,7 +936,7 @@ func TestRecordSignoff_RejectsNonEligibleActor(t *testing.T) {
 	repo := &fakeDecisionRepo{instance: inst}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, freezeInvoker: &fakeFreezeInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -991,7 +991,7 @@ func TestRecordSignoff_CapabilityDenied(t *testing.T) {
 	repo := &fakeDecisionRepo{instance: inst}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
-	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, freezeInvoker: &fakeFreezeInvoker{}}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, pinInvoker: &fakePinInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
 	req := SignoffRequest{
@@ -1056,12 +1056,12 @@ func TestRecordSignoff_FinalApprovalBlockedByUnresolvedComments(t *testing.T) {
 		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-comments-1", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
-	freeze := &fakeFreezeInvoker{}
+	pin := &fakePinInvoker{}
 	svc := &DecisionService{
-		repo:          repo,
-		emitter:       emitter,
-		clock:         fixedClock{t: signedAt},
-		freezeInvoker: freeze,
+		repo:       repo,
+		emitter:    emitter,
+		clock:      fixedClock{t: signedAt},
+		pinInvoker: pin,
 	}
 	db := newDecisionTestDB(t, conn)
 
@@ -1081,8 +1081,8 @@ func TestRecordSignoff_FinalApprovalBlockedByUnresolvedComments(t *testing.T) {
 	if !errors.Is(err, ErrApprovalBlockedByUnresolvedComments) {
 		t.Fatalf("expected ErrApprovalBlockedByUnresolvedComments, got %v", err)
 	}
-	if freeze.calls != 0 {
-		t.Fatalf("freeze must not run when unresolved comments block approval, got %d calls", freeze.calls)
+	if pin.calls != 0 {
+		t.Fatalf("pin must not run when unresolved comments block approval, got %d calls", pin.calls)
 	}
 	if repo.instanceStatusTo != "" {
 		t.Fatalf("instance status should not advance when blocked, got %q", repo.instanceStatusTo)

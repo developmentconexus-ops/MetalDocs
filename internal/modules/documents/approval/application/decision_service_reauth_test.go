@@ -102,7 +102,7 @@ func newReauthDecisionService(reg *signature.Registry, repo repository.ApprovalR
 		repo:          repo,
 		emitter:       emitter,
 		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
-		freezeInvoker: &fakeFreezeInvoker{},
+		pinInvoker: &fakePinInvoker{},
 	}).WithSignatureRegistry(reg)
 }
 

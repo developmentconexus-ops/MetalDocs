@@ -24,10 +24,6 @@ type SnapshotReader interface {
 	ReadFreezeAt(ctx context.Context, tenantID, revisionID string, q ...repository.DBTX) (*time.Time, error)
 }
 
-type FinalDocxWriter interface {
-	WriteFinalDocx(ctx context.Context, tenantID, revisionID, s3Key string, contentHash []byte, q ...repository.DBTX) error
-}
-
 type FanoutClient interface {
 	Fanout(ctx context.Context, req fanout.FanoutRequest) (fanout.FanoutResponse, error)
 }
@@ -49,12 +45,11 @@ type FreezeService struct {
 	valuesRead interface {
 		ListValues(ctx context.Context, tenantID, revisionID string) ([]repository.PlaceholderValue, error)
 	}
-	resolvers        *resolvers.Registry
-	finalize         FreezeFinalizer
-	resolveCtx       ResolverContextBuilder
-	snapshots        SnapshotReader
-	finalDocx        FinalDocxWriter
-	fanout           FanoutClient
+	resolvers         *resolvers.Registry
+	finalize          FreezeFinalizer
+	resolveCtx        ResolverContextBuilder
+	snapshots         SnapshotReader
+	fanout            FanoutClient
 	materializeOutbox MaterializeOutboxEnqueuer
 }
 
@@ -76,14 +71,14 @@ func NewFreezeService(
 		ListValues(ctx context.Context, tenantID, revisionID string) ([]repository.PlaceholderValue, error)
 	},
 	reg *resolvers.Registry, final FreezeFinalizer, ctxBuilder ResolverContextBuilder,
-	snapshots SnapshotReader, finalDocx FinalDocxWriter,
+	snapshots SnapshotReader,
 	fanoutClient FanoutClient,
 ) *FreezeService {
 	return &FreezeService{
 		schemas: schemas, values: values, valuesRead: valuesRead,
 		resolvers: reg, finalize: final, resolveCtx: ctxBuilder,
-		snapshots: snapshots, finalDocx: finalDocx,
-		fanout: fanoutClient,
+		snapshots: snapshots,
+		fanout:    fanoutClient,
 	}
 }
 
@@ -93,9 +88,9 @@ func (s *FreezeService) WithMaterializeOutbox(enqueuer MaterializeOutboxEnqueuer
 	return s
 }
 
-// pinValidateAndHash is the shared setup path for both Pin and Freeze:
-// validates required placeholders, resolves computed ones, computes values_hash,
-// and writes the freeze marker inside tx. Returns the resolved valMap and schema.
+// pinValidateAndHash is the Pin setup path: validates required placeholders,
+// resolves computed ones, computes values_hash, and writes the freeze marker
+// inside tx. Returns the resolved valMap and schema.
 func (s *FreezeService) pinValidateAndHash(
 	ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext,
 ) (map[string]any, []tmpldom.Placeholder, error) {
@@ -294,72 +289,4 @@ func (s *FreezeService) Materialize(ctx context.Context, tenantID, revisionID st
 		FinalDocxS3Key: resp.FinalDocxS3Key,
 		ContentHash:    contentHashBytes,
 	}, nil
-}
-
-// Freeze is the original synchronous implementation kept for backward compatibility.
-// New code should use Pin (in-tx) + Materialize (async worker) instead.
-// tx is mandatory (ADR 0015 amended by Wave Z Z-5).
-func (s *FreezeService) Freeze(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver ApproverContext) error {
-	if tx == nil {
-		return fmt.Errorf("freeze_service: tx required (ADR 0015 amended by Wave Z Z-5)")
-	}
-	snap, valuesFrozenAt, err := s.snapshots.ReadSnapshotWithFreezeAt(ctx, tenantID, revisionID, tx)
-	if err != nil {
-		return fmt.Errorf("read snapshot: %w", err)
-	}
-	if valuesFrozenAt != nil {
-		return nil
-	}
-
-	valMap, schema, err := s.pinValidateAndHash(ctx, tx, tenantID, revisionID, approver)
-	if err != nil {
-		return err
-	}
-
-	idToName := make(map[string]string, len(schema))
-	for _, p := range schema {
-		if p.Name != "" {
-			idToName[p.ID] = p.Name
-		}
-	}
-
-	placeholderVals := map[string]string{}
-	resolvedForSubblocks := map[string]any{}
-	for id, v := range valMap {
-		if sv, ok := v.(string); ok {
-			key := id
-			if n, ok := idToName[id]; ok {
-				key = n
-			}
-			placeholderVals[key] = sv
-			resolvedForSubblocks[id] = sv
-		}
-	}
-
-	composition := snap.CompositionJSON
-	if len(composition) == 0 {
-		composition = json.RawMessage(`{}`)
-	}
-
-	if s.fanout == nil {
-		return fmt.Errorf("freeze: fanout client not configured")
-	}
-
-	resp, err := s.fanout.Fanout(ctx, fanout.FanoutRequest{
-		TenantID:          tenantID,
-		RevisionID:        revisionID,
-		BodyDocxS3Key:     snap.BodyDocxS3Key,
-		PlaceholderValues: placeholderVals,
-		Composition:       json.RawMessage(composition),
-		ResolvedValues:    resolvedForSubblocks,
-	})
-	if err != nil {
-		return fmt.Errorf("fanout: %w", err)
-	}
-
-	contentHashBytes, err := hex.DecodeString(resp.ContentHash)
-	if err != nil {
-		return fmt.Errorf("decode content_hash: %w", err)
-	}
-	return s.finalDocx.WriteFinalDocx(ctx, tenantID, revisionID, resp.FinalDocxS3Key, contentHashBytes, tx)
 }

@@ -523,7 +523,7 @@ func main() {
 	startOutboxWorkers(ctx, &workerWG, deps.Publisher, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg)
 
 	approvalServices.Decision = approvalapp.NewDecisionService(
-		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService,
+		approvalRepo, approvalEmitter, approvalapp.RealClock{},
 	).WithPDFOutbox(pdfOutboxRepo).WithPinInvoker(fanoutCfg.freezeService).
 		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB)).
 		WithCDFieldReader(cdReader)
@@ -881,7 +881,7 @@ func buildFanoutComponents(
 	freezeService := docapp.NewFreezeService(
 		schemaReader, fillInRepo, fillInRepo,
 		resolverReg, snapRepo, ctxBuilder,
-		snapRepo, snapRepo, client,
+		snapRepo, client,
 	)
 	return fanoutComponents{client: client, freezeService: freezeService}
 }

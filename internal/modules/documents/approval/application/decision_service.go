@@ -37,11 +37,7 @@ var ErrReauthNotConfigured = errors.New("approval: signature verifier not config
 // by the sign-off handlers, never by the client.
 const signatureMethodPasswordReauth = "password_reauth"
 
-type FreezeInvoker interface {
-	Freeze(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
-}
-
-// PinInvoker is the async-freeze replacement for FreezeInvoker (ADR 0015).
+// PinInvoker is the async-freeze seam (ADR 0015).
 // Pin performs validation, resolves computed placeholders, writes values_hash +
 // frozen_at, and enqueues a materialize_dispatch_outbox row — all inside tx.
 // No network calls to docx-renderer.
@@ -56,12 +52,11 @@ type PDFOutboxEnqueuer interface {
 
 // DecisionService handles approver approve/reject decisions.
 type DecisionService struct {
-	repo          repository.ApprovalRepository
-	emitter       EventEmitter
-	clock         Clock
-	freezeInvoker FreezeInvoker
-	pinInvoker    PinInvoker
-	pdfOutbox     PDFOutboxEnqueuer
+	repo       repository.ApprovalRepository
+	emitter    EventEmitter
+	clock      Clock
+	pinInvoker PinInvoker
+	pdfOutbox  PDFOutboxEnqueuer
 	// sigRegistry verifies the e-signature credential before a sign-off is
 	// recorded. nil only in tests that exercise non-reauth methods.
 	sigRegistry       *signature.Registry
@@ -69,17 +64,18 @@ type DecisionService struct {
 	lifecycleEnqueuer docsdomain.LifecycleEventEnqueuer
 }
 
+// NewDecisionService builds the approve/reject decision service. The async-freeze
+// seam is wired separately via WithPinInvoker (ADR 0015); RecordSignoff requires
+// a PinInvoker to be set before the approval-quorum path runs.
 func NewDecisionService(
 	repo repository.ApprovalRepository,
 	emitter EventEmitter,
 	clock Clock,
-	freezeInvoker FreezeInvoker,
 ) *DecisionService {
 	return &DecisionService{
-		repo:          repo,
-		emitter:       emitter,
-		clock:         clock,
-		freezeInvoker: freezeInvoker,
+		repo:    repo,
+		emitter: emitter,
+		clock:   clock,
 	}
 }
 
@@ -96,8 +92,9 @@ func (s *DecisionService) WithCDFieldReader(r controlleddocumentsdomain.CDFieldR
 	return s
 }
 
-// WithPinInvoker enables the async-freeze path (ADR 0015). When set, Pin is
-// called instead of Freeze during signoff, eliminating the in-tx network call.
+// WithPinInvoker wires the async-freeze path (ADR 0015): during signoff Pin
+// records the frozen pointer in-tx and the heavy materialize/PDF work is
+// dispatched via the outbox afterward, eliminating any in-tx network call.
 func (s *DecisionService) WithPinInvoker(invoker PinInvoker) *DecisionService {
 	s.pinInvoker = invoker
 	return s
@@ -393,23 +390,14 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 				if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
 					return err
 				}
-				if s.pinInvoker != nil {
-					if err := s.pinInvoker.Pin(ctx, tx, req.TenantID, instance.DocumentID, docapp.ApproverContext{
-						UserID:       req.ActorUserID,
-						Capabilities: req.Capabilities,
-					}); err != nil {
-						return fmt.Errorf("recordSignoff: pin: %w", err)
-					}
-				} else {
-					if s.freezeInvoker == nil {
-						return fmt.Errorf("recordSignoff: neither pinInvoker nor freezeInvoker configured")
-					}
-					if err := s.freezeInvoker.Freeze(ctx, tx, req.TenantID, instance.DocumentID, docapp.ApproverContext{
-						UserID:       req.ActorUserID,
-						Capabilities: req.Capabilities,
-					}); err != nil {
-						return fmt.Errorf("recordSignoff: freeze: %w", err)
-					}
+				if s.pinInvoker == nil {
+					return fmt.Errorf("recordSignoff: pinInvoker not configured")
+				}
+				if err := s.pinInvoker.Pin(ctx, tx, req.TenantID, instance.DocumentID, docapp.ApproverContext{
+					UserID:       req.ActorUserID,
+					Capabilities: req.Capabilities,
+				}); err != nil {
+					return fmt.Errorf("recordSignoff: pin: %w", err)
 				}
 				// Transition document under_review → approved.
 				res, err := tx.ExecContext(ctx, `

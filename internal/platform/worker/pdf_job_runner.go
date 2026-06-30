@@ -73,14 +73,17 @@ func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error 
 	if payload.TenantID == "" || payload.RevisionID == "" {
 		return fmt.Errorf("pdf job runner: missing payload fields")
 	}
-	docxKey := payload.FinalDocxS3Key
-	if docxKey == "" {
-		docxKey = fmt.Sprintf("tenants/%s/revisions/%s/frozen.docx", payload.TenantID, payload.RevisionID)
+	// FinalDocxS3Key is required: it is the renderer-produced key (computed by
+	// apps/docx-renderer/src/routes/fanout.ts:frozenDocxKey and persisted via the
+	// producer), never a value the worker may guess. A missing key is a malformed
+	// event and must fail rather than silently fall back to a hardcoded default.
+	if payload.FinalDocxS3Key == "" {
+		return fmt.Errorf("pdf job runner: missing final_docx_s3_key")
 	}
 
-	outputKey := fmt.Sprintf("tenants/%s/revisions/%s/final.pdf", payload.TenantID, payload.RevisionID)
+	outputKey := workerPDFKey(payload.TenantID, payload.RevisionID)
 	result, err := r.converter.ConvertPDF(ctx, servicebus.ConvertPDFRequest{
-		DocxKey:   docxKey,
+		DocxKey:   payload.FinalDocxS3Key,
 		OutputKey: outputKey,
 	})
 	if err != nil {

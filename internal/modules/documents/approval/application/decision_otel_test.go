@@ -12,7 +12,6 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
@@ -115,13 +114,6 @@ type stubClock struct{}
 
 func (stubClock) Now() time.Time { return time.Time{} }
 
-// stubFreezeInvoker satisfies application.FreezeInvoker.
-type stubFreezeInvoker struct{}
-
-func (stubFreezeInvoker) Freeze(_ context.Context, _ platformdb.Tx, _, _ string, _ docapp.ApproverContext) error {
-	return nil
-}
-
 func TestRecordSignoff_EmitsSignoffRecordSpan(t *testing.T) {
 	sr := tracetest.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
@@ -133,7 +125,6 @@ func TestRecordSignoff_EmitsSignoffRecordSpan(t *testing.T) {
 		stubApprovalRepo{},
 		stubEventEmitter{},
 		stubClock{},
-		stubFreezeInvoker{},
 	)
 
 	req := application.SignoffRequest{

@@ -17,16 +17,6 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-type fakeFreezeInvoker struct {
-	calls int
-	err   error
-}
-
-func (f *fakeFreezeInvoker) Freeze(_ context.Context, _ db.Tx, _, _ string, _ docapp.ApproverContext) error {
-	f.calls++
-	return f.err
-}
-
 type fakePinInvoker struct {
 	calls int
 	err   error
@@ -210,67 +200,10 @@ func newFreezeDecisionTestDB(t *testing.T, conn *freezeDecisionConn) *sql.DB {
 	return db
 }
 
-func TestRecordSignoff_QuorumApproved_CallsFreezeAndApprovesDocument(t *testing.T) {
+func TestRecordSignoff_PinError_RollsBackTransaction(t *testing.T) {
 	const (
-		instanceID = "inst-freeze-a"
-		stageID    = "stage-freeze-a"
-		actorID    = "approver-1"
-		authorID   = "author-1"
-	)
-	signedAt := time.Date(2026, 4, 23, 12, 0, 0, 0, time.UTC)
-	repo := &fakeDecisionRepo{
-		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
-		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-a", WasReplay: false},
-	}
-	freeze := &fakeFreezeInvoker{}
-	conn := &freezeDecisionConn{
-		actorID: actorID,
-		stageSignoffs: []signoffRow{{
-			id:                 "sig-a",
-			approvalInstanceID: instanceID,
-			stageInstanceID:    stageID,
-			actorUserID:        actorID,
-			actorTenantID:      "tenant-1",
-			decision:           "approve",
-			signedAt:           signedAt,
-			signatureMethod:    "password",
-			signaturePayload:   []byte(`{}`),
-			contentHash:        validContentHash,
-		}},
-	}
-	db := newFreezeDecisionTestDB(t, conn)
-	svc := &DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: signedAt},
-		freezeInvoker: freeze,
-	}
-
-	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
-		TenantID:         "tenant-1",
-		InstanceID:       instanceID,
-		StageInstanceID:  stageID,
-		ActorUserID:      actorID,
-		Decision:         "approve",
-		SignatureMethod:  "password",
-		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
-	})
-	if err != nil {
-		t.Fatalf("RecordSignoff() error = %v", err)
-	}
-	if !result.InstanceApproved || conn.documentStatus != "approved" {
-		t.Fatalf("expected approved document, status=%q result=%+v", conn.documentStatus, result)
-	}
-	if freeze.calls != 1 {
-		t.Fatalf("Freeze should be called once, got %d", freeze.calls)
-	}
-}
-
-func TestRecordSignoff_FreezeError_RollsBackTransaction(t *testing.T) {
-	const (
-		instanceID = "inst-freeze-b"
-		stageID    = "stage-freeze-b"
+		instanceID = "inst-pin-b"
+		stageID    = "stage-pin-b"
 		actorID    = "approver-1"
 		authorID   = "author-1"
 	)
@@ -279,7 +212,7 @@ func TestRecordSignoff_FreezeError_RollsBackTransaction(t *testing.T) {
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-b", WasReplay: false},
 	}
-	freeze := &fakeFreezeInvoker{err: errors.New("fanout failed")}
+	pin := &fakePinInvoker{err: errors.New("pin failed")}
 	conn := &freezeDecisionConn{
 		actorID: actorID,
 		stageSignoffs: []signoffRow{{
@@ -296,12 +229,11 @@ func TestRecordSignoff_FreezeError_RollsBackTransaction(t *testing.T) {
 		}},
 	}
 	db := newFreezeDecisionTestDB(t, conn)
-	svc := &DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: signedAt},
-		freezeInvoker: freeze,
-	}
+	svc := (&DecisionService{
+		repo:    repo,
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: signedAt},
+	}).WithPinInvoker(pin)
 
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
@@ -314,13 +246,13 @@ func TestRecordSignoff_FreezeError_RollsBackTransaction(t *testing.T) {
 		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if err == nil {
-		t.Fatal("expected freeze error")
+		t.Fatal("expected pin error")
 	}
 	if conn.committed {
-		t.Fatal("transaction should not commit on freeze error")
+		t.Fatal("transaction should not commit on pin error")
 	}
 	if !conn.rolledBack {
-		t.Fatal("transaction should roll back on freeze error")
+		t.Fatal("transaction should roll back on pin error")
 	}
 	if conn.documentStatus != "under_review" {
 		t.Fatalf("document status should stay under_review, got %q", conn.documentStatus)
@@ -331,70 +263,10 @@ func TestRecordSignoff_FreezeError_RollsBackTransaction(t *testing.T) {
 // to cover the deprecated post-commit pdfDispatcher.Dispatch path, which has been
 // removed. PDF dispatch is now exclusively transactional via pdfOutbox (ADR 0015).
 
-func TestRecordSignoff_OutboxEnqueuedInsideTx(t *testing.T) {
+func TestRecordSignoff_WasReplay_DoesNotPin(t *testing.T) {
 	const (
-		instanceID = "inst-outbox-1"
-		stageID    = "stage-outbox-1"
-		actorID    = "approver-1"
-		authorID   = "author-1"
-	)
-	signedAt := time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC)
-	repo := &fakeDecisionRepo{
-		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
-		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-outbox-1", WasReplay: false},
-	}
-	outbox := &fakePDFOutboxEnqueuer{}
-	conn := &freezeDecisionConn{
-		actorID: actorID,
-		stageSignoffs: []signoffRow{{
-			id:                 "sig-outbox-1",
-			approvalInstanceID: instanceID,
-			stageInstanceID:    stageID,
-			actorUserID:        actorID,
-			actorTenantID:      "tenant-1",
-			decision:           "approve",
-			signedAt:           signedAt,
-			signatureMethod:    "password",
-			signaturePayload:   []byte(`{}`),
-			contentHash:        validContentHash,
-		}},
-	}
-	db := newFreezeDecisionTestDB(t, conn)
-	svc := (&DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: signedAt},
-		freezeInvoker: &fakeFreezeInvoker{},
-	}).WithPDFOutbox(outbox)
-
-	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
-		TenantID:         "tenant-1",
-		InstanceID:       instanceID,
-		StageInstanceID:  stageID,
-		ActorUserID:      actorID,
-		Decision:         "approve",
-		SignatureMethod:  "password",
-		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
-	})
-	if err != nil {
-		t.Fatalf("RecordSignoff() error = %v", err)
-	}
-	if !result.InstanceApproved {
-		t.Fatal("expected InstanceApproved=true")
-	}
-	if outbox.calls != 1 {
-		t.Fatalf("outbox.Enqueue should be called once, got %d", outbox.calls)
-	}
-	if len(outbox.tenantIDs) == 0 || outbox.tenantIDs[0] != "tenant-1" {
-		t.Fatalf("outbox tenantID = %v, want tenant-1", outbox.tenantIDs)
-	}
-}
-
-func TestRecordSignoff_WasReplay_DoesNotCallFreeze(t *testing.T) {
-	const (
-		instanceID = "inst-freeze-d"
-		stageID    = "stage-freeze-d"
+		instanceID = "inst-pin-d"
+		stageID    = "stage-pin-d"
 		actorID    = "approver-1"
 		authorID   = "author-1"
 	)
@@ -403,15 +275,14 @@ func TestRecordSignoff_WasReplay_DoesNotCallFreeze(t *testing.T) {
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-d", WasReplay: true},
 	}
-	freeze := &fakeFreezeInvoker{}
+	pin := &fakePinInvoker{}
 	conn := &freezeDecisionConn{actorID: actorID}
 	db := newFreezeDecisionTestDB(t, conn)
-	svc := &DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: signedAt},
-		freezeInvoker: freeze,
-	}
+	svc := (&DecisionService{
+		repo:    repo,
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: signedAt},
+	}).WithPinInvoker(pin)
 
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:        "tenant-1",
@@ -424,8 +295,8 @@ func TestRecordSignoff_WasReplay_DoesNotCallFreeze(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RecordSignoff() error = %v", err)
 	}
-	if freeze.calls != 0 {
-		t.Fatalf("Freeze must not run on replay, got %d call(s)", freeze.calls)
+	if pin.calls != 0 {
+		t.Fatalf("Pin must not run on replay, got %d call(s)", pin.calls)
 	}
 }
 
@@ -441,7 +312,7 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-comments", WasReplay: false},
 	}
-	freeze := &fakeFreezeInvoker{}
+	pin := &fakePinInvoker{}
 	conn := &freezeDecisionConn{
 		actorID:            actorID,
 		unresolvedComments: 1,
@@ -459,12 +330,11 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 		}},
 	}
 	db := newFreezeDecisionTestDB(t, conn)
-	svc := &DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: signedAt},
-		freezeInvoker: freeze,
-	}
+	svc := (&DecisionService{
+		repo:    repo,
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: signedAt},
+	}).WithPinInvoker(pin)
 
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
@@ -488,12 +358,12 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 	if conn.documentStatus != "under_review" {
 		t.Fatalf("document status should stay under_review, got %q", conn.documentStatus)
 	}
-	if freeze.calls != 0 {
-		t.Fatalf("freeze must not run when unresolved comments block approval, got %d calls", freeze.calls)
+	if pin.calls != 0 {
+		t.Fatalf("pin must not run when unresolved comments block approval, got %d calls", pin.calls)
 	}
 }
 
-func TestRecordSignoff_PinInvoker_CallsPinNotFreeze(t *testing.T) {
+func TestRecordSignoff_PinInvoker_CallsPin(t *testing.T) {
 	const (
 		instanceID = "inst-pin-1"
 		stageID    = "stage-pin-1"
@@ -506,7 +376,6 @@ func TestRecordSignoff_PinInvoker_CallsPinNotFreeze(t *testing.T) {
 		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-pin-1", WasReplay: false},
 	}
 	pin := &fakePinInvoker{}
-	freeze := &fakeFreezeInvoker{}
 	conn := &freezeDecisionConn{
 		actorID: actorID,
 		stageSignoffs: []signoffRow{{
@@ -524,10 +393,9 @@ func TestRecordSignoff_PinInvoker_CallsPinNotFreeze(t *testing.T) {
 	}
 	db := newFreezeDecisionTestDB(t, conn)
 	svc := (&DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: signedAt},
-		freezeInvoker: freeze,
+		repo:    repo,
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: signedAt},
 	}).WithPinInvoker(pin)
 
 	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
@@ -548,9 +416,6 @@ func TestRecordSignoff_PinInvoker_CallsPinNotFreeze(t *testing.T) {
 	}
 	if pin.calls != 1 {
 		t.Fatalf("Pin should be called once, got %d", pin.calls)
-	}
-	if freeze.calls != 0 {
-		t.Fatalf("Freeze must not be called when pinInvoker is set, got %d", freeze.calls)
 	}
 }
 
@@ -638,12 +503,11 @@ func TestRecordSignoff_RejectPath_AssertsDocumentEditBeforeDocumentWrite(t *test
 		}},
 	}
 	db := newFreezeDecisionTestDB(t, conn)
-	svc := &DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: signedAt},
-		freezeInvoker: &fakeFreezeInvoker{},
-	}
+	svc := (&DecisionService{
+		repo:    repo,
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: signedAt},
+	}).WithPinInvoker(&fakePinInvoker{})
 
 	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",

@@ -50,9 +50,14 @@ type Client struct {
 	http         *http.Client
 }
 
+// NewClient builds a fanout client. h is a required dependency: an injected,
+// timeout-bound *http.Client (e.g. httpclient.NewInternalClient). Passing nil is
+// a programmer error and panics rather than silently falling back to
+// http.DefaultClient (which has no timeout and can hang indefinitely). Mirrors
+// db.NewTxRunner's non-nil dependency contract.
 func NewClient(baseURL, serviceToken string, h *http.Client) *Client {
 	if h == nil {
-		h = http.DefaultClient
+		panic("fanout: NewClient requires a non-nil *http.Client")
 	}
 	return &Client{baseURL: baseURL, serviceToken: serviceToken, http: h}
 }

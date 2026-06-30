@@ -21,7 +21,7 @@ type Payload interface {
 type PDFConvertPayload struct {
 	TenantID       string `json:"tenant_id"`
 	RevisionID     string `json:"revision_id"`
-	FinalDocxS3Key string `json:"final_docx_s3_key,omitempty"`
+	FinalDocxS3Key string `json:"final_docx_s3_key"`
 	ContentHash    string `json:"content_hash,omitempty"`
 }
 
