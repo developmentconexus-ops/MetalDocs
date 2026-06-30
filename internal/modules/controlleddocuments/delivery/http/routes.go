@@ -15,6 +15,7 @@ import (
 	controlleddocumentsapi "metaldocs/internal/modules/controlleddocuments/api"
 	"metaldocs/internal/modules/controlleddocuments/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	"metaldocs/internal/modules/iam/authz"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
@@ -428,7 +429,15 @@ func optionalUUID(value *string) (*openapi_types.UUID, error) {
 }
 
 func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
+	var capDenied authz.ErrCapDenied
 	switch {
+	// ADR 0022 tier-2: an in-tx authz.Require denial (e.g. PeekSeq's preview-code
+	// create check) is "you lack this capability" — surface it as 403
+	// FORBIDDEN_CAPABILITY problem+json, the same client-visible code the documents
+	// module emits, never the default 500. (Without this case the wrapped denial
+	// fell through to INTERNAL_ERROR.)
+	case errors.As(err, &capDenied):
+		httpresponse.WriteError(w, http.StatusForbidden, problem.CodeForbiddenCapability, "you do not have the required capability in this area")
 	case errors.Is(err, controlleddocumentsdomain.ErrNoActiveInstance):
 		httpresponse.WriteError(w, http.StatusNotFound, "NO_ACTIVE_INSTANCE", "no active document instance for this controlled document")
 	case errors.Is(err, controlleddocumentsdomain.ErrCDNotFound):

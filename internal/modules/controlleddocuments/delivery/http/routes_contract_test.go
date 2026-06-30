@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	controlleddocumentsapi "metaldocs/internal/modules/controlleddocuments/api"
 	"metaldocs/internal/modules/controlleddocuments/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/db"
@@ -439,6 +441,43 @@ func TestWriteDomainError_TemplateArtifactInvariantUnconfiguredIs500(t *testing.
 	}
 	if body.Code != "template.artifact_invariant_unconfigured" {
 		t.Fatalf("code = %q, want %q", body.Code, "template.artifact_invariant_unconfigured")
+	}
+}
+
+// TestWriteDomainError_CapabilityDeniedIs403 locks the RFC 9457 + ADR 0022
+// invariant: a tier-2 authz.Require denial (returned wrapped by the service, e.g.
+// PeekSeq's "authz check preview code: %w") must surface as 403 FORBIDDEN_CAPABILITY
+// problem+json — never the default 500 INTERNAL_ERROR. Mirrors the documents-module
+// mapErr convention (errors.As(&authz.ErrCapDenied) → StatusForbidden /
+// CodeForbiddenCapability) so both PDP tiers map to the same client-visible code.
+func TestWriteDomainError_CapabilityDeniedIs403(t *testing.T) {
+	handler := &Handler{}
+	rec := httptest.NewRecorder()
+
+	// Reproduce the exact wrapping the service applies (service.go PeekSeq).
+	wrapped := fmt.Errorf("controlled_documents: authz check preview code: %w",
+		authz.ErrCapDenied{
+			Capability: string(iamdomain.CapControlledDocumentCreate),
+			AreaCode:   "producao",
+			ActorID:    "user-1",
+		})
+
+	handler.writeDomainError(rec, wrapped)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusForbidden, rec.Body.String())
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Fatalf("content-type = %q, want application/problem+json", ct)
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
+	}
+	if body.Code != string(problem.CodeForbiddenCapability) {
+		t.Fatalf("code = %q, want %q", body.Code, problem.CodeForbiddenCapability)
 	}
 }
 
