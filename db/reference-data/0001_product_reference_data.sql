@@ -118,6 +118,14 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'document.supersede', 'Supersede a document with a successor') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'document.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'document.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+-- SoD boundary (by design): the terminal template transitions are held by
+-- qms_admin (template.publish is also seeded to system_admin above; template.archive
+-- is qms_admin-only, with system_admin reaching it via the tier-2 bypass). The
+-- approver role deliberately holds template.approve/review/view but NOT
+-- template.archive or template.publish: the capability that decides a template
+-- (approve) is separated from the capability that executes its terminal lifecycle
+-- transition (archive/publish). To broaden archive, grant the template.archive
+-- capability to another role here — never re-reason in roles.
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.archive', 'Archive a template') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
 -- SP-1 token dictionary capabilities (ADR superseding 0008).
