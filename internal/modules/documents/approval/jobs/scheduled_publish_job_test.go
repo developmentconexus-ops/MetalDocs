@@ -19,7 +19,6 @@ import (
 	"github.com/riverqueue/river"
 
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
-	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/tests/integration/testdb"
@@ -57,7 +56,7 @@ func TestScheduledPublishWorker_PublishesWhenTruthMatches(t *testing.T) {
 	)
 
 	emitter := &approvalapp.MemoryEmitter{}
-	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, approvalapp.RealClock{}, cdinfra.NewCDFieldReaderPG())
+	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, approvalapp.RealClock{}, testdb.NewCDFieldReader(t))
 	worker := NewScheduledPublishWorker(services.Scheduler, db)
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
@@ -110,7 +109,7 @@ func TestScheduledPublishWorker_NoOpWhenGenerationIsStale(t *testing.T) {
 	)
 
 	emitter := &approvalapp.MemoryEmitter{}
-	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, approvalapp.RealClock{}, cdinfra.NewCDFieldReaderPG())
+	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, approvalapp.RealClock{}, testdb.NewCDFieldReader(t))
 	worker := NewScheduledPublishWorker(services.Scheduler, db)
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
@@ -159,7 +158,7 @@ func TestScheduledPublishWorker_NoOpWhenDeliveredBeforeEffectiveTime(t *testing.
 	)
 
 	emitter := &approvalapp.MemoryEmitter{}
-	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, fixedClock{t: effectiveAt.Add(-1 * time.Minute)}, cdinfra.NewCDFieldReaderPG())
+	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{}), emitter, fixedClock{t: effectiveAt.Add(-1 * time.Minute)}, testdb.NewCDFieldReader(t))
 	worker := NewScheduledPublishWorker(services.Scheduler, db)
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
