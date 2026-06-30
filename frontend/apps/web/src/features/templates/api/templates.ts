@@ -66,19 +66,6 @@ export interface TemplateSchemas {
   composition: CompositionConfig | null;
 }
 
-export type TemplateListRow = {
-  id: string;
-  key: string;
-  name: string;
-  description?: string;
-  latest_version: number;
-  latest_version_id?: string;
-  published_version_id?: string | null;
-  updated_at?: string;
-  doc_type_code?: string | null;
-  archived_at: string | null;
-};
-
 export async function createTemplate(cmd: {
   key: string;
   name: string;

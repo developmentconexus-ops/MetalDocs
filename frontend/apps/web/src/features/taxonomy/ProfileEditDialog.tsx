@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { DocumentFamily, DocumentProfile, CreateProfileRequest, UpdateProfileRequest } from "./types";
 import { createProfile, updateProfile, setDefaultTemplate, fetchFamilies } from './api/taxonomy';
-import { listTemplates, type TemplateListRow } from "../templates/api/templates";
+import { listTemplates, type TemplateDTO } from "../templates/api/templates";
 
 type Props = {
   mode: "create" | "edit";
@@ -22,18 +22,14 @@ export function ProfileEditDialog({ mode, profile, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [templateError, setTemplateError] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
-  const [publishedTemplates, setPublishedTemplates] = useState<TemplateListRow[]>([]);
+  const [publishedTemplates, setPublishedTemplates] = useState<TemplateDTO[]>([]);
   const [families, setFamilies] = useState<DocumentFamily[]>([]);
 
   useEffect(() => {
     fetchFamilies().then(setFamilies).catch(() => {/* non-critical */});
     if (mode !== "edit") return;
     listTemplates().then(({ templates }) =>
-      setPublishedTemplates(
-        templates
-          .filter((t) => t.published_version_id != null)
-          .map((t) => ({ ...t, description: t.description ?? undefined }))
-      )
+      setPublishedTemplates(templates.filter((t) => t.published_version_id != null))
     ).catch(() => {/* non-critical */});
   }, [mode]);
 
