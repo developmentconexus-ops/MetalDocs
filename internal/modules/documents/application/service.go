@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -331,12 +330,21 @@ func (s *Service) cloneIntoTx(ctx context.Context, tx db.Tx, in cloneIntoTxInput
 		}
 	}
 
-	// content_hash is required by document_revisions but storage_key is empty
-	// at this point. Use the docx-renderer-not-configured fallback:
-	// sha256(docxKey). Kept stable across replays.
-	h := sha256.New()
-	h.Write([]byte(docxKey))
-	contentHash = fmt.Sprintf("%x", h.Sum(nil))
+	// F-D6: the creation revision has no rendered docx bytes yet, so there is no
+	// real content hash to record. Use the empty-string "not-yet-materialized"
+	// sentinel — the exact pattern the canonical sibling spawnNextDraft uses
+	// (lifecycle.go:469-475 / NewTemplateVersionDraft leaves ContentHash empty so
+	// the publish gate forces a real edit before publish). We must NOT fabricate a
+	// hash over the storage-key string: a synthetic sha256(docxKey) is not
+	// content-addressable, so it silently occupies a real-looking slot in the
+	// UNIQUE(document_id, content_hash) dedup space (RestoreCheckpoint, repository.go
+	// ~1481), masquerading as a real content hash even though no bytes exist. (The
+	// submit path is unaffected either way: content_hash_at_submit is computed
+	// independently in submit_service.go, not read from this column.) NULL is not an option:
+	// document_revisions.content_hash is text NOT NULL (baseline ~1955) and NULLs
+	// are distinct under the UNIQUE index, which would break dedup; "" stays a
+	// single well-defined sentinel and readers already COALESCE it (repo ~1792).
+	contentHash = ""
 
 	formDataJSON := in.FormData
 	if len(formDataJSON) == 0 {
