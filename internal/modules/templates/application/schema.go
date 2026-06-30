@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"regexp"
-	"sync"
 	"time"
 
 	"metaldocs/internal/modules/iam/authz"
@@ -100,23 +99,18 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 
 var placeholderNameRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,49}$`)
 
-// placeholderCatalogSet is the set of valid computed-placeholder names.
-// Derived once from render/domain.ComputedCatalog() — single source of truth
-// per ADR 0050. Adding a token to ComputedCatalog automatically unlocks it here.
-var (
-	placeholderCatalogSet     map[string]struct{}
-	placeholderCatalogSetOnce sync.Once
-)
-
+// computedCatalogSet returns the set of valid computed-placeholder names,
+// derived from render/domain.ComputedCatalog() — single source of truth per
+// ADR 0050. ComputedCatalog is a pure function returning a fresh static slice,
+// so it is called inline at each use-site (no caching needed); adding a token
+// there automatically unlocks it here.
 func computedCatalogSet() map[string]struct{} {
-	placeholderCatalogSetOnce.Do(func() {
-		tokens := renderdomain.ComputedCatalog()
-		placeholderCatalogSet = make(map[string]struct{}, len(tokens))
-		for _, t := range tokens {
-			placeholderCatalogSet[t.Key] = struct{}{}
-		}
-	})
-	return placeholderCatalogSet
+	tokens := renderdomain.ComputedCatalog()
+	set := make(map[string]struct{}, len(tokens))
+	for _, t := range tokens {
+		set[t.Key] = struct{}{}
+	}
+	return set
 }
 
 func ValidatePlaceholders(phs []domain.Placeholder, nativeNames map[string]int) error {
