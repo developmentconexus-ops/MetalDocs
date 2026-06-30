@@ -8,6 +8,8 @@ type CreateTemplateRequest =
   paths['/templates']['post']['requestBody']['content']['application/json'];
 type CreateTemplateResponse =
   paths['/templates']['post']['responses'][201]['content']['application/json'];
+type ListTemplatesResponse =
+  paths['/templates']['get']['responses'][200]['content']['application/json'];
 type GeneratedTemplateDTO = components['schemas']['TemplateDTO'];
 type GeneratedVersionDTO = components['schemas']['VersionDTO'];
 
@@ -126,23 +128,14 @@ export async function listTemplates(params?: {
   if (params?.doc_type) qs.set('doc_type', params.doc_type);
 
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
-  const body = await apiFetch<{
-    data?: { templates?: unknown; items?: unknown };
-    meta?: { limit?: unknown; offset?: unknown };
-  }>(`/api/v1/templates${suffix}`);
+  const body = await apiFetch<ListTemplatesResponse>(`/api/v1/templates${suffix}`);
 
-  const dataTemplates = body?.data?.templates;
-  const dataItems = body?.data?.items;
-  const templates = Array.isArray(dataTemplates)
-    ? (dataTemplates as TemplateDTO[])
-    : Array.isArray(dataItems)
-      ? (dataItems as TemplateDTO[])
-      : [];
+  const templates = body.data.templates as TemplateDTO[];
 
   const defaultLimit = params?.limit ?? 50;
   const defaultOffset = params?.offset ?? 0;
-  const limit = toFiniteNumber(body?.meta?.limit) ?? defaultLimit;
-  const offset = toFiniteNumber(body?.meta?.offset) ?? defaultOffset;
+  const limit = toFiniteNumber(body.meta.limit) ?? defaultLimit;
+  const offset = toFiniteNumber(body.meta.offset) ?? defaultOffset;
 
   return { templates, meta: { limit, offset } };
 }
