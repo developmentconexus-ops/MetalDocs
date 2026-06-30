@@ -4432,7 +4432,14 @@ export interface operations {
     };
     listTemplates: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Max rows to return (bounded catalog page size). */
+                limit?: number;
+                /** @description Row offset for simple offset pagination. */
+                offset?: number;
+                /** @description Optional profile code filter (e.g. DC, POP). */
+                doc_type?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4470,6 +4477,10 @@ export interface operations {
                     description?: string;
                     /** @description Profile code (e.g. DC, POP). Omit or null for generic templates. */
                     doc_type_code?: string;
+                    /** @description Role binding required to approve this template's versions. Defaults to 'approver' server-side when omitted. */
+                    approver_role?: string;
+                    /** @description Optional role binding required to review this template's versions before approval. */
+                    reviewer_role?: string | null;
                 };
             };
         };
@@ -6606,6 +6617,7 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                "Idempotency-Key": string;
                 /** @description Expected revision version ETag in the form "v<N>" */
                 "If-Match": string;
             };
@@ -6665,7 +6677,9 @@ export interface operations {
     publishDocument: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
             };
@@ -6691,7 +6705,9 @@ export interface operations {
     scheduleDocumentPublish: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
             };
@@ -6717,7 +6733,9 @@ export interface operations {
     supersedeDocument: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
             };
@@ -6743,7 +6761,9 @@ export interface operations {
     obsoleteDocument: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
             };
@@ -6769,7 +6789,9 @@ export interface operations {
     cancelApprovalInstance: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 instance_id: string;
             };
@@ -6898,7 +6920,9 @@ export interface operations {
     cancelDocumentApproval: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
             };

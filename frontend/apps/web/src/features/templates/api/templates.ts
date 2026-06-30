@@ -1,6 +1,6 @@
-import { apiFetch } from '../../../lib/api/client';
+import { api, apiFetch } from '../../../lib/api/client';
 import { ApiError } from '../../../lib/api/errors';
-import type { components, paths } from '../../../lib/api-types';
+import type { components, operations, paths } from '../../../lib/api-types';
 import type { Placeholder, CompositionConfig } from '../placeholder-types';
 export type { Placeholder, CompositionConfig };
 
@@ -8,8 +8,9 @@ type CreateTemplateRequest =
   paths['/templates']['post']['requestBody']['content']['application/json'];
 type CreateTemplateResponse =
   paths['/templates']['post']['responses'][201]['content']['application/json'];
-type ListTemplatesResponse =
-  paths['/templates']['get']['responses'][200]['content']['application/json'];
+// Query params derived from the generated contract so the snake_case wire keys
+// (limit/offset/doc_type) can never drift from the spec (F-C2).
+type ListTemplatesQuery = NonNullable<operations['listTemplates']['parameters']['query']>;
 type GeneratedTemplateDTO = components['schemas']['TemplateDTO'];
 type GeneratedVersionDTO = components['schemas']['VersionDTO'];
 
@@ -78,19 +79,6 @@ export type TemplateListRow = {
   archived_at: string | null;
 };
 
-function toFiniteNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    const n = Number(value);
-    if (Number.isFinite(n)) {
-      return n;
-    }
-  }
-  return null;
-}
-
 export async function createTemplate(cmd: {
   key: string;
   name: string;
@@ -122,22 +110,23 @@ export async function listTemplates(params?: {
   offset?: number;
   doc_type?: string;
 }): Promise<{ templates: TemplateDTO[]; meta: { limit: number; offset: number } }> {
-  const qs = new URLSearchParams();
-  if (params?.limit !== undefined) qs.set('limit', String(params.limit));
-  if (params?.offset !== undefined) qs.set('offset', String(params.offset));
-  if (params?.doc_type) qs.set('doc_type', params.doc_type);
+  const query: ListTemplatesQuery = {};
+  if (params?.limit !== undefined) query.limit = params.limit;
+  if (params?.offset !== undefined) query.offset = params.offset;
+  if (params?.doc_type) query.doc_type = params.doc_type;
 
-  const suffix = qs.toString() ? `?${qs.toString()}` : '';
-  const body = await apiFetch<ListTemplatesResponse>(`/api/v1/templates${suffix}`);
+  const { data, error } = await api.GET('/templates', { params: { query } });
+  if (error) {
+    throw error instanceof ApiError
+      ? error
+      : new ApiError('templates.list_failed', 0, 'Falha ao listar templates.');
+  }
+  if (!data) {
+    throw new ApiError('templates.empty_response', 0, 'Resposta vazia ao listar templates.');
+  }
 
-  const templates = body.data.templates as TemplateDTO[];
-
-  const defaultLimit = params?.limit ?? 50;
-  const defaultOffset = params?.offset ?? 0;
-  const limit = toFiniteNumber(body.meta.limit) ?? defaultLimit;
-  const offset = toFiniteNumber(body.meta.offset) ?? defaultOffset;
-
-  return { templates, meta: { limit, offset } };
+  const templates = data.data.templates as TemplateDTO[];
+  return { templates, meta: { limit: data.meta.limit, offset: data.meta.offset } };
 }
 
 export async function getTemplate(id: string): Promise<{ template: TemplateDTO; latest_version: VersionDTO }> {
