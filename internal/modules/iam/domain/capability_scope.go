@@ -28,11 +28,12 @@ const (
 // (no unclassified cap, no stale entry); TestAreaGradeCapabilitySet locks the
 // area-grade set so a silent reclassification fails the build.
 //
-// NOTE (runtime gap, ADR 0022 Phase 3): document.create and the
-// controlled_documents.* caps are classified area-grade here (the declared
-// target) but their tier-2 call sites still pass the literal "tenant" today.
-// Phase 2 only declares scope; aligning those call sites to a real areaCode is
-// later-phase work and out of scope for this change.
+// Runtime alignment (ADR 0022 Phase 7, completed): the Phase 3 gap is CLOSED.
+// document.create and the controlled_documents.* caps are classified area-grade
+// here AND their tier-2 call sites now pass the resource's real areaCode (not
+// the literal "tenant"): documents/repository/repository.go:145 (docArea) and
+// controlleddocuments/application/service.go:307,353,526,661,753
+// (ProcessAreaCode / locked areaCode). Declaration and runtime now agree.
 var capabilityScopes = map[Capability]CapabilityScope{
 	// --- Area-grade: writes against an area-scoped resource ---
 	CapDocumentCreate:              ScopeArea,
