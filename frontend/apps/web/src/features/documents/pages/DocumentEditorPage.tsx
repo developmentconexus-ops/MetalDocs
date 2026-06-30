@@ -18,7 +18,8 @@ import {
 import type { DocumentDetail } from '../api/documents';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
-import { EditorMetaSidebar } from '../components/EditorMetaSidebar';
+import { ArtifactMetaSidebar } from '../../shared/controlled-artifact/ArtifactMetaSidebar';
+import type { ApprovalChainItem, ArtifactMetaModel, VersionHistoryItem } from '../../shared/controlled-artifact/types';
 import {
   EditorChrome,
   editorChromeStyles,
@@ -30,7 +31,7 @@ import { CodeChip, StatusPill, type DocumentStatus } from '../../../components/u
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { useAreasQuery } from '../queries/useAreasQuery';
 import { useControlledDocumentDetailQuery } from '../../controlled-documents/queries/useControlledDocumentDetailQuery';
-import { buildVisibilityLabel, formatRevisionCode, hasSettledSidebarIdentity, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
+import { buildVisibilityLabel, displayRevisionTitle, formatRevisionCode, hasSettledSidebarIdentity, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
 import styles from './styles/DocumentEditorPage.module.css';
 
 export type DocumentEditorPageProps = {
@@ -387,14 +388,18 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     areaLabel,
     visibilityLabel,
   });
-  const sidebarHistory = (revisionHistoryQuery.data?.items ?? []).map((item) => ({
-    documentId: item.document_id,
-    revisionCode: formatRevisionCode(item.revision_number),
-    revisionTitle: item.revision_title,
-    status: item.status,
-    createdAt: item.created_at,
-    isCurrent: item.is_current,
-  }));
+  const lineage: VersionHistoryItem[] = (revisionHistoryQuery.data?.items ?? []).map((item) => {
+    const revisionLabel = formatRevisionCode(item.revision_number);
+    return {
+      versionNumber: item.revision_number,
+      revisionNumber: item.revision_number,
+      revisionLabel,
+      status: item.status as unknown as VersionHistoryItem['status'],
+      title: displayRevisionTitle(item.revision_title, revisionLabel),
+      createdAt: item.created_at,
+      isCurrent: item.is_current,
+    };
+  });
 
   return (
     <div className={styles.page} data-editor-root>
@@ -479,25 +484,44 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
           )}
         </main>
         {!pageLoadError ? (
-          <EditorMetaSidebar
-          open={sidebarOpen}
-          onToggle={() => {
-            setSidebarOpen((prev) => {
-              const next = !prev;
-              localStorage.setItem('editor-sidebar-open', String(next));
-              return next;
-            });
-          }}
-          code={docCode || undefined}
-          loading={!sidebarIdentityReady}
-          profileLabel={profileLabel ?? undefined}
-          areaLabel={areaLabel ?? undefined}
-          visibilityLabel={visibilityLabel ?? undefined}
-          fileSizeBytes={artifactMetadata.fileSizeBytes ?? null}
-          pageCount={artifactMetadata.pageCount ?? null}
-          history={sidebarHistory}
-          approvalChain={docStatus === 'under_review' ? approvalInstanceQuery.data ?? null : null}
-          documentStatus={docStatus}
+          <ArtifactMetaSidebar
+            open={sidebarOpen}
+            onToggle={() => {
+              setSidebarOpen((prev) => {
+                const next = !prev;
+                localStorage.setItem('editor-sidebar-open', String(next));
+                return next;
+              });
+            }}
+            loading={!sidebarIdentityReady}
+            code={docCode || null}
+            status={statusForPill}
+            meta={{
+              profileLabel,
+              areaLabel,
+              visibilityLabel,
+              fileSizeBytes: artifactMetadata.fileSizeBytes ?? null,
+              pageCount: artifactMetadata.pageCount ?? null,
+              createdAt: null,
+              effectiveFrom: null,
+              nextReviewAt: null,
+            }}
+            approvalChain={
+              docStatus === 'under_review' && approvalInstanceQuery.data
+                ? approvalInstanceQuery.data.stages.flatMap((stage, stageIndex) =>
+                    stage.actors.map((actor) => ({
+                      stageIndex,
+                      label: stage.label,
+                      status: actor.status,
+                      actorUserId: actor.user_id,
+                      actorDisplay: actor.display_name,
+                      decision: actor.decision ?? null,
+                      signedAt: null,
+                    })),
+                  )
+                : null
+            }
+            lineage={lineage}
           />
         ) : null}
         {revisionTitleDialogOpen ? (

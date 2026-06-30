@@ -18,12 +18,6 @@ const longDateFmt = new Intl.DateTimeFormat('pt-BR', {
   year: 'numeric',
 });
 
-const shortDateFmt = new Intl.DateTimeFormat('pt-BR', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-});
-
 const dateTimeFmt = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: '2-digit',
@@ -51,12 +45,6 @@ export function hasSettledSidebarIdentity(input: {
 export function formatPublishedAt(input: string | null | undefined): string {
   const d = parseDate(input);
   return d ? longDateFmt.format(d) : EM_DASH;
-}
-
-// "08/05/2026" — used in KPI strip / version timeline
-export function formatShortDate(input: string | null | undefined): string {
-  const d = parseDate(input);
-  return d ? shortDateFmt.format(d) : EM_DASH;
 }
 
 // "08/05/2026 14:36" — used in signoff timestamps
@@ -98,6 +86,10 @@ export function resolveAreaLabel(code: string, areas: Array<{ code: string; name
 // ADR 0013: canonical implementation lifted to `lib/labels/revisionCode.ts`.
 // Re-exported here to keep existing documents-side imports working.
 export { formatRevisionCode } from '../../../lib/labels/revisionCode';
+
+// Canonical implementation lifted to `lib/format/dates.ts`.
+// Re-exported here to keep existing documents-side imports working.
+export { formatShortDate } from '../../../lib/format/dates';
 
 export function displayRevisionTitle(title: string | null | undefined, revisionCode: string): string {
   const trimmed = title?.trim();
