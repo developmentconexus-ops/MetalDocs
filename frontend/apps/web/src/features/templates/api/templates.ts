@@ -211,10 +211,14 @@ export async function getDocxURL(templateId: string, versionNum: number): Promis
   return body.data.url;
 }
 
-export async function submitForReview(templateId: string, versionNum: number): Promise<VersionDTO> {
+export async function submitForReview(
+  templateId: string,
+  versionNum: number,
+  idempotencyKey: string,
+): Promise<VersionDTO> {
   const data = await apiFetch<{ data: { version: VersionDTO } }>(
     `/api/v1/templates/${templateId}/versions/${versionNum}/submit`,
-    { method: 'POST' },
+    { method: 'POST', idempotencyKey },
   );
   return data.data.version;
 }
@@ -223,11 +227,12 @@ export async function reviewVersion(
   templateId: string,
   versionNum: number,
   accept: boolean,
+  idempotencyKey: string,
   reason?: string,
 ): Promise<VersionDTO> {
   const data = await apiFetch<{ data: { version: VersionDTO } }>(
     `/api/v1/templates/${templateId}/versions/${versionNum}/review`,
-    { method: 'POST', body: JSON.stringify({ accept, reason: reason || '' }) },
+    { method: 'POST', idempotencyKey, body: JSON.stringify({ accept, reason: reason || '' }) },
   );
   return data.data.version;
 }
@@ -246,6 +251,7 @@ export async function approveVersion(
   templateId: string,
   versionNum: number,
   accept: boolean,
+  idempotencyKey: string,
   reason?: string,
 ): Promise<ApproveVersionResult> {
   const data = await apiFetch<{
@@ -255,6 +261,7 @@ export async function approveVersion(
     };
   }>(`/api/v1/templates/${templateId}/versions/${versionNum}/approve`, {
     method: 'POST',
+    idempotencyKey,
     body: JSON.stringify({ accept, reason: reason || '' }),
   });
   const raw = data.data.next_draft;

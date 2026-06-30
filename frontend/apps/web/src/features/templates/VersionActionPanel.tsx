@@ -55,10 +55,19 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
     }
   }
 
+  // One Idempotency-Key per user action (generated at click time, not per
+  // render): both lifecycle calls require the header server-side. Mirrors
+  // createTemplate / finalizeDocument.
   const approveAct = (accept: boolean) =>
-    approveVersion(version.template_id, version.version_number, accept, reason);
+    approveVersion(version.template_id, version.version_number, accept, crypto.randomUUID(), reason);
   const reviewAct = async (accept: boolean): Promise<ActResult> => ({
-    version: await reviewVersion(version.template_id, version.version_number, accept, reason),
+    version: await reviewVersion(
+      version.template_id,
+      version.version_number,
+      accept,
+      crypto.randomUUID(),
+      reason,
+    ),
     nextDraft: null,
   });
 

@@ -81,7 +81,9 @@ describe('VersionActionPanel — approve→publish next_draft handoff', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
 
     await waitFor(() => expect(onVersionUpdate).toHaveBeenCalledTimes(1));
-    expect(approveMock).toHaveBeenCalledWith('tpl-1', 1, true, '');
+    // Signature: (templateId, versionNum, accept, idempotencyKey, reason).
+    // The key is a per-action UUID generated at click time.
+    expect(approveMock).toHaveBeenCalledWith('tpl-1', 1, true, expect.any(String), '');
     expect(onVersionUpdate).toHaveBeenCalledWith(published, { id: 'ver-2', versionNumber: 2 });
     expect(await screen.findByText('Publicado. Nova versão de rascunho criada.')).toBeInTheDocument();
   });

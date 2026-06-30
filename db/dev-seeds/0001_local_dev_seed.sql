@@ -156,6 +156,20 @@ VALUES
     'admin-local',
     NULL
   ),
+  -- F-IAM1: 'approver' (the wiki QA approval account) needs a tier-2 membership.
+  -- It had iam_user_roles but no user_process_areas, so authz.Require (which
+  -- reads only UPA) returned 403 FORBIDDEN_CAPABILITY on every approve/publish
+  -- even though /auth/me listed the capability. Mirrors approver-test/rh above.
+  (
+    'approver',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'rh',
+    'approver',
+    now(),
+    NULL,
+    'admin-local',
+    NULL
+  ),
   -- Qualidade: varied roles so the tenant directory shows multiple users/areas.
   (
     'admin',

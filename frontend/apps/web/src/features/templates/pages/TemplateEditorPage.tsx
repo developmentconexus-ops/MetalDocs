@@ -152,7 +152,7 @@ export function TemplateEditorPage({
     setSubmitting(true);
     try {
       if (autosave.hasPending()) await autosave.flush();
-      const updated = await submitForReview(templateId, versionNum);
+      const updated = await submitForReview(templateId, versionNum, crypto.randomUUID());
       setLiveVersion(updated);
       setSubmitMsg({ kind: 'success', text: 'Enviado para revisão.' });
     } catch (err) {
