@@ -178,8 +178,9 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, err.Error())
 		return
 	}
-	if field := missingPublishTemplateVersionField(req); field != "" {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "field "+field+" is required")
+	schemaKey := strings.TrimSpace(req.SchemaKey)
+	if schemaKey == "" {
+		writeErr(w, http.StatusBadRequest, codeTplInvalidBody, "field schema_key is required")
 		return
 	}
 
@@ -189,7 +190,7 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		ActorRoles:    actorRolesFromReq(r),
 		TemplateID:    id,
 		VersionNumber: n,
-		SchemaKey:     strings.TrimSpace(req.SchemaKey),
+		SchemaKey:     schemaKey,
 	})
 	if err != nil {
 		writeMappedErr(w, err)
@@ -203,15 +204,6 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		NextDraftId:         res.NextDraft.ID,
 		NextDraftVersionNum: res.NextDraft.VersionNumber,
 	})
-}
-
-func missingPublishTemplateVersionField(req templatesapi.PublishTemplateVersionJSONRequestBody) string {
-	switch {
-	case strings.TrimSpace(req.SchemaKey) == "":
-		return "schema_key"
-	default:
-		return ""
-	}
 }
 
 func intString(v int) string {
