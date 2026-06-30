@@ -461,6 +461,7 @@ func TestSubmitRevisionForReview_RouteNotFound(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "non-existent-route",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
@@ -483,6 +484,7 @@ func TestSubmitRevisionForReview_StageInsertError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
@@ -511,6 +513,7 @@ func TestSubmitRevisionForReview_EmitError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
@@ -1392,6 +1395,7 @@ func TestSubmitRevisionForReview_ContentHashError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"nested": map[string]any{"val": float64(1.5)}},
 		RevisionVersion: 1,
 	}
@@ -1412,10 +1416,10 @@ func TestSubmitRevisionForReview_ContentHashError(t *testing.T) {
 // noopStmt is a minimal driver.Stmt that reports no success.
 type noopStmt struct{}
 
-func (s *noopStmt) Close() error                                  { return nil }
-func (s *noopStmt) NumInput() int                                  { return -1 }
-func (s *noopStmt) Exec(_ []driver.Value) (driver.Result, error)  { return submitNoopResult{}, nil }
-func (s *noopStmt) Query(_ []driver.Value) (driver.Rows, error)   { return submitEmptyRows{}, nil }
+func (s *noopStmt) Close() error                                 { return nil }
+func (s *noopStmt) NumInput() int                                { return -1 }
+func (s *noopStmt) Exec(_ []driver.Value) (driver.Result, error) { return submitNoopResult{}, nil }
+func (s *noopStmt) Query(_ []driver.Value) (driver.Rows, error)  { return submitEmptyRows{}, nil }
 
 // beginFailConn fails on Begin/BeginTx.
 type beginFailConn struct{}
@@ -1632,6 +1636,7 @@ func TestSubmitRevisionForReview_BeginTxError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
@@ -2170,6 +2175,7 @@ func TestSubmitRevisionForReview_CommitError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
@@ -2330,6 +2336,7 @@ func TestSubmitRevisionForReview_StageQueryError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
@@ -3251,6 +3258,7 @@ func TestSubmitRevisionForReview_RouteValidateError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}

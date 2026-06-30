@@ -619,6 +619,10 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		ContentFormData: map[string]any{"_content_hash": prereqs.ContentHash},
 		RevisionVersion: int(prereqs.RevisionVersion),
 		RevisionNumber:  int(prereqs.RevisionNumber),
+		// Thread the validated client key (checked non-empty + UUID above) so the
+		// created approval_instances.idempotency_key is the client key, not a
+		// server-clock derivation (F-D4).
+		IdempotencyKey: idempotencyKey,
 	})
 	if err != nil {
 		status, msg := mapErr(err)

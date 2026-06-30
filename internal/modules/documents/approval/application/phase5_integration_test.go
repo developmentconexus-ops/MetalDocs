@@ -431,6 +431,7 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 		SubmittedBy:     authorID,
 		ContentFormData: map[string]any{"title": "P5 Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
+		IdempotencyKey:  "44444444-4444-4444-4444-444444444401",
 	}
 	submitResult, err := submitSvc.SubmitRevisionForReview(ctx, newTxRunner(submitDB), submitReq)
 	if err != nil {
@@ -449,10 +450,10 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 	// --- Step 2: RecordSignoff (approve, quorum met) ---
 	// Instance must be InProgress for RecordSignoff to accept it.
 	inProgressInstance := &domain.Instance{
-		ID:              instanceID,
-		TenantID:        tenantID,
-		DocumentID:      documentID,
-		RouteID:         routeID,
+		ID:                  instanceID,
+		TenantID:            tenantID,
+		DocumentID:          documentID,
+		RouteID:             routeID,
 		Status:              domain.InstanceInProgress,
 		SubmittedBy:         authorID,
 		SubmittedAt:         now,
@@ -595,10 +596,10 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 
 	// Instance in in-progress state for the signoff.
 	inProgressInstance := &domain.Instance{
-		ID:              instanceID,
-		TenantID:        tenantID,
-		DocumentID:      documentID,
-		RouteID:         routeID,
+		ID:                  instanceID,
+		TenantID:            tenantID,
+		DocumentID:          documentID,
+		RouteID:             routeID,
 		Status:              domain.InstanceInProgress,
 		SubmittedBy:         authorID,
 		SubmittedAt:         clockAtSubmit1.t,
@@ -656,6 +657,7 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 		SubmittedBy:     authorID,
 		ContentFormData: map[string]any{"title": "Reject Doc v1"},
 		RevisionVersion: 1,
+		IdempotencyKey:  "44444444-4444-4444-4444-444444444402",
 	}
 	submitResult1, err := submitSvc1.SubmitRevisionForReview(ctx, newTxRunner(db1), submitReq1)
 	if err != nil {
@@ -715,6 +717,7 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 		SubmittedBy:     authorID,
 		ContentFormData: map[string]any{"title": "Reject Doc v2"},
 		RevisionVersion: 2, // bumped revision
+		IdempotencyKey:  "44444444-4444-4444-4444-444444444403",
 	}
 	submitResult2, err := submitSvc2.SubmitRevisionForReview(ctx, newTxRunner(db2), submitReq2)
 	if err != nil {

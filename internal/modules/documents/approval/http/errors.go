@@ -127,7 +127,8 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, ErrIfMatchMalformed):
 		statusCode = http.StatusBadRequest
 		code = approvalCodeValidationIfMatchBad
-	case errors.Is(err, ErrIdempotencyRequired):
+	case errors.Is(err, ErrIdempotencyRequired),
+		errors.Is(err, application.ErrIdempotencyKeyRequired):
 		statusCode = http.StatusBadRequest
 		code = approvalCodeIdempotencyRequired
 	case errors.Is(err, idempotency.ErrConflict):

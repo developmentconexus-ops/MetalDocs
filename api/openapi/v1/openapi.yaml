@@ -3242,6 +3242,7 @@ paths:
           (migration 0142b) is the backstop.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       responses:
         '201':

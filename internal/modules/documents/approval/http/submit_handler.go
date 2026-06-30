@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
@@ -18,6 +19,17 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actorID := iamdomain.UserIDFromContext(r.Context())
+
+	// The platform idempotency middleware (router.go) already validated presence
+	// and UUID shape; re-read the header to thread the client key into the service
+	// so it becomes approval_instances.idempotency_key (DB UNIQUE backstop, F-D4).
+	// The empty guard mirrors the route-admin sibling and fail-closes if this
+	// handler is ever mounted without the middleware (e.g. in a unit test).
+	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if idempotencyKey == "" {
+		WriteError(w, ErrIdempotencyRequired)
+		return
+	}
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
@@ -51,6 +63,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		SubmittedBy:     actorID,
 		ContentFormData: map[string]any{"_content_hash": req.ContentHash},
 		RevisionVersion: expectedRevisionVersion,
+		IdempotencyKey:  idempotencyKey,
 	})
 	if err != nil {
 		WriteError(w, err)

@@ -197,7 +197,6 @@ func (r *submitSingleValueRows) Next(dest []driver.Value) error {
 	return nil
 }
 
-
 // routeRow returns a single-column-set row representing approval_routes.
 // Columns: id, tenant_id, profile_code, version
 type routeRows struct {
@@ -364,6 +363,7 @@ func TestSubmitRevisionForReview_HappyPath(t *testing.T) {
 		DocumentID:      "doc-uuid-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "My Doc", "revision": 1},
 		RevisionVersion: 1,
 	}
@@ -375,11 +375,48 @@ func TestSubmitRevisionForReview_HappyPath(t *testing.T) {
 	if result.InstanceID == "" {
 		t.Error("SubmitResult.InstanceID must not be empty")
 	}
+	// The client idempotency key must be threaded verbatim onto the instance so
+	// the UNIQUE(document_id, idempotency_key) constraint is a real backstop
+	// (F-D4) — never a server-clock derivation.
+	if repo.lastInstance.IdempotencyKey != req.IdempotencyKey {
+		t.Errorf("instance idempotency key = %q; want %q (client key threaded)", repo.lastInstance.IdempotencyKey, req.IdempotencyKey)
+	}
 	if len(emitter.Events) != 1 {
 		t.Errorf("expected 1 governance event; got %d", len(emitter.Events))
 	}
 	if emitter.Events[0].EventType != "approval_submitted" {
 		t.Errorf("event type = %q; want %q", emitter.Events[0].EventType, "approval_submitted")
+	}
+}
+
+func TestSubmitRevisionForReview_RequiresIdempotencyKey(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db := newSubmitTestDB(t, true)
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 1,
+		// IdempotencyKey deliberately empty.
+	}
+
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
+	if !errors.Is(err, ErrIdempotencyKeyRequired) {
+		t.Fatalf("error = %v, want ErrIdempotencyKeyRequired", err)
+	}
+	// Fail-closed before any instance is inserted or event emitted.
+	if repo.lastInstance.ID != "" {
+		t.Error("no instance should be inserted when the idempotency key is missing")
+	}
+	if len(emitter.Events) != 0 {
+		t.Errorf("no governance event should be emitted; got %d", len(emitter.Events))
 	}
 }
 
@@ -396,6 +433,7 @@ func TestSubmitRevisionForReview_DefaultsRevisionTitleForFirstGovernedRevision(t
 		DocumentID:      "doc-uuid-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		RevisionTitle:   "",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 1,
@@ -423,6 +461,7 @@ func TestSubmitRevisionForReview_RequiresRevisionTitleAfterFirstGovernedRevision
 		DocumentID:      "doc-uuid-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		RevisionTitle:   "   ",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 1,
@@ -452,6 +491,7 @@ func TestSubmitRevisionForReview_ContentHashUsesGovernedRevisionNumber(t *testin
 		DocumentID:      "doc-uuid-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		RevisionTitle:   "Atualizacao",
 		ContentFormData: formData,
 		RevisionVersion: 7,
@@ -546,6 +586,7 @@ func TestSubmitRevisionForReview_DuplicateSubmission(t *testing.T) {
 		DocumentID:      "doc-uuid-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "My Doc", "revision": 1},
 		RevisionVersion: 1,
 	}
@@ -575,6 +616,7 @@ func TestSubmitRevisionForReview_CapabilityDenied(t *testing.T) {
 		DocumentID:      "doc-uuid-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 1,
 	}

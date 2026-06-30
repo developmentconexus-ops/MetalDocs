@@ -32,6 +32,6 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/documents/{id}/publish", h.idempotent("POST /api/v1/documents/{id}/publish", wrapper.PublishDocument))
 	mux.Handle("POST /api/v1/documents/{id}/schedule-publish", h.idempotent("POST /api/v1/documents/{id}/schedule-publish", wrapper.ScheduleDocumentPublish))
 	mux.HandleFunc("POST /api/v1/documents/{id}/signoff", wrapper.RecordDocumentSignoff)
-	mux.HandleFunc("POST /api/v1/documents/{id}/submit", wrapper.SubmitDocumentForApproval)
+	mux.Handle("POST /api/v1/documents/{id}/submit", h.idempotent("POST /api/v1/documents/{id}/submit", wrapper.SubmitDocumentForApproval))
 	mux.Handle("POST /api/v1/documents/{id}/supersede", h.idempotent("POST /api/v1/documents/{id}/supersede", wrapper.SupersedeDocument))
 }

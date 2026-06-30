@@ -38,6 +38,7 @@ type SubmitRequest struct {
 	ContentFormData map[string]any // raw form data for hashing
 	RevisionVersion int            // OCC version from caller
 	RevisionNumber  int            // governed documents.revision_number
+	IdempotencyKey  string         // client Idempotency-Key header, threaded from the handler
 }
 
 // SubmitResult is returned on successful submission.
@@ -65,14 +66,17 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 		return SubmitResult{}, fmt.Errorf("submit: content hash: %w", err)
 	}
 
-	// Step 3: compute idempotency key.
-	idempotencyKey, err := ComputeIdempotencyKey(IdempotencyInput{
-		ActorUserID: req.SubmittedBy,
-		DocumentID:  req.DocumentID,
-		Timestamp:   s.clock.Now(),
-	})
-	if err != nil {
-		return SubmitResult{}, fmt.Errorf("submit: idempotency key: %w", err)
+	// Step 3: require the caller-supplied idempotency key. It is the client's
+	// Idempotency-Key header, threaded through the handler, and becomes the
+	// approval_instances.idempotency_key value so the
+	// UNIQUE(document_id, idempotency_key) constraint is a real DB-enforced
+	// replay backstop behind the HTTP idempotency middleware (F-D4). A
+	// server-clock-derived key is never used: a retry seconds later would
+	// otherwise mint a fresh key, bypass the constraint, and create a duplicate
+	// approval instance.
+	idempotencyKey := strings.TrimSpace(req.IdempotencyKey)
+	if idempotencyKey == "" {
+		return SubmitResult{}, ErrIdempotencyKeyRequired
 	}
 
 	// Step 4: run the submission as one unit of work; the runner owns
@@ -236,6 +240,12 @@ const defaultInitialRevisionTitle = "Criacao do documento"
 
 var ErrRevisionTitleRequired = errors.New("revisionTitle is required")
 
+// ErrIdempotencyKeyRequired is returned when SubmitRevisionForReview is called
+// without a client idempotency key. Both HTTP entrypoints (the submit handler and
+// finalizeDocument) guarantee a non-empty key, so this is a fail-closed
+// defense-in-depth guard at the service boundary.
+var ErrIdempotencyKeyRequired = errors.New("submit: idempotency key is required")
+
 func normalizeGovernedRevisionTitle(revisionNumber int, title string) (string, error) {
 	trimmed := strings.TrimSpace(title)
 	if trimmed != "" {
@@ -246,4 +256,3 @@ func normalizeGovernedRevisionTitle(revisionNumber int, title string) (string, e
 	}
 	return "", ErrRevisionTitleRequired
 }
-

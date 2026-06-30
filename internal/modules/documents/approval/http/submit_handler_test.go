@@ -22,9 +22,11 @@ type fakeSubmitService struct {
 	result application.SubmitResult
 	err    error
 	gotReq application.SubmitRequest
+	called bool
 }
 
 func (f *fakeSubmitService) SubmitRevisionForReview(_ context.Context, _ db.TxRunner, req application.SubmitRequest) (application.SubmitResult, error) {
+	f.called = true
 	f.gotReq = req
 	if f.err != nil {
 		return application.SubmitResult{}, f.err
@@ -52,7 +54,7 @@ func TestSubmitHandler(t *testing.T) {
 		{
 			name:           "happy path",
 			ifMatch:        "\"v3\"",
-			idempotencyKey: "",
+			idempotencyKey: "22222222-2222-2222-2222-222222222222",
 			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
 			svcErr:         nil,
 			wantStatus:     http.StatusCreated,
@@ -60,30 +62,37 @@ func TestSubmitHandler(t *testing.T) {
 			wantETag:       "\"v4\"",
 		},
 		{
+			name:           "missing idempotency key",
+			ifMatch:        "\"v3\"",
+			idempotencyKey: "",
+			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+			wantStatus:     http.StatusBadRequest,
+		},
+		{
 			name:           "missing if-match",
 			ifMatch:        "",
-			idempotencyKey: "",
+			idempotencyKey: "22222222-2222-2222-2222-222222222222",
 			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
 			wantStatus:     http.StatusPreconditionRequired,
 		},
 		{
 			name:           "malformed if-match",
 			ifMatch:        "oops",
-			idempotencyKey: "",
+			idempotencyKey: "22222222-2222-2222-2222-222222222222",
 			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
 			wantStatus:     http.StatusBadRequest,
 		},
 		{
 			name:           "validate fails",
 			ifMatch:        "\"v1\"",
-			idempotencyKey: "",
+			idempotencyKey: "22222222-2222-2222-2222-222222222222",
 			body:           `{"route_id":"","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
 			wantStatus:     http.StatusBadRequest,
 		},
 		{
 			name:           "service stale revision",
 			ifMatch:        "\"v2\"",
-			idempotencyKey: "",
+			idempotencyKey: "22222222-2222-2222-2222-222222222222",
 			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
 			svcErr:         repository.ErrStaleRevision,
 			wantStatus:     http.StatusConflict,
@@ -91,7 +100,7 @@ func TestSubmitHandler(t *testing.T) {
 		{
 			name:           "service capability denied",
 			ifMatch:        "\"v2\"",
-			idempotencyKey: "",
+			idempotencyKey: "22222222-2222-2222-2222-222222222222",
 			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
 			svcErr:         authz.ErrCapDenied{Capability: "doc.submit", AreaCode: "tenant", ActorID: "actor-1"},
 			wantStatus:     http.StatusForbidden,
@@ -99,7 +108,7 @@ func TestSubmitHandler(t *testing.T) {
 		{
 			name:           "service generic error",
 			ifMatch:        "\"v2\"",
-			idempotencyKey: "",
+			idempotencyKey: "22222222-2222-2222-2222-222222222222",
 			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
 			svcErr:         errors.New("boom"),
 			wantStatus:     http.StatusInternalServerError,
@@ -131,6 +140,11 @@ func TestSubmitHandler(t *testing.T) {
 				t.Fatalf("status = %d, want %d", rr.Code, tt.wantStatus)
 			}
 
+			// Missing idempotency key must fail closed before the service is invoked.
+			if tt.name == "missing idempotency key" && svc.called {
+				t.Fatalf("service was called despite missing idempotency key")
+			}
+
 			if tt.wantStatus == http.StatusCreated {
 				var out contracts.SubmitResponse
 				if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
@@ -141,6 +155,9 @@ func TestSubmitHandler(t *testing.T) {
 				}
 				if got := rr.Header().Get("ETag"); got != tt.wantETag {
 					t.Fatalf("etag = %q, want %q", got, tt.wantETag)
+				}
+				if svc.gotReq.IdempotencyKey != tt.idempotencyKey {
+					t.Fatalf("threaded idempotency key = %q, want %q", svc.gotReq.IdempotencyKey, tt.idempotencyKey)
 				}
 			}
 		})
