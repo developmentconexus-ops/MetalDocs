@@ -29,9 +29,9 @@ function buildModel(overrides: Partial<ArtifactViewModel> = {}): ArtifactViewMod
         { label: "POP-GENERAL-014" },
       ],
       badges: [
-        { label: "POP-GENERAL-014", variant: "code" },
-        { label: "REV01 · publicado", variant: "status" },
-        { label: "Procedimento Operacional", variant: "type" },
+        { key: "code", label: "POP-GENERAL-014", variant: "code" },
+        { key: "status", label: "REV01 · publicado", variant: "status" },
+        { key: "type", label: "Procedimento Operacional", variant: "type" },
       ],
       subtitle: "publicado em 19 de maio de 2026",
     },

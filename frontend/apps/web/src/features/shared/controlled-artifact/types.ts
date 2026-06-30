@@ -39,6 +39,8 @@ export type ArtifactBadgeVariant = "code" | "status" | "type" | "neutral";
 
 /** A single badge rendered in the hero area (data only — not ReactNode). */
 export interface ArtifactBadge {
+  /** Stable React key (e.g. "code", "status", "type") — avoids index-keyed reconciliation. */
+  key: string;
   label: string;
   variant: ArtifactBadgeVariant;
 }

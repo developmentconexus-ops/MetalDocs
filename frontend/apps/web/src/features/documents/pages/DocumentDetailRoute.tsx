@@ -14,25 +14,14 @@ import { useControlledDocumentActiveDocumentQuery } from '../queries/useControll
 import { useDistributionSummaryQuery } from '../queries/useDistributionSummaryQuery';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
-import styles from '../../shared/controlled-artifact/ArtifactDetailView.module.css';
-
-const ACTIVE_SIBLING_STATES = ['draft', 'under_review', 'approved', 'scheduled', 'rejected'] as const;
-type ActiveSiblingState = (typeof ACTIVE_SIBLING_STATES)[number];
-
-function getActiveSiblingCtaLabel(state: ActiveSiblingState): string {
-  if (state === 'draft') return 'Continuar rascunho';
-  if (state === 'under_review') return 'Acompanhar revisão';
-  if (state === 'approved') return 'Publicar revisão aprovada';
-  if (state === 'scheduled') return 'Ver publicação agendada';
-  return 'Retomar revisão rejeitada';
-}
-
-function getActiveSiblingDestination(documentId: string, state: ActiveSiblingState): string {
-  if (state === 'draft' || state === 'rejected') {
-    return `/documents/${documentId}/edit`;
-  }
-  return `/documents/${documentId}`;
-}
+import {
+  ACTIVE_SIBLING_STATES,
+  canInitiateRevision as canInitiateRevisionGate,
+  getActiveSiblingCtaLabel,
+  getActiveSiblingDestination,
+  type ActiveSiblingState,
+} from '../lib/documentWorkflow';
+import styles from './DocumentDetailRoute.module.css';
 
 /**
  * Document-specific route wrapper for the shared ArtifactDetailView. Owns all
@@ -48,6 +37,7 @@ export function DocumentDetailRoute() {
 
   const documentId = rawDocumentId ?? '';
 
+  // TODO(T11): drop these once model.actions carries the wired run() handlers and the route consumes model.actions.
   const scheduledLifecycleRefetchInterval = 5_000;
   const docQuery = useDocumentDetailQuery(documentId, { pollScheduledLifecycle: true });
   const shouldPollScheduledLifecycle = docQuery.data?.status === 'scheduled';
@@ -125,9 +115,7 @@ export function DocumentDetailRoute() {
       ? getActiveSiblingDestination(activeSiblingDocumentId, activeSiblingState)
       : null;
 
-  const canInitiateRevision =
-    user != null &&
-    user.roles.some((r) => ['system_admin', 'editor', 'qms_admin', 'area_admin'].includes(r));
+  const canInitiateRevision = canInitiateRevisionGate(user);
   const canCreateRevision =
     canInitiateRevision &&
     isPublished &&

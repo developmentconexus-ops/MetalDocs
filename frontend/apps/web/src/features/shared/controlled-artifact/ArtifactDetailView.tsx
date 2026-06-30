@@ -42,6 +42,7 @@ function toVersionEntries(model: ArtifactViewModel): VersionEntry[] {
   return model.lineage.map((item) => ({
     v: item.revisionLabel ?? `REV${String(item.revisionNumber ?? 0).padStart(2, "0")}`,
     when: formatShortDate(item.createdAt) || EM_DASH,
+    // VersionEntry.author shows the lifecycle status — no per-revision author field exists on the model yet.
     author: item.status || EM_DASH,
     current: item.isCurrent,
     summary: item.title?.trim() || "Sem título governado registrado.",
@@ -59,10 +60,6 @@ export function ArtifactDetailView({ model, heroActions, aside, extras }: Artifa
   const versionLabel = model.revisionLabel ?? formatRevisionCode(model.versionNumber);
   const profileLabel = model.meta.profileLabel ?? EM_DASH;
   const areaLabel = model.meta.areaLabel ?? EM_DASH;
-  const pageCountLabel =
-    model.meta.pageCount == null || Number.isNaN(model.meta.pageCount) || model.meta.pageCount < 0
-      ? EM_DASH
-      : String(model.meta.pageCount);
   const fileSizeLabel = formatFileSize(model.meta.fileSizeBytes);
   const effectiveFromLabel = model.meta.effectiveFrom ? formatShortDate(model.meta.effectiveFrom) : EM_DASH;
   const nextReviewLabel = model.meta.nextReviewAt ? formatShortDate(model.meta.nextReviewAt) : EM_DASH;
@@ -98,24 +95,24 @@ export function ArtifactDetailView({ model, heroActions, aside, extras }: Artifa
         }
         badges={
           <>
-            {model.hero.badges.map((badge, index) => {
+            {model.hero.badges.map((badge) => {
               if (badge.variant === "code") {
                 return (
-                  <CodeChip key={`badge-${index}`} className={styles.codeChip}>
+                  <CodeChip key={badge.key} className={styles.codeChip}>
                     {badge.label}
                   </CodeChip>
                 );
               }
               if (badge.variant === "status") {
                 return (
-                  <span key={`badge-${index}`} className={styles.vigenteBadge}>
+                  <span key={badge.key} className={styles.vigenteBadge}>
                     <span className={styles.vigenteDot} />
                     {badge.label}
                   </span>
                 );
               }
               return (
-                <span key={`badge-${index}`} className={styles.typeLabel}>
+                <span key={badge.key} className={styles.typeLabel}>
                   {badge.label}
                 </span>
               );

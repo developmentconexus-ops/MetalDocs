@@ -145,9 +145,9 @@ describe('useDocumentArtifact', () => {
       { label: 'Geral' },
       { label: 'POP-GENERAL-014' },
     ]);
-    expect(model.hero.badges).toContainEqual({ label: 'POP-GENERAL-014', variant: 'code' });
-    expect(model.hero.badges).toContainEqual({ label: 'REV01 · publicado', variant: 'status' });
-    expect(model.hero.badges).toContainEqual({ label: 'Procedimento Operacional', variant: 'type' });
+    expect(model.hero.badges).toContainEqual({ key: 'code', label: 'POP-GENERAL-014', variant: 'code' });
+    expect(model.hero.badges).toContainEqual({ key: 'status', label: 'REV01 · publicado', variant: 'status' });
+    expect(model.hero.badges).toContainEqual({ key: 'type', label: 'Procedimento Operacional', variant: 'type' });
     expect(model.hero.subtitle).toBe('publicado em 19 de maio de 2026');
   });
 

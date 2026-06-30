@@ -1,6 +1,11 @@
 import { useAuthStore } from '../../../store/auth.store';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
-import { formatPublishedAt, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
+import { formatPageCount, formatPublishedAt, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
+import {
+  ACTIVE_SIBLING_STATES,
+  canInitiateRevision as canInitiateRevisionGate,
+  type ActiveSiblingState,
+} from '../lib/documentWorkflow';
 import type {
   ApprovalChainItem,
   ArtifactActionSet,
@@ -21,9 +26,6 @@ import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { formatShortDate } from '../../../lib/format/dates';
 
 const EM_DASH = '—';
-
-const ACTIVE_SIBLING_STATES = ['draft', 'under_review', 'approved', 'scheduled', 'rejected'] as const;
-type ActiveSiblingState = (typeof ACTIVE_SIBLING_STATES)[number];
 
 type StatusPresentation = {
   badgeLabel: string;
@@ -145,10 +147,8 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     ? EM_DASH
     : String(distributionSummaryQuery.data?.total_targets ?? EM_DASH);
 
-  // Page count label — honest em-dash when absent (L236 parity).
-  const pageCountLabel = doc?.current_revision_page_count != null && doc.current_revision_page_count >= 0
-    ? String(doc.current_revision_page_count)
-    : EM_DASH;
+  // Page count label — canonical formatter (honest em-dash when absent).
+  const pageCountLabel = formatPageCount(doc?.current_revision_page_count);
 
   // scheduled→published-head current version override (L300-309 parity).
   const revisionHistoryItems = revisionHistoryQuery.data?.items ?? [];
@@ -164,14 +164,14 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
   // Hero badges (data only): code chip, version·status pill, profile/type label.
   const badges: ArtifactBadge[] = [];
   if (code) {
-    badges.push({ label: code, variant: 'code' });
+    badges.push({ key: 'code', label: code, variant: 'code' });
   }
   const isObsolete = status === 'obsolete';
   if (!isObsolete && revisionLabel) {
-    badges.push({ label: `${revisionLabel} · ${statusPresentation.badgeLabel}`, variant: 'status' });
+    badges.push({ key: 'status', label: `${revisionLabel} · ${statusPresentation.badgeLabel}`, variant: 'status' });
   }
   if (profileLabel) {
-    badges.push({ label: profileLabel, variant: 'type' });
+    badges.push({ key: 'type', label: profileLabel, variant: 'type' });
   }
 
   const breadcrumb: BreadcrumbItem[] = [
@@ -190,6 +190,7 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
           label: stage.label,
           status: stage.status,
           actorUserId: signoff?.actor_user_id ?? null,
+          // TODO(iam): resolve actorDisplay to a display name via user-lookup query when available; currently echoes actor_user_id.
           actorDisplay: signoff?.actor_user_id ?? null,
           decision: signoff?.decision ?? null,
           signedAt: signoff?.signed_at ?? null,
@@ -216,8 +217,7 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     ACTIVE_SIBLING_STATES.includes(activeDocument.approval_state as ActiveSiblingState)
       ? activeDocument.document_id
       : null;
-  const canInitiateRevision =
-    user != null && user.roles.some((r) => ['system_admin', 'editor', 'qms_admin', 'area_admin'].includes(r));
+  const canInitiateRevision = canInitiateRevisionGate(user);
   const canCreateRevision =
     canInitiateRevision && isPublished && Boolean(doc?.controlled_document_id) && activeSiblingDocumentId == null;
   const canPublish = canInitiateRevision && isApproved && Boolean(activeDocument?.content_hash);
