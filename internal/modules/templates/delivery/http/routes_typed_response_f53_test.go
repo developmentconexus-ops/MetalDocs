@@ -84,19 +84,16 @@ func assertF53PresignShape(t *testing.T, body []byte) {
 }
 
 // TestPublishTemplateVersion200JSONResponse_DeclaredKeysOnly — F5.3 H-D pin (publish).
-// Pins the strict-server generated type's JSON shape: exactly the 3 fields declared
-// at openapi.yaml:1331 (published_version_id, next_draft_id, next_draft_version_num).
-// `published_version_number` is NOT declared and must NOT appear — the prior handler
-// emitted it as an undeclared M1/F1.3 leak.
+// Pins the strict-server generated type's JSON shape: exactly the 1 field declared
+// at openapi.yaml (published_version_id only — next_draft_* removed in M1·T2).
+// `published_version_number` and `next_draft_*` must NOT appear.
 //
-// Compile-time guarantee: the handler at routes_generated.go:238 now writes this
-// strict-server struct directly, so the leaked field cannot be re-introduced
+// Compile-time guarantee: the handler at routes_generated.go writes this
+// strict-server struct directly, so leaked fields cannot be re-introduced
 // without first amending openapi.yaml + re-generating api.gen.go.
 func TestPublishTemplateVersion200JSONResponse_DeclaredKeysOnly(t *testing.T) {
 	resp := templatesapi.PublishTemplateVersion200JSONResponse{
-		PublishedVersionId:  "11111111-1111-1111-1111-111111111111",
-		NextDraftId:         "22222222-2222-4222-8222-222222222222",
-		NextDraftVersionNum: 2,
+		PublishedVersionId: "11111111-1111-1111-1111-111111111111",
 	}
 	encoded, err := json.Marshal(resp)
 	if err != nil {
@@ -107,13 +104,11 @@ func TestPublishTemplateVersion200JSONResponse_DeclaredKeysOnly(t *testing.T) {
 		t.Fatalf("decode encoded body: %v (raw=%s)", err, string(encoded))
 	}
 	declared := map[string]struct{}{
-		"published_version_id":   {},
-		"next_draft_id":          {},
-		"next_draft_version_num": {},
+		"published_version_id": {},
 	}
 	for k := range raw {
 		if _, ok := declared[k]; !ok {
-			t.Fatalf("unexpected key %q in publish 200 body: keys=%v (must match openapi.yaml:1331)", k, mapKeysT(raw))
+			t.Fatalf("unexpected key %q in publish 200 body: keys=%v (must match openapi.yaml)", k, mapKeysT(raw))
 		}
 	}
 	for k := range declared {
@@ -123,5 +118,11 @@ func TestPublishTemplateVersion200JSONResponse_DeclaredKeysOnly(t *testing.T) {
 	}
 	if _, leaked := raw["published_version_number"]; leaked {
 		t.Fatalf("undeclared key %q leaked into publish 200 body — F5.3/M1.F1.3 regression", "published_version_number")
+	}
+	if _, leaked := raw["next_draft_id"]; leaked {
+		t.Fatalf("removed key %q must not appear in publish 200 body — M1.T2 regression", "next_draft_id")
+	}
+	if _, leaked := raw["next_draft_version_num"]; leaked {
+		t.Fatalf("removed key %q must not appear in publish 200 body — M1.T2 regression", "next_draft_version_num")
 	}
 }

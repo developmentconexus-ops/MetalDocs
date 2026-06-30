@@ -187,17 +187,14 @@ type ApproveCmd struct {
 	Reason                string
 }
 
-// ApproveResult mirrors PublishTemplateVersionResult so that lifecycle
-// transitions that terminate as publish return both the now-published
-// version and the freshly spawned v(n+1) draft in one round-trip.
-// NextDraft is nil when the transition does not publish (reject path,
-// or reviewer path that only flips to approved awaiting a separate
-// publish call — currently unreachable because Approve with reviewer
-// publishes immediately, but the field stays nullable for forward
-// compatibility with that future split).
+// ApproveResult holds the now-published version on the accept path, or
+// the reverted draft on the reject path. NextDraft is always nil:
+// auto-spawning the next revision was removed in M1·T2. Use
+// CreateNextVersion (POST /api/v1/templates/{id}/versions) to start a
+// new draft deliberately.
 type ApproveResult struct {
 	Version   *domain.TemplateVersion
-	NextDraft *domain.TemplateVersion
+	NextDraft *domain.TemplateVersion // always nil; retained for zero-value safety at call sites
 }
 
 func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, error) {
@@ -251,15 +248,6 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 		approvedRev := version.RevisionNumber
 		template.CurrentRevisionNumber = &approvedRev
 
-		// Spawn v(n+1) draft in the same tx so the caller can navigate without a
-		// list refetch. The docx copy runs pre-tx (store-then-reference).
-		nextNum := nextVersionNumber(template.LatestVersion, version.VersionNumber)
-		next, err := s.spawnNextDraft(ctx, cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, nextNum, version)
-		if err != nil {
-			return nil, err
-		}
-		template.LatestVersion = nextNum
-
 		audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, nil, s.clock.Now())
 		if err != nil {
 			return nil, err
@@ -285,9 +273,6 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 				}
 				return err
 			}
-			if err := s.repo.CreateVersionTx(ctx, tx, next); err != nil {
-				return err
-			}
 			if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
 				return wrapAppErr("templates approve: append audit", err)
 			}
@@ -295,7 +280,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 		}); err != nil {
 			return nil, err
 		}
-		return &ApproveResult{Version: version, NextDraft: next}, nil
+		return &ApproveResult{Version: version}, nil
 	}
 
 	if err := version.CanTransition(domain.VersionStatusDraft, hasReviewer); err != nil {
@@ -339,9 +324,13 @@ type PublishTemplateVersionCmd struct {
 	SchemaKey                         string
 }
 
+// PublishTemplateVersionResult holds the now-published version. NextDraft is
+// always nil: auto-spawning the next revision was removed in M1·T2. Use
+// CreateNextVersion (POST /api/v1/templates/{id}/versions) to start a new
+// draft deliberately.
 type PublishTemplateVersionResult struct {
 	PublishedVersion *domain.TemplateVersion
-	NextDraft        *domain.TemplateVersion
+	NextDraft        *domain.TemplateVersion // always nil; retained for zero-value safety at call sites
 }
 
 func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplateVersionCmd) (*PublishTemplateVersionResult, error) {
@@ -408,14 +397,6 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	publishedRev := version.RevisionNumber
 	template.CurrentRevisionNumber = &publishedRev
 
-	nextNum := nextVersionNumber(template.LatestVersion, version.VersionNumber)
-	next, err := s.spawnNextDraft(ctx, cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, nextNum, version)
-	if err != nil {
-		return nil, err
-	}
-	// Mirror Approve: set LatestVersion before the tx so exactly ONE
-	// UpdateTemplateTx carries the final state (F-T5 — eliminates redundant write).
-	template.LatestVersion = nextNum
 	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{"schema_key": cmd.SchemaKey}, now)
 	if err != nil {
 		return nil, err
@@ -441,9 +422,6 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 			}
 			return err
 		}
-		if err := s.repo.CreateVersionTx(ctx, tx, next); err != nil {
-			return err
-		}
 		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
 			return wrapAppErr("templates publish: append audit", err)
 		}
@@ -451,7 +429,7 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	}); err != nil {
 		return nil, err
 	}
-	return &PublishTemplateVersionResult{PublishedVersion: version, NextDraft: next}, nil
+	return &PublishTemplateVersionResult{PublishedVersion: version}, nil
 }
 
 // nextVersionNumber allocates the next version slot. The new draft must be

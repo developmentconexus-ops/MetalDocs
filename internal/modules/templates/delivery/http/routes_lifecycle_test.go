@@ -298,15 +298,9 @@ func TestApprove_Accept_Happy(t *testing.T) {
 	if out.Data.Version.Status != string(domain.VersionStatusPublished) {
 		t.Fatalf("expected status=published, got %q", out.Data.Version.Status)
 	}
-	if out.Data.NextDraft == nil {
-		t.Fatal("expected data.next_draft to be populated on approve-publish")
-	}
-	if out.Data.NextDraft.VersionNumber != out.Data.Version.VersionNumber+1 {
-		t.Fatalf("expected next_draft.version_number=%d, got %d",
-			out.Data.Version.VersionNumber+1, out.Data.NextDraft.VersionNumber)
-	}
-	if out.Data.NextDraft.ID == "" {
-		t.Fatal("expected next_draft.id to be non-empty")
+	// M1·T2: auto next-draft spawn removed; next_draft must be absent/null.
+	if out.Data.NextDraft != nil {
+		t.Fatalf("expected next_draft=null on approve-publish (auto-spawn removed), got version_number=%d", out.Data.NextDraft.VersionNumber)
 	}
 }
 
@@ -344,10 +338,6 @@ func TestApprove_Reject_NextDraftNull(t *testing.T) {
 			Version struct {
 				Status string `json:"status"`
 			} `json:"version"`
-			NextDraft *struct {
-				ID            string `json:"id"`
-				VersionNumber int    `json:"version_number"`
-			} `json:"next_draft"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
@@ -356,9 +346,7 @@ func TestApprove_Reject_NextDraftNull(t *testing.T) {
 	if out.Data.Version.Status != string(domain.VersionStatusDraft) {
 		t.Fatalf("expected status=draft on reject, got %q", out.Data.Version.Status)
 	}
-	if out.Data.NextDraft != nil {
-		t.Fatalf("expected next_draft=null on reject, got %+v", out.Data.NextDraft)
-	}
+	// M1·T2: next_draft field removed; reject path returns only version.
 }
 
 func TestArchiveTemplate_Happy(t *testing.T) {

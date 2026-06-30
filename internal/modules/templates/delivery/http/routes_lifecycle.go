@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"github.com/google/uuid"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -153,20 +152,6 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 	}
 	var resp templatesapi.ApproveTemplateVersionResponse
 	resp.Data.Version = verDTO
-	if res.NextDraft != nil {
-		nextID, parseErr := uuid.Parse(res.NextDraft.ID)
-		if parseErr != nil {
-			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
-			return
-		}
-		resp.Data.NextDraft = &struct {
-			Id            openapi_types.UUID `json:"id"`
-			VersionNumber int                `json:"version_number"`
-		}{
-			Id:            nextID,
-			VersionNumber: res.NextDraft.VersionNumber,
-		}
-	}
 	writeJSON(w, http.StatusOK, resp)
 }
 

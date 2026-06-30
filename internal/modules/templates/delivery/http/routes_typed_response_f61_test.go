@@ -117,12 +117,8 @@ func TestLifecycle_TypedResponseShape(t *testing.T) {
 		if string(out.Data.Version.Status) != string(domain.VersionStatusPublished) {
 			t.Fatalf("status=%q want=published", out.Data.Version.Status)
 		}
-		if out.Data.NextDraft == nil {
-			t.Fatal("next_draft nil; expected populated on publish path")
-		}
-		if out.Data.NextDraft.VersionNumber != out.Data.Version.VersionNumber+1 {
-			t.Fatalf("next_draft.version_number=%d want=%d", out.Data.NextDraft.VersionNumber, out.Data.Version.VersionNumber+1)
-		}
+		// M1·T2: auto next-draft spawn removed; next_draft field is gone from the schema.
+		// The strict decode above (DisallowUnknownFields) already guards against next_draft leaking back.
 	})
 
 	t.Run("approve_reject", func(t *testing.T) {
@@ -153,9 +149,7 @@ func TestLifecycle_TypedResponseShape(t *testing.T) {
 		if string(out.Data.Version.Status) != string(domain.VersionStatusDraft) {
 			t.Fatalf("status=%q want=draft on reject", out.Data.Version.Status)
 		}
-		if out.Data.NextDraft != nil {
-			t.Fatalf("next_draft want=null on reject, got %+v", out.Data.NextDraft)
-		}
+		// M1·T2: next_draft field removed from schema; strict decode guards against leaks.
 	})
 
 	t.Run("archive", func(t *testing.T) {
