@@ -17,7 +17,7 @@ const (
 	systemBlankTemplateID       = "00000000-0000-0000-0000-000000000101"
 )
 
-func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request, params templatesapi.ListTemplatesParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
@@ -27,27 +27,28 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 		writeMappedErr(w, err)
 		return
 	}
-	q := r.URL.Query()
 
-	limit, ok := readQueryInt(q.Get("limit"), 50)
-	if !ok {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidLimit, "limit must be an integer")
-		return
+	// Query params are now contract-declared (F-C1); the generated wrapper binds
+	// and type-checks them, so the handler only enforces the business bound
+	// (max page size) and applies defaults for omitted params.
+	limit := 50
+	if params.Limit != nil {
+		limit = *params.Limit
 	}
 	if limit > 200 {
 		writeErr(w, http.StatusBadRequest, codeTplInvalidLimit, "limit must be less than or equal to 200")
 		return
 	}
-	offset, ok := readQueryInt(q.Get("offset"), 0)
-	if !ok {
-		writeErr(w, http.StatusBadRequest, codeTplInvalidParam, "offset must be an integer")
-		return
+	offset := 0
+	if params.Offset != nil {
+		offset = *params.Offset
 	}
 
-	docType := strings.TrimSpace(q.Get("doc_type"))
 	var docTypeCode *string
-	if docType != "" {
-		docTypeCode = &docType
+	if params.DocType != nil {
+		if docType := strings.TrimSpace(*params.DocType); docType != "" {
+			docTypeCode = &docType
+		}
 	}
 
 	templates, err := h.svc.ListTemplates(r.Context(), application.ListFilter{

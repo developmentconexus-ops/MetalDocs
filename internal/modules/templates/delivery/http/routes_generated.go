@@ -13,8 +13,8 @@ import (
 
 var _ templatesapi.ServerInterface = (*Handler)(nil)
 
-func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request) {
-	h.listTemplates(w, r)
+func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request, params templatesapi.ListTemplatesParams) {
+	h.listTemplates(w, r, params)
 }
 
 func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templatesapi.CreateTemplateParams) {
@@ -47,6 +47,19 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 	if req.DocTypeCode != nil {
 		docTypeCode = strings.TrimSpace(*req.DocTypeCode)
 	}
+	// approver_role is now caller-configurable (F-T4); default to "approver"
+	// server-side when omitted or blank so the creation contract is self-contained
+	// without changing the historical default binding.
+	approverRole := "approver"
+	if req.ApproverRole != nil && strings.TrimSpace(*req.ApproverRole) != "" {
+		approverRole = strings.TrimSpace(*req.ApproverRole)
+	}
+	var reviewerRole *string
+	if req.ReviewerRole != nil {
+		if trimmed := strings.TrimSpace(*req.ReviewerRole); trimmed != "" {
+			reviewerRole = &trimmed
+		}
+	}
 	res, err := h.svc.CreateTemplate(r.Context(), application.CreateTemplateCmd{
 		TenantID:     tenantID,
 		ActorUserID:  actorID,
@@ -54,7 +67,8 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 		Name:         strings.TrimSpace(req.Name),
 		Description:  description,
 		DocTypeCode:  docTypeCode,
-		ApproverRole: "approver",
+		ApproverRole: approverRole,
+		ReviewerRole: reviewerRole,
 	})
 	if err != nil {
 		writeMappedErr(w, err)
