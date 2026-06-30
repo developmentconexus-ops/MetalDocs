@@ -16,7 +16,6 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	authdomain "metaldocs/internal/modules/auth/domain"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -679,14 +678,14 @@ SELECT status, process_area_code
 		if err != nil {
 			return fmt.Errorf("controlled_documents: marshal changeStatus payload: %w", err)
 		}
-		actorID := ""
-		if u, ok := authdomain.CurrentUserFromContext(ctx); ok {
-			actorID = u.UserID
-		}
+		// Reuse the actor validated at the top of changeStatus (:625). The
+		// middleware seeds authn (iam) and authdomain context keys atomically
+		// from the same currentUser.UserID, so this is the same actor — no need
+		// to re-extract via the unguarded authdomain path (which defaulted to "").
 		if err := s.govLogger.LogTx(ctx, tx, taxonomydomain.GovernanceEvent{
 			TenantID:     tenantID,
 			EventType:    taxonomydomain.GovernanceEventType(eventType),
-			ActorUserID:  actorID,
+			ActorUserID:  actorUserID,
 			ResourceType: "controlled_document",
 			ResourceID:   controlledDocumentID,
 			PayloadJSON:  payload,
