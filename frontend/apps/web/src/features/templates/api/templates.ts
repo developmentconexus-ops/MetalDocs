@@ -206,39 +206,23 @@ export async function reviewVersion(
   return data.data.version;
 }
 
-export interface NextDraftRef {
-  id: string;
-  versionNumber: number;
-}
-
-export interface ApproveVersionResult {
-  version: VersionDTO;
-  nextDraft: NextDraftRef | null;
-}
-
 export async function approveVersion(
   templateId: string,
   versionNum: number,
   accept: boolean,
   idempotencyKey: string,
   reason?: string,
-): Promise<ApproveVersionResult> {
+): Promise<VersionDTO> {
   const data = await apiFetch<{
     data: {
       version: VersionDTO;
-      next_draft?: { id: string; version_number: number } | null;
     };
   }>(`/api/v1/templates/${templateId}/versions/${versionNum}/approve`, {
     method: 'POST',
     idempotencyKey,
     body: JSON.stringify({ accept, reason: reason || '' }),
   });
-  const raw = data.data.next_draft;
-  const nextDraft: NextDraftRef | null =
-    raw && raw.id && Number.isFinite(raw.version_number)
-      ? { id: raw.id, versionNumber: raw.version_number }
-      : null;
-  return { version: data.data.version, nextDraft };
+  return data.data.version;
 }
 
 // Wire-format types (backend snake_case)

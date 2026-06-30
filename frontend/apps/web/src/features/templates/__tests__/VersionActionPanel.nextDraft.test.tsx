@@ -67,38 +67,33 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('VersionActionPanel — approve→publish next_draft handoff', () => {
-  it('forwards nextDraft to onVersionUpdate on no-reviewer approve and shows publish toast', async () => {
+describe('VersionActionPanel — approve→publish (next_draft removed)', () => {
+  it('calls onVersionUpdate with only the version on no-reviewer approve and shows publish toast', async () => {
     const v = makeVersion();
     const published = { ...v, status: 'published' as const };
-    approveMock.mockResolvedValueOnce({
-      version: published,
-      nextDraft: { id: 'ver-2', versionNumber: 2 },
-    });
+    approveMock.mockResolvedValueOnce(published);
     const onVersionUpdate = vi.fn();
 
     render(<VersionActionPanel version={v} onVersionUpdate={onVersionUpdate} />);
     fireEvent.click(screen.getByRole('button', { name: 'Publicar' }));
 
     await waitFor(() => expect(onVersionUpdate).toHaveBeenCalledTimes(1));
-    // Signature: (templateId, versionNum, accept, idempotencyKey, reason).
-    // The key is a per-action UUID generated at click time.
     expect(approveMock).toHaveBeenCalledWith('tpl-1', 1, true, expect.any(String), '');
-    expect(onVersionUpdate).toHaveBeenCalledWith(published, { id: 'ver-2', versionNumber: 2 });
-    expect(await screen.findByText('Publicado. Nova versão de rascunho criada.')).toBeInTheDocument();
+    expect(onVersionUpdate).toHaveBeenCalledWith(published);
+    expect(await screen.findByText('Publicado')).toBeInTheDocument();
   });
 
-  it('passes nextDraft=null on reject and keeps generic message', async () => {
+  it('calls onVersionUpdate with the version on reject and shows reject toast', async () => {
     const v = makeVersion();
     const rejected = { ...v, status: 'draft' as const };
-    approveMock.mockResolvedValueOnce({ version: rejected, nextDraft: null });
+    approveMock.mockResolvedValueOnce(rejected);
     const onVersionUpdate = vi.fn();
 
     render(<VersionActionPanel version={v} onVersionUpdate={onVersionUpdate} />);
     fireEvent.click(screen.getByRole('button', { name: 'Rejeitar' }));
 
     await waitFor(() => expect(onVersionUpdate).toHaveBeenCalledTimes(1));
-    expect(onVersionUpdate).toHaveBeenCalledWith(rejected, null);
+    expect(onVersionUpdate).toHaveBeenCalledWith(rejected);
     expect(screen.queryByText('Publicado. Nova versão de rascunho criada.')).not.toBeInTheDocument();
   });
 });

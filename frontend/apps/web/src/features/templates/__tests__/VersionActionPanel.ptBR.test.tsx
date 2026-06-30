@@ -151,7 +151,7 @@ describe('VersionActionPanel — pt-BR labels (F-FE5)', () => {
     seedActor(['approver'], ['template.approve']);
     const v = makeVersion();
     const published = { ...v, status: 'published' as const };
-    approveMock.mockResolvedValueOnce({ version: published, nextDraft: null });
+    approveMock.mockResolvedValueOnce(published);
 
     render(<VersionActionPanel version={v} onVersionUpdate={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: 'Publicar' }));
@@ -165,7 +165,7 @@ describe('VersionActionPanel — pt-BR labels (F-FE5)', () => {
     seedActor(['approver'], ['template.approve']);
     const v = makeVersion();
     const rejected = { ...v, status: 'draft' as const };
-    approveMock.mockResolvedValueOnce({ version: rejected, nextDraft: null });
+    approveMock.mockResolvedValueOnce(rejected);
 
     render(<VersionActionPanel version={v} onVersionUpdate={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: 'Rejeitar' }));

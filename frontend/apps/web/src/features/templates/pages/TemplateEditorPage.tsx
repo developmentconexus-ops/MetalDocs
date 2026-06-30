@@ -359,11 +359,8 @@ export function TemplateEditorPage({
       {currentVersion && ['in_review', 'approved', 'published'].includes(currentVersion.status) && (
         <VersionActionPanel
           version={currentVersion}
-          onVersionUpdate={(v, nextDraft) => {
+          onVersionUpdate={(v) => {
             setLiveVersion(v);
-            if (nextDraft && onNavigateToVersion) {
-              onNavigateToVersion(templateId, nextDraft.versionNumber);
-            }
           }}
         />
       )}

@@ -1,7 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import {
   type VersionDTO,
-  type NextDraftRef,
   approveVersion,
   reviewVersion,
 } from './api/templates';
@@ -14,15 +13,14 @@ import {
   type VersionActionGate,
 } from './lib/canActOnVersion';
 
-type ActResult = { version: VersionDTO; nextDraft?: NextDraftRef | null };
+type ActResult = { version: VersionDTO };
 
 type Props = {
   version: VersionDTO;
-  onVersionUpdate: (v: VersionDTO, nextDraft?: NextDraftRef | null) => void;
+  onVersionUpdate: (v: VersionDTO) => void;
 };
 
 const EMPTY_ACTOR: ActorContext = { roles: [], capabilities: [] };
-const PUBLISHED_WITH_NEXT_DRAFT_MSG = 'Publicado. Nova versão de rascunho criada.';
 
 function tooltipFor(gate: VersionActionGate): string | undefined {
   return gate.allowed ? undefined : gate.reason;
@@ -45,9 +43,8 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
     setSuccess(null);
     try {
       const res = await fn();
-      const msg = res.nextDraft ? PUBLISHED_WITH_NEXT_DRAFT_MSG : successMsg;
-      setSuccess(msg);
-      onVersionUpdate(res.version, res.nextDraft ?? null);
+      setSuccess(successMsg);
+      onVersionUpdate(res.version);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -58,8 +55,9 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
   // One Idempotency-Key per user action (generated at click time, not per
   // render): both lifecycle calls require the header server-side. Mirrors
   // createTemplate / finalizeDocument.
-  const approveAct = (accept: boolean) =>
-    approveVersion(version.template_id, version.version_number, accept, crypto.randomUUID(), reason);
+  const approveAct = async (accept: boolean): Promise<ActResult> => ({
+    version: await approveVersion(version.template_id, version.version_number, accept, crypto.randomUUID(), reason),
+  });
   const reviewAct = async (accept: boolean): Promise<ActResult> => ({
     version: await reviewVersion(
       version.template_id,
@@ -68,7 +66,6 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
       crypto.randomUUID(),
       reason,
     ),
-    nextDraft: null,
   });
 
   if (version.status === 'in_review') {
