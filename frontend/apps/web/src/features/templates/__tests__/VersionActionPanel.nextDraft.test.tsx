@@ -78,7 +78,7 @@ describe('VersionActionPanel — approve→publish next_draft handoff', () => {
     const onVersionUpdate = vi.fn();
 
     render(<VersionActionPanel version={v} onVersionUpdate={onVersionUpdate} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publicar' }));
 
     await waitFor(() => expect(onVersionUpdate).toHaveBeenCalledTimes(1));
     // Signature: (templateId, versionNum, accept, idempotencyKey, reason).
@@ -95,7 +95,7 @@ describe('VersionActionPanel — approve→publish next_draft handoff', () => {
     const onVersionUpdate = vi.fn();
 
     render(<VersionActionPanel version={v} onVersionUpdate={onVersionUpdate} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rejeitar' }));
 
     await waitFor(() => expect(onVersionUpdate).toHaveBeenCalledTimes(1));
     expect(onVersionUpdate).toHaveBeenCalledWith(rejected, null);

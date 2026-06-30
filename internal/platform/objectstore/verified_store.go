@@ -15,6 +15,10 @@ import (
 
 const defaultMaxObjectBytes = 25 * 1024 * 1024
 
+// SystemTenantID is the well-known sentinel for system-owned objects (e.g. built-in
+// templates). Copy allows a system-tenant srcKey to be copied into any tenant.
+const SystemTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+
 // VerifiedPointer is the verified result of a confirmed upload.
 type VerifiedPointer struct {
 	StorageKey  string
@@ -43,8 +47,22 @@ func NewVerifiedStore(client, signingClient *minio.Client, bucket string, maxSiz
 	return &VerifiedStore{client: client, signingClient: signingClient, bucket: bucket, maxSizeBytes: maxSizeBytes}
 }
 
+// KeyHasTenantPrefix reports whether key resides inside tenantID's namespace
+// (tenants/{tenantID}/…). It is the single source of truth for the tenant-prefix
+// rule: assertTenant, Copy's srcKey check, and out-of-package callers (e.g. the
+// PDF-completion webhook) all delegate here so the rule cannot silently diverge.
+// An empty tenantID never matches — without this guard a "" tenant would reduce
+// the check to the prefix "tenants//", which a crafted "tenants//…" key would
+// satisfy, bypassing isolation at the kernel boundary.
+func KeyHasTenantPrefix(tenantID, key string) bool {
+	if tenantID == "" {
+		return false
+	}
+	return strings.HasPrefix(key, "tenants/"+tenantID+"/")
+}
+
 func (s *VerifiedStore) assertTenant(tenantID, key string) error {
-	if !strings.HasPrefix(key, "tenants/"+tenantID+"/") {
+	if !KeyHasTenantPrefix(tenantID, key) {
 		return ErrKeyOutsideTenant
 	}
 	return nil
@@ -102,13 +120,19 @@ func (s *VerifiedStore) Confirm(ctx context.Context, tenantID, key, expectedHash
 
 // Copy duplicates an existing object to a new tenant-scoped key, server-side
 // (no bytes stream through the app, so the producer invariant is preserved — no
-// docx is authored by the Go server). The DESTINATION is tenant-prefix guarded,
-// same as the write path; the SOURCE is a DB-sourced / server-trusted key (read
-// path, not guarded). Used by copy-on-spawn so each template version owns a
+// docx is authored by the Go server). Both srcKey and dstKey are tenant-prefix
+// guarded; the only exception is a srcKey owned by the system tenant
+// (SystemTenantID), which may be copied into any tenant's namespace (e.g. built-in
+// template copy-on-spawn). Used by copy-on-spawn so each template version owns a
 // distinct object instead of sharing a key with its source.
 func (s *VerifiedStore) Copy(ctx context.Context, tenantID, srcKey, dstKey string) error {
 	if err := s.assertTenant(tenantID, dstKey); err != nil {
 		return err
+	}
+	// Assert srcKey belongs to the same tenant OR to the system tenant — explicit
+	// exception, not an omission of the check.
+	if !KeyHasTenantPrefix(tenantID, srcKey) && !KeyHasTenantPrefix(SystemTenantID, srcKey) {
+		return ErrKeyOutsideTenant
 	}
 	_, err := s.client.CopyObject(ctx,
 		minio.CopyDestOptions{Bucket: s.bucket, Object: dstKey},
@@ -123,14 +147,69 @@ func (s *VerifiedStore) Copy(ctx context.Context, tenantID, srcKey, dstKey strin
 	return nil
 }
 
-// --- read path (NOT guarded: keys are DB-sourced / server-trusted) ---
+// --- read path ---
 
+// AssertedPresignGet is a tenant-guarded variant of PresignGet for callers that
+// derive the key from user-controlled input rather than from a DB-sourced column.
+// It mirrors PresignPut (:55-63) in taking a tenantID and asserting the prefix
+// before issuing the presigned URL. DB-sourced callers should use PresignGet.
+func (s *VerifiedStore) AssertedPresignGet(ctx context.Context, tenantID, key string, ttl time.Duration) (string, error) {
+	if err := s.assertTenant(tenantID, key); err != nil {
+		return "", err
+	}
+	return s.PresignGet(ctx, key, ttl)
+}
+
+// PresignGet presigns a GET URL for a DB-sourced / server-trusted key (NOT guarded).
 func (s *VerifiedStore) PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error) {
 	u, err := s.signingClient.PresignedGetObject(ctx, s.bucket, key, ttl, nil)
 	if err != nil {
 		return "", fmt.Errorf("objectstore: presign get: %w", err)
 	}
 	return u.String(), nil
+}
+
+// AssertedReadObject is the tenant-guarded read primitive: it asserts key resides
+// in tenantID's namespace OR the system tenant's (mirroring Copy :114-123 — the
+// schema files it reads may be system-owned built-in templates) before delegating
+// to ReadObject. Callers that hold a tenantID should use this rather than the
+// unguarded ReadObject so a poisoned/mis-scoped DB key cannot fetch a cross-tenant
+// object — defense-in-depth above the SQL tenant scoping.
+func (s *VerifiedStore) AssertedReadObject(ctx context.Context, tenantID, key string, maxBytes int64) ([]byte, error) {
+	if !KeyHasTenantPrefix(tenantID, key) && !KeyHasTenantPrefix(SystemTenantID, key) {
+		return nil, ErrKeyOutsideTenant
+	}
+	return s.ReadObject(ctx, key, maxBytes)
+}
+
+// ReadObject fetches an object and returns its bytes, enforcing a caller-supplied
+// maxBytes size limit (mirrors Confirm :68-100 — read + LimitReader + size check —
+// but without a hash comparison). Intended for trusted internal reads (e.g. schema
+// files) where the caller knows the key from the DB but does not have an expected
+// hash. Returns ErrObjectMissing when the object does not exist and
+// ErrObjectTooLarge when the size limit is exceeded (the object is NOT deleted).
+// Prefer AssertedReadObject when a tenantID is in scope.
+func (s *VerifiedStore) ReadObject(ctx context.Context, key string, maxBytes int64) ([]byte, error) {
+	obj, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		if isNoSuchKeyErr(err) {
+			return nil, ErrObjectMissing
+		}
+		return nil, fmt.Errorf("objectstore: read get: %w", err)
+	}
+	defer obj.Close()
+
+	payload, err := io.ReadAll(io.LimitReader(obj, maxBytes+1))
+	if err != nil {
+		if isNoSuchKeyErr(err) {
+			return nil, ErrObjectMissing
+		}
+		return nil, fmt.Errorf("objectstore: read body: %w", err)
+	}
+	if int64(len(payload)) > maxBytes {
+		return nil, ErrObjectTooLarge
+	}
+	return payload, nil
 }
 
 func (s *VerifiedStore) Exists(ctx context.Context, key string) (bool, error) {

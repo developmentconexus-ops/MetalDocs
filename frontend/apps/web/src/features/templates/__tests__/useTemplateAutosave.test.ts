@@ -39,6 +39,23 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('useTemplateAutosave — dirty status (F-FE4)', () => {
+  it('sets status to dirty immediately when queueDocx is called', async () => {
+    vi.stubGlobal('fetch', makeOkFetch());
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useTemplateAutosave('tpl-1', 1));
+
+    expect(result.current.status).toBe('idle');
+
+    await act(async () => {
+      result.current.queueDocx(new ArrayBuffer(4));
+    });
+
+    expect(result.current.status).toBe('dirty');
+    vi.useRealTimers();
+  });
+});
+
 describe('useTemplateAutosave — flush (F-FE1)', () => {
   it('returns true and calls commitAutosave when upload succeeds', async () => {
     vi.stubGlobal('fetch', makeOkFetch());

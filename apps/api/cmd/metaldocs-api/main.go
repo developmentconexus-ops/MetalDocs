@@ -430,7 +430,7 @@ func main() {
 		DB:      deps.SQLDB,
 		Presign: docPresigner,
 		TplRead: docgenv2.NewFanoutTemplateReader(
-			docgenv2.NewTemplateReader(deps.SQLDB, deps.MinioClient, deps.MinioBucket),
+			docgenv2.NewTemplateReader(deps.SQLDB, docPresigner),
 			docgenv2.NewTemplatesTemplateReader(deps.SQLDB),
 		),
 		FormVal:                      formval.NewGojsonschema(),
@@ -510,9 +510,16 @@ func main() {
 	// Wire materialize outbox into the freeze service so Pin can enqueue async jobs.
 	fanoutCfg.freezeService.WithMaterializeOutbox(materializeOutboxRepo)
 
+	stagingOutboxWorkerCfg, err := config.LoadStagingOutboxWorkerConfig()
+	if err != nil {
+		slog.Error("invalid staging outbox worker config", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
+	}
+
 	// StagingOutboxWorker.Run() only returns nil (context cancellation); no restart loop needed.
 	var workerWG sync.WaitGroup
-	startOutboxWorkers(ctx, &workerWG, deps.Publisher, pdfOutboxRepo, materializeOutboxRepo)
+	startOutboxWorkers(ctx, &workerWG, deps.Publisher, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg)
 
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService,
@@ -869,6 +876,7 @@ func startOutboxWorkers(
 	wg *sync.WaitGroup,
 	publisher messaging.Publisher,
 	pdfOutboxRepo, materializeOutboxRepo *fanout.StagingOutboxRepository,
+	workerCfg config.StagingOutboxWorkerConfig,
 ) {
 	start := func(w *fanout.StagingOutboxWorker) {
 		wg.Add(1)
@@ -891,7 +899,7 @@ func startOutboxWorkers(
 				ContentHash: hex.EncodeToString(r.ContentHash),
 			},
 		}
-	}, slog.Default())
+	}, workerCfg, slog.Default())
 	start(pdfOutboxWorker)
 
 	materializeOutboxWorker := fanout.NewStagingOutboxWorker(materializeOutboxRepo, publisher, func(r fanout.OutboxRow) messaging.Event {
@@ -906,7 +914,7 @@ func startOutboxWorkers(
 				RevisionID: r.RevisionID,
 			},
 		}
-	}, slog.Default())
+	}, workerCfg, slog.Default())
 	start(materializeOutboxWorker)
 }
 

@@ -56,7 +56,7 @@ describe('VersionActionPanel gating', () => {
   it('disables Approve Review with tooltip when actor lacks template.review', () => {
     setUser(['reviewer'], []);
     render(<VersionActionPanel version={inReviewWithReviewer()} onVersionUpdate={() => {}} />);
-    const acceptBtn = screen.getByRole('button', { name: /approve review/i });
+    const acceptBtn = screen.getByRole('button', { name: /aprovar revisão/i });
     expect(acceptBtn).toBeDisabled();
     expect(acceptBtn.getAttribute('title')).toContain('template.review');
   });
@@ -64,7 +64,7 @@ describe('VersionActionPanel gating', () => {
   it('disables Approve Review with tooltip when actor lacks pending_reviewer_role', () => {
     setUser(['approver'], ['template.review']);
     render(<VersionActionPanel version={inReviewWithReviewer()} onVersionUpdate={() => {}} />);
-    const acceptBtn = screen.getByRole('button', { name: /approve review/i });
+    const acceptBtn = screen.getByRole('button', { name: /aprovar revisão/i });
     expect(acceptBtn).toBeDisabled();
     expect(acceptBtn.getAttribute('title')).toContain('reviewer');
   });
@@ -72,7 +72,7 @@ describe('VersionActionPanel gating', () => {
   it('enables Approve Review when actor has cap + role', () => {
     setUser(['reviewer'], ['template.review']);
     render(<VersionActionPanel version={inReviewWithReviewer()} onVersionUpdate={() => {}} />);
-    const acceptBtn = screen.getByRole('button', { name: /approve review/i });
+    const acceptBtn = screen.getByRole('button', { name: /aprovar revisão/i });
     expect(acceptBtn).not.toBeDisabled();
     expect(acceptBtn.getAttribute('title')).toBeFalsy();
   });

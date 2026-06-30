@@ -74,7 +74,7 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 		return nil, err
 	}
 
-	storageKey := fmt.Sprintf("tenants/%s/documents/%s/exports/%s.pdf", tenantID, documentID, hex.EncodeToString(compositeHash))
+	storageKey := documentExportKey(tenantID, documentID, compositeHash)
 
 	existing, err := s.repo.GetExportByHash(ctx, tenantID, documentID, compositeHash)
 	if err == nil {

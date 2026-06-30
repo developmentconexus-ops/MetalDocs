@@ -223,6 +223,7 @@ export function TemplateEditorPage({
 
   const autosaveState: AutosaveState =
     autosave.status === 'saving' ? 'saving' :
+    autosave.status === 'dirty' ? 'dirty' :
     autosave.status === 'error' ? 'error' :
     autosave.status === 'saved' ? 'saved' :
     'idle';

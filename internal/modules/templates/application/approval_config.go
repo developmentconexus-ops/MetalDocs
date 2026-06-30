@@ -12,7 +12,6 @@ import (
 
 type UpsertApprovalConfigCmd struct {
 	TenantID, ActorUserID, TemplateID string
-	ActorRoles                        []string
 	ReviewerRole                      *string
 	ApproverRole                      string
 }
@@ -32,18 +31,13 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 		return nil, domain.ErrArchived
 	}
 
+	// Elevation rule (ADR 0051 / REQ-AUTHZ-5):
+	//   Published template  → require template.manage (in-tx); no creator shortcut.
+	//   Unpublished template, creator → domain-ownership shortcut; template.edit suffices.
+	//   Unpublished template, non-creator → require template.manage (in-tx).
+	// The in-tx CapTemplateEdit check (:77) remains the base gate for all paths.
 	hasEverPublished := template.PublishedVersionID != nil
-	isOperator := containsRole(cmd.ActorRoles, string(iamdomain.RoleSystemAdmin)) ||
-		containsRole(cmd.ActorRoles, string(iamdomain.RoleQmsAdmin))
-	if hasEverPublished {
-		if !isOperator {
-			return nil, domain.ErrForbidden
-		}
-	} else {
-		if template.CreatedBy != cmd.ActorUserID && !isOperator {
-			return nil, domain.ErrForbidden
-		}
-	}
+	requireManage := hasEverPublished || template.CreatedBy != cmd.ActorUserID
 
 	if cmd.ApproverRole == "" {
 		return nil, domain.ErrInvalidApprovalConfig
@@ -76,6 +70,11 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
 			return fmt.Errorf("templates approval config: authz: %w", err)
+		}
+		if requireManage {
+			if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateManage), "tenant"); err != nil {
+				return fmt.Errorf("templates approval config: authz manage: %w", err)
+			}
 		}
 		if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &config); err != nil {
 			return wrapAppErr("templates approval config: upsert", err)

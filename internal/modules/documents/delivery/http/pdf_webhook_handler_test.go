@@ -60,7 +60,9 @@ func TestPDFWebhookHandler_ValidSignaturePersists(t *testing.T) {
 	writer := &fakePDFWriter{}
 	h := NewPDFWebhookHandler(writer, "shh")
 
-	body := `{"tenant_id":"tenant-db","final_pdf_s3_key":"final/r.docx.pdf","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
+	// Key must carry the canonical tenant prefix (F-O2: tenant-bound validation).
+	const s3Key = "tenants/tenant-db/documents/doc-1/exports/r.pdf"
+	body := `{"tenant_id":"tenant-db","final_pdf_s3_key":"` + s3Key + `","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete", strings.NewReader(body))
 	req.SetPathValue("id", "doc-1")
 	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))
@@ -74,7 +76,7 @@ func TestPDFWebhookHandler_ValidSignaturePersists(t *testing.T) {
 	if writer.calls != 1 {
 		t.Fatalf("writer calls = %d", writer.calls)
 	}
-	if writer.tenant != "tenant-db" || writer.docID != "doc-1" || writer.s3Key != "final/r.docx.pdf" {
+	if writer.tenant != "tenant-db" || writer.docID != "doc-1" || writer.s3Key != s3Key {
 		t.Fatalf("wrong fields: %+v", writer)
 	}
 	if hex.EncodeToString(writer.hash) != "abcd" {
@@ -198,5 +200,28 @@ func TestPDFWebhookHandler_InvalidFinalPDFS3KeyRejected400(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status=%d, want 400", rec.Code)
+	}
+}
+
+// F-O2: full tenant-prefix guard — key must start with "tenants/<canonicalTenantID>/".
+func TestPDFWebhookHandler_ForeignTenantPrefixRejected400(t *testing.T) {
+	writer := &fakePDFWriter{tenantByDoc: "tenant-db"}
+	h := NewPDFWebhookHandler(writer, "shh")
+
+	// Key belongs to a different tenant's namespace — must be rejected even though
+	// the structural check (no "..", no NUL) passes.
+	body := `{"tenant_id":"tenant-db","final_pdf_s3_key":"tenants/attacker/documents/doc-1/exports/x.pdf","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete", strings.NewReader(body))
+	req.SetPathValue("id", "doc-1")
+	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))
+	rec := httptest.NewRecorder()
+
+	h.HandlePDFComplete(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d, want 400", rec.Code)
+	}
+	if writer.calls != 0 {
+		t.Fatalf("writer must not be called; calls=%d", writer.calls)
 	}
 }

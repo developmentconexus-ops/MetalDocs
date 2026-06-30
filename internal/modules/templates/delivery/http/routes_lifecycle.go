@@ -231,7 +231,6 @@ func (h *Handler) upsertApprovalConfig(w http.ResponseWriter, r *http.Request) {
 		TenantID:     tenantID,
 		ActorUserID:  actorID,
 		TemplateID:   templateID,
-		ActorRoles:   actorRolesFromReq(r),
 		ReviewerRole: req.ReviewerRole,
 		ApproverRole: req.ApproverRole,
 	})

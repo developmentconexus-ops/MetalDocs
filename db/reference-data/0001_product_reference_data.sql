@@ -130,6 +130,11 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'token_dictionary.manage', 'Create, update, delete tenant token dictionary entries') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'token_dictionary.manage', 'Create, update, delete tenant token dictionary entries') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
+-- ADR 0051: template.manage — elevated approval-config governance capability.
+-- Granted to qms_admin (was the former isOperator role-string check target).
+-- system_admin accesses via tier-2 bypass (not seeded explicitly).
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.manage', 'Edit approval config of published templates') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+
 -- ADR 0022 Phase 10 (F2): the four redundant phantom caps Phase 8 seeded here
 -- (doc.edit_draft / doc.reconstruct / workflow.instance.cancel / doc.view_published)
 -- were merged into the canonical document.edit / document.view caps — identical

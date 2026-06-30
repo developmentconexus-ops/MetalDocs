@@ -454,7 +454,7 @@ func TestNoRoleStringInDelivery_IgnoresNonDelivery(t *testing.T) {
 // drop, or a multi-row VALUES rewrite that the single-row regex cannot parse all
 // change this count and fail loudly — protecting seed-registry-parity, which
 // silently under-counts if the regex stops matching a row.
-const expectedRoleCapabilityRows = 102
+const expectedRoleCapabilityRows = 103 // +1: qms_admin → template.manage (F-CD7, ADR 0051)
 
 func TestSeedRowCount_GoldenMatchesParser(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)

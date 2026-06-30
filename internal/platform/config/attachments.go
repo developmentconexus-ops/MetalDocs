@@ -35,6 +35,7 @@ type AttachmentsConfig struct {
 	MinIOAccessKey        string
 	MinIOSecretKey        string
 	MinIOBucket           string
+	MinIORegion           string
 	MinIOUseSSL           bool
 	MinIOAutoCreateBucket bool
 }
@@ -91,6 +92,10 @@ func LoadAttachmentsConfig() (AttachmentsConfig, error) {
 		cfg.MinIOAccessKey = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_ACCESS_KEY"))
 		cfg.MinIOSecretKey = os.Getenv("METALDOCS_MINIO_SECRET_KEY")
 		cfg.MinIOBucket = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_BUCKET"))
+		cfg.MinIORegion = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_REGION"))
+		if cfg.MinIORegion == "" {
+			cfg.MinIORegion = "us-east-1"
+		}
 		cfg.MinIOUseSSL = parseBoolEnv("METALDOCS_MINIO_USE_SSL", false)
 		cfg.MinIOAutoCreateBucket = parseBoolEnv("METALDOCS_MINIO_AUTO_CREATE_BUCKET", false)
 

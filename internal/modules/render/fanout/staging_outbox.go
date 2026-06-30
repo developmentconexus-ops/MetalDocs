@@ -120,10 +120,12 @@ UPDATE %s
 
 func (r *StagingOutboxRepository) MarkFailed(ctx context.Context, id string, errStr string, nextRetryAt time.Time, finalize bool) error {
 	if finalize {
+		// F-R3: set dead_lettered_at when permanently failing a row, mirroring
+		// internal/platform/messaging/outbox/postgres/consumer.go:152-177.
 		//nolint:gosec // table name is allowlist-validated at construction
 		res, err := r.db.ExecContext(ctx, fmt.Sprintf(`
 UPDATE %s
-   SET status='failed', last_error=$2, attempts=attempts+1
+   SET status='failed', last_error=$2, attempts=attempts+1, dead_lettered_at=NOW()
  WHERE id=$1::uuid`, r.table), id, errStr)
 		if err != nil {
 			return err
@@ -153,6 +155,21 @@ UPDATE %s
 		return fmt.Errorf("%s mark failed retry: row not found: id=%s", r.name, id)
 	}
 	return nil
+}
+
+// CountDeadLettered returns the number of rows that have been permanently
+// dead-lettered in this outbox table. Mirrors the dead_lettered_at visibility
+// pattern from internal/platform/messaging/outbox/postgres/consumer.go.
+func (r *StagingOutboxRepository) CountDeadLettered(ctx context.Context) (int, error) {
+	var n int
+	//nolint:gosec // table name is allowlist-validated at construction
+	err := r.db.QueryRowContext(ctx, fmt.Sprintf(
+		`SELECT COUNT(*) FROM %s WHERE dead_lettered_at IS NOT NULL`, r.table),
+	).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("%s count dead lettered: %w", r.name, err)
+	}
+	return n, nil
 }
 
 // ReadState returns the latest status for the given tenant+revision.

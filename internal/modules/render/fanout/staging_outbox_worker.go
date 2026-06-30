@@ -6,6 +6,7 @@ import (
 	"math"
 	"time"
 
+	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/messaging"
 )
 
@@ -30,20 +31,25 @@ type StagingOutboxWorker struct {
 	log        *slog.Logger
 }
 
-// NewStagingOutboxWorker constructs a worker.
+// NewStagingOutboxWorker constructs a worker from an externally-loaded config.
 // buildEvent constructs the messaging.Event for a given row; it encapsulates
 // the per-table event type, idempotency-key prefix, and payload shape.
 func NewStagingOutboxWorker(
 	repo stagingOutboxRepoAPI,
 	pub messaging.Publisher,
 	buildEvent func(OutboxRow) messaging.Event,
+	cfg config.StagingOutboxWorkerConfig,
 	log *slog.Logger,
 ) *StagingOutboxWorker {
 	return &StagingOutboxWorker{
-		repo: repo, pub: pub, buildEvent: buildEvent,
-		pollEvery: 5 * time.Second, batchSize: 10,
-		maxAttempt: 5, staleAfter: 5 * time.Minute,
-		log: log,
+		repo:       repo,
+		pub:        pub,
+		buildEvent: buildEvent,
+		pollEvery:  time.Duration(cfg.PollIntervalSeconds) * time.Second,
+		batchSize:  cfg.BatchSize,
+		maxAttempt: cfg.MaxAttempts,
+		staleAfter: time.Duration(cfg.StaleAfterSeconds) * time.Second,
+		log:        log,
 	}
 }
 
@@ -79,8 +85,17 @@ func (w *StagingOutboxWorker) tick(ctx context.Context) {
 func (w *StagingOutboxWorker) dispatchOne(ctx context.Context, r OutboxRow) {
 	err := w.pub.Publish(ctx, w.buildEvent(r))
 	if err == nil {
+		// F-R4: if MarkDispatched fails, fall through to MarkFailed so the row
+		// is retried rather than silently abandoned in 'processing' state.
 		if mErr := w.repo.MarkDispatched(ctx, r.ID); mErr != nil {
 			w.log.Error("staging outbox mark dispatched", "id", r.ID, "err", mErr)
+			finalize := r.Attempts+1 >= w.maxAttempt
+			cappedAttempts := min(max(r.Attempts, 0), 30)
+			backoff := time.Duration(math.Min(float64(30*time.Minute), float64(time.Duration(1<<cappedAttempts)*30*time.Second)))
+			nextRetry := time.Now().Add(backoff)
+			if fErr := w.repo.MarkFailed(ctx, r.ID, mErr.Error(), nextRetry, finalize); fErr != nil {
+				w.log.Error("staging outbox mark failed after dispatch error", "id", r.ID, "err", fErr)
+			}
 		}
 		return
 	}

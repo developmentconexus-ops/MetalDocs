@@ -86,7 +86,7 @@ func buildWorkerPDFConverter() (*servicebus.GotenbergPDFClient, error) {
 	minioClient, err := miniogo.New(attachmentsCfg.MinIOEndpoint, &miniogo.Options{
 		Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
 		Secure: attachmentsCfg.MinIOUseSSL,
-		Region: "us-east-1",
+		Region: attachmentsCfg.MinIORegion,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("init minio client: %w", err)

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/problem"
 )
 
@@ -79,6 +80,11 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "invalid JSON body")
 		return
 	}
+	// Normalize once at the boundary so the validated form and the persisted form
+	// are identical — validating a trimmed key but storing the un-trimmed original
+	// would let a leading-space key bypass the (trimming) prefix guard yet land in
+	// the DB in a form that fails the (non-trimming) objectstore.assertTenant later.
+	body.FinalPDFS3Key = strings.TrimSpace(body.FinalPDFS3Key)
 	if !isValidFinalPDFS3Key(body.FinalPDFS3Key) {
 		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "invalid final_pdf_s3_key")
 		return
@@ -99,6 +105,15 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 	}
 	if strings.TrimSpace(body.TenantID) != "" && strings.TrimSpace(body.TenantID) != canonicalTenantID {
 		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "tenant_id does not match document")
+		return
+	}
+	// Full tenant-prefix guard: require the key to reside inside the canonical
+	// tenant's namespace. Delegates to the objectstore kernel's single source of
+	// truth for the prefix rule (rather than re-implementing it) so the webhook
+	// and VerifiedStore.assertTenant cannot silently diverge. Must run AFTER
+	// ResolveTenantByDocumentID so canonicalTenantID is known.
+	if !objectstore.KeyHasTenantPrefix(canonicalTenantID, body.FinalPDFS3Key) {
+		writePDFWebhookErr(w, http.StatusBadRequest, problem.CodeValidationError, "final_pdf_s3_key outside tenant scope")
 		return
 	}
 

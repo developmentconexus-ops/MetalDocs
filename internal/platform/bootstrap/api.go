@@ -124,7 +124,7 @@ func buildMinioClients(attachmentsCfg config.AttachmentsConfig) (*miniogo.Client
 	internalClient, err := miniogo.New(attachmentsCfg.MinIOEndpoint, &miniogo.Options{
 		Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
 		Secure: attachmentsCfg.MinIOUseSSL,
-		Region: "us-east-1",
+		Region: attachmentsCfg.MinIORegion,
 	})
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("init minio internal client: %w", err)
@@ -133,7 +133,7 @@ func buildMinioClients(attachmentsCfg config.AttachmentsConfig) (*miniogo.Client
 	publicClient, err := miniogo.New(attachmentsCfg.MinIOPublicEndpoint, &miniogo.Options{
 		Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
 		Secure: attachmentsCfg.MinIOUseSSL,
-		Region: "us-east-1",
+		Region: attachmentsCfg.MinIORegion,
 	})
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("init minio public client: %w", err)

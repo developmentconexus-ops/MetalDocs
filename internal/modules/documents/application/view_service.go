@@ -16,8 +16,10 @@ import (
 const viewDownloadTTL = 15 * time.Minute
 
 // ViewPresigner is implemented by objectstore helpers that presign a GET URL.
+// AssertedPresignGet is the tenant-guarded variant (F-O3): it asserts the key
+// prefix before issuing the URL, providing defense-in-depth on the view read path.
 type ViewPresigner interface {
-	PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error)
+	AssertedPresignGet(ctx context.Context, tenantID, key string, ttl time.Duration) (string, error)
 }
 
 // PDFOutboxStateReader returns the latest pdf_outbox state for a revision/document.
@@ -82,7 +84,7 @@ func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID s
 		}
 
 		if pdfKey.Valid && pdfKey.String != "" {
-			url, err := s.presigner.PresignGet(ctx, pdfKey.String, viewDownloadTTL)
+			url, err := s.presigner.AssertedPresignGet(ctx, tenantID, pdfKey.String, viewDownloadTTL)
 			if err != nil {
 				return fmt.Errorf("view: presign: %w", err)
 			}

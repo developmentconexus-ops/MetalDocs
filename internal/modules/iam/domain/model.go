@@ -105,6 +105,10 @@ const (
 	CapTemplateApprove Capability = "template.approve"
 	CapTemplatePublish Capability = "template.publish"
 	CapTemplateArchive Capability = "template.archive"
+	// CapTemplateManage governs elevated template governance operations that
+	// require operator authority: editing a published template's approval config.
+	// Checked tier-2 in-tx via authz.Require. ADR 0051 / REQ-AUTHZ-5.
+	CapTemplateManage Capability = "template.manage"
 
 	CapControlledDocumentCreate    Capability = "controlled_documents.create"
 	CapControlledDocumentObsolete  Capability = "controlled_documents.obsolete"
@@ -152,6 +156,7 @@ var validCapabilities = map[Capability]struct{}{
 	CapTemplateApprove:             {},
 	CapTemplatePublish:             {},
 	CapTemplateArchive:             {},
+	CapTemplateManage:              {},
 	CapControlledDocumentCreate:    {},
 	CapControlledDocumentObsolete:  {},
 	CapControlledDocumentSupersede: {},

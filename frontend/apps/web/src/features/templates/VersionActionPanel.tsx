@@ -73,20 +73,24 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
 
   if (version.status === 'in_review') {
     const hasReviewer = version.pending_reviewer_role != null;
-    const acceptLabel = hasReviewer ? 'Approve Review' : 'Publish';
+    const acceptLabel = hasReviewer ? 'Aprovar Revisão' : 'Publicar';
     const acceptGate = hasReviewer ? canReview(version, actor) : canPublish(version, actor);
+    // F-FE6: rejectGate intentionally aliases acceptGate — same actor governs
+    // both accept and reject at this stage (SoD applies between author and
+    // reviewer/approver, not within them). If the backend ever adds a separate
+    // reject capability, replace this alias with the dedicated gate.
     const rejectGate = acceptGate;
     const acceptAction = hasReviewer
-      ? () => act(() => reviewAct(true), 'Review approved')
-      : () => act(() => approveAct(true), 'Published');
+      ? () => act(() => reviewAct(true), 'Revisão aprovada')
+      : () => act(() => approveAct(true), 'Publicado');
     const rejectAction = hasReviewer
-      ? () => act(() => reviewAct(false), 'Review rejected')
-      : () => act(() => approveAct(false), 'Rejected - back to draft');
+      ? () => act(() => reviewAct(false), 'Revisão rejeitada')
+      : () => act(() => approveAct(false), 'Rejeitado — volta para rascunho');
     return (
       <div style={panelStyle}>
-        <strong style={{ fontSize: '0.875rem' }}>{hasReviewer ? 'Reviewer actions' : 'Approver actions'}</strong>
+        <strong style={{ fontSize: '0.875rem' }}>{hasReviewer ? 'Ações do revisor' : 'Ações do aprovador'}</strong>
         <textarea
-          placeholder="Reason (optional)"
+          placeholder="Motivo (opcional)"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={2}
@@ -97,6 +101,7 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
         {success && <div style={{ color: '#065f46', fontSize: '0.8125rem' }}>{success}</div>}
         <div style={{ display: 'flex', gap: 8 }}>
           <button
+            type="button"
             onClick={acceptAction}
             disabled={busy || !acceptGate.allowed}
             title={tooltipFor(acceptGate)}
@@ -105,12 +110,13 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
             {acceptLabel}
           </button>
           <button
+            type="button"
             onClick={rejectAction}
             disabled={busy || !rejectGate.allowed}
             title={tooltipFor(rejectGate)}
             style={{ ...btnStyle, background: '#fff', color: '#dc2626', border: '1px solid #dc2626' }}
           >
-            Reject
+            Rejeitar
           </button>
         </div>
       </div>
@@ -121,9 +127,9 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
     const approveGate = canApprove(version, actor);
     return (
       <div style={panelStyle}>
-        <strong style={{ fontSize: '0.875rem' }}>Approver actions</strong>
+        <strong style={{ fontSize: '0.875rem' }}>Ações do aprovador</strong>
         <textarea
-          placeholder="Reason (optional)"
+          placeholder="Motivo (opcional)"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={2}
@@ -134,20 +140,22 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
         {success && <div style={{ color: '#065f46', fontSize: '0.8125rem' }}>{success}</div>}
         <div style={{ display: 'flex', gap: 8 }}>
           <button
-            onClick={() => act(() => approveAct(true), 'Published')}
+            type="button"
+            onClick={() => act(() => approveAct(true), 'Publicado')}
             disabled={busy || !approveGate.allowed}
             title={tooltipFor(approveGate)}
             style={{ ...btnStyle, background: '#2563eb', color: '#fff' }}
           >
-            Publish
+            Publicar
           </button>
           <button
-            onClick={() => act(() => approveAct(false), 'Rejected - back to draft')}
+            type="button"
+            onClick={() => act(() => approveAct(false), 'Rejeitado — volta para rascunho')}
             disabled={busy || !approveGate.allowed}
             title={tooltipFor(approveGate)}
             style={{ ...btnStyle, background: '#fff', color: '#dc2626', border: '1px solid #dc2626' }}
           >
-            Reject
+            Rejeitar
           </button>
         </div>
       </div>
@@ -157,7 +165,7 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
   if (version.status === 'published') {
     return (
       <div style={{ ...panelStyle, background: '#f0fdf4', borderColor: '#bbf7d0' }}>
-        <span style={{ color: '#166534', fontSize: '0.875rem' }}>This version is published</span>
+        <span style={{ color: '#166534', fontSize: '0.875rem' }}>Esta versão está publicada</span>
       </div>
     );
   }

@@ -11,7 +11,7 @@ async function sha256Hex(buf: ArrayBuffer): Promise<string> {
 export function useTemplateAutosave(templateId: string, versionNum: number) {
   const pendingDocx = useRef<ArrayBuffer | null>(null);
   const timer = useRef<number | null>(null);
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle');
 
   const flush = useCallback(async (): Promise<boolean> => {
     if (!pendingDocx.current) return true;
@@ -49,6 +49,7 @@ export function useTemplateAutosave(templateId: string, versionNum: number) {
   const queueDocx = useCallback(
     (buf: ArrayBuffer) => {
       pendingDocx.current = buf;
+      setStatus('dirty');
       schedule();
     },
     [schedule],

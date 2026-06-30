@@ -118,6 +118,7 @@ var capabilityDescriptions = map[Capability]string{
 	CapTemplateApprove:             "Aprovar template",
 	CapTemplatePublish:             "Publicar template",
 	CapTemplateArchive:             "Arquivar template",
+	CapTemplateManage:              "Gerenciar configurações avançadas de templates (config de aprovação em publicados)",
 	CapControlledDocumentCreate:    "Criar documento controlado",
 	CapControlledDocumentObsolete:  "Tornar documento controlado obsoleto",
 	CapControlledDocumentSupersede: "Substituir documento controlado",
