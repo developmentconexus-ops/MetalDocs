@@ -123,7 +123,12 @@ LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
 LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
 WHERE t.tenant_id = $1::uuid
   AND t.system_owned = false
-  AND ($2::text IS NULL OR t.doc_type_code = $2)
+  -- A profile filter ($2) returns templates scoped to that profile PLUS generic
+  -- templates (doc_type_code = ''), which by product definition apply to every
+  -- profile — the template wizard's "Genérico" scope promises "templates
+  -- genéricos aparecem para todos os perfis". A NULL filter returns every
+  -- non-system template (management listing).
+  AND ($2::text IS NULL OR t.doc_type_code = $2 OR t.doc_type_code = '')
 ORDER BY t.created_at DESC
 LIMIT $3 OFFSET $4`
 

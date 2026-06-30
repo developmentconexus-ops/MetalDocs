@@ -1127,7 +1127,11 @@ paths:
             default: 0
         - name: doc_type
           in: query
-          description: Optional profile code filter (e.g. DC, POP).
+          description: >-
+            Optional profile code filter (e.g. DC, POP). Returns templates scoped
+            to this profile PLUS generic templates (created with no profile
+            scope), since generic templates apply to every profile. Omit to list
+            every non-system template (management view).
           schema:
             type: string
       responses:
