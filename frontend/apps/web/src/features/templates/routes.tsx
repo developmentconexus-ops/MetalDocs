@@ -21,4 +21,9 @@ export const templatesRoutes: RouteObject[] = [
     handle: { workspaceView: "templates", editMode: true },
     lazy: () => import("./pages/TemplateEditorRoutePage"),
   },
+  {
+    path: "templates/:templateId",
+    handle: { workspaceView: "templates" },
+    lazy: () => import("./pages/TemplateDetailRoute"),
+  },
 ];

@@ -128,6 +128,12 @@ export async function getVersion(templateId: string, n: number): Promise<Version
   return apiFetch<VersionDTO>(`/api/v1/templates/${templateId}/versions/${n}`);
 }
 
+// F1.2 / ADR 0035 — manual next-version: POST with empty body, flat VersionDTO response, no idempotency key.
+// M1 removed auto-spawn on approve/publish; this is the only path to a new template version.
+export async function createNextVersion(templateId: string): Promise<VersionDTO> {
+  return apiFetch<VersionDTO>(`/api/v1/templates/${templateId}/versions`, { method: 'POST' });
+}
+
 export async function presignAutosave(
   templateId: string,
   versionNum: number,
