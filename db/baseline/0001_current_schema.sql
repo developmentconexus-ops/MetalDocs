@@ -21,17 +21,23 @@ CREATE SCHEMA IF NOT EXISTS metaldocs;
 
 
 --
--- Name: public; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA IF NOT EXISTS public;
 
 
 --
--- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
 --
 
-COMMENT ON SCHEMA public IS 'standard public schema';
+
+
+--
+--
+
+
+
+--
+--
+
 
 
 --
@@ -189,15 +195,15 @@ DECLARE
   _correlation_id UUID        := pg_catalog.gen_random_uuid();
 BEGIN
   -- ── Input validation (before any query) ──────────────────────────────────
+  -- Role values are NOT re-validated here: the user_process_areas role CHECK
+  -- constraint is the single source of truth and rejects an invalid role on the
+  -- INSERT below (ADR 0022 — no duplicated role list to drift).
   IF _user_id !~ '^[a-z0-9_.@-]+$' THEN
     RAISE EXCEPTION 'invalid user_id: %', _user_id USING ERRCODE = '22023';
   END IF;
   IF _area_code !~ '^[A-Z0-9_]+$' THEN
     RAISE EXCEPTION 'invalid area_code: %', _area_code USING ERRCODE = '22023';
   END IF;
-  -- Role values are NOT re-validated here: the user_process_areas role CHECK
-  -- constraint is the single source of truth and rejects an invalid role on the
-  -- INSERT below (ADR 0022 — no duplicated role list to drift).
   IF _granted_by !~ '^[a-z0-9_.@-]+$' THEN
     RAISE EXCEPTION 'invalid granted_by: %', _granted_by USING ERRCODE = '22023';
   END IF;
@@ -322,14 +328,13 @@ DECLARE
   _now            TIMESTAMPTZ := pg_catalog.clock_timestamp();
 BEGIN
   -- ── Input validation (before any query) ──────────────────────────────────
+  -- Role not re-validated; an unknown role simply matches no active row below.
   IF _user_id !~ '^[a-z0-9_.@-]+$' THEN
     RAISE EXCEPTION 'invalid user_id: %', _user_id USING ERRCODE = '22023';
   END IF;
   IF _area_code !~ '^[A-Z0-9_]+$' THEN
     RAISE EXCEPTION 'invalid area_code: %', _area_code USING ERRCODE = '22023';
   END IF;
-  -- Role not re-validated; an unknown role simply matches no active row below
-  -- (ADR 0022 — the user_process_areas CHECK is the single source of truth).
   IF _revoked_by !~ '^[a-z0-9_.@-]+$' THEN
     RAISE EXCEPTION 'invalid revoked_by: %', _revoked_by USING ERRCODE = '22023';
   END IF;
@@ -417,74 +422,54 @@ DECLARE
   v_bypass        TEXT;
   v_asserted_raw  TEXT;
   v_asserted      JSONB;
-  v_required_caps TEXT[];   -- one or more acceptable caps for this table/op
+  v_required_caps TEXT[];
   v_tenant_id     UUID;
   v_cap_found     BOOLEAN := FALSE;
   v_element       JSONB;
 BEGIN
-  -- ---- Determine required capability set for this table/operation. --------
   CASE
     WHEN TG_TABLE_NAME = 'approval_instances' AND TG_OP = 'INSERT' THEN
       v_required_caps := ARRAY['document.submit'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'approval_signoffs' AND TG_OP = 'INSERT' THEN
       v_required_caps := ARRAY['document.signoff'];
       v_tenant_id     := NEW.actor_tenant_id;
-
     WHEN TG_TABLE_NAME = 'iam_user_roles' THEN
       v_required_caps := ARRAY['user.manage'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'user_process_areas' THEN
       v_required_caps := ARRAY['membership.manage'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'documents' AND TG_OP = 'INSERT' THEN
       v_required_caps := ARRAY['document.create'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'documents' AND TG_OP = 'UPDATE' THEN
       v_required_caps := ARRAY['document.edit'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'controlled_documents' AND TG_OP = 'INSERT' THEN
       v_required_caps := ARRAY['controlled_documents.create'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'controlled_documents' AND TG_OP = 'UPDATE' THEN
-      -- Either lifecycle cap is acceptable.
       v_required_caps := ARRAY['controlled_documents.obsolete', 'controlled_documents.supersede'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'cd_sequence_counters' THEN
       v_required_caps := ARRAY['controlled_documents.create'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'document_profiles' THEN
       v_required_caps := ARRAY['taxonomy.manage'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'document_process_areas' THEN
       v_required_caps := ARRAY['taxonomy.manage'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'document_families' THEN
       v_required_caps := ARRAY['taxonomy.manage'];
-      -- document_families has no tenant_id column.
       v_tenant_id     := NULL;
-
     WHEN TG_TABLE_NAME = 'templates_template' THEN
-      v_required_caps := ARRAY['template.create', 'template.edit', 'template.submit',
-                                'template.approve', 'template.publish'];
+      v_required_caps := ARRAY['template.create', 'template.edit', 'template.submit', 'template.approve', 'template.publish'];
       v_tenant_id     := NEW.tenant_id;
-
     WHEN TG_TABLE_NAME = 'templates_template_version' THEN
-      v_required_caps := ARRAY['template.create', 'template.edit', 'template.submit',
-                                'template.approve', 'template.publish'];
-      -- template_version has no tenant_id column.
-      v_tenant_id     := NULL;
-
+      v_required_caps := ARRAY['template.create', 'template.edit', 'template.submit', 'template.approve', 'template.publish'];
+      v_tenant_id     := NEW.tenant_id;
     ELSE
       -- Fail-closed: a table carrying this trigger with no capability mapping is a
       -- wiring error, not a license to pass through. Refuse the write loudly.
@@ -492,7 +477,6 @@ BEGIN
         USING ERRCODE = 'P0001';
   END CASE;
 
-  -- ---- Bypass path. -------------------------------------------------------
   v_bypass := pg_catalog.current_setting('metaldocs.bypass_authz', true);
   IF v_bypass IS NOT NULL AND v_bypass <> '' THEN
     IF v_bypass = 'scheduler' THEN
@@ -518,35 +502,29 @@ BEGIN
       END;
       RETURN NEW;
     ELSE
-      RAISE EXCEPTION 'ErrCapabilityNotAsserted: unrecognised bypass token; caps % required on %',
-                      v_required_caps, TG_TABLE_NAME
+      RAISE EXCEPTION 'ErrCapabilityNotAsserted: unrecognised bypass token; caps % required on %', v_required_caps, TG_TABLE_NAME
         USING ERRCODE = 'P0001';
     END IF;
   END IF;
 
-  -- ---- Read asserted_caps GUC. --------------------------------------------
   v_asserted_raw := pg_catalog.current_setting('metaldocs.asserted_caps', true);
   IF v_asserted_raw IS NULL OR v_asserted_raw = '' THEN
-    RAISE EXCEPTION 'ErrCapabilityNotAsserted: one of % required but metaldocs.asserted_caps is not set on %',
-                    v_required_caps, TG_TABLE_NAME
+    RAISE EXCEPTION 'ErrCapabilityNotAsserted: one of % required but metaldocs.asserted_caps is not set on %', v_required_caps, TG_TABLE_NAME
       USING ERRCODE = 'P0001';
   END IF;
 
   BEGIN
     v_asserted := v_asserted_raw::JSONB;
   EXCEPTION WHEN invalid_text_representation OR others THEN
-    RAISE EXCEPTION 'ErrCapabilityNotAsserted: metaldocs.asserted_caps is not valid JSONB (caps % required)',
-                    v_required_caps
+    RAISE EXCEPTION 'ErrCapabilityNotAsserted: metaldocs.asserted_caps is not valid JSONB (caps % required)', v_required_caps
       USING ERRCODE = 'P0001';
   END;
 
   IF jsonb_typeof(v_asserted) <> 'array' THEN
-    RAISE EXCEPTION 'ErrCapabilityNotAsserted: metaldocs.asserted_caps must be a JSONB array (caps % required)',
-                    v_required_caps
+    RAISE EXCEPTION 'ErrCapabilityNotAsserted: metaldocs.asserted_caps must be a JSONB array (caps % required)', v_required_caps
       USING ERRCODE = 'P0001';
   END IF;
 
-  -- ---- Scan for any required cap. ----------------------------------------
   FOR v_element IN SELECT * FROM jsonb_array_elements(v_asserted) LOOP
     IF (v_element->>'cap') = ANY(v_required_caps) THEN
       v_cap_found := TRUE;
@@ -555,8 +533,7 @@ BEGIN
   END LOOP;
 
   IF NOT v_cap_found THEN
-    RAISE EXCEPTION 'ErrCapabilityNotAsserted: none of % present in asserted_caps on %',
-                    v_required_caps, TG_TABLE_NAME
+    RAISE EXCEPTION 'ErrCapabilityNotAsserted: none of % present in asserted_caps on %', v_required_caps, TG_TABLE_NAME
       USING ERRCODE = 'P0001';
   END IF;
 
@@ -617,9 +594,12 @@ CREATE FUNCTION public.enforce_placeholder_value_tenant_consistent() RETURNS tri
     AS $$
 DECLARE doc_tenant UUID;
 BEGIN
-    SELECT tenant_id INTO doc_tenant FROM documents WHERE id = NEW.revision_id;
+    SELECT d.tenant_id INTO doc_tenant
+      FROM document_revisions r
+      JOIN documents d ON d.id = r.document_id
+     WHERE r.id = NEW.revision_id;
     IF doc_tenant IS NULL THEN
-        RAISE EXCEPTION 'document % not found', NEW.revision_id USING ERRCODE = 'foreign_key_violation';
+        RAISE EXCEPTION 'revision % not found', NEW.revision_id USING ERRCODE = 'foreign_key_violation';
     END IF;
     IF doc_tenant <> NEW.tenant_id THEN
         RAISE EXCEPTION 'tenant mismatch: document=% value=%', doc_tenant, NEW.tenant_id
@@ -772,6 +752,51 @@ $$;
 
 
 --
+-- Name: enforce_template_version_tenant_consistent(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.enforce_template_version_tenant_consistent() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'pg_temp'
+    AS $$
+DECLARE
+  v_asserting_tenant TEXT;
+  v_parent_tenant    UUID;
+BEGIN
+  -- Read the tx-local tenant GUC set by authz.SeedTxIdentity.
+  -- The second argument (true) suppresses the error if the GUC is unset so we
+  -- can emit a descriptive message rather than a generic "unrecognised parameter".
+  v_asserting_tenant := pg_catalog.current_setting('metaldocs.tenant_id', true);
+
+  IF v_asserting_tenant IS NULL OR v_asserting_tenant = '' THEN
+    -- Fail closed: a write without a tenant context is a wiring error.
+    RAISE EXCEPTION 'enforce_template_version_tenant_consistent: metaldocs.tenant_id GUC is not set; tenant context required for templates_template_version writes'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- Resolve the parent template's tenant.
+  SELECT tenant_id INTO v_parent_tenant
+    FROM public.templates_template
+   WHERE id = NEW.template_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'enforce_template_version_tenant_consistent: parent template % does not exist',
+      NEW.template_id
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+
+  IF v_parent_tenant::TEXT IS DISTINCT FROM v_asserting_tenant THEN
+    RAISE EXCEPTION 'enforce_template_version_tenant_consistent: cross-tenant write rejected (asserting tenant %, parent template tenant %)',
+      v_asserting_tenant, v_parent_tenant
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: enforce_user_process_areas_update_contract(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -864,9 +889,7 @@ END;
 $$;
 
 
-SET default_tablespace = '';
 
-SET default_table_access_method = heap;
 
 --
 -- Name: audit_events; Type: TABLE; Schema: metaldocs; Owner: -
@@ -886,6 +909,8 @@ CREATE TABLE metaldocs.audit_events (
     prev_hash text DEFAULT ''::text NOT NULL,
     row_hash text DEFAULT ''::text NOT NULL
 );
+
+ALTER TABLE ONLY metaldocs.audit_events FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -908,6 +933,33 @@ ALTER SEQUENCE metaldocs.audit_events_audit_sequence_seq OWNED BY metaldocs.audi
 
 
 --
+-- Name: audit_export_jobs; Type: TABLE; Schema: metaldocs; Owner: -
+--
+
+CREATE TABLE metaldocs.audit_export_jobs (
+    id text NOT NULL,
+    tenant_id uuid NOT NULL,
+    actor_id text NOT NULL,
+    format text NOT NULL,
+    filter_json jsonb NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    object_key text,
+    download_token text,
+    expires_at timestamp with time zone,
+    error_message text,
+    estimated_rows bigint DEFAULT 0 NOT NULL,
+    actual_rows bigint DEFAULT 0 NOT NULL,
+    payload bytea,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    CONSTRAINT audit_export_jobs_format_check CHECK ((format = ANY (ARRAY['csv'::text, 'jsonl'::text]))),
+    CONSTRAINT audit_export_jobs_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'running'::text, 'ready'::text, 'failed'::text])))
+);
+
+ALTER TABLE ONLY metaldocs.audit_export_jobs FORCE ROW LEVEL SECURITY;
+
+
+--
 -- Name: auth_identities; Type: TABLE; Schema: metaldocs; Owner: -
 --
 
@@ -924,7 +976,9 @@ CREATE TABLE metaldocs.auth_identities (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     display_name text NOT NULL,
-    is_active boolean DEFAULT true NOT NULL
+    is_active boolean DEFAULT true NOT NULL,
+    last_failed_login_at timestamp with time zone,
+    last_failed_login_ip text
 );
 
 
@@ -944,51 +998,7 @@ CREATE TABLE metaldocs.auth_sessions (
     tenant_id uuid NOT NULL
 );
 
-
---
--- Name: tenants; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.tenants (
-    id uuid NOT NULL,
-    name text NOT NULL,
-    slug text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT tenants_name_not_blank CHECK ((length(btrim(name)) > 0)),
-    CONSTRAINT tenants_slug_not_blank CHECK ((length(btrim(slug)) > 0))
-);
-
-
---
--- Name: document_attachments; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.document_attachments (
-    id text NOT NULL,
-    document_id text NOT NULL,
-    file_name text NOT NULL,
-    content_type text NOT NULL,
-    size_bytes bigint NOT NULL,
-    storage_key text NOT NULL,
-    uploaded_by text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT document_attachments_size_bytes_check CHECK ((size_bytes > 0))
-);
-
-
---
--- Name: document_collaboration_presence; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.document_collaboration_presence (
-    document_id text NOT NULL,
-    user_id text NOT NULL,
-    display_name text NOT NULL,
-    last_seen_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
+ALTER TABLE ONLY metaldocs.auth_sessions FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1001,23 +1011,6 @@ CREATE TABLE metaldocs.document_departments (
     description text DEFAULT ''::text NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: document_edit_locks; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.document_edit_locks (
-    document_id text NOT NULL,
-    locked_by text NOT NULL,
-    display_name text NOT NULL,
-    lock_reason text DEFAULT ''::text NOT NULL,
-    acquired_at timestamp with time zone NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT chk_document_edit_locks_expiry CHECK ((expires_at > acquired_at))
 );
 
 
@@ -1067,6 +1060,8 @@ CREATE TABLE metaldocs.document_process_areas (
     CONSTRAINT area_code_format CHECK ((code ~ '^[a-z][a-z0-9_-]{1,63}$'::text)),
     CONSTRAINT area_code_not_tenant CHECK ((code <> 'tenant'::text))
 );
+
+ALTER TABLE ONLY metaldocs.document_process_areas FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1124,7 +1119,6 @@ CREATE TABLE metaldocs.document_profiles (
     name text NOT NULL,
     description text DEFAULT ''::text NOT NULL,
     review_interval_days integer NOT NULL,
-    is_active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     alias text NOT NULL,
     tenant_id uuid DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid NOT NULL,
@@ -1137,6 +1131,8 @@ CREATE TABLE metaldocs.document_profiles (
     CONSTRAINT profile_code_format CHECK ((code ~ '^[a-z][a-z0-9_-]{1,63}$'::text))
 );
 
+ALTER TABLE ONLY metaldocs.document_profiles FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: document_sequences; Type: TABLE; Schema: metaldocs; Owner: -
@@ -1146,32 +1142,6 @@ CREATE TABLE metaldocs.document_sequences (
     profile_code text NOT NULL,
     next_value integer NOT NULL,
     CONSTRAINT document_sequences_next_value_check CHECK ((next_value > 0))
-);
-
-
---
--- Name: document_subjects; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.document_subjects (
-    code text NOT NULL,
-    process_area_code text NOT NULL,
-    name text NOT NULL,
-    description text DEFAULT ''::text NOT NULL,
-    is_active boolean DEFAULT true NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: document_template_assignments; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.document_template_assignments (
-    document_id text NOT NULL,
-    template_key text NOT NULL,
-    template_version integer NOT NULL,
-    assigned_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1245,122 +1215,6 @@ CREATE TABLE metaldocs.document_types (
 
 
 --
--- Name: document_version_images; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.document_version_images (
-    document_version_id uuid NOT NULL,
-    image_id uuid NOT NULL
-);
-
-
---
--- Name: document_versions; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.document_versions (
-    document_id text NOT NULL,
-    version_number integer NOT NULL,
-    content text DEFAULT ''::text NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    content_hash text NOT NULL,
-    change_summary text DEFAULT ''::text NOT NULL,
-    content_source text DEFAULT 'native'::text NOT NULL,
-    native_content jsonb,
-    docx_storage_key text,
-    pdf_storage_key text,
-    text_content text,
-    file_size_bytes bigint,
-    original_filename text,
-    page_count integer,
-    search_vector tsvector GENERATED ALWAYS AS (to_tsvector('portuguese'::regconfig, COALESCE(text_content, ''::text))) STORED,
-    body_blocks jsonb DEFAULT '[]'::jsonb,
-    values_json jsonb DEFAULT '{}'::jsonb NOT NULL,
-    template_key text,
-    template_version integer,
-    renderer_pin jsonb,
-    release_artifact_key text,
-    canonical_mddm_snapshot jsonb
-);
-
-
---
--- Name: COLUMN document_versions.renderer_pin; Type: COMMENT; Schema: metaldocs; Owner: -
---
-
-COMMENT ON COLUMN metaldocs.document_versions.renderer_pin IS 'Frozen renderer inputs captured at release time: {renderer_version, layout_ir_hash, template_key, template_version, pinned_at}. NULL for drafts.';
-
-
---
--- Name: COLUMN document_versions.release_artifact_key; Type: COMMENT; Schema: metaldocs; Owner: -
---
-
-COMMENT ON COLUMN metaldocs.document_versions.release_artifact_key IS 'Storage key for the immutable DOCX artifact generated at release time';
-
-
---
--- Name: COLUMN document_versions.canonical_mddm_snapshot; Type: COMMENT; Schema: metaldocs; Owner: -
---
-
-COMMENT ON COLUMN metaldocs.document_versions.canonical_mddm_snapshot IS 'Frozen MDDM envelope JSON captured at release time (post-migration, post-canonicalization)';
-
-
---
--- Name: document_versions_mddm; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.document_versions_mddm (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    document_id text NOT NULL,
-    version_number integer NOT NULL,
-    revision_label text NOT NULL,
-    status metaldocs.mddm_version_status NOT NULL,
-    content_blocks jsonb,
-    docx_bytes bytea,
-    template_ref jsonb,
-    content_hash text,
-    revision_diff jsonb,
-    change_summary text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by text NOT NULL,
-    approved_at timestamp with time zone,
-    approved_by text,
-    CONSTRAINT document_versions_mddm_version_number_check CHECK ((version_number >= 1))
-);
-
-
---
--- Name: documents; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.documents (
-    id text NOT NULL,
-    title text NOT NULL,
-    owner_id text NOT NULL,
-    classification text NOT NULL,
-    status text NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    document_type_code text NOT NULL,
-    business_unit text NOT NULL,
-    department text NOT NULL,
-    tags jsonb DEFAULT '[]'::jsonb NOT NULL,
-    effective_at timestamp with time zone,
-    expiry_at timestamp with time zone,
-    metadata_json jsonb DEFAULT '{}'::jsonb NOT NULL,
-    document_profile_code text NOT NULL,
-    document_family_code text NOT NULL,
-    process_area_code text,
-    subject_code text,
-    profile_schema_version integer DEFAULT 1 NOT NULL,
-    document_sequence integer NOT NULL,
-    document_code text NOT NULL,
-    document_type_key text DEFAULT ''::text NOT NULL,
-    document_type_version integer DEFAULT 1 NOT NULL
-);
-
-
---
 -- Name: iam_group_members; Type: TABLE; Schema: metaldocs; Owner: -
 --
 
@@ -1371,6 +1225,8 @@ CREATE TABLE metaldocs.iam_group_members (
     granted_at timestamp with time zone DEFAULT now() NOT NULL,
     granted_by text
 );
+
+ALTER TABLE ONLY metaldocs.iam_group_members FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1395,6 +1251,8 @@ CREATE TABLE metaldocs.iam_groups (
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY metaldocs.iam_groups FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: iam_user_roles; Type: TABLE; Schema: metaldocs; Owner: -
@@ -1409,6 +1267,8 @@ CREATE TABLE metaldocs.iam_user_roles (
     CONSTRAINT chk_iam_user_roles_role_code CHECK ((role_code = ANY (ARRAY['system_admin'::text, 'approver'::text, 'author'::text, 'editor'::text, 'viewer'::text])))
 );
 
+ALTER TABLE ONLY metaldocs.iam_user_roles FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: iam_users; Type: TABLE; Schema: metaldocs; Owner: -
@@ -1422,8 +1282,44 @@ CREATE TABLE metaldocs.iam_users (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     tenant_id uuid DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid NOT NULL,
     deactivated_at timestamp with time zone,
+    last_login_ip text,
+    last_login_user_agent text,
+    last_login_device_label text,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    mfa_enabled boolean DEFAULT false NOT NULL,
+    mfa_enrolled_at timestamp with time zone,
     CONSTRAINT iam_users_deactivated_after_created CHECK (((deactivated_at IS NULL) OR (deactivated_at >= created_at)))
 );
+
+ALTER TABLE ONLY metaldocs.iam_users FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: COLUMN iam_users.last_login_ip; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON COLUMN metaldocs.iam_users.last_login_ip IS 'Client IP recorded on most recent successful login (PR-4).';
+
+
+--
+-- Name: COLUMN iam_users.last_login_user_agent; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON COLUMN metaldocs.iam_users.last_login_user_agent IS 'Raw User-Agent header on most recent successful login (PR-4).';
+
+
+--
+-- Name: COLUMN iam_users.last_login_device_label; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON COLUMN metaldocs.iam_users.last_login_device_label IS 'Derived device label (browser + OS). Populated by PR-7; nullable until then.';
+
+
+--
+-- Name: COLUMN iam_users.last_seen_at; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON COLUMN metaldocs.iam_users.last_seen_at IS 'Most recent authenticated-request or WS heartbeat timestamp (PR-9). Drives presence online/idle classification.';
 
 
 --
@@ -1448,6 +1344,8 @@ CREATE TABLE metaldocs.idempotency_keys (
     CONSTRAINT idempotency_keys_status_check CHECK ((status = ANY (ARRAY['in_flight'::text, 'completed'::text, 'failed'::text])))
 );
 
+ALTER TABLE ONLY metaldocs.idempotency_keys FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: job_leases; Type: TABLE; Schema: metaldocs; Owner: -
@@ -1461,6 +1359,29 @@ CREATE TABLE metaldocs.job_leases (
     heartbeat_at timestamp with time zone DEFAULT now() NOT NULL,
     expires_at timestamp with time zone NOT NULL
 );
+
+
+--
+-- Name: materialize_dispatch_outbox; Type: TABLE; Schema: metaldocs; Owner: -
+--
+
+CREATE TABLE metaldocs.materialize_dispatch_outbox (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
+    revision_id uuid NOT NULL,
+    content_hash bytea NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    last_error text,
+    claimed_at timestamp with time zone,
+    next_retry_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    dispatched_at timestamp with time zone,
+    dead_lettered_at timestamp with time zone,
+    CONSTRAINT materialize_dispatch_outbox_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'dispatched'::text, 'failed'::text])))
+);
+
+ALTER TABLE ONLY metaldocs.materialize_dispatch_outbox FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1514,19 +1435,22 @@ ALTER SEQUENCE metaldocs.mddm_shadow_diff_events_id_seq OWNED BY metaldocs.mddm_
 --
 
 CREATE TABLE metaldocs.notifications (
-    id text NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
     recipient_user_id text NOT NULL,
     event_type text NOT NULL,
     resource_type text NOT NULL,
     resource_id text NOT NULL,
     title text NOT NULL,
     message text NOT NULL,
-    status text NOT NULL,
-    idempotency_key text NOT NULL,
+    status text DEFAULT 'PENDING'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     read_at timestamp with time zone,
+    source_event_id uuid,
     CONSTRAINT notifications_status_check CHECK ((status = ANY (ARRAY['PENDING'::text, 'SENT'::text, 'READ'::text])))
 );
+
+ALTER TABLE ONLY metaldocs.notifications FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1569,8 +1493,11 @@ CREATE TABLE metaldocs.pdf_dispatch_outbox (
     next_retry_at timestamp with time zone DEFAULT now() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     dispatched_at timestamp with time zone,
+    dead_lettered_at timestamp with time zone,
     CONSTRAINT pdf_dispatch_outbox_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'dispatched'::text, 'failed'::text])))
 );
+
+ALTER TABLE ONLY metaldocs.pdf_dispatch_outbox FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1584,22 +1511,6 @@ CREATE TABLE metaldocs.role_capabilities (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT ck_cap_format CHECK ((capability ~ '^[a-z][a-z0-9._]*[a-z0-9]$'::text)),
     CONSTRAINT ck_cap_not_legacy CHECK ((capability <> ALL (ARRAY['document.finalize'::text, 'document.archive'::text])))
-);
-
-
---
--- Name: template_audit_log; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.template_audit_log (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    template_key text NOT NULL,
-    version integer,
-    action text NOT NULL,
-    actor_id text NOT NULL,
-    diff_summary text,
-    trace_id text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1628,6 +1539,102 @@ CREATE TABLE metaldocs.template_drafts (
 
 
 --
+-- Name: tenant_plans; Type: TABLE; Schema: metaldocs; Owner: -
+--
+
+CREATE TABLE metaldocs.tenant_plans (
+    tenant_id uuid NOT NULL,
+    plan_tier text DEFAULT 'pro'::text NOT NULL,
+    seats_allocated integer DEFAULT 100 NOT NULL,
+    storage_allocated_bytes bigint DEFAULT '53687091200'::bigint NOT NULL,
+    api_calls_allocated integer DEFAULT 1000000 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT tenant_plans_api_calls_allocated_check CHECK ((api_calls_allocated >= 0)),
+    CONSTRAINT tenant_plans_plan_tier_check CHECK ((plan_tier = ANY (ARRAY['free'::text, 'pro'::text, 'enterprise'::text]))),
+    CONSTRAINT tenant_plans_seats_allocated_check CHECK ((seats_allocated >= 0)),
+    CONSTRAINT tenant_plans_storage_allocated_bytes_check CHECK ((storage_allocated_bytes >= 0))
+);
+
+ALTER TABLE ONLY metaldocs.tenant_plans FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: TABLE tenant_plans; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON TABLE metaldocs.tenant_plans IS 'PR-8: read-only plan envelope per tenant (seats/storage/api_calls allocated, tier label). Mutation owned by Tier-A platform-owner surface.';
+
+
+--
+-- Name: COLUMN tenant_plans.plan_tier; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON COLUMN metaldocs.tenant_plans.plan_tier IS 'free | pro | enterprise — display label only at Tier-B.';
+
+
+--
+-- Name: COLUMN tenant_plans.seats_allocated; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON COLUMN metaldocs.tenant_plans.seats_allocated IS 'Seat quota; consumed by COUNT(iam_users WHERE is_active).';
+
+
+--
+-- Name: COLUMN tenant_plans.storage_allocated_bytes; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON COLUMN metaldocs.tenant_plans.storage_allocated_bytes IS 'Storage quota in bytes; consumed by attachment/blob aggregation (tech-debt: real consumption pending).';
+
+
+--
+-- Name: COLUMN tenant_plans.api_calls_allocated; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON COLUMN metaldocs.tenant_plans.api_calls_allocated IS 'API call quota per billing window; consumed by audit/request-log aggregation (tech-debt: source not wired).';
+
+
+--
+-- Name: tenants; Type: TABLE; Schema: metaldocs; Owner: -
+--
+
+CREATE TABLE metaldocs.tenants (
+    id uuid NOT NULL,
+    name text NOT NULL,
+    slug text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT tenants_name_not_blank CHECK ((length(btrim(name)) > 0)),
+    CONSTRAINT tenants_slug_not_blank CHECK ((length(btrim(slug)) > 0))
+);
+
+
+--
+-- Name: token_dictionary_entries; Type: TABLE; Schema: metaldocs; Owner: -
+--
+
+CREATE TABLE metaldocs.token_dictionary_entries (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
+    name text NOT NULL,
+    value text NOT NULL,
+    label text NOT NULL,
+    description text,
+    created_by text NOT NULL,
+    updated_by text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT token_dictionary_entries_description_check CHECK (((description IS NULL) OR (char_length(description) <= 1024))),
+    CONSTRAINT token_dictionary_entries_label_check CHECK (((char_length(label) >= 1) AND (char_length(label) <= 256))),
+    CONSTRAINT token_dictionary_entries_name_check CHECK ((name ~ '^[A-Za-z0-9_]+$'::text)),
+    CONSTRAINT token_dictionary_entries_name_check1 CHECK (((char_length(name) >= 1) AND (char_length(name) <= 64))),
+    CONSTRAINT token_dictionary_entries_value_check CHECK (((char_length(value) >= 1) AND (char_length(value) <= 4096)))
+);
+
+ALTER TABLE ONLY metaldocs.token_dictionary_entries FORCE ROW LEVEL SECURITY;
+
+
+--
 -- Name: user_process_areas; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1644,6 +1651,8 @@ CREATE TABLE public.user_process_areas (
     CONSTRAINT revoked_by_required_when_revoked CHECK ((((effective_to IS NULL) AND (revoked_by IS NULL)) OR ((effective_to IS NOT NULL) AND (revoked_by IS NOT NULL)))),
     CONSTRAINT user_process_areas_role_check CHECK ((role = ANY (ARRAY['viewer'::text, 'editor'::text, 'approver'::text, 'author'::text, 'signer'::text, 'area_admin'::text, 'qms_admin'::text])))
 );
+
+ALTER TABLE ONLY public.user_process_areas FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1662,157 +1671,23 @@ CREATE VIEW metaldocs.user_process_areas AS
 
 
 --
--- Name: workflow_approvals; Type: TABLE; Schema: metaldocs; Owner: -
+-- Name: v_active_user_areas; Type: VIEW; Schema: metaldocs; Owner: -
 --
 
-CREATE TABLE metaldocs.workflow_approvals (
-    id text NOT NULL,
-    document_id text NOT NULL,
-    requested_by text NOT NULL,
-    assigned_reviewer text NOT NULL,
-    decision_by text,
-    status text NOT NULL,
-    request_reason text DEFAULT ''::text NOT NULL,
-    decision_reason text,
-    requested_at timestamp with time zone NOT NULL,
-    decided_at timestamp with time zone,
-    CONSTRAINT workflow_approvals_status_check CHECK ((status = ANY (ARRAY['PENDING'::text, 'APPROVED'::text, 'REJECTED'::text])))
-);
+CREATE VIEW metaldocs.v_active_user_areas AS
+ SELECT tenant_id,
+    user_id,
+    area_code,
+    role
+   FROM public.user_process_areas
+  WHERE (effective_to IS NULL);
 
 
 --
--- Name: approval_instances; Type: TABLE; Schema: public; Owner: -
+-- Name: VIEW v_active_user_areas; Type: COMMENT; Schema: metaldocs; Owner: -
 --
 
-CREATE TABLE public.approval_instances (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    tenant_id uuid NOT NULL,
-    document_id uuid NOT NULL,
-    route_id uuid NOT NULL,
-    route_version_snapshot integer NOT NULL,
-    status text NOT NULL,
-    submitted_by text NOT NULL,
-    submitted_at timestamp with time zone DEFAULT now() NOT NULL,
-    completed_at timestamp with time zone,
-    content_hash_at_submit text NOT NULL,
-    idempotency_key text NOT NULL,
-    CONSTRAINT approval_instances_status_check CHECK ((status = ANY (ARRAY['in_progress'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text])))
-);
-
-
---
--- Name: approval_route_stages; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.approval_route_stages (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    route_id uuid NOT NULL,
-    stage_order integer NOT NULL,
-    name text NOT NULL,
-    required_role text NOT NULL,
-    required_capability text NOT NULL,
-    area_code text NOT NULL,
-    quorum text NOT NULL,
-    quorum_m integer,
-    on_eligibility_drift text NOT NULL,
-    CONSTRAINT approval_route_stages_on_eligibility_drift_check CHECK ((on_eligibility_drift = ANY (ARRAY['reduce_quorum'::text, 'fail_stage'::text, 'keep_snapshot'::text]))),
-    CONSTRAINT approval_route_stages_quorum_check CHECK ((quorum = ANY (ARRAY['any_1_of'::text, 'all_of'::text, 'm_of_n'::text]))),
-    CONSTRAINT approval_route_stages_quorum_m_consistent CHECK ((((quorum = 'm_of_n'::text) AND (quorum_m IS NOT NULL) AND (quorum_m >= 1)) OR ((quorum <> 'm_of_n'::text) AND (quorum_m IS NULL)))),
-    CONSTRAINT approval_route_stages_stage_order_check CHECK ((stage_order >= 1))
-);
-
-
---
--- Name: approval_routes; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.approval_routes (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    tenant_id uuid NOT NULL,
-    profile_code text NOT NULL,
-    name text NOT NULL,
-    version integer DEFAULT 1 NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by text NOT NULL,
-    active boolean DEFAULT true NOT NULL
-);
-
-
---
--- Name: approval_signoffs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.approval_signoffs (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    approval_instance_id uuid NOT NULL,
-    stage_instance_id uuid NOT NULL,
-    actor_user_id text NOT NULL,
-    actor_tenant_id uuid NOT NULL,
-    decision text NOT NULL,
-    comment text,
-    signed_at timestamp with time zone DEFAULT now() NOT NULL,
-    signature_method text NOT NULL,
-    signature_payload jsonb NOT NULL,
-    content_hash text NOT NULL,
-    actor_display_name_snapshot text,
-    CONSTRAINT approval_signoffs_decision_check CHECK ((decision = ANY (ARRAY['approve'::text, 'reject'::text])))
-);
-
-
---
--- Name: approval_stage_instances; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.approval_stage_instances (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    approval_instance_id uuid NOT NULL,
-    stage_order integer NOT NULL,
-    name_snapshot text NOT NULL,
-    required_role_snapshot text NOT NULL,
-    required_capability_snapshot text NOT NULL,
-    area_code_snapshot text NOT NULL,
-    quorum_snapshot text NOT NULL,
-    quorum_m_snapshot integer,
-    on_eligibility_drift_snapshot text NOT NULL,
-    eligible_actor_ids jsonb NOT NULL,
-    effective_denominator integer,
-    status text NOT NULL,
-    opened_at timestamp with time zone,
-    completed_at timestamp with time zone,
-    CONSTRAINT approval_stage_instances_on_eligibility_drift_snapshot_check CHECK ((on_eligibility_drift_snapshot = ANY (ARRAY['reduce_quorum'::text, 'fail_stage'::text, 'keep_snapshot'::text]))),
-    CONSTRAINT approval_stage_instances_quorum_snapshot_check CHECK ((quorum_snapshot = ANY (ARRAY['any_1_of'::text, 'all_of'::text, 'm_of_n'::text]))),
-    CONSTRAINT approval_stage_instances_stage_order_check CHECK ((stage_order >= 1)),
-    CONSTRAINT approval_stage_instances_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'skipped'::text, 'rejected_here'::text, 'cancelled'::text])))
-);
-
-
---
--- Name: autosave_pending_uploads; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.autosave_pending_uploads (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    session_id uuid NOT NULL,
-    document_id uuid NOT NULL,
-    base_revision_id uuid NOT NULL,
-    content_hash text NOT NULL,
-    storage_key text NOT NULL,
-    presigned_at timestamp with time zone DEFAULT now() NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
-    consumed_at timestamp with time zone
-);
-
-
---
--- Name: cd_sequence_counters; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.cd_sequence_counters (
-    tenant_id uuid NOT NULL,
-    profile_code text NOT NULL,
-    process_area_code text NOT NULL,
-    next_seq integer DEFAULT 1 NOT NULL
-);
+COMMENT ON VIEW metaldocs.v_active_user_areas IS 'Published active-membership read contract (ADR-0039 D3a/D4; ADR 0037 D1): active-now user-area-role rows (effective_to IS NULL). Non-owner modules read THIS view, never public.user_process_areas. Columns (tenant_id, user_id, area_code, role). Mission backend-module-boundary-hardening M3/F3.1.';
 
 
 --
@@ -1826,6 +1701,8 @@ CREATE TABLE public.controlled_document_area_grants (
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.controlled_document_area_grants FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: controlled_document_user_grants; Type: TABLE; Schema: public; Owner: -
@@ -1837,6 +1714,8 @@ CREATE TABLE public.controlled_document_user_grants (
     user_id text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.controlled_document_user_grants FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -1863,118 +1742,109 @@ CREATE TABLE public.controlled_documents (
     CONSTRAINT controlled_documents_visibility_scope_check CHECK ((visibility_scope = ANY (ARRAY['company'::text, 'restricted'::text])))
 );
 
-
---
--- Name: document_checkpoints; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.document_checkpoints (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    document_id uuid NOT NULL,
-    revision_id uuid NOT NULL,
-    version_num integer NOT NULL,
-    label text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_by text NOT NULL
-);
+ALTER TABLE ONLY public.controlled_documents FORCE ROW LEVEL SECURITY;
 
 
 --
--- Name: document_comments; Type: TABLE; Schema: public; Owner: -
+-- Name: v_cd_grantee; Type: VIEW; Schema: metaldocs; Owner: -
 --
 
-CREATE TABLE public.document_comments (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    tenant_id uuid NOT NULL,
-    document_id uuid NOT NULL,
-    library_comment_id integer NOT NULL,
-    parent_library_id integer,
-    author_id text NOT NULL,
-    author_display text NOT NULL,
-    content_json jsonb NOT NULL,
-    resolved_at timestamp with time zone,
-    resolved_by text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: document_exports; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.document_exports (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    document_id uuid NOT NULL,
-    revision_id uuid NOT NULL,
-    composite_hash bytea NOT NULL,
-    storage_key text NOT NULL,
-    size_bytes bigint NOT NULL,
-    paper_size text DEFAULT 'A4'::text NOT NULL,
-    landscape boolean DEFAULT false NOT NULL,
-    docgen_v2_ver text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT document_exports_composite_hash_check CHECK ((octet_length(composite_hash) = 32)),
-    CONSTRAINT document_exports_size_bytes_check CHECK ((size_bytes > 0))
-);
+CREATE VIEW metaldocs.v_cd_grantee AS
+ SELECT cd.tenant_id,
+    cd.id AS controlled_document_id,
+    upa.user_id AS grantee_user_id
+   FROM ((public.controlled_documents cd
+     JOIN public.controlled_document_area_grants cdag ON (((cdag.tenant_id = cd.tenant_id) AND (cdag.controlled_document_id = cd.id))))
+     JOIN metaldocs.v_active_user_areas upa ON (((upa.tenant_id = cd.tenant_id) AND (upa.area_code = cdag.area_code))))
+  WHERE (cd.visibility_scope = 'restricted'::text)
+UNION
+ SELECT cd.tenant_id,
+    cd.id AS controlled_document_id,
+    cdug.user_id AS grantee_user_id
+   FROM (public.controlled_documents cd
+     JOIN public.controlled_document_user_grants cdug ON (((cdug.tenant_id = cd.tenant_id) AND (cdug.controlled_document_id = cd.id))))
+  WHERE (cd.visibility_scope = 'restricted'::text);
 
 
 --
--- Name: document_placeholder_values; Type: TABLE; Schema: public; Owner: -
+-- Name: VIEW v_cd_grantee; Type: COMMENT; Schema: metaldocs; Owner: -
 --
 
-CREATE TABLE public.document_placeholder_values (
-    tenant_id uuid NOT NULL,
-    revision_id uuid NOT NULL,
-    placeholder_id text NOT NULL,
-    value_text text,
-    value_typed jsonb,
-    source text NOT NULL,
-    computed_from text,
-    resolver_version integer,
-    inputs_hash bytea,
-    validated_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT document_placeholder_values_inputs_hash_check CHECK (((inputs_hash IS NULL) OR (octet_length(inputs_hash) = 32))),
-    CONSTRAINT document_placeholder_values_source_check CHECK ((source = ANY (ARRAY['user'::text, 'computed'::text, 'default'::text, 'dictionary'::text])))
-);
+COMMENT ON VIEW metaldocs.v_cd_grantee IS 'Published CD bounded visibility edges (ADR-0039 D3a/D4): one (tenant_id, controlled_document_id, grantee_user_id) row per actor who may see a RESTRICTED CD via an ACTIVE area-grant membership (metaldocs.v_active_user_areas, effective_to IS NULL, ADR 0037 D1) or a direct user-grant. Gated on visibility_scope = ''restricted'' to mirror the inline search predicate exactly; revoked members and company-scope cross-products are excluded. Non-owner modules (search) read THIS view, never CD''s grant base tables. Mission backend-module-boundary-hardening M4/F4.1.';
 
 
 --
--- Name: document_revisions; Type: TABLE; Schema: public; Owner: -
+-- Name: v_cd_search_facts; Type: VIEW; Schema: metaldocs; Owner: -
 --
 
-CREATE TABLE public.document_revisions (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    document_id uuid NOT NULL,
-    revision_num bigint NOT NULL,
-    parent_revision_id uuid,
-    session_id uuid NOT NULL,
-    storage_key text NOT NULL,
-    content_hash text NOT NULL,
-    form_data_snapshot jsonb,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: document_revisions_revision_num_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.document_revisions_revision_num_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
+CREATE VIEW metaldocs.v_cd_search_facts AS
+ SELECT tenant_id,
+    id AS controlled_document_id,
+    code,
+    department_code,
+    profile_code,
+    sequence_num,
+    (visibility_scope = 'company'::text) AS is_company,
+    owner_user_id
+   FROM public.controlled_documents cd;
 
 
 --
--- Name: document_revisions_revision_num_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: VIEW v_cd_search_facts; Type: COMMENT; Schema: metaldocs; Owner: -
 --
 
-ALTER SEQUENCE public.document_revisions_revision_num_seq OWNED BY public.document_revisions.revision_num;
+COMMENT ON VIEW metaldocs.v_cd_search_facts IS 'Published CD search projection + scalar visibility legs (ADR-0039 D3a/D4). 1 row/CD: projection cols (code, department_code, profile_code, sequence_num) + is_company (= visibility_scope = ''company'') + owner_user_id. Non-owner modules (search) read THIS view, never public.controlled_documents. Mission backend-module-boundary-hardening M4/F4.1.';
+
+
+--
+-- Name: v_cd_obligated_readers; Type: VIEW; Schema: metaldocs; Owner: -
+--
+
+CREATE VIEW metaldocs.v_cd_obligated_readers AS
+ WITH legs AS (
+         SELECT cdug.tenant_id,
+            cdug.controlled_document_id,
+            cdug.user_id,
+            NULL::text AS area_code,
+            'user_grant'::text AS source,
+            1 AS source_rank
+           FROM public.controlled_document_user_grants cdug
+        UNION ALL
+         SELECT cdag.tenant_id,
+            cdag.controlled_document_id,
+            upa.user_id,
+            upa.area_code,
+            'area_grant'::text AS source,
+            2 AS source_rank
+           FROM (public.controlled_document_area_grants cdag
+             JOIN metaldocs.v_active_user_areas upa ON (((upa.tenant_id = cdag.tenant_id) AND (upa.area_code = cdag.area_code))))
+        UNION ALL
+         SELECT f.tenant_id,
+            f.controlled_document_id,
+            tu.user_id,
+            NULL::text AS area_code,
+            'company_scope'::text AS source,
+            3 AS source_rank
+           FROM (metaldocs.v_cd_search_facts f
+             JOIN ( SELECT DISTINCT v_active_user_areas.tenant_id,
+                    v_active_user_areas.user_id
+                   FROM metaldocs.v_active_user_areas) tu ON ((tu.tenant_id = f.tenant_id)))
+          WHERE f.is_company
+        )
+ SELECT DISTINCT ON (tenant_id, controlled_document_id, user_id) tenant_id,
+    controlled_document_id,
+    user_id,
+    area_code,
+    source
+   FROM legs
+  ORDER BY tenant_id, controlled_document_id, user_id, source_rank, area_code;
+
+
+--
+-- Name: VIEW v_cd_obligated_readers; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON VIEW metaldocs.v_cd_obligated_readers IS 'Published CD obligated-reader read contract (ADR-0040; ADR-0039 D3a/D4): one (tenant_id, controlled_document_id, user_id, area_code NULL, source) row per user obligated to read a CD. Three legs UNION''d (user_grant ∪ active area_grant member ∪ company-scope active tenant user) and DISTINCT BY (tenant_id, cd, user_id) with source precedence user_grant > area_grant > company_scope. Non-owner modules (distribution) read THIS view, never CD''s grant base tables. v_cd_grantee remains restricted-only by design (search semantics, migration 0243). Mission frontend-screen-completion M2/F2.1a.';
 
 
 --
@@ -2020,6 +1890,9 @@ CREATE TABLE public.documents (
     code text,
     created_by_display_name_snapshot text,
     area_name_snapshot text,
+    revision_title text,
+    schedule_generation bigint DEFAULT 0 NOT NULL,
+    superseded_document_id uuid,
     CONSTRAINT documents_body_docx_hash_len CHECK (((body_docx_hash IS NULL) OR (octet_length(body_docx_hash) = 32))),
     CONSTRAINT documents_composition_config_hash_len CHECK (((composition_config_hash IS NULL) OR (octet_length(composition_config_hash) = 32))),
     CONSTRAINT documents_content_hash_len CHECK (((content_hash IS NULL) OR (octet_length(content_hash) = 32))),
@@ -2030,6 +1903,342 @@ CREATE TABLE public.documents (
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'finalized'::text, 'archived'::text, 'under_review'::text, 'approved'::text, 'rejected'::text, 'scheduled'::text, 'published'::text, 'superseded'::text, 'obsolete'::text]))),
     CONSTRAINT documents_values_hash_len CHECK (((values_hash IS NULL) OR (octet_length(values_hash) = 32)))
 );
+
+ALTER TABLE ONLY public.documents FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: COLUMN documents.schedule_generation; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.schedule_generation IS 'Monotonic generation used to invalidate stale scheduled publish jobs after reschedule or cancel.';
+
+
+--
+-- Name: v_document_search_facts; Type: VIEW; Schema: metaldocs; Owner: -
+--
+
+CREATE VIEW metaldocs.v_document_search_facts AS
+ SELECT tenant_id,
+    id,
+    controlled_document_id,
+    name,
+    status,
+    profile_code_snapshot,
+    process_area_code_snapshot,
+    created_by,
+    code,
+    revision_number,
+    effective_from,
+    effective_to,
+    created_at,
+    archived_at
+   FROM public.documents d;
+
+
+--
+-- Name: VIEW v_document_search_facts; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON VIEW metaldocs.v_document_search_facts IS 'Published documents search projection (ADR-0039 D3a/D4). Pure 1:1 projection of public.documents: the 14 columns the search consumer reads (tenant_id, id, controlled_document_id, name, status, profile_code_snapshot, process_area_code_snapshot, created_by, code, revision_number, effective_from, effective_to, created_at, archived_at). No WHERE, no COALESCE: archived_at exposed (consumer applies its own active filter), nullable cols pass through. Non-owner modules (search) read THIS view, never public.documents. Mission backend-module-boundary-hardening M4/F4.2.';
+
+
+--
+-- Name: v_process_area_name; Type: VIEW; Schema: metaldocs; Owner: -
+--
+
+CREATE VIEW metaldocs.v_process_area_name AS
+ SELECT tenant_id,
+    code AS area_code,
+    name AS area_name
+   FROM metaldocs.document_process_areas;
+
+
+--
+-- Name: VIEW v_process_area_name; Type: COMMENT; Schema: metaldocs; Owner: -
+--
+
+COMMENT ON VIEW metaldocs.v_process_area_name IS 'Published taxonomy per-area human-label read contract (ADR-0041; ADR-0039 D3a/D4): one (tenant_id, area_code, area_name) row per (tenant_id, area_code), 1:1 projection of metaldocs.document_process_areas (code → area_code, name → area_name). No is_active / archived_at filter — labels resolve for archived areas (parity with internal/modules/taxonomy/infrastructure/area_catalog_reader.go). Sole consumer: distribution module (F2.2), joining on (tenant_id, area_code) to F2.1a''s v_cd_obligated_readers. Mission frontend-screen-completion M2/F2.1b.';
+
+
+--
+-- Name: approval_instances; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.approval_instances (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
+    document_id uuid NOT NULL,
+    route_id uuid NOT NULL,
+    route_version_snapshot integer NOT NULL,
+    status text NOT NULL,
+    submitted_by text NOT NULL,
+    submitted_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    content_hash_at_submit text NOT NULL,
+    idempotency_key text NOT NULL,
+    CONSTRAINT approval_instances_status_check CHECK ((status = ANY (ARRAY['in_progress'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text])))
+);
+
+ALTER TABLE ONLY public.approval_instances FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: approval_route_stages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.approval_route_stages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    route_id uuid NOT NULL,
+    stage_order integer NOT NULL,
+    name text NOT NULL,
+    required_role text NOT NULL,
+    required_capability text NOT NULL,
+    area_code text NOT NULL,
+    quorum text NOT NULL,
+    quorum_m integer,
+    on_eligibility_drift text NOT NULL,
+    CONSTRAINT approval_route_stages_on_eligibility_drift_check CHECK ((on_eligibility_drift = ANY (ARRAY['reduce_quorum'::text, 'fail_stage'::text, 'keep_snapshot'::text]))),
+    CONSTRAINT approval_route_stages_quorum_check CHECK ((quorum = ANY (ARRAY['any_1_of'::text, 'all_of'::text, 'm_of_n'::text]))),
+    CONSTRAINT approval_route_stages_quorum_m_consistent CHECK ((((quorum = 'm_of_n'::text) AND (quorum_m IS NOT NULL) AND (quorum_m >= 1)) OR ((quorum <> 'm_of_n'::text) AND (quorum_m IS NULL)))),
+    CONSTRAINT approval_route_stages_stage_order_check CHECK ((stage_order >= 1))
+);
+
+
+--
+-- Name: approval_routes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.approval_routes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
+    profile_code text NOT NULL,
+    name text NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by text NOT NULL,
+    active boolean DEFAULT true NOT NULL
+);
+
+ALTER TABLE ONLY public.approval_routes FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: approval_signoffs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.approval_signoffs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    approval_instance_id uuid NOT NULL,
+    stage_instance_id uuid NOT NULL,
+    actor_user_id text NOT NULL,
+    actor_tenant_id uuid NOT NULL,
+    decision text NOT NULL,
+    comment text,
+    signed_at timestamp with time zone DEFAULT now() NOT NULL,
+    signature_method text NOT NULL,
+    signature_payload jsonb NOT NULL,
+    content_hash text NOT NULL,
+    actor_display_name_snapshot text,
+    CONSTRAINT approval_signoffs_decision_check CHECK ((decision = ANY (ARRAY['approve'::text, 'reject'::text])))
+);
+
+
+--
+-- Name: approval_stage_instances; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.approval_stage_instances (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    approval_instance_id uuid NOT NULL,
+    stage_order integer NOT NULL,
+    name_snapshot text NOT NULL,
+    required_role_snapshot text NOT NULL,
+    required_capability_snapshot text NOT NULL,
+    area_code_snapshot text NOT NULL,
+    quorum_snapshot text NOT NULL,
+    quorum_m_snapshot integer,
+    on_eligibility_drift_snapshot text NOT NULL,
+    eligible_actor_ids jsonb NOT NULL,
+    effective_denominator integer,
+    status text NOT NULL,
+    opened_at timestamp with time zone,
+    completed_at timestamp with time zone,
+    skip_reason text,
+    CONSTRAINT approval_stage_instances_on_eligibility_drift_snapshot_check CHECK ((on_eligibility_drift_snapshot = ANY (ARRAY['reduce_quorum'::text, 'fail_stage'::text, 'keep_snapshot'::text]))),
+    CONSTRAINT approval_stage_instances_quorum_snapshot_check CHECK ((quorum_snapshot = ANY (ARRAY['any_1_of'::text, 'all_of'::text, 'm_of_n'::text]))),
+    CONSTRAINT approval_stage_instances_stage_order_check CHECK ((stage_order >= 1)),
+    CONSTRAINT approval_stage_instances_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'skipped'::text, 'rejected_here'::text, 'cancelled'::text])))
+);
+
+
+--
+-- Name: auth_failure_counters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.auth_failure_counters (
+    actor_id text NOT NULL,
+    fail_count integer DEFAULT 0 NOT NULL,
+    window_start timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: autosave_pending_uploads; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.autosave_pending_uploads (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_id uuid NOT NULL,
+    document_id uuid NOT NULL,
+    base_revision_id uuid NOT NULL,
+    content_hash text NOT NULL,
+    storage_key text NOT NULL,
+    presigned_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    consumed_at timestamp with time zone
+);
+
+
+--
+-- Name: cd_sequence_counters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cd_sequence_counters (
+    tenant_id uuid NOT NULL,
+    profile_code text NOT NULL,
+    process_area_code text NOT NULL,
+    next_seq integer DEFAULT 1 NOT NULL
+);
+
+ALTER TABLE ONLY public.cd_sequence_counters FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: document_checkpoints; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_checkpoints (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    document_id uuid NOT NULL,
+    revision_id uuid NOT NULL,
+    version_num integer NOT NULL,
+    label text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by text NOT NULL
+);
+
+
+--
+-- Name: document_comments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_comments (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
+    document_id uuid NOT NULL,
+    library_comment_id integer NOT NULL,
+    parent_library_id integer,
+    author_id text NOT NULL,
+    author_display text NOT NULL,
+    content_json jsonb NOT NULL,
+    resolved_at timestamp with time zone,
+    resolved_by text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY public.document_comments FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: document_exports; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_exports (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    document_id uuid NOT NULL,
+    revision_id uuid NOT NULL,
+    composite_hash bytea NOT NULL,
+    storage_key text NOT NULL,
+    size_bytes bigint NOT NULL,
+    paper_size text DEFAULT 'A4'::text NOT NULL,
+    landscape boolean DEFAULT false NOT NULL,
+    docgen_v2_ver text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    tenant_id uuid NOT NULL,
+    CONSTRAINT document_exports_composite_hash_check CHECK ((octet_length(composite_hash) = 32)),
+    CONSTRAINT document_exports_size_bytes_check CHECK ((size_bytes > 0))
+);
+
+ALTER TABLE ONLY public.document_exports FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: document_placeholder_values; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_placeholder_values (
+    tenant_id uuid NOT NULL,
+    revision_id uuid NOT NULL,
+    placeholder_id text NOT NULL,
+    value_text text,
+    value_typed jsonb,
+    source text NOT NULL,
+    computed_from text,
+    resolver_version integer,
+    inputs_hash bytea,
+    validated_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT document_placeholder_values_inputs_hash_check CHECK (((inputs_hash IS NULL) OR (octet_length(inputs_hash) = 32))),
+    CONSTRAINT document_placeholder_values_source_check CHECK ((source = ANY (ARRAY['user'::text, 'computed'::text, 'default'::text, 'dictionary'::text])))
+);
+
+ALTER TABLE ONLY public.document_placeholder_values FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: document_revisions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.document_revisions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    document_id uuid NOT NULL,
+    revision_num bigint NOT NULL,
+    parent_revision_id uuid,
+    session_id uuid NOT NULL,
+    storage_key text NOT NULL,
+    content_hash text NOT NULL,
+    form_data_snapshot jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    file_size_bytes bigint,
+    page_count integer,
+    page_count_source text,
+    CONSTRAINT document_revisions_file_size_bytes_nonnegative CHECK (((file_size_bytes IS NULL) OR (file_size_bytes >= 0))),
+    CONSTRAINT document_revisions_page_count_positive CHECK (((page_count IS NULL) OR (page_count > 0))),
+    CONSTRAINT document_revisions_page_count_provenance_coupling_check CHECK ((((page_count IS NULL) AND (page_count_source IS NULL)) OR ((page_count IS NOT NULL) AND (page_count_source = ANY (ARRAY['eigenpal_client'::text, 'server_renderer'::text]))))),
+    CONSTRAINT document_revisions_page_count_source_check CHECK (((page_count_source IS NULL) OR (page_count_source = ANY (ARRAY['eigenpal_client'::text, 'server_renderer'::text]))))
+);
+
+
+--
+-- Name: document_revisions_revision_num_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.document_revisions_revision_num_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: document_revisions_revision_num_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.document_revisions_revision_num_seq OWNED BY public.document_revisions.revision_num;
 
 
 --
@@ -2045,8 +2254,11 @@ CREATE TABLE public.editor_sessions (
     released_at timestamp with time zone,
     last_acknowledged_revision_id uuid NOT NULL,
     status text NOT NULL,
+    tenant_id uuid NOT NULL,
     CONSTRAINT editor_sessions_status_check CHECK ((status = ANY (ARRAY['active'::text, 'expired'::text, 'released'::text, 'force_released'::text])))
 );
+
+ALTER TABLE ONLY public.editor_sessions FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -2066,6 +2278,8 @@ CREATE TABLE public.governance_events (
     dedupe_key text,
     correlation_id text
 );
+
+ALTER TABLE ONLY public.governance_events FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -2094,6 +2308,8 @@ CREATE TABLE public.template_audit_log (
     metadata_json jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.template_audit_log FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -2137,6 +2353,8 @@ CREATE TABLE public.templates (
     created_by text NOT NULL
 );
 
+ALTER TABLE ONLY public.templates FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: templates_approval_config; Type: TABLE; Schema: public; Owner: -
@@ -2155,7 +2373,7 @@ CREATE TABLE public.templates_approval_config (
 
 CREATE TABLE public.templates_audit_log (
     id bigint NOT NULL,
-    tenant_id text NOT NULL,
+    tenant_id uuid NOT NULL,
     template_id uuid NOT NULL,
     version_id uuid,
     actor_id text NOT NULL,
@@ -2163,6 +2381,8 @@ CREATE TABLE public.templates_audit_log (
     details jsonb DEFAULT '{}'::jsonb NOT NULL,
     occurred_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.templates_audit_log FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -2190,14 +2410,11 @@ ALTER SEQUENCE public.templates_audit_log_id_seq OWNED BY public.templates_audit
 
 CREATE TABLE public.templates_template (
     id uuid NOT NULL,
-    tenant_id text NOT NULL,
+    tenant_id uuid NOT NULL,
     doc_type_code text NOT NULL,
     key text NOT NULL,
     name text NOT NULL,
     description text DEFAULT ''::text NOT NULL,
-    areas text[] DEFAULT '{}'::text[] NOT NULL,
-    visibility text NOT NULL,
-    specific_areas text[] DEFAULT '{}'::text[] NOT NULL,
     latest_version integer DEFAULT 0 NOT NULL,
     published_version_id uuid,
     created_by text NOT NULL,
@@ -2205,6 +2422,8 @@ CREATE TABLE public.templates_template (
     archived_at timestamp with time zone,
     system_owned boolean DEFAULT false NOT NULL
 );
+
+ALTER TABLE ONLY public.templates_template FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -2231,8 +2450,16 @@ CREATE TABLE public.templates_template_version (
     published_at timestamp with time zone,
     obsoleted_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    lock_version integer DEFAULT 0 NOT NULL
+    lock_version integer DEFAULT 0 NOT NULL,
+    revision_number integer DEFAULT 0 NOT NULL,
+    tenant_id uuid NOT NULL,
+    CONSTRAINT chk_template_version_content_hash CHECK (((content_hash = ''::text) OR (length(content_hash) = 64))),
+    CONSTRAINT chk_template_version_content_hash_non_draft CHECK (((status = 'draft'::text) OR (length(content_hash) = 64))),
+    CONSTRAINT chk_template_version_number_positive CHECK ((version_number >= 1)),
+    CONSTRAINT chk_template_version_status CHECK ((status = ANY (ARRAY['draft'::text, 'in_review'::text, 'approved'::text, 'published'::text, 'obsolete'::text])))
 );
+
+ALTER TABLE ONLY public.templates_template_version FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -2288,6 +2515,14 @@ ALTER TABLE metaldocs.audit_events
 
 
 --
+-- Name: audit_export_jobs audit_export_jobs_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.audit_export_jobs
+    ADD CONSTRAINT audit_export_jobs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: auth_identities auth_identities_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
@@ -2304,43 +2539,11 @@ ALTER TABLE ONLY metaldocs.auth_sessions
 
 
 --
--- Name: document_attachments document_attachments_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_attachments
-    ADD CONSTRAINT document_attachments_pkey PRIMARY KEY (id);
-
-
---
--- Name: document_attachments document_attachments_storage_key_key; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_attachments
-    ADD CONSTRAINT document_attachments_storage_key_key UNIQUE (storage_key);
-
-
---
--- Name: document_collaboration_presence document_collaboration_presence_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_collaboration_presence
-    ADD CONSTRAINT document_collaboration_presence_pkey PRIMARY KEY (document_id, user_id);
-
-
---
 -- Name: document_departments document_departments_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
 ALTER TABLE ONLY metaldocs.document_departments
     ADD CONSTRAINT document_departments_pkey PRIMARY KEY (code);
-
-
---
--- Name: document_edit_locks document_edit_locks_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_edit_locks
-    ADD CONSTRAINT document_edit_locks_pkey PRIMARY KEY (document_id);
 
 
 --
@@ -2416,22 +2619,6 @@ ALTER TABLE ONLY metaldocs.document_sequences
 
 
 --
--- Name: document_subjects document_subjects_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_subjects
-    ADD CONSTRAINT document_subjects_pkey PRIMARY KEY (code);
-
-
---
--- Name: document_template_assignments document_template_assignments_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_template_assignments
-    ADD CONSTRAINT document_template_assignments_pkey PRIMARY KEY (document_id);
-
-
---
 -- Name: document_template_versions_mddm document_template_versions_mddm_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
@@ -2469,46 +2656,6 @@ ALTER TABLE ONLY metaldocs.document_type_schema_versions
 
 ALTER TABLE ONLY metaldocs.document_types
     ADD CONSTRAINT document_types_pkey PRIMARY KEY (code);
-
-
---
--- Name: document_version_images document_version_images_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_version_images
-    ADD CONSTRAINT document_version_images_pkey PRIMARY KEY (document_version_id, image_id);
-
-
---
--- Name: document_versions_mddm document_versions_mddm_document_id_version_number_key; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_versions_mddm
-    ADD CONSTRAINT document_versions_mddm_document_id_version_number_key UNIQUE (document_id, version_number);
-
-
---
--- Name: document_versions_mddm document_versions_mddm_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_versions_mddm
-    ADD CONSTRAINT document_versions_mddm_pkey PRIMARY KEY (id);
-
-
---
--- Name: document_versions document_versions_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_versions
-    ADD CONSTRAINT document_versions_pkey PRIMARY KEY (document_id, version_number);
-
-
---
--- Name: documents documents_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.documents
-    ADD CONSTRAINT documents_pkey PRIMARY KEY (id);
 
 
 --
@@ -2560,22 +2707,6 @@ ALTER TABLE ONLY metaldocs.iam_users
 
 
 --
--- Name: tenants tenants_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.tenants
-    ADD CONSTRAINT tenants_pkey PRIMARY KEY (id);
-
-
---
--- Name: tenants tenants_slug_key; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.tenants
-    ADD CONSTRAINT tenants_slug_key UNIQUE (slug);
-
-
---
 -- Name: idempotency_keys idempotency_keys_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
@@ -2592,19 +2723,19 @@ ALTER TABLE ONLY metaldocs.job_leases
 
 
 --
+-- Name: materialize_dispatch_outbox materialize_dispatch_outbox_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.materialize_dispatch_outbox
+    ADD CONSTRAINT materialize_dispatch_outbox_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: mddm_shadow_diff_events mddm_shadow_diff_events_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
 ALTER TABLE ONLY metaldocs.mddm_shadow_diff_events
     ADD CONSTRAINT mddm_shadow_diff_events_pkey PRIMARY KEY (id);
-
-
---
--- Name: notifications notifications_idempotency_key_key; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.notifications
-    ADD CONSTRAINT notifications_idempotency_key_key UNIQUE (idempotency_key);
 
 
 --
@@ -2648,19 +2779,43 @@ ALTER TABLE ONLY metaldocs.role_capabilities
 
 
 --
--- Name: template_audit_log template_audit_log_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.template_audit_log
-    ADD CONSTRAINT template_audit_log_pkey PRIMARY KEY (id);
-
-
---
 -- Name: template_drafts template_drafts_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
 ALTER TABLE ONLY metaldocs.template_drafts
     ADD CONSTRAINT template_drafts_pkey PRIMARY KEY (template_key);
+
+
+--
+-- Name: tenant_plans tenant_plans_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.tenant_plans
+    ADD CONSTRAINT tenant_plans_pkey PRIMARY KEY (tenant_id);
+
+
+--
+-- Name: tenants tenants_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.tenants
+    ADD CONSTRAINT tenants_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tenants tenants_slug_key; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.tenants
+    ADD CONSTRAINT tenants_slug_key UNIQUE (slug);
+
+
+--
+-- Name: token_dictionary_entries token_dictionary_entries_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.token_dictionary_entries
+    ADD CONSTRAINT token_dictionary_entries_pkey PRIMARY KEY (id);
 
 
 --
@@ -2672,19 +2827,19 @@ ALTER TABLE ONLY metaldocs.iam_user_roles
 
 
 --
+-- Name: materialize_dispatch_outbox ux_materialize_dispatch_outbox_revision; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.materialize_dispatch_outbox
+    ADD CONSTRAINT ux_materialize_dispatch_outbox_revision UNIQUE (tenant_id, revision_id);
+
+
+--
 -- Name: pdf_dispatch_outbox ux_pdf_dispatch_outbox_revision; Type: CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
 ALTER TABLE ONLY metaldocs.pdf_dispatch_outbox
     ADD CONSTRAINT ux_pdf_dispatch_outbox_revision UNIQUE (tenant_id, revision_id);
-
-
---
--- Name: workflow_approvals workflow_approvals_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.workflow_approvals
-    ADD CONSTRAINT workflow_approvals_pkey PRIMARY KEY (id);
 
 
 --
@@ -2781,6 +2936,14 @@ ALTER TABLE ONLY public.approval_stage_instances
 
 ALTER TABLE ONLY public.approval_stage_instances
     ADD CONSTRAINT approval_stage_instances_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: auth_failure_counters auth_failure_counters_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.auth_failure_counters
+    ADD CONSTRAINT auth_failure_counters_pkey PRIMARY KEY (actor_id);
 
 
 --
@@ -2952,22 +3115,6 @@ ALTER TABLE ONLY public.template_versions
 
 
 --
--- Name: templates templates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.templates
-    ADD CONSTRAINT templates_pkey PRIMARY KEY (id);
-
-
---
--- Name: templates templates_tenant_key_unique; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.templates
-    ADD CONSTRAINT templates_tenant_key_unique UNIQUE (tenant_id, key);
-
-
---
 -- Name: templates_approval_config templates_approval_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2981,6 +3128,14 @@ ALTER TABLE ONLY public.templates_approval_config
 
 ALTER TABLE ONLY public.templates_audit_log
     ADD CONSTRAINT templates_audit_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: templates templates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.templates
+    ADD CONSTRAINT templates_pkey PRIMARY KEY (id);
 
 
 --
@@ -3013,6 +3168,14 @@ ALTER TABLE ONLY public.templates_template_version
 
 ALTER TABLE ONLY public.templates_template_version
     ADD CONSTRAINT templates_template_version_template_id_version_number_key UNIQUE (template_id, version_number);
+
+
+--
+-- Name: templates templates_tenant_key_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.templates
+    ADD CONSTRAINT templates_tenant_key_unique UNIQUE (tenant_id, key);
 
 
 --
@@ -3059,6 +3222,20 @@ CREATE INDEX idx_audit_events_tenant_id ON metaldocs.audit_events USING btree (t
 
 
 --
+-- Name: idx_auth_identities_last_failed_login_at; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE INDEX idx_auth_identities_last_failed_login_at ON metaldocs.auth_identities USING btree (last_failed_login_at) WHERE (last_failed_login_at IS NOT NULL);
+
+
+--
+-- Name: idx_auth_identities_locked_until; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE INDEX idx_auth_identities_locked_until ON metaldocs.auth_identities USING btree (locked_until) WHERE (locked_until IS NOT NULL);
+
+
+--
 -- Name: idx_auth_sessions_active; Type: INDEX; Schema: metaldocs; Owner: -
 --
 
@@ -3080,38 +3257,10 @@ CREATE INDEX idx_auth_sessions_user_id ON metaldocs.auth_sessions USING btree (u
 
 
 --
--- Name: idx_doc_versions_search; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_doc_versions_search ON metaldocs.document_versions USING gin (search_vector);
-
-
---
--- Name: idx_document_attachments_document_id_created_at; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_document_attachments_document_id_created_at ON metaldocs.document_attachments USING btree (document_id, created_at DESC);
-
-
---
--- Name: idx_document_collaboration_presence_last_seen; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_document_collaboration_presence_last_seen ON metaldocs.document_collaboration_presence USING btree (document_id, last_seen_at DESC);
-
-
---
 -- Name: idx_document_departments_is_active; Type: INDEX; Schema: metaldocs; Owner: -
 --
 
 CREATE INDEX idx_document_departments_is_active ON metaldocs.document_departments USING btree (is_active);
-
-
---
--- Name: idx_document_edit_locks_expires_at; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_document_edit_locks_expires_at ON metaldocs.document_edit_locks USING btree (expires_at);
 
 
 --
@@ -3126,125 +3275,6 @@ CREATE INDEX idx_document_images_sha256 ON metaldocs.document_images USING btree
 --
 
 CREATE INDEX idx_document_profile_schema_versions_active ON metaldocs.document_profile_schema_versions USING btree (profile_code, is_active);
-
-
---
--- Name: idx_document_subjects_process_area_code; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_document_subjects_process_area_code ON metaldocs.document_subjects USING btree (process_area_code);
-
-
---
--- Name: idx_document_versions_created_at; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_document_versions_created_at ON metaldocs.document_versions USING btree (created_at DESC);
-
-
---
--- Name: idx_documents_business_unit; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_business_unit ON metaldocs.documents USING btree (business_unit);
-
-
---
--- Name: idx_documents_created_at; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_created_at ON metaldocs.documents USING btree (created_at DESC);
-
-
---
--- Name: idx_documents_department; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_department ON metaldocs.documents USING btree (department);
-
-
---
--- Name: idx_documents_document_code_unique; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE UNIQUE INDEX idx_documents_document_code_unique ON metaldocs.documents USING btree (document_code);
-
-
---
--- Name: idx_documents_document_family_code; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_document_family_code ON metaldocs.documents USING btree (document_family_code);
-
-
---
--- Name: idx_documents_document_profile_code; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_document_profile_code ON metaldocs.documents USING btree (document_profile_code);
-
-
---
--- Name: idx_documents_document_type_code; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_document_type_code ON metaldocs.documents USING btree (document_type_code);
-
-
---
--- Name: idx_documents_document_type_key; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_document_type_key ON metaldocs.documents USING btree (document_type_key);
-
-
---
--- Name: idx_documents_owner_id; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_owner_id ON metaldocs.documents USING btree (owner_id);
-
-
---
--- Name: idx_documents_process_area_code; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_process_area_code ON metaldocs.documents USING btree (process_area_code);
-
-
---
--- Name: idx_documents_profile_schema_version; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_profile_schema_version ON metaldocs.documents USING btree (document_profile_code, profile_schema_version);
-
-
---
--- Name: idx_documents_profile_sequence_unique; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE UNIQUE INDEX idx_documents_profile_sequence_unique ON metaldocs.documents USING btree (document_profile_code, document_sequence);
-
-
---
--- Name: idx_documents_review_reminder_window; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_review_reminder_window ON metaldocs.documents USING btree (status, expiry_at) WHERE ((expiry_at IS NOT NULL) AND (status = ANY (ARRAY['APPROVED'::text, 'PUBLISHED'::text])));
-
-
---
--- Name: idx_documents_subject_code; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_documents_subject_code ON metaldocs.documents USING btree (subject_code);
-
-
---
--- Name: idx_dvi_image; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_dvi_image ON metaldocs.document_version_images USING btree (image_id);
 
 
 --
@@ -3276,24 +3306,10 @@ CREATE INDEX idx_idempotency_keys_in_flight_expires ON metaldocs.idempotency_key
 
 
 --
--- Name: idx_notifications_recipient_created_at; Type: INDEX; Schema: metaldocs; Owner: -
+-- Name: idx_notifications_recipient_created; Type: INDEX; Schema: metaldocs; Owner: -
 --
 
-CREATE INDEX idx_notifications_recipient_created_at ON metaldocs.notifications USING btree (recipient_user_id, created_at DESC);
-
-
---
--- Name: idx_one_active_draft_per_doc; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE UNIQUE INDEX idx_one_active_draft_per_doc ON metaldocs.document_versions_mddm USING btree (document_id) WHERE (status = ANY (ARRAY['draft'::metaldocs.mddm_version_status, 'pending_approval'::metaldocs.mddm_version_status]));
-
-
---
--- Name: idx_one_released_per_doc; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE UNIQUE INDEX idx_one_released_per_doc ON metaldocs.document_versions_mddm USING btree (document_id) WHERE (status = 'released'::metaldocs.mddm_version_status);
+CREATE INDEX idx_notifications_recipient_created ON metaldocs.notifications USING btree (tenant_id, recipient_user_id, created_at DESC, id DESC);
 
 
 --
@@ -3311,20 +3327,6 @@ CREATE INDEX idx_outbox_dead_lettered ON metaldocs.outbox_events USING btree (de
 
 
 --
--- Name: idx_template_audit_log_actor; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_template_audit_log_actor ON metaldocs.template_audit_log USING btree (actor_id);
-
-
---
--- Name: idx_template_audit_log_key; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_template_audit_log_key ON metaldocs.template_audit_log USING btree (template_key);
-
-
---
 -- Name: idx_template_drafts_draft_status; Type: INDEX; Schema: metaldocs; Owner: -
 --
 
@@ -3339,10 +3341,38 @@ CREATE INDEX idx_template_drafts_profile ON metaldocs.template_drafts USING btre
 
 
 --
--- Name: idx_workflow_approvals_document_id_requested_at; Type: INDEX; Schema: metaldocs; Owner: -
+-- Name: idx_tenant_plans_plan_tier; Type: INDEX; Schema: metaldocs; Owner: -
 --
 
-CREATE INDEX idx_workflow_approvals_document_id_requested_at ON metaldocs.workflow_approvals USING btree (document_id, requested_at DESC);
+CREATE INDEX idx_tenant_plans_plan_tier ON metaldocs.tenant_plans USING btree (plan_tier);
+
+
+--
+-- Name: ix_audit_export_jobs_download_token; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE INDEX ix_audit_export_jobs_download_token ON metaldocs.audit_export_jobs USING btree (download_token) WHERE (download_token IS NOT NULL);
+
+
+--
+-- Name: ix_audit_export_jobs_tenant_actor; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE INDEX ix_audit_export_jobs_tenant_actor ON metaldocs.audit_export_jobs USING btree (tenant_id, actor_id, created_at DESC);
+
+
+--
+-- Name: ix_iam_users_tenant_last_seen; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE INDEX ix_iam_users_tenant_last_seen ON metaldocs.iam_users USING btree (tenant_id, last_seen_at DESC);
+
+
+--
+-- Name: ix_materialize_dispatch_outbox_pending; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE INDEX ix_materialize_dispatch_outbox_pending ON metaldocs.materialize_dispatch_outbox USING btree (next_retry_at) WHERE (status = ANY (ARRAY['pending'::text, 'processing'::text]));
 
 
 --
@@ -3381,6 +3411,20 @@ CREATE UNIQUE INDEX uq_document_types_type_key ON metaldocs.document_types USING
 
 
 --
+-- Name: uq_notifications_recipient_event; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_notifications_recipient_event ON metaldocs.notifications USING btree (recipient_user_id, source_event_id) WHERE (source_event_id IS NOT NULL);
+
+
+--
+-- Name: uq_token_dictionary_tenant_name; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_token_dictionary_tenant_name ON metaldocs.token_dictionary_entries USING btree (tenant_id, name);
+
+
+--
 -- Name: ux_document_profiles_tenant_code; Type: INDEX; Schema: metaldocs; Owner: -
 --
 
@@ -3409,13 +3453,6 @@ CREATE UNIQUE INDEX ux_process_areas_tenant_code ON metaldocs.document_process_a
 
 
 --
--- Name: document_exports_doc_hash_uidx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX document_exports_doc_hash_uidx ON public.document_exports USING btree (document_id, composite_hash);
-
-
---
 -- Name: document_exports_document_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3427,6 +3464,20 @@ CREATE INDEX document_exports_document_id_idx ON public.document_exports USING b
 --
 
 CREATE INDEX idx_audit_tenant_created ON public.template_audit_log USING btree (tenant_id, created_at DESC);
+
+
+--
+-- Name: idx_controlled_documents_code_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_controlled_documents_code_trgm ON public.controlled_documents USING gin (code public.gin_trgm_ops);
+
+
+--
+-- Name: idx_controlled_documents_title_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_controlled_documents_title_trgm ON public.controlled_documents USING gin (title public.gin_trgm_ops);
 
 
 --
@@ -3458,6 +3509,13 @@ CREATE INDEX idx_documents_form_data_gin ON public.documents USING gin (form_dat
 
 
 --
+-- Name: idx_documents_superseded_document_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_documents_superseded_document_id ON public.documents USING btree (superseded_document_id) WHERE (superseded_document_id IS NOT NULL);
+
+
+--
 -- Name: idx_documents_template_version; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3469,6 +3527,13 @@ CREATE INDEX idx_documents_template_version ON public.documents USING btree (tem
 --
 
 CREATE INDEX idx_documents_tenant_status ON public.documents USING btree (tenant_id, status);
+
+
+--
+-- Name: idx_editor_sessions_tenant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_editor_sessions_tenant_id ON public.editor_sessions USING btree (tenant_id);
 
 
 --
@@ -3500,13 +3565,6 @@ CREATE INDEX idx_revisions_doc_num ON public.document_revisions USING btree (doc
 
 
 --
--- Name: idx_templates_tenant; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_templates_tenant ON public.templates USING btree (tenant_id);
-
-
---
 -- Name: idx_templates_audit_template_time; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3518,6 +3576,13 @@ CREATE INDEX idx_templates_audit_template_time ON public.templates_audit_log USI
 --
 
 CREATE INDEX idx_templates_template_tenant_doctype ON public.templates_template USING btree (tenant_id, doc_type_code);
+
+
+--
+-- Name: idx_templates_tenant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_templates_tenant ON public.templates USING btree (tenant_id);
 
 
 --
@@ -3619,6 +3684,27 @@ CREATE INDEX ix_user_process_areas_active ON public.user_process_areas USING btr
 
 
 --
+-- Name: uq_document_exports_tenant_doc_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_document_exports_tenant_doc_hash ON public.document_exports USING btree (tenant_id, document_id, composite_hash);
+
+
+--
+-- Name: uq_one_published_per_template; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_one_published_per_template ON public.templates_template_version USING btree (template_id) WHERE (status = 'published'::text);
+
+
+--
+-- Name: uq_templates_template_version_docx_storage_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_templates_template_version_docx_storage_key ON public.templates_template_version USING btree (docx_storage_key);
+
+
+--
 -- Name: ux_approval_instances_active_document_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3658,6 +3744,13 @@ CREATE UNIQUE INDEX ux_governance_events_caps_bump_spec_version ON public.govern
 --
 
 CREATE UNIQUE INDEX ux_templates_system_blank ON public.templates_template USING btree (tenant_id, key) WHERE ((system_owned = true) AND (key = '__system_blank__'::text));
+
+
+--
+-- Name: ux_templates_version_revision; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_templates_version_revision ON public.templates_template_version USING btree (template_id, revision_number);
 
 
 --
@@ -3864,6 +3957,13 @@ CREATE TRIGGER trg_signoff_tenant_consistent BEFORE INSERT ON public.approval_si
 
 
 --
+-- Name: templates_template_version trg_template_version_tenant_consistent; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_template_version_tenant_consistent BEFORE INSERT OR UPDATE ON public.templates_template_version FOR EACH ROW EXECUTE FUNCTION public.enforce_template_version_tenant_consistent();
+
+
+--
 -- Name: user_process_areas trg_user_process_areas_no_delete; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3875,30 +3975,6 @@ CREATE TRIGGER trg_user_process_areas_no_delete BEFORE DELETE ON public.user_pro
 --
 
 CREATE TRIGGER trg_user_process_areas_update_contract BEFORE UPDATE ON public.user_process_areas FOR EACH ROW EXECUTE FUNCTION public.enforce_user_process_areas_update_contract();
-
-
---
--- Name: document_attachments document_attachments_document_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_attachments
-    ADD CONSTRAINT document_attachments_document_id_fkey FOREIGN KEY (document_id) REFERENCES metaldocs.documents(id) ON DELETE RESTRICT;
-
-
---
--- Name: document_collaboration_presence document_collaboration_presence_document_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_collaboration_presence
-    ADD CONSTRAINT document_collaboration_presence_document_id_fkey FOREIGN KEY (document_id) REFERENCES metaldocs.documents(id) ON DELETE CASCADE;
-
-
---
--- Name: document_edit_locks document_edit_locks_document_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_edit_locks
-    ADD CONSTRAINT document_edit_locks_document_id_fkey FOREIGN KEY (document_id) REFERENCES metaldocs.documents(id) ON DELETE CASCADE;
 
 
 --
@@ -3942,59 +4018,11 @@ ALTER TABLE ONLY metaldocs.document_sequences
 
 
 --
--- Name: document_subjects document_subjects_process_area_code_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_subjects
-    ADD CONSTRAINT document_subjects_process_area_code_fkey FOREIGN KEY (process_area_code) REFERENCES metaldocs.document_process_areas(code);
-
-
---
--- Name: document_template_assignments document_template_assignments_document_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_template_assignments
-    ADD CONSTRAINT document_template_assignments_document_id_fkey FOREIGN KEY (document_id) REFERENCES metaldocs.documents(id) ON DELETE CASCADE;
-
-
---
 -- Name: document_type_schema_versions document_type_schema_versions_type_key_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
 ALTER TABLE ONLY metaldocs.document_type_schema_versions
     ADD CONSTRAINT document_type_schema_versions_type_key_fkey FOREIGN KEY (type_key) REFERENCES metaldocs.document_types(type_key);
-
-
---
--- Name: document_version_images document_version_images_document_version_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_version_images
-    ADD CONSTRAINT document_version_images_document_version_id_fkey FOREIGN KEY (document_version_id) REFERENCES metaldocs.document_versions_mddm(id) ON DELETE CASCADE;
-
-
---
--- Name: document_version_images document_version_images_image_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_version_images
-    ADD CONSTRAINT document_version_images_image_id_fkey FOREIGN KEY (image_id) REFERENCES metaldocs.document_images(id);
-
-
---
--- Name: document_versions document_versions_document_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_versions
-    ADD CONSTRAINT document_versions_document_id_fkey FOREIGN KEY (document_id) REFERENCES metaldocs.documents(id) ON DELETE RESTRICT;
-
-
---
--- Name: document_versions_mddm document_versions_mddm_document_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_versions_mddm
-    ADD CONSTRAINT document_versions_mddm_document_id_fkey FOREIGN KEY (document_id) REFERENCES metaldocs.documents(id) ON DELETE CASCADE;
 
 
 --
@@ -4022,43 +4050,11 @@ ALTER TABLE ONLY metaldocs.auth_sessions
 
 
 --
--- Name: documents fk_documents_document_family_code; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
+-- Name: idempotency_keys fk_idempotency_keys_tenant; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
-ALTER TABLE ONLY metaldocs.documents
-    ADD CONSTRAINT fk_documents_document_family_code FOREIGN KEY (document_family_code) REFERENCES metaldocs.document_families(code);
-
-
---
--- Name: documents fk_documents_document_profile_code; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.documents
-    ADD CONSTRAINT fk_documents_document_profile_code FOREIGN KEY (document_profile_code) REFERENCES metaldocs.document_profiles(code);
-
-
---
--- Name: documents fk_documents_document_type_code; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.documents
-    ADD CONSTRAINT fk_documents_document_type_code FOREIGN KEY (document_type_code) REFERENCES metaldocs.document_types(code);
-
-
---
--- Name: documents fk_documents_process_area_code; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.documents
-    ADD CONSTRAINT fk_documents_process_area_code FOREIGN KEY (process_area_code) REFERENCES metaldocs.document_process_areas(code);
-
-
---
--- Name: documents fk_documents_subject_code; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.documents
-    ADD CONSTRAINT fk_documents_subject_code FOREIGN KEY (subject_code) REFERENCES metaldocs.document_subjects(code);
+ALTER TABLE ONLY metaldocs.idempotency_keys
+    ADD CONSTRAINT fk_idempotency_keys_tenant FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id) ON DELETE CASCADE;
 
 
 --
@@ -4118,11 +4114,11 @@ ALTER TABLE ONLY metaldocs.template_drafts
 
 
 --
--- Name: workflow_approvals workflow_approvals_document_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
+-- Name: tenant_plans tenant_plans_tenant_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
-ALTER TABLE ONLY metaldocs.workflow_approvals
-    ADD CONSTRAINT workflow_approvals_document_id_fkey FOREIGN KEY (document_id) REFERENCES metaldocs.documents(id) ON DELETE RESTRICT;
+ALTER TABLE ONLY metaldocs.tenant_plans
+    ADD CONSTRAINT tenant_plans_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id) ON DELETE CASCADE;
 
 
 --
@@ -4366,6 +4362,14 @@ ALTER TABLE ONLY public.documents
 
 
 --
+-- Name: documents documents_superseded_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.documents
+    ADD CONSTRAINT documents_superseded_document_id_fkey FOREIGN KEY (superseded_document_id) REFERENCES public.documents(id);
+
+
+--
 -- Name: editor_sessions editor_sessions_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4390,6 +4394,14 @@ ALTER TABLE ONLY public.documents
 
 
 --
+-- Name: document_exports fk_document_exports_tenant; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.document_exports
+    ADD CONSTRAINT fk_document_exports_tenant FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id) ON DELETE CASCADE;
+
+
+--
 -- Name: templates fk_templates_current_published; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4403,6 +4415,14 @@ ALTER TABLE ONLY public.templates
 
 ALTER TABLE ONLY public.templates_template
     ADD CONSTRAINT fk_templates_published_version FOREIGN KEY (published_version_id) REFERENCES public.templates_template_version(id);
+
+
+--
+-- Name: templates_template_version fk_templates_template_version_tenant; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.templates_template_version
+    ADD CONSTRAINT fk_templates_template_version_tenant FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id) ON DELETE CASCADE;
 
 
 --
@@ -4454,9 +4474,437 @@ ALTER TABLE ONLY public.user_process_areas
 
 
 --
--- PostgreSQL database dump complete
+-- Name: audit_events; Type: ROW SECURITY; Schema: metaldocs; Owner: -
 --
 
+ALTER TABLE metaldocs.audit_events ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: audit_export_jobs; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.audit_export_jobs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: auth_sessions; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.auth_sessions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_process_areas; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.document_process_areas ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_profiles; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.document_profiles ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: iam_group_members; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.iam_group_members ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: iam_groups; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.iam_groups ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: iam_user_roles; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.iam_user_roles ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: iam_users; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.iam_users ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: idempotency_keys; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.idempotency_keys ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: materialize_dispatch_outbox; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.materialize_dispatch_outbox ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: notifications; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.notifications ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: pdf_dispatch_outbox; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.pdf_dispatch_outbox ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: audit_events tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.audit_events USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))));
+
+
+--
+-- Name: audit_export_jobs tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.audit_export_jobs USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: auth_sessions tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.auth_sessions USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: document_process_areas tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.document_process_areas USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: document_profiles tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.document_profiles USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: iam_group_members tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.iam_group_members USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: iam_groups tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.iam_groups USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: iam_user_roles tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.iam_user_roles USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: iam_users tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.iam_users USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: idempotency_keys tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.idempotency_keys USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: materialize_dispatch_outbox tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.materialize_dispatch_outbox USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: notifications tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.notifications USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: pdf_dispatch_outbox tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.pdf_dispatch_outbox USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: tenant_plans tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.tenant_plans USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: token_dictionary_entries tenant_isolation; Type: POLICY; Schema: metaldocs; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON metaldocs.token_dictionary_entries USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: tenant_plans; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.tenant_plans ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: token_dictionary_entries; Type: ROW SECURITY; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE metaldocs.token_dictionary_entries ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: approval_instances; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.approval_instances ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: approval_routes; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.approval_routes ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: cd_sequence_counters; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.cd_sequence_counters ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: controlled_document_area_grants; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.controlled_document_area_grants ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: controlled_document_user_grants; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.controlled_document_user_grants ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: controlled_documents; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.controlled_documents ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_comments; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_comments ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_exports; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_exports ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: document_placeholder_values; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.document_placeholder_values ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: documents; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: editor_sessions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.editor_sessions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: governance_events; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.governance_events ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: template_audit_log; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.template_audit_log ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: templates; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.templates ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: templates_audit_log; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.templates_audit_log ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: templates_template; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.templates_template ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: templates_template_version; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.templates_template_version ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: approval_instances tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.approval_instances USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: approval_routes tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.approval_routes USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: cd_sequence_counters tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.cd_sequence_counters USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: controlled_document_area_grants tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.controlled_document_area_grants USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: controlled_document_user_grants tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.controlled_document_user_grants USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: controlled_documents tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.controlled_documents USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: document_comments tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.document_comments USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: document_exports tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.document_exports USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: document_placeholder_values tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.document_placeholder_values USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: documents tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.documents USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: editor_sessions tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.editor_sessions USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: governance_events tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.governance_events USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: template_audit_log tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.template_audit_log USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: templates tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.templates USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: templates_audit_log tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.templates_audit_log USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: templates_template tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.templates_template USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: templates_template_version tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.templates_template_version USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: user_process_areas tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation ON public.user_process_areas USING (((NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text) IS NULL) OR (tenant_id = (NULLIF(current_setting('metaldocs.tenant_id'::text, true), ''::text))::uuid)));
+
+
+--
+-- Name: user_process_areas; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.user_process_areas ENABLE ROW LEVEL SECURITY;
+
+--
+-- PostgreSQL database dump complete
+--
 
 
 

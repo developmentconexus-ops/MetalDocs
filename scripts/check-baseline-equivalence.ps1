@@ -31,7 +31,16 @@ function Export-Query {
 Write-Host "[check-baseline-equivalence] Comparing runtime-used schema objects..."
 
 $queries = @(
-  @{ Name = "columns"; Sql = "SELECT table_schema, table_name, column_name, ordinal_position, data_type, udt_name, is_nullable, column_default FROM information_schema.columns WHERE table_schema IN ('public','metaldocs') ORDER BY 1,2,4;" },
+  # ordinal_position is the ORDER BY key (so a real column *reordering* is still
+  # caught) but is deliberately NOT in the compared projection: a freshly-created
+  # baseline table has contiguous attnums while an incrementally-migrated table
+  # carries attnum gaps from past ALTER ... DROP COLUMN (e.g. folded 0236 dropping
+  # templates_template.visibility). That gap is invisible at runtime — every client
+  # binds columns by name via generated/contract-first SQL — so comparing the
+  # absolute number would reject a correct squash on a non-runtime difference. The
+  # column set, types, nullability, defaults, and relative order are what equivalence
+  # means, and those are all still compared.
+  @{ Name = "columns"; Sql = "SELECT table_schema, table_name, column_name, data_type, udt_name, is_nullable, column_default FROM information_schema.columns WHERE table_schema IN ('public','metaldocs') ORDER BY table_schema, table_name, ordinal_position;" },
   @{ Name = "constraints"; Sql = "SELECT n.nspname AS table_schema, c.relname AS table_name, con.conname, con.contype, pg_get_constraintdef(con.oid) FROM pg_constraint con JOIN pg_class c ON c.oid = con.conrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname IN ('public','metaldocs') ORDER BY 1,2,3;" },
   @{ Name = "indexes"; Sql = "SELECT schemaname, tablename, indexname, indexdef FROM pg_indexes WHERE schemaname IN ('public','metaldocs') ORDER BY 1,2,3;" },
   @{ Name = "triggers"; Sql = "SELECT trigger_schema, event_object_table, trigger_name, action_timing, event_manipulation, action_statement FROM information_schema.triggers WHERE trigger_schema IN ('public','metaldocs') ORDER BY 1,2,3,4,5;" },
