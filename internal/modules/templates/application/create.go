@@ -49,6 +49,7 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 
 	version := domain.NewTemplateVersionDraft(
 		s.uuid.New(),
+		cmd.TenantID,
 		template.ID,
 		cmd.ActorUserID,
 		templateDocxKey(cmd.TenantID, template.ID, 1),

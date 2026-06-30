@@ -52,25 +52,25 @@ func TestTemplateVersionReader_GetTemplateVersionState_Live(t *testing.T) {
 		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO public.templates_template_version (
-				id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
+				id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 				metadata_schema, placeholder_schema, author_id, published_at
 			) VALUES (
-				$1::uuid, $2::uuid, 1, 0, 'published', 'templates/tvs/body.docx', 'body-hash-1',
+				$1::uuid, $4::uuid, $2::uuid, 1, 0, 'published', 'templates/tvs/body.docx', 'body-hash-1',
 				'{}'::jsonb, '{"placeholders":[]}'::jsonb, $3, now()
 			)`,
-			publishedVersionID, templateID, actorID,
+			publishedVersionID, templateID, actorID, tnt.ID,
 		); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO public.templates_template_version (
-				id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
+				id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 				metadata_schema, placeholder_schema, author_id, published_at
 			) VALUES (
-				$1::uuid, $2::uuid, 2, 1, 'obsolete', 'templates/tvs/body2.docx', 'body-hash-2',
+				$1::uuid, $4::uuid, $2::uuid, 2, 1, 'obsolete', 'templates/tvs/body2.docx', 'body-hash-2',
 				'{}'::jsonb, '{"placeholders":[]}'::jsonb, $3, now()
 			)`,
-			obsoleteVersionID, templateID, actorID,
+			obsoleteVersionID, templateID, actorID, tnt.ID,
 		); err != nil {
 			return err
 		}

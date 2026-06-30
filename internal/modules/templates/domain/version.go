@@ -17,6 +17,7 @@ const (
 
 type TemplateVersion struct {
 	ID                  string
+	TenantID            string
 	TemplateID          string
 	VersionNumber       int
 	RevisionNumber      int
@@ -39,9 +40,10 @@ type TemplateVersion struct {
 	CreatedAt           time.Time
 }
 
-func NewTemplateVersionDraft(id, templateID, authorID, docxStorageKey string, versionNumber int, metadata MetadataSchema, placeholders []Placeholder, createdAt time.Time) *TemplateVersion {
+func NewTemplateVersionDraft(id, tenantID, templateID, authorID, docxStorageKey string, versionNumber int, metadata MetadataSchema, placeholders []Placeholder, createdAt time.Time) *TemplateVersion {
 	return &TemplateVersion{
 		ID:                id,
+		TenantID:          tenantID,
 		TemplateID:        templateID,
 		VersionNumber:     versionNumber,
 		Status:            VersionStatusDraft,

@@ -480,6 +480,7 @@ func (s *Service) spawnNextDraft(ctx context.Context, tenantID, templateID, acto
 	}
 	return domain.NewTemplateVersionDraft(
 		s.uuid.New(),
+		tenantID,
 		templateID,
 		actorID,
 		dstKey,

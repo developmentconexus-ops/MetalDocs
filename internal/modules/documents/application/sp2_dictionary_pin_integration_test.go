@@ -78,11 +78,11 @@ func seedDictTemplate(t *testing.T, db *sql.DB, tenantID, actorID, templateKey, 
 		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO templates_template_version (
-				id, template_id, version_number, status, docx_storage_key, content_hash,
+				id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash,
 				metadata_schema, placeholder_schema, author_id, published_at
-			) VALUES ($1::uuid, $2::uuid, 1, 'published', 'templates/dict-test/body.docx', 'dict-body-hash',
+			) VALUES ($1::uuid, $5::uuid, $2::uuid, 1, 'published', 'templates/dict-test/body.docx', 'dict-body-hash',
 				'{}'::jsonb, $3::jsonb, $4, now())`,
-			templateVersionID, templateID, string(schema), actorID,
+			templateVersionID, templateID, string(schema), actorID, tenantID,
 		); err != nil {
 			return err
 		}

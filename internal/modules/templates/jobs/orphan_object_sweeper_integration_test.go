@@ -85,10 +85,10 @@ func seedTemplateWithVersion(t *testing.T, db *sql.DB, tenantID, templateID stri
 	}
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO public.templates_template_version
-		   (id, template_id, version_number, status, docx_storage_key, content_hash,
+		   (id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash,
 		    metadata_schema, placeholder_schema, author_id, pending_approver_role, lock_version)
-		 VALUES ($1::uuid, $2::uuid, $3, 'draft', $4, 'hash', '{}'::jsonb, '[]'::jsonb, 'tester', 'approver', 0)`,
-		uuid.NewString(), templateID, versionNumber, docxKey,
+		 VALUES ($1::uuid, $5::uuid, $2::uuid, $3, 'draft', $4, 'hash', '{}'::jsonb, '[]'::jsonb, 'tester', 'approver', 0)`,
+		uuid.NewString(), templateID, versionNumber, docxKey, tenantID,
 	); err != nil {
 		t.Fatalf("seed version: %v", err)
 	}

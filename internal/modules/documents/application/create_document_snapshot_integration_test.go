@@ -79,13 +79,13 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO templates_template_version (
-				id, template_id, version_number, status, docx_storage_key, content_hash,
+				id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash,
 				metadata_schema, placeholder_schema, author_id, published_at
 			) VALUES (
-				$1::uuid, $2::uuid, 1, 'published', 'templates/snapshot/body.docx', 'body-hash',
+				$1::uuid, $4::uuid, $2::uuid, 1, 'published', 'templates/snapshot/body.docx', 'body-hash',
 				'{}'::jsonb, '{"placeholders":[]}'::jsonb, $3, now()
 			)`,
-			templateVersionID, templateID, actorID,
+			templateVersionID, templateID, actorID, tenantID,
 		); err != nil {
 			return err
 		}

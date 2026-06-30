@@ -73,11 +73,11 @@ func seedTemplateVersion(t *testing.T, db *sql.DB, tenantID, schemaJSON string) 
 		}
 		_, err := tx.ExecContext(context.Background(), `
 			INSERT INTO public.templates_template_version (
-				id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
+				id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 				metadata_schema, placeholder_schema, author_id, published_at
-			) VALUES ($1::uuid, $2::uuid, 1, 0, 'published', 'templates/f24/body.docx', 'f24-hash',
+			) VALUES ($1::uuid, $4::uuid, $2::uuid, 1, 0, 'published', 'templates/f24/body.docx', 'f24-hash',
 				'{}'::jsonb, `+schemaJSON+`::jsonb, $3, now())`,
-			versionID, templateID, actorID,
+			versionID, templateID, actorID, tenantID,
 		)
 		return err
 	})

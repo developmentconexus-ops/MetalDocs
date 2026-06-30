@@ -194,12 +194,12 @@ func (r *Repository) CreateVersion(ctx context.Context, v *domain.TemplateVersio
 	// increments thereafter. The DEFAULT 0 in the schema is a safety floor.
 	const q = `
 INSERT INTO templates_template_version (
-	id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
+	id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
 	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
 ) VALUES (
-	$1, $2, $3,
+	$1, $21::uuid, $2, $3,
 	COALESCE((SELECT MAX(rn.revision_number) + 1
 	            FROM templates_template_version rn
 	           WHERE rn.template_id = $2), 0),
@@ -214,6 +214,7 @@ RETURNING revision_number`
 		metadataJSON, placeholderJSON, v.AuthorID,
 		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
 		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, v.CreatedAt,
+		v.TenantID,
 	)
 	if err = row.Scan(&v.RevisionNumber); err != nil {
 		return fmt.Errorf("templates repository create version: %w", err)
@@ -229,12 +230,12 @@ func (r *Repository) CreateVersionTx(ctx context.Context, tx db.Tx, v *domain.Te
 	// ADR 0013: see CreateVersion comment.
 	const q = `
 INSERT INTO templates_template_version (
-	id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
+	id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
 	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
 ) VALUES (
-	$1, $2, $3,
+	$1, $21::uuid, $2, $3,
 	COALESCE((SELECT MAX(rn.revision_number) + 1
 	            FROM templates_template_version rn
 	           WHERE rn.template_id = $2), 0),
@@ -249,6 +250,7 @@ RETURNING revision_number`
 		metadataJSON, placeholderJSON, v.AuthorID,
 		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
 		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, v.CreatedAt,
+		v.TenantID,
 	)
 	if err := row.Scan(&v.RevisionNumber); err != nil {
 		return fmt.Errorf("templates repository create version tx: %w", err)

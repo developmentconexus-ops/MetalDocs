@@ -1,0 +1,170 @@
+//go:build integration
+// +build integration
+
+package repository_test
+
+import (
+	"context"
+	"database/sql"
+	"testing"
+
+	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/modules/templates/repository"
+	"metaldocs/tests/integration/testdb"
+)
+
+// TestTemplateVersion_TenantID_RLSParity proves migration 0256: the
+// templates_template_version table now carries its own tenant_id column and is
+// covered by the canonical FORCE-RLS tenant_isolation policy (REQ-TEN-1 / F-DB5),
+// instead of relying solely on the JOIN to templates_template.
+//
+// Two independent guarantees are asserted:
+//
+//	(a) a normal version insert through the repository, in a tenant context,
+//	    succeeds and persists the command's tenant_id onto the new row; and
+//	(b) the RLS USING clause filters cross-tenant reads — under a NOBYPASSRLS
+//	    role with metaldocs.tenant_id set to tenant A, tenant B's version row is
+//	    invisible even on a direct table read with no JOIN/WHERE tenant predicate.
+//
+// (b) must SET ROLE to a NOBYPASSRLS role: the dev/test connection role is a
+// superuser with BYPASSRLS (see migration 0234/0237 caveat, ADR 0022 Phase 5),
+// for which RLS never applies. The production app role is NOSUPERUSER +
+// NOBYPASSRLS, so this is the faithful way to exercise the deployed policy.
+func TestTemplateVersion_TenantID_RLSParity(t *testing.T) {
+	ctx := context.Background()
+	db, dbName := testdb.Open(t)
+
+	// Bare runtime tables (templates_*) must resolve to public.*; evict the
+	// connection that ran the ALTER so the pool reopens with the new default.
+	if _, err := db.ExecContext(ctx, `ALTER DATABASE "`+dbName+`" SET search_path TO public, metaldocs`); err != nil {
+		t.Fatalf("alter database search_path: %v", err)
+	}
+	db.SetMaxIdleConns(0)
+	db.SetMaxIdleConns(4)
+	db.SetMaxOpenConns(4)
+
+	tntA := testdb.NewTenant(t, db)
+	tntB := testdb.NewTenant(t, db)
+	actorA := testdb.NewUser(t, db, testdb.WithTenant(tntA.ID)).ID
+	actorB := testdb.NewUser(t, db, testdb.WithTenant(tntB.ID)).ID
+
+	templateA := testdb.DeterministicID(t, "rls-template-a")
+	templateB := testdb.DeterministicID(t, "rls-template-b")
+	versionA := testdb.DeterministicID(t, "rls-version-a")
+	versionB := testdb.DeterministicID(t, "rls-version-b")
+
+	repo := repository.New(db)
+
+	// ── (a) repository insert in tenant context persists tenant_id ───────────
+	// Seed the parent templates raw (cap-gated), then insert versions through the
+	// repository's CreateVersionTx so the production INSERT column list + binding
+	// is the system under test.
+	testdb.SeedWithCaps(t, db, `[{"cap":"template.create"}]`, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO public.templates_template (
+				id, tenant_id, doc_type_code, key, name, latest_version, published_version_id, created_by
+			) VALUES
+				($1::uuid, $2::uuid, 'po', 'rls-tpl-a', 'RLS Template A', 1, NULL, $3),
+				($4::uuid, $5::uuid, 'po', 'rls-tpl-b', 'RLS Template B', 1, NULL, $6)`,
+			templateA, tntA.ID, actorA, templateB, tntB.ID, actorB,
+		); err != nil {
+			return err
+		}
+		if err := repo.CreateVersionTx(ctx, tx, &domain.TemplateVersion{
+			ID:                versionA,
+			TenantID:          tntA.ID,
+			TemplateID:        templateA,
+			VersionNumber:     1,
+			Status:            domain.VersionStatusDraft,
+			MetadataSchema:    domain.MetadataSchema{},
+			PlaceholderSchema: []domain.Placeholder{},
+			AuthorID:          actorA,
+			DocxStorageKey:    "templates/rls-a/body.docx",
+		}); err != nil {
+			return err
+		}
+		return repo.CreateVersionTx(ctx, tx, &domain.TemplateVersion{
+			ID:                versionB,
+			TenantID:          tntB.ID,
+			TemplateID:        templateB,
+			VersionNumber:     1,
+			Status:            domain.VersionStatusDraft,
+			MetadataSchema:    domain.MetadataSchema{},
+			PlaceholderSchema: []domain.Placeholder{},
+			AuthorID:          actorB,
+			DocxStorageKey:    "templates/rls-b/body.docx",
+		})
+	})
+
+	t.Run("insert_persists_tenant_id", func(t *testing.T) {
+		var gotTenant string
+		if err := db.QueryRowContext(ctx,
+			`SELECT tenant_id::text FROM public.templates_template_version WHERE id = $1::uuid`,
+			versionA,
+		).Scan(&gotTenant); err != nil {
+			t.Fatalf("read back version tenant_id: %v", err)
+		}
+		if gotTenant != tntA.ID {
+			t.Fatalf("version A tenant_id = %q, want %q (insert must persist command tenant)", gotTenant, tntA.ID)
+		}
+	})
+
+	// ── (b) RLS USING clause filters cross-tenant reads ──────────────────────
+	t.Run("rls_filters_cross_tenant_read", func(t *testing.T) {
+		// Create a NOBYPASSRLS role and grant it read on the table, so FORCE RLS
+		// actually applies (the connection role is a BYPASSRLS superuser).
+		const rlsRole = "rls_tester_tpl_version"
+		if _, err := db.ExecContext(ctx, `DROP ROLE IF EXISTS `+rlsRole); err != nil {
+			t.Fatalf("drop role: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, `CREATE ROLE `+rlsRole+` NOLOGIN NOBYPASSRLS`); err != nil {
+			t.Fatalf("create role: %v", err)
+		}
+		t.Cleanup(func() { _, _ = db.ExecContext(ctx, `DROP ROLE IF EXISTS `+rlsRole) })
+		if _, err := db.ExecContext(ctx, `GRANT USAGE ON SCHEMA public TO `+rlsRole); err != nil {
+			t.Fatalf("grant schema usage: %v", err)
+		}
+		if _, err := db.ExecContext(ctx, `GRANT SELECT ON public.templates_template_version TO `+rlsRole); err != nil {
+			t.Fatalf("grant select: %v", err)
+		}
+
+		// Single connection so SET ROLE + GUC + query all run together.
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			t.Fatalf("acquire conn: %v", err)
+		}
+		defer conn.Close()
+		defer func() { _, _ = conn.ExecContext(ctx, `RESET ROLE`) }()
+
+		if _, err := conn.ExecContext(ctx, `SELECT set_config('metaldocs.tenant_id', $1, false)`, tntA.ID); err != nil {
+			t.Fatalf("set tenant_id GUC: %v", err)
+		}
+		if _, err := conn.ExecContext(ctx, `SET ROLE `+rlsRole); err != nil {
+			t.Fatalf("set role: %v", err)
+		}
+
+		// Direct table read, NO join, NO tenant WHERE predicate: isolation must
+		// come entirely from the RLS policy. Tenant A's row visible, B's hidden.
+		var visibleA bool
+		if err := conn.QueryRowContext(ctx,
+			`SELECT EXISTS (SELECT 1 FROM public.templates_template_version WHERE id = $1::uuid)`,
+			versionA,
+		).Scan(&visibleA); err != nil {
+			t.Fatalf("query tenant A visibility: %v", err)
+		}
+		if !visibleA {
+			t.Fatal("tenant A's own version must be visible under metaldocs.tenant_id = A")
+		}
+
+		var visibleB bool
+		if err := conn.QueryRowContext(ctx,
+			`SELECT EXISTS (SELECT 1 FROM public.templates_template_version WHERE id = $1::uuid)`,
+			versionB,
+		).Scan(&visibleB); err != nil {
+			t.Fatalf("query tenant B visibility: %v", err)
+		}
+		if visibleB {
+			t.Fatal("RLS breach: tenant B's version is visible while metaldocs.tenant_id = A — tenant_isolation policy not enforced")
+		}
+	})
+}
