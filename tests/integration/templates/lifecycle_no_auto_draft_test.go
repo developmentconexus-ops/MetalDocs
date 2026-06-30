@@ -66,8 +66,8 @@ func countVersionRows(t *testing.T, db *sql.DB, templateID string) int {
 func versionStatuses(t *testing.T, db *sql.DB, templateID string) map[int]string {
 	t.Helper()
 	rows, err := db.QueryContext(context.Background(),
-		`SELECT version_num, status FROM public.templates_template_version
-		  WHERE template_id = $1::uuid ORDER BY version_num`,
+		`SELECT version_number, status FROM public.templates_template_version
+		  WHERE template_id = $1::uuid ORDER BY version_number`,
 		templateID,
 	)
 	if err != nil {
@@ -137,12 +137,23 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 	// ── Step 2: seed content hash (simulates autosave commit) ─────────────
 	// The approve gate (T-004) requires a non-empty content_hash. Update directly
 	// via SQL since the presigner is a no-op and there is no autosave service here.
+	// content_hash must satisfy chk_template_version_content_hash (length 64) and
+	// chk_template_version_content_hash_non_draft once the version leaves draft.
+	const seedContentHash = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
 	testdb.SeedWithCaps(t, db, `[{"cap":"template.edit"}]`, func(tx *sql.Tx) error {
+		// trg_template_version_tenant_consistent reads metaldocs.tenant_id (set by
+		// authz.SeedTxIdentity in production). Assert it tx-locally for this raw write
+		// so the trigger sees the parent template's tenant.
+		if _, err := tx.ExecContext(ctx,
+			`SELECT set_config('metaldocs.tenant_id', $1, true)`, tenant.ID,
+		); err != nil {
+			return err
+		}
 		_, err := tx.ExecContext(ctx,
 			`UPDATE public.templates_template_version
-			    SET docx_content_hash = 'integration-test-hash'
+			    SET content_hash = $2
 			  WHERE id = $1::uuid`,
-			v1ID,
+			v1ID, seedContentHash,
 		)
 		return err
 	})
