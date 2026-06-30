@@ -1,32 +1,33 @@
-import type React from 'react';
-import { Fragment } from 'react';
-import { Icon } from '../../../components/ui/Icon';
-import styles from './DocumentHero.module.css';
+import type React from "react";
+import { Fragment } from "react";
+import { Icon } from "../../../components/ui/Icon";
+import type { BreadcrumbItem } from "./types";
+import styles from "./ArtifactHero.module.css";
 
-interface DocumentHeroProps {
-  breadcrumbItems: Array<{ label: string; href?: string }>;
-  docCard: React.ReactNode;
-  badges: React.ReactNode;
+interface ArtifactHeroProps {
+  breadcrumb: BreadcrumbItem[];
+  docCard?: React.ReactNode;
+  badges?: React.ReactNode;
   title: string;
-  subtitle: React.ReactNode;
-  actions: React.ReactNode;
+  subtitle?: React.ReactNode;
+  actions?: React.ReactNode;
 }
 
-export function DocumentHero({
-  breadcrumbItems,
+export function ArtifactHero({
+  breadcrumb,
   docCard,
   badges,
   title,
   subtitle,
   actions,
-}: DocumentHeroProps) {
+}: ArtifactHeroProps) {
   return (
     <header className={styles.hero}>
       <div className={styles.heroOverlay} />
 
       <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
-        {breadcrumbItems.map((item, index) => {
-          const isLast = index === breadcrumbItems.length - 1;
+        {breadcrumb.map((item, index) => {
+          const isLast = index === breadcrumb.length - 1;
 
           return (
             <Fragment key={`${item.label}-${index}`}>

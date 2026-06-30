@@ -4,7 +4,7 @@ import { Icon } from '../../../components/ui/Icon';
 import { Avatar } from '../../../components/ui/Avatar';
 import { CodeChip } from '../../../components/ui/CodeChip';
 import { resolveQueryError, ApiError, resolveErrorMessage } from '../../../lib/api';
-import { DocumentHero } from '../components/DocumentHero';
+import { ArtifactHero } from '../../shared/controlled-artifact/ArtifactHero';
 import { DocumentVersionTimeline } from '../components/DocumentVersionTimeline';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
@@ -381,8 +381,8 @@ export function DocumentPublishedPage() {
       )}
 
       {/* Hero */}
-      <DocumentHero
-        breadcrumbItems={[
+      <ArtifactHero
+        breadcrumb={[
           { label: 'Biblioteca', href: '/documents' },
           ...(areaLabel !== '—' ? [{ label: areaLabel }] : []),
           { label: code },

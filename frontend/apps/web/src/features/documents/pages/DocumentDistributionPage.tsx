@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
-import { DocumentHero } from '../components/DocumentHero';
+import { ArtifactHero } from '../../shared/controlled-artifact/ArtifactHero';
 import { DocRefCard } from '../components/distribution/DocRefCard';
 import { KPIStrip } from '../components/distribution/KPIStrip';
 import { DonutCard } from '../components/distribution/DonutCard';
@@ -88,8 +88,8 @@ export function DocumentDistributionPage() {
 
   return (
     <div className={styles.page}>
-      <DocumentHero
-        breadcrumbItems={[
+      <ArtifactHero
+        breadcrumb={[
           { label: 'Biblioteca', href: '/documents' },
           { label: EM_DASH },
           { label: code, href: `/documents/${documentId}` },
