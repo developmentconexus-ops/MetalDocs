@@ -4,7 +4,7 @@
 >
 > **Naming note:** module dir is `internal/modules/templates/` and routes still mount under `/api/v1/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates-refactor.md#R-101`).
 
-**Last verified:** 2026-06-29 (ADR 0050 — `/placeholder-catalog` and `ValidatePlaceholders` both derived from `render/domain.ComputedCatalog()` single source; hand-maintained 7-key slices deleted; `approval_date` now author-visible; templates→render/domain legal edge; prior: 2026-06-28 SP-1 cross-link to tokens module added) | **Prior:** 2026-06-15 (M4/F4.2 — port ADR 0030 cross-link: `TemplateVersionPort` extended with `GetTemplateVersionState`; raw state now exposed to controlled-documents without cross-module SQL) | **Prior:** 2026-06-12 (Wave 2.12: `db==nil` dual-mode branches removed from autosave/create/lifecycle/schema/approval_config application services — single-mode only; `CreateTemplateTx` no longer writes `areas`/`visibility`/`specific_areas` (dropped by migration 0236); nodualmode CI guard. Prior Wave 2: AppendAuditTx before commit; typed CapTemplate* consts; upsertApprovalConfig tier-1 fixed template.admin→CapTemplateEdit; publish route tier-1 aligned to CapTemplatePublish; post-publication role gate fixed phantom admin→system_admin/qms_admin; CompositionConfig deleted; legacy areas/visibility columns removed from CreateTemplate INSERT. Prior: Wave 1: F-07-sub-split — ListAudit reads metaldocs.audit_events; version_id now carried in audit payload) | prior: 2026-06-10 (P2 consolidation: �3/�5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section) | prior: 2026-05-31 (feat/templates-approve-next-draft-response: Approve response now mirrors PublishTemplateVersion � returns `{ version, next_draft }` so the editor navigates straight from vN to the auto-spawned vN+1 draft; `Service.Approve` spawns the draft in-tx in both reviewer+no-reviewer accept paths; `ApproveTemplateVersionResponse` schema added to OpenAPI; FE `approveVersion` returns `{ version, nextDraft }`, `VersionActionPanel` forwards `nextDraft` and shows "Publicado. Nova vers�o de rascunho criada.", `TemplateEditorPage` calls `onNavigateToVersion` when present) | prior: 2026-05-31 (fix/templates-publish-role-binding � `PublishTemplateVersion` now enforces `pending_approver_role` Tier 2 binding alongside the Tier 1 `template.publish` capability; T-004 fully closed; `Service.Approve` refactored to share new `domain.TemplateVersion.RoleBindingFor` helper; denied-attempt audit emitted) | prior: 2026-05-31 (fix/templates-schema-occ-lock: PUT /schema lock-version CAS � `expected_lock_version` required on the contract, `UpdateVersionSchemaCAS`/`Tx` enforce CAS, 412 `stale_lock_version` on miss; FE useTemplateSchemas holds lockVersion, surfaces staleConflict + refetch � multi-tab last-write-wins closed) | prior: 2026-05-29 (feat/templates-rev-labels: ADR 0013 � first-class `revision_number` column on `templates_template_version` + `current_revision_number` on TemplateDTO; FE renders REV{nn} via shared `formatRevisionCode`; bug/templates-version-chip: honest chip via `published_version_number`; qa/templates-list: empty-state i18n fix + dead `updated_at` cast removal in `TemplatesListPage.tsx`) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 22 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table; 2026-05-29 added `published_version_number` to TemplateDTO so the list-page version chip reflects the *published* version, not the auto-spawned draft `latest_version`; 2026-05-29 promoted `revision_number` to a persisted column per ADR 0013 so REV chip labels are backend-canonical and never computed in the FE) | **Maturity:** L3
+**Last verified:** 2026-06-30 (ADR 0052 + ADR 0053 — manual versioning only: `Approve`/`PublishTemplateVersion` transition status only; `CreateNextVersion` is the sole revision path; `next_draft*` dropped from contract; status `in_review` renamed to `under_review`; templates render through shared controlled-artifact view layer with `TemplateDetailRoute` + `TemplateApprovalRoute`; inline `VersionActionPanel` removed from approval surface; prior: ADR 0050 — `/placeholder-catalog` and `ValidatePlaceholders` both derived from `render/domain.ComputedCatalog()` single source; hand-maintained 7-key slices deleted; `approval_date` now author-visible; templates→render/domain legal edge; prior: 2026-06-28 SP-1 cross-link to tokens module added) | **Prior:** 2026-06-15 (M4/F4.2 — port ADR 0030 cross-link: `TemplateVersionPort` extended with `GetTemplateVersionState`; raw state now exposed to controlled-documents without cross-module SQL) | **Prior:** 2026-06-12 (Wave 2.12: `db==nil` dual-mode branches removed from autosave/create/lifecycle/schema/approval_config application services — single-mode only; `CreateTemplateTx` no longer writes `areas`/`visibility`/`specific_areas` (dropped by migration 0236); nodualmode CI guard. Prior Wave 2: AppendAuditTx before commit; typed CapTemplate* consts; upsertApprovalConfig tier-1 fixed template.admin→CapTemplateEdit; publish route tier-1 aligned to CapTemplatePublish; post-publication role gate fixed phantom admin→system_admin/qms_admin; CompositionConfig deleted; legacy areas/visibility columns removed from CreateTemplate INSERT. Prior: Wave 1: F-07-sub-split — ListAudit reads metaldocs.audit_events; version_id now carried in audit payload) | prior: 2026-06-10 (P2 consolidation: �3/�5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section) | prior: 2026-05-31 (fix/templates-schema-occ-lock: PUT /schema lock-version CAS � `expected_lock_version` required on the contract, `UpdateVersionSchemaCAS`/`Tx` enforce CAS, 412 `stale_lock_version` on miss; FE useTemplateSchemas holds lockVersion, surfaces staleConflict + refetch � multi-tab last-write-wins closed) | prior: 2026-05-29 (feat/templates-rev-labels: ADR 0013 � first-class `revision_number` column on `templates_template_version` + `current_revision_number` on TemplateDTO; FE renders REV{nn} via shared `formatRevisionCode`; bug/templates-version-chip: honest chip via `published_version_number`; qa/templates-list: empty-state i18n fix + dead `updated_at` cast removal in `TemplatesListPage.tsx`) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 22 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table; 2026-05-29 added `published_version_number` to TemplateDTO so the list-page version chip reflects the *published* version, not the auto-spawned draft `latest_version`; 2026-05-29 promoted `revision_number` to a persisted column per ADR 0013 so REV chip labels are backend-canonical and never computed in the FE) | **Maturity:** L3
 
 ### Version chip source-of-truth (2026-05-29)
 
@@ -45,7 +45,7 @@ Frontend wiring (all under `frontend/apps/web/src/features/templates/`):
 ### 1.1 Requirements overview
 
 - **Authoring of regulated DOCX templates** with eigenpal-native `{name}` placeholders restricted to the fixed 8-token computed catalog (per `wiki/concepts/placeholders.md`, ADR 0008 amended by ADR 0050; catalog derived from `render/domain.ComputedCatalog()`).
-- **Two-stage approval lifecycle** (`draft Ã¢â€ â€™ in_review Ã¢â€ â€™ approved Ã¢â€ â€™ published`, with `obsolete` for superseded versions) enforcing ISO segregation of duties (per `wiki/concepts/iso-segregation.md`).
+- **Two-stage approval lifecycle** (`draft → under_review → approved → published`, with `obsolete` for superseded versions) enforcing ISO segregation of duties (per `wiki/concepts/iso-segregation.md`).
 - **Snapshot contract for downstream consumers** Ã¢â‚¬â€ published `template_version.placeholder_schema` is read by `documents` at instantiation (`wiki/modules/documents.md Ã‚Â§8.7`).
 - **Authoring identity carried on every version** Ã¢â‚¬â€ `author_id`, `reviewer_id`, `approver_id` columns are the SoD probe surface consumed by `approval` (per `wiki/modules/approval.md` SoD T-003).
 - **Per-tenant isolation** Ã¢â‚¬â€ every template scoped by `tenant_id` (origin: `wiki/architecture/data-model.md`).
@@ -325,13 +325,12 @@ State transitions on `templates_template_version.status`:
 
 | From | To | Trigger | Authz cap (intended / actual) | SoD check |
 |---|---|---|---|---|
-| draft | in_review | `POST .../submit` | `template.submit` / **bypassed (T-001)** | Ã¢â‚¬â€ (no actor restriction at submit) |
-| in_review | approved | `POST .../review` (Accept) | `template.approve` / bypassed | `CheckSegregation("reviewer", actor, author, nil)` Ã¢Å“â€œ |
-| in_review | draft | `POST .../review` (Reject) | `template.approve` / bypassed | Ã¢â‚¬â€ |
+| draft | under_review | `POST .../submit` | `template.submit` / **bypassed (T-001)** | Ã¢â‚¬â€ (no actor restriction at submit) |
+| under_review | approved | `POST .../review` (Accept) | `template.approve` / bypassed | `CheckSegregation("reviewer", actor, author, nil)` Ã¢Å“â€œ |
+| under_review | draft | `POST .../review` (Reject) | `template.approve` / bypassed | Ã¢â‚¬â€ |
 | approved | published | `POST .../approve` (Accept, hasReviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, reviewer)` Ã¢Å“â€œ |
-| in_review | published | `POST .../approve` (Accept, no reviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, nil)` Ã¢Å“â€œ |
+| under_review | published | `POST .../approve` (Accept, no reviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, nil)` Ã¢Å“â€œ |
 | draft | published | `POST .../publish` (`PublishTemplateVersion`) | `template.publish` (Tier 1) + `pending_approver_role` binding (Tier 2, since 2026-05-31) | CheckSegregation(approver, actor, author, reviewer) + role-binding (T-004 CLOSED) |
-| (n/a) | draft (v(n+1)) | side-effect of `Approve(Accept)` and `PublishTemplateVersion` � spawned in same tx; returned to caller as `next_draft` so the editor can navigate without a list refetch (feat/templates-approve-next-draft-response) | implicit | � |
 | approved | draft | `POST .../approve` (Reject) | `template.approve` / bypassed | Ã¢â‚¬â€ |
 | published | obsolete | side-effect of `Approve(Accept)` or `PublishTemplateVersion` (`ObsoletePreviousPublished`) | implicit | Ã¢â‚¬â€ |
 | any | (template.archived_at NOT NULL) | `POST .../archive` | `template.edit` / bypassed | Ã¢â‚¬â€ |
@@ -362,12 +361,11 @@ sequenceDiagram
     S->>R: AppendAudit(AuditPublished)
     R->>DB: INSERT templates_audit_log
     Note over S: AuditObsoleted constant exists; never written for the obsolete side-effect
-    S->>S: CreateNextVersion(...)  Ã¢â‚¬â€ auto-spawn draft v(n+1)
-    S-->>H: PublishTemplateVersionResult{Published, NextDraft}
+    S-->>H: PublishTemplateVersionResult{PublishedVersion}
     H-->>C: 200
 ```
 
-`Service.Approve` (Accept branch, lifecycle.go) follows the same publish-then-spawn pattern and returns `ApproveResult{Version, NextDraft}`. The HTTP handler writes `data.next_draft = { id, version_number } | null` so the editor can navigate from `vN` to `vN+1` in a single round-trip � mirrors `PublishTemplateVersion`, ADR 0012 contract-first. `next_draft` is null on the reject path. (feat/templates-approve-next-draft-response)
+`Service.Approve` (Accept branch, `lifecycle.go:198`) transitions to `published`, updates head pointers, appends the audit event, and returns `ApproveResult{Version}` only. No next draft is spawned — use `POST /api/v1/templates/{id}/versions` (`CreateNextVersion`) to start a new revision deliberately (ADR 0052).
 
 Failure modes:
 
@@ -397,8 +395,7 @@ Failure modes:
 - Postgres tripwire: `db/migrations/0231_db_hardening_tripwire_and_dead_schema.sql:88-93` attaches `trg_require_cap_asserted` to `public.templates_template` and `public.templates_template_version`.
 - Capabilities in seed (`migrations/0165_role_capabilities_reseed.sql`): `template.view/create/edit/submit/approve/publish` mapped to `viewer/editor/author/approver/system_admin` Ã¢â‚¬â€ currently advisory only. See T-001.
 
-- **Frontend defense-in-depth gate (2026-05-31, Workstream 4)**: `frontend/apps/web/src/features/templates/lib/canActOnVersion.ts` exposes `canSubmit/canReview/canApprove/canPublish` returning `{ allowed, reason }`. `TemplateEditorPage` (Submeter) and `VersionActionPanel` (Approve/Reject/Publish) consume the gate via `disabled + title` so users see why a button is unavailable (status / capability / role-binding mismatch). Backend remains the sole enforcer (`wiki/concepts/authz-tiers.md`); the FE hint is fed by `CurrentUser.capabilities` (added to `/api/v1/auth/me` + `/login`) � `iamapp.CapabilityService.CapsByUserID` resolves the union of direct + group role capabilities, with `system_admin` short-circuiting to `iamdomain.AllCapabilities()`.
-
+- **Frontend defense-in-depth gate (2026-05-31, updated ADR 0053)**: `frontend/apps/web/src/features/templates/lib/canActOnVersion.ts` exposes `canSubmit/canReview/canApprove/canPublish` returning `{ allowed, reason }`. `TemplateEditorPage` (Submeter) and `TemplateApprovalRoute` (Approve/Reject/Publish — replaces the removed inline `VersionActionPanel`) consume the gate via `disabled + title` so users see why a button is unavailable (status / capability / role-binding mismatch). Backend remains the sole enforcer (`wiki/concepts/authz-tiers.md`); the FE hint is fed by `CurrentUser.capabilities` (added to `/api/v1/auth/me` + `/login`) — `iamapp.CapabilityService.CapsByUserID` resolves the union of direct + group role capabilities, with `system_admin` short-circuiting to `iamdomain.AllCapabilities()`.
 ### 8.2 Error envelope
 
 - All non-2xx responses: legacy `{"error":{"code","message"}}` via `httpresponse.WriteJSON` (`delivery/http/handler.go:95-102`). RFC 9457 Problem+JSON not adopted. See T-005.
@@ -439,6 +436,20 @@ Failure modes:
 - Template-injection blast radius: a malicious resolver_key on a published template propagates to every document instantiated from that version (per `wiki/modules/documents.md ÃâÃÂ§8.7` snapshot path).
 ---
 
+### 8.9 Frontend view layer (ADR 0053)
+
+Templates now render through the **shared controlled-artifact view layer** (ADR 0053). Clicking a template in the list routes to `TemplateDetailRoute` — the shared `ArtifactDetailView` shell — matching the document detail experience. The eigenpal editor is reached only via an explicit "Editar modelo" action from that screen.
+
+Key files:
+- `frontend/apps/web/src/features/templates/pages/TemplateDetailRoute.tsx` — thin route wrapper; calls `useTemplateArtifact`, owns `useState`/dialogs, passes `heroActions`/`aside`/`extras` slots to the shell.
+- `frontend/apps/web/src/features/templates/pages/TemplateApprovalRoute.tsx` — thin approval route wrapper; calls `useTemplateApprovalArtifact`.
+- `frontend/apps/web/src/features/templates/adapters/useTemplateArtifact.ts` — fetches template data, maps to `ArtifactViewModel`; all template-specific business rules live here.
+- `frontend/apps/web/src/features/templates/adapters/useTemplateApprovalArtifact.ts` — approval-surface adapter.
+- `frontend/apps/web/src/features/shared/controlled-artifact/` — shell components (`ArtifactDetailView`, `ArtifactDetailLayout`, `ArtifactHero`, `ArtifactHeroCard`, `ArtifactMetaSidebar`, `ArtifactApprovalScreen`, `VersionTimeline`) and `types.ts` (`ArtifactViewModel` contract).
+
+The inline `VersionActionPanel` component (previously embedded in `TemplateEditorPage`) has been removed; approval actions now live in `TemplateApprovalRoute` via the shell's action model. See `wiki/architecture/frontend-structure.md` Section 17 for the four hard rules that govern the shell layer.
+
+
 ## 9. Architecture Decisions
 
 | Decision | Link / Status |
@@ -453,6 +464,8 @@ Failure modes:
 | Two parallel publish paths (`Approve` vs `PublishTemplateVersion`) | tech-debt: covered by ADR 0007 (two-tier authz); T-004 CLOSED 2026-05-31 |
 | Module-local audit **write** sink (`templates_audit_log`); `ListAudit` reads `metaldocs.audit_events` (Wave 1 half-fix) | tech-debt: T-013 (full write-path migration pending) |
 | `TemplateVersionPort` extended with `GetTemplateVersionState` — templates owns the raw state read; controlled-documents `PostgresTemplateVersionChecker` deleted + `status := "published"` hardcode removed (M4/F4.2) | [`wiki/decisions/0030-template-version-state-port.md`](../decisions/0030-template-version-state-port.md) |
+| Manual template versioning — `Approve`/`PublishTemplateVersion` transition status only; `CreateNextVersion` is the sole revision path; `next_draft*` dropped from contract; `in_review` → `under_review` | [`wiki/decisions/0052-template-manual-versioning.md`](../decisions/0052-template-manual-versioning.md) |
+| Shared controlled-artifact frontend view layer — one presentational shell renders documents + templates; per-kind adapters + thin route wrappers + four hard rules | [`wiki/decisions/0053-shared-controlled-artifact-view-layer.md`](../decisions/0053-shared-controlled-artifact-view-layer.md) |
 
 ---
 
@@ -492,7 +505,7 @@ Top 3 (by severity, then blast-radius):
 | Template Version | A specific revision of a template (`version_number` per template). Carries the DOCX storage key, content hash, metadata + placeholder schemas, and lifecycle status. |
 | Placeholder | A `{name}` token in the DOCX whose `PHType` is one of the fixed 7-token catalog. Substituted at document finalize. |
 | Approval Config | Per-template binding of `reviewer_role` (optional) and `approver_role` (required). Drives `pending_*_role` on each new version. |
-| ApprovalConfig.HasReviewer | Boolean derived from `reviewer_role != nil`. Determines whether `Approve` requires `status == approved` (with reviewer) or `status == in_review` (without). |
+| ApprovalConfig.HasReviewer | Boolean derived from `reviewer_role != nil`. Determines whether `Approve` requires `status == approved` (with reviewer) or `status == under_review` (without). |
 | Audit log (templates) | Module-local sink at `templates_audit_log`. Parallel to canonical `metaldocs.audit_events`. |
 | Obsolete | Status assigned to the previous published version when a new version is published. |
 
@@ -517,7 +530,7 @@ Top 3 (by severity, then blast-radius):
 
 ## Cross-links
 
-- Related ADRs: `wiki/decisions/0001-eigenpal-adoption.md`, `wiki/decisions/0003-token-syntax-migration.md`, `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0008-placeholder-fixed-catalog.md`, `wiki/decisions/0012-contract-first-api.md`, `wiki/decisions/0050-computed-token-catalog-single-source.md`
+- Related ADRs: `wiki/decisions/0001-eigenpal-adoption.md`, `wiki/decisions/0003-token-syntax-migration.md`, `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0008-placeholder-fixed-catalog.md`, `wiki/decisions/0012-contract-first-api.md`, `wiki/decisions/0050-computed-token-catalog-single-source.md`, `wiki/decisions/0052-template-manual-versioning.md`, `wiki/decisions/0053-shared-controlled-artifact-view-layer.md`
 - Related concepts: `wiki/concepts/placeholders.md`, `wiki/concepts/token-syntax.md`, `wiki/concepts/iso-segregation.md`, `wiki/concepts/error-ux.md`, `wiki/concepts/authz-tiers.md`
 - Downstream module: `wiki/modules/documents.md` (consumes published versions; snapshots placeholder schema at finalize)
 - Taxonomy coupling: `wiki/modules/taxonomy.md` Ã¢â‚¬â€ taxonomy's `TemplateVersionChecker` (`infrastructure/template_version_checker.go:11`) READ-joins `templates_template_version` + `templates_template` to verify `IsPublished` when binding a profile's default template; taxonomy Ã‚Â§3.2 documents this IN-edge
@@ -530,6 +543,7 @@ Top 3 (by severity, then blast-radius):
 
 ## Changelog
 
+- 2026-06-30 - ADR 0052 + ADR 0053: manual versioning (no auto-next-draft on approve/publish); `CreateNextVersion` is the sole revision path; `next_draft*` dropped from OpenAPI contract (regen, no drift); status renamed `in_review` to `under_review` (DB migration + contract + FE literals in `canActOnVersion.ts`); `Approve` returns `ApproveResult{Version}` only; `PublishTemplateVersion` returns `PublishTemplateVersionResult{PublishedVersion}` only. Templates now render through the shared controlled-artifact view layer: `TemplateDetailRoute` + `TemplateApprovalRoute` route wrappers; per-kind adapters `useTemplateArtifact` + `useTemplateApprovalArtifact`; inline `VersionActionPanel` removed.
 - 2026-06-29 - ADR 0050: computed-token catalog single source of truth. Hand-maintained 7-key `placeholderCatalog` slice (routes_catalog.go) and `placeholderCatalogSet` (schema.go) both deleted; both consumers now derive from `render/domain.ComputedCatalog()`. `approval_date` is now author-visible (was absent from both copies). Bidirectional parity guard added in render module (`catalog_parity_test.go`). `templates → render/domain` legal edge per `check-module-boundaries.ps1`.
 - 2026-06-12 - Wave 2 structural refresh: `AppendAuditTx` before commit (audit + state transition atomic); tier-1 literal capability strings replaced with typed `iamdomain.CapTemplate*` consts; `upsertApprovalConfig` tier-1 fixed from phantom `template.admin` to `CapTemplateEdit` (route was permanently locked — now functional); publish route tier-1 aligned to `CapTemplatePublish`; post-publication role gate fixed from phantom `admin` to system_admin/qms_admin; `CompositionConfig` deleted from domain; legacy `areas/visibility/specific_areas` columns removed from `CreateTemplate` INSERT (`CreateTemplateTx` still writes them — residual, tracked as debt).
 
