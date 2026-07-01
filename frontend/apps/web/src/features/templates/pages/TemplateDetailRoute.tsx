@@ -5,7 +5,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "../../../components/ui/Icon";
 import { ArtifactDetailView } from "../../shared/controlled-artifact/ArtifactDetailView";
 import { useTemplateArtifact } from "../adapters/useTemplateArtifact";
-import { useTemplateDetailQuery } from "../queries/useTemplateDetailQuery";
 import { createNextVersion } from "../api/templates";
 import { QK } from "../../../lib/queryKeys";
 import { resolveQueryError } from "../../../lib/api";
@@ -22,9 +21,6 @@ export function TemplateDetailRoute() {
   const { templateId = "" } = useParams<{ templateId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  const detailQuery = useTemplateDetailQuery(templateId);
-  const latestStatus = detailQuery.data?.latest_version.status;
 
   const { model, isLoading, isError } = useTemplateArtifact(templateId);
 
@@ -76,7 +72,7 @@ export function TemplateDetailRoute() {
   // screen (parity with documents → /approvals/:id); published → manually spawn the
   // next version (the only revision path since M1 dropped auto-spawn — ADR 0052).
   let heroActions: ReactNode;
-  switch (latestStatus) {
+  switch (model.status) {
     case "under_review":
       heroActions = (
         <div className={styles.heroActions}>

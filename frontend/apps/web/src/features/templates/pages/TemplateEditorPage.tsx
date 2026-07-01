@@ -20,7 +20,7 @@ import {
   type AutosaveState,
 } from '../../shared/components/editor-chrome';
 import { StatusPill, type DocumentStatus } from '../../../components/ui';
-import { ApiError, resolveErrorMessage } from '../../../lib/api';
+import { resolveQueryError } from '../../../lib/api';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import styles from './styles/TemplateEditorPage.module.css';
 
@@ -41,12 +41,6 @@ const AUTOSAVE_LABELS_PT = {
   saved: 'Salvo',
   error: 'Falha ao salvar',
 };
-
-function resolveError(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) return resolveErrorMessage(err.code, err.message);
-  if (err instanceof Error) return err.message;
-  return fallback;
-}
 
 export function TemplateEditorPage({
   templateId,
@@ -167,7 +161,7 @@ export function TemplateEditorPage({
       setLiveVersion(updated);
       setSubmitMsg({ kind: 'success', text: 'Enviado para revisão.' });
     } catch (err) {
-      setSubmitMsg({ kind: 'error', text: resolveError(err, 'Falha ao submeter para revisão.') });
+      setSubmitMsg({ kind: 'error', text: resolveQueryError(err, 'Falha ao submeter para revisão.') });
     } finally {
       setSubmitting(false);
     }
@@ -183,7 +177,7 @@ export function TemplateEditorPage({
       await autosave.importDocx(await file.arrayBuffer());
       draft.refetch();
     } catch (err) {
-      setImportErr(resolveError(err, 'Falha ao importar arquivo .docx.'));
+      setImportErr(resolveQueryError(err, 'Falha ao importar arquivo .docx.'));
     } finally {
       setImporting(false);
     }
