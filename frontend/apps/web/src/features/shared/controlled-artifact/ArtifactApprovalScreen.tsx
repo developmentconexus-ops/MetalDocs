@@ -1,20 +1,24 @@
 import type React from "react";
+import { Fragment } from "react";
+import { Link } from "react-router-dom";
 import { Avatar } from "../../../components/ui/Avatar";
-import { formatSignedAt } from "../../../lib/format/dates";
-import { ArtifactHero } from "./ArtifactHero";
-import { ArtifactHeroDocCard, ArtifactHeroBadges } from "./ArtifactHeroCard";
-import type { ArtifactAction, ArtifactViewModel } from "./types";
+import { Icon } from "../../../components/ui/Icon";
+import { StatusPill } from "../../../components/ui/StatusPill";
+import { ArtifactApprovalFlow } from "./ArtifactApprovalFlow";
+import { ArtifactDecisionPanel } from "./ArtifactDecisionPanel";
+import type { ArtifactAction, ArtifactAuthorMeta, ArtifactViewModel } from "./types";
 import styles from "./ArtifactApprovalScreen.module.css";
 
 interface ArtifactApprovalScreenProps {
   model: ArtifactViewModel;
-  /** Kind-specific main content (document review canvas + tabs, or template preview). */
+  /** Kind-specific main body: the A4 document / review canvas. Scrolls under the header. */
   main: React.ReactNode;
-  /** Kind-specific decision-sidebar extras rendered BELOW the action buttons and
-   *  approval chain (e.g. document integrity panel / lock badge / timeline, or a
-   *  template reason composer). Optional. */
+  /** Optional route-owned tab strip rendered between the doc header and the body. */
+  tabs?: React.ReactNode;
+  /** Kind-specific sidebar extras rendered BELOW the decision panel / actions (e.g.
+   *  document integrity panel / lock badge / timeline). Optional. */
   decisionExtras?: React.ReactNode;
-  /** Route-owned modal dialogs (SignoffDialog, SupersedePublishDialog, …). Optional. */
+  /** Route-owned modal dialogs (SupersedePublishDialog, CancelInstanceDialog, …). Optional. */
   dialogs?: React.ReactNode;
 }
 
@@ -29,100 +33,170 @@ function variantClass(action: ArtifactAction): string {
   }
 }
 
+/** Author / submission descriptor row — renders only the segments that are present. */
+function AuthorMetaRow({ authorMeta }: { authorMeta: ArtifactAuthorMeta }) {
+  const segments: React.ReactNode[] = [];
+  if (authorMeta.authorRole != null) segments.push(<span key="role">{authorMeta.authorRole}</span>);
+  if (authorMeta.areaLabel != null) segments.push(<span key="area">{authorMeta.areaLabel}</span>);
+  if (authorMeta.submittedLabel != null) segments.push(<span key="submitted">{authorMeta.submittedLabel}</span>);
+  if (authorMeta.priorDecisionLabel != null)
+    segments.push(<span key="prior">{authorMeta.priorDecisionLabel}</span>);
+
+  const hasAny = authorMeta.authorName != null || segments.length > 0;
+  if (!hasAny) return null;
+
+  return (
+    <div className={styles.authorRow}>
+      {authorMeta.authorName != null && (
+        <span className={styles.authorLead}>
+          <Avatar name={authorMeta.authorName} size="sm" />
+          {authorMeta.authorName}
+        </span>
+      )}
+      {segments.map((seg, i) => (
+        <Fragment key={i}>
+          {(i > 0 || authorMeta.authorName != null) && <span className={styles.authorSep}>·</span>}
+          {seg}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
 /**
- * Purely presentational approval surface for a controlled artifact. Consumes an
- * `ArtifactViewModel` and optional ReactNode slots — no data fetching, no
- * `useParams`, no `kind` branching. Every kind-specific difference is either
- * normalized into the model by the adapter or injected via a slot by the caller.
+ * Approval cockpit for a controlled artifact. Purely presentational: consumes an
+ * `ArtifactViewModel` (+ optional ReactNode slots) with no data fetching, no
+ * `useParams`, and no `kind` branching. Mirrors the detalhe-signoff reference —
+ * a focused review header + body on the left, and a decision sidebar (approval
+ * flow-viz + decision panel) on the right.
+ *
+ * The sidebar is lifecycle-state-driven: when the adapter supplies a `decision`
+ * model (document under_review sign, template review/approve) the cockpit renders
+ * the §DECISÃO header + flow + `ArtifactDecisionPanel`. Otherwise it falls back to
+ * the plain `actions[]` band + the route's `decisionExtras` slot (draft submit,
+ * approved publish, read-only states).
  */
 export function ArtifactApprovalScreen({
   model,
   main,
+  tabs,
   decisionExtras,
   dialogs,
 }: ArtifactApprovalScreenProps) {
-  const subtitle = model.hero.subtitle;
-
   const hasActions = model.actions.length > 0;
-  const hasChain = model.approvalChain != null && model.approvalChain.length > 0;
+  const chain = model.approvalChain;
+  const hasChain = chain != null && chain.length > 0;
+  const decision = model.decision;
 
   return (
     <div className={styles.root}>
-      {/* Hero — reuses ArtifactHero for breadcrumb + badges + title, consistent
-          with ArtifactDetailView. No heroActions slot: approval-screen workflow
-          buttons live exclusively in the decision sidebar. */}
-      <ArtifactHero
-        breadcrumb={model.hero.breadcrumb}
-        docCard={<ArtifactHeroDocCard model={model} />}
-        badges={<ArtifactHeroBadges badges={model.hero.badges} />}
-        title={model.title}
-        subtitle={subtitle ? <span>{subtitle}</span> : null}
-      />
-
-      {/* Two-column body */}
       <div className={styles.body}>
-        {/* Main content slot */}
-        <main className={styles.main}>{main}</main>
+        {/* ─── Main: focused doc header + body ─────────────────────────────── */}
+        <main className={styles.main}>
+          <header className={styles.docHeader}>
+            {model.hero.breadcrumb.length > 0 && (
+              <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
+                {model.hero.breadcrumb.map((item, index) => {
+                  const isLast = index === model.hero.breadcrumb.length - 1;
+                  return (
+                    <Fragment key={`${item.label}-${index}`}>
+                      {item.href && !isLast ? (
+                        <Link to={item.href} className={styles.breadcrumbLink}>
+                          {item.label}
+                        </Link>
+                      ) : (
+                        <span>{item.label}</span>
+                      )}
+                      {!isLast && <Icon name="chevron" size={10} className={styles.breadcrumbSep} />}
+                    </Fragment>
+                  );
+                })}
+              </nav>
+            )}
 
-        {/* Decision sidebar */}
+            <div className={styles.titleRow}>
+              {model.code != null && <span className={styles.codeChip}>{model.code}</span>}
+              <h1 className={styles.title}>{model.title}</h1>
+            </div>
+
+            <div className={styles.statusRow}>
+              <StatusPill status={model.status} />
+              <span className={styles.versionTag}>v{model.versionNumber}</span>
+              {model.revisionLabel != null && (
+                <>
+                  <span className={styles.statusSep}>·</span>
+                  <span className={styles.versionTag}>{model.revisionLabel}</span>
+                </>
+              )}
+            </div>
+
+            {model.authorMeta != null && <AuthorMetaRow authorMeta={model.authorMeta} />}
+          </header>
+
+          {tabs != null && <div className={styles.tabStrip}>{tabs}</div>}
+
+          <div className={styles.bodyContent}>{main}</div>
+        </main>
+
+        {/* ─── Sidebar: decision cockpit ───────────────────────────────────── */}
         <aside aria-label="Decisão de aprovação" className={styles.aside}>
-
-          {/* Ações — only rendered when there are actions */}
-          {hasActions && (
-            <div className={styles.asideSection}>
-              <h2 className={styles.asideSectionTitle}>Ações</h2>
-              <div className={styles.actions}>
-                {model.actions.map((action) => (
-                  <button
-                    key={action.key}
-                    type="button"
-                    data-action={action.key}
-                    className={`${styles.actionBtn} ${variantClass(action)}`}
-                    disabled={!action.available}
-                    title={action.available ? undefined : action.reason}
-                    onClick={() => {
-                      void action.run();
-                    }}
-                  >
-                    {action.label}
-                  </button>
-                ))}
+          {decision != null ? (
+            <>
+              <div className={styles.decisionHead}>
+                <div className={styles.decisionKicker}>{decision.kicker}</div>
+                <h2 className={styles.decisionHeading}>{decision.heading}</h2>
+                <p className={styles.decisionDesc}>{decision.description}</p>
               </div>
+
+              {hasChain && (
+                <div className={styles.flowBand}>
+                  <div className={styles.bandKicker}>Fluxo de aprovação</div>
+                  <ArtifactApprovalFlow items={chain} />
+                </div>
+              )}
+
+              <ArtifactDecisionPanel model={decision} />
+
+              {decisionExtras}
+            </>
+          ) : (
+            <div className={styles.fallback}>
+              {hasActions && (
+                <div className={styles.asideSection}>
+                  <h2 className={styles.bandKicker}>Ações</h2>
+                  <div className={styles.actions}>
+                    {model.actions.map((action) => (
+                      <button
+                        key={action.key}
+                        type="button"
+                        data-action={action.key}
+                        className={`${styles.actionBtn} ${variantClass(action)}`}
+                        disabled={!action.available}
+                        title={action.available ? undefined : action.reason}
+                        onClick={() => {
+                          void action.run();
+                        }}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {hasChain && (
+                <div className={styles.asideSection}>
+                  <h2 className={styles.bandKicker}>Fluxo de aprovação</h2>
+                  <ArtifactApprovalFlow items={chain} />
+                </div>
+              )}
+
+              {decisionExtras}
             </div>
           )}
-
-          {/* Approval chain — null for templates, skipped when empty */}
-          {hasChain && (
-            <div className={styles.asideSection}>
-              <h2 className={styles.asideSectionTitle}>Cadeia de aprovação</h2>
-              <ul className={styles.chainList} aria-label="Cadeia de aprovação">
-                {model.approvalChain!.map((item) => (
-                  <li key={`${item.stageIndex}-${item.actorUserId ?? "unassigned"}`} className={styles.chainItem}>
-                    <div className={styles.chainItemLabel}>{item.label}</div>
-                    {item.actorDisplay != null && (
-                      <div className={styles.chainItemActor}>
-                        <Avatar name={item.actorDisplay} size="sm" />
-                        {" "}{item.actorDisplay}
-                      </div>
-                    )}
-                    {item.signedAt != null && (
-                      <div className={styles.chainItemMeta}>
-                        {formatSignedAt(item.signedAt)}
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Kind-specific extras (integrity panel, reason composer, etc.) */}
-          {decisionExtras}
-
         </aside>
       </div>
 
-      {/* Route-owned dialogs */}
       {dialogs}
     </div>
   );
