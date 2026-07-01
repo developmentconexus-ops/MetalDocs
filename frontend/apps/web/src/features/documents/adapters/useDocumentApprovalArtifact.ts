@@ -13,7 +13,8 @@ import type {
 } from '../../shared/controlled-artifact/types';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useActiveDocumentContextQuery } from '../../approval/queries/useActiveDocumentContextQuery';
-import { TRANSITION_POLICY, type TransitionPolicy, toApprovalState } from '../lib/approvalWorkflow';
+import { TRANSITION_POLICY, type TransitionPolicy, toApprovalState, mapApprovalChain } from '../lib/approvalWorkflow';
+import { resolveOwnerDisplay } from '../../shared/controlled-artifact/resolveOwnerDisplay';
 
 /**
  * Route-supplied dialog/prompt openers bound to each emitted action's `run`.
@@ -77,6 +78,7 @@ export function useDocumentApprovalArtifact(
   documentId: string,
   handlers: DocumentApprovalHandlers,
 ): DocumentApprovalArtifact {
+  const user = useAuthStore((s) => s.user);
   const docQuery = useDocumentDetailQuery(documentId);
   const doc = docQuery.data ?? null;
   const controlledDocumentId = doc?.controlled_document_id ?? '';
@@ -146,20 +148,7 @@ export function useDocumentApprovalArtifact(
 
   // Approval chain: one ApprovalChainItem per stage (first signoff per stage),
   // matching the document detail adapter's mapping.
-  const approvalChain: ApprovalChainItem[] | null = instance
-    ? instance.stages.map((stage) => {
-        const signoff = stage.signoffs[0] ?? null;
-        return {
-          stageIndex: stage.stage_index,
-          label: stage.label,
-          status: stage.status,
-          actorUserId: signoff?.actor_user_id ?? null,
-          actorDisplay: signoff?.actor_user_id ?? null,
-          decision: signoff?.decision ?? null,
-          signedAt: signoff?.signed_at ?? null,
-        };
-      })
-    : null;
+  const approvalChain: ApprovalChainItem[] | null = instance ? mapApprovalChain(instance.stages) : null;
 
   // Ordered, gated actions — emit ONLY the allowed actions, in display order
   // (submit → signoff → cancel → publish), matching the old "button appears only
@@ -204,11 +193,6 @@ export function useDocumentApprovalArtifact(
     });
   }
 
-  // Owner-name resolution (created_by, with current-user displayName fallback) —
-  // parity with the detail adapter, even though the approval screen does not show
-  // the meta sidebar; it keeps the model self-consistent.
-  const user = useAuthStore((s) => s.user);
-
   const model: ArtifactViewModel | null = doc
     ? {
         kind: 'document',
@@ -237,10 +221,7 @@ export function useDocumentApprovalArtifact(
           createdAt: doc.created_at ?? null,
           effectiveFrom: null,
           nextReviewAt: null,
-          ownerName:
-            user?.userId && doc.created_by === user.userId
-              ? (user.displayName ?? doc.created_by)
-              : (doc.created_by ?? null),
+          ownerName: resolveOwnerDisplay(doc.created_by, user),
           ownerDescriptor: null,
         },
         kpis: [],

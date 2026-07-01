@@ -1,11 +1,13 @@
 import { useAuthStore } from '../../../store/auth.store';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import { formatPageCount, formatPublishedAt, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
+import { resolveOwnerDisplay } from '../../shared/controlled-artifact/resolveOwnerDisplay';
 import {
   ACTIVE_SIBLING_STATES,
   canInitiateRevision as canInitiateRevisionGate,
   type ActiveSiblingState,
 } from '../lib/documentWorkflow';
+import { mapApprovalChain } from '../lib/approvalWorkflow';
 import type {
   ApprovalChainItem,
   ArtifactBadge,
@@ -136,10 +138,7 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
   const statusPresentation = getDocumentStatusPresentation(status, publishedAt);
 
   // Owner name: created_by; if creator is the current user, use displayName (L217-222 parity).
-  const createdByRaw = doc?.created_by ?? EM_DASH;
-  const ownerName = (user?.userId && createdByRaw === user.userId)
-    ? (user.displayName ?? createdByRaw)
-    : createdByRaw;
+  const ownerName = resolveOwnerDisplay(doc?.created_by, user) ?? EM_DASH;
 
   // Coverage denominator (obligated audience) — EM_DASH on error/missing (L232-234 parity).
   const obligatedCount = distributionSummaryQuery.isError
@@ -181,21 +180,7 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
 
   // Approval chain: one ApprovalChainItem per signoff slot, grouped downstream by stageIndex.
   // Mirrors the page's "first signoff per stage" timeline (one actor per stage in current workflow).
-  const approvalChain: ApprovalChainItem[] | null = approval
-    ? approval.stages.map((stage) => {
-        const signoff = stage.signoffs[0] ?? null;
-        return {
-          stageIndex: stage.stage_index,
-          label: stage.label,
-          status: stage.status,
-          actorUserId: signoff?.actor_user_id ?? null,
-          // TODO(iam): resolve actorDisplay to a display name via user-lookup query when available; currently echoes actor_user_id.
-          actorDisplay: signoff?.actor_user_id ?? null,
-          decision: signoff?.decision ?? null,
-          signedAt: signoff?.signed_at ?? null,
-        };
-      })
-    : null;
+  const approvalChain: ApprovalChainItem[] | null = approval ? mapApprovalChain(approval.stages) : null;
 
   const lineage: VersionHistoryItem[] = revisionHistoryItems.map((item) => ({
     versionNumber: item.revision_number ?? 0,

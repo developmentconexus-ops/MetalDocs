@@ -9,6 +9,25 @@
 // preserved byte-for-byte. Do NOT fork a second policy.
 
 import type { ApprovalState } from '../../approval/api/approvalTypes';
+import type { ApprovalChainItem } from '../../shared/controlled-artifact/types';
+
+/**
+ * Minimal structural interface for a stage passed to `mapApprovalChain`.
+ * Intentionally loose on `signature_method` (string vs. SignatureMethod) so
+ * both the hand-rolled ApprovalInstance.stages and the codegen
+ * ApprovalInstanceByDocumentResponse.stages satisfy this parameter.
+ * Only the fields actually consumed by the mapping are required.
+ */
+interface MappableStage {
+  stage_index: number;
+  label: string;
+  status: string;
+  signoffs: Array<{
+    actor_user_id: string;
+    decision: string;
+    signed_at: string;
+  }>;
+}
 
 export interface TransitionPolicy {
   disabledReason?: string;
@@ -77,4 +96,28 @@ export function toApprovalState(status: string): ApprovalState {
     return status as ApprovalState;
   }
   return 'draft';
+}
+
+/**
+ * Map an ApprovalInstance's stages array to the kind-agnostic ApprovalChainItem[]
+ * used by the shared controlled-artifact view layer.
+ *
+ * Deduplicated from useDocumentArtifact and useDocumentApprovalArtifact — both
+ * adapters map the same StageInstance shape. Callers retain their own null-guards
+ * so absence of an instance still yields null.
+ */
+export function mapApprovalChain(stages: MappableStage[]): ApprovalChainItem[] {
+  return stages.map((stage) => {
+    const signoff = stage.signoffs[0] ?? null;
+    return {
+      stageIndex: stage.stage_index,
+      label: stage.label,
+      status: stage.status,
+      actorUserId: signoff?.actor_user_id ?? null,
+      // TODO(iam): resolve actorDisplay to a display name via user-lookup query when available; currently echoes actor_user_id.
+      actorDisplay: signoff?.actor_user_id ?? null,
+      decision: signoff?.decision ?? null,
+      signedAt: signoff?.signed_at ?? null,
+    };
+  });
 }

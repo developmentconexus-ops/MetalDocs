@@ -1,5 +1,6 @@
 import { useAuthStore } from '../../../store/auth.store';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
+import { resolveOwnerDisplay } from '../../shared/controlled-artifact/resolveOwnerDisplay';
 import type {
   ArtifactBadge,
   ArtifactKpiCell,
@@ -43,10 +44,7 @@ export function useTemplateArtifact(templateId: string): TemplateArtifact {
   const badgeLabel = templateStatusLabel(version?.status ?? '');
 
   // Owner name: created_by; if creator is the current user, use displayName.
-  const createdByRaw = template?.created_by ?? EM_DASH;
-  const ownerName = (user?.userId && createdByRaw === user.userId)
-    ? (user.displayName ?? createdByRaw)
-    : createdByRaw;
+  const ownerName = resolveOwnerDisplay(template?.created_by, user) ?? EM_DASH;
 
   // Hero badges (push in order; skip when source missing).
   const badges: ArtifactBadge[] = [];
