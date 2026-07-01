@@ -85,15 +85,11 @@ export function mapSignoffError(error: unknown): SignoffError {
     if (error.code === 'sod.submitter_cannot_sign') return of('sod_submitter');
     if (error.code === 'sod.cross_stage_duplicate') return of('sod_duplicate');
     const resolved = resolveErrorMessage(error.code);
-    return {
-      kind: 'server',
-      message: resolved === 'Erro inesperado.' ? SERVER_FALLBACK : resolved,
-      stale: false,
-    };
+    return new SignoffError('server', resolved === 'Erro inesperado.' ? SERVER_FALLBACK : resolved);
   }
 
   if (error instanceof TypeError) return of('network');
   if (error instanceof Error && /network|failed to fetch|fetch/i.test(error.message)) return of('network');
 
-  return { kind: 'server', message: SERVER_FALLBACK, stale: false };
+  return new SignoffError('server', SERVER_FALLBACK);
 }

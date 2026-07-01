@@ -1,0 +1,323 @@
+/* ArtifactDecisionPanel.module.css — cockpit decision box.
+   Mirrors the detalhe-signoff "Decisão" band: radio cards, justificativa, honest
+   signer block (+ optional legal e-signature password), legal checkbox, and a
+   submit footer whose tone follows the selected option. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.scroll {
+  flex: 1;
+  overflow: auto;
+  padding: var(--sp-5) var(--sp-5) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+}
+
+.kicker {
+  font-size: 0.59375rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: var(--sp-3);
+}
+
+.required {
+  color: var(--danger);
+}
+
+/* ─── Decision radio cards ───────────────────────────────────────────────── */
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: 0.875rem 1rem;
+  border-radius: var(--r-2);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.option:hover {
+  border-color: var(--border-strong);
+}
+
+.option[data-tone="approve"].optionSelected {
+  border-color: var(--success);
+  background: var(--success-bg);
+}
+
+.option[data-tone="reject"].optionSelected {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.radio {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  margin-top: 0.125rem;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.option[data-tone="approve"].optionSelected .radio {
+  border-color: var(--success);
+}
+
+.option[data-tone="reject"].optionSelected .radio {
+  border-color: var(--danger);
+}
+
+.radioInner {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.option[data-tone="approve"].optionSelected .radioInner {
+  background: var(--success);
+}
+
+.option[data-tone="reject"].optionSelected .radioInner {
+  background: var(--danger);
+}
+
+.optionBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.optionLabel {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.option[data-tone="approve"].optionSelected .optionLabel {
+  color: var(--success);
+}
+
+.option[data-tone="reject"].optionSelected .optionLabel {
+  color: var(--danger);
+}
+
+.optionDesc {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ─── Justificativa ──────────────────────────────────────────────────────── */
+
+.field {
+  display: block;
+  margin-bottom: var(--sp-4);
+}
+
+.textarea {
+  width: 100%;
+  resize: none;
+  font-family: var(--font-sans);
+  font-size: 0.78125rem;
+  padding: 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+
+.textarea[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+/* ─── Signer block ───────────────────────────────────────────────────────── */
+
+.signer {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  padding: 0.75rem;
+  margin-bottom: var(--sp-4);
+}
+
+.signerIdentity {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+
+.signerText {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  min-width: 0;
+}
+
+.signerName {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.signerDetail {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.signerNote {
+  font-size: 0.65625rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  padding: 0.5rem 0.625rem;
+  background: var(--surface);
+  border-radius: var(--r-1);
+  font-family: var(--font-mono);
+  margin-top: var(--sp-2);
+}
+
+/* ─── Legal e-signature password ─────────────────────────────────────────── */
+
+.passwordField {
+  display: block;
+  margin-top: var(--sp-2);
+}
+
+.passwordLabel {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.passwordInput {
+  width: 100%;
+  font-size: 0.8125rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-1);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.passwordInput:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+
+/* ─── Legal checkbox ─────────────────────────────────────────────────────── */
+
+.legal {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  font-size: 0.71875rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: var(--sp-4);
+  cursor: pointer;
+}
+
+.legal input {
+  margin-top: 2px;
+  accent-color: var(--brand);
+  flex-shrink: 0;
+}
+
+/* ─── Banners ────────────────────────────────────────────────────────────── */
+
+.stale,
+.error {
+  font-size: 0.71875rem;
+  line-height: 1.5;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--r-2);
+  margin-bottom: var(--sp-3);
+}
+
+.stale {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+}
+
+.error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+
+/* ─── Submit footer ──────────────────────────────────────────────────────── */
+
+.footer {
+  padding: var(--sp-4) var(--sp-5);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.submit {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: 0.6875rem 1rem;
+  border-radius: var(--r-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--brand-deep);
+  background: var(--brand);
+  color: var(--text-on-brand);
+  transition: background 120ms ease, opacity 120ms ease;
+}
+
+.submit[data-tone="approve"]:not(:disabled) {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+.submit[data-tone="reject"]:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.submit:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
