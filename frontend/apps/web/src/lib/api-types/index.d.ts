@@ -2874,7 +2874,7 @@ export interface components {
              */
             revision_number?: number;
             /** @enum {string} */
-            status: "draft" | "in_review" | "approved" | "published" | "obsolete";
+            status: "draft" | "under_review" | "approved" | "published" | "obsolete";
             docx_storage_key?: string | null;
             content_hash?: string | null;
             metadata_schema?: {
@@ -2927,19 +2927,6 @@ export interface components {
         ApproveTemplateVersionResponse: {
             data: {
                 version: components["schemas"]["VersionDTO"];
-                /**
-                 * @description When the Approve transition terminates as publish (no-reviewer
-                 *     path) or the approver explicitly publishes, a fresh draft
-                 *     v(n+1) is spawned in the same transaction. Returned so the
-                 *     caller can navigate without a list refetch. Null when the
-                 *     transition does not publish (reject path, or reviewer path
-                 *     that only flips to approved).
-                 */
-                next_draft: {
-                    /** Format: uuid */
-                    id: string;
-                    version_number: number;
-                } | null;
             };
         };
         /**
@@ -4437,7 +4424,7 @@ export interface operations {
                 limit?: number;
                 /** @description Row offset for simple offset pagination. */
                 offset?: number;
-                /** @description Optional profile code filter (e.g. DC, POP). */
+                /** @description Optional profile code filter (e.g. DC, POP). Returns templates scoped to this profile PLUS generic templates (created with no profile scope), since generic templates apply to every profile. Omit to list every non-system template (management view). */
                 doc_type?: string;
             };
             header?: never;
@@ -4634,7 +4621,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description published + next draft created */
+            /** @description version published */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4642,8 +4629,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         published_version_id: string;
-                        next_draft_id: string;
-                        next_draft_version_num: number;
                     };
                 };
             };

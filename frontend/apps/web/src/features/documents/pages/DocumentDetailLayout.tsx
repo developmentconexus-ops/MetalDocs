@@ -1,29 +1,16 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import styles from './DocumentDetailLayout.module.css';
+import { ArtifactDetailLayout } from "../../shared/controlled-artifact/ArtifactDetailLayout";
+import type { ArtifactTab } from "../../shared/controlled-artifact/types";
+
+/**
+ * Documents-owned tab set for the controlled-artifact detail shell. The shared
+ * `ArtifactDetailLayout` holds no kind-specific defaults (ADR 0053 purity); each
+ * consumer supplies its own tabs. Documents get "Documento" + "Distribuição".
+ */
+const DOCUMENT_TABS: ArtifactTab[] = [
+  { key: "documento", label: "Documento", href: "." },
+  { key: "distribuicao", label: "Distribuição", href: "distribution" },
+];
 
 export function DocumentDetailLayout() {
-  return (
-    <div className={styles.root}>
-      <nav className={styles.tabStrip}>
-        <NavLink
-          to="."
-          end
-          className={({ isActive }) =>
-            isActive ? `${styles.tab} ${styles.tabActive}` : styles.tab
-          }
-        >
-          Documento
-        </NavLink>
-        <NavLink
-          to="distribution"
-          className={({ isActive }) =>
-            isActive ? `${styles.tab} ${styles.tabActive}` : styles.tab
-          }
-        >
-          Distribuição
-        </NavLink>
-      </nav>
-      <Outlet />
-    </div>
-  );
+  return <ArtifactDetailLayout tabs={DOCUMENT_TABS} />;
 }

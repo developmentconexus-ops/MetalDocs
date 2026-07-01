@@ -12,9 +12,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DocumentDistributionPage } from '../../pages/DocumentDistributionPage';
 
 // ── Route mock ───────────────────────────────────────────────────────────────
-vi.mock('react-router-dom', () => ({
-  useParams: () => ({ documentId: 'doc-dist-1' }),
-}));
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return {
+    ...actual,
+    useParams: () => ({ documentId: 'doc-dist-1' }),
+  };
+});
 
 // ── doc-detail mock ──────────────────────────────────────────────────────────
 vi.mock('../../queries/useDocumentDetailQuery', () => ({
@@ -97,8 +101,14 @@ const emptyRecipientsFixture: DistributionRecipientsResponse = {
 // ── Helper ───────────────────────────────────────────────────────────────────
 function wrap() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // MemoryRouter needed because ArtifactHero now uses react-router Link
+  const { MemoryRouter } = require('react-router-dom') as typeof import('react-router-dom');
   return ({ children }: { children: React.ReactNode }) =>
-    React.createElement(QueryClientProvider, { client: qc }, children);
+    React.createElement(
+      MemoryRouter,
+      null,
+      React.createElement(QueryClientProvider, { client: qc }, children),
+    );
 }
 
 describe('DocumentDistributionPage — F2.3 distribution wiring', () => {

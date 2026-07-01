@@ -5,8 +5,9 @@ import { type TemplateSchemas, type VersionDTO, submitForReview } from '../api/t
 import { useTemplateDraft } from '../hooks/useTemplateDraft';
 import { useTemplateAutosave } from '../hooks/useTemplateAutosave';
 import { useTemplateSchemas } from '../hooks/useTemplateSchemas';
-import { VersionActionPanel } from '../VersionActionPanel';
 import { AvailableTokensPanel } from '../AvailableTokensPanel';
+import { useTemplateArtifact } from '../adapters/useTemplateArtifact';
+import { ArtifactMetaSidebar } from '../../shared/controlled-artifact/ArtifactMetaSidebar';
 import { partitionDetected } from '../lib/tokens';
 import { canSubmit, type ActorContext } from '../lib/canActOnVersion';
 import { useAuthStore } from '../../../store/auth.store';
@@ -19,7 +20,7 @@ import {
   type AutosaveState,
 } from '../../shared/components/editor-chrome';
 import { StatusPill, type DocumentStatus } from '../../../components/ui';
-import { ApiError, resolveErrorMessage } from '../../../lib/api';
+import { resolveQueryError } from '../../../lib/api';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import styles from './styles/TemplateEditorPage.module.css';
 
@@ -40,12 +41,6 @@ const AUTOSAVE_LABELS_PT = {
   saved: 'Salvo',
   error: 'Falha ao salvar',
 };
-
-function resolveError(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) return resolveErrorMessage(err.code, err.message);
-  if (err instanceof Error) return err.message;
-  return fallback;
-}
 
 export function TemplateEditorPage({
   templateId,
@@ -72,6 +67,10 @@ export function TemplateEditorPage({
   const [unknownTokens, setUnknownTokens] = useState<string[]>([]);
   const [invalidTokens, setInvalidTokens] = useState<string[]>([]);
   const catalogByKey = useMemo(() => new Map(catalog.map((c) => [c.key, c])), [catalog]);
+  const { model: metaModel, isLoading: metaLoading } = useTemplateArtifact(templateId);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(
+    () => localStorage.getItem('editor-sidebar-open') !== 'false',
+  );
 
   const currentVersion = liveVersion ?? draft.version ?? null;
   const isDraft = currentVersion?.status === 'draft';
@@ -162,7 +161,7 @@ export function TemplateEditorPage({
       setLiveVersion(updated);
       setSubmitMsg({ kind: 'success', text: 'Enviado para revisão.' });
     } catch (err) {
-      setSubmitMsg({ kind: 'error', text: resolveError(err, 'Falha ao submeter para revisão.') });
+      setSubmitMsg({ kind: 'error', text: resolveQueryError(err, 'Falha ao submeter para revisão.') });
     } finally {
       setSubmitting(false);
     }
@@ -178,7 +177,7 @@ export function TemplateEditorPage({
       await autosave.importDocx(await file.arrayBuffer());
       draft.refetch();
     } catch (err) {
-      setImportErr(resolveError(err, 'Falha ao importar arquivo .docx.'));
+      setImportErr(resolveQueryError(err, 'Falha ao importar arquivo .docx.'));
     } finally {
       setImporting(false);
     }
@@ -216,8 +215,7 @@ export function TemplateEditorPage({
   const versionStatus: DocumentStatus | null = (() => {
     const s = currentVersion?.status;
     if (!s) return null;
-    if (s === 'in_review') return 'under_review';
-    if (s === 'draft' || s === 'approved' || s === 'published') return s;
+    if (s === 'draft' || s === 'under_review' || s === 'approved' || s === 'published') return s;
     return null;
   })();
 
@@ -354,19 +352,24 @@ export function TemplateEditorPage({
             />
           </EditorChrome>
         </main>
-      </div>
-
-      {currentVersion && ['in_review', 'approved', 'published'].includes(currentVersion.status) && (
-        <VersionActionPanel
-          version={currentVersion}
-          onVersionUpdate={(v, nextDraft) => {
-            setLiveVersion(v);
-            if (nextDraft && onNavigateToVersion) {
-              onNavigateToVersion(templateId, nextDraft.versionNumber);
-            }
+        <ArtifactMetaSidebar
+          open={sidebarOpen}
+          onToggle={() => {
+            setSidebarOpen((prev) => {
+              const next = !prev;
+              localStorage.setItem('editor-sidebar-open', String(next));
+              return next;
+            });
           }}
+          loading={metaLoading}
+          code={metaModel.code}
+          meta={metaModel.meta}
+          approvalChain={null}
+          lineage={metaModel.lineage}
+          ariaLabel="Identificação do modelo"
+          loadingLabel="Carregando metadados do modelo"
         />
-      )}
+      </div>
     </div>
   );
 }

@@ -28,7 +28,7 @@ export const documentsRoutes: RouteObject[] = [
     children: [
       {
         index: true,
-        lazy: () => import('./pages/DocumentPublishedPage').then(m => ({ Component: m.DocumentPublishedPage })),
+        lazy: () => import('./pages/DocumentDetailRoute').then(m => ({ Component: m.DocumentDetailRoute })),
       },
       {
         path: 'distribution',

@@ -47,7 +47,7 @@ describe('formatRevisionCode', () => {
 
 describe('displayRevisionTitle', () => {
   it('defaults the first governed revision title', () => {
-    expect(displayRevisionTitle('', 'REV00')).toBe('Criacao do documento');
+    expect(displayRevisionTitle('', 'REV00')).toBe('Criação do documento');
   });
 
   it('keeps user-authored titles for later revisions', () => {

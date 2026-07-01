@@ -65,8 +65,8 @@ func TestSubmitForReview_Happy(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Data.Version.Status != string(domain.VersionStatusInReview) {
-		t.Fatalf("expected status=in_review, got %q", out.Data.Version.Status)
+	if out.Data.Version.Status != string(domain.VersionStatusUnderReview) {
+		t.Fatalf("expected status=under_review, got %q", out.Data.Version.Status)
 	}
 }
 
@@ -114,7 +114,7 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 		ID:            "22222222-2222-4222-8222-222222222222",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
-		Status:        domain.VersionStatusInReview,
+		Status:        domain.VersionStatusUnderReview,
 	}
 	repo.approvalConfigs["11111111-1111-1111-1111-111111111111"] = &domain.ApprovalConfig{TemplateID: "11111111-1111-1111-1111-111111111111", ApproverRole: "approver"}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
@@ -218,7 +218,7 @@ func TestReview_Accept_Happy(t *testing.T) {
 		ID:                  "22222222-2222-4222-8222-222222222222",
 		TemplateID:          "11111111-1111-1111-1111-111111111111",
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 	}
@@ -286,10 +286,6 @@ func TestApprove_Accept_Happy(t *testing.T) {
 				Status        string `json:"status"`
 				VersionNumber int    `json:"version_number"`
 			} `json:"version"`
-			NextDraft *struct {
-				ID            string `json:"id"`
-				VersionNumber int    `json:"version_number"`
-			} `json:"next_draft"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
@@ -298,19 +294,12 @@ func TestApprove_Accept_Happy(t *testing.T) {
 	if out.Data.Version.Status != string(domain.VersionStatusPublished) {
 		t.Fatalf("expected status=published, got %q", out.Data.Version.Status)
 	}
-	if out.Data.NextDraft == nil {
-		t.Fatal("expected data.next_draft to be populated on approve-publish")
-	}
-	if out.Data.NextDraft.VersionNumber != out.Data.Version.VersionNumber+1 {
-		t.Fatalf("expected next_draft.version_number=%d, got %d",
-			out.Data.Version.VersionNumber+1, out.Data.NextDraft.VersionNumber)
-	}
-	if out.Data.NextDraft.ID == "" {
-		t.Fatal("expected next_draft.id to be non-empty")
-	}
+	// M1·T2: the approve-publish response no longer carries a next_draft field;
+	// the strict-decode typed-response tests (routes_typed_response_f53/f61) are
+	// the wire-shape guard. This test asserts the published status only.
 }
 
-func TestApprove_Reject_NextDraftNull(t *testing.T) {
+func TestApprove_Reject_ReturnsDraftVersionOnly(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
@@ -344,10 +333,6 @@ func TestApprove_Reject_NextDraftNull(t *testing.T) {
 			Version struct {
 				Status string `json:"status"`
 			} `json:"version"`
-			NextDraft *struct {
-				ID            string `json:"id"`
-				VersionNumber int    `json:"version_number"`
-			} `json:"next_draft"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
@@ -356,9 +341,7 @@ func TestApprove_Reject_NextDraftNull(t *testing.T) {
 	if out.Data.Version.Status != string(domain.VersionStatusDraft) {
 		t.Fatalf("expected status=draft on reject, got %q", out.Data.Version.Status)
 	}
-	if out.Data.NextDraft != nil {
-		t.Fatalf("expected next_draft=null on reject, got %+v", out.Data.NextDraft)
-	}
+	// M1·T2: next_draft field removed; reject path returns only version.
 }
 
 func TestArchiveTemplate_Happy(t *testing.T) {

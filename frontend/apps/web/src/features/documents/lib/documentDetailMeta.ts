@@ -4,33 +4,7 @@
 
 const EM_DASH = '—';
 
-export const DEFAULT_INITIAL_REVISION_TITLE = 'Criacao do documento';
-
-function parseDate(input: string | null | undefined): Date | null {
-  if (!input) return null;
-  const d = new Date(input);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-const longDateFmt = new Intl.DateTimeFormat('pt-BR', {
-  day: '2-digit',
-  month: 'long',
-  year: 'numeric',
-});
-
-const shortDateFmt = new Intl.DateTimeFormat('pt-BR', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-});
-
-const dateTimeFmt = new Intl.DateTimeFormat('pt-BR', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
+export const DEFAULT_INITIAL_REVISION_TITLE = 'Criação do documento';
 
 type ControlledDocumentVisibility = {
   scope: 'company' | 'restricted';
@@ -47,37 +21,13 @@ export function hasSettledSidebarIdentity(input: {
   return Boolean(input.code && input.profileLabel && input.areaLabel && input.visibilityLabel);
 }
 
-// "08 de maio de 2026" — used in published-doc owner banner
-export function formatPublishedAt(input: string | null | undefined): string {
-  const d = parseDate(input);
-  return d ? longDateFmt.format(d) : EM_DASH;
-}
+// Canonical implementations lifted to `lib/format/dates.ts`.
+// Re-exported here to keep existing documents-side imports working.
+export { formatSignedAt, formatPublishedAt } from '../../../lib/format/dates';
 
-// "08/05/2026" — used in KPI strip / version timeline
-export function formatShortDate(input: string | null | undefined): string {
-  const d = parseDate(input);
-  return d ? shortDateFmt.format(d) : EM_DASH;
-}
-
-// "08/05/2026 14:36" — used in signoff timestamps
-export function formatSignedAt(input: string | null | undefined): string {
-  const d = parseDate(input);
-  return d ? dateTimeFmt.format(d) : EM_DASH;
-}
-
-// "1 KB" / "2,5 MB" — published-doc Tamanho fact. Binary units (1 KB = 1024 B),
-// pt-BR decimal comma, em-dash fallback when the API returns null/undefined.
-export function formatFileSize(bytes: number | null | undefined): string {
-  if (bytes == null || Number.isNaN(bytes) || bytes < 0) return EM_DASH;
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const exp = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / Math.pow(1024, exp);
-  // Whole numbers render without decimals; otherwise one pt-BR decimal place.
-  const rounded = exp === 0 ? value : Math.round(value * 10) / 10;
-  const text = Number.isInteger(rounded) ? String(rounded) : rounded.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
-  return `${text} ${units[exp]}`;
-}
+// Canonical implementation lifted to `lib/format/fileSize.ts`.
+// Re-exported here to keep existing documents-side imports working.
+export { formatFileSize } from '../../../lib/format/fileSize';
 
 // "12 páginas" → just the integer; em-dash when the API returns null/undefined.
 export function formatPageCount(count: number | null | undefined): string {
@@ -99,33 +49,14 @@ export function resolveAreaLabel(code: string, areas: Array<{ code: string; name
 // Re-exported here to keep existing documents-side imports working.
 export { formatRevisionCode } from '../../../lib/labels/revisionCode';
 
+// Canonical implementation lifted to `lib/format/dates.ts`.
+// Re-exported here to keep existing documents-side imports working.
+export { formatShortDate } from '../../../lib/format/dates';
+
 export function displayRevisionTitle(title: string | null | undefined, revisionCode: string): string {
   const trimmed = title?.trim();
   if (trimmed) return trimmed;
   return revisionCode === 'REV00' ? DEFAULT_INITIAL_REVISION_TITLE : EM_DASH;
-}
-
-export function formatRevisionStatus(status: string): string {
-  switch (status) {
-    case 'draft':
-      return 'Draft';
-    case 'under_review':
-      return 'Em revisão';
-    case 'approved':
-      return 'Aprovado';
-    case 'rejected':
-      return 'Rejeitado';
-    case 'scheduled':
-      return 'Agendado';
-    case 'published':
-      return 'Publicada';
-    case 'superseded':
-      return 'Substituida';
-    case 'obsolete':
-      return 'Obsoleta';
-    default:
-      return status;
-  }
 }
 
 export function buildVisibilityLabel(
@@ -141,13 +72,3 @@ export function buildVisibilityLabel(
   const areaNames = visibility.area_codes.map((code) => resolveAreaLabel(code, areas));
   return `Restrito a area ${areaNames.join(', ')}`;
 }
-
-// Signoff actor status → display config
-export type SignoffStatus = 'pending' | 'approved' | 'rejected' | 'abstained';
-
-export const SIGNOFF_STATUS_META: Record<SignoffStatus, { label: string; className: string }> = {
-  pending:   { label: 'Aguardando', className: 'pending'  },
-  approved:  { label: 'Aprovado',   className: 'approved' },
-  rejected:  { label: 'Rejeitado',  className: 'rejected' },
-  abstained: { label: 'Abstido',    className: 'abstained'},
-};

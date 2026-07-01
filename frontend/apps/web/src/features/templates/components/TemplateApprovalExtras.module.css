@@ -1,0 +1,82 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.statusLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-muted, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.publishedNote {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary, #374151);
+  margin: 0;
+}
+
+.reasonField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.reasonLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #374151);
+}
+
+.reasonTextarea {
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 0.375rem;
+  resize: vertical;
+  font-family: inherit;
+  color: var(--color-text-primary, #111827);
+  background: var(--color-bg-input, #fff);
+  box-sizing: border-box;
+}
+
+.reasonTextarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reasonTextarea:focus {
+  outline: 2px solid var(--color-focus-ring, #6366f1);
+  outline-offset: 0;
+}
+
+.messageError {
+  font-size: 0.875rem;
+  color: var(--color-danger, #dc2626);
+  margin: 0;
+  padding: 0.375rem 0.5rem;
+  background: var(--color-danger-bg, #fef2f2);
+  border: 1px solid var(--color-danger-border, #fecaca);
+  border-radius: 0.25rem;
+}
+
+.messageSuccess {
+  font-size: 0.875rem;
+  color: var(--color-success, #16a34a);
+  margin: 0;
+  padding: 0.375rem 0.5rem;
+  background: var(--color-success-bg, #f0fdf4);
+  border: 1px solid var(--color-success-border, #bbf7d0);
+  border-radius: 0.25rem;
+}

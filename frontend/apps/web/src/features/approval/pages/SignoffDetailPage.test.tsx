@@ -23,6 +23,7 @@ function makeDoc(overrides: Partial<documentsApi.DocumentDetail> = {}) {
     name: 'POP Limpeza de Linha',
     status: 'under_review',
     revision_version: 3,
+    revision_number: 3,
     controlled_document_id: 'cd-1',
     current_revision_id: 'rev-1',
     created_by: 'user-approver-1',
@@ -72,23 +73,30 @@ describe('SignoffDetailPage', () => {
     vi.spyOn(documentsApi, 'listComments').mockResolvedValue([]);
   });
 
-  it('renders the document header from getDocument', async () => {
+  it('renders the document title and code from getDocument', async () => {
     renderAt();
     await waitFor(() => {
-      expect(screen.getByText('POP Limpeza de Linha')).toBeTruthy();
-      expect(screen.getByText('POP-QUA-0148')).toBeTruthy();
+      // Title appears in the hero + the main header; code appears in the hero
+      // docCard / breadcrumb / badge — assert presence via getAllByText.
+      expect(screen.getAllByText('POP Limpeza de Linha').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('POP-QUA-0148').length).toBeGreaterThan(0);
     });
   });
 
-  it('mounts the decision panel (Assinar present for under_review)', async () => {
+  it('mounts the inline decision panel (sign options present for under_review)', async () => {
     renderAt();
-    await waitFor(() => { expect(screen.getByText('Assinar')).toBeTruthy(); });
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: /Assinar e aprovar/ })).toBeTruthy();
+    });
+    expect(screen.getByRole('radio', { name: /Assinar e devolver/ })).toBeTruthy();
+    // Legal e-signature affordances live inline in the panel now (no modal).
+    expect(screen.getByLabelText('Senha')).toBeTruthy();
   });
 
   it('tab list has exactly two tabs: documento and comentarios', async () => {
     renderAt();
     await waitFor(() => {
-      expect(screen.getByText('POP Limpeza de Linha')).toBeTruthy();
+      expect(screen.getAllByText('POP Limpeza de Linha').length).toBeGreaterThan(0);
     });
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(2);
@@ -115,6 +123,16 @@ describe('SignoffDetailPage', () => {
     });
   });
 
+  it('shows the inactive-flow message when there is no active approval context', async () => {
+    vi.spyOn(approvalApi, 'getActiveDocumentContext').mockResolvedValue(null);
+    renderAt();
+    await waitFor(() => {
+      expect(
+        screen.getByText('Este documento não está em um fluxo de aprovação ativo.'),
+      ).toBeTruthy();
+    });
+  });
+
   it('renders flattened comment text on the Comentários tab', async () => {
     vi.spyOn(documentsApi, 'listComments').mockResolvedValue([
       {
@@ -135,11 +153,34 @@ describe('SignoffDetailPage', () => {
     ] as unknown as Awaited<ReturnType<typeof documentsApi.listComments>>);
     renderAt();
     await waitFor(() => {
-      expect(screen.getByText('POP Limpeza de Linha')).toBeTruthy();
+      expect(screen.getAllByText('POP Limpeza de Linha').length).toBeGreaterThan(0);
     });
     fireEvent.click(screen.getByRole('tab', { name: 'Comentários' }));
     await waitFor(() => {
       expect(screen.getByText('Revisar a seção 3.')).toBeTruthy();
     });
+  });
+
+  it('renders the integrity panel (content hash + copy) in the decision sidebar', async () => {
+    renderAt();
+    await waitFor(() => {
+      expect(screen.getByText('Integridade')).toBeTruthy();
+    });
+    expect(screen.getByText('hash-abc')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copiar' })).toBeTruthy();
+  });
+
+  it('preselects the reject decision inline when ?decision=reject is present', async () => {
+    renderAt('/approvals/doc-1?decision=reject');
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: /Assinar e devolver/ })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    });
+    expect(screen.getByRole('radio', { name: /Assinar e aprovar/ })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
   });
 });

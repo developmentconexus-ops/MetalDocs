@@ -1,0 +1,670 @@
+/* ArtifactDetailView.module.css — shared controlled-artifact detail surface.
+   Ported verbatim from the documents DocumentPublishedPage.module.css (Phase 3b style port).
+   Document-specific route chrome (loading/error states, hero workflow actions, coverage
+   side-card, obsolete watermark, revision composer) lives in the route's own module
+   (DocumentDetailRoute.module.css) — this module holds only what the shared view renders. */
+
+/* ─── Root ─────────────────────────────────────────────────────────────── */
+
+.root {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  background: var(--bg);
+}
+
+/* ─── Signoff empty / loading ────────────────────────────────────────────── */
+
+.signoffLoading,
+.signoffEmpty {
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+/* ─── Content area ───────────────────────────────────────────────────────── */
+
+.content {
+  padding: var(--sp-7) var(--sp-9) 5rem;
+  max-width: 73.75rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+}
+
+/* ─── KPI strip ──────────────────────────────────────────────────────────── */
+
+.kpiStrip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  overflow: hidden;
+}
+
+.kpiCell {
+  padding: 1.125rem 1.375rem;
+  border-right: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.kpiCell:last-child {
+  border-right: none;
+}
+
+.kpiCellLink {
+  appearance: none;
+  background: none;
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  border-radius: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.kpiCellLink:hover,
+.kpiCellLink:focus-visible {
+  background: var(--surface-2);
+}
+
+.kpiLabel {
+  font-size: 0.59375rem;
+  margin-bottom: var(--sp-2);
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.kpiValue {
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.1;
+  font-family: var(--font-mono);
+  margin-bottom: var(--sp-1);
+}
+
+.kpiHint {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+/* ─── Sections ───────────────────────────────────────────────────────────── */
+
+.section {}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 1.125rem;
+}
+
+.sectionKicker {
+  font-size: 0.59375rem;
+  margin-bottom: var(--sp-1);
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.sectionTitle {
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+/* ─── AboutCard ──────────────────────────────────────────────────────────── */
+
+.aboutLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--sp-4);
+}
+
+.aboutCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  overflow: hidden;
+}
+
+.ownerBanner {
+  padding: 1.125rem 1.375rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ownerInfo {
+  flex: 1;
+}
+
+.ownerName {
+  font-size: 0.8125rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.ownerMeta {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.factsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.factCell {
+  padding: 0.875rem 1.375rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.factCell:nth-child(odd) {
+  border-right: 1px solid var(--border);
+}
+
+.factCell:nth-child(-n+2) {
+  border-top: none;
+}
+
+.factIcon {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--r-2);
+  background: var(--brand-pale);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.factContent {
+  min-width: 0;
+  flex: 1;
+}
+
+.factLabel {
+  font-size: 0.5625rem;
+  margin-bottom: 0.125rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.factValue {
+  font-size: 0.78125rem;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── SignoffPipeline ────────────────────────────────────────────────────── */
+
+.signoffCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  padding: 1.5rem 1.5rem 1.375rem;
+}
+
+.signoffGrid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+}
+
+.signoffConnector {
+  position: absolute;
+  top: 1.125rem;
+  left: 16.66%;
+  right: 16.66%;
+  height: 2px;
+  background: var(--success);
+  border-radius: 1px;
+}
+
+.signoffStage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 var(--sp-2);
+}
+
+.signoffPin {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--success);
+  color: var(--text-on-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid var(--surface);
+  box-shadow: var(--shadow-success);
+  margin-bottom: 0.875rem;
+  z-index: 2;
+}
+
+.signoffStageName {
+  font-size: 0.5625rem;
+  margin-bottom: var(--sp-2);
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.signoffActor {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+}
+
+.signoffActorName {
+  font-size: 0.8125rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.signoffActorRole {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-bottom: var(--sp-1);
+}
+
+.signoffWhen {
+  font-family: var(--font-mono);
+  font-size: 0.65625rem;
+  color: var(--text-faint);
+}
+
+/* ─── Section aside ──────────────────────────────────────────────────────── */
+
+.sectionAside {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ─── VersionTimeline ────────────────────────────────────────────────────── */
+
+.timelineCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  padding: 1.75rem 1.75rem 1.5rem;
+}
+
+.timelineTrack {
+  position: relative;
+  height: 3.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.timelineLine {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  top: 1.6875rem;
+  height: 2px;
+  background: linear-gradient(90deg, var(--surface-3) 0%, var(--brand-pale) 60%, var(--brand) 100%);
+  border-radius: 1px;
+}
+
+.timelinePins {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.timelinePin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.timelinePinDate {
+  font-size: 0.59375rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: var(--sp-1);
+}
+
+.timelinePinCurrent .timelinePinDate {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.timelinePinDot {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  z-index: 2;
+}
+
+.timelinePinCurrent .timelinePinDot {
+  width: 1.375rem;
+  height: 1.375rem;
+  background: var(--brand);
+  border-color: var(--brand-deep);
+  box-shadow: var(--shadow-doc-card);
+}
+
+.timelinePinLabel {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: var(--sp-1);
+}
+
+.timelinePinLabelCurrent {
+  color: var(--brand);
+}
+
+.timelineDetail {
+  padding: 1rem 1.125rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+
+.timelineDetailHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: var(--sp-2);
+}
+
+.timelineDetailVersion {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.timelineDetailBadge {
+  height: 1.125rem;
+  padding: 0 0.5rem;
+  border-radius: var(--r-pill);
+  font-size: 0.59375rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+  background: var(--success-bg);
+  color: var(--success);
+  display: inline-flex;
+  align-items: center;
+}
+
+.timelineDetailMeta {
+  font-family: var(--font-mono);
+  font-size: 0.65625rem;
+  color: var(--text-muted);
+}
+
+.timelineDetailSummary {
+  font-size: 0.8125rem;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+/* ─── RelatedGrid ────────────────────────────────────────────────────────── */
+
+.relatedGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.625rem;
+}
+
+.relatedCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  cursor: default;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+}
+
+.relatedCard:hover {
+  border-color: var(--brand);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-2px);
+}
+
+.relatedCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.relatedCardIcon {
+  width: 1.75rem;
+  height: 1.75rem;
+  background: var(--brand-pale);
+  color: var(--brand);
+  border-radius: var(--r-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.relatedCardRel {
+  font-size: 0.59375rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.relatedCardTitle {
+  font-size: 0.8125rem;
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.relatedCardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.relatedCardCode {
+  font-family: var(--font-mono);
+  font-size: 0.65625rem;
+  color: var(--text-muted);
+}
+
+.relatedCardType {
+  font-size: 0.65625rem;
+  color: var(--text-muted);
+}
+
+/* ─── CommentsCard ───────────────────────────────────────────────────────── */
+
+.commentsCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  padding: 0.25rem 1.375rem 1.125rem;
+}
+
+.commentRow {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  gap: 0.875rem;
+  padding: 1.125rem 0;
+}
+
+.commentRowBorder {
+  border-bottom: 1px solid var(--border);
+}
+
+.commentContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.commentMeta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.commentAuthor {
+  font-size: 0.8125rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.commentRole {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.commentWhen {
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+  margin-left: auto;
+}
+
+.commentText {
+  font-size: 0.8125rem;
+  color: var(--text-soft);
+  line-height: 1.55;
+}
+
+.replyRow {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  gap: 0.875rem;
+  padding: 0.875rem 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.replyBox {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0.625rem 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
+
+.replyPlaceholder {
+  flex: 1;
+  font-size: 0.8125rem;
+  color: var(--text-faint);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+
+  .content {
+    padding: var(--sp-6) var(--sp-6) 4rem;
+  }
+
+}
+
+@media (max-width: 768px) {
+
+  .content {
+    padding: var(--sp-5) var(--sp-4) 3rem;
+  }
+
+  .kpiStrip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .kpiCell {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .kpiCell:nth-child(2n) {
+    border-right: none;
+  }
+
+  .kpiCell:nth-last-child(-n+2) {
+    border-bottom: none;
+  }
+
+  .aboutLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .signoffGrid {
+    grid-template-columns: 1fr;
+    gap: var(--sp-4);
+  }
+
+  .signoffConnector {
+    display: none;
+  }
+
+  .relatedGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .factsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .factCell:nth-child(odd) {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}

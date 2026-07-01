@@ -8,11 +8,11 @@ import (
 type VersionStatus string
 
 const (
-	VersionStatusDraft     VersionStatus = "draft"
-	VersionStatusInReview  VersionStatus = "in_review"
-	VersionStatusApproved  VersionStatus = "approved"
-	VersionStatusPublished VersionStatus = "published"
-	VersionStatusObsolete  VersionStatus = "obsolete"
+	VersionStatusDraft       VersionStatus = "draft"
+	VersionStatusUnderReview VersionStatus = "under_review"
+	VersionStatusApproved    VersionStatus = "approved"
+	VersionStatusPublished   VersionStatus = "published"
+	VersionStatusObsolete    VersionStatus = "obsolete"
 )
 
 type TemplateVersion struct {
@@ -67,7 +67,7 @@ func NewTemplateVersionDraft(id, tenantID, templateID, authorID, docxStorageKey 
 // posture should assert the field is non-empty separately.
 func (v *TemplateVersion) RoleBindingFor(transition VersionStatus) string {
 	switch transition {
-	case VersionStatusInReview, VersionStatusApproved:
+	case VersionStatusUnderReview, VersionStatusApproved:
 		if v.PendingReviewerRole != nil {
 			return *v.PendingReviewerRole
 		}
@@ -80,10 +80,10 @@ func (v *TemplateVersion) RoleBindingFor(transition VersionStatus) string {
 func (v *TemplateVersion) CanTransition(next VersionStatus, hasReviewer bool) error {
 	switch v.Status {
 	case VersionStatusDraft:
-		if next == VersionStatusInReview {
+		if next == VersionStatusUnderReview {
 			return nil
 		}
-	case VersionStatusInReview:
+	case VersionStatusUnderReview:
 		if next == VersionStatusDraft {
 			return nil
 		}

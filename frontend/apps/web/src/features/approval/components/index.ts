@@ -1,6 +1,5 @@
 export * from './ApprovalTimelinePanel';
 export * from './LockBadge';
-export * from './ControlledDocumentDetailPanel';
-export * from './SignoffDialog';
+export * from './DocumentApprovalExtras';
 export * from './SupersedePublishDialog';
 export * from './StateBadge';

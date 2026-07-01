@@ -63,6 +63,7 @@ export const QK = {
     byProfile: (profileCode: string) =>
       ['templates', 'by-profile', profileCode] as const,
     placeholderCatalog: () => ['templates', 'placeholder-catalog'] as const,
+    detail: (id: string) => ['templates', 'detail', id] as const,
   },
   tokens: {
     all: ['tokens'] as const,

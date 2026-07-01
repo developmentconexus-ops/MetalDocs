@@ -42,8 +42,8 @@ func TestSubmitForReview_Happy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SubmitForReview returned error: %v", err)
 	}
-	if got.Status != domain.VersionStatusInReview {
-		t.Fatalf("expected status %q, got %q", domain.VersionStatusInReview, got.Status)
+	if got.Status != domain.VersionStatusUnderReview {
+		t.Fatalf("expected status %q, got %q", domain.VersionStatusUnderReview, got.Status)
 	}
 	if got.SubmittedAt == nil {
 		t.Fatal("expected SubmittedAt to be set")
@@ -75,7 +75,7 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 		ID:            "ver-1",
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		Status:        domain.VersionStatusInReview,
+		Status:        domain.VersionStatusUnderReview,
 	}
 	repo.templates[template.ID] = template
 	repo.versions[version.ID] = version
@@ -136,7 +136,7 @@ func TestReview_Accept(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 		SubmittedAt:         &submittedAt,
@@ -180,7 +180,7 @@ func TestReview_Reject(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 		SubmittedAt:         &submittedAt,
@@ -227,7 +227,7 @@ func TestReview_WrongRole(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 	}
@@ -257,7 +257,7 @@ func TestReview_SegregationViolation(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 	}
@@ -286,7 +286,7 @@ func TestReview_NoReviewerStage(t *testing.T) {
 		ID:            "ver-1",
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		Status:        domain.VersionStatusInReview,
+		Status:        domain.VersionStatusUnderReview,
 		AuthorID:      "author-1",
 	}
 	repo.templates[template.ID] = template
@@ -372,17 +372,16 @@ func TestApprove_Accept_WithReviewer(t *testing.T) {
 	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublished {
 		t.Fatalf("expected one %q audit event, got %v", domain.AuditPublished, repo.audit)
 	}
-	if res.NextDraft == nil {
-		t.Fatal("expected NextDraft to be populated on approve-publish")
+	// M1·T2: no auto next-draft. LatestVersion must NOT be bumped by approve
+	// (no new draft was allocated); it stays at the template's prior value —
+	// 0 here (unset default).
+	if template.LatestVersion != 0 {
+		t.Fatalf("expected template.LatestVersion unchanged (0), got %d", template.LatestVersion)
 	}
-	if res.NextDraft.VersionNumber != version.VersionNumber+1 {
-		t.Fatalf("expected NextDraft.VersionNumber %d, got %d", version.VersionNumber+1, res.NextDraft.VersionNumber)
-	}
-	if res.NextDraft.Status != domain.VersionStatusDraft {
-		t.Fatalf("expected NextDraft.Status %q, got %q", domain.VersionStatusDraft, res.NextDraft.Status)
-	}
-	if template.LatestVersion != res.NextDraft.VersionNumber {
-		t.Fatalf("expected template.LatestVersion %d, got %d", res.NextDraft.VersionNumber, template.LatestVersion)
+	// Exactly two version rows in total (old published + approved-now-published).
+	// No third row was spawned.
+	if len(repo.versions) != 2 {
+		t.Fatalf("expected 2 version rows (old published + approved), got %d", len(repo.versions))
 	}
 }
 
@@ -393,7 +392,7 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: nil,
 		PendingApproverRole: "approver",
@@ -425,17 +424,15 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 	if template.PublishedVersionNumber == nil || *template.PublishedVersionNumber != version.VersionNumber {
 		t.Fatalf("expected PublishedVersionNumber %d, got %v", version.VersionNumber, template.PublishedVersionNumber)
 	}
-	if res.NextDraft == nil {
-		t.Fatal("expected NextDraft to be populated on approve-publish (no-reviewer path)")
+	// M1·T2: no auto next-draft. LatestVersion must NOT be bumped by approve
+	// (no new draft was allocated); it stays at the template's prior value —
+	// 0 here (unset default).
+	if template.LatestVersion != 0 {
+		t.Fatalf("expected template.LatestVersion unchanged (0), got %d", template.LatestVersion)
 	}
-	if res.NextDraft.VersionNumber != version.VersionNumber+1 {
-		t.Fatalf("expected NextDraft.VersionNumber %d, got %d", version.VersionNumber+1, res.NextDraft.VersionNumber)
-	}
-	if res.NextDraft.Status != domain.VersionStatusDraft {
-		t.Fatalf("expected NextDraft.Status %q, got %q", domain.VersionStatusDraft, res.NextDraft.Status)
-	}
-	if template.LatestVersion != res.NextDraft.VersionNumber {
-		t.Fatalf("expected template.LatestVersion %d, got %d", res.NextDraft.VersionNumber, template.LatestVersion)
+	// Exactly one version row — no draft v2 created in tx.
+	if len(repo.versions) != 1 {
+		t.Fatalf("expected 1 version row (just the published one), got %d", len(repo.versions))
 	}
 }
 
@@ -446,7 +443,7 @@ func TestApprove_Accept_EmptyContentHash_ReturnsContentHashMismatch(t *testing.T
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: nil,
 		PendingApproverRole: "approver",
@@ -508,9 +505,6 @@ func TestApprove_Reject(t *testing.T) {
 		t.Fatalf("Approve returned error: %v", err)
 	}
 	got := res.Version
-	if res.NextDraft != nil {
-		t.Fatalf("expected NextDraft nil on reject, got %v", res.NextDraft)
-	}
 	if got.Status != domain.VersionStatusDraft {
 		t.Fatalf("expected status %q, got %q", domain.VersionStatusDraft, got.Status)
 	}
@@ -535,7 +529,7 @@ func TestApprove_WrongRole(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingApproverRole: "approver",
 	}
@@ -657,7 +651,7 @@ func TestReview_UsesTemplateReviewCapability(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 	}
@@ -810,7 +804,7 @@ func TestReviewReturnsConcurrentTransitionWhenVersionMoved(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 		SubmittedAt:         &submittedAt,
@@ -878,9 +872,11 @@ func TestPublishTemplateVersionReturnsConcurrentTransitionWhenVersionMoved(t *te
 	}
 }
 
-func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
+// TestPublishTemplateVersion_NoAutoNextDraft asserts M1·T2: PublishTemplateVersion
+// must NOT spawn a next draft row or call CreateVersionTx. The published version
+// is committed; no v(n+1) is created. Manual CreateNextVersion is the only path.
+func TestPublishTemplateVersion_NoAutoNextDraft(t *testing.T) {
 	repo := newFakeRepo()
-	repo.failCreateVersion = true
 	template := &domain.Template{
 		ID:            "tpl-1",
 		TenantID:      "tenant-a",
@@ -900,7 +896,7 @@ func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
 	repo.versions[version.ID] = version
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
 
-	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+	res, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "approver-1",
 		ActorRoles:    []string{"approver"},
@@ -908,193 +904,22 @@ func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
 		VersionNumber: 1,
 		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
 	})
-	// CreateVersionTx failure must propagate as an error from PublishTemplateVersion.
-	if err == nil {
-		t.Fatalf("expected publish to fail when creating next draft fails")
-	}
-}
-
-func TestApprove_Accept_CopiesSourceDocxToDistinctKey(t *testing.T) {
-	repo := newFakeRepo()
-	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 2}
-	version := &domain.TemplateVersion{
-		ID:                  "ver-2",
-		TemplateID:          template.ID,
-		VersionNumber:       2,
-		Status:              domain.VersionStatusInReview,
-		AuthorID:            "author-1",
-		PendingApproverRole: "approver",
-		DocxStorageKey:      "tenants/tenant-a/templates/tpl-1/versions/2.docx",
-		ContentHash:         "live_hash",
-	}
-	repo.templates[template.ID] = template
-	repo.versions[version.ID] = version
-
-	presign := &fakePresigner{}
-	svc := application.New(repo, presign, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
-
-	res, err := svc.Approve(context.Background(), application.ApproveCmd{
-		TenantID:      "tenant-a",
-		ActorUserID:   "approver-1",
-		ActorRoles:    []string{"approver"},
-		TemplateID:    template.ID,
-		VersionNumber: 2,
-		Accept:        true,
-	})
-	if err != nil {
-		t.Fatalf("Approve returned error: %v", err)
-	}
-	wantDst := "tenants/tenant-a/templates/tpl-1/versions/3.docx"
-	if res.NextDraft.DocxStorageKey != wantDst {
-		t.Fatalf("next draft docx key = %q, want %q", res.NextDraft.DocxStorageKey, wantDst)
-	}
-	if res.NextDraft.DocxStorageKey == version.DocxStorageKey {
-		t.Fatalf("next draft must NOT share the source key %q", version.DocxStorageKey)
-	}
-	if res.NextDraft.ContentHash != "" {
-		t.Fatalf("next draft ContentHash must be empty so the publish gate still forces an edit, got %q", res.NextDraft.ContentHash)
-	}
-	want := [2]string{version.DocxStorageKey, wantDst}
-	if len(presign.CopyPairs) != 1 || presign.CopyPairs[0] != want {
-		t.Fatalf("expected one copy %v, got %v", want, presign.CopyPairs)
-	}
-}
-
-func TestApprove_Accept_AbortsWhenDocxCopyFails(t *testing.T) {
-	repo := newFakeRepo()
-	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
-	version := &domain.TemplateVersion{
-		ID:                  "ver-1",
-		TemplateID:          template.ID,
-		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
-		AuthorID:            "author-1",
-		PendingApproverRole: "approver",
-		DocxStorageKey:      "tenants/tenant-a/templates/tpl-1/versions/1.docx",
-		ContentHash:         "live_hash",
-	}
-	repo.templates[template.ID] = template
-	repo.versions[version.ID] = version
-
-	presign := &fakePresigner{copyErr: errors.New("copy boom")}
-	svc := application.New(repo, presign, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
-
-	_, err := svc.Approve(context.Background(), application.ApproveCmd{
-		TenantID:      "tenant-a",
-		ActorUserID:   "approver-1",
-		ActorRoles:    []string{"approver"},
-		TemplateID:    template.ID,
-		VersionNumber: 1,
-		Accept:        true,
-	})
-	if err == nil {
-		t.Fatal("expected Approve to fail when the docx copy fails")
-	}
-	if len(repo.audit) != 0 {
-		t.Fatalf("expected no audit on aborted spawn (tx never opened), got %d", len(repo.audit))
-	}
-	if len(repo.versions) != 1 {
-		t.Fatalf("expected no next-draft row to be created, want 1 version got %d", len(repo.versions))
-	}
-}
-
-func TestPublishTemplateVersion_AbortsWhenDocxCopyFails(t *testing.T) {
-	repo := newFakeRepo()
-	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
-	version := &domain.TemplateVersion{
-		ID:                  "ver-1",
-		TemplateID:          template.ID,
-		VersionNumber:       1,
-		Status:              domain.VersionStatusDraft,
-		AuthorID:            "author-1",
-		PendingApproverRole: "approver",
-		DocxStorageKey:      "tenants/tenant-a/templates/tpl-1/versions/1.docx",
-		ContentHash:         "live_hash",
-	}
-	repo.templates[template.ID] = template
-	repo.versions[version.ID] = version
-
-	presign := &fakePresigner{copyErr: errors.New("copy boom")}
-	svc := application.New(repo, presign, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
-
-	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
-		TenantID:      "tenant-a",
-		ActorUserID:   "approver-1",
-		ActorRoles:    []string{"approver"},
-		TemplateID:    template.ID,
-		VersionNumber: 1,
-		SchemaKey:     "tenants/tenant-a/templates/tpl-1/versions/1.schema.json",
-	})
-	if err == nil {
-		t.Fatal("expected PublishTemplateVersion to fail when the docx copy fails")
-	}
-	if len(repo.audit) != 0 {
-		t.Fatalf("expected no audit on aborted spawn (tx never opened), got %d", len(repo.audit))
-	}
-	if len(repo.versions) != 1 {
-		t.Fatalf("expected no next-draft row to be created, want 1 version got %d", len(repo.versions))
-	}
-	// The copy fails PRE-TX, so the source version's persisted state must remain
-	// untouched — the publish-time mutations (Status/PublishedAt) happen on a
-	// GetVersion clone and only commit via UpdateVersionTx inside the tx that
-	// never opened.
-	stored := repo.versions[version.ID]
-	if stored.Status != domain.VersionStatusDraft {
-		t.Fatalf("source version status must stay draft on aborted publish, got %q", stored.Status)
-	}
-	if stored.PublishedAt != nil {
-		t.Fatalf("source version PublishedAt must stay nil on aborted publish, got %v", stored.PublishedAt)
-	}
-}
-
-// TestPublishTemplateVersion_SingleTemplateTx asserts the F-T5 fix: exactly
-// ONE UpdateTemplateTx call is issued per PublishTemplateVersion, and it
-// carries LatestVersion = nextNum (not the stale pre-spawn value).
-func TestPublishTemplateVersion_SingleTemplateTx(t *testing.T) {
-	repo := newFakeRepo()
-	template := &domain.Template{
-		ID:            "tpl-1",
-		TenantID:      "tenant-a",
-		LatestVersion: 2,
-	}
-	version := &domain.TemplateVersion{
-		ID:                  "ver-2",
-		TemplateID:          template.ID,
-		VersionNumber:       2,
-		Status:              domain.VersionStatusDraft,
-		DocxStorageKey:      "tenants/tenant-a/templates/tpl-1/versions/2.docx",
-		ContentHash:         "hash_ok",
-		AuthorID:            "author-1",
-		PendingApproverRole: "approver",
-	}
-	repo.templates[template.ID] = template
-	repo.versions[version.ID] = version
-
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
-
-	res, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
-		TenantID:      "tenant-a",
-		ActorUserID:   "approver-1",
-		ActorRoles:    []string{"approver"},
-		TemplateID:    template.ID,
-		VersionNumber: 2,
-		SchemaKey:     "tenants/tenant-a/templates/tpl-1/versions/2.schema.json",
-	})
 	if err != nil {
 		t.Fatalf("PublishTemplateVersion returned error: %v", err)
 	}
-
-	wantNextNum := 3 // nextVersionNumber(latestVersion=2, sourceVersionNumber=2) = 3
-	if res.NextDraft.VersionNumber != wantNextNum {
-		t.Fatalf("expected NextDraft.VersionNumber %d, got %d", wantNextNum, res.NextDraft.VersionNumber)
+	if res.PublishedVersion.Status != domain.VersionStatusPublished {
+		t.Fatalf("expected published status, got %q", res.PublishedVersion.Status)
 	}
-
-	// F-T5: exactly one UpdateTemplateTx must be issued.
+	// Exactly one version row: no draft v2 was created.
+	if len(repo.versions) != 1 {
+		t.Fatalf("expected 1 version row, got %d", len(repo.versions))
+	}
+	// Exactly one UpdateTemplateTx call (no second call for LatestVersion bump).
 	if got := len(repo.UpdateTemplateTxCalls); got != 1 {
-		t.Fatalf("F-T5: expected exactly 1 UpdateTemplateTx call, got %d (calls: %v)", got, repo.UpdateTemplateTxCalls)
+		t.Fatalf("expected exactly 1 UpdateTemplateTx call, got %d (calls: %v)", got, repo.UpdateTemplateTxCalls)
 	}
-	// The single write must carry LatestVersion = nextNum (not the stale value).
-	if repo.UpdateTemplateTxCalls[0] != wantNextNum {
-		t.Fatalf("F-T5: UpdateTemplateTx called with LatestVersion=%d, want %d", repo.UpdateTemplateTxCalls[0], wantNextNum)
+	// LatestVersion must remain 1 (the published version) — no new draft allocated.
+	if repo.UpdateTemplateTxCalls[0] != 1 {
+		t.Fatalf("UpdateTemplateTx called with LatestVersion=%d, want 1", repo.UpdateTemplateTxCalls[0])
 	}
 }

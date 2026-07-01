@@ -1,0 +1,206 @@
+import { renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { ApprovalInstance } from '../../approval/api/approvalTypes';
+
+vi.mock('../../../store/auth.store', () => ({
+  useAuthStore: (selector: (state: { user: { userId: string; displayName: string } }) => unknown) =>
+    selector({ user: { userId: 'admin-user', displayName: 'Administrator' } }),
+}));
+
+vi.mock('../queries/useDocumentDetailQuery', () => ({
+  useDocumentDetailQuery: vi.fn(),
+}));
+vi.mock('../../approval/queries/useActiveDocumentContextQuery', () => ({
+  useActiveDocumentContextQuery: vi.fn(),
+}));
+vi.mock('../../approval/api/approvalApi', () => ({
+  getInstance: vi.fn(),
+}));
+
+import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
+import { useActiveDocumentContextQuery } from '../../approval/queries/useActiveDocumentContextQuery';
+import { getInstance } from '../../approval/api/approvalApi';
+import {
+  useDocumentApprovalArtifact,
+  type DocumentApprovalHandlers,
+} from './useDocumentApprovalArtifact';
+
+const BASE_DOC = {
+  id: 'doc-1',
+  code: 'POP-QUA-0148',
+  name: 'POP Limpeza de Linha',
+  status: 'under_review',
+  revision_version: 3,
+  revision_number: 3,
+  controlled_document_id: 'cd-1',
+  current_revision_id: 'rev-1',
+  created_by: 'admin-user',
+};
+
+function makeInstance(): ApprovalInstance {
+  return {
+    id: 'inst-1',
+    document_id: 'doc-1',
+    route_id: 'route-1',
+    status: 'in_progress',
+    submitted_by: 'maria',
+    submitted_at: '2026-04-15T10:00:00.000Z',
+    stages: [
+      {
+        id: 'stage-0',
+        stage_index: 0,
+        label: 'Qualidade',
+        status: 'passed',
+        signoffs: [
+          {
+            id: 'so-0',
+            actor_user_id: 'approver-1',
+            decision: 'approve',
+            signature_method: 'password_reauth',
+            signed_at: '2026-04-15T11:00:00.000Z',
+          },
+        ],
+      },
+    ],
+  };
+}
+
+const handlers: DocumentApprovalHandlers = {
+  openSubmit: vi.fn(),
+  cancelInstance: vi.fn(),
+  openPublish: vi.fn(),
+};
+
+function mockContext(approvalState: string, overrides: Record<string, unknown> = {}) {
+  vi.mocked(useActiveDocumentContextQuery).mockReturnValue({
+    data: {
+      document_id: 'doc-1',
+      approval_state: approvalState,
+      content_hash: 'hash-abc',
+      revision_version: 3,
+      approval_instance_id: 'inst-1',
+      ...overrides,
+    },
+    isLoading: false,
+    isError: false,
+  } as never);
+}
+
+describe('useDocumentApprovalArtifact', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useDocumentDetailQuery).mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: BASE_DOC,
+      refetch: vi.fn(),
+    } as never);
+    vi.mocked(getInstance).mockResolvedValue(makeInstance());
+  });
+
+  it('emits ONLY the submit action in draft state', async () => {
+    mockContext('draft', { approval_instance_id: undefined });
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+
+    await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+    const keys = result.current.model?.actions.map((a) => a.key);
+    expect(keys).toEqual(['submit']);
+  });
+
+  it('emits ONLY the cancel action in under_review (signing routes through the decision panel)', async () => {
+    mockContext('under_review');
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+
+    await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+    const actions = result.current.model?.actions ?? [];
+    expect(actions.map((a) => a.key)).toEqual(['cancel']);
+    const cancel = actions.find((a) => a.key === 'cancel');
+    expect(cancel?.variant).toBe('secondary');
+  });
+
+  it('emits ONLY the publish action in approved state', async () => {
+    mockContext('approved');
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+
+    await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+    expect(result.current.model?.actions.map((a) => a.key)).toEqual(['publish']);
+  });
+
+  it('emits ONLY the publish action in published state', async () => {
+    mockContext('published');
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+
+    await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+    expect(result.current.model?.actions.map((a) => a.key)).toEqual(['publish']);
+  });
+
+  it.each(['scheduled', 'superseded', 'rejected', 'obsolete', 'cancelled'])(
+    'emits NO actions in read-only / terminal state %s',
+    async (state) => {
+      mockContext(state);
+      const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+
+      await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+      expect(result.current.model?.actions).toEqual([]);
+    },
+  );
+
+  it('binds each action run to the supplied route handlers', async () => {
+    mockContext('under_review');
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+
+    await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+    const cancel = result.current.model?.actions.find((a) => a.key === 'cancel');
+    cancel?.run();
+    expect(handlers.cancelInstance).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps the approval instance stages/signoffs into approvalChain', async () => {
+    mockContext('under_review');
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+
+    await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+    const chain = result.current.model?.approvalChain;
+    expect(chain).not.toBeNull();
+    expect(chain).toHaveLength(1);
+    expect(chain?.[0]).toMatchObject({
+      stageIndex: 0,
+      label: 'Qualidade',
+      status: 'passed',
+      actorUserId: 'approver-1',
+      actorDisplay: 'approver-1',
+      decision: 'approve',
+      signedAt: '2026-04-15T11:00:00.000Z',
+    });
+  });
+
+  it('reports contextError when the active-document context query errors', () => {
+    vi.mocked(useActiveDocumentContextQuery).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    } as never);
+
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+    expect(result.current.contextError).toBe(true);
+  });
+
+  it('reports noActiveContext when the document has no active approval context', () => {
+    vi.mocked(useActiveDocumentContextQuery).mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+    } as never);
+
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+    expect(result.current.noActiveContext).toBe(true);
+  });
+});

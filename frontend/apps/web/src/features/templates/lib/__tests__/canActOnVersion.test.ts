@@ -45,7 +45,7 @@ describe('canSubmit', () => {
   });
 
   it('denies when status != draft', () => {
-    const gate = canSubmit(makeVersion({ status: 'in_review' }), actor({ capabilities: ['template.submit'] }));
+    const gate = canSubmit(makeVersion({ status: 'under_review' }), actor({ capabilities: ['template.submit'] }));
     expect(gate.allowed).toBe(false);
     if (!gate.allowed) expect(gate.reason).toContain('status');
   });
@@ -58,15 +58,15 @@ describe('canSubmit', () => {
 });
 
 describe('canReview', () => {
-  it('allows when in_review + has template.review + role matches pending_reviewer_role', () => {
+  it('allows when under_review + has template.review + role matches pending_reviewer_role', () => {
     const gate = canReview(
-      makeVersion({ status: 'in_review', pending_reviewer_role: 'reviewer' }),
+      makeVersion({ status: 'under_review', pending_reviewer_role: 'reviewer' }),
       actor({ capabilities: ['template.review'], roles: ['reviewer'] }),
     );
     expect(gate.allowed).toBe(true);
   });
 
-  it('denies when status != in_review', () => {
+  it('denies when status != under_review', () => {
     const gate = canReview(
       makeVersion({ status: 'draft', pending_reviewer_role: 'reviewer' }),
       actor({ capabilities: ['template.review'], roles: ['reviewer'] }),
@@ -76,7 +76,7 @@ describe('canReview', () => {
 
   it('denies when no pending_reviewer_role (no-reviewer flow)', () => {
     const gate = canReview(
-      makeVersion({ status: 'in_review', pending_reviewer_role: null }),
+      makeVersion({ status: 'under_review', pending_reviewer_role: null }),
       actor({ capabilities: ['template.review'], roles: ['reviewer'] }),
     );
     expect(gate.allowed).toBe(false);
@@ -84,7 +84,7 @@ describe('canReview', () => {
 
   it('denies when capability missing', () => {
     const gate = canReview(
-      makeVersion({ status: 'in_review', pending_reviewer_role: 'reviewer' }),
+      makeVersion({ status: 'under_review', pending_reviewer_role: 'reviewer' }),
       actor({ capabilities: [], roles: ['reviewer'] }),
     );
     expect(gate.allowed).toBe(false);
@@ -93,7 +93,7 @@ describe('canReview', () => {
 
   it('denies when role binding mismatched', () => {
     const gate = canReview(
-      makeVersion({ status: 'in_review', pending_reviewer_role: 'reviewer' }),
+      makeVersion({ status: 'under_review', pending_reviewer_role: 'reviewer' }),
       actor({ capabilities: ['template.review'], roles: ['approver'] }),
     );
     expect(gate.allowed).toBe(false);
@@ -120,7 +120,7 @@ describe('canApprove', () => {
 
   it('denies when status != approved', () => {
     const gate = canApprove(
-      makeVersion({ status: 'in_review', pending_approver_role: 'approver' }),
+      makeVersion({ status: 'under_review', pending_approver_role: 'approver' }),
       actor({ capabilities: ['template.approve'], roles: ['approver'] }),
     );
     expect(gate.allowed).toBe(false);
@@ -146,26 +146,26 @@ describe('canApprove', () => {
 });
 
 describe('canPublish', () => {
-  // The "Publish" button on in_review without reviewer actually calls approveVersion
+  // The "Publish" button on under_review without reviewer actually calls approveVersion
   // (POST /approve → Service.Approve accepts + publishes + spawns next draft in-tx).
   // Backend capability is template.approve, not template.publish.
-  it('allows when in_review without reviewer + has template.approve + matches pending_approver_role', () => {
+  it('allows when under_review without reviewer + has template.approve + matches pending_approver_role', () => {
     const gate = canPublish(
-      makeVersion({ status: 'in_review', pending_reviewer_role: null, pending_approver_role: 'approver' }),
+      makeVersion({ status: 'under_review', pending_reviewer_role: null, pending_approver_role: 'approver' }),
       actor({ capabilities: ['template.approve'], roles: ['approver'] }),
     );
     expect(gate.allowed).toBe(true);
   });
 
-  it('denies when in_review WITH reviewer (must go through review first)', () => {
+  it('denies when under_review WITH reviewer (must go through review first)', () => {
     const gate = canPublish(
-      makeVersion({ status: 'in_review', pending_reviewer_role: 'reviewer', pending_approver_role: 'approver' }),
+      makeVersion({ status: 'under_review', pending_reviewer_role: 'reviewer', pending_approver_role: 'approver' }),
       actor({ capabilities: ['template.approve'], roles: ['approver'] }),
     );
     expect(gate.allowed).toBe(false);
   });
 
-  it('denies when status != in_review', () => {
+  it('denies when status != under_review', () => {
     const gate = canPublish(
       makeVersion({ status: 'approved', pending_reviewer_role: null, pending_approver_role: 'approver' }),
       actor({ capabilities: ['template.approve'], roles: ['approver'] }),
@@ -175,7 +175,7 @@ describe('canPublish', () => {
 
   it('denies when capability missing', () => {
     const gate = canPublish(
-      makeVersion({ status: 'in_review', pending_reviewer_role: null, pending_approver_role: 'approver' }),
+      makeVersion({ status: 'under_review', pending_reviewer_role: null, pending_approver_role: 'approver' }),
       actor({ capabilities: [], roles: ['approver'] }),
     );
     expect(gate.allowed).toBe(false);
@@ -184,7 +184,7 @@ describe('canPublish', () => {
 
   it('denies when role binding mismatched', () => {
     const gate = canPublish(
-      makeVersion({ status: 'in_review', pending_reviewer_role: null, pending_approver_role: 'approver' }),
+      makeVersion({ status: 'under_review', pending_reviewer_role: null, pending_approver_role: 'approver' }),
       actor({ capabilities: ['template.approve'], roles: ['author'] }),
     );
     expect(gate.allowed).toBe(false);

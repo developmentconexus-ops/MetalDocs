@@ -6,6 +6,7 @@ import { VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta
 import { DocPaperPreview } from '../DocPaperPreview';
 import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
 import { formatRevisionCode } from '../../../lib/documentDetailMeta';
+import { formatCodePreview } from '../../../lib/codePreview';
 import styles from './StepConfirm.module.css';
 
 type SummaryField = { label: string; value: string };
@@ -21,6 +22,7 @@ export type StepConfirmProps = {
   isBlankTemplateSelected?: boolean;
   blankTemplateName?: string;
   previewCode: string | null;
+  previewCodeLoading: boolean;
   authorDisplayName: string;
   createdAt: Date;
   consent: boolean;
@@ -45,6 +47,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
     isBlankTemplateSelected = false,
     blankTemplateName = 'Em branco',
     previewCode,
+    previewCodeLoading,
     authorDisplayName,
     createdAt,
     consent,
@@ -57,7 +60,13 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
     submitDisabled,
   } = props;
 
-  const codePreview = previewCode ?? `${profile?.code ?? '???'}-${area?.code ?? '???'}-???`;
+  const codePreview = formatCodePreview({
+    ready: profile != null && area != null,
+    isLoading: previewCodeLoading,
+    code: previewCode,
+    profileCode: profile?.code ?? null,
+    areaCode: area?.code ?? null,
+  });
   const revisionCode = formatRevisionCode(0);
   const visibilityLabel = buildVisibilityLabel(visibility, visibilityAreaCodes, inviteeCount);
   const profileLabel = profile ? `${profile.code} — ${profile.name}` : '—';

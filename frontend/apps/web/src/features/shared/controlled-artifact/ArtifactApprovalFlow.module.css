@@ -1,0 +1,106 @@
+/* ArtifactApprovalFlow.module.css — vertical approval-flow timeline.
+   Mirrors the detalhe-signoff cockpit "Fluxo de aprovação" band: a status dot per
+   step, a connector line joining them, and a who / role · time descriptor. */
+
+.flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-4);
+}
+
+.step:last-child {
+  padding-bottom: 0;
+}
+
+/* Connector line joining a step's dot to the next step's dot. */
+.connector {
+  position: absolute;
+  left: 0.5625rem; /* dot centre: half of the 1.125rem dot width */
+  top: 1.375rem;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+
+/* ─── Status dot ─────────────────────────────────────────────────────────── */
+
+.dot {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+
+.dot_approved {
+  background: var(--success);
+}
+
+.dot_rejected {
+  background: var(--danger);
+}
+
+.dot_sent {
+  background: var(--text-muted);
+}
+
+.dot_current {
+  background: var(--surface);
+  border: 2px dashed var(--brand);
+}
+
+.dot_pending {
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+}
+
+/* Small white centre pip for the neutral "sent" hand-off dot. */
+.dotInner {
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border-radius: 50%;
+  background: #fff;
+}
+
+/* ─── Step body ──────────────────────────────────────────────────────────── */
+
+.stepBody {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+}
+
+.who {
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.whoCurrent {
+  color: var(--brand);
+}
+
+.meta {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.time {
+  font-family: var(--font-mono);
+}

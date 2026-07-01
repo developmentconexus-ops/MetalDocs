@@ -1,0 +1,137 @@
+/* ArtifactHeroCard.module.css — shared hero doc-card and badge row for a
+   controlled artifact. Extracted from ArtifactDetailView.module.css so that
+   ArtifactApprovalScreen can consume these classes without a cross-module CSS
+   reach-across. */
+
+/* ─── DocCardMini ────────────────────────────────────────────────────────── */
+
+.docCard {
+  width: 10.5rem;
+  height: 14rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-1);
+  box-shadow: var(--shadow-doc-card);
+  transform: perspective(75rem) rotateY(-12deg) rotateX(4deg);
+  transform-style: preserve-3d;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.docCardHeader {
+  height: 2.25rem;
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
+  display: flex;
+  align-items: center;
+  padding: 0 0.875rem;
+  color: var(--text-on-brand);
+  font-family: var(--font-mono);
+  font-size: 0.59375rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.docCardBody {
+  flex: 1;
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.docCardCode {
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  color: var(--brand-deep);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: var(--sp-1);
+}
+
+.docCardType {
+  font-size: 0.59375rem;
+  color: var(--text-soft);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+
+.docCardSpacer {
+  flex: 1;
+}
+
+.docCardDivider {
+  height: 1px;
+  background: var(--border);
+  margin-bottom: var(--sp-2);
+}
+
+.docCardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.docCardVersion {
+  font-size: 0.59375rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.docCardDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+/* ─── Hero badges ────────────────────────────────────────────────────────── */
+
+.codeChip {
+  display: inline-flex;
+  align-items: center;
+  height: 1.5rem;
+  padding: 0 0.6875rem;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--brand);
+  border: 1px solid var(--brand-pale);
+  font-size: 0.71875rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.vigenteBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 1.375rem;
+  padding: 0 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  background: var(--success-bg);
+  color: var(--success);
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vigenteDot {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+.typeLabel {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

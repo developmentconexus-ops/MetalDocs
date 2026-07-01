@@ -1,12 +1,11 @@
 import { usePreviewCodeQuery } from '../../../controlled-documents/queries/usePreviewCodeQuery';
+import { formatCodePreview } from '../../lib/codePreview';
 import styles from './CodePreviewBanner.module.css';
 
 export type CodePreviewBannerProps = {
   profileCode: string | null;
   areaCode: string;
 };
-
-const PLACEHOLDER = '???';
 
 export function CodePreviewBanner({
   profileCode,
@@ -16,11 +15,13 @@ export function CodePreviewBanner({
   const ready = profileCode !== null && effectiveAreaCode !== null;
   const { data, isLoading } = usePreviewCodeQuery(profileCode, effectiveAreaCode);
 
-  const code = !ready
-    ? `${PLACEHOLDER}-${PLACEHOLDER}-${PLACEHOLDER}`
-    : isLoading
-    ? `${profileCode}-${areaCode}-…`
-    : data?.code ?? `${profileCode}-${areaCode}-${PLACEHOLDER}`;
+  const code = formatCodePreview({
+    ready,
+    isLoading,
+    code: data?.code,
+    profileCode,
+    areaCode: effectiveAreaCode,
+  });
 
   const kicker = ready
     ? `Código gerado · próximo em (${profileCode}, ${areaCode})`

@@ -66,7 +66,7 @@ func TestPresignAutosave_NonDraft(t *testing.T) {
 		ID:             "ver-1",
 		TemplateID:     "tpl-1",
 		VersionNumber:  1,
-		Status:         domain.VersionStatusInReview,
+		Status:         domain.VersionStatusUnderReview,
 		DocxStorageKey: "templates/tpl-1/versions/1.docx",
 	}
 

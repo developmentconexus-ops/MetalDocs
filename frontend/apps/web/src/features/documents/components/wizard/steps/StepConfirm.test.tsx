@@ -30,30 +30,35 @@ const area: ProcessArea = {
   createdAt: '2026-05-19T10:00:00-03:00',
 };
 
+const baseProps = {
+  profile,
+  area,
+  title: 'Documento de teste',
+  visibility: 'company' as const,
+  visibilityAreaCodes: [],
+  inviteeCount: 0,
+  template: null,
+  isBlankTemplateSelected: true,
+  blankTemplateName: 'Em branco',
+  authorDisplayName: 'Admin',
+  createdAt: new Date('2026-05-19T10:00:00-03:00'),
+  consent: false,
+  submitting: false,
+  error: null,
+  onConsent: vi.fn(),
+  onSubmit: vi.fn(),
+  onBack: vi.fn(),
+  onCancel: vi.fn(),
+  submitDisabled: true,
+};
+
 describe('StepConfirm', () => {
   it('shows governed REV00 semantics instead of raw v1 during document creation', () => {
     render(
       <StepConfirm
-        profile={profile}
-        area={area}
-        title="Documento de teste"
-        visibility="company"
-        visibilityAreaCodes={[]}
-        inviteeCount={0}
-        template={null}
-        isBlankTemplateSelected
-        blankTemplateName="Em branco"
+        {...baseProps}
         previewCode="POP-GENERAL-011"
-        authorDisplayName="Admin"
-        createdAt={new Date('2026-05-19T10:00:00-03:00')}
-        consent={false}
-        submitting={false}
-        error={null}
-        onConsent={vi.fn()}
-        onSubmit={vi.fn()}
-        onBack={vi.fn()}
-        onCancel={vi.fn()}
-        submitDisabled
+        previewCodeLoading={false}
       />,
     );
 
@@ -68,30 +73,57 @@ describe('StepConfirm', () => {
 
     render(
       <StepConfirm
-        profile={profile}
-        area={area}
-        title="Documento de teste"
-        visibility="company"
-        visibilityAreaCodes={[]}
-        inviteeCount={0}
-        template={null}
-        isBlankTemplateSelected
-        blankTemplateName="Em branco"
+        {...baseProps}
         previewCode="POP-GENERAL-011"
-        authorDisplayName="Admin"
-        createdAt={new Date('2026-05-19T10:00:00-03:00')}
-        consent={false}
-        submitting={false}
-        error={null}
+        previewCodeLoading={false}
         onConsent={onConsent}
-        onSubmit={vi.fn()}
-        onBack={vi.fn()}
-        onCancel={vi.fn()}
-        submitDisabled
       />,
     );
 
     fireEvent.click(screen.getByRole('checkbox'));
     expect(onConsent).toHaveBeenCalledWith(true);
+  });
+
+  it('shows loading affordance (POP-GENERAL-…) when query is in flight and profile+area are set', () => {
+    render(
+      <StepConfirm
+        {...baseProps}
+        previewCode={null}
+        previewCodeLoading={true}
+      />,
+    );
+
+    // Should show loading ellipsis form, not a bare ???
+    expect(screen.getAllByText('POP-GENERAL-…').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^\?\?\?/)).not.toBeInTheDocument();
+  });
+
+  it('shows graceful fallback (POP-GENERAL-???) when query finished with null and profile+area are set', () => {
+    render(
+      <StepConfirm
+        {...baseProps}
+        previewCode={null}
+        previewCodeLoading={false}
+      />,
+    );
+
+    // Should show profile-area-??? fallback, not a bare ???-???-???
+    expect(screen.getAllByText('POP-GENERAL-???').length).toBeGreaterThan(0);
+    expect(screen.queryByText('???-???-???')).not.toBeInTheDocument();
+  });
+
+  it('shows ???-???-??? when profile is null (selections incomplete)', () => {
+    render(
+      <StepConfirm
+        {...baseProps}
+        profile={null}
+        previewCode={null}
+        previewCodeLoading={false}
+      />,
+    );
+
+    // All code slots should show the full not-ready placeholder
+    const chips = screen.getAllByText('???-???-???');
+    expect(chips.length).toBeGreaterThan(0);
   });
 });

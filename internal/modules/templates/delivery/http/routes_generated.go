@@ -210,13 +210,10 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 		writeMappedErr(w, err)
 		return
 	}
-	// Strict-server typed response — exactly the 3 fields declared at
-	// openapi.yaml:1331 (M5/F5.3 H-D remediation; closes the M1/F1.3 declared-
-	// fields-only leak that emitted an undeclared `published_version_number`).
+	// Strict-server typed response — exactly the 1 field declared at
+	// openapi.yaml (M1·T2: next_draft_* removed; published_version_id only).
 	writeJSON(w, http.StatusOK, templatesapi.PublishTemplateVersion200JSONResponse{
-		PublishedVersionId:  res.PublishedVersion.ID,
-		NextDraftId:         res.NextDraft.ID,
-		NextDraftVersionNum: res.NextDraft.VersionNumber,
+		PublishedVersionId: res.PublishedVersion.ID,
 	})
 }
 

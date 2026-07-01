@@ -406,7 +406,7 @@ describe('DocumentEditorPage autosave wiring', () => {
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
     );
     await waitFor(() =>
-      expect(screen.getByText('3 paginas · 1,3 KB')).toBeTruthy(),
+      expect(screen.getByText('3 páginas · 1,3 KB')).toBeTruthy(),
     );
   });
 
@@ -435,7 +435,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
-    fireEvent.change(screen.getByLabelText('TÃ­tulo'), { target: { value: 'Atualizacao de procedimento' } });
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Atualizacao de procedimento' } });
     fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));
 
     await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
@@ -521,7 +521,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
-    fireEvent.change(screen.getByLabelText('TÃ­tulo'), { target: { value: 'Atualizacao de procedimento' } });
+    fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Atualizacao de procedimento' } });
     fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));
 
     await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
@@ -552,7 +552,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
     fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Informe o tÃ­tulo da revisÃ£o para submeter.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Informe o título da revisão para submeter.');
     expect(vi.mocked(api.finalizeDocument)).not.toHaveBeenCalled();
   });
 });
@@ -571,7 +571,7 @@ describe('DocumentEditorPage load failure state', () => {
     );
 
     expect(screen.queryByTestId('editor')).toBeNull();
-    expect(screen.queryByText('Identificacao')).toBeNull();
+    expect(screen.queryByText('Identificação')).toBeNull();
     expect(screen.queryByText('Próximos aprovadores')).toBeNull();
   });
 
@@ -598,7 +598,7 @@ describe('DocumentEditorPage load failure state', () => {
 
     expect(screen.getAllByText('C-001').length).toBeGreaterThan(0);
     expect(screen.getByText('Original')).toBeTruthy();
-    expect(screen.getByText('Identificacao')).toBeTruthy();
+    expect(screen.getByText('Identificação')).toBeTruthy();
     expect(screen.queryByTestId('editor')).toBeNull();
     expect(screen.queryByText('http_403')).toBeNull();
     expect(screen.queryByText('missing_signed_url')).toBeNull();

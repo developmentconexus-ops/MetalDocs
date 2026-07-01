@@ -1,6 +1,6 @@
 ﻿# Frontend Structure
 
-> **Last verified:** 2026-05-28 (AppShell admin route guard wired to `handle.requiresAdmin`)
+> **Last verified:** 2026-06-30 (ADR 0053 — shared controlled-artifact view layer; `ArtifactViewModel` boundary; four hard rules; template detail screen)
 > **Scope:** Canonical folder layout, naming, routing, state, API, design-system rules for `frontend/apps/web`. Comparison baseline for refactor reviews and the `metaldocs-frontend` skill.
 > **Out of scope:** Backend module layout (see `system-overview.md`), eigenpal internals (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
@@ -12,6 +12,8 @@
 > - `frontend/apps/web/src/features/shell/components/AppToolbar.tsx:7`     52px top bar (search, notifications, new-doc)
 > - `frontend/apps/web/src/features/shell/components/SectionPanel.tsx:4`     224px slot panel (Library only)
 > - `frontend/apps/web/src/features/`     one folder per domain
+> - `frontend/apps/web/src/features/shared/controlled-artifact/types.ts`     `ArtifactViewModel` contract (ADR 0053)
+> - `frontend/apps/web/src/features/shared/controlled-artifact/ArtifactDetailView.tsx`     top-level shell component
 > - `frontend/apps/web/src/components/ui/`     design-system primitives only
 > - `frontend/apps/web/src/lib/api/`     apiFetch, ApiError, authBus, openapi-fetch wrapper
 > - `frontend/apps/web/src/lib/queryKeys.ts:27`     centralized `QK` constants; all `queryKey` / `invalidateQueries` calls import from here; `QK.templates.byProfile` added
@@ -62,6 +64,7 @@ frontend/apps/web/src/
                     SectionPanel.tsx    # 224px slot panel (Library only, via route handle flag)
           features/shared/            #     cross-feature UI primitives (used by 2+ features)
                 components/
+                    controlled-artifact/ # shared shell: ArtifactDetailView, ArtifactApprovalScreen, VersionTimeline + types.ts (ADR 0053)
                     editor-chrome/      # toolbar overlay + eigenpal overrides for eigenpal-based pages
                           EditorChrome.tsx          # wrapper with left/center/right/alert slots
                           EditorChrome.module.css   # overlay positioning + eigenpal CSS overrides + button primitives
@@ -376,10 +379,75 @@ When implementing:
 -     Direct `fetch` calls. Use `lib/api/`.
 -     Hand-written types that mirror OpenAPI shapes. Codegen.
 -     Cross-feature imports from `features/<a>/components/<x>` into `features/<b>/`. If you need it, the component is a primitive     move to `components/ui/` or `features/shared/`.
+-     Data fetching, `useParams`, or `kind` branching inside `features/shared/controlled-artifact/` shell components (see Section 17 four hard rules).
 -     Inline styles for theming. CSS Modules + tokens.
 -     Backwards-compat re-exports during migration.
 
 ---
+
+## 17. Shared controlled-artifact view layer (ADR 0053)
+
+Both controlled **documents** and controlled **templates** render through a single set of purely presentational components, bounded by a kind-agnostic `ArtifactViewModel`. This prevents duplication-driven drift and enforces parity by construction.
+
+### 17.1 Boundary: `ArtifactViewModel`
+
+`frontend/apps/web/src/features/shared/controlled-artifact/types.ts` defines the complete view-model contract:
+- `ArtifactViewModel` — top-level kind-agnostic model. Template-only fields (`code`, `subtitle`, `areaLabel`, `fileSizeBytes`, `pageCount`, `effectiveFrom`, `nextReviewAt`, `approvalChain`) are **nullable** so the shell renders a reduced surface without branching on kind.
+- Supporting types: `ArtifactHeroModel`, `ArtifactMetaModel`, `ArtifactKpiCell`, `ApprovalChainItem`, `VersionHistoryItem`, `ArtifactTab`, `ArtifactAction`.
+- `LifecycleStatus` — aliases the canonical `DocumentStatus` union; no parallel fork for templates.
+
+### 17.2 Shell components (all under `features/shared/controlled-artifact/`)
+
+| Component | File | Purpose |
+|---|---|---|
+| `ArtifactDetailView` | `ArtifactDetailView.tsx` | Top-level shell; composes hero + sidebar + tabs + slots |
+| `ArtifactDetailLayout` | `ArtifactDetailLayout.tsx` | Grid layout for the detail screen |
+| `ArtifactHero` | `ArtifactHero.tsx` | Hero bar with code, title, status badge, `heroActions` slot |
+| `ArtifactHeroCard` | `ArtifactHeroCard.tsx` | Compact hero card variant |
+| `ArtifactMetaSidebar` | `ArtifactMetaSidebar.tsx` | Metadata sidebar (owner, area, dates, KPIs) |
+| `ArtifactApprovalScreen` | `ArtifactApprovalScreen.tsx` | Approval decision surface |
+| `VersionTimeline` | `VersionTimeline.tsx` | Revision history timeline |
+
+### 17.3 Per-kind adapters
+
+Adapters are the **only** place kind-specific API shapes and business rules live. They fetch kind data, apply business rules, and return a finished `ArtifactViewModel` to the route.
+
+| Adapter | File | Kind |
+|---|---|---|
+| `useDocumentArtifact` | `features/documents/adapters/useDocumentArtifact.ts` | documents — detail |
+| `useDocumentApprovalArtifact` | `features/documents/adapters/useDocumentApprovalArtifact.ts` | documents — approval |
+| `useTemplateArtifact` | `features/templates/adapters/useTemplateArtifact.ts` | templates — detail |
+| `useTemplateApprovalArtifact` | `features/templates/adapters/useTemplateApprovalArtifact.ts` | templates — approval |
+
+### 17.4 Thin route wrappers
+
+Route components stay thin: call one adapter, own kind-specific `useState` + dialogs, pass slots into the shell.
+
+| Route | File | Notes |
+|---|---|---|
+| `TemplateDetailRoute` | `features/templates/pages/TemplateDetailRoute.tsx` | Clicking a template opens this screen (not the editor directly); editor reached via explicit "Editar modelo" action |
+| `TemplateApprovalRoute` | `features/templates/pages/TemplateApprovalRoute.tsx` | Template approval decisions |
+| `SignoffDetailPage` | `features/approval/pages/SignoffDetailPage.tsx` | Document approval decisions; owns `CancelInstanceDialog` (replaces the former `window.prompt` cancel flow) |
+
+### 17.5 Four hard rules (enforced at code review)
+
+Every component under `features/shared/controlled-artifact/` must obey **all four** rules, without exception:
+
+1. **No data fetching** — no react-query hooks, no API imports, no `useParams`. The component receives a finished `ArtifactViewModel`.
+2. **No `kind` branching** — the component never inspects `model.kind` to choose layout. Divergence is expressed as data (null fields, empty arrays, ordered `actions`), never as conditionals.
+3. **No cross-feature imports** — the shell imports only from `shared/` and shared primitives; it never reaches into `documents/`, `templates/`, or `approval/`. No component imports another component's CSS module.
+4. **Composition via `ReactNode` slots** — kind-specific chrome (hero action buttons, document coverage aside, error banners) is injected by the route as `heroActions` / `aside` / `extras` slots. The shell owns none of that behaviour.
+
+### 17.6 Shared dedup helpers
+
+Logic shared by more than one adapter is extracted once:
+- `frontend/apps/web/src/features/shared/controlled-artifact/resolveOwnerDisplay.ts` — owner-name resolution with current-user fallback; consumed by all four adapters.
+- `frontend/apps/web/src/features/documents/lib/approvalWorkflow.ts` (`mapApprovalChain`) — stage→`ApprovalChainItem` mapping; consumed by both document adapters and the template approval adapter.
+
+### 17.7 Decision reference
+
+See `wiki/decisions/0053-shared-controlled-artifact-view-layer.md` for rationale, consequences, and the lifecycle-parity precondition (ADR 0052 — `under_review` status alignment + manual template versioning).
+
 
 ## 16. References
 
@@ -388,5 +456,7 @@ When implementing:
 - `wiki/architecture/system-overview.md`     services + ports
 - `wiki/architecture/api-contract.md`     OpenAPI spec, oapi-codegen backend codegen, frontend `gen:api` script, CI drift guard
 - `wiki/decisions/`     architecture decision records
+- `wiki/decisions/0053-shared-controlled-artifact-view-layer.md`     shared controlled-artifact view layer (Section 17)
+- `wiki/decisions/0052-template-manual-versioning.md`     template manual versioning + `under_review` status (lifecycle parity precondition for Section 17)
 - `frontend/apps/web/design-source/README.md`     screen intake protocol (added with Block 0)
 

@@ -1308,16 +1308,14 @@ paths:
                 schema_key: { type: string }
       responses:
         '200':
-          description: published + next draft created
+          description: version published
           content:
             application/json:
               schema:
                 type: object
-                required: [published_version_id, next_draft_id, next_draft_version_num]
+                required: [published_version_id]
                 properties:
                   published_version_id: { type: string }
-                  next_draft_id: { type: string }
-                  next_draft_version_num: { type: integer }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -5505,7 +5503,7 @@ components:
           description: >
             0-based regulated revision counter. REV{nn} = revision_number,
             zero-padded. ADR 0013.
-        status: { type: string, enum: [draft, in_review, approved, published, obsolete] }
+        status: { type: string, enum: [draft, under_review, approved, published, obsolete] }
         docx_storage_key: { type: string, nullable: true }
         content_hash: { type: string, nullable: true }
         metadata_schema: { type: object, nullable: true, additionalProperties: true }
@@ -5563,24 +5561,10 @@ components:
       properties:
         data:
           type: object
-          required: [version, next_draft]
+          required: [version]
           properties:
             version:
               $ref: '#/components/schemas/VersionDTO'
-            next_draft:
-              type: object
-              nullable: true
-              description: |
-                When the Approve transition terminates as publish (no-reviewer
-                path) or the approver explicitly publishes, a fresh draft
-                v(n+1) is spawned in the same transaction. Returned so the
-                caller can navigate without a list refetch. Null when the
-                transition does not publish (reject path, or reviewer path
-                that only flips to approved).
-              required: [id, version_number]
-              properties:
-                id: { type: string, format: uuid }
-                version_number: { type: integer, minimum: 1 }
     TemplateVersionEnvelope:
       description: |
         Shared 200 response envelope for template version mutations that return the
