@@ -126,6 +126,42 @@ function setupDraft() {
   });
 }
 
+function setupUnderReview() {
+  mockUseTemplateArtifact.mockReturnValue({
+    model: { ...MOCK_MODEL, status: "under_review" },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
+  mockUseTemplateDetailQuery.mockReturnValue({
+    data: {
+      template: { id: "tpl-1", name: "Modelo X" },
+      latest_version: { status: "under_review" },
+    },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
+}
+
+function setupApproved() {
+  mockUseTemplateArtifact.mockReturnValue({
+    model: { ...MOCK_MODEL, status: "approved" },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
+  mockUseTemplateDetailQuery.mockReturnValue({
+    data: {
+      template: { id: "tpl-1", name: "Modelo X" },
+      latest_version: { status: "approved" },
+    },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 describe("TemplateDetailRoute", () => {
   beforeEach(() => {
@@ -188,5 +224,27 @@ describe("TemplateDetailRoute", () => {
 
     expect(screen.getByText(/carregando modelo/i)).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
+  });
+
+  it("under_review shows 'Revisar versão' and navigates to the approval screen", () => {
+    setupUnderReview();
+    renderRoute();
+
+    const reviewBtn = screen.getByRole("button", { name: /revisar versão/i });
+    expect(reviewBtn).toBeInTheDocument();
+
+    fireEvent.click(reviewBtn);
+    expect(navigateMock).toHaveBeenCalledWith("/templates/tpl-1/approval");
+  });
+
+  it("approved shows 'Publicar versão' and navigates to the approval screen", () => {
+    setupApproved();
+    renderRoute();
+
+    const publishBtn = screen.getByRole("button", { name: /publicar versão/i });
+    expect(publishBtn).toBeInTheDocument();
+
+    fireEvent.click(publishBtn);
+    expect(navigateMock).toHaveBeenCalledWith("/templates/tpl-1/approval");
   });
 });

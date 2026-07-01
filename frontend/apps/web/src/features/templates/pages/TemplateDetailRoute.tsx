@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "../../../components/ui/Icon";
@@ -50,11 +51,8 @@ export function TemplateDetailRoute() {
     );
   }
 
-  // Published latest ⇒ the only path forward is a brand-new version.
-  // Non-published ⇒ a working draft exists; edit it.
-  const isPublished = latestStatus === "published";
-
   const handleEdit = () => navigate(`/templates/${templateId}/edit`);
+  const handleReview = () => navigate(`/templates/${templateId}/approval`);
 
   const handleCreateVersion = async () => {
     if (isCreating) return;
@@ -73,10 +71,43 @@ export function TemplateDetailRoute() {
   };
 
   // ── Hero actions slot ──────────────────────────────────────────────────────
-  const heroActions = (
-    <div className={styles.heroActions}>
-      {isPublished ? (
-        <>
+  // Detail screen is the lifecycle hub: each status routes to its natural next step.
+  // draft → edit the working draft; under_review/approved → the dedicated approval
+  // screen (parity with documents → /approvals/:id); published → manually spawn the
+  // next version (the only revision path since M1 dropped auto-spawn — ADR 0052).
+  let heroActions: ReactNode;
+  switch (latestStatus) {
+    case "under_review":
+      heroActions = (
+        <div className={styles.heroActions}>
+          <button className="btn btn-primary btn-lg" type="button" onClick={handleReview}>
+            <Icon name="check" size={15} />
+            Revisar versão
+          </button>
+          <button className="btn" type="button" onClick={handleEdit}>
+            <Icon name="eye" size={13} />
+            Ver no editor
+          </button>
+        </div>
+      );
+      break;
+    case "approved":
+      heroActions = (
+        <div className={styles.heroActions}>
+          <button className="btn btn-primary btn-lg" type="button" onClick={handleReview}>
+            <Icon name="upload" size={15} />
+            Publicar versão
+          </button>
+          <button className="btn" type="button" onClick={handleEdit}>
+            <Icon name="eye" size={13} />
+            Ver no editor
+          </button>
+        </div>
+      );
+      break;
+    case "published":
+      heroActions = (
+        <div className={styles.heroActions}>
           <button
             className="btn btn-primary btn-lg"
             type="button"
@@ -90,14 +121,13 @@ export function TemplateDetailRoute() {
             <Icon name="eye" size={13} />
             Ver no editor
           </button>
-        </>
-      ) : (
-        <>
-          <button
-            className="btn btn-primary btn-lg"
-            type="button"
-            onClick={handleEdit}
-          >
+        </div>
+      );
+      break;
+    case "draft":
+      heroActions = (
+        <div className={styles.heroActions}>
+          <button className="btn btn-primary btn-lg" type="button" onClick={handleEdit}>
             <Icon name="edit" size={15} />
             Editar modelo
           </button>
@@ -111,10 +141,21 @@ export function TemplateDetailRoute() {
             <Icon name="edit" size={13} />
             Criar nova versão
           </button>
-        </>
-      )}
-    </div>
-  );
+        </div>
+      );
+      break;
+    default:
+      // obsolete / unknown: read-only entry only.
+      heroActions = (
+        <div className={styles.heroActions}>
+          <button className="btn" type="button" onClick={handleEdit}>
+            <Icon name="eye" size={13} />
+            Ver no editor
+          </button>
+        </div>
+      );
+      break;
+  }
 
   // ── Extras slot: create-version error banner ───────────────────────────────
   const extras = createError ? (
