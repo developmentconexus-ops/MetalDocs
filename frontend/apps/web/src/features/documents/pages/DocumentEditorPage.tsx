@@ -520,6 +520,20 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                       stageIndex,
                       label: stage.label,
                       status: actor.status,
+                      // The stage label doubles as the role descriptor in the flow-viz
+                      // (parity with the document mapApprovalChain — no separate role field).
+                      roleLabel: stage.label,
+                      // This instance DTO carries the resolved outcome in `actor.status`
+                      // directly (approved/rejected/active/waiting), so derive the shared
+                      // ApprovalFlowState from it rather than the signoff-decision tense.
+                      flowState:
+                        actor.status === 'approved'
+                          ? ('approved' as const)
+                          : actor.status === 'rejected'
+                            ? ('rejected' as const)
+                            : actor.status === 'active'
+                              ? ('current' as const)
+                              : ('pending' as const),
                       actorUserId: actor.user_id,
                       actorDisplay: actor.display_name,
                       decision: actor.decision ?? null,

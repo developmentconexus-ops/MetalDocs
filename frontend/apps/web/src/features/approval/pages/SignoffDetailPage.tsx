@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
 import { formatDateTime } from '../../../lib/formatDate';
@@ -14,11 +14,13 @@ import { ArtifactApprovalScreen } from '../../shared/controlled-artifact/Artifac
 import { CancelInstanceDialog } from '../components/CancelInstanceDialog';
 import { DocumentApprovalExtras } from '../components/DocumentApprovalExtras';
 import { ReviewDocumentCanvas, type ReviewDocumentCanvasRef } from '../components/ReviewDocumentCanvas';
-import { SignoffDialog } from '../components/SignoffDialog';
 import { SupersedePublishDialog } from '../components/SupersedePublishDialog';
+import { useSignoffMutation } from '../hooks/useSignoffMutation';
 import { commentPlainText } from '../lib/commentPlainText';
-import type { ArtifactViewModel } from '../../shared/controlled-artifact/types';
+import type { ArtifactDecisionModel, ArtifactViewModel } from '../../shared/controlled-artifact/types';
 import styles from './SignoffDetailPage.module.css';
+
+const NOOP = () => {};
 
 type Tab = 'documento' | 'comentarios';
 
@@ -28,12 +30,15 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 /**
- * Document-specific route wrapper for the shared ArtifactApprovalScreen. Owns all
- * interactive state (dialog visibility, the review-canvas ref + flushSave, the
- * cancel prompt, the ?decision= auto-open) and injects the document review tabs as
- * the `main` slot, the integrity / lock / timeline / submit-picker as the
- * `decisionExtras` slot, and the sign-off / publish modals as the `dialogs` slot.
- * Gating + data + the action set come from useDocumentApprovalArtifact.
+ * Document-specific route wrapper for the shared ArtifactApprovalScreen. Composes
+ * the shared DecisionModel for the inline sign-off (password re-auth + legal-effect
+ * confirmation — the document's legal e-signature), owns the remaining interactive
+ * state (publish / cancel / submit-picker dialogs, the review-canvas ref + flushSave)
+ * and injects the document review tabs as the `main` slot, the integrity / lock /
+ * timeline / submit-picker as the `decisionExtras` slot, and the publish / cancel
+ * modals as the `dialogs` slot. The `?decision=` param preselects the sign-off
+ * option via `defaultOptionKey`. Gating + data + the action set come from
+ * useDocumentApprovalArtifact.
  */
 export function SignoffDetailPage() {
   const { documentId = '' } = useParams<{ documentId: string }>();
@@ -45,12 +50,9 @@ export function SignoffDetailPage() {
   const [tab, setTab] = useState<Tab>('documento');
   const canvasRef = useRef<ReviewDocumentCanvasRef>(null);
 
-  const [showSignoff, setShowSignoff] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
-  const [decisionError, setDecisionError] = useState<string | null>(null);
-  const autoOpenedRef = useRef(false);
 
   const currentUser = useAuthStore((s) => s.user);
 
@@ -63,20 +65,11 @@ export function SignoffDetailPage() {
     await canvasRef.current?.flushSave();
   };
 
+  // Signing routes exclusively through the DecisionPanel now, so the adapter's plain
+  // 'signoff' action is retired (filtered out below) and its handler is a no-op.
   const handlers: DocumentApprovalHandlers = {
     openSubmit: () => setShowSubmit(true),
-    openSignoff: () => {
-      void (async () => {
-        setDecisionError(null);
-        try {
-          await flushSave();
-        } catch {
-          setDecisionError('Não foi possível salvar as alterações antes de registrar a decisão.');
-          return;
-        }
-        setShowSignoff(true);
-      })();
-    },
+    openSignoff: NOOP,
     cancelInstance: () => setShowCancel(true),
     openPublish: () => setShowPublish(true),
   };
@@ -97,24 +90,15 @@ export function SignoffDetailPage() {
     isStale,
   } = useDocumentApprovalArtifact(documentId, handlers);
 
+  const { signOff } = useSignoffMutation({
+    documentId,
+    contentHash: contentHash ?? '',
+    revisionVersion,
+  });
+
   // Sidebar is "loading" once the document is present but the active context has
   // not yet resolved (no error, no confirmed/absent context).
   const contextLoading = Boolean(doc) && !contextError && !noActiveContext && contentHash == null;
-
-  // ?decision= auto-open: once the instance loads and signoff is allowed, open the
-  // SignoffDialog exactly once (queue triage), preselecting the decision.
-  useEffect(() => {
-    if (
-      initialSignoffDecision &&
-      !autoOpenedRef.current &&
-      instance &&
-      policy.actions.signoff &&
-      lockedByInstanceId
-    ) {
-      autoOpenedRef.current = true;
-      setShowSignoff(true);
-    }
-  }, [initialSignoffDecision, instance, policy, lockedByInstanceId]);
 
   if (docQuery.isLoading) {
     return <div className={styles.state}>Carregando documento…</div>;
@@ -156,33 +140,86 @@ export function SignoffDetailPage() {
     );
   } else {
     decisionExtras = (
-      <>
-        {decisionError ? (
-          <div className={styles.state} role="alert">
-            {decisionError}
-          </div>
-        ) : null}
-        <DocumentApprovalExtras
-          documentId={documentId}
-          status={toApprovalState(approvalState)}
-          policy={policy}
-          contentHash={contentHash}
-          revisionVersion={revisionVersion}
-          lockedByInstanceId={lockedByInstanceId}
-          instance={instance}
-          isStale={isStale}
-          onRefetchInstance={refetchInstance}
-          showSubmit={showSubmit}
-          onCloseSubmit={() => setShowSubmit(false)}
-        />
-      </>
+      <DocumentApprovalExtras
+        documentId={documentId}
+        status={toApprovalState(approvalState)}
+        policy={policy}
+        contentHash={contentHash}
+        revisionVersion={revisionVersion}
+        lockedByInstanceId={lockedByInstanceId}
+        instance={instance}
+        isStale={isStale}
+        onRefetchInstance={refetchInstance}
+        showSubmit={showSubmit}
+        onCloseSubmit={() => setShowSubmit(false)}
+      />
     );
   }
 
-  // Suppress the action buttons until the sidebar is in its ready state so they
-  // never render during loading / error / no-context (parity with the old panel,
-  // which only rendered action buttons inside the loaded panel).
-  const screenModel: ArtifactViewModel = sidebarReady ? model : { ...model, actions: [] };
+  // The document sign-off carries legal e-signature weight: a password re-auth + a
+  // legal-effect confirmation. Offered only when the active context is confirmed and
+  // policy allows signing on a locked instance. The panel owns password/reason state.
+  const signoffOffered =
+    sidebarReady && policy.actions.signoff && lockedByInstanceId != null && instance != null && contentHash != null;
+
+  const decision: ArtifactDecisionModel | undefined = signoffOffered
+    ? {
+        kicker: 'Assinatura requerida',
+        heading: 'Registrar decisão',
+        description:
+          'Sua decisão é registrada com efeito de assinatura eletrônica na trilha de auditoria do documento.',
+        options: [
+          {
+            key: 'approve',
+            label: 'Assinar e aprovar',
+            description: 'Aprova o documento e avança o fluxo de aprovação.',
+            tone: 'approve',
+            submitLabel: 'Assinar e aprovar',
+            requiresReason: false,
+          },
+          {
+            key: 'reject',
+            label: 'Assinar e devolver',
+            description: 'Devolve o documento ao autor · requer justificativa.',
+            tone: 'reject',
+            submitLabel: 'Assinar e devolver',
+            requiresReason: true,
+          },
+        ],
+        reasonLabel: 'Justificativa',
+        reasonPlaceholder: 'Comentário visível na trilha de auditoria…',
+        password: { label: 'Senha' },
+        legal: {
+          text: 'Confirmo que revisei o conteúdo integralmente e que esta decisão tem efeito de assinatura eletrônica conforme a MP 2.200-2/2001.',
+        },
+        signer: currentUser
+          ? {
+              name: currentUser.displayName,
+              detail: currentUser.email ?? currentUser.username,
+              note: 'Assinatura digital gerada no ato da confirmação.',
+            }
+          : null,
+        defaultOptionKey: initialSignoffDecision ?? null,
+        submit: async ({ optionKey, reason, password }) => {
+          try {
+            await flushSave();
+          } catch {
+            throw new Error('Não foi possível salvar as alterações antes de registrar a decisão.');
+          }
+          await signOff({
+            decision: optionKey === 'approve' ? 'approve' : 'reject',
+            reason: reason || undefined,
+            password,
+          });
+          await refetchInstance();
+        },
+      }
+    : undefined;
+
+  // Suppress the action buttons until the sidebar is ready, and always retire the
+  // plain 'signoff' action — signing routes exclusively through the DecisionPanel.
+  const baseActions = sidebarReady ? model.actions.filter((a) => a.key !== 'signoff') : [];
+  const screenModel: ArtifactViewModel = { ...model, actions: baseActions, decision };
 
   const main = (
     <div className={styles.main}>
@@ -262,18 +299,6 @@ export function SignoffDetailPage() {
 
   const dialogs = (
     <>
-      {showSignoff && instance && contentHash != null ? (
-        <SignoffDialog
-          documentId={documentId}
-          contentHash={contentHash}
-          instanceId={instance.id}
-          revisionVersion={revisionVersion}
-          initialDecision={initialSignoffDecision}
-          onClose={() => setShowSignoff(false)}
-          onSuccess={() => void refetchInstance()}
-        />
-      ) : null}
-
       {showPublish && contentHash != null ? (
         <SupersedePublishDialog
           documentId={documentId}

@@ -2,6 +2,7 @@ import type { ArtifactViewModel } from '../../shared/controlled-artifact/types';
 import type { VersionDTO } from '../api/templates';
 import type { ActorContext } from '../lib/canActOnVersion';
 import { buildTemplateApprovalActions, type TemplateApprovalHandlers } from '../lib/templateApprovalActions';
+import { buildTemplateApprovalChain } from '../lib/templateApprovalChain';
 import { useTemplateDetailQuery } from '../queries/useTemplateDetailQuery';
 import { useAuthStore } from '../../../store/auth.store';
 import { useTemplateArtifact } from './useTemplateArtifact';
@@ -23,9 +24,11 @@ export interface TemplateApprovalArtifact {
  * badge/meta mapping) and overrides only `actions` with the ordered, gated
  * approval actions built by `buildTemplateApprovalActions`.
  *
- * Templates have `approvalChain: null` (no approval-instance/signoff model —
- * only pending reviewer/approver roles on the version DTO), so the shared
- * screen skips the chain section entirely.
+ * The approval-flow chain is built from the version's inline submit/review/approve
+ * fields (`buildTemplateApprovalChain`) — the SAME `ApprovalChainItem[]` shape the
+ * document mapper produces — so the shared cockpit flow-viz renders identically for
+ * both kinds. (The former `approvalChain: null` was an adapter shortcut; templates
+ * are not signoff-less.)
  *
  * `useTemplateDetailQuery` is called a second time here; react-query deduplicates
  * by key so no extra network request is made.
@@ -40,6 +43,7 @@ export function useTemplateApprovalArtifact(
   const user = useAuthStore((s) => s.user);
   const actor: ActorContext = { roles: user?.roles ?? [], capabilities: user?.capabilities ?? [] };
   const actions = version ? buildTemplateApprovalActions(version, actor, handlers) : [];
-  const model: ArtifactViewModel = { ...base.model, actions };
+  const approvalChain = version ? buildTemplateApprovalChain(version) : base.model.approvalChain;
+  const model: ArtifactViewModel = { ...base.model, actions, approvalChain };
   return { model, version, isLoading: base.isLoading, isError: base.isError, refetch: base.refetch };
 }

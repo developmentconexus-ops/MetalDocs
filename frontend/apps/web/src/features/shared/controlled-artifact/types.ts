@@ -123,10 +123,28 @@ export interface ArtifactMetaModel {
 // ---------------------------------------------------------------------------
 
 /**
- * A single signoff slot within one stage of the approval chain.
+ * Normalized flow state for one approval-chain step, driving the shared
+ * flow-viz dot rendering. Kind-agnostic — both the document instance mapper and
+ * the template version mapper resolve their raw states into this union so the
+ * timeline renders identically regardless of kind.
  *
- * Generalizes `ApprovalInstance.stages[].signoffs[]`. `approvalChain` on the
- * root view-model is `null` for templates, which have no instance/signoff model.
+ * - `approved` — step signed off / accepted (solid success dot with check).
+ * - `rejected` — step returned / rejected (danger dot).
+ * - `sent`     — step completed as a hand-off, not a signoff (e.g. author
+ *                submitted for review — solid neutral dot).
+ * - `current`  — the step awaiting the viewer's decision now (dashed brand ring).
+ * - `pending`  — a future step not yet reached (hollow dot).
+ */
+export type ApprovalFlowState = "approved" | "rejected" | "sent" | "current" | "pending";
+
+/**
+ * A single step within the approval chain.
+ *
+ * Generalizes both `ApprovalInstance.stages[].signoffs[]` (documents) and the
+ * inline submit/review/approve fields on a template `VersionDTO`. Templates are
+ * NOT signoff-less: they carry the same submit→review→approve actors + timestamps
+ * inline on the version, so both kinds populate this shape (the former
+ * `approvalChain: null for templates` was an adapter shortcut, not a data gap).
  */
 export interface ApprovalChainItem {
   /** Zero-based index of the parent approval stage. */
@@ -135,6 +153,10 @@ export interface ApprovalChainItem {
   label: string;
   /** Stage-level status string (mirrors the API `stage.status` values). */
   status: string;
+  /** Short role descriptor shown under the actor (e.g. "Autora", "Revisão técnica"). Null when not applicable. */
+  roleLabel: string | null;
+  /** Normalized flow state driving the shared flow-viz dot. */
+  flowState: ApprovalFlowState;
   /** User ID of the actor assigned to this signoff slot. Null when unassigned. */
   actorUserId: string | null;
   /** Display name of the actor. Null when unassigned. */
@@ -215,6 +237,108 @@ export interface ArtifactAction {
 }
 
 // ---------------------------------------------------------------------------
+// Author / submission meta (approval cockpit header row)
+// ---------------------------------------------------------------------------
+
+/**
+ * The author / submission descriptor row rendered in the approval cockpit header
+ * (avatar + author, area, submitted-ago, prior-approval). Every field is nullable
+ * so the header degrades honestly when a fact is unavailable (Grade-A: omit, never
+ * fabricate — e.g. documents expose no due-date, so there is no due-date field).
+ */
+export interface ArtifactAuthorMeta {
+  /** Display name of the author/owner. Null when unknown. */
+  authorName: string | null;
+  /** Role descriptor for the author (e.g. "Autora"). Null when not applicable. */
+  authorRole: string | null;
+  /** Process-area label (e.g. "Qualidade"). Null for templates / when unknown. */
+  areaLabel: string | null;
+  /** Free-text submission descriptor (e.g. "Enviado para revisão há 3h"). Null when unknown. */
+  submittedLabel: string | null;
+  /** Prior-decision descriptor (e.g. "1ª aprovação por Bruno Said · 11:08"). Null when none. */
+  priorDecisionLabel: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Decision model (approval cockpit sidebar)
+// ---------------------------------------------------------------------------
+
+/** Visual tone of a decision option — approve (success) or return/reject (danger). */
+export type ArtifactDecisionTone = "approve" | "reject";
+
+/**
+ * One selectable decision in the cockpit decision panel (e.g. "Aprovar",
+ * "Devolver com ajuste"). Kind-agnostic: documents map these to signoff
+ * approve/reject, templates to review/approve accept/reject.
+ */
+export interface ArtifactDecisionOption {
+  /** Stable key + test hook (e.g. "approve", "reject"). */
+  key: string;
+  /** Radio-card title (e.g. "Aprovar"). */
+  label: string;
+  /** Radio-card description line (e.g. "Congela a versão · dispara fanout PDF · publica"). */
+  description: string;
+  tone: ArtifactDecisionTone;
+  /** Submit-button label when this option is selected (e.g. "Assinar e aprovar"). */
+  submitLabel: string;
+  /** When true, the justificativa is required before submit is enabled. */
+  requiresReason: boolean;
+}
+
+/**
+ * Signer identity block. Shows the REAL current-user identity; the cryptographic
+ * artifacts (hash/timestamp/IP) are produced server-side at signing and are not
+ * fabricated here — `note` carries an honest "gerado no ato" statement instead.
+ */
+export interface ArtifactDecisionSigner {
+  /** Real signer display name. */
+  name: string;
+  /** Secondary identity line (e.g. "Gerente de Qualidade · email"). Null when unknown. */
+  detail: string | null;
+  /** Honest note replacing fabricated signature metadata. Null to omit. */
+  note: string | null;
+}
+
+/**
+ * Normalized decision surface for the cockpit sidebar. Present only in states
+ * that require a multi-option decision (document under_review sign; template
+ * under_review review / approved approve). Absent states fall back to the plain
+ * `actions[]` + a route-supplied extras slot.
+ *
+ * The shared `ArtifactDecisionPanel` owns all local UI state (selected option,
+ * reason, password, legal-checkbox, in-flight/error) and calls `submit`. The
+ * adapter/route owns what `submit` does (lifted signoff hook, or template
+ * review/approve mutation) and surfaces user-facing failures by rejecting with
+ * an Error whose message the panel renders.
+ */
+export interface ArtifactDecisionModel {
+  /** Sidebar kicker (e.g. "§ Decisão requerida"). */
+  kicker: string;
+  /** Sidebar heading (e.g. "Sua aprovação"). */
+  heading: string;
+  /** Context copy under the heading. */
+  description: string;
+  /** Ordered decision options (>= 1). */
+  options: ArtifactDecisionOption[];
+  reasonLabel: string;
+  reasonPlaceholder: string;
+  /** Legal e-signature password field (documents). Null = no password (templates). */
+  password: { label: string } | null;
+  /** Legal-effect confirmation checkbox (documents). Null = none (templates). */
+  legal: { text: string } | null;
+  /** Signer identity block. Null to omit. */
+  signer: ArtifactDecisionSigner | null;
+  /** Option preselected on mount (e.g. from a `?decision=` deep-link). Null = none. */
+  defaultOptionKey?: string | null;
+  /**
+   * Perform the decision. Resolves on success (the panel then relies on query
+   * invalidation to re-render the next lifecycle state); rejects with an Error
+   * whose `.message` the panel shows inline.
+   */
+  submit: (input: { optionKey: string; reason: string; password: string }) => Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
 // ArtifactViewModel — root normalized view-model
 // ---------------------------------------------------------------------------
 
@@ -263,7 +387,19 @@ export interface ArtifactViewModel {
   /**
    * Ordered list of contextual workflow actions for the approval decision sidebar.
    * Empty when no actions apply (e.g. read-only states) — the detail view does not
-   * render these.
+   * render these. In the cockpit these render as the fallback when `decision` is
+   * absent (e.g. draft submit-for-review, approved publish/schedule).
    */
   actions: ArtifactAction[];
+  /**
+   * Author / submission descriptor for the approval cockpit header. Optional —
+   * the detail view ignores it; the approval screen renders it when present.
+   */
+  authorMeta?: ArtifactAuthorMeta;
+  /**
+   * Multi-option decision surface for the approval cockpit sidebar. Present only
+   * in states that require a review/approve decision. When absent, the cockpit
+   * renders the plain `actions[]` + the route's decision-extras slot instead.
+   */
+  decision?: ArtifactDecisionModel;
 }

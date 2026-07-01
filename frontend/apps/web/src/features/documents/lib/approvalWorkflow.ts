@@ -9,7 +9,7 @@
 // preserved byte-for-byte. Do NOT fork a second policy.
 
 import type { ApprovalState } from '../../approval/api/approvalTypes';
-import type { ApprovalChainItem } from '../../shared/controlled-artifact/types';
+import type { ApprovalChainItem, ApprovalFlowState } from '../../shared/controlled-artifact/types';
 
 /**
  * Minimal structural interface for a stage passed to `mapApprovalChain`.
@@ -113,6 +113,10 @@ export function mapApprovalChain(stages: MappableStage[]): ApprovalChainItem[] {
       stageIndex: stage.stage_index,
       label: stage.label,
       status: stage.status,
+      // The stage label doubles as the role descriptor in the flow-viz secondary
+      // line (documents have no separate role field distinct from the stage).
+      roleLabel: stage.label,
+      flowState: stageFlowState(stage.status, signoff?.decision ?? null),
       actorUserId: signoff?.actor_user_id ?? null,
       // TODO(iam): resolve actorDisplay to a display name via user-lookup query when available; currently echoes actor_user_id.
       actorDisplay: signoff?.actor_user_id ?? null,
@@ -120,4 +124,17 @@ export function mapApprovalChain(stages: MappableStage[]): ApprovalChainItem[] {
       signedAt: signoff?.signed_at ?? null,
     };
   });
+}
+
+/**
+ * Normalize a document stage's raw `status` + signoff `decision` into the
+ * kind-agnostic `ApprovalFlowState` the shared flow-viz renders. A recorded
+ * decision wins; otherwise an active/current stage is the pending-decision step
+ * and anything else is a not-yet-reached future step.
+ */
+function stageFlowState(status: string, decision: string | null): ApprovalFlowState {
+  if (decision === 'approved') return 'approved';
+  if (decision === 'rejected') return 'rejected';
+  if (status === 'active' || status === 'in_progress' || status === 'current') return 'current';
+  return 'pending';
 }

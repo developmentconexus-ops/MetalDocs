@@ -150,7 +150,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* §DECISÃO REQUERIDA header band. */

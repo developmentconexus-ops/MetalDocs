@@ -88,6 +88,29 @@ export function ArtifactApprovalScreen({
   const hasChain = chain != null && chain.length > 0;
   const decision = model.decision;
 
+  const actionsBand = hasActions ? (
+    <div className={styles.asideSection}>
+      <h2 className={styles.bandKicker}>{decision != null ? "Outras ações" : "Ações"}</h2>
+      <div className={styles.actions}>
+        {model.actions.map((action) => (
+          <button
+            key={action.key}
+            type="button"
+            data-action={action.key}
+            className={`${styles.actionBtn} ${variantClass(action)}`}
+            disabled={!action.available}
+            title={action.available ? undefined : action.reason}
+            onClick={() => {
+              void action.run();
+            }}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className={styles.root}>
       <div className={styles.body}>
@@ -157,32 +180,16 @@ export function ArtifactApprovalScreen({
 
               <ArtifactDecisionPanel model={decision} />
 
-              {decisionExtras}
+              {(actionsBand != null || decisionExtras != null) && (
+                <div className={styles.fallback}>
+                  {actionsBand}
+                  {decisionExtras}
+                </div>
+              )}
             </>
           ) : (
             <div className={styles.fallback}>
-              {hasActions && (
-                <div className={styles.asideSection}>
-                  <h2 className={styles.bandKicker}>Ações</h2>
-                  <div className={styles.actions}>
-                    {model.actions.map((action) => (
-                      <button
-                        key={action.key}
-                        type="button"
-                        data-action={action.key}
-                        className={`${styles.actionBtn} ${variantClass(action)}`}
-                        disabled={!action.available}
-                        title={action.available ? undefined : action.reason}
-                        onClick={() => {
-                          void action.run();
-                        }}
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {actionsBand}
 
               {hasChain && (
                 <div className={styles.asideSection}>
