@@ -19,8 +19,7 @@ export interface TemplateApprovalHandlers {
 }
 
 /**
- * Ordered, gated approval actions for a template version, mirroring the states the
- * former inline VersionActionPanel handled:
+ * Ordered, gated approval actions for a template version. Covers:
  *   - draft            → Submeter para revisão            (canSubmit → runSubmit)
  *   - under_review + reviewer → Aprovar revisão / Rejeitar (canReview → runReview)
  *   - under_review, no reviewer → Publicar / Rejeitar     (canPublish → runApprove)

@@ -82,10 +82,11 @@ export function canApprove(version: VersionDTO, actor: ActorContext): VersionAct
 
 // canPublish gates the no-reviewer "Publish" button on the under_review state.
 // The UI label is "Publish" but the actual call is approveVersion (POST /approve
-// → Service.Approve, which accepts and publishes + spawns next draft in-tx).
-// Backend cap therefore is template.approve, NOT template.publish (template.publish
-// gates the direct POST /publish endpoint, which the editor screen does not call).
-// Role binding: pending_approver_role.
+// → Service.Approve, which accepts and publishes the version in-tx). It does NOT
+// spawn the next draft — since M1 the next version is created only via the manual
+// CreateNextVersion path (ADR 0052). Backend cap therefore is template.approve, NOT
+// template.publish (template.publish gates the direct POST /publish endpoint, which
+// the editor screen does not call). Role binding: pending_approver_role.
 export function canPublish(version: VersionDTO, actor: ActorContext): VersionActionGate {
   const noReviewerFlow = version.pending_reviewer_role == null;
   return evaluate({

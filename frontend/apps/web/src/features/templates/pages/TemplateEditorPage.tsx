@@ -5,8 +5,9 @@ import { type TemplateSchemas, type VersionDTO, submitForReview } from '../api/t
 import { useTemplateDraft } from '../hooks/useTemplateDraft';
 import { useTemplateAutosave } from '../hooks/useTemplateAutosave';
 import { useTemplateSchemas } from '../hooks/useTemplateSchemas';
-import { VersionActionPanel } from '../VersionActionPanel';
 import { AvailableTokensPanel } from '../AvailableTokensPanel';
+import { useTemplateArtifact } from '../adapters/useTemplateArtifact';
+import { ArtifactMetaSidebar } from '../../shared/controlled-artifact/ArtifactMetaSidebar';
 import { partitionDetected } from '../lib/tokens';
 import { canSubmit, type ActorContext } from '../lib/canActOnVersion';
 import { useAuthStore } from '../../../store/auth.store';
@@ -72,6 +73,10 @@ export function TemplateEditorPage({
   const [unknownTokens, setUnknownTokens] = useState<string[]>([]);
   const [invalidTokens, setInvalidTokens] = useState<string[]>([]);
   const catalogByKey = useMemo(() => new Map(catalog.map((c) => [c.key, c])), [catalog]);
+  const { model: metaModel, isLoading: metaLoading } = useTemplateArtifact(templateId);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(
+    () => localStorage.getItem('editor-sidebar-open') !== 'false',
+  );
 
   const currentVersion = liveVersion ?? draft.version ?? null;
   const isDraft = currentVersion?.status === 'draft';
@@ -353,16 +358,23 @@ export function TemplateEditorPage({
             />
           </EditorChrome>
         </main>
-      </div>
-
-      {currentVersion && ['under_review', 'approved', 'published'].includes(currentVersion.status) && (
-        <VersionActionPanel
-          version={currentVersion}
-          onVersionUpdate={(v) => {
-            setLiveVersion(v);
+        <ArtifactMetaSidebar
+          open={sidebarOpen}
+          onToggle={() => {
+            setSidebarOpen((prev) => {
+              const next = !prev;
+              localStorage.setItem('editor-sidebar-open', String(next));
+              return next;
+            });
           }}
+          loading={metaLoading}
+          code={metaModel.code}
+          status={versionStatus}
+          meta={metaModel.meta}
+          approvalChain={null}
+          lineage={metaModel.lineage}
         />
-      )}
+      </div>
     </div>
   );
 }
