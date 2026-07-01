@@ -1,14 +1,10 @@
 import type React from "react";
 import { Avatar } from "../../../components/ui/Avatar";
-import { CodeChip } from "../../../components/ui/CodeChip";
-import { formatRevisionCode } from "../../../lib/labels/revisionCode";
 import { formatSignedAt } from "../../../lib/format/dates";
 import { ArtifactHero } from "./ArtifactHero";
+import { ArtifactHeroDocCard, ArtifactHeroBadges } from "./ArtifactHeroCard";
 import type { ArtifactAction, ArtifactViewModel } from "./types";
 import styles from "./ArtifactApprovalScreen.module.css";
-import detailStyles from "./ArtifactDetailView.module.css";
-
-const EM_DASH = "—";
 
 interface ArtifactApprovalScreenProps {
   model: ArtifactViewModel;
@@ -45,10 +41,6 @@ export function ArtifactApprovalScreen({
   decisionExtras,
   dialogs,
 }: ArtifactApprovalScreenProps) {
-  const code = model.code ?? EM_DASH;
-  const versionLabel = model.revisionLabel ?? formatRevisionCode(model.versionNumber);
-  const profileLabel = model.meta.profileLabel ?? EM_DASH;
-  const areaLabel = model.meta.areaLabel ?? EM_DASH;
   const subtitle = model.hero.subtitle;
 
   const hasActions = model.actions.length > 0;
@@ -61,47 +53,8 @@ export function ArtifactApprovalScreen({
           buttons live exclusively in the decision sidebar. */}
       <ArtifactHero
         breadcrumb={model.hero.breadcrumb}
-        docCard={
-          <div className={detailStyles.docCard}>
-            <div className={detailStyles.docCardHeader}>{areaLabel}</div>
-            <div className={detailStyles.docCardBody}>
-              <div className={detailStyles.docCardCode}>{code}</div>
-              <div className={detailStyles.docCardType}>{profileLabel}</div>
-              <div className={detailStyles.docCardSpacer} />
-              <div className={detailStyles.docCardDivider} />
-              <div className={detailStyles.docCardFooter}>
-                <span className={detailStyles.docCardVersion}>{versionLabel}</span>
-                <span className={detailStyles.docCardDot} />
-              </div>
-            </div>
-          </div>
-        }
-        badges={
-          <>
-            {model.hero.badges.map((badge) => {
-              if (badge.variant === "code") {
-                return (
-                  <CodeChip key={badge.key} className={detailStyles.codeChip}>
-                    {badge.label}
-                  </CodeChip>
-                );
-              }
-              if (badge.variant === "status") {
-                return (
-                  <span key={badge.key} className={detailStyles.vigenteBadge}>
-                    <span className={detailStyles.vigenteDot} />
-                    {badge.label}
-                  </span>
-                );
-              }
-              return (
-                <span key={badge.key} className={detailStyles.typeLabel}>
-                  {badge.label}
-                </span>
-              );
-            })}
-          </>
-        }
+        docCard={<ArtifactHeroDocCard model={model} />}
+        badges={<ArtifactHeroBadges badges={model.hero.badges} />}
         title={model.title}
         subtitle={subtitle ? <span>{subtitle}</span> : null}
       />

@@ -3,12 +3,12 @@ import styles from "./ArtifactMetaSidebar.module.css";
 import { Avatar } from "../../../components/ui/Avatar";
 import { formatShortDate } from "../../../lib/format/dates";
 import { formatFileSize } from "../../../lib/format/fileSize";
-import type { ApprovalChainItem, ArtifactMetaModel, LifecycleStatus, VersionHistoryItem } from "./types";
+import type { ApprovalChainItem, ArtifactMetaModel, VersionHistoryItem } from "./types";
 
 const APPROVAL_BADGE_LABELS: Record<string, string> = {
   approved: "aprovou",
   rejected: "rejeitou",
-  active: "proximo",
+  active: "próximo",
   waiting: "aguarda",
 };
 
@@ -17,7 +17,7 @@ const MAX_COLLAPSED_HISTORY_ITEMS = 3;
 function formatPageSizeSummary(pageCount: number | null, fileSizeBytes: number | null): string | null {
   const parts: string[] = [];
   if (typeof pageCount === "number" && Number.isFinite(pageCount) && pageCount > 0) {
-    parts.push(`${pageCount} ${pageCount === 1 ? "pagina" : "paginas"}`);
+    parts.push(`${pageCount} ${pageCount === 1 ? "página" : "páginas"}`);
   }
   if (typeof fileSizeBytes === "number" && Number.isFinite(fileSizeBytes) && fileSizeBytes >= 0) {
     parts.push(formatFileSize(fileSizeBytes));
@@ -30,7 +30,6 @@ interface ArtifactMetaSidebarProps {
   onToggle: () => void;
   loading?: boolean;
   code?: string | null;
-  status?: LifecycleStatus | null;
   meta: ArtifactMetaModel;
   approvalChain?: ApprovalChainItem[] | null;
   lineage?: VersionHistoryItem[];
@@ -41,7 +40,6 @@ export function ArtifactMetaSidebar({
   onToggle,
   loading = false,
   code,
-  status,
   meta,
   approvalChain = null,
   lineage = [],
@@ -58,7 +56,7 @@ export function ArtifactMetaSidebar({
         ...recentNonCurrentHistory.slice(0, MAX_COLLAPSED_HISTORY_ITEMS - 1),
       ].slice(0, MAX_COLLAPSED_HISTORY_ITEMS);
 
-  const showApprovalChain = status === "under_review" && approvalChain != null && approvalChain.length > 0;
+  const showApprovalChain = approvalChain != null && approvalChain.length > 0;
 
   return (
     <div className={styles.sidebarOuter}>
@@ -76,10 +74,10 @@ export function ArtifactMetaSidebar({
         </svg>
       </button>
       {open && (
-        <aside className={styles.sidebar} aria-label="Identificacao do documento">
+        <aside className={styles.sidebar} aria-label="Identificação do documento">
           <div className={styles.panelFrame}>
             <section className={styles.section}>
-              <div className={styles.sectionHeader}>Identificacao</div>
+              <div className={styles.sectionHeader}>Identificação</div>
               {loading ? (
                 <div className={styles.metaRows}>
                   <div className={styles.metaRow}>
@@ -90,7 +88,7 @@ export function ArtifactMetaSidebar({
                 <div className={styles.metaRows}>
                   {code ? (
                     <div className={styles.metaRow}>
-                      <span className={styles.metaLabel}>Codigo</span>
+                      <span className={styles.metaLabel}>Código</span>
                       <span className={styles.metaCode}>{code}</span>
                     </div>
                   ) : null}
@@ -99,7 +97,7 @@ export function ArtifactMetaSidebar({
                     <span className={styles.metaValue}>{meta.profileLabel ?? "---"}</span>
                   </div>
                   <div className={styles.metaRow}>
-                    <span className={styles.metaLabel}>Area responsavel</span>
+                    <span className={styles.metaLabel}>Área responsável</span>
                     <span className={styles.metaValue}>{meta.areaLabel ?? "---"}</span>
                   </div>
                   <div className={styles.metaRow}>
@@ -108,7 +106,7 @@ export function ArtifactMetaSidebar({
                   </div>
                   {pageSizeSummary ? (
                     <div className={styles.metaRow}>
-                      <span className={styles.metaLabel}>Paginas</span>
+                      <span className={styles.metaLabel}>Páginas</span>
                       <span className={styles.metaValue}>{pageSizeSummary}</span>
                     </div>
                   ) : null}
@@ -117,8 +115,8 @@ export function ArtifactMetaSidebar({
             </section>
             <div className={styles.divider} />
             <section className={styles.section}>
-              <div className={styles.sectionHeader}>Revisoes</div>
-              <div className={styles.revisionList} aria-label="Historico de revisoes">
+              <div className={styles.sectionHeader}>Revisões</div>
+              <div className={styles.revisionList} aria-label="Histórico de revisões">
                 {visibleHistory.map((item) => (
                   <div
                     key={`${item.versionNumber}-${item.revisionNumber ?? "r"}-${item.revisionLabel ?? ""}`}
@@ -141,7 +139,7 @@ export function ArtifactMetaSidebar({
                   className={styles.historyToggle}
                   onClick={() => setHistoryExpanded((expanded) => !expanded)}
                 >
-                  {historyExpanded ? "Ver menos revisoes" : "Ver todas as revisoes"}
+                  {historyExpanded ? "Ver menos revisões" : "Ver todas as revisões"}
                 </button>
               ) : null}
             </section>
@@ -149,7 +147,7 @@ export function ArtifactMetaSidebar({
               <>
                 <div className={styles.divider} />
                 <section className={styles.section}>
-                  <div className={styles.sectionHeader}>Proximos aprovadores</div>
+                  <div className={styles.sectionHeader}>Próximos aprovadores</div>
                   <div className={styles.approverList}>
                     {approvalChain?.map((item, idx) => {
                       const badgeClassName =
@@ -179,7 +177,7 @@ export function ArtifactMetaSidebar({
             ) : null}
             <div className={styles.panelFill} aria-hidden="true">
               <span className={styles.panelFillLine} />
-              <span className={styles.panelFillText}>Dossie governado</span>
+              <span className={styles.panelFillText}>Dossiê governado</span>
             </div>
           </div>
         </aside>

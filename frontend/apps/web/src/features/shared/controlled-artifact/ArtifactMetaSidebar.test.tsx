@@ -74,27 +74,26 @@ describe("ArtifactMetaSidebar", () => {
         open
         onToggle={() => {}}
         code="POP-RH-001"
-        status="draft"
         meta={meta}
         approvalChain={null}
         lineage={lineage}
       />,
     );
 
-    expect(screen.getByLabelText("Identificacao do documento")).toBeInTheDocument();
-    expect(screen.getByText("Identificacao")).toBeInTheDocument();
+    expect(screen.getByLabelText("Identificação do documento")).toBeInTheDocument();
+    expect(screen.getByText("Identificação")).toBeInTheDocument();
     expect(screen.queryByText("Metadados")).not.toBeInTheDocument();
     expect(screen.getByText("Tipo")).toBeInTheDocument();
-    expect(screen.getByText("Area responsavel")).toBeInTheDocument();
+    expect(screen.getByText("Área responsável")).toBeInTheDocument();
     expect(screen.getByText("Procedimento Operacional")).toBeInTheDocument();
     expect(screen.getByText("Recursos Humanos")).toBeInTheDocument();
     expect(screen.getByText("Restrito a area Recursos Humanos")).toBeInTheDocument();
-    expect(screen.getByText("Paginas")).toBeInTheDocument();
-    expect(screen.getByText("3 paginas · 1,3 KB")).toBeInTheDocument();
+    expect(screen.getByText("Páginas")).toBeInTheDocument();
+    expect(screen.getByText("3 páginas · 1,3 KB")).toBeInTheDocument();
     expect(screen.getByText("REV01")).toBeInTheDocument();
     expect(screen.getByText("Ajuste operacional")).toBeInTheDocument();
     expect(screen.queryByText(/Draft|Em revis/i)).not.toBeInTheDocument();
-    expect(screen.queryByText("Proximos aprovadores")).not.toBeInTheDocument();
+    expect(screen.queryByText("Próximos aprovadores")).not.toBeInTheDocument();
 
     const toggle = screen.getByRole("button", { name: /fechar painel/i });
     expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -150,7 +149,7 @@ describe("ArtifactMetaSidebar", () => {
       />,
     );
 
-    expect(screen.getByText("Dossie governado")).toBeInTheDocument();
+    expect(screen.getByText("Dossiê governado")).toBeInTheDocument();
   });
 
   it("collapses long governed histories and can expand them", async () => {
@@ -211,16 +210,15 @@ describe("ArtifactMetaSidebar", () => {
         meta={emptyMeta}
         lineage={[]}
         approvalChain={approvalChain}
-        status="under_review"
       />,
     );
 
-    expect(screen.getByText("Proximos aprovadores")).toBeInTheDocument();
+    expect(screen.getByText("Próximos aprovadores")).toBeInTheDocument();
     expect(screen.getByText("Maria Souza")).toBeInTheDocument();
     expect(screen.getByText("Joao Lima")).toBeInTheDocument();
     expect(screen.getByText("Ana Costa")).toBeInTheDocument();
     expect(screen.getByText("aprovou")).toBeInTheDocument();
-    expect(screen.getByText("proximo")).toBeInTheDocument();
+    expect(screen.getByText("próximo")).toBeInTheDocument();
     expect(screen.getByText("aguarda")).toBeInTheDocument();
   });
 
@@ -236,8 +234,8 @@ describe("ArtifactMetaSidebar", () => {
 
     const toggle = screen.getByRole("button", { name: /abrir painel/i });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Identificacao")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Identificacao do documento")).not.toBeInTheDocument();
+    expect(screen.queryByText("Identificação")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Identificação do documento")).not.toBeInTheDocument();
   });
 
   it("uses the singular page noun for a one-page artifact", () => {
@@ -245,6 +243,6 @@ describe("ArtifactMetaSidebar", () => {
 
     render(<ArtifactMetaSidebar open onToggle={() => {}} meta={meta} lineage={[]} />);
 
-    expect(screen.getByText("1 pagina · 1,3 KB")).toBeInTheDocument();
+    expect(screen.getByText("1 página · 1,3 KB")).toBeInTheDocument();
   });
 });

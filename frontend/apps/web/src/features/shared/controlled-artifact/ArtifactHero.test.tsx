@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { ArtifactHero } from "./ArtifactHero";
 
 describe("ArtifactHero", () => {
@@ -17,14 +18,16 @@ describe("ArtifactHero", () => {
 
   it("renders each breadcrumb label", () => {
     render(
-      <ArtifactHero
-        breadcrumb={[
-          { label: "Biblioteca", href: "/documents" },
-          { label: "RH", href: "/rh" },
-          { label: "DC-RH-001" },
-        ]}
-        title="Title"
-      />,
+      <MemoryRouter>
+        <ArtifactHero
+          breadcrumb={[
+            { label: "Biblioteca", href: "/documents" },
+            { label: "RH", href: "/rh" },
+            { label: "DC-RH-001" },
+          ]}
+          title="Title"
+        />
+      </MemoryRouter>,
     );
     expect(screen.getByText("Biblioteca")).toBeTruthy();
     expect(screen.getByText("RH")).toBeTruthy();
@@ -33,13 +36,15 @@ describe("ArtifactHero", () => {
 
   it("renders non-last crumb with href as an anchor", () => {
     render(
-      <ArtifactHero
-        breadcrumb={[
-          { label: "Biblioteca", href: "/documents" },
-          { label: "Last" },
-        ]}
-        title="Title"
-      />,
+      <MemoryRouter>
+        <ArtifactHero
+          breadcrumb={[
+            { label: "Biblioteca", href: "/documents" },
+            { label: "Last" },
+          ]}
+          title="Title"
+        />
+      </MemoryRouter>,
     );
     const link = screen.getByRole("link", { name: "Biblioteca" });
     expect(link.getAttribute("href")).toBe("/documents");
@@ -47,13 +52,15 @@ describe("ArtifactHero", () => {
 
   it("renders the last crumb as plain text even when it has an href", () => {
     render(
-      <ArtifactHero
-        breadcrumb={[
-          { label: "Biblioteca", href: "/documents" },
-          { label: "Last Crumb", href: "/last" },
-        ]}
-        title="Title"
-      />,
+      <MemoryRouter>
+        <ArtifactHero
+          breadcrumb={[
+            { label: "Biblioteca", href: "/documents" },
+            { label: "Last Crumb", href: "/last" },
+          ]}
+          title="Title"
+        />
+      </MemoryRouter>,
     );
     // "Last Crumb" must appear but NOT as a link
     expect(screen.getByText("Last Crumb")).toBeTruthy();

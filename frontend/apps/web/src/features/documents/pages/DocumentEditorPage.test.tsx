@@ -406,7 +406,7 @@ describe('DocumentEditorPage autosave wiring', () => {
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
     );
     await waitFor(() =>
-      expect(screen.getByText('3 paginas · 1,3 KB')).toBeTruthy(),
+      expect(screen.getByText('3 páginas · 1,3 KB')).toBeTruthy(),
     );
   });
 
@@ -571,7 +571,7 @@ describe('DocumentEditorPage load failure state', () => {
     );
 
     expect(screen.queryByTestId('editor')).toBeNull();
-    expect(screen.queryByText('Identificacao')).toBeNull();
+    expect(screen.queryByText('Identificação')).toBeNull();
     expect(screen.queryByText('Próximos aprovadores')).toBeNull();
   });
 
@@ -598,7 +598,7 @@ describe('DocumentEditorPage load failure state', () => {
 
     expect(screen.getAllByText('C-001').length).toBeGreaterThan(0);
     expect(screen.getByText('Original')).toBeTruthy();
-    expect(screen.getByText('Identificacao')).toBeTruthy();
+    expect(screen.getByText('Identificação')).toBeTruthy();
     expect(screen.queryByTestId('editor')).toBeNull();
     expect(screen.queryByText('http_403')).toBeNull();
     expect(screen.queryByText('missing_signed_url')).toBeNull();

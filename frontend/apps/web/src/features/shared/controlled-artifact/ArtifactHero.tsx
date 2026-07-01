@@ -1,5 +1,6 @@
 import type React from "react";
 import { Fragment } from "react";
+import { Link } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import type { BreadcrumbItem } from "./types";
 import styles from "./ArtifactHero.module.css";
@@ -32,9 +33,9 @@ export function ArtifactHero({
           return (
             <Fragment key={`${item.label}-${index}`}>
               {item.href && !isLast ? (
-                <a href={item.href} className={styles.breadcrumbLink}>
+                <Link to={item.href} className={styles.breadcrumbLink}>
                   {item.label}
-                </a>
+                </Link>
               ) : (
                 <span>{item.label}</span>
               )}

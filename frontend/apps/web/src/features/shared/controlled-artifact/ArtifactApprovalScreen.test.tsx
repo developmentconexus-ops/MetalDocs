@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { ArtifactApprovalScreen } from "./ArtifactApprovalScreen";
 import type { ArtifactAction, ArtifactViewModel } from "./types";
 
@@ -80,10 +81,12 @@ describe("ArtifactApprovalScreen", () => {
   it("renders one button per model.actions entry in order with the correct label", () => {
     const actions = buildActions();
     render(
-      <ArtifactApprovalScreen
-        model={buildModel({ actions })}
-        main={<div>main content</div>}
-      />,
+      <MemoryRouter>
+        <ArtifactApprovalScreen
+          model={buildModel({ actions })}
+          main={<div>main content</div>}
+        />
+      </MemoryRouter>,
     );
 
     const buttons = screen.getAllByRole("button");
@@ -100,10 +103,12 @@ describe("ArtifactApprovalScreen", () => {
   it("renders an unavailable action as a disabled button with the reason as title", () => {
     const actions = buildActions();
     render(
-      <ArtifactApprovalScreen
-        model={buildModel({ actions })}
-        main={<div>main content</div>}
-      />,
+      <MemoryRouter>
+        <ArtifactApprovalScreen
+          model={buildModel({ actions })}
+          main={<div>main content</div>}
+        />
+      </MemoryRouter>,
     );
 
     const signoffBtn = screen.getByRole("button", { name: "Assinar" });
@@ -117,10 +122,12 @@ describe("ArtifactApprovalScreen", () => {
       { key: "submit", label: "Submeter", variant: "primary", available: true, run },
     ];
     render(
-      <ArtifactApprovalScreen
-        model={buildModel({ actions })}
-        main={<div>main content</div>}
-      />,
+      <MemoryRouter>
+        <ArtifactApprovalScreen
+          model={buildModel({ actions })}
+          main={<div>main content</div>}
+        />
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Submeter" }));
@@ -129,10 +136,12 @@ describe("ArtifactApprovalScreen", () => {
 
   it("renders no action buttons and no 'Ações' heading when model.actions is empty", () => {
     render(
-      <ArtifactApprovalScreen
-        model={buildModel({ actions: [] })}
-        main={<div>main content</div>}
-      />,
+      <MemoryRouter>
+        <ArtifactApprovalScreen
+          model={buildModel({ actions: [] })}
+          main={<div>main content</div>}
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.queryByText("Ações")).not.toBeInTheDocument();
@@ -142,12 +151,14 @@ describe("ArtifactApprovalScreen", () => {
 
   it("renders the main, decisionExtras, and dialogs slots", () => {
     render(
-      <ArtifactApprovalScreen
-        model={buildModel()}
-        main={<div>Conteúdo principal</div>}
-        decisionExtras={<div>Painel de integridade</div>}
-        dialogs={<div>Modal de assinatura</div>}
-      />,
+      <MemoryRouter>
+        <ArtifactApprovalScreen
+          model={buildModel()}
+          main={<div>Conteúdo principal</div>}
+          decisionExtras={<div>Painel de integridade</div>}
+          dialogs={<div>Modal de assinatura</div>}
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.getByText("Conteúdo principal")).toBeInTheDocument();
@@ -157,10 +168,12 @@ describe("ArtifactApprovalScreen", () => {
 
   it("renders nothing for the approval chain when model.approvalChain is null", () => {
     render(
-      <ArtifactApprovalScreen
-        model={buildModel({ approvalChain: null })}
-        main={<div>main content</div>}
-      />,
+      <MemoryRouter>
+        <ArtifactApprovalScreen
+          model={buildModel({ approvalChain: null })}
+          main={<div>main content</div>}
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.queryByLabelText("Cadeia de aprovação")).not.toBeInTheDocument();
@@ -189,10 +202,12 @@ describe("ArtifactApprovalScreen", () => {
       },
     ];
     render(
-      <ArtifactApprovalScreen
-        model={buildModel({ approvalChain })}
-        main={<div>main content</div>}
-      />,
+      <MemoryRouter>
+        <ArtifactApprovalScreen
+          model={buildModel({ approvalChain })}
+          main={<div>main content</div>}
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.getByText("Maria Souza")).toBeInTheDocument();

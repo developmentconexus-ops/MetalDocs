@@ -5,9 +5,13 @@ import React from 'react';
 
 import { DocumentDistributionPage } from './DocumentDistributionPage';
 
-vi.mock('react-router-dom', () => ({
-  useParams: () => ({ documentId: 'doc-dist-1' }),
-}));
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return {
+    ...actual,
+    useParams: () => ({ documentId: 'doc-dist-1' }),
+  };
+});
 
 vi.mock('../queries/useDocumentDetailQuery', () => ({
   useDocumentDetailQuery: vi.fn(),
@@ -53,8 +57,14 @@ const baseDoc = {
 
 function wrap() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // MemoryRouter needed because ArtifactHero now uses react-router Link
+  const { MemoryRouter } = require('react-router-dom') as typeof import('react-router-dom');
   return ({ children }: { children: React.ReactNode }) =>
-    React.createElement(QueryClientProvider, { client: qc }, children);
+    React.createElement(
+      MemoryRouter,
+      null,
+      React.createElement(QueryClientProvider, { client: qc }, children),
+    );
 }
 
 describe('DocumentDistributionPage', () => {

@@ -496,7 +496,6 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
             }}
             loading={!sidebarIdentityReady}
             code={docCode || null}
-            status={statusForPill}
             meta={{
               profileLabel,
               areaLabel,

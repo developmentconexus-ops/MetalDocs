@@ -369,7 +369,6 @@ export function TemplateEditorPage({
           }}
           loading={metaLoading}
           code={metaModel.code}
-          status={versionStatus}
           meta={metaModel.meta}
           approvalChain={null}
           lineage={metaModel.lineage}
