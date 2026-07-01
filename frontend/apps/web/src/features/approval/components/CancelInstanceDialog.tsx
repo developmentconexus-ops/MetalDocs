@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react';
 
+import { resolveErrorMessage } from '../../../lib/api';
 import { cancel } from '../api/approvalApi';
 import styles from './CancelInstanceDialog.module.css';
 
@@ -36,8 +37,8 @@ export function CancelInstanceDialog({ documentId, onClose, onSuccess }: CancelI
       await cancel(documentId, { reason: trimmed });
       onSuccess();
       onClose();
-    } catch {
-      setError('Erro ao cancelar instância.');
+    } catch (err) {
+      setError(resolveErrorMessage(err));
       setSubmitting(false);
     }
   };

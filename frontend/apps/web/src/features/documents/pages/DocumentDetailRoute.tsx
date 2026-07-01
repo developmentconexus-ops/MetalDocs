@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
 import { CodeChip } from '../../../components/ui/CodeChip';
-import { resolveQueryError, ApiError, resolveErrorMessage } from '../../../lib/api';
+import { resolveQueryError, ApiError } from '../../../lib/api';
 import { ArtifactDetailView } from '../../shared/controlled-artifact/ArtifactDetailView';
 import { useDocumentArtifact } from '../adapters/useDocumentArtifact';
 import { createRevision } from '../../controlled-documents/api/controlledDocuments';
@@ -148,7 +148,7 @@ export function DocumentDetailRoute() {
         setPdfStatus({ kind: 'rate_limited', retryAfterSec: 60 });
         return;
       }
-      setPdfStatus({ kind: 'error', message: resolveErrorMessage(e) });
+      setPdfStatus({ kind: 'error', message: resolveQueryError(e, 'Falha ao gerar PDF.') });
     }
   };
 

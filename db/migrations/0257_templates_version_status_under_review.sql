@@ -22,8 +22,9 @@ ALTER TABLE public.templates_template_version
 
 -- ── Step 2: migrate existing data ─────────────────────────────────────────────
 -- The backfill touches version rows; both BEFORE-UPDATE triggers (cap-asserted
--- and tenant-consistent) must stand down for this system DDL data-fix, exactly
--- as 0256 disabled them during the tenant_id backfill.
+-- and tenant-consistent) must stand down for this system DDL data-fix, following
+-- the established convention for trigger-guarded backfills (disable → data-fix →
+-- re-enable in reverse order within the same transaction).
 
 ALTER TABLE public.templates_template_version DISABLE TRIGGER trg_require_cap_asserted;
 

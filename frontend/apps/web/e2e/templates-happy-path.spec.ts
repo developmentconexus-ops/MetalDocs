@@ -63,12 +63,13 @@ async function mockBaseAPIs(page: Page, versionOverride: Record<string, unknown>
         user_id: 'user-1',
         email: 'test@example.com',
         roles: ['admin', 'quality'],
+        capabilities: ['template.submit', 'template.review', 'template.approve'],
         tenant_id: 'tenant-1',
       }),
     }),
   );
   // Templates list — match with or without query string
-  await page.route(/\/api\/v2\/templates(\?.*)?$/, (r) => {
+  await page.route(/\/api\/v1\/templates(\?.*)?$/, (r) => {
     if (r.request().method() === 'GET') {
       r.fulfill({
         status: 200,

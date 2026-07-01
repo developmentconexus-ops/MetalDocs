@@ -41,3 +41,17 @@ document hero/meta mapping.
 
 **Done when:** the two document adapters share one hero/meta mapping (compose-then-strip),
 matching the template adapter pattern.
+
+## M-4 — `useDocumentDetailQuery` has no explicit `staleTime`
+
+`frontend/apps/web/src/features/documents/queries/useDocumentDetailQuery.ts`
+
+The query omits `staleTime` (TanStack v5 default `0`), so every focus/mount re-marks the
+cache stale and refetches. `useTemplateDetailQuery` sets `staleTime: 60_000` for the same
+class of data. The file is outside this PR's touched set, so aligning it was deferred to
+avoid adjacent-refactor scope creep; the effect is extra refetches, not incorrect data
+(dedup + the `pollScheduledLifecycle` `refetchInterval` override are unaffected).
+
+**Done when:** `useDocumentDetailQuery` sets a `staleTime` consistent with the 30s
+staleness boundary already used in `useDocumentApprovalArtifact` (and with
+`useTemplateDetailQuery`), retired together with the M-1/M-2 query-ownership cleanup.

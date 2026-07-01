@@ -4,7 +4,7 @@
 
 const EM_DASH = '—';
 
-export const DEFAULT_INITIAL_REVISION_TITLE = 'Criacao do documento';
+export const DEFAULT_INITIAL_REVISION_TITLE = 'Criação do documento';
 
 type ControlledDocumentVisibility = {
   scope: 'company' | 'restricted';
@@ -59,29 +59,6 @@ export function displayRevisionTitle(title: string | null | undefined, revisionC
   return revisionCode === 'REV00' ? DEFAULT_INITIAL_REVISION_TITLE : EM_DASH;
 }
 
-export function formatRevisionStatus(status: string): string {
-  switch (status) {
-    case 'draft':
-      return 'Draft';
-    case 'under_review':
-      return 'Em revisão';
-    case 'approved':
-      return 'Aprovado';
-    case 'rejected':
-      return 'Rejeitado';
-    case 'scheduled':
-      return 'Agendado';
-    case 'published':
-      return 'Publicada';
-    case 'superseded':
-      return 'Substituida';
-    case 'obsolete':
-      return 'Obsoleta';
-    default:
-      return status;
-  }
-}
-
 export function buildVisibilityLabel(
   visibility: ControlledDocumentVisibility | null | undefined,
   areas: Array<{ code: string; name: string }>,
@@ -95,13 +72,3 @@ export function buildVisibilityLabel(
   const areaNames = visibility.area_codes.map((code) => resolveAreaLabel(code, areas));
   return `Restrito a area ${areaNames.join(', ')}`;
 }
-
-// Signoff actor status → display config
-export type SignoffStatus = 'pending' | 'approved' | 'rejected' | 'abstained';
-
-export const SIGNOFF_STATUS_META: Record<SignoffStatus, { label: string; className: string }> = {
-  pending:   { label: 'Aguardando', className: 'pending'  },
-  approved:  { label: 'Aprovado',   className: 'approved' },
-  rejected:  { label: 'Rejeitado',  className: 'rejected' },
-  abstained: { label: 'Abstido',    className: 'abstained'},
-};

@@ -299,7 +299,7 @@ func TestApprove_Accept_Happy(t *testing.T) {
 	// the wire-shape guard. This test asserts the published status only.
 }
 
-func TestApprove_Reject_NextDraftNull(t *testing.T) {
+func TestApprove_Reject_ReturnsDraftVersionOnly(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}

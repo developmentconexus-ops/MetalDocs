@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ApiError } from '../../../lib/api';
 import * as approvalApi from '../api/approvalApi';
 import { CancelInstanceDialog } from './CancelInstanceDialog';
 
@@ -55,10 +56,14 @@ describe('CancelInstanceDialog', () => {
     });
   });
 
-  it('shows an error alert and does NOT call onClose when cancel rejects', async () => {
+  it('surfaces the resolved backend error and does NOT call onClose when cancel rejects', async () => {
     const onClose = vi.fn();
     const onSuccess = vi.fn();
-    vi.mocked(approvalApi.cancel).mockRejectedValue(new Error('server error'));
+    // A domain ApiError must be resolved through the shared errorMessages map,
+    // not swallowed behind a hardcoded fallback (senior review M-2).
+    vi.mocked(approvalApi.cancel).mockRejectedValue(
+      new ApiError('validation.failed', 400, 'raw backend detail'),
+    );
 
     render(
       <CancelInstanceDialog
@@ -78,7 +83,7 @@ describe('CancelInstanceDialog', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeTruthy();
-      expect(screen.getByText('Erro ao cancelar instância.')).toBeTruthy();
+      expect(screen.getByText('A validação dos dados informados falhou.')).toBeTruthy();
     });
 
     expect(onClose).not.toHaveBeenCalled();
