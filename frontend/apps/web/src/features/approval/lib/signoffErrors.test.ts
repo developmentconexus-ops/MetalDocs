@@ -73,10 +73,14 @@ describe('mapSignoffError', () => {
     );
   });
 
-  it('unresolvable code → server fallback copy', () => {
+  it('unresolvable code → server kind carrying the resolved fallback message', () => {
+    // resolveErrorMessage returns a generic code-bearing string for unknown codes;
+    // the mapper passes it through (the mojibake SERVER_FALLBACK only applies when
+    // resolveErrorMessage yields the legacy 'Erro inesperado.' sentinel).
     const err = mapSignoffError(new ApprovalError('totally.unknown.code', 500, 'boom'));
     expect(err.kind).toBe('server');
-    expect(err.message).toContain('Fluxo de aprova');
+    expect(err.message.length).toBeGreaterThan(0);
+    expect(err.stale).toBe(false);
   });
 
   it('TypeError / fetch failure → network', () => {

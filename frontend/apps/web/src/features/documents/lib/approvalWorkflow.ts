@@ -133,8 +133,10 @@ export function mapApprovalChain(stages: MappableStage[]): ApprovalChainItem[] {
  * and anything else is a not-yet-reached future step.
  */
 function stageFlowState(status: string, decision: string | null): ApprovalFlowState {
-  if (decision === 'approved') return 'approved';
-  if (decision === 'rejected') return 'rejected';
+  // `decision` follows the Signoff contract verbs ('approve' | 'reject'); map the
+  // recorded outcome onto the past-tense flow-viz adjective.
+  if (decision === 'approve') return 'approved';
+  if (decision === 'reject') return 'rejected';
   if (status === 'active' || status === 'in_progress' || status === 'current') return 'current';
   return 'pending';
 }

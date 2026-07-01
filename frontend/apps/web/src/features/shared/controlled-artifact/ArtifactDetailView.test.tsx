@@ -49,6 +49,8 @@ function buildModel(overrides: Partial<ArtifactViewModel> = {}): ArtifactViewMod
         stageIndex: 0,
         label: "Qualidade",
         status: "passed",
+        roleLabel: "Qualidade",
+        flowState: "approved",
         actorUserId: "approver-1",
         actorDisplay: "approver-1",
         decision: "approve",

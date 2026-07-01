@@ -48,6 +48,8 @@ function buildModel(overrides: Partial<ArtifactViewModel> = {}): ArtifactViewMod
         stageIndex: 0,
         label: "Qualidade",
         status: "active",
+        roleLabel: "Qualidade",
+        flowState: "current",
         actorUserId: "approver-1",
         actorDisplay: "Maria Souza",
         decision: null,
@@ -186,6 +188,8 @@ describe("ArtifactApprovalScreen", () => {
         stageIndex: 0,
         label: "Qualidade",
         status: "active",
+        roleLabel: "Qualidade",
+        flowState: "current" as const,
         actorUserId: "user-1",
         actorDisplay: "Maria Souza",
         decision: null,
@@ -195,6 +199,8 @@ describe("ArtifactApprovalScreen", () => {
         stageIndex: 1,
         label: "Diretoria",
         status: "waiting",
+        roleLabel: "Diretoria",
+        flowState: "pending" as const,
         actorUserId: "user-2",
         actorDisplay: "João Lima",
         decision: null,
@@ -212,8 +218,8 @@ describe("ArtifactApprovalScreen", () => {
 
     expect(screen.getByText("Maria Souza")).toBeInTheDocument();
     expect(screen.getByText("João Lima")).toBeInTheDocument();
-    // Stage labels appear in the chain
-    expect(screen.getByText("Qualidade")).toBeInTheDocument();
-    expect(screen.getByText("Diretoria")).toBeInTheDocument();
+    // Stage/role labels appear in the flow-viz meta line ("<role> · <time>").
+    expect(screen.getByText(/Qualidade/)).toBeInTheDocument();
+    expect(screen.getByText(/Diretoria/)).toBeInTheDocument();
   });
 });

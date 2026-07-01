@@ -98,12 +98,21 @@ describe('useTemplateApprovalArtifact', () => {
     } as never);
   });
 
-  it('returns model.kind === "template" and model.approvalChain === null (base model unchanged)', () => {
+  it('returns model.kind === "template" and a 3-step submit→review→approve chain', () => {
     const { result } = renderHook(() =>
       useTemplateApprovalArtifact('tpl-1', makeHandlers()),
     );
     expect(result.current.model.kind).toBe('template');
-    expect(result.current.model.approvalChain).toBeNull();
+    // Templates are not signoff-less: the adapter builds the same ApprovalChainItem[]
+    // shape documents use, so the shared cockpit flow-viz renders for both kinds.
+    const chain = result.current.model.approvalChain;
+    expect(chain).not.toBeNull();
+    expect(chain).toHaveLength(3);
+    expect(chain?.map((s) => s.label)).toEqual(['Autoria', 'Revisão técnica', 'Aprovação']);
+    // Draft: authoring is the current step, downstream stages still pending.
+    expect(chain?.[0].flowState).toBe('current');
+    expect(chain?.[1].flowState).toBe('pending');
+    expect(chain?.[2].flowState).toBe('pending');
   });
 
   it('for under_review WITH reviewer + fully-capable actor → model.actions has 2 items, both available:true', () => {

@@ -83,11 +83,14 @@ describe('SignoffDetailPage', () => {
     });
   });
 
-  it('mounts the decision sidebar (Assinar present for under_review)', async () => {
+  it('mounts the inline decision panel (sign options present for under_review)', async () => {
     renderAt();
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Assinar' })).toBeTruthy();
+      expect(screen.getByRole('radio', { name: /Assinar e aprovar/ })).toBeTruthy();
     });
+    expect(screen.getByRole('radio', { name: /Assinar e devolver/ })).toBeTruthy();
+    // Legal e-signature affordances live inline in the panel now (no modal).
+    expect(screen.getByLabelText('Senha')).toBeTruthy();
   });
 
   it('tab list has exactly two tabs: documento and comentarios', async () => {
@@ -167,10 +170,17 @@ describe('SignoffDetailPage', () => {
     expect(screen.getByRole('button', { name: 'Copiar' })).toBeTruthy();
   });
 
-  it('auto-opens the SignoffDialog when ?decision= is present', async () => {
+  it('preselects the reject decision inline when ?decision=reject is present', async () => {
     renderAt('/approvals/doc-1?decision=reject');
     await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeTruthy();
+      expect(screen.getByRole('radio', { name: /Assinar e devolver/ })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
     });
+    expect(screen.getByRole('radio', { name: /Assinar e aprovar/ })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
   });
 });

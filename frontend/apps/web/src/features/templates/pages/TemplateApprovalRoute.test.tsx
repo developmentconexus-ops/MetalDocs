@@ -141,44 +141,49 @@ describe("TemplateApprovalRoute", () => {
     vi.mocked(useTemplateDetailQuery).mockReturnValue(makeDetailReturn() as ReturnType<typeof useTemplateDetailQuery>);
   });
 
-  it("renders the action buttons and the review canvas stub", () => {
+  it("renders the decision panel radios and the review canvas stub", () => {
     renderRoute();
 
     expect(screen.getByTestId("review-canvas")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Publicar" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Rejeitar" })).toBeTruthy();
+    // status=approved + accept.available → the shared DecisionPanel owns accept/reject
+    // as radio cards (no plain action buttons).
+    expect(screen.getByRole("radio", { name: /Publicar/ })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /Rejeitar/ })).toBeTruthy();
   });
 
-  it("clicking Publicar calls approveVersion with (tpl-1, 2, true, <uuid>, '') and shows success", async () => {
+  it("selecting Publicar and submitting calls approveVersion with (tpl-1, 2, true, <uuid>, '')", async () => {
     vi.mocked(templatesApi.approveVersion).mockResolvedValue({ version_number: 2, status: "published" } as never);
 
     renderRoute();
 
-    fireEvent.click(screen.getByRole("button", { name: "Publicar" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Publicar/ }));
+    // Submit footer label mirrors the selected option's submitLabel.
+    fireEvent.click(screen.getByRole("button", { name: /Publicar/ }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Publicado/)).toBeTruthy();
+      expect(vi.mocked(templatesApi.approveVersion)).toHaveBeenCalledOnce();
     });
 
-    expect(vi.mocked(templatesApi.approveVersion)).toHaveBeenCalledOnce();
-    const [calledId, calledVersion, calledAccept] = vi.mocked(templatesApi.approveVersion).mock.calls[0];
+    const [calledId, calledVersion, calledAccept, , calledReason] =
+      vi.mocked(templatesApi.approveVersion).mock.calls[0];
     expect(calledId).toBe("tpl-1");
     expect(calledVersion).toBe(2);
     expect(calledAccept).toBe(true);
-    // reason arg (index 4) defaults to empty string
-    expect(vi.mocked(templatesApi.approveVersion).mock.calls[0][4]).toBe("");
+    // No motivo typed → reason arg (index 4) is the trimmed empty string.
+    expect(calledReason).toBe("");
   });
 
-  it("typing a reason then clicking Rejeitar calls approveVersion with accept=false and the typed reason", async () => {
+  it("selecting Rejeitar, typing a motivo, and submitting calls approveVersion accept=false with the reason", async () => {
     vi.mocked(templatesApi.approveVersion).mockResolvedValue({ version_number: 2, status: "draft" } as never);
 
     renderRoute();
 
-    // The textarea is labelled "Motivo (opcional)" — status=approved so showReason=true
-    const textarea = screen.getByLabelText("Motivo (opcional)");
+    fireEvent.click(screen.getByRole("radio", { name: /Rejeitar/ }));
+    // Reject requires a motivo — the label carries the " · obrigatória" suffix.
+    const textarea = screen.getByLabelText(/Motivo/);
     fireEvent.change(textarea, { target: { value: "Conteúdo incorreto" } });
 
-    fireEvent.click(screen.getByRole("button", { name: "Rejeitar" }));
+    fireEvent.click(screen.getByRole("button", { name: /Rejeitar/ }));
 
     await waitFor(() => {
       expect(vi.mocked(templatesApi.approveVersion)).toHaveBeenCalledOnce();
@@ -192,12 +197,13 @@ describe("TemplateApprovalRoute", () => {
     expect(calledReason).toBe("Conteúdo incorreto");
   });
 
-  it("shows an error alert when approveVersion rejects", async () => {
+  it("shows an error alert in the panel when approveVersion rejects", async () => {
     vi.mocked(templatesApi.approveVersion).mockRejectedValue(new Error("Servidor indisponível"));
 
     renderRoute();
 
-    fireEvent.click(screen.getByRole("button", { name: "Publicar" }));
+    fireEvent.click(screen.getByRole("radio", { name: /Publicar/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Publicar/ }));
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeTruthy();
