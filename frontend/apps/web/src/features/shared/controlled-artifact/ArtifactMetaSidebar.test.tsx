@@ -28,10 +28,28 @@ describe("ArtifactMetaSidebar", () => {
       />,
     );
 
-    expect(screen.getByText("Carregando metadados do documento")).toBeInTheDocument();
+    expect(screen.getByText("Carregando metadados")).toBeInTheDocument();
     expect(screen.queryByText("---")).not.toBeInTheDocument();
     expect(screen.queryByText("pop")).not.toBeInTheDocument();
     expect(screen.queryByText("general")).not.toBeInTheDocument();
+  });
+
+  it("uses caller-supplied kind labels for aria-label and loading copy (purity)", () => {
+    render(
+      <ArtifactMetaSidebar
+        open
+        onToggle={() => {}}
+        loading
+        code="MODELO-001"
+        meta={emptyMeta}
+        ariaLabel="Identificação do modelo"
+        loadingLabel="Carregando metadados do modelo"
+      />,
+    );
+
+    expect(screen.getByLabelText("Identificação do modelo")).toBeInTheDocument();
+    expect(screen.getByText("Carregando metadados do modelo")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Identificação do artefato")).not.toBeInTheDocument();
   });
 
   it("renders real governed metadata and hides approval chain in draft", () => {
@@ -80,7 +98,7 @@ describe("ArtifactMetaSidebar", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Identificação do documento")).toBeInTheDocument();
+    expect(screen.getByLabelText("Identificação do artefato")).toBeInTheDocument();
     expect(screen.getByText("Identificação")).toBeInTheDocument();
     expect(screen.queryByText("Metadados")).not.toBeInTheDocument();
     expect(screen.getByText("Tipo")).toBeInTheDocument();
@@ -241,7 +259,7 @@ describe("ArtifactMetaSidebar", () => {
     const toggle = screen.getByRole("button", { name: /abrir painel/i });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Identificação")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Identificação do documento")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Identificação do artefato")).not.toBeInTheDocument();
   });
 
   it("uses the singular page noun for a one-page artifact", () => {

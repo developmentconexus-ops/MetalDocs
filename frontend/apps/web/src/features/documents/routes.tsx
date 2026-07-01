@@ -24,7 +24,7 @@ export const documentsRoutes: RouteObject[] = [
   {
     path: 'documents/:documentId',
     handle: { workspaceView: 'library' },
-    lazy: () => import('../shared/controlled-artifact/ArtifactDetailLayout').then(m => ({ Component: m.ArtifactDetailLayout })),
+    lazy: () => import('./pages/DocumentDetailLayout').then(m => ({ Component: m.DocumentDetailLayout })),
     children: [
       {
         index: true,

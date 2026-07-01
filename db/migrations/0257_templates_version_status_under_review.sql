@@ -5,8 +5,8 @@
 --
 -- Only the string value in chk_template_version_status changes.  All other
 -- template-version status values (draft/approved/published/obsolete) are
--- unchanged.  The corresponding Go constant (VersionStatusInReview) keeps its
--- identifier; only its value string changes to "under_review".
+-- unchanged.  The corresponding Go constant is VersionStatusUnderReview, value
+-- "under_review".
 --
 -- FIX (forward-only, idempotent):
 --   1. Drop the existing status CHECK constraint (which allows 'in_review').

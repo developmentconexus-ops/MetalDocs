@@ -65,7 +65,7 @@ func TestSubmitForReview_Happy(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Data.Version.Status != string(domain.VersionStatusInReview) {
+	if out.Data.Version.Status != string(domain.VersionStatusUnderReview) {
 		t.Fatalf("expected status=under_review, got %q", out.Data.Version.Status)
 	}
 }
@@ -114,7 +114,7 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 		ID:            "22222222-2222-4222-8222-222222222222",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
-		Status:        domain.VersionStatusInReview,
+		Status:        domain.VersionStatusUnderReview,
 	}
 	repo.approvalConfigs["11111111-1111-1111-1111-111111111111"] = &domain.ApprovalConfig{TemplateID: "11111111-1111-1111-1111-111111111111", ApproverRole: "approver"}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
@@ -218,7 +218,7 @@ func TestReview_Accept_Happy(t *testing.T) {
 		ID:                  "22222222-2222-4222-8222-222222222222",
 		TemplateID:          "11111111-1111-1111-1111-111111111111",
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 	}

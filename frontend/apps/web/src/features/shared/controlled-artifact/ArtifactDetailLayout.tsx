@@ -4,25 +4,18 @@ import styles from "./ArtifactDetailLayout.module.css";
 
 /**
  * Tabbed shell for the controlled-artifact detail view. Purely presentational —
- * no data fetching, no kind branching. Tabs are model-driven: each tab renders as
- * a router NavLink when `href` is set (active styling preserved), or a static
- * non-link span when `href` is absent (template single-tab case).
- *
- * The default tab set reproduces the documents shell ("Documento" / "Distribuição")
- * so the document route can mount this without passing any props. The template route
- * passes a reduced single-tab set.
+ * no data fetching, no kind branching, no kind-specific defaults. Tabs are
+ * model-driven and REQUIRED: each caller (documents, templates) owns and passes
+ * its own tab set. Each tab renders as a router NavLink when `href` is set (active
+ * styling preserved), or a static non-link span when `href` is absent (single-tab
+ * case). The shared layer holds no document- or template-specific routing.
  */
 
-const DEFAULT_TABS: ArtifactTab[] = [
-  { key: "documento", label: "Documento", href: "." },
-  { key: "distribuicao", label: "Distribuição", href: "distribution" },
-];
-
 interface ArtifactDetailLayoutProps {
-  tabs?: ArtifactTab[];
+  tabs: ArtifactTab[];
 }
 
-export function ArtifactDetailLayout({ tabs = DEFAULT_TABS }: ArtifactDetailLayoutProps) {
+export function ArtifactDetailLayout({ tabs }: ArtifactDetailLayoutProps) {
   return (
     <div className={styles.root}>
       <nav className={styles.tabStrip}>

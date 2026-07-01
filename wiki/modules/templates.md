@@ -173,7 +173,7 @@ Grouped by file. Source of truth: `_artifacts/01-surface.md` Ã‚Â§3.
 | File | Symbol | Kind | Purpose |
 |---|---|---|---|
 | `internal/modules/templates/domain/template.go:8` | `Template` | struct | Template aggregate root |
-| `internal/modules/templates/domain/version.go:10` | `VersionStatusDraft`, `VersionStatusInReview`, `VersionStatusApproved`, `VersionStatusPublished`, `VersionStatusObsolete` | const | Version state machine (const block line 10; first value `VersionStatusDraft` at line 11) |
+| `internal/modules/templates/domain/version.go:10` | `VersionStatusDraft`, `VersionStatusUnderReview`, `VersionStatusApproved`, `VersionStatusPublished`, `VersionStatusObsolete` | const | Version state machine (const block line 10; first value `VersionStatusDraft` at line 11) |
 | `internal/modules/templates/domain/version.go:18` | `TemplateVersion` | struct | Version entity (owns DOCX key, hashes, schemas, status, identities) |
 | `internal/modules/templates/domain/schemas.go:5` | `MetadataSchema` | struct | Per-version metadata schema (DocCodePattern, retention, distribution) |
 | `internal/modules/templates/domain/schemas.go:27` | `PHText`, `PHDate`, `PHNumber`, `PHSelect`, `PHUser`, `PHPicture`, `PHComputed` | const | Fixed 7-token catalog (per `wiki/concepts/placeholders.md`; const block opens at line 26) |

@@ -41,8 +41,8 @@ function toVersionEntries(model: ArtifactViewModel): VersionEntry[] {
   return model.lineage.map((item) => ({
     v: item.revisionLabel ?? `REV${String(item.revisionNumber ?? 0).padStart(2, "0")}`,
     when: formatShortDate(item.createdAt) || EM_DASH,
-    // VersionEntry.author shows the lifecycle status — no per-revision author field exists on the model yet.
-    author: item.status || EM_DASH,
+    // VersionEntry.meta trails the date with the lifecycle status — no per-revision author field exists on the model yet.
+    meta: item.status || EM_DASH,
     current: item.isCurrent,
     summary: item.title?.trim() || "Sem título governado registrado.",
   }));
@@ -260,17 +260,17 @@ export function ArtifactDetailView({ model, heroActions, aside, extras }: Artifa
           )}
         </section>
 
-        {/* Section: Documentos relacionados — backend não disponível, defer rastreado em wiki/backlog/documento-publicado.md */}
+        {/* Section: Artefatos relacionados — backend não disponível, defer rastreado em wiki/backlog/documento-publicado.md */}
         <section className={styles.section}>
           <div className={styles.sectionHead}>
             <div>
               <div className={styles.sectionKicker}>04 · Referências</div>
-              <h2 className={styles.sectionTitle}>Documentos relacionados</h2>
+              <h2 className={styles.sectionTitle}>Artefatos relacionados</h2>
             </div>
             <span className={styles.sectionAside}>não disponível</span>
           </div>
           <div className={styles.signoffEmpty}>
-            O modelo de relacionamentos entre documentos ainda não está disponível.
+            O modelo de relacionamentos entre artefatos controlados ainda não está disponível.
           </div>
         </section>
 
@@ -284,7 +284,7 @@ export function ArtifactDetailView({ model, heroActions, aside, extras }: Artifa
             <span className={styles.sectionAside}>não disponível</span>
           </div>
           <div className={styles.signoffEmpty}>
-            Comentários de exibição ainda não estão disponíveis para este documento.
+            Comentários de exibição ainda não estão disponíveis para este artefato.
           </div>
         </section>
 

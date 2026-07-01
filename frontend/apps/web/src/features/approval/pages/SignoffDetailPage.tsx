@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
-import { formatDateTime } from '../../../lib/formatDate';
+import { formatSignedAt } from '../../../lib/format/dates';
 import { useAuthStore } from '../../../store/auth.store';
 import { useDocumentCommentsQuery } from '../../documents/queries/useDocumentCommentsQuery';
 import { useDocumentDetailQuery } from '../../documents/queries/useDocumentDetailQuery';
@@ -98,7 +98,7 @@ export function SignoffDetailPage() {
   const contextLoading = Boolean(doc) && !contextError && !noActiveContext && contentHash == null;
 
   if (docQuery.isLoading) {
-    return <div className={styles.state}>Carregando documento…</div>;
+    return <div className={styles.state} role="status" aria-live="polite">Carregando documento…</div>;
   }
   if (docQuery.isError || !doc || !model) {
     return (
@@ -115,7 +115,7 @@ export function SignoffDetailPage() {
 
   let decisionExtras: React.ReactNode;
   if (contextLoading) {
-    decisionExtras = <div className={styles.state}>Carregando dados de aprovação…</div>;
+    decisionExtras = <div className={styles.state} role="status" aria-live="polite">Carregando dados de aprovação…</div>;
   } else if (contextError) {
     decisionExtras = (
       <div className={styles.state} role="alert">
@@ -280,7 +280,7 @@ export function SignoffDetailPage() {
                   <li key={c.id} className={styles.comment}>
                     <div className={styles.commentHead}>
                       <strong>{c.author}</strong>
-                      <span className={styles.commentDate}>{formatDateTime(c.created_at)}</span>
+                      <span className={styles.commentDate}>{formatSignedAt(c.created_at)}</span>
                       {c.done ? <span className={styles.resolved}>Resolvido</span> : null}
                     </div>
                     <p className={styles.commentBody}>{commentPlainText(c.content)}</p>

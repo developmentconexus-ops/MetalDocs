@@ -4,7 +4,8 @@ import styles from "./VersionTimeline.module.css";
 export type VersionEntry = {
   v: string;
   when: string;   // "18 mar 2025"
-  author: string;
+  /** Free-form trailing metadata shown after the date (e.g. lifecycle status). */
+  meta: string;
   summary: string;
   current: boolean;
 };
@@ -73,7 +74,7 @@ export function VersionTimeline({ versions }: Props) {
             <span className={styles.detailBadge}>atual</span>
           )}
           <span className={styles.detailMeta}>
-            · {hov.when} · {hov.author}
+            · {hov.when} · {hov.meta}
           </span>
         </div>
         <div className={styles.detailSummary}>{hov.summary}</div>

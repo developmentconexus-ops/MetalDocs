@@ -331,7 +331,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   function handleConfirmFinalize() {
     const trimmed = revisionTitleInput.trim();
     if (!trimmed) {
-      setRevisionTitleError('Informe o tÃ­tulo da revisÃ£o para submeter.');
+      setRevisionTitleError('Informe o título da revisão para submeter.');
       return;
     }
     void submitForReview(trimmed);
@@ -537,15 +537,17 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 : null
             }
             lineage={lineage}
+            ariaLabel="Identificação do documento"
+            loadingLabel="Carregando metadados do documento"
           />
         ) : null}
         {revisionTitleDialogOpen ? (
           <div className={styles.dialogBackdrop} role="presentation">
             <div className={styles.dialogPanel} role="dialog" aria-modal="true" aria-labelledby="revision-title-dialog-title">
-              <h2 id="revision-title-dialog-title" className={styles.dialogTitle}>TÃ­tulo da revisÃ£o</h2>
-              <p className={styles.dialogText}>Informe o motivo governado desta revisÃ£o antes de submeter o documento para aprovaÃ§Ã£o.</p>
+              <h2 id="revision-title-dialog-title" className={styles.dialogTitle}>Título da revisão</h2>
+              <p className={styles.dialogText}>Informe o motivo governado desta revisão antes de submeter o documento para aprovação.</p>
               <label className={styles.dialogField}>
-                <span>TÃ­tulo</span>
+                <span>Título</span>
                 <input
                   type="text"
                   value={revisionTitleInput}
@@ -562,7 +564,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                   Cancelar
                 </button>
                 <button type="button" className={styles.dialogPrimaryBtn} onClick={handleConfirmFinalize}>
-                  Confirmar submissÃ£o
+                  Confirmar submissão
                 </button>
               </div>
             </div>

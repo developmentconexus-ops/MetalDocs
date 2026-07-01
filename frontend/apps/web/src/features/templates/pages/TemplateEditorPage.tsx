@@ -366,6 +366,8 @@ export function TemplateEditorPage({
           meta={metaModel.meta}
           approvalChain={null}
           lineage={metaModel.lineage}
+          ariaLabel="Identificação do modelo"
+          loadingLabel="Carregando metadados do modelo"
         />
       </div>
     </div>

@@ -3,7 +3,6 @@ package application_test
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -65,7 +64,6 @@ type fakeRepo struct {
 
 	ignoreTenantOnGetTemplate bool
 	lockVersions              map[string]int
-	failCreateVersion         bool
 	getTemplateByKeyErr       error
 
 	// UpdateTemplateTxCalls records the LatestVersion on each UpdateTemplateTx
@@ -136,9 +134,6 @@ func (r *fakeRepo) UpdateTemplate(_ context.Context, t *domain.Template) error {
 }
 
 func (r *fakeRepo) CreateVersion(_ context.Context, v *domain.TemplateVersion) error {
-	if r.failCreateVersion {
-		return errors.New("forced create version failure")
-	}
 	if _, ok := r.lockVersions[v.ID]; !ok {
 		r.lockVersions[v.ID] = v.LockVersion
 	}

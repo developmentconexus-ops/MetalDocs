@@ -25,65 +25,9 @@ import { useDistributionSummaryQuery } from '../queries/useDistributionSummaryQu
 import { useAreasQuery } from '../queries/useAreasQuery';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { formatShortDate } from '../../../lib/format/dates';
+import { getDocumentStatusPresentation } from '../lib/documentStatusPresentation';
 
 const EM_DASH = '—';
-
-type StatusPresentation = {
-  badgeLabel: string;
-  subtitle: string | null;
-  ownerMeta: string;
-};
-
-// Lifted verbatim from DocumentPublishedPage so governed status copy is preserved byte-for-byte.
-// ownerMeta is intentionally DISTINCT from subtitle for scheduled/superseded (governed requirement).
-function getDocumentStatusPresentation(status: string, publishedAt: string): StatusPresentation {
-  const hasPublishedAt = publishedAt !== EM_DASH;
-
-  switch (status) {
-    case 'approved':
-      return {
-        badgeLabel: 'aprovado',
-        subtitle: hasPublishedAt ? `aprovado em ${publishedAt}` : 'Aprovado',
-        ownerMeta: hasPublishedAt ? `aprovado em ${publishedAt}` : 'aprovado',
-      };
-    case 'scheduled':
-      return {
-        badgeLabel: 'agendado',
-        subtitle: hasPublishedAt ? `aprovação concluída em ${publishedAt}` : 'Publicação agendada',
-        ownerMeta: hasPublishedAt ? `publicação agendada · aprovado em ${publishedAt}` : 'publicação agendada',
-      };
-    case 'published':
-      return {
-        badgeLabel: 'publicado',
-        subtitle: hasPublishedAt ? `publicado em ${publishedAt}` : 'Publicado',
-        ownerMeta: hasPublishedAt ? `publicado em ${publishedAt}` : 'publicado',
-      };
-    case 'superseded':
-      return {
-        badgeLabel: 'substituído',
-        subtitle: hasPublishedAt ? `publicado em ${publishedAt}` : 'Substituído por revisão posterior',
-        ownerMeta: hasPublishedAt ? `substituído · publicado em ${publishedAt}` : 'substituído por revisão posterior',
-      };
-    case 'obsolete':
-      return {
-        badgeLabel: 'obsoleto',
-        subtitle: hasPublishedAt ? `obsoleto após publicação em ${publishedAt}` : 'Documento obsoleto',
-        ownerMeta: hasPublishedAt ? `obsoleto · publicado em ${publishedAt}` : 'obsoleto',
-      };
-    case 'draft':
-      return { badgeLabel: 'rascunho', subtitle: 'Rascunho — ainda não publicado', ownerMeta: 'rascunho' };
-    case 'under_review':
-      return { badgeLabel: 'em revisão', subtitle: 'Aguardando decisão de aprovação', ownerMeta: 'em revisão' };
-    case 'rejected':
-      return { badgeLabel: 'rejeitado', subtitle: 'Revisão rejeitada', ownerMeta: 'rejeitado' };
-    default:
-      return {
-        badgeLabel: status || 'sem status',
-        subtitle: hasPublishedAt ? `publicado em ${publishedAt}` : null,
-        ownerMeta: hasPublishedAt ? `publicado em ${publishedAt}` : (status || EM_DASH),
-      };
-  }
-}
 
 export interface DocumentArtifact {
   model: ArtifactViewModel;

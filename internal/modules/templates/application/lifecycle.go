@@ -44,12 +44,12 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 
 	version.PendingReviewerRole = config.ReviewerRole
 	version.PendingApproverRole = config.ApproverRole
-	if err := version.CanTransition(domain.VersionStatusInReview, config.HasReviewer()); err != nil {
+	if err := version.CanTransition(domain.VersionStatusUnderReview, config.HasReviewer()); err != nil {
 		return nil, err
 	}
 
 	now := s.clock.Now()
-	version.Status = domain.VersionStatusInReview
+	version.Status = domain.VersionStatusUnderReview
 	version.SubmittedAt = &now
 
 	audit, err := newAuditEvent(
@@ -118,7 +118,7 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 	if err != nil {
 		return nil, err
 	}
-	if version.Status != domain.VersionStatusInReview {
+	if version.Status != domain.VersionStatusUnderReview {
 		return nil, domain.ErrInvalidStateTransition
 	}
 	if version.PendingReviewerRole == nil {
@@ -213,7 +213,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 		if version.Status != domain.VersionStatusApproved {
 			return nil, domain.ErrInvalidStateTransition
 		}
-	} else if version.Status != domain.VersionStatusInReview {
+	} else if version.Status != domain.VersionStatusUnderReview {
 		return nil, domain.ErrInvalidStateTransition
 	}
 

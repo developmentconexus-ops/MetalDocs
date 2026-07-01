@@ -33,6 +33,10 @@ interface ArtifactMetaSidebarProps {
   meta: ArtifactMetaModel;
   approvalChain?: ApprovalChainItem[] | null;
   lineage?: VersionHistoryItem[];
+  /** Kind-specific a11y label for the panel; caller supplies "documento"/"modelo". */
+  ariaLabel?: string;
+  /** Kind-specific loading copy; caller supplies "documento"/"modelo". */
+  loadingLabel?: string;
 }
 
 export function ArtifactMetaSidebar({
@@ -43,6 +47,8 @@ export function ArtifactMetaSidebar({
   meta,
   approvalChain = null,
   lineage = [],
+  ariaLabel = "Identificação do artefato",
+  loadingLabel = "Carregando metadados",
 }: ArtifactMetaSidebarProps) {
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const pageSizeSummary = formatPageSizeSummary(meta.pageCount, meta.fileSizeBytes);
@@ -74,14 +80,14 @@ export function ArtifactMetaSidebar({
         </svg>
       </button>
       {open && (
-        <aside className={styles.sidebar} aria-label="Identificação do documento">
+        <aside className={styles.sidebar} aria-label={ariaLabel}>
           <div className={styles.panelFrame}>
             <section className={styles.section}>
               <div className={styles.sectionHeader}>Identificação</div>
               {loading ? (
                 <div className={styles.metaRows}>
                   <div className={styles.metaRow}>
-                    <span className={styles.metaValue}>Carregando metadados do documento</span>
+                    <span className={styles.metaValue}>{loadingLabel}</span>
                   </div>
                 </div>
               ) : (

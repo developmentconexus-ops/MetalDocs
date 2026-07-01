@@ -24,6 +24,12 @@ const dateTimeFmt = new Intl.DateTimeFormat('pt-BR', {
   minute: '2-digit',
 });
 
+const longDateFmt = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: 'long',
+  year: 'numeric',
+});
+
 // "08/05/2026"
 export function formatShortDate(input: string | null | undefined): string {
   const d = parseDate(input);
@@ -34,4 +40,10 @@ export function formatShortDate(input: string | null | undefined): string {
 export function formatSignedAt(input: string | null | undefined): string {
   const d = parseDate(input);
   return d ? dateTimeFmt.format(d) : EM_DASH;
+}
+
+// "08 de maio de 2026" — used in published-doc owner banner
+export function formatPublishedAt(input: string | null | undefined): string {
+  const d = parseDate(input);
+  return d ? longDateFmt.format(d) : EM_DASH;
 }

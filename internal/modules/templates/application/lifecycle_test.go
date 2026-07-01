@@ -42,8 +42,8 @@ func TestSubmitForReview_Happy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SubmitForReview returned error: %v", err)
 	}
-	if got.Status != domain.VersionStatusInReview {
-		t.Fatalf("expected status %q, got %q", domain.VersionStatusInReview, got.Status)
+	if got.Status != domain.VersionStatusUnderReview {
+		t.Fatalf("expected status %q, got %q", domain.VersionStatusUnderReview, got.Status)
 	}
 	if got.SubmittedAt == nil {
 		t.Fatal("expected SubmittedAt to be set")
@@ -75,7 +75,7 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 		ID:            "ver-1",
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		Status:        domain.VersionStatusInReview,
+		Status:        domain.VersionStatusUnderReview,
 	}
 	repo.templates[template.ID] = template
 	repo.versions[version.ID] = version
@@ -136,7 +136,7 @@ func TestReview_Accept(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 		SubmittedAt:         &submittedAt,
@@ -180,7 +180,7 @@ func TestReview_Reject(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 		SubmittedAt:         &submittedAt,
@@ -227,7 +227,7 @@ func TestReview_WrongRole(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 	}
@@ -257,7 +257,7 @@ func TestReview_SegregationViolation(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 	}
@@ -286,7 +286,7 @@ func TestReview_NoReviewerStage(t *testing.T) {
 		ID:            "ver-1",
 		TemplateID:    template.ID,
 		VersionNumber: 1,
-		Status:        domain.VersionStatusInReview,
+		Status:        domain.VersionStatusUnderReview,
 		AuthorID:      "author-1",
 	}
 	repo.templates[template.ID] = template
@@ -392,7 +392,7 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: nil,
 		PendingApproverRole: "approver",
@@ -443,7 +443,7 @@ func TestApprove_Accept_EmptyContentHash_ReturnsContentHashMismatch(t *testing.T
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: nil,
 		PendingApproverRole: "approver",
@@ -529,7 +529,7 @@ func TestApprove_WrongRole(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingApproverRole: "approver",
 	}
@@ -651,7 +651,7 @@ func TestReview_UsesTemplateReviewCapability(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 	}
@@ -804,7 +804,7 @@ func TestReviewReturnsConcurrentTransitionWhenVersionMoved(t *testing.T) {
 		ID:                  "ver-1",
 		TemplateID:          template.ID,
 		VersionNumber:       1,
-		Status:              domain.VersionStatusInReview,
+		Status:              domain.VersionStatusUnderReview,
 		AuthorID:            "author-1",
 		PendingReviewerRole: &reviewerRole,
 		SubmittedAt:         &submittedAt,

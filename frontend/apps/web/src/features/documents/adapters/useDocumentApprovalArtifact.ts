@@ -182,6 +182,15 @@ export function useDocumentApprovalArtifact(
     });
   }
 
+  // The approval cockpit deliberately builds a REDUCED ArtifactViewModel here
+  // rather than composing `useDocumentArtifact` (the way `useTemplateApprovalArtifact`
+  // composes `useTemplateArtifact`). The cockpit hero uses an "Aprovações" breadcrumb,
+  // a single code chip, and empty profile/area/visibility meta — the sign-off surface
+  // intentionally omits the detail screen's richer identity block. Both this hook and
+  // `useDocumentArtifact` read the SAME `useDocumentDetailQuery` key, so there is no
+  // extra network cost; the divergence is presentational scope, not a second source of
+  // truth. If the cockpit ever needs the full identity block, compose the detail model
+  // and override hero/meta instead of widening this literal. (Reviewer M-6, T11 follow-up.)
   const model: ArtifactViewModel | null = doc
     ? {
         kind: 'document',

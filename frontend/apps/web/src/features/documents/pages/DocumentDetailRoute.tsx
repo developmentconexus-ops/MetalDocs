@@ -38,6 +38,7 @@ export function DocumentDetailRoute() {
   const documentId = rawDocumentId ?? '';
 
   // TODO(T11): drop these once model.actions carries the wired run() handlers and the route consumes model.actions.
+  // Tracked: wiki/backlog/controlled-artifact-shared-cockpit.md (finding M-2).
   const scheduledLifecycleRefetchInterval = 5_000;
   const docQuery = useDocumentDetailQuery(documentId, { pollScheduledLifecycle: true });
   const shouldPollScheduledLifecycle = docQuery.data?.status === 'scheduled';
@@ -249,6 +250,12 @@ export function DocumentDetailRoute() {
       {pdfStatus.kind === 'error' && (
         <span role='alert' className={styles.pdfAlert}>{pdfStatus.message}</span>
       )}
+      {/*
+        Soft-disable: aria-disabled (not native `disabled`) is deliberate — these
+        actions keep keyboard focus so AT users can reach the `title` tooltip that
+        explains WHY the action is unavailable (missing permission / active context).
+        The onClick guards (`if (canPublish) …`) suppress the action itself.
+      */}
       {isApproved ? (
         <button
           className='btn'

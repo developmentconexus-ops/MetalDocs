@@ -6,18 +6,6 @@ const EM_DASH = '—';
 
 export const DEFAULT_INITIAL_REVISION_TITLE = 'Criacao do documento';
 
-function parseDate(input: string | null | undefined): Date | null {
-  if (!input) return null;
-  const d = new Date(input);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-const longDateFmt = new Intl.DateTimeFormat('pt-BR', {
-  day: '2-digit',
-  month: 'long',
-  year: 'numeric',
-});
-
 type ControlledDocumentVisibility = {
   scope: 'company' | 'restricted';
   area_codes: string[];
@@ -33,15 +21,9 @@ export function hasSettledSidebarIdentity(input: {
   return Boolean(input.code && input.profileLabel && input.areaLabel && input.visibilityLabel);
 }
 
-// "08 de maio de 2026" — used in published-doc owner banner
-export function formatPublishedAt(input: string | null | undefined): string {
-  const d = parseDate(input);
-  return d ? longDateFmt.format(d) : EM_DASH;
-}
-
-// Canonical implementation lifted to `lib/format/dates.ts`.
+// Canonical implementations lifted to `lib/format/dates.ts`.
 // Re-exported here to keep existing documents-side imports working.
-export { formatSignedAt } from '../../../lib/format/dates';
+export { formatSignedAt, formatPublishedAt } from '../../../lib/format/dates';
 
 // Canonical implementation lifted to `lib/format/fileSize.ts`.
 // Re-exported here to keep existing documents-side imports working.
