@@ -20,6 +20,7 @@ import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
 import { ArtifactMetaSidebar } from '../../shared/controlled-artifact/ArtifactMetaSidebar';
 import type { VersionHistoryItem } from '../../shared/controlled-artifact/types';
+import { actorStatusToFlowState } from '../lib/approvalWorkflow';
 import {
   EditorChrome,
   editorChromeStyles,
@@ -524,16 +525,9 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                       // (parity with the document mapApprovalChain — no separate role field).
                       roleLabel: stage.label,
                       // This instance DTO carries the resolved outcome in `actor.status`
-                      // directly (approved/rejected/active/waiting), so derive the shared
-                      // ApprovalFlowState from it rather than the signoff-decision tense.
-                      flowState:
-                        actor.status === 'approved'
-                          ? ('approved' as const)
-                          : actor.status === 'rejected'
-                            ? ('rejected' as const)
-                            : actor.status === 'active'
-                              ? ('current' as const)
-                              : ('pending' as const),
+                      // directly (approved/rejected/active/waiting); the shared helper
+                      // maps it to ApprovalFlowState (single source of truth).
+                      flowState: actorStatusToFlowState(actor.status),
                       actorUserId: actor.user_id,
                       actorDisplay: actor.display_name,
                       decision: actor.decision ?? null,

@@ -35,12 +35,12 @@ function variantClass(action: ArtifactAction): string {
 
 /** Author / submission descriptor row — renders only the segments that are present. */
 function AuthorMetaRow({ authorMeta }: { authorMeta: ArtifactAuthorMeta }) {
-  const segments: React.ReactNode[] = [];
-  if (authorMeta.authorRole != null) segments.push(<span key="role">{authorMeta.authorRole}</span>);
-  if (authorMeta.areaLabel != null) segments.push(<span key="area">{authorMeta.areaLabel}</span>);
-  if (authorMeta.submittedLabel != null) segments.push(<span key="submitted">{authorMeta.submittedLabel}</span>);
+  const segments: { key: string; label: string }[] = [];
+  if (authorMeta.authorRole != null) segments.push({ key: 'role', label: authorMeta.authorRole });
+  if (authorMeta.areaLabel != null) segments.push({ key: 'area', label: authorMeta.areaLabel });
+  if (authorMeta.submittedLabel != null) segments.push({ key: 'submitted', label: authorMeta.submittedLabel });
   if (authorMeta.priorDecisionLabel != null)
-    segments.push(<span key="prior">{authorMeta.priorDecisionLabel}</span>);
+    segments.push({ key: 'prior', label: authorMeta.priorDecisionLabel });
 
   const hasAny = authorMeta.authorName != null || segments.length > 0;
   if (!hasAny) return null;
@@ -54,9 +54,9 @@ function AuthorMetaRow({ authorMeta }: { authorMeta: ArtifactAuthorMeta }) {
         </span>
       )}
       {segments.map((seg, i) => (
-        <Fragment key={i}>
+        <Fragment key={seg.key}>
           {(i > 0 || authorMeta.authorName != null) && <span className={styles.authorSep}>·</span>}
-          {seg}
+          <span>{seg.label}</span>
         </Fragment>
       ))}
     </div>

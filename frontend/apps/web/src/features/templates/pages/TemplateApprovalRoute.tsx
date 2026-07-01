@@ -7,16 +7,19 @@ import {
   type TemplateApprovalHandlers,
 } from "../adapters/useTemplateApprovalArtifact";
 import { useTemplateDetailQuery } from "../queries/useTemplateDetailQuery";
-import { submitForReview, reviewVersion, approveVersion, type VersionDTO } from "../api/templates";
+import {
+  submitForReview,
+  reviewVersion,
+  approveVersion,
+  type VersionDTO,
+  type VersionStatus,
+} from "../api/templates";
 import { TemplateReviewCanvas } from "../components/TemplateReviewCanvas";
 import { TemplateApprovalExtras } from "../components/TemplateApprovalExtras";
 import { QK } from "../../../lib/queryKeys";
 import { resolveQueryError } from "../../../lib/api";
-import type { DocumentStatus } from "../../../components/ui";
 import type { ArtifactDecisionModel, ArtifactViewModel } from "../../shared/controlled-artifact/types";
 import styles from "./TemplateApprovalRoute.module.css";
-
-const NOOP = () => {};
 
 /**
  * Template-specific route wrapper for the shared ArtifactApprovalScreen. Composes
@@ -35,7 +38,7 @@ export function TemplateApprovalRoute() {
 
   const detailQuery = useTemplateDetailQuery(templateId);
   const versionNum = detailQuery.data?.latest_version.version_number ?? null;
-  const status = (detailQuery.data?.latest_version.status ?? null) as DocumentStatus | null;
+  const status: VersionStatus | null = detailQuery.data?.latest_version.status ?? null;
 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
@@ -163,14 +166,7 @@ export function TemplateApprovalRoute() {
       main={<TemplateReviewCanvas templateId={templateId} versionNum={versionNum} />}
       decisionExtras={
         decision != null ? undefined : (
-          <TemplateApprovalExtras
-            status={status}
-            showReason={false}
-            reason=""
-            onReasonChange={NOOP}
-            busy={busy}
-            message={message}
-          />
+          <TemplateApprovalExtras status={status} message={message} />
         )
       }
     />

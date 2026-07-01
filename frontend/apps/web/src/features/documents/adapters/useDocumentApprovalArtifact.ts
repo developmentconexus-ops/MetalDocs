@@ -25,8 +25,6 @@ import { resolveOwnerDisplay } from '../../shared/controlled-artifact/resolveOwn
 export interface DocumentApprovalHandlers {
   /** Open the inline submit route-picker. */
   openSubmit: () => void;
-  /** Run beforeDecision (flushSave) then open the SignoffDialog. */
-  openSignoff: () => void;
   /** Open the CancelInstanceDialog to collect a reason and cancel the approval instance. */
   cancelInstance: () => void;
   /** Open the SupersedePublishDialog. */
@@ -69,10 +67,10 @@ export interface DocumentApprovalArtifact {
  * `ArtifactViewModel` (approvalChain + the ordered, gated `actions`). The route
  * wrapper owns dialog state and passes the openers in via `handlers`.
  *
- * Behavior is preserved byte-for-byte from the former ControlledDocumentDetailPanel:
- * the same actions appear in the same states (submit → signoff → cancel → publish),
- * "Assinar" is disabled until the instance loads, and the 404 fallback seeds a
- * "v0" ETag so a cold submit still sends a valid If-Match.
+ * The plain actions appear per state (submit → cancel → publish); signing routes
+ * through the shared DecisionPanel instead of a button (gated on
+ * `policy.actions.signoff` in the route). The 404 fallback seeds a "v0" ETag so a
+ * cold submit still sends a valid If-Match.
  */
 export function useDocumentApprovalArtifact(
   documentId: string,
@@ -151,9 +149,10 @@ export function useDocumentApprovalArtifact(
   const approvalChain: ApprovalChainItem[] | null = instance ? mapApprovalChain(instance.stages) : null;
 
   // Ordered, gated actions — emit ONLY the allowed actions, in display order
-  // (submit → signoff → cancel → publish), matching the old "button appears only
-  // when allowed" behavior. The signoff button additionally requires a lock and
-  // is disabled until the instance loads (available=false ⇒ rendered disabled).
+  // (submit → cancel → publish), matching the old "button appears only when
+  // allowed" behavior. Signing is NOT a plain action: it routes exclusively
+  // through the shared DecisionPanel, gated on `policy.actions.signoff` in the
+  // route (SignoffDetailPage), so no 'signoff' button is emitted here.
   const actions: ArtifactAction[] = [];
   if (policy.actions.submit) {
     actions.push({
@@ -162,16 +161,6 @@ export function useDocumentApprovalArtifact(
       variant: 'primary',
       available: true,
       run: handlers.openSubmit,
-    });
-  }
-  if (policy.actions.signoff && lockedByInstanceId) {
-    actions.push({
-      key: 'signoff',
-      label: 'Assinar',
-      variant: 'primary',
-      available: Boolean(instance),
-      reason: instance ? undefined : 'Carregando dados de aprovação…',
-      run: handlers.openSignoff,
     });
   }
   if (policy.actions.cancelInstance) {

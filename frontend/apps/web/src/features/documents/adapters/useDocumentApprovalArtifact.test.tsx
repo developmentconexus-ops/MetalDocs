@@ -68,7 +68,6 @@ function makeInstance(): ApprovalInstance {
 
 const handlers: DocumentApprovalHandlers = {
   openSubmit: vi.fn(),
-  openSignoff: vi.fn(),
   cancelInstance: vi.fn(),
   openPublish: vi.fn(),
 };
@@ -110,16 +109,14 @@ describe('useDocumentApprovalArtifact', () => {
     expect(keys).toEqual(['submit']);
   });
 
-  it('emits signoff + cancel in under_review (in display order) and gates signoff on the instance', async () => {
+  it('emits ONLY the cancel action in under_review (signing routes through the decision panel)', async () => {
     mockContext('under_review');
     const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
     const actions = result.current.model?.actions ?? [];
-    expect(actions.map((a) => a.key)).toEqual(['signoff', 'cancel']);
-    const signoff = actions.find((a) => a.key === 'signoff');
-    expect(signoff?.available).toBe(true);
+    expect(actions.map((a) => a.key)).toEqual(['cancel']);
     const cancel = actions.find((a) => a.key === 'cancel');
     expect(cancel?.variant).toBe('secondary');
   });
@@ -159,10 +156,6 @@ describe('useDocumentApprovalArtifact', () => {
     const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
-
-    const signoff = result.current.model?.actions.find((a) => a.key === 'signoff');
-    signoff?.run();
-    expect(handlers.openSignoff).toHaveBeenCalledTimes(1);
 
     const cancel = result.current.model?.actions.find((a) => a.key === 'cancel');
     cancel?.run();

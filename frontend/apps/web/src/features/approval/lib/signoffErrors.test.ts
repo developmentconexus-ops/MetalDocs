@@ -35,7 +35,7 @@ describe('mapSignoffError', () => {
   it('signoff.not_eligible → not_eligible', () => {
     const err = mapSignoffError(new ApprovalError('signoff.not_eligible', 403, 'not eligible'));
     expect(err.kind).toBe('not_eligible');
-    expect(err.message).toContain('Voce nao esta mais elegivel para assinar esta etapa.');
+    expect(err.message).toContain('Você não está mais elegível para assinar esta etapa.');
   });
 
   it('status 401 (unmatched code) → session_expired', () => {

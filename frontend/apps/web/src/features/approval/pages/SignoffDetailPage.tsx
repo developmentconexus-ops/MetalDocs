@@ -20,8 +20,6 @@ import { commentPlainText } from '../lib/commentPlainText';
 import type { ArtifactDecisionModel, ArtifactViewModel } from '../../shared/controlled-artifact/types';
 import styles from './SignoffDetailPage.module.css';
 
-const NOOP = () => {};
-
 type Tab = 'documento' | 'comentarios';
 
 const TABS: { id: Tab; label: string }[] = [
@@ -65,11 +63,10 @@ export function SignoffDetailPage() {
     await canvasRef.current?.flushSave();
   };
 
-  // Signing routes exclusively through the DecisionPanel now, so the adapter's plain
-  // 'signoff' action is retired (filtered out below) and its handler is a no-op.
+  // Signing routes exclusively through the DecisionPanel now — the adapter emits no
+  // 'signoff' action, so there is no handler for it.
   const handlers: DocumentApprovalHandlers = {
     openSubmit: () => setShowSubmit(true),
-    openSignoff: NOOP,
     cancelInstance: () => setShowCancel(true),
     openPublish: () => setShowPublish(true),
   };
@@ -216,9 +213,9 @@ export function SignoffDetailPage() {
       }
     : undefined;
 
-  // Suppress the action buttons until the sidebar is ready, and always retire the
-  // plain 'signoff' action — signing routes exclusively through the DecisionPanel.
-  const baseActions = sidebarReady ? model.actions.filter((a) => a.key !== 'signoff') : [];
+  // Suppress the action buttons until the sidebar is ready. Signing is not among
+  // model.actions (it routes through the DecisionPanel), so no filtering is needed.
+  const baseActions = sidebarReady ? model.actions : [];
   const screenModel: ArtifactViewModel = { ...model, actions: baseActions, decision };
 
   const main = (

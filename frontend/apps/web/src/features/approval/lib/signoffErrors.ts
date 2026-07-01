@@ -42,12 +42,13 @@ export class SignoffError extends Error {
   }
 }
 
-// Byte-for-byte the strings the dialog rendered. The `server` fallback keeps the
-// original mojibake so no user-visible copy changes with this refactor.
+// The strings the panel renders per error kind. The retired dialog carried Latin-1
+// mojibake / ASCII-stripped copy for two of these; corrected to proper UTF-8 PT-BR
+// now that the mapping lives in a pure, testable module.
 const MESSAGES: Record<Exclude<SignoffErrorKind, 'server'>, string> = {
   stale: 'Documento foi alterado. Atualize a página antes de tentar novamente.',
   bad_password: 'Senha incorreta. Verifique e tente novamente.',
-  not_eligible: 'Voce nao esta mais elegivel para assinar esta etapa.',
+  not_eligible: 'Você não está mais elegível para assinar esta etapa.',
   session_expired: 'Sessão expirada. Autentique novamente para assinar.',
   rate_limited: 'Muitas tentativas. Aguarde 30 segundos antes de tentar novamente.',
   network: 'Erro de conexão. Verifique sua internet e tente novamente.',
@@ -63,7 +64,7 @@ const MESSAGES: Record<Exclude<SignoffErrorKind, 'server'>, string> = {
 };
 
 const SERVER_FALLBACK =
-  'Fluxo de aprovaÃ§Ã£o indisponÃ­vel no momento. Verifique se o documento ainda estÃ¡ elegÃ­vel para sua revisÃ£o.';
+  'Fluxo de aprovação indisponível no momento. Verifique se o documento ainda está elegível para sua revisão.';
 
 function of(kind: Exclude<SignoffErrorKind, 'server'>): SignoffError {
   return new SignoffError(kind, MESSAGES[kind]);

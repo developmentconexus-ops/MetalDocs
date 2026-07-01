@@ -370,8 +370,10 @@ export interface ArtifactViewModel {
    *  in order with zero kind awareness. */
   kpis: ArtifactKpiCell[];
   /**
-   * Ordered list of approval chain signoff slots. Null for templates (which have
-   * no approval instance / signoff model — only pending reviewer/approver roles).
+   * Ordered list of approval chain signoff slots. Both kinds populate this — the
+   * document adapter from `ApprovalInstance.stages[]`, the template adapter from
+   * the inline submit→review→approve fields (`buildTemplateApprovalChain`). Null
+   * only when no version/instance is loaded yet (the base template detail adapter).
    */
   approvalChain: ApprovalChainItem[] | null;
   /**

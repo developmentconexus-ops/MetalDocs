@@ -140,3 +140,17 @@ function stageFlowState(status: string, decision: string | null): ApprovalFlowSt
   if (status === 'active' || status === 'in_progress' || status === 'current') return 'current';
   return 'pending';
 }
+
+/**
+ * Normalize a document editor approval-instance actor `status` into the shared
+ * `ApprovalFlowState`. Distinct from `stageFlowState`: that editor DTO resolves the
+ * outcome onto the actor directly ('approved' | 'rejected' | 'active' | 'waiting'),
+ * so there is no separate signoff-decision tense to reconcile. Single source of
+ * truth for the actor-status → flow-state mapping used by the editor sidebar chain.
+ */
+export function actorStatusToFlowState(status: string): ApprovalFlowState {
+  if (status === 'approved') return 'approved';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'active') return 'current';
+  return 'pending';
+}
