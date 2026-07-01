@@ -11,7 +11,7 @@ import {
 } from '../../documents/adapters/useDocumentApprovalArtifact';
 import { toApprovalState } from '../../documents/lib/approvalWorkflow';
 import { ArtifactApprovalScreen } from '../../shared/controlled-artifact/ArtifactApprovalScreen';
-import { cancel } from '../api/approvalApi';
+import { CancelInstanceDialog } from '../components/CancelInstanceDialog';
 import { DocumentApprovalExtras } from '../components/DocumentApprovalExtras';
 import { ReviewDocumentCanvas, type ReviewDocumentCanvasRef } from '../components/ReviewDocumentCanvas';
 import { SignoffDialog } from '../components/SignoffDialog';
@@ -48,6 +48,7 @@ export function SignoffDetailPage() {
   const [showSignoff, setShowSignoff] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const autoOpenedRef = useRef(false);
 
@@ -76,20 +77,7 @@ export function SignoffDetailPage() {
         setShowSignoff(true);
       })();
     },
-    cancelInstance: () => {
-      void (async () => {
-        const reason = window.prompt('Motivo do cancelamento da instância:');
-        if (!reason || !reason.trim()) {
-          return;
-        }
-        try {
-          await cancel(documentId, { reason: reason.trim() });
-          await refetchInstance();
-        } catch (_error) {
-          setDecisionError('Erro ao cancelar instância.');
-        }
-      })();
-    },
+    cancelInstance: () => setShowCancel(true),
     openPublish: () => setShowPublish(true),
   };
 
@@ -292,6 +280,14 @@ export function SignoffDetailPage() {
           contentHash={contentHash}
           publishedDocumentId={publishedDocumentId}
           onClose={() => setShowPublish(false)}
+          onSuccess={() => void refetchInstance()}
+        />
+      ) : null}
+
+      {showCancel ? (
+        <CancelInstanceDialog
+          documentId={documentId}
+          onClose={() => setShowCancel(false)}
           onSuccess={() => void refetchInstance()}
         />
       ) : null}
