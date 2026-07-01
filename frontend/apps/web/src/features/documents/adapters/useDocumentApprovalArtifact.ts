@@ -27,7 +27,7 @@ export interface DocumentApprovalHandlers {
   openSubmit: () => void;
   /** Run beforeDecision (flushSave) then open the SignoffDialog. */
   openSignoff: () => void;
-  /** window.prompt for a reason → cancel the approval instance. */
+  /** Open the CancelInstanceDialog to collect a reason and cancel the approval instance. */
   cancelInstance: () => void;
   /** Open the SupersedePublishDialog. */
   openPublish: () => void;

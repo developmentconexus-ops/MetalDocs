@@ -508,6 +508,11 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
               ownerName: null,
               ownerDescriptor: null,
             }}
+            // Editor sidebar surfaces the signoff chain only while the document is
+            // actively under review; once approved/published the dedicated approval
+            // screen owns the chain. ArtifactMetaSidebar is status-agnostic by design
+            // (m-3) — this gate is deliberate call-site data-scoping, not lifecycle
+            // coupling leaking back into the presentational layer.
             approvalChain={
               docStatus === 'under_review' && approvalInstanceQuery.data
                 ? approvalInstanceQuery.data.stages.flatMap((stage, stageIndex) =>
