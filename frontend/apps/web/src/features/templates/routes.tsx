@@ -12,6 +12,11 @@ export const templatesRoutes: RouteObject[] = [
     lazy: () => import("./pages/TemplateWizardPage"),
   },
   {
+    path: "templates/:templateId/approval",
+    handle: { workspaceView: "templates" },
+    lazy: () => import("./pages/TemplateApprovalRoute"),
+  },
+  {
     // ADR 0013 coherence: the editor URL mirrors documents (`documents/:documentId/edit`)
     // and never leaks the internal 1-based version_number. The working version is
     // resolved from the template's latest_version inside the route page. Humans only
