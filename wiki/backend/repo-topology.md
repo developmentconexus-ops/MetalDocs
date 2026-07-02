@@ -1,6 +1,6 @@
 # Repository Topology
 
-> **Last verified:** 2026-06-15 (M4c F4c.5 — pgtest deleted, testdb canonical harness)
+> **Last verified:** 2026-07-01 (TST-13 — deleted `start-api-no-build.ps1`, `start-api-planc.ps1`, `start-api.sh`, `check-governance.sh`, `run_metaldocs.ps1`, `dev-api-web.ps1`; prior: 2026-06-15 M4c F4c.5)
 > **Scope:** Top-level directory layout, all binaries built and run, Go module configuration, CI pipeline shape, script entry points, and orphan/legacy classification for every top-level directory. Does not descend into `frontend/`, `node_modules/`, `vendor/`, `.worktrees/`, `.clone/`, or `non_git/` beyond identification.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (binary 1)
@@ -311,10 +311,8 @@ The entire `internal/api/v2/` package (`types_gen.go` + `contract_test.go`) was 
 
 | Path | Status |
 |---|---|
-| `start-api-planc.ps1` | Plan-C variant targeting port 8083 for a specific worktree; last git touch `403ad2eef` (2026-04); not referenced by CI |
 | `start-spec1-api.ps1` | **Dead** — contains hardcoded absolute path to a different machine username (`C:\Users\leandro.theodoro.MN-NTB-LEANDROT\...`); cannot function on the current machine; last git touch `9c62bd3a2` (early 2026) |
-| `dev-api.ps1`, `dev-api-web.ps1`, `dev-api-perf.ps1` | Alternate dev launch wrappers without the freshness checks of `start-api.ps1`; non-authoritative per CLAUDE.md §1 |
-| `start-api-no-build.ps1` | Starts API without build step (no freshness check) |
+| `dev-api.ps1`, `dev-api-perf.ps1` | Alternate dev launch wrappers without the freshness checks of `start-api.ps1`; non-authoritative per CLAUDE.md §1 |
 | `spec2_phase1_smoke.sh` | spec2 phase 1 smoke test (legacy) |
 | `w5-preflight-dump.sh`, `w5-rollback.sh` | Phase-5 preflight/rollback helpers |
 | `docx-v2-seed-minio.sh`, `docx-v2-verify-migrations.sh` | docx-v2 seeding helpers |
@@ -577,7 +575,7 @@ These flags are tracked in [./legacy-register.md](./legacy-register.md).
 |---|---|---|---|
 | **DEAD-BINARY** | `cmd/seed-test-document/main.go` | Dead binary | Hardcoded DSN and MinIO credentials; no CI reference; no canonical script; `seed-test-document.exe` in `.gitignore`. Last git touch: commit `c4a7d9a93` (2026-04). RF candidate for deletion. |
 | **DEAD-SCRIPT-1** | `scripts/start-spec1-api.ps1` | Dead script | Contains hardcoded absolute path to a different machine username (`C:\Users\leandro.theodoro.MN-NTB-LEANDROT\...`). Cannot function on current machine. Last git touch: commit `9c62bd3a2` (early 2026). |
-| **LEGACY-SCRIPT** | `scripts/start-api-planc.ps1` | Legacy script | Plan-C variant targeting port 8083 for a specific worktree. Last git touch: `403ad2eef` (2026-04). Not referenced by CI. Retain for context or delete. |
+| ~~**LEGACY-SCRIPT**~~ | ~~`scripts/start-api-planc.ps1`~~ | **CLOSED TST-13 (2026-07-01)** | Deleted — Plan-C variant targeting port 8083 for a specific worktree; not referenced by CI or docs. |
 | ~~**EMPTY-PKG**~~ | ~~`internal/platform/cache/`~~ | **CLOSED Wave 1 (F-08)** | Deleted; `.gitkeep` + directory removed (REQ-TOP-3). |
 | ~~**ORPHAN-SURFACE**~~ | ~~`api/openapi/spec2.yaml` + `internal/api/v2/`~~ | **CLOSED Wave 1 (F-03)** | Both deleted; contract tests migrated to `problem.Problem`; `capability-catalog-hash` CI job removed (REQ-API-2). |
 | ~~**BROKEN-GATE**~~ | ~~`ops/CAPABILITY_CATALOG.sha256`~~ | **CLOSED Wave 1 (F-03)** | File deleted; its CI job removed; real REQ-AUTHZ-5 guard = api-lint registry rules. |
