@@ -806,6 +806,14 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 	// resolverReg built later at the composition root for runtime resolution.
 	templatesResolverReg := resolvers.NewRegistry()
 	resolvers.RegisterBuiltins(templatesResolverReg)
+	// SEC-08 fail-fast: PHComputed.resolver_key validation (schema.go ValidatePlaceholders)
+	// silently no-ops when the ResolverRegistryReader is nil or empty, letting an
+	// arbitrary resolver_key persist into published templates and every document
+	// instantiated from them (wiki/modules/templates-tech-debt.md T-008). Assert the
+	// registry is wired and non-empty at boot instead of trusting the call graph.
+	if templatesResolverReg == nil || len(templatesResolverReg.Known()) == 0 {
+		return nil, nil, nil, errors.New("templates resolver registry is nil or empty; resolver_key validation would be silently skipped (SEC-08 / T-008)")
+	}
 	templatesRepo := templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter)
 	templatesSvc := templatesapp.New(templatesRepo, templatesPresigner, wiring.Clock{}, wiring.UUIDGen{}, templatesResolverReg).WithRunner(db.NewTxRunner(deps.SQLDB))
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {

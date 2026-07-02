@@ -84,7 +84,7 @@ func (h *Handler) handleMfaCoverage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.service == nil {
-		writeMfaCoverageZero(w)
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Security service is not configured"))
 		return
 	}
 	coverage, err := h.service.MfaCoverage(r.Context(), tenantID)
@@ -106,7 +106,7 @@ func (h *Handler) handleLockouts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.service == nil {
-		writeJSON(w, http.StatusOK, lockoutsResponse{Items: []lockoutItem{}})
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Security service is not configured"))
 		return
 	}
 	items, err := h.service.ListLockouts(r.Context(), tenantID)
@@ -146,7 +146,7 @@ func (h *Handler) handleSignals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.service == nil {
-		writeJSON(w, http.StatusOK, signalsResponse{Items: []signalItem{}})
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, problem.CodeInternalError, "Security service is not configured"))
 		return
 	}
 	signals, err := h.service.ListSignals(r.Context(), tenantID)
@@ -211,11 +211,3 @@ func mfaCoverageToJSON(c securitydomain.MfaCoverage) mfaCoverageResponse {
 	}
 }
 
-func writeMfaCoverageZero(w http.ResponseWriter) {
-	writeJSON(w, http.StatusOK, mfaCoverageResponse{
-		TotalUsers:    0,
-		MfaEnabled:    0,
-		MfaEnabledPct: 0,
-		ByRole:        []mfaCoverageByRoleItem{},
-	})
-}

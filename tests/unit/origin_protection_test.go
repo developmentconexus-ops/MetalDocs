@@ -119,6 +119,33 @@ func TestOriginProtectionHonorsXForwardedProtoFromTrustedProxy(t *testing.T) {
 	}
 }
 
+// TestOriginProtectionBlocksCrossOriginPost verifies the core CSRF case
+// (SEC-07): a state-changing request carrying a session cookie and an
+// explicit foreign Origin header (not same-origin, not in the trusted-origin
+// allowlist) is rejected — distinct from the missing-Origin and
+// spoofed-X-Forwarded-Proto cases already covered above.
+func TestOriginProtectionBlocksCrossOriginPost(t *testing.T) {
+	protector := security.NewOriginProtection(security.OriginProtectionConfig{
+		Enabled:           true,
+		SessionCookieName: "metaldocs_session",
+		TrustedOrigins:    []string{"http://127.0.0.1:4173"},
+	})
+
+	handler := protector.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8080/api/v1/auth/change-password", nil)
+	req.AddCookie(&http.Cookie{Name: "metaldocs_session", Value: "session-token"})
+	req.Header.Set("Origin", "https://evil.example")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected cross-origin POST to be rejected, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestOriginProtectionAllowsGetWithoutOrigin(t *testing.T) {
 	protector := security.NewOriginProtection(security.OriginProtectionConfig{
 		Enabled:           true,
