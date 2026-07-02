@@ -1,131 +1,84 @@
+# --- Secrets (never commit) ---
+.env
+.env.docx-renderer
+.env.docgen-v2
+
+# --- Build artifacts (pattern-based; no binaries in repo) ---
+*.exe
+*.exe~
+bin/
+*.tsbuildinfo
+
+# --- Logs & runtime captures (pattern-based) ---
+*.log
+*.out
+*.err
+logs/
+docx-renderer.*.log
+docgen-v2.*.log
+
+# --- Local QA scratch (cookie jars, request/response captures) ---
+cookies.txt
+qa-*.txt
+qa-session.tmp
+*-payload.json
+login-response.txt
+
+# --- Caches & package stores ---
 .gocache/
 .gocache-build/
+.gomodcache/
+.pnpm-store/
 node_modules/
-metaldocs-api.exe
-metaldocs-api-local.exe
-metaldocs-api-local.exe~
-api-lint.exe
-api_err.log
-api_out.log
-.env
-backups/
-non_git/
-non_git/db/reference-schema/
-tmp_api_err.log
-tmp_api_out.log
-tmp_web_err.log
-tmp_web_out.log
-tmp-*.log
-tmp-*.err.log
-tmp-*.out.log
 frontend/apps/web/node_modules/
+apps/docgen/node_modules/
+apps/docx-renderer/node_modules/
+
+# --- Frontend build/test output ---
 frontend/apps/web/dist/
-frontend/apps/web/*.tsbuildinfo
 frontend/apps/web/vite.config.js
 frontend/apps/web/vite.config.d.ts
-carbone/renders/
-.tmp/
-.tmp*
-tmp/
-.superpowers/
 frontend/apps/web/test-results/
 frontend/apps/web/playwright-report/
 frontend/apps/web/.cache/
-apps/docgen/node_modules/
-apps/docgen/dist/
-apps/docx-renderer/node_modules/
-apps/docx-renderer/dist/
-
-.worktrees/
-.pnpm-store/
-.claude/settings.local.json
-apps/ck5-studio/.dev.err
 frontend/apps/web/.tmp-main-tsc.txt
-\!
-coverage_phase5.out
-.claude/worktrees/
+frontend/apps/web/tmp-*.docx
+frontend/apps/web/design-source/.design-canvas.state.json
+frontend/apps/web/design-source/uploads/
+apps/docgen/dist/
+apps/docx-renderer/dist/
+apps/ck5-studio/.dev.err
+
+# --- Scratch & temp dirs ---
+.tmp/
+.tmp*
+tmp/
+tmp_*
+backups/
+non_git/
+carbone/renders/
+.clone/
+
+# --- Tooling runtime (Claude / Codex / superpowers) ---
+.claude/settings.local.json
 .claude/launch.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.claude/agents/
+frontend/apps/web/.claude/
 .codex/
 .codex-run/
 .codex-gocache/
-.gomodcache/
-worker.err.log
-worker.out.log
-frontend/apps/web/design-source/.design-canvas.state.json
-.env.docx-renderer
-
-# Build artifacts
-bin/*.exe
-*.exe~
-metaldocs-e2e-seed.exe
-metaldocs-worker.exe
-seed-test-document.exe
-
-# Runtime log files
-api-*.log
-api-*.err.log
-api-*.out.log
-api-*.err
-api-*.out
-api-new.log
-api-restart.log
-docx-renderer.log
-docx-renderer.err
-docx-renderer.*.log
-# Legacy name (pre-rename from docgen-v2)
-docgen-v2.log
-docgen-v2.err
-docgen-v2.*.log
-.env.docgen-v2
-worker.log
-worker-*.log
-worker-*.err.log
-worker-*.out.log
-frontend/apps/web/vite-*.log
-frontend/apps/web/vite-*.err.log
-frontend/apps/web/vite-*.out.log
-frontend/apps/web/tmp-*.docx
-
-# Codex runtime dirs
 .codex-appdata/
 .codex-go-build-cache/
-.clone/
+.superpowers/
+.worktrees/
+memory/
 
-# Claude sub-project and runtime artifacts
-.claude/scheduled_tasks.lock
-frontend/apps/web/.claude/
-frontend/apps/web/design-source/uploads/
-
-# Claude agents config
-.claude/agents/
-
-# Superpowers plans/reviews (AI session artifacts)
+# --- AI session artifacts (not canonical docs) ---
 docs/superpowers/plans/
 docs/superpowers/reviews/
 reviews/
 # Canonical wiki reviews (multi-session review tracker) are NOT ignored
 !wiki/reviews/
 !wiki/reviews/**
-
-# Local QA session artifacts (cookie jars, scratch tmp)
-qa-*.txt
-qa-session.tmp
-
-# Additional build artifacts
-metaldocs-jobs.exe
-
-# Loose debug logs
-debug.log
-
-# Local QA scratch (cookies, request/response captures, dev logs)
-cookies.txt
-*-payload.json
-login-response.txt
-frontend-dev.log
-frontend-dev.err.log
-
-# Claude project-root memory (local session state — not for repo)
-memory/
-
-# API stdout/stderr capture (start-api.ps1 tee)
-logs/

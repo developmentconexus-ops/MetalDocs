@@ -4,6 +4,20 @@ on:
     branches: [main, develop]
 
 jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build all packages
+        run: go build ./...
+      - name: Run full unit test suite
+        run: go test -count=1 -timeout 600s ./...
+        timeout-minutes: 12
+
   smoke:
     runs-on: ubuntu-latest
     services:
