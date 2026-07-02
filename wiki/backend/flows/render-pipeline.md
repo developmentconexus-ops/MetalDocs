@@ -1,6 +1,6 @@
 # Document Render Pipeline — End-to-End Flow
 
-> **Last verified:** 2026-06-11
+> **Last verified:** 2026-07-01 (ARC-01: §7 template reader fallback flipped canonical-first; legacy `TemplateReader` is now fallback-only with a residual-hit counter + WARN log) | **Prior:** 2026-06-11
 > **Scope:** The complete render pipeline: from approval trigger through placeholder resolution (Pin), async DOCX materialization (Materialize), PDF conversion, to frozen artifact storage. Covers all five flows: primary async freeze, legacy synchronous freeze, PDF conversion, forensic reconstruction, and template reader fallback. Includes all actors: Go API binary, Go worker binary, docx-renderer sidecar, Gotenberg, and MinIO.
 > **Key files:**
 > - `internal/modules/documents/application/freeze_service.go`
@@ -231,18 +231,20 @@ sequenceDiagram
 
 This is not a user-visible flow but an infrastructure-layer branching path used each time a materialize job needs the template DOCX.
 
+**ARC-01 (2026-07-01): canonical-first.** `FanoutTemplateReader` reads the canonical `templates_template_version`/`templates_template` family first; the legacy `template_versions`/`templates` reader is fallback-only, invoked only on `sql.ErrNoRows` from the canonical read.
+
 ```mermaid
 flowchart TD
-    A["FreezeService.Materialize\ncalls SnapshotReader or TplRead"] --> B["FanoutTemplateReader.GetPublishedVersion\n(platform/docgenv2/templates_reader.go:53)"]
-    B --> C["TemplateReader.GetPublishedVersion\n(legacy: template_versions / templates)\nSchema JSON fetched from MinIO"]
-    C -->|"sql.ErrNoRows"| D["TemplatesTemplateReader.GetPublishedVersion\n(new: templates_template_version / templates_template)\nSchema always ''"]
+    A["FreezeService.Materialize\ncalls SnapshotReader or TplRead"] --> B["FanoutTemplateReader.GetPublishedVersion\n(platform/docgenv2/templates_reader.go)"]
+    B --> C["TemplatesTemplateReader.GetPublishedVersion\n(canonical: templates_template_version / templates_template)\nSchema always ''"]
+    C -->|"sql.ErrNoRows"| D["TemplateReader.GetPublishedVersion\n(legacy: template_versions / templates)\nSchema JSON fetched from MinIO"]
     C -->|"any other error"| E["return error — no fallback"]
-    C -->|"row found"| F["return version with schema JSON"]
-    D -->|"found"| G["return version, schema = ''"]
+    C -->|"found"| F["return version, schema = ''"]
+    D -->|"found"| G["return version with schema JSON\n(increments legacyTemplateReadTotal + WARN log)"]
     D -->|"not found"| H["return sql.ErrNoRows"]
 ```
 
-This fallback exists because the codebase is mid-migration between two template schemas. Once the legacy `template_versions`/`templates` tables are fully migrated, `TemplateReader` and the `FanoutTemplateReader` chain should be removed.
+This fallback exists because the codebase is mid-migration between two template schemas. Every legacy-fallback hit is counted (`docgenv2.LegacyTemplateReadCount()`) and logged at WARN with `tenant_id`/`template_version_id`, so a full run window can prove zero residual legacy reads. Once that run-window proof holds, DB-01 removes `TemplateReader`, the `FanoutTemplateReader` chain, and the legacy `template_versions`/`templates` tables.
 
 ---
 

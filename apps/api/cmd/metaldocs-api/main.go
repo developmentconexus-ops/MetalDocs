@@ -431,9 +431,11 @@ func main() {
 	docDeps := documents.Dependencies{
 		DB:      deps.SQLDB,
 		Presign: docPresigner,
+		// ARC-01: canonical templates_template_version read first; legacy
+		// template_versions is fallback-only (docgenv2.FanoutTemplateReader).
 		TplRead: docgenv2.NewFanoutTemplateReader(
-			docgenv2.NewTemplateReader(deps.SQLDB, docPresigner),
 			docgenv2.NewTemplatesTemplateReader(deps.SQLDB),
+			docgenv2.NewTemplateReader(deps.SQLDB, docPresigner),
 		),
 		FormVal:                      formval.NewGojsonschema(),
 		Audit:                        wiring.NewDocumentsAuditSink(deps.AuditWriter),
