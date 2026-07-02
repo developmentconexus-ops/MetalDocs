@@ -40,8 +40,8 @@ Three stages across two binaries and the API process.
 
 When an approval decision triggers PDF dispatch:
 
-1. `fanout.PDFDispatchAdapter.DispatchPDF` calls `pdfOutboxRepo.Enqueue` inside the approvals transaction, inserting a row into `metaldocs.pdf_dispatch_outbox` with `status='pending'`.
-2. The `PDFOutboxWorker` goroutine polls `pdf_dispatch_outbox` every 5 s (`internal/modules/render/fanout/pdf_outbox_worker.go:35` — `pollEvery: 5 * time.Second` in `NewPDFOutboxWorker`). It claims up to 10 rows with `FOR UPDATE SKIP LOCKED`, then calls `messaging.Publisher.Publish` for each row, inserting into `metaldocs.outbox_events` with `idempotency_key = "docgen_v2_pdf:{tenantID}:{revisionID}"` (ON CONFLICT DO NOTHING).
+1. `DecisionService` calls `s.pdfOutbox.Enqueue` (`fanout.StagingOutboxRepository`, `decision_service.go:535`) inside the approvals transaction, inserting a row into `metaldocs.pdf_dispatch_outbox` with `status='pending'` (APP-01 2026-07-01: the former `PDFDispatchAdapter` post-commit path is deleted — outbox is the only dispatch path).
+2. A `fanout.StagingOutboxWorker` goroutine (PDF instance wired at `apps/api/cmd/metaldocs-api/main.go:930`; poll interval/batch from `config.StagingOutboxWorkerConfig`) polls `pdf_dispatch_outbox`. It claims rows with `FOR UPDATE SKIP LOCKED`, then calls `messaging.Publisher.Publish` for each row, inserting into `metaldocs.outbox_events` with `idempotency_key = "docgen_v2_pdf:{tenantID}:{revisionID}"` (ON CONFLICT DO NOTHING).
 
 ### Stage B — Outbox claim and PDF execution (in worker binary)
 

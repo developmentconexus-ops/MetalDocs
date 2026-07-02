@@ -69,7 +69,7 @@ a template without the resolver erroring on unpublished documents.
 
 1. Freeze service substitutes the 8 fixed tokens in the DOCX (eigenpal-native format).
 2. Frozen DOCX uploaded to MinIO.
-3. PDFDispatcher publishes a `docgen_v2_pdf` outbox event with `messaging.PDFConvertPayload`.
+3. `DecisionService` enqueues a `pdf_dispatch_outbox` row inside the approval transaction; `StagingOutboxWorker` polls it and publishes the `docgen_v2_pdf` event with `messaging.PDFConvertPayload` (APP-01 2026-07-01: the old post-commit `PDFDispatcher`/`PDFDispatchAdapter` path was deleted — outbox is the only dispatch path).
 4. PDFJobRunner picks up the typed payload, calls Gotenberg via docx-renderer.
 5. Resulting PDF stored alongside the DOCX in MinIO.
 

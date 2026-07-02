@@ -492,8 +492,8 @@ Multiple files or types are confirmed dead code — either explicitly deprecated
 | Artifact | Status | Location |
 |---|---|---|
 | `CutoverService` | Dead post-migration-0142 (applied ~1 year ago); not in Services struct; no HTTP route; reachable only from `coverage_boost_test.go` | `internal/modules/documents/approval/application/cutover_service.go:1-80` |
-| Deprecated `PDFDispatchInvoker` post-commit dispatch path | Compiled but inactive when pdfOutbox is wired (production case); silently activates if caller omits outbox wiring | `internal/modules/documents/approval/application/decision_service.go:43,60,64,566-573` |
-| `FreezeService.Freeze` synchronous path | Annotated 'New code should use Pin + Materialize instead'; unclear if any production callsite still exercises it | `internal/modules/documents/application/freeze_service.go:302` |
+| ~~Deprecated `PDFDispatchInvoker` post-commit dispatch path~~ | **CLOSED 2026-07-01 (APP-01):** invoker surface removed earlier (5a6b407b, d7609020); orphaned `PDFDispatcher`/`PDFDispatchAdapter` + tests deleted from `render/fanout` — outbox path is the only dispatcher | — |
+| ~~`FreezeService.Freeze` synchronous path~~ | **CLOSED (d7609020):** synchronous Freeze deleted; Pin + Materialize only | — |
 | `CompositionConfig` struct | ADR 0008 removed composition 2026-04-27; struct exported with no inbound callers | `internal/modules/templates/domain/schemas.go:81` |
 | `AreaService.SetParent` (cycle-safe, transactional) | Only called from `area_service_test.go:49`; production updateArea handler calls AreaService.Update instead (without cycle check) | `internal/modules/taxonomy/application/area_service.go:111` |
 | `SnapshotService.SnapshotFromTemplate` | Marked deprecated; retained for unnamed backfill scripts | `internal/modules/documents/application/snapshot_service.go:46` |

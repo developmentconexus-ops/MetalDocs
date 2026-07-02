@@ -39,11 +39,10 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Linked backlog row:** `backlog/approval-refactor.md#R-003` (merged Plan 7 2026-05-11, commit `b8747d6a`)
 - **Linked ADR:** missing-ADR
 
-### T-004 · Deprecated post-commit PDF dispatcher path still compiled
-- **Severity:** major
-- **Surface:** `internal/modules/documents/approval/application/decision_service.go:43,60` (`NewDecisionService` accepts `PDFDispatchInvoker`; `WithPDFOutbox` overlays optional outbox); `internal/modules/render/fanout/pdf_dispatcher.go:27`
-- **Observation:** When a caller constructs `DecisionService` without `WithPDFOutbox`, the legacy post-commit `PDFDispatchInvoker.Dispatch` path runs. That path emits `messaging.Event` with empty `IdempotencyKey`; if the messaging bus dedupes by `IdempotencyKey`, dispatches after the first one are silently dropped. Composition root `apps/api/cmd/metaldocs-api/main.go:494-497` does wire `WithPDFOutbox(pdfOutboxRepo)`, so live binary uses the outbox path — but the deprecated surface remains constructible (test fixtures, future callers).
-- **Evidence:** prior stub "Outbox idempotency_key bug"; cross-deps artifact §3 `apps/api/cmd/metaldocs-api/main.go:494-497`.
+### T-004 · ~~Deprecated post-commit PDF dispatcher path still compiled~~ CLOSED 2026-07-01
+- **Severity:** ~~major~~ closed
+- **Resolution (APP-01, grade-A simplification):** the deprecated surface no longer exists. `PDFDispatchInvoker` was removed from `DecisionService` earlier (rename `5a6b407b`, Freeze-path deletion `d7609020` — outbox is the only dispatch path; no `WithPDFOutbox` overlay remains). The empty-`IdempotencyKey` hazard was fixed in `5b7a155a` (key always `"docgen_v2_pdf:"+TenantID+":"+RevisionID`). The last remnant — orphaned `PDFDispatcher`/`PDFDispatchAdapter` in `internal/modules/render/fanout/` (constructible only by their own tests, zero production callers) — deleted 2026-07-01 with their tests; `go build ./...` + `go test ./internal/modules/render/...` green.
+- **Evidence:** grep `NewPDFDispatcher|NewPDFDispatchAdapter` → only self-tests before deletion; composition root wires outbox-only.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-004`
 - **Linked ADR:** missing-ADR
 

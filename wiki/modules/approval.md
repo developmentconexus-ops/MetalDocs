@@ -96,7 +96,7 @@ The module owns the regulated audit hop. When a document author finalizes a revi
 
 Inbound interfaces (16 HTTP routes â€” see Â§5.3) plus 5 Go-package consumers per cross-deps artifact Â§2 (documents, documents/delivery/http, apps/jobs/cmd/metaldocs-jobs, jobs/stuck_instance_watchdog, iam test only).
 
-Outbound: `internal/modules/iam/authz` (`Require`, `RequireAll`), `internal/modules/iam/domain` (User), `internal/modules/documents/application` (`PDFDispatchInvoker`), `internal/modules/documents/domain` (`ErrDocumentNotFound`), `internal/platform/tenant` (`FromContext`), `internal/platform/idempotency` (`Store`, `Key`), `internal/test` (e2e clock offset).
+Outbound: `internal/modules/iam/authz` (`Require`, `RequireAll`), `internal/modules/iam/domain` (User), `internal/modules/documents/domain` (`ErrDocumentNotFound`), `internal/platform/tenant` (`FromContext`), `internal/platform/idempotency` (`Store`, `Key`), `internal/test` (e2e clock offset). (`PDFDispatchInvoker` removed — APP-01 2026-07-01.)
 
 ---
 
@@ -444,7 +444,7 @@ Per index IP-007: observability stack not wired in MetalDocs. Module does not as
 
 ### 8.7 Transactional outbox (PDF dispatch)
 
-`pdfOutbox.Enqueue` (`internal/modules/render/fanout/pdf_outbox_repository.go:25`) runs inside the same tx as `RecordSignoff` final-stage approval. INSERT uses `ON CONFLICT (tenant_id, revision_id) DO NOTHING`. Consumer (`render/fanout` job) drains out-of-band. Deprecated post-commit `PDFDispatchInvoker` path remains compiled â€” T-004.
+`pdfOutbox.Enqueue` (`internal/modules/render/fanout/staging_outbox.go`, `StagingOutboxRepository`) runs inside the same tx as `RecordSignoff` final-stage approval. INSERT uses `ON CONFLICT (tenant_id, revision_id) DO NOTHING`. Consumer (`StagingOutboxWorker`) drains out-of-band. The deprecated post-commit `PDFDispatchInvoker` path was fully deleted 2026-07-01 (APP-01) — T-004 closed.
 
 ---
 
@@ -492,7 +492,7 @@ Pointer-only. Body lives in `wiki/modules/approval-tech-debt.md`. Severity rubri
 
 Top 3 open (by severity, then by blast-radius):
 1. Signoff & cancel doc-scoped routes absent from OpenAPI (T-002 residual) — frontend hand-rolls types for `SignoffByDocumentHandler` / `CancelByDocumentHandler` / v2 doc-action POSTs; route-admin sub-item BE-1 resolved 2026-06-02 — see tech-debt §T-002.
-2. Deprecated post-commit `PDFDispatchInvoker` path still compiled — see tech-debt §T-004.
+2. ~~Deprecated post-commit `PDFDispatchInvoker` path still compiled~~ CLOSED 2026-07-01 (APP-01) — surface fully deleted; see tech-debt §T-004.
 3. Inbox two-query LIMIT/OFFSET + COUNT with snapshot drift — see tech-debt §T-005.
 
 ---

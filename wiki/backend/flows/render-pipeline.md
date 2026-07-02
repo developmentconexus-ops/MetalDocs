@@ -1,6 +1,6 @@
 # Document Render Pipeline — End-to-End Flow
 
-> **Last verified:** 2026-07-01 (ARC-01: §7 template reader fallback flipped canonical-first; legacy `TemplateReader` is now fallback-only with a residual-hit counter + WARN log) | **Prior:** 2026-06-11
+> **Last verified:** 2026-07-01 (ARC-01: §7 template reader fallback flipped canonical-first; legacy `TemplateReader` is now fallback-only with a residual-hit counter + WARN log. APP-01: §4 legacy synchronous freeze + `PDFDispatcher`/`PDFDispatchAdapter` removed — PDF dispatch outbox-only) | **Prior:** 2026-06-11
 > **Scope:** The complete render pipeline: from approval trigger through placeholder resolution (Pin), async DOCX materialization (Materialize), PDF conversion, to frozen artifact storage. Covers all five flows: primary async freeze, legacy synchronous freeze, PDF conversion, forensic reconstruction, and template reader fallback. Includes all actors: Go API binary, Go worker binary, docx-renderer sidecar, Gotenberg, and MinIO.
 > **Key files:**
 > - `internal/modules/documents/application/freeze_service.go`
@@ -135,38 +135,15 @@ sequenceDiagram
 
 ---
 
-## 4. Flow 2: legacy synchronous freeze
+## 4. Flow 2: legacy synchronous freeze — REMOVED
 
-This path is **explicitly superseded** by Pin+Materialize. The comment at `freeze_service.go:300` reads: "New code should use Pin (in-tx) + Materialize (async worker) instead." It remains exported and callable.
-
-```mermaid
-sequenceDiagram
-    participant Caller
-    participant FreezeSync as FreezeService.Freeze<br/>(freeze_service.go:302)
-    participant FanoutCli as fanout.Client
-    participant DocxRend as docx-renderer
-    participant MinIO
-    participant PDFDispatch as PDFDispatchAdapter
-
-    Caller->>FreezeSync: Freeze(ctx, revisionID)
-    FreezeSync->>FreezeSync: pinValidateAndHash() [same as Pin path]
-    FreezeSync->>FanoutCli: Fanout(FanoutRequest) [BLOCKS calling goroutine]
-    FanoutCli->>DocxRend: POST /render/fanout
-    DocxRend->>MinIO: read body DOCX, write frozen.docx
-    DocxRend-->>FanoutCli: response
-    FreezeSync->>FreezeSync: FinalDocxWriter.WriteFinalDocx (final_docx_s3_key, content_hash)
-    FreezeSync-->>Caller: return
-    note over Caller,PDFDispatch: Caller must separately call PDFDispatchAdapter.Dispatch<br/>to enqueue the PDF job — not done automatically
-    Caller->>PDFDispatch: Dispatch(ctx, revisionID)
-```
-
-[runtime-unverified]: Confirm whether any live callsite still invokes `FreezeService.Freeze` in production, or whether it can be removed.
+This path no longer exists. `FreezeService.Freeze` (blocking, synchronous fanout in the caller's goroutine) was deleted in `d7609020`; the companion post-commit `PDFDispatcher`/`PDFDispatchAdapter` surface was deleted 2026-07-01 (APP-01, grade-A simplification). Pin (in-tx) + Materialize (async worker) is the only freeze path; PDF dispatch is outbox-only (`DecisionService` → `pdf_dispatch_outbox` → `StagingOutboxWorker`). See flow 1 above.
 
 ---
 
 ## 5. Flow 3: PDF conversion (Gotenberg direct path)
 
-This flow is triggered by `docgen_v2_pdf` events in the outbox, produced either by `PDFOutboxWorker` (async path) or directly by `PDFDispatchAdapter` (legacy path).
+This flow is triggered by `docgen_v2_pdf` events in the outbox, produced by the PDF `StagingOutboxWorker` instance (the only producer — APP-01 deleted the legacy `PDFDispatchAdapter` direct path).
 
 ```mermaid
 sequenceDiagram
