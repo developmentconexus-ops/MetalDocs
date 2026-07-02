@@ -74,14 +74,14 @@ type FamilyTx interface {
 }
 
 type FamilyRepository interface {
-	GetByCode(ctx context.Context, code FamilyCode) (*DocumentFamily, error)
-	List(ctx context.Context, includeInactive bool) ([]DocumentFamily, error)
+	GetByCode(ctx context.Context, tenantID string, code FamilyCode) (*DocumentFamily, error)
+	List(ctx context.Context, tenantID string, includeInactive bool) ([]DocumentFamily, error)
 	Create(ctx context.Context, f *DocumentFamily) error
 	CreateTx(ctx context.Context, tx FamilyTx, f *DocumentFamily) error
 	Update(ctx context.Context, f *DocumentFamily) error
 	HasActiveProfiles(ctx context.Context, tenantID string, familyCode FamilyCode) (bool, error)
 	BeginTx(ctx context.Context) (FamilyTx, error)
-	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, code FamilyCode) (*DocumentFamily, error)
+	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID string, code FamilyCode) (*DocumentFamily, error)
 	HasActiveProfilesTx(ctx context.Context, tx FamilyTx, tenantID string, familyCode FamilyCode) (bool, error)
 	// Tx methods intentionally mirror the non-tx methods so services can stage
 	// lock/read/write flows without leaking transaction details into callers.

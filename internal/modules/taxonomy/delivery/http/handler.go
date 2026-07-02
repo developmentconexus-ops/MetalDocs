@@ -26,8 +26,8 @@ type areaService interface {
 }
 
 type familyService interface {
-	List(ctx context.Context, includeInactive bool) ([]domain.DocumentFamily, error)
-	Get(ctx context.Context, code domain.FamilyCode) (*domain.DocumentFamily, error)
+	List(ctx context.Context, tenantID string, includeInactive bool) ([]domain.DocumentFamily, error)
+	Get(ctx context.Context, tenantID string, code domain.FamilyCode) (*domain.DocumentFamily, error)
 	Create(ctx context.Context, f *domain.DocumentFamily) error
 	Update(ctx context.Context, f *domain.DocumentFamily) (*domain.DocumentFamily, error)
 	Deactivate(ctx context.Context, code domain.FamilyCode) error

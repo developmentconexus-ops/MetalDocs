@@ -85,6 +85,7 @@ SELECT EXISTS (
 func family(code string) *domain.DocumentFamily {
 	return &domain.DocumentFamily{
 		Code:        domain.FamilyCode(code),
+		TenantID:    "tenant-a",
 		Name:        "Procedimentos",
 		Description: "Familia global para fluxo de editor",
 		IsActive:    true,

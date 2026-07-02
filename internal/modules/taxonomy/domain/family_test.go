@@ -25,6 +25,7 @@ func TestDocumentFamily_DeactivateAlreadyInactive(t *testing.T) {
 func TestNewDocumentFamily_NormalizesAndActivates(t *testing.T) {
 	family, err := NewDocumentFamily(DocumentFamily{
 		Code:        " policy ",
+		TenantID:    " tenant-a ",
 		Name:        " Policy ",
 		Description: " Desc ",
 		IsActive:    false,
@@ -32,7 +33,7 @@ func TestNewDocumentFamily_NormalizesAndActivates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if family.Code != "policy" || family.Name != "Policy" || family.Description != "Desc" {
+	if family.Code != "policy" || family.TenantID != "tenant-a" || family.Name != "Policy" || family.Description != "Desc" {
 		t.Fatalf("unexpected normalized family: %#v", family)
 	}
 	if !family.IsActive {
@@ -44,7 +45,10 @@ func TestNewDocumentFamily_RequiredFields(t *testing.T) {
 	if _, err := NewDocumentFamily(DocumentFamily{Name: "Policy"}); !errors.Is(err, ErrFamilyCodeRequired) {
 		t.Fatalf("expected ErrFamilyCodeRequired, got %v", err)
 	}
-	if _, err := NewDocumentFamily(DocumentFamily{Code: "policy"}); !errors.Is(err, ErrFamilyNameRequired) {
+	if _, err := NewDocumentFamily(DocumentFamily{Code: "policy"}); !errors.Is(err, ErrFamilyTenantRequired) {
+		t.Fatalf("expected ErrFamilyTenantRequired, got %v", err)
+	}
+	if _, err := NewDocumentFamily(DocumentFamily{Code: "policy", TenantID: "tenant-a"}); !errors.Is(err, ErrFamilyNameRequired) {
 		t.Fatalf("expected ErrFamilyNameRequired, got %v", err)
 	}
 }

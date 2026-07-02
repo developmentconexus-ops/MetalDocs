@@ -27,7 +27,12 @@ func (h *Handler) listFamilies(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "include_inactive must be true or false")
 		return
 	}
-	items, err := h.families.List(r.Context(), includeInactive)
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+	items, err := h.families.List(r.Context(), tenantID, includeInactive)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list families")
 		return
@@ -51,8 +56,14 @@ func (h *Handler) createFamily(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "name is required")
 		return
 	}
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 	f := &domain.DocumentFamily{
 		Code:        domain.FamilyCode(req.Code),
+		TenantID:    tenantID,
 		Name:        strings.TrimSpace(req.Name),
 		Description: strings.TrimSpace(req.Description),
 	}
@@ -64,7 +75,12 @@ func (h *Handler) createFamily(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getFamily(w http.ResponseWriter, r *http.Request) {
-	f, err := h.families.Get(r.Context(), domain.FamilyCode(r.PathValue("code")))
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+	f, err := h.families.Get(r.Context(), tenantID, domain.FamilyCode(r.PathValue("code")))
 	if err != nil {
 		h.writeFamilyError(w, err)
 		return
@@ -78,8 +94,14 @@ func (h *Handler) updateFamily(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
 		return
 	}
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 	f := &domain.DocumentFamily{
 		Code:        domain.FamilyCode(r.PathValue("code")),
+		TenantID:    tenantID,
 		Name:        strings.TrimSpace(req.Name),
 		Description: strings.TrimSpace(req.Description),
 	}

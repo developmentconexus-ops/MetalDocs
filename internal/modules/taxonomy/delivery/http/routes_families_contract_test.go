@@ -10,16 +10,17 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeFamilyService struct {
 	createErr error
 }
 
-func (f fakeFamilyService) List(_ context.Context, includeInactive bool) ([]domain.DocumentFamily, error) {
+func (f fakeFamilyService) List(_ context.Context, tenantID string, includeInactive bool) ([]domain.DocumentFamily, error) {
 	return nil, nil
 }
-func (f fakeFamilyService) Get(_ context.Context, code domain.FamilyCode) (*domain.DocumentFamily, error) {
+func (f fakeFamilyService) Get(_ context.Context, tenantID string, code domain.FamilyCode) (*domain.DocumentFamily, error) {
 	return nil, domain.ErrFamilyNotFound
 }
 func (f fakeFamilyService) Create(_ context.Context, fam *domain.DocumentFamily) error {
@@ -36,6 +37,7 @@ func TestFamiliesHandler_GetMissing_Returns404(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/taxonomy/families/missing", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -58,6 +60,7 @@ func TestFamiliesHandler_ListReturns200(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/taxonomy/families", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -72,6 +75,7 @@ func TestFamiliesHandler_CreateUniqueViolationReturns409(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/families", strings.NewReader(`{"code":"F1","name":"Family"}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -86,6 +90,7 @@ func TestFamiliesHandler_CreateConstraintViolationReturnsGenericValidationMessag
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/families", strings.NewReader(`{"code":"F1","name":"Family"}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

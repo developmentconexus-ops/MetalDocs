@@ -26,9 +26,9 @@ func TestFamilyRepository_Create_SetsAuthzGUCBeforeRequire(t *testing.T) {
 	mock.ExpectBegin()
 	expectTaxonomyManageAuthz(mock, "actor-1", "tenant-a")
 	mock.ExpectExec(regexp.QuoteMeta(`
-INSERT INTO metaldocs.document_families (code, name, description, is_active)
-VALUES ($1, $2, $3, $4)`)).
-		WithArgs("procedure", "Procedimentos", "Familia global para fluxo de editor", true).
+INSERT INTO metaldocs.document_families (code, tenant_id, name, description, is_active)
+VALUES ($1, $2, $3, $4, $5)`)).
+		WithArgs("procedure", "tenant-a", "Procedimentos", "Familia global para fluxo de editor", true).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -119,16 +119,16 @@ func TestFamilyRepository_GetByCodeForUpdate_RequiresAuthzBeforeLock(t *testing.
 
 	expectTaxonomyManageAuthz(mock, "actor-1", "tenant-a")
 	mock.ExpectQuery(regexp.QuoteMeta(`
-SELECT code, name, description, is_active, created_at
+SELECT code, tenant_id, name, description, is_active, created_at
 FROM metaldocs.document_families
-WHERE code = $1
+WHERE tenant_id = $1 AND code = $2
 FOR UPDATE`)).
-		WithArgs("procedure").
-		WillReturnRows(sqlmock.NewRows([]string{"code", "name", "description", "is_active", "created_at"}).
-			AddRow("procedure", "Procedimentos", "Familia global para fluxo de editor", true, time.Date(2026, 5, 26, 0, 0, 0, 0, time.UTC)))
+		WithArgs("tenant-a", "procedure").
+		WillReturnRows(sqlmock.NewRows([]string{"code", "tenant_id", "name", "description", "is_active", "created_at"}).
+			AddRow("procedure", "tenant-a", "Procedimentos", "Familia global para fluxo de editor", true, time.Date(2026, 5, 26, 0, 0, 0, 0, time.UTC)))
 	mock.ExpectRollback()
 
-	if _, err := repo.GetByCodeForUpdate(ctx, tx, "procedure"); err != nil {
+	if _, err := repo.GetByCodeForUpdate(ctx, tx, "tenant-a", "procedure"); err != nil {
 		t.Fatalf("GetByCodeForUpdate: %v", err)
 	}
 	if err := tx.Rollback(); err != nil {

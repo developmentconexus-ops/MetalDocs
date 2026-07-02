@@ -22,16 +22,16 @@ func NewFamilyService(families domain.FamilyRepository, govLogger domain.Governa
 	return &FamilyService{families: families, govLogger: govLogger}
 }
 
-func (s *FamilyService) List(ctx context.Context, includeInactive bool) ([]domain.DocumentFamily, error) {
-	families, err := s.families.List(ctx, includeInactive)
+func (s *FamilyService) List(ctx context.Context, tenantID string, includeInactive bool) ([]domain.DocumentFamily, error) {
+	families, err := s.families.List(ctx, tenantID, includeInactive)
 	if err != nil {
 		return nil, fmt.Errorf("taxonomy: list families: %w", err)
 	}
 	return families, nil
 }
 
-func (s *FamilyService) Get(ctx context.Context, code domain.FamilyCode) (*domain.DocumentFamily, error) {
-	family, err := s.families.GetByCode(ctx, code)
+func (s *FamilyService) Get(ctx context.Context, tenantID string, code domain.FamilyCode) (*domain.DocumentFamily, error) {
+	family, err := s.families.GetByCode(ctx, tenantID, code)
 	if err != nil {
 		return nil, fmt.Errorf("taxonomy: get family %q: %w", code, err)
 	}
@@ -94,12 +94,17 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 		}
 	}()
 
-	existing, err := s.families.GetByCodeForUpdate(ctx, tx, f.Code)
+	tenantID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("taxonomy: resolve tenant for family update: %w", err)
+	}
+	existing, err := s.families.GetByCodeForUpdate(ctx, tx, tenantID, f.Code)
 	if err != nil {
 		return nil, fmt.Errorf("taxonomy: lock family %q: %w", f.Code, err)
 	}
 	normalized, err := domain.NewDocumentFamily(domain.DocumentFamily{
 		Code:        existing.Code,
+		TenantID:    existing.TenantID,
 		Name:        f.Name,
 		Description: f.Description,
 	})
@@ -115,7 +120,6 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 	if err != nil {
 		return nil, fmt.Errorf("taxonomy: marshal family update governance payload: %w", err)
 	}
-	tenantID, _ := tenant.FromContext(ctx)
 	actorUserID, _ := authn.UserIDFromContext(ctx)
 	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
 		TenantID:     tenantID,
@@ -146,13 +150,13 @@ func (s *FamilyService) Deactivate(ctx context.Context, code domain.FamilyCode) 
 		}
 	}()
 
-	f, err := s.families.GetByCodeForUpdate(ctx, tx, code)
-	if err != nil {
-		return fmt.Errorf("taxonomy: lock family %q: %w", code, err)
-	}
 	tenantID, err := tenant.FromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("taxonomy: resolve tenant for family deactivate: %w", err)
+	}
+	f, err := s.families.GetByCodeForUpdate(ctx, tx, tenantID, code)
+	if err != nil {
+		return fmt.Errorf("taxonomy: lock family %q: %w", code, err)
 	}
 	hasProfiles, err := s.families.HasActiveProfilesTx(ctx, tx, tenantID, code)
 	if err != nil {

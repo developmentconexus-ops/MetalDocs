@@ -37,7 +37,7 @@ func NewFamilyRepository(db *sql.DB) *FamilyRepository {
 	return &FamilyRepository{db: db}
 }
 
-func (r *FamilyRepository) GetByCode(ctx context.Context, code domain.FamilyCode) (*domain.DocumentFamily, error) {
+func (r *FamilyRepository) GetByCode(ctx context.Context, tenantID string, code domain.FamilyCode) (*domain.DocumentFamily, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin get family tx: %w", err)
@@ -52,13 +52,13 @@ func (r *FamilyRepository) GetByCode(ctx context.Context, code domain.FamilyCode
 	}
 
 	const q = `
-SELECT code, name, description, is_active, created_at
+SELECT code, tenant_id, name, description, is_active, created_at
 FROM metaldocs.document_families
-WHERE code = $1`
+WHERE tenant_id = $1 AND code = $2`
 
 	var f domain.DocumentFamily
-	err = tx.QueryRowContext(ctx, q, code).Scan(
-		&f.Code, &f.Name, &f.Description, &f.IsActive, &f.CreatedAt,
+	err = tx.QueryRowContext(ctx, q, tenantID, code).Scan(
+		&f.Code, &f.TenantID, &f.Name, &f.Description, &f.IsActive, &f.CreatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrFamilyNotFound
@@ -69,7 +69,7 @@ WHERE code = $1`
 	return &f, nil
 }
 
-func (r *FamilyRepository) List(ctx context.Context, includeInactive bool) ([]domain.DocumentFamily, error) {
+func (r *FamilyRepository) List(ctx context.Context, tenantID string, includeInactive bool) ([]domain.DocumentFamily, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin list families tx: %w", err)
@@ -84,14 +84,15 @@ func (r *FamilyRepository) List(ctx context.Context, includeInactive bool) ([]do
 	}
 
 	q := `
-SELECT code, name, description, is_active, created_at
-FROM metaldocs.document_families`
+SELECT code, tenant_id, name, description, is_active, created_at
+FROM metaldocs.document_families
+WHERE tenant_id = $1`
 	if !includeInactive {
-		q += " WHERE is_active = TRUE"
+		q += " AND is_active = TRUE"
 	}
 	q += " ORDER BY code ASC"
 
-	rows, err := tx.QueryContext(ctx, q)
+	rows, err := tx.QueryContext(ctx, q, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +101,7 @@ FROM metaldocs.document_families`
 	out := make([]domain.DocumentFamily, 0)
 	for rows.Next() {
 		var f domain.DocumentFamily
-		if err := rows.Scan(&f.Code, &f.Name, &f.Description, &f.IsActive, &f.CreatedAt); err != nil {
+		if err := rows.Scan(&f.Code, &f.TenantID, &f.Name, &f.Description, &f.IsActive, &f.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, f)
@@ -125,9 +126,9 @@ func (r *FamilyRepository) Create(ctx context.Context, f *domain.DocumentFamily)
 		return fmt.Errorf("taxonomy: authz check Create family: %w", err)
 	}
 	const q = `
-INSERT INTO metaldocs.document_families (code, name, description, is_active)
-VALUES ($1, $2, $3, $4)`
-	if _, err := tx.ExecContext(ctx, q, f.Code, f.Name, f.Description, f.IsActive); err != nil {
+INSERT INTO metaldocs.document_families (code, tenant_id, name, description, is_active)
+VALUES ($1, $2, $3, $4, $5)`
+	if _, err := tx.ExecContext(ctx, q, f.Code, f.TenantID, f.Name, f.Description, f.IsActive); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -147,9 +148,9 @@ func (r *FamilyRepository) CreateTx(ctx context.Context, tx domain.FamilyTx, f *
 		return fmt.Errorf("taxonomy: authz check CreateTx family: %w", err)
 	}
 	const q = `
-INSERT INTO metaldocs.document_families (code, name, description, is_active)
-VALUES ($1, $2, $3, $4)`
-	_, err := sqlTx.tx.ExecContext(ctx, q, f.Code, f.Name, f.Description, f.IsActive)
+INSERT INTO metaldocs.document_families (code, tenant_id, name, description, is_active)
+VALUES ($1, $2, $3, $4, $5)`
+	_, err := sqlTx.tx.ExecContext(ctx, q, f.Code, f.TenantID, f.Name, f.Description, f.IsActive)
 	return err
 }
 
@@ -169,8 +170,8 @@ func (r *FamilyRepository) Update(ctx context.Context, f *domain.DocumentFamily)
 	const q = `
 UPDATE metaldocs.document_families
 SET name = $1, description = $2, is_active = $3
-WHERE code = $4`
-	result, err := tx.ExecContext(ctx, q, f.Name, f.Description, f.IsActive, f.Code)
+WHERE tenant_id = $4 AND code = $5`
+	result, err := tx.ExecContext(ctx, q, f.Name, f.Description, f.IsActive, f.TenantID, f.Code)
 	if err != nil {
 		return fmt.Errorf("update family %q: %w", f.Code, err)
 	}
@@ -216,7 +217,7 @@ func (r *FamilyRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error)
 	return familyTx{tx: tx}, nil
 }
 
-func (r *FamilyRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, code domain.FamilyCode) (*domain.DocumentFamily, error) {
+func (r *FamilyRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, tenantID string, code domain.FamilyCode) (*domain.DocumentFamily, error) {
 	sqlTx, ok := tx.(familyTx)
 	if !ok {
 		return nil, fmt.Errorf("invalid family tx type %T", tx)
@@ -228,14 +229,14 @@ func (r *FamilyRepository) GetByCodeForUpdate(ctx context.Context, tx domain.Fam
 		return nil, fmt.Errorf("taxonomy: authz check Get family for update: %w", err)
 	}
 	const q = `
-SELECT code, name, description, is_active, created_at
+SELECT code, tenant_id, name, description, is_active, created_at
 FROM metaldocs.document_families
-WHERE code = $1
+WHERE tenant_id = $1 AND code = $2
 FOR UPDATE`
 
 	var f domain.DocumentFamily
-	err := sqlTx.tx.QueryRowContext(ctx, q, code).Scan(
-		&f.Code, &f.Name, &f.Description, &f.IsActive, &f.CreatedAt,
+	err := sqlTx.tx.QueryRowContext(ctx, q, tenantID, code).Scan(
+		&f.Code, &f.TenantID, &f.Name, &f.Description, &f.IsActive, &f.CreatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrFamilyNotFound
@@ -284,8 +285,8 @@ func (r *FamilyRepository) UpdateTx(ctx context.Context, tx domain.FamilyTx, f *
 	const q = `
 UPDATE metaldocs.document_families
 SET name = $1, description = $2, is_active = $3
-WHERE code = $4`
-	result, err := sqlTx.tx.ExecContext(ctx, q, f.Name, f.Description, f.IsActive, f.Code)
+WHERE tenant_id = $4 AND code = $5`
+	result, err := sqlTx.tx.ExecContext(ctx, q, f.Name, f.Description, f.IsActive, f.TenantID, f.Code)
 	if err != nil {
 		return fmt.Errorf("update family tx %q: %w", f.Code, err)
 	}
