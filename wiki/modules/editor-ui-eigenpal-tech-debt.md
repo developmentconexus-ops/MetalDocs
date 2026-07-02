@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/editor-ui-eigenpal.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/editor-ui-eigenpal-refactor.md`.
 
-**Last verified:** 2026-06-23
+**Last verified:** 2026-07-02
 
 ## Severity scale
 
@@ -54,13 +54,14 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. Trigg
 - **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-008`
 - **Linked ADR:** ADR 0046 — decision recorded; implementation in Phase 3
 
-### T-009 · Worker retry not wired on `*RenderError.Retryable()`
-- **Severity:** major
-- **Surface:** `internal/modules/render/freeze_service.go` and `internal/modules/render/fanout/reconstruction.go` — both call `fanout.Client.Fanout(...)` and propagate the returned `error` without consulting `*RenderError.Retryable()`. A `template_parse` defect (permanent, 4xx) is indistinguishable from a transient 5xx from the worker's retry logic, so the worker may retry a permanently-broken template indefinitely.
-- **Observation:** `*RenderError.Retryable()` is implemented in `internal/modules/render/fanout/client.go`. Wiring `errors.As(&RenderError{})` + retry/permanent-fail branching is the missing step. Deferred from Phase 3A; planned for Phase 3B or a standalone follow-up.
-- **Evidence:** `internal/modules/render/fanout/client.go` (Retryable method); absence of `errors.As` in `freeze_service.go` and `reconstruction.go`.
-- **Linked backlog row:** (not yet filed)
-- **Linked ADR:** none
+### T-009 · Worker retry not wired on `*RenderError.Retryable()` — **RESOLVED 2026-06-26, test-hardened 2026-07-02 (APP-02)**
+- **Severity:** major → **resolved**
+- **Surface:** `internal/platform/worker/service.go` `markFailure`; error originates in `internal/modules/render/fanout/client.go` (`*RenderError`, `Retryable() bool`) and flows through `internal/modules/documents/application/freeze_service.go` (`Materialize`, wraps `fmt.Errorf("materialize: fanout: %w", err)`) and `internal/platform/worker/materialize_job_runner.go` (`Handle`, wraps `fmt.Errorf("materialize job runner: %w", err)`) into the worker's outbox failure path.
+- **Resolution (commit `9aab29c5`, 2026-06-26, "harden(eigenpal): audit remediation across ACL render + worker paths"):** `markFailure` now does a structural `errors.As(handleErr, &interface{ Retryable() bool })` match — unwrapping through both `%w` layers — and forces `attempt = MaxAttempts` when the matched error reports `Retryable() == false`, so a permanent defect (e.g. `template_parse`, 4xx) dead-letters on the very first observed failure instead of consuming the full retry budget. Transient/unclassified errors (5xx, network errors, or anything not implementing the interface) keep the existing exponential-backoff path unchanged. The match is structural (not `errors.As(&*fanout.RenderError)`) specifically so `internal/platform/worker` stays decoupled from the `render` module — no import inversion.
+- **2026-07-02 (APP-02) gap found and closed:** the fix logic existed but had zero unit-test coverage proving the branch — `service_test.go` only covered the unrelated `errUnsupportedEventType` DLQ path. `internal/modules/render/fanout/reconstruction.go`'s `ReconstructService.Reconstruct` still propagates the raw (unwrapped) `*RenderError` — that path is a manual/forensic re-render invoked outside the outbox retry loop (no worker consumer calls it), so `Retryable()` classification does not apply there; confirmed no consumer retries it blindly.
+- **Evidence:** `internal/platform/worker/service_test.go` — `TestWorkerService_NonRetryableRenderError_DeadLettersOnFirstAttempt` (permanent error → `DeadLetteredAt` set, `NextAttemptAt` nil, on `AttemptCount: 1`) and `TestWorkerService_RetryableRenderError_SchedulesBackoffLikeBefore` (transient error → `NextAttemptAt` set, `DeadLetteredAt` nil, unchanged backoff). Both drive `markFailure` with a `%w`-wrapped fake classified error mirroring the real two-layer wrap chain. `go build ./...`, `go test ./internal/platform/worker/... ./internal/modules/render/... ./internal/modules/documents/application/...`, `go vet -tags integration ./...` all green.
+- **Linked backlog row:** (not filed — resolved before filing)
+- **Linked ADR:** none (structural-interface pattern is a targeted platform/module decoupling technique, not a standalone architectural decision)
 
 ### T-010 · Renderer OTel exporter absent (REQ-OBS-3 / RF-1 deferred)
 - **Severity:** minor

@@ -1,6 +1,6 @@
 # Flow: Async Job Pipeline
 
-> **Last verified:** 2026-06-11
+> **Last verified:** 2026-07-02
 > **Scope:** End-to-end async flows for all five async subsystems — PDF generation, DOCX materialization, scheduled-publish cutover, in-API maintenance jobs, and in-API sweepers — with Mermaid sequence diagrams. Includes a jobs-vs-worker comparison table answering why both binaries exist.
 > **Key files:**
 > - `apps/worker/cmd/metaldocs-worker/main.go`
@@ -214,11 +214,14 @@ Both use `authz.WithBackgroundBypass`. No restart logic — if the goroutine exi
 | Outcome | Action | Location |
 |---------|--------|---------|
 | Handler success | `MarkPublished` — sets `published_at = now()` | `service.go:84` |
-| Handler failure, attempts < MaxAttempts | `MarkFailed` — sets `next_attempt_at = now() + backoffDuration(attempt)` | `service.go` `markFailure` |
+| Handler failure, classified non-retryable (see below), any attempt | `MarkFailed` — sets `dead_lettered_at = now()` immediately, skipping remaining retry budget | `service.go` `markFailure` |
+| Handler failure, attempts < MaxAttempts (retryable or unclassified) | `MarkFailed` — sets `next_attempt_at = now() + backoffDuration(attempt)` | `service.go` `markFailure` |
 | Handler failure, attempts >= MaxAttempts | `MarkFailed` — sets `dead_lettered_at = now()` | `service.go` `markFailure` |
 | Worker crash (in-flight at claim time) | `next_attempt_at` elapses after `claimLease = max(RetryMaxSeconds, 5min)`; row becomes claimable again | `consumer.go:25` |
 
 **Worker outbox backoff** (`service.go:130-151`): `backoffDuration(attempt) = min(base * 2^(attempt-1), max)`. The loop iterates `attempt-1` times, so attempt=1 yields `base` (no doubling), attempt=2 yields `base*2`, etc. Default: base=10s, max=300s.
+
+**Permanent-failure fast path** (`service.go` `markFailure`, added commit `9aab29c5`): before computing backoff, `markFailure` does a structural match — `errors.As(handleErr, &interface{ Retryable() bool })` — unwrapping through any `fmt.Errorf("...: %w", err)` chain. If the matched error reports `Retryable() == false` (e.g. `*fanout.RenderError` for a `template_parse` defect: a permanent, non-retriable template/composition bug from the docx-renderer, as opposed to a transient 5xx/network failure), `markFailure` forces `attempt = MaxAttempts` so the event dead-letters on the very first observed failure instead of burning the full retry budget on a defect that can never succeed. The match is structural rather than a direct import of `fanout.RenderError` so `internal/platform/worker` stays decoupled from the `render` module (no platform→module import inversion). This only applies to the `docx_materialize` (`EventTypeMaterializeFanout`) path, which is the only worker-routed consumer of `fanout.Client.Fanout`; `render/fanout/reconstruction.go`'s `ReconstructService.Reconstruct` (manual/forensic re-render) is not driven by the outbox retry loop and does not need this classification. Covered by `internal/platform/worker/service_test.go` (`TestWorkerService_NonRetryableRenderError_DeadLettersOnFirstAttempt`, `TestWorkerService_RetryableRenderError_SchedulesBackoffLikeBefore`).
 
 **PDF outbox worker backoff** (`pdf_outbox_worker.go:89`): uses a separate formula — `min(30min, 30s * 2^attempts)` — where `attempts` is the current `r.Attempts` value (0-based, capped at 30). This is an entirely distinct implementation from the worker-service backoff above.
 

@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -187,6 +188,106 @@ func TestWorkerService_UnknownEventDeadLettersInsteadOfPublishing(t *testing.T) 
 	}
 	if !strings.Contains(consumer.failures[0].LastError, "unsupported event type") {
 		t.Fatalf("LastError = %q, want unsupported event type", consumer.failures[0].LastError)
+	}
+}
+
+// fakeClassifiedError mirrors the shape of fanout.RenderError (Status/Kind +
+// Retryable()) without importing the render module — platform/worker must
+// stay decoupled from module internals (see markFailure's structural match).
+type fakeClassifiedError struct {
+	kind      string
+	retryable bool
+}
+
+func (e *fakeClassifiedError) Error() string   { return "render failed (" + e.kind + ")" }
+func (e *fakeClassifiedError) Retryable() bool { return e.retryable }
+
+func TestWorkerService_NonRetryableRenderError_DeadLettersOnFirstAttempt(t *testing.T) {
+	consumer := &fakeConsumer{
+		events: []messaging.Event{
+			{
+				EventID:      "materialize-permanent",
+				EventType:    messaging.EventTypeMaterializeFanout,
+				AttemptCount: 1,
+				TraceID:      "trace-permanent",
+				Payload: messaging.MaterializeFanoutPayload{
+					TenantID:   "t1",
+					RevisionID: "r1",
+				},
+			},
+		},
+	}
+
+	// Simulate the real wrapping chain: fanout.Client returns *RenderError,
+	// FreezeService.Materialize wraps with "materialize: fanout: %w", and
+	// MaterializeJobRunner.Handle wraps again with "materialize job runner: %w".
+	permanent := &fakeClassifiedError{kind: "template_parse", retryable: false}
+	wrapped := fmt.Errorf("materialize job runner: %w", fmt.Errorf("materialize: fanout: %w", permanent))
+
+	// markFailure is the classification seam under test (RunOnce's handler
+	// dispatch to *MaterializeJobRunner is exercised separately in
+	// materialize_job_runner_test.go via the concrete-type dependency).
+	cfg := config.WorkerConfig{MaxAttempts: 5, RetryBaseSeconds: 10, RetryMaxSeconds: 300}
+	svc := NewService(consumer, cfg)
+	dlq, err := svc.markFailure(context.Background(), consumer.events[0], wrapped)
+	if err != nil {
+		t.Fatalf("markFailure: %v", err)
+	}
+	if !dlq {
+		t.Fatal("expected non-retryable classified error to dead-letter on first attempt")
+	}
+	if len(consumer.failures) != 1 {
+		t.Fatalf("failures = %#v, want 1", consumer.failures)
+	}
+	failure := consumer.failures[0]
+	if failure.DeadLetteredAt == nil {
+		t.Fatal("expected DeadLetteredAt to be set on first attempt for a non-retryable error")
+	}
+	if failure.NextAttemptAt != nil {
+		t.Fatalf("expected no backoff scheduling for a non-retryable error, got NextAttemptAt=%v", *failure.NextAttemptAt)
+	}
+	if !strings.Contains(failure.LastError, "template_parse") {
+		t.Fatalf("LastError = %q, want it to name the defect class", failure.LastError)
+	}
+}
+
+func TestWorkerService_RetryableRenderError_SchedulesBackoffLikeBefore(t *testing.T) {
+	consumer := &fakeConsumer{
+		events: []messaging.Event{
+			{
+				EventID:      "materialize-transient",
+				EventType:    messaging.EventTypeMaterializeFanout,
+				AttemptCount: 1,
+				TraceID:      "trace-transient",
+				Payload: messaging.MaterializeFanoutPayload{
+					TenantID:   "t1",
+					RevisionID: "r1",
+				},
+			},
+		},
+	}
+
+	transient := &fakeClassifiedError{kind: "renderer_unavailable", retryable: true}
+	wrapped := fmt.Errorf("materialize job runner: %w", fmt.Errorf("materialize: fanout: %w", transient))
+
+	cfg := config.WorkerConfig{MaxAttempts: 5, RetryBaseSeconds: 10, RetryMaxSeconds: 300}
+	svc := NewService(consumer, cfg)
+	dlq, err := svc.markFailure(context.Background(), consumer.events[0], wrapped)
+	if err != nil {
+		t.Fatalf("markFailure: %v", err)
+	}
+	if dlq {
+		t.Fatal("expected a retryable classified error not to dead-letter on first attempt")
+	}
+	if len(consumer.failures) != 1 {
+		t.Fatalf("failures = %#v, want 1", consumer.failures)
+	}
+	failure := consumer.failures[0]
+	if failure.DeadLetteredAt != nil {
+		t.Fatal("expected no DeadLetteredAt for a retryable error on first attempt")
+	}
+	if failure.NextAttemptAt == nil {
+		t.Fatal("expected NextAttemptAt to be scheduled (existing backoff behavior)")
 	}
 }
 
