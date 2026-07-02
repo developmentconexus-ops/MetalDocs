@@ -612,29 +612,61 @@ func mapRoleToMembership(role string) string {
 	}
 }
 
+// ensureTemplateVersion seeds a published template + version in the CANONICAL
+// templates_template / templates_template_version family (TST-01). The finalize/
+// snapshot flow this harness exercises over HTTP resolves docx_storage_key via
+// docgenv2.FanoutTemplateReader, which tries the legacy public.templates /
+// template_versions tables first and falls back to templates_template /
+// templates_template_version only on sql.ErrNoRows. Seeding exclusively the
+// canonical family (no legacy rows) forces every e2e run through the fallback
+// branch, proving it end-to-end instead of masking it behind the legacy-first read.
+//
+// templates_template_version carries an extra trigger beyond the tier-3 capability
+// tripwire (enforce_capability_asserted, satisfied by e2eAssertedCaps' template.create):
+// trg_template_version_tenant_consistent requires the tx-local metaldocs.tenant_id
+// GUC to be set and to match the parent template's tenant. Set it once per seed tx.
 func ensureTemplateVersion(ctx context.Context, tx *sql.Tx, tenantID, actorID string) (string, error) {
 	templateID := uuid.NewString()
 	templateVersionID := uuid.NewString()
 
-	if _, err := tx.ExecContext(ctx, `
-INSERT INTO templates (id, tenant_id, key, name, description, current_published_version_id, created_at, updated_at, created_by)
-VALUES ($1, $2, $3, 'E2E Template', 'E2E seed template', NULL, now(), now(), $4)
-ON CONFLICT (tenant_id, key)
-DO UPDATE SET updated_at = now(), created_by = EXCLUDED.created_by`, templateID, tenantID, "e2e-seed-template", actorID); err != nil {
-		return "", fmt.Errorf("upsert template: %w", err)
+	if _, err := tx.ExecContext(ctx,
+		`SELECT set_config('metaldocs.tenant_id', $1, true)`, tenantID,
+	); err != nil {
+		return "", fmt.Errorf("set tenant_id GUC: %w", err)
 	}
 
-	if _, err := tx.ExecContext(ctx, `
-INSERT INTO template_versions (id, template_id, version_num, status, grammar_version, docx_storage_key, schema_storage_key, docx_content_hash, schema_content_hash, published_at, published_by, deprecated_at, lock_version, created_at, updated_at, created_by)
-VALUES ($1, $2, 1, 'published', 1, 'seed/template.docx', 'seed/template.schema.json', 'seed-docx-hash', 'seed-schema-hash', now(), $3, NULL, 0, now(), now(), $3)
-ON CONFLICT (template_id, version_num)
-DO UPDATE SET status = EXCLUDED.status,
-              published_at = EXCLUDED.published_at,
-              published_by = EXCLUDED.published_by,
-              updated_at = now()
-RETURNING id`, templateVersionID, templateID, actorID); err != nil {
+	if err := tx.QueryRowContext(ctx, `
+INSERT INTO templates_template (id, tenant_id, doc_type_code, key, name, description, latest_version, published_version_id, created_by, created_at)
+VALUES ($1, $2::uuid, '', $3, 'E2E Template', 'E2E seed template', 1, NULL, $4, now())
+ON CONFLICT (tenant_id, key)
+DO UPDATE SET created_by = EXCLUDED.created_by
+RETURNING id::text`, templateID, tenantID, "e2e-seed-template", actorID).Scan(&templateID); err != nil {
 		if queryErr := tx.QueryRowContext(ctx,
-			`SELECT id::text FROM template_versions WHERE template_id = $1 AND version_num = 1`,
+			`SELECT id::text FROM templates_template WHERE tenant_id = $1::uuid AND key = $2`,
+			tenantID, "e2e-seed-template",
+		).Scan(&templateID); queryErr != nil {
+			return "", fmt.Errorf("upsert template: %w", err)
+		}
+	}
+
+	// content_hash must be a 64-hex value for any non-draft status
+	// (chk_template_version_content_hash / chk_template_version_content_hash_non_draft).
+	// docx_storage_key is globally unique (uq_templates_template_version_docx_storage_key)
+	// and only one published version is allowed per template
+	// (uq_one_published_per_template), so key off template_id to stay idempotent.
+	docxStorageKey := "templates/e2e-seed/" + templateID + "/body.docx"
+	contentHash := strings.Repeat("0", 64)
+
+	if err := tx.QueryRowContext(ctx, `
+INSERT INTO templates_template_version (id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash, metadata_schema, placeholder_schema, author_id, published_at)
+VALUES ($1, $2::uuid, $3, 1, 'published', $4, $5, '{}'::jsonb, '{"placeholders":[]}'::jsonb, $6, now())
+ON CONFLICT (template_id, version_number)
+DO UPDATE SET status = 'published',
+              published_at = now()
+RETURNING id::text`, templateVersionID, tenantID, templateID, docxStorageKey, contentHash, actorID,
+	).Scan(&templateVersionID); err != nil {
+		if queryErr := tx.QueryRowContext(ctx,
+			`SELECT id::text FROM templates_template_version WHERE template_id = $1 AND version_number = 1`,
 			templateID,
 		).Scan(&templateVersionID); queryErr != nil {
 			return "", fmt.Errorf("upsert template version: %w", err)
@@ -642,7 +674,7 @@ RETURNING id`, templateVersionID, templateID, actorID); err != nil {
 	}
 
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE templates SET current_published_version_id = $2, updated_at = now() WHERE id = $1`,
+		`UPDATE templates_template SET published_version_id = $2 WHERE id = $1`,
 		templateID, templateVersionID,
 	); err != nil {
 		return "", fmt.Errorf("update template current version: %w", err)

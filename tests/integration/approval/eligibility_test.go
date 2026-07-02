@@ -125,8 +125,10 @@ func TestSignoff_Eligibility(t *testing.T) {
 
 	// (c) Trigger blocks non-eligible actor and allows eligible actor.
 	// Uses a single transaction with savepoints so no data is permanently committed.
-	// Seeds the full FK chain: iam_users → templates → template_versions → documents →
-	//   approval_routes → approval_instances → approval_stage_instances → approval_signoffs.
+	// Seeds the full FK chain: iam_users → templates_template → templates_template_version →
+	//   documents → approval_routes → approval_instances → approval_stage_instances →
+	//   approval_signoffs. Template family is canonical (TST-01); documents.template_version_id
+	//   has no FK to either family, so the choice doesn't affect what this test exercises.
 	// Uses the dev tenant (ffffffff-...) where document_profiles exist for 'dc' profile_code.
 	t.Run("trigger_blocks_non_eligible_allows_eligible", func(t *testing.T) {
 		const devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
@@ -163,11 +165,27 @@ func TestSignoff_Eligibility(t *testing.T) {
 			t.Skipf("cannot seed iam_users: %v", err)
 		}
 
+		// TST-01: seed the CANONICAL templates_template / templates_template_version
+		// family, not the legacy public.templates / template_versions tables. This
+		// test only needs a template_version_id to satisfy documents.template_version_id
+		// NOT NULL (the column carries no FK to either family) — it never reads the
+		// template back through docgenv2.FanoutTemplateReader, so canonical-vs-legacy
+		// doesn't change what's under test (the approval_signoffs eligibility trigger).
+		//
+		// templates_template_version carries trg_template_version_tenant_consistent,
+		// which requires the tx-local metaldocs.tenant_id GUC regardless of the
+		// metaldocs.bypass_authz bypass set above (a separate trigger/GUC).
+		if _, err := tx.ExecContext(ctx,
+			`SELECT set_config('metaldocs.tenant_id', $1, true)`, devTenantID,
+		); err != nil {
+			t.Skipf("cannot set tenant_id GUC: %v", err)
+		}
+
 		// Seed template.
 		var tplID string
 		if err := tx.QueryRowContext(ctx, `
-			INSERT INTO templates (tenant_id, key, name, created_by)
-			VALUES ($1::uuid, $2, 'Trigger Test Tpl', $3::uuid)
+			INSERT INTO templates_template (tenant_id, doc_type_code, key, name, latest_version, created_by)
+			VALUES ($1::uuid, '', $2, 'Trigger Test Tpl', 1, $3::uuid)
 			ON CONFLICT (tenant_id, key) DO UPDATE SET name = EXCLUDED.name
 			RETURNING id::text`,
 			devTenantID, "trg-elig-tpl-"+docID[:8], authorID,
@@ -175,16 +193,19 @@ func TestSignoff_Eligibility(t *testing.T) {
 			t.Skipf("cannot seed template: %v", err)
 		}
 
-		// Seed template_version.
+		// Seed template_version. content_hash must be 64-hex for non-draft status
+		// (chk_template_version_content_hash_non_draft); docx_storage_key is globally
+		// unique (uq_templates_template_version_docx_storage_key), so key it off tplID.
 		var tvID string
 		if err := tx.QueryRowContext(ctx, `
-			INSERT INTO template_versions
-			  (template_id, version_num, status, docx_storage_key, schema_storage_key,
-			   docx_content_hash, schema_content_hash, created_by)
-			VALUES ($1::uuid, 1, 'published', 'key/t.docx', 'key/s.json', 'aa', 'bb', $2::uuid)
-			ON CONFLICT (template_id, version_num) DO UPDATE SET status = EXCLUDED.status
+			INSERT INTO templates_template_version
+			  (tenant_id, template_id, version_number, status, docx_storage_key,
+			   content_hash, metadata_schema, placeholder_schema, author_id, published_at)
+			VALUES ($1::uuid, $2::uuid, 1, 'published', 'templates/trg-elig/' || $2 || '/body.docx',
+			        repeat('a', 64), '{}'::jsonb, '{"placeholders":[]}'::jsonb, $3::uuid, now())
+			ON CONFLICT (template_id, version_number) DO UPDATE SET status = EXCLUDED.status
 			RETURNING id::text`,
-			tplID, authorID,
+			devTenantID, tplID, authorID,
 		).Scan(&tvID); err != nil {
 			t.Skipf("cannot seed template_version: %v", err)
 		}
