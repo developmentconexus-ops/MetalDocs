@@ -335,7 +335,7 @@ describe('DocumentEditorPage autosave wiring', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
 
-    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', {}));
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', 0, {}));
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
     );
@@ -361,7 +361,7 @@ describe('DocumentEditorPage autosave wiring', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
 
-    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', {}));
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', 0, {}));
     expect(mockState.sessionReleaseSpy).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
     expect(toastSpy).toHaveBeenCalledWith(
@@ -441,7 +441,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
     expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(latestBuffer, { foo: 'bar' }, 3);
     expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', { revision_title: 'Atualizacao de procedimento' }));
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', 1, { revision_title: 'Atualizacao de procedimento' }));
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
   });
 
@@ -464,7 +464,7 @@ describe('DocumentEditorPage autosave wiring', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
 
-    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', {}));
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', 0, {}));
     expect(mockState.editorSaveNowSpy).not.toHaveBeenCalled();
     expect(mockState.autosaveFlushSpy).not.toHaveBeenCalled();
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
@@ -489,7 +489,7 @@ describe('DocumentEditorPage autosave wiring', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
 
-    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', {}));
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', 0, {}));
     expect(mockState.editorSaveNowSpy).not.toHaveBeenCalled();
     expect(mockState.autosaveFlushSpy).not.toHaveBeenCalled();
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));

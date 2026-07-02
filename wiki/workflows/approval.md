@@ -1,6 +1,6 @@
 # Workflow: Approval
 
-> **Last verified:** 2026-06-08 (Phase F F8: finalizeDocument line anchor updated :423 → :435; CheckReplay note replaced with BeginReplay)
+> **Last verified:** 2026-07-01 (CON-01 grade-A simplification: `POST /documents/{id}/finalize` — still the route the editor's **Finalizar** button calls, per the Quick summary below — is now a deprecated convenience wrapper; `POST /documents/{id}/submit` is canonical (DEC-01). `If-Match` is now mandatory on finalize (OCC parity with submit). The atomic finalize+submit behavior described below is unchanged, since finalize still converges on the same `SubmitRevisionForReview` call.) | prior: 2026-06-08 (Phase F F8: finalizeDocument line anchor updated :423 → :435; CheckReplay note replaced with BeginReplay)
 > **Scope:** Submit → route assignment → signoffs → approval condition met → freeze trigger.
 > **Out of scope:** Freeze pipeline (see `workflows/freeze-and-fanout.md`), route admin (see `modules/approval.md`).
 > **Key files:**

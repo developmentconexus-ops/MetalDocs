@@ -268,7 +268,12 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
         setEditorDirty(false);
       }
       const trimmedRevisionTitle = revisionTitle?.trim();
-      await finalizeDocument(documentID, trimmedRevisionTitle ? { revision_title: trimmedRevisionTitle } : {});
+      // If-Match is mandatory server-side (CON-01 OCC parity with canonical
+      // /submit, DEC-01). Autosave commits advance the revision *id*, not
+      // documents.revision_version (that only bumps on the draft->under_review
+      // transition itself), so the cached doc.revision_version read here is
+      // still the version the server expects to match.
+      await finalizeDocument(documentID, doc.revision_version, trimmedRevisionTitle ? { revision_title: trimmedRevisionTitle } : {});
       setSubmitStatusOverride('under_review');
       queryClient.setQueryData(QK.documents.detail(documentID), (current: DocumentDetail | undefined) => {
         if (!current) return current;

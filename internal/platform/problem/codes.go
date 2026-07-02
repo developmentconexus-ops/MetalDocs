@@ -52,6 +52,13 @@ const (
 	CodeStaleBase               Code = "STALE_BASE"
 	CodeISOSegregationViolation Code = "ISO_SEGREGATION_VIOLATION"
 	CodeSystemTemplateImmutable Code = "SYSTEM_TEMPLATE_IMMUTABLE"
+	// CodePreconditionRequired is the canonical-catalog counterpart of the
+	// approval/http package's local approvalCodePreconditionIfMatch
+	// ("precondition.if_match_required") — that package is excluded from the
+	// guarded-package catalog check (dotted taxonomy predates this catalog), but
+	// documents/delivery/http is guarded, so CON-01's finalize handler (mandatory
+	// If-Match, OCC parity with /documents/{id}/submit) uses this typed constant.
+	CodePreconditionRequired Code = "PRECONDITION_REQUIRED"
 )
 
 // IAM area-membership domain codes (used in Problem.code by the memberships

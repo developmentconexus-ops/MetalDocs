@@ -1247,7 +1247,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Finalize document */
+        /**
+         * Finalize document
+         * @deprecated
+         * @description Deprecated convenience wrapper around the same draft→under_review transition as POST /documents/{id}/submit (CON-01). Resolves route_id and content_hash server-side instead of taking them from the caller. New integrations must call /documents/{id}/submit directly, which is canonical (DEC-01). If-Match is required for OCC parity with submit; a stale (or missing) revision version now yields the same 409/428 precondition semantics as submit.
+         */
         post: operations["finalizeDocument"];
         delete?: never;
         options?: never;
@@ -1658,7 +1662,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Submit document for approval */
+        /**
+         * Submit document for approval
+         * @description Canonical draft→under_review submission endpoint (DEC-01). Callers supply route_id and content_hash explicitly; contrast with the deprecated POST /documents/{id}/finalize, which resolves both server-side as a convenience wrapper over this same operation.
+         */
         post: operations["submitDocumentForApproval"];
         delete?: never;
         options?: never;
@@ -3134,6 +3141,21 @@ export interface components {
         FinalizeDocumentRequest: {
             /** @description Required for governed revisions after REV00. Omit for REV00 to use the canonical initial title. */
             revision_title?: string;
+        };
+        SubmitDocumentRequest: {
+            /**
+             * Format: uuid
+             * @description Active approval route to submit against.
+             */
+            route_id: string;
+            /** @description SHA-256 hex digest of the content being submitted (autosave-computed). */
+            content_hash: string;
+        };
+        SubmitDocumentResponse: {
+            /** Format: uuid */
+            instance_id: string;
+            was_replay: boolean;
+            etag: string;
         };
         DocumentRevisionHistoryItem: {
             /** Format: uuid */
@@ -5775,6 +5797,8 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>" */
+                "If-Match": string;
             };
             path: {
                 id: string;
@@ -6618,14 +6642,22 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitDocumentRequest"];
+            };
+        };
         responses: {
             /** @description created */
             201: {
                 headers: {
+                    /** @description New revision version ETag in the form "v<N>", reflecting the post-submit revision_version. */
+                    ETag?: string;
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SubmitDocumentResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];

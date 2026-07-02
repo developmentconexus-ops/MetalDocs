@@ -53,7 +53,9 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "documents schedule publish", method: http.MethodPost, path: "/api/v1/documents/d1/schedule-publish", wantCap: iamdomain.CapDocumentPublish, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents supersede", method: http.MethodPost, path: "/api/v1/documents/d1/supersede", wantCap: iamdomain.CapDocumentSupersede, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents obsolete", method: http.MethodPost, path: "/api/v1/documents/d1/obsolete", wantCap: iamdomain.CapDocumentObsolete, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "documents finalize", method: http.MethodPost, path: "/api/v1/documents/d1/finalize", wantCap: iamdomain.CapDocumentSignoff, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		// CON-01: finalize is a deprecated convenience wrapper over the submit
+		// draft->under_review transition and must gate on the same capability.
+		{name: "documents finalize", method: http.MethodPost, path: "/api/v1/documents/d1/finalize", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents session force release", method: http.MethodPost, path: "/api/v1/documents/d1/session/force-release", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents session generic", method: http.MethodPost, path: "/api/v1/documents/d1/session/acquire", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents autosave", method: http.MethodPost, path: "/api/v1/documents/d1/autosave/commit", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},

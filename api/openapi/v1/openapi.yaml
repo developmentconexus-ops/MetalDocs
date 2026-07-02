@@ -2460,6 +2460,15 @@ paths:
   /documents/{id}/finalize:
     post:
       summary: Finalize document
+      deprecated: true
+      description: >-
+        Deprecated convenience wrapper around the same draft→under_review
+        transition as POST /documents/{id}/submit (CON-01). Resolves route_id
+        and content_hash server-side instead of taking them from the caller.
+        New integrations must call /documents/{id}/submit directly, which is
+        canonical (DEC-01). If-Match is required for OCC parity with submit;
+        a stale (or missing) revision version now yields the same 409/428
+        precondition semantics as submit.
       tags: [documents]
       operationId: finalizeDocument
       parameters:
@@ -2468,6 +2477,7 @@ paths:
           in: header
           required: true
           schema: { type: string, format: uuid }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       requestBody:
         required: true
         content:
@@ -3246,6 +3256,11 @@ paths:
   /documents/{id}/submit:
     post:
       summary: Submit document for approval
+      description: >-
+        Canonical draft→under_review submission endpoint (DEC-01). Callers
+        supply route_id and content_hash explicitly; contrast with the
+        deprecated POST /documents/{id}/finalize, which resolves both
+        server-side as a convenience wrapper over this same operation.
       tags: [approval]
       operationId: submitDocumentForApproval
       x-authz-area:
@@ -3260,9 +3275,23 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitDocumentRequest'
       responses:
         '201':
           description: created
+          headers:
+            ETag:
+              schema: { type: string }
+              description: New revision version ETag in the form "v<N>", reflecting the post-submit revision_version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitDocumentResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -5839,6 +5868,30 @@ components:
           type: string
           minLength: 1
           description: Required for governed revisions after REV00. Omit for REV00 to use the canonical initial title.
+    SubmitDocumentRequest:
+      type: object
+      required: [route_id, content_hash]
+      properties:
+        route_id:
+          type: string
+          format: uuid
+          description: Active approval route to submit against.
+        content_hash:
+          type: string
+          minLength: 64
+          maxLength: 64
+          description: SHA-256 hex digest of the content being submitted (autosave-computed).
+    SubmitDocumentResponse:
+      type: object
+      required: [instance_id, was_replay, etag]
+      properties:
+        instance_id:
+          type: string
+          format: uuid
+        was_replay:
+          type: boolean
+        etag:
+          type: string
     DocumentRevisionHistoryItem:
       type: object
       required: [document_id, revision_number, revision_title, status, created_at, is_current]

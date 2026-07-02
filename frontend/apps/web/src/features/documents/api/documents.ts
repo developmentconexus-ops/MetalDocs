@@ -37,10 +37,19 @@ export async function renameDocument(id: string, name: string): Promise<void> {
     body: JSON.stringify({ name }),
   });
 }
-export async function finalizeDocument(id: string, body: FinalizeDocumentRequest): Promise<FinalizeDocumentResult> {
+// finalizeDocument calls the deprecated convenience wrapper over POST
+// /documents/{id}/submit (CON-01; canonical per DEC-01). If-Match is now
+// mandatory server-side for OCC parity with submit — revisionVersion must be
+// the revision_version the caller last read (DocumentDetail.revision_version),
+// sent as "v<N>". route_id/content_hash stay server-resolved: this editor call
+// site has no route lookup and no access to the server's canonical stored
+// content hash, so it cannot migrate to /submit directly without a new
+// endpoint (out of scope here; see CON-01 remediation notes).
+export async function finalizeDocument(id: string, revisionVersion: number, body: FinalizeDocumentRequest): Promise<FinalizeDocumentResult> {
   return apiFetch<FinalizeDocumentResult>(`/api/v1/documents/${id}/finalize`, {
     method: 'POST',
     idempotencyKey: crypto.randomUUID(),
+    headers: { 'If-Match': `"v${revisionVersion}"` },
     body: JSON.stringify(body),
   });
 }

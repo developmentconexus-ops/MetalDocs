@@ -16,6 +16,7 @@ import (
 	documentsapi "metaldocs/internal/modules/documents/api"
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
+	approvalrepository "metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/documents/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
@@ -30,6 +31,40 @@ import (
 
 	"github.com/google/uuid"
 )
+
+// CON-01 (grade-A simplification, DEC-01): finalize is a deprecated convenience
+// wrapper over /documents/{id}/submit and must enforce the same OCC precondition.
+// Mirrors approvalhttp.ErrIfMatchRequired / ErrIfMatchMalformed and its parseIfMatch
+// (internal/modules/documents/approval/http/handler.go) — kept as a local,
+// package-scoped copy rather than an exported cross-package helper because the two
+// packages do not otherwise share delivery-layer internals.
+var (
+	errFinalizeIfMatchRequired  = errors.New("precondition: If-Match header required")
+	errFinalizeIfMatchMalformed = errors.New("precondition: If-Match header malformed; expected \"v<N>\"")
+)
+
+// The 428 case uses the canonical problem.CodePreconditionRequired constant
+// (internal/platform/problem/codes.go) rather than a local literal — this
+// package is in the codes-catalog guard's guardedPackages list (unlike
+// approval/http, which predates the catalog and keeps its own dotted
+// approvalCodePreconditionIfMatch), so ad-hoc problem.Code strings are
+// rejected by TestNoAdHocStringCodes.
+
+func parseFinalizeIfMatch(header string) (int, error) {
+	value := strings.TrimSpace(header)
+	if value == "" {
+		return -1, errFinalizeIfMatchRequired
+	}
+	value = strings.Trim(value, "\"")
+	if !strings.HasPrefix(value, "v") {
+		return -1, errFinalizeIfMatchMalformed
+	}
+	version, err := strconv.Atoi(strings.TrimPrefix(value, "v"))
+	if err != nil || version <= 0 {
+		return -1, errFinalizeIfMatchMalformed
+	}
+	return version, nil
+}
 
 // documentReader covers read/list/stats/ownership queries.
 type documentReader interface {
@@ -180,7 +215,16 @@ func (h *Handler) registerRoutes(mux *http.ServeMux, rl *ratelimit.Middleware, u
 	mux.HandleFunc("GET /api/v1/documents/stats", wrapper.DocumentStats)
 	mux.HandleFunc("GET /api/v1/documents/{id}", wrapper.GetDocument)
 	mux.HandleFunc("PATCH /api/v1/documents/{id}", wrapper.RenameDocument)
-	mux.HandleFunc("POST /api/v1/documents/{id}/finalize", wrapper.FinalizeDocument)
+	// CON-01: registered directly (bypassing wrapper.FinalizeDocument) so the
+	// hand-written finalizeDocument's own If-Match parsing governs precondition
+	// semantics (428 missing / 400 malformed), mirroring how the canonical
+	// /documents/{id}/submit route bypasses its generated wrapper for the same
+	// reason (approvalhttp.RegisterRoutes registers h.SubmitHandler directly).
+	// Going through wrapper.FinalizeDocument would let oapi-codegen's generic
+	// required-header check short-circuit to a blanket 400 before reaching
+	// finalizeDocument, collapsing the missing-If-Match case to 400 instead of
+	// the 428 precondition-required status submit uses.
+	mux.HandleFunc("POST /api/v1/documents/{id}/finalize", h.finalizeDocument)
 	mux.HandleFunc("POST /api/v1/documents/{id}/archive", wrapper.ArchiveDocument)
 	mux.HandleFunc("POST /api/v1/documents/{id}/duplicate", wrapper.DuplicateDocument)
 	mux.HandleFunc("POST /api/v1/documents/{id}/session/acquire", wrapper.AcquireDocumentSession)
@@ -539,6 +583,24 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// CON-01: If-Match is mandatory (OCC parity with the canonical /submit
+	// endpoint, DEC-01) — the client-asserted revision_version is threaded through
+	// to SubmitRevisionForReview below instead of the freshly-read prereqs value,
+	// so a concurrent draft edit between the client's last read and this call is
+	// caught as repository.ErrStaleRevision (409/428 via mapErr), not silently
+	// finalized against a version the client never saw.
+	expectedRevisionVersion, err := parseFinalizeIfMatch(r.Header.Get("If-Match"))
+	if err != nil {
+		status := http.StatusBadRequest
+		code := problem.CodeValidationError
+		if errors.Is(err, errFinalizeIfMatchRequired) {
+			status = http.StatusPreconditionRequired
+			code = problem.CodePreconditionRequired
+		}
+		httpErr(w, status, code)
+		return
+	}
+
 	payloadHash, err := idempotency.RequestHash(r)
 	if err != nil {
 		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
@@ -617,7 +679,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		SubmittedBy:     actorID,
 		RevisionTitle:   revisionTitle,
 		ContentFormData: map[string]any{"_content_hash": prereqs.ContentHash},
-		RevisionVersion: int(prereqs.RevisionVersion),
+		RevisionVersion: expectedRevisionVersion,
 		RevisionNumber:  int(prereqs.RevisionNumber),
 		// Thread the validated client key (checked non-empty + UUID above) so the
 		// created approval_instances.idempotency_key is the client key, not a
@@ -1376,6 +1438,12 @@ func mapErr(err error) (int, problem.Code) {
 		errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
 		return http.StatusConflict, problem.CodeConflict
 	case errors.Is(err, domain.ErrStaleBase):
+		return http.StatusConflict, problem.CodeConcurrentModification
+	// CON-01: finalize now threads the client's If-Match version through to the same
+	// SubmitRevisionForReview OCC check submit uses; a mismatch surfaces the same
+	// repository.ErrStaleRevision the submit path maps (approvalhttp.MapErrorToResponse)
+	// to 409 CONCURRENT_MODIFICATION.
+	case errors.Is(err, approvalrepository.ErrStaleRevision):
 		return http.StatusConflict, problem.CodeConcurrentModification
 	case errors.Is(err, domain.ErrInvalidStateTransition),
 		errors.Is(err, controlleddocumentsdomain.ErrCDNotActive):

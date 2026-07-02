@@ -16,6 +16,7 @@ import (
 
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
+	approvalrepository "metaldocs/internal/modules/documents/approval/repository"
 	httphandler "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
@@ -255,10 +256,21 @@ func newMux(t *testing.T, svc *fakeSvc) *http.ServeMux {
 
 type fakeApprovalSubmitter struct {
 	called bool
+	// err, when set, is returned by SubmitRevisionForReview instead of a
+	// success result — used by CON-01 tests to simulate approvalrepository.ErrStaleRevision
+	// (a client If-Match version that no longer matches the server's revision_version).
+	err error
+	// gotReq captures the request threaded through, so tests can assert the
+	// If-Match-derived RevisionVersion actually reached the submit service.
+	gotReq approvalapp.SubmitRequest
 }
 
-func (f *fakeApprovalSubmitter) SubmitRevisionForReview(_ context.Context, _ platformdb.TxRunner, _ approvalapp.SubmitRequest) (approvalapp.SubmitResult, error) {
+func (f *fakeApprovalSubmitter) SubmitRevisionForReview(_ context.Context, _ platformdb.TxRunner, req approvalapp.SubmitRequest) (approvalapp.SubmitResult, error) {
 	f.called = true
+	f.gotReq = req
+	if f.err != nil {
+		return approvalapp.SubmitResult{}, f.err
+	}
 	return approvalapp.SubmitResult{InstanceID: "22222222-2222-4222-8222-222222222222"}, nil
 }
 
@@ -718,6 +730,7 @@ func TestFinalizeDocument_ProfileNotFoundUsesProblemEnvelope(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste"}`)))
 	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+	req.Header.Set("If-Match", "\"v1\"")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -745,6 +758,7 @@ func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
 	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", key)
+	req.Header.Set("If-Match", "\"v1\"")
 	if tid, err := tenant.FromContext(req.Context()); err != nil || tid == "" {
 		t.Fatalf("tenant missing before ServeHTTP: tid=%q err=%v", tid, err)
 	}
@@ -789,6 +803,7 @@ func TestFinalizeDocument_ContentHashQueryNoRows_ContinuesWithEmptyHash(t *testi
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
 	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+	req.Header.Set("If-Match", "\"v1\"")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -825,6 +840,7 @@ func TestFinalizeDocument_ContentHashQueryError_Returns500(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
 	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+	req.Header.Set("If-Match", "\"v1\"")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -833,6 +849,82 @@ func TestFinalizeDocument_ContentHashQueryError_Returns500(t *testing.T) {
 	}
 	if submitter.called {
 		t.Fatal("submit service should not be called on prereqs failure")
+	}
+}
+
+// TestFinalizeDocument_MissingIfMatch_Returns428 verifies CON-01 OCC parity:
+// finalize now requires If-Match the same way /documents/{id}/submit does.
+func TestFinalizeDocument_MissingIfMatch_Returns428(t *testing.T) {
+	svc := &fakeSvc{}
+	submitter := &fakeApprovalSubmitter{}
+	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, &sql.DB{}, submitter, &fakeFinalizeIdempotencyStore{})
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
+	withAuthHeaders(req, "editor")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusPreconditionRequired {
+		t.Fatalf("expected 428, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if submitter.called {
+		t.Fatal("submit service should not be called when If-Match is missing")
+	}
+}
+
+// TestFinalizeDocument_MalformedIfMatch_Returns400 verifies a syntactically
+// invalid If-Match (not "v<N>") is rejected before reaching the submit service.
+func TestFinalizeDocument_MalformedIfMatch_Returns400(t *testing.T) {
+	svc := &fakeSvc{}
+	submitter := &fakeApprovalSubmitter{}
+	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, &sql.DB{}, submitter, &fakeFinalizeIdempotencyStore{})
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
+	withAuthHeaders(req, "editor")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+	req.Header.Set("If-Match", "oops")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if submitter.called {
+		t.Fatal("submit service should not be called when If-Match is malformed")
+	}
+}
+
+// TestFinalizeDocument_StaleRevision_Returns409 verifies CON-01 OCC parity:
+// when the client's If-Match version no longer matches the server's
+// revision_version, the submit service returns approvalrepository.ErrStaleRevision
+// and finalize maps it to 409, exactly like /documents/{id}/submit does.
+func TestFinalizeDocument_StaleRevision_Returns409(t *testing.T) {
+	svc := &fakeSvc{}
+	submitter := &fakeApprovalSubmitter{err: approvalrepository.ErrStaleRevision}
+	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, &sql.DB{}, submitter, &fakeFinalizeIdempotencyStore{})
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
+	withAuthHeaders(req, "editor")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+	req.Header.Set("If-Match", "\"v7\"")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if !submitter.called {
+		t.Fatal("expected submit service to be called")
+	}
+	if submitter.gotReq.RevisionVersion != 7 {
+		t.Fatalf("expected If-Match-derived RevisionVersion=7 threaded to submit service, got %d", submitter.gotReq.RevisionVersion)
 	}
 }
 

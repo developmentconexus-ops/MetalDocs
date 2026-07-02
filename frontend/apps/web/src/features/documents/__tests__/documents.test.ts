@@ -55,8 +55,8 @@ describe('documents with apiFetch', () => {
         ),
       ),
     );
-    await expect(finalizeDocument('doc-1', { revision_title: 'Ajuste operacional' })).rejects.toBeInstanceOf(ApiError);
-    await expect(finalizeDocument('doc-1', { revision_title: 'Ajuste operacional' })).rejects.toMatchObject({ code: 'not_found.route', status: 404 });
+    await expect(finalizeDocument('doc-1', 1, { revision_title: 'Ajuste operacional' })).rejects.toBeInstanceOf(ApiError);
+    await expect(finalizeDocument('doc-1', 1, { revision_title: 'Ajuste operacional' })).rejects.toMatchObject({ code: 'not_found.route', status: 404 });
   });
 
   it('getDocument returns typed detail payload with embedded FormDataJSON', async () => {
@@ -119,12 +119,14 @@ describe('documents with apiFetch', () => {
       ),
     );
 
-    const result = await finalizeDocument('doc-1', { revision_title: 'Ajuste operacional' });
+    const result = await finalizeDocument('doc-1', 3, { revision_title: 'Ajuste operacional' });
 
     expect(result).toEqual({ instance_id: 'inst_1' });
     const [, init] = fetchSpy.mock.calls[0] ?? [];
     const headers = init?.headers as Record<string, string> | undefined;
-    expect(headers).toMatchObject({ 'Idempotency-Key': '11111111-1111-4111-8111-111111111111' });
+    // CON-01: If-Match is now mandatory server-side (OCC parity with canonical
+    // /submit, DEC-01), derived from the caller-supplied revisionVersion.
+    expect(headers).toMatchObject({ 'Idempotency-Key': '11111111-1111-4111-8111-111111111111', 'If-Match': '"v3"' });
     expect(JSON.parse(String(init?.body))).toEqual({ revision_title: 'Ajuste operacional' });
   });
 
