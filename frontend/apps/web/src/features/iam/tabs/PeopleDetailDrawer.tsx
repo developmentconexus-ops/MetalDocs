@@ -177,12 +177,12 @@ function RolesPanel({ user }: { user: ManagedUser }) {
       qc.setQueryData(key, {
         ...value,
         items: value.items.map((u) =>
-          u.user_id === user.user_id ? { ...u, tenantRole } : u,
+          u.user_id === user.user_id ? { ...u, tenant_role: tenantRole } : u,
         ),
       });
     }
     patch.mutate(
-      { userId: user.user_id, body: { tenantRole } },
+      { userId: user.user_id, body: { tenant_role: tenantRole } },
       {
         onSuccess: () => {
           toast.success("Função atualizada.");

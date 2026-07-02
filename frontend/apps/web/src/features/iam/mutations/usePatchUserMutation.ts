@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../lib/api/client";
+import type { components } from "../../../lib/api-types";
 import { QK } from "../../../lib/queryKeys";
 
 type PatchUserVariables = {
   userId: string;
-  body: Record<string, unknown>;
+  body: components["schemas"]["UpdateManagedUserRequest"];
 };
 
 export function usePatchUserMutation() {
