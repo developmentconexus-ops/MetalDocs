@@ -77,7 +77,7 @@ Frontend wiring (all under `frontend/apps/web/src/features/templates/`):
 - Authz: two-tier per `wiki/decisions/0007-two-tier-authz.md` � **applied Plan 5 and extended 2026-05-17** (`WithDB` builder + `authz.Require`; DOCX autosave/import commit now sets transaction GUCs before updating `templates_template_version`; DB tripwire on `templates_template` + `templates_template_version`; T-001 closed).
 - API contract: OpenAPI 3.0.3 generated via oapi-codegen; Plan 12.4 generated coverage includes the mounted template route set (see T-006 closed).
 - Error envelope: RFC 9457 Problem+JSON per `wiki/architecture/api-design-system.md` Ã¢â‚¬â€ **NOT applied** (see T-005).
-- Placeholder syntax + catalog: per `wiki/concepts/placeholders.md` (fixed 7-token) and `wiki/concepts/token-syntax.md` (`{name}` single-brace, eigenpal-native).
+- Placeholder syntax + catalog: per `wiki/concepts/placeholders.md` (fixed 8-type placeholder catalog) and `wiki/concepts/token-syntax.md` (`{name}` single-brace, eigenpal-native).
 - Editor: eigenpal `templatePlugin` for DOCX authoring (per ADR 0001 `wiki/decisions/0001-eigenpal-adoption.md`).
 
 ---
@@ -176,7 +176,7 @@ Grouped by file. Source of truth: `_artifacts/01-surface.md` Ã‚Â§3.
 | `internal/modules/templates/domain/version.go:10` | `VersionStatusDraft`, `VersionStatusUnderReview`, `VersionStatusApproved`, `VersionStatusPublished`, `VersionStatusObsolete` | const | Version state machine (const block line 10; first value `VersionStatusDraft` at line 11) |
 | `internal/modules/templates/domain/version.go:18` | `TemplateVersion` | struct | Version entity (owns DOCX key, hashes, schemas, status, identities) |
 | `internal/modules/templates/domain/schemas.go:5` | `MetadataSchema` | struct | Per-version metadata schema (DocCodePattern, retention, distribution) |
-| `internal/modules/templates/domain/schemas.go:27` | `PHText`, `PHDate`, `PHNumber`, `PHSelect`, `PHUser`, `PHPicture`, `PHComputed` | const | Fixed 7-token catalog (per `wiki/concepts/placeholders.md`; const block opens at line 26) |
+| `internal/modules/templates/domain/schemas.go:27` | `PHText`, `PHDate`, `PHNumber`, `PHSelect`, `PHUser`, `PHPicture`, `PHComputed`, `PHDictionary` | const | Fixed 8-type placeholder catalog (per `wiki/concepts/placeholders.md`; const block opens at line 26) |
 | `internal/modules/templates/domain/schemas.go:55` | `VisibilityCondition` | struct | Conditional placeholder visibility primitive |
 | `internal/modules/templates/domain/schemas.go:61` | `Placeholder` | struct | Placeholder entity (id, type, name, options, etc.) |
 | `internal/modules/templates/domain/schemas.go:81` | `CompositionConfig` | struct | **DELETED Wave 2** (was deprecated per ADR `wiki/decisions/0008-placeholder-fixed-catalog.md` Ã¢â‚¬â€ composition removed 2026-04-27; struct retained for backward compat) |
@@ -503,7 +503,7 @@ Top 3 (by severity, then blast-radius):
 |---|---|
 | Template | A reusable DOCX skeleton bound to a `doc_type_code` and `tenant_id`. Aggregate root; PK on `templates_template`. Runtime/API use selection is profile/document-type driven, not creator-scoped visibility driven. |
 | Template Version | A specific revision of a template (`version_number` per template). Carries the DOCX storage key, content hash, metadata + placeholder schemas, and lifecycle status. |
-| Placeholder | A `{name}` token in the DOCX whose `PHType` is one of the fixed 7-token catalog. Substituted at document finalize. |
+| Placeholder | A `{name}` token in the DOCX whose `PHType` is one of the fixed 8-type placeholder catalog. Substituted at document finalize. |
 | Approval Config | Per-template binding of `reviewer_role` (optional) and `approver_role` (required). Drives `pending_*_role` on each new version. |
 | ApprovalConfig.HasReviewer | Boolean derived from `reviewer_role != nil`. Determines whether `Approve` requires `status == approved` (with reviewer) or `status == under_review` (without). |
 | Audit log (templates) | Module-local sink at `templates_audit_log`. Parallel to canonical `metaldocs.audit_events`. |
@@ -521,7 +521,7 @@ Top 3 (by severity, then blast-radius):
 | SoD violation on Approve | 409 `template.sod_violation`; cannot approve own work | `domain/approval.go:37 CheckSegregation` enforces author ? reviewer ? approver | Operator routes to different actor |
 | Publish path bypasses SoD (`Service.PublishTemplateVersion`) | Direct publish allowed without reviewer/approver chain | T-004 � known divergence between `Service.Approve` and `Service.PublishTemplateVersion` | Restrict `template.publish` capability; T-004 tracks unification |
 | Missing `template.publish` / `template.approve` capability | 403 `authz.forbidden` from tier-2 (PR #37 added `pending_approver_role` Tier-2 binding) | Backend authz check | Operator escalates; never bypass tier-1 |
-| Placeholder validation rejects unknown PHType | 422 `template.invalid_placeholder` | `application/schema.go:84 ValidatePlaceholders` enforces fixed 7-token catalog | Author fixes schema; refer to `wiki/concepts/placeholders.md` |
+| Placeholder validation rejects unknown PHType | 422 `template.invalid_placeholder` | `application/schema.go:84 ValidatePlaceholders` enforces fixed 8-type placeholder catalog | Author fixes schema; refer to `wiki/concepts/placeholders.md` |
 | `PHComputed` resolver_key unknown (registry wired) | 422 `template.unknown_resolver` | `ResolverRegistryReader` lookup fails | Operator registers the resolver; T-008 � currently nil registry at wiring |
 | Tripwire abort on template_version write | 500 (mapped to RFC 9457); INSERT rejected because `metaldocs.asserted_caps` missing | Postgres `RAISE` from template tripwire | Code path bypassed `authz.Require(CapTemplateEdit/...)`; 2026-05-17 CommitAutosave/SaveTemplateDraft hardening wraps writes in `template.edit` tx |
 | Idempotency replay on submit/review/approve/publish | 200 with prior body; lifecycle state unchanged | PR #36 stabilized idempotency key handling | Expected; safe network retry |
