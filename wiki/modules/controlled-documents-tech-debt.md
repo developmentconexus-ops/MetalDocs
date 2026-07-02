@@ -2,7 +2,7 @@
 
 > Companion to [wiki/modules/controlled-documents.md](controlled-documents.md). Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in [wiki/backlog/controlled-documents-refactor.md](../backlog/controlled-documents-refactor.md).
 
-**Last verified:** 2026-06-12 (Wave 2.12 sync — db==nil authz-bypass class-B branch in Create deleted (authz now unconditional); DBTX replaced by db.Tx; sequence.go no longer imports database/sql; orphan document_subjects column+index noted as deferred; no existing debt rows opened or closed) | **Prior:** 2026-06-12 (Wave 2 sync — T-005 partially addressed by RLS migration 0234) | **Prior:** 2026-06-11
+**Last verified:** 2026-07-01 (Grade-A simplification register reconciliation — T-005 fully closed, cd_sequence_counters RLS confirmed via migration 0237/commit ad70f641 folded into baseline by fa5b6fd9; T-006 re-verified still open, no authz.Require on GetActiveDocument read path) | **Prior:** 2026-06-12 (Wave 2.12 sync — db==nil authz-bypass class-B branch in Create deleted (authz now unconditional); DBTX replaced by db.Tx; sequence.go no longer imports database/sql; orphan document_subjects column+index noted as deferred; no existing debt rows opened or closed) | **Prior:** 2026-06-12 (Wave 2 sync — T-005 partially addressed by RLS migration 0234) | **Prior:** 2026-06-11
 
 ## Severity scale
 
@@ -64,22 +64,23 @@ The category names are useful only when paired with concrete triggers. Use the t
 - **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-004`](../backlog/controlled-documents-refactor.md)
 - **Linked ADR:** [wiki/decisions/0007-two-tier-authz.md](../decisions/0007-two-tier-authz.md)
 
-### T-005    Tenant scoping via query arg only — no GUC + RLS backstop — PARTIALLY RESOLVED Wave 2
-- **Severity:** major (partially resolved — `controlled_documents` RLS applied; `cd_sequence_counters` still unguarded)
+### T-005    Tenant scoping via query arg only — no GUC + RLS backstop — CLOSED 2026-07-01 (Wave Z, migration 0237)
+- **Severity:** major (closed)
 - **Surface:** `internal/modules/controlleddocuments/infrastructure/repository.go` — `GetByID`, `GetByCode`, `CodeExists`, `List`, `CreateTx`, `UpdateStatus`, `NextAndIncrement` (all include `tenant_id = $...` predicate)
-- **Wave 2 progress:** Migration 0234 (`db/migrations/0234_rls_controlled_documents_audit_events.sql`) applied ENABLE + FORCE ROW LEVEL SECURITY + NULL-permissive `tenant_isolation` policy to `public.controlled_documents`. RLS is effective for NOSUPERUSER+NOBYPASSRLS production roles (dev Docker superuser bypasses). `cd_sequence_counters` RLS not yet applied — residual gap.
-- **Observation:** Every WHERE clause includes `tenant_id = $...` from the request context (sourced via `tenant.FromContext` — Plan 3 removed the `X-Tenant-ID` header source). Wave 2 added RLS backstop on `controlled_documents`. Residual: `cd_sequence_counters` still has query-arg-only scoping with no RLS or GUC backstop.
-- **Evidence:** `controlled-documents/_artifacts/04-persistence.md`   5; `controlled-documents/_artifacts/05-industry.md` IP-008
-- **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-005`](../backlog/controlled-documents-refactor.md)
+- **Wave 2 progress:** Migration 0234 (`db/migrations/0234_rls_controlled_documents_audit_events.sql`) applied ENABLE + FORCE ROW LEVEL SECURITY + NULL-permissive `tenant_isolation` policy to `public.controlled_documents`.
+- **Resolution (Wave Z):** `cd_sequence_counters` residual gap closed by migration 0237 ("rls_all_tenant_tables", commit `ad70f641` — "Z-2/Z-3 RLS on all 27 remaining tenant tables + idempotency tenant FK (F-12 tail, RF-6, REQ-TEN-1, F-09d, ADR 0027 executed in full)"), archived at `archive/migrations/post-baseline-2026-06-fold/0237_rls_all_tenant_tables.sql:179-183` (`ALTER TABLE public.cd_sequence_counters ENABLE ROW LEVEL SECURITY; ... FORCE ROW LEVEL SECURITY;` + `tenant_isolation` policy). Folded into the curated baseline by commit `fa5b6fd9`; confirmed live in `db/baseline/0001_current_schema.sql:4687` (`ENABLE ROW LEVEL SECURITY`) and `:4791` (`CREATE POLICY tenant_isolation ON public.cd_sequence_counters ...`). RLS is effective for NOSUPERUSER+NOBYPASSRLS production roles (dev Docker superuser bypasses).
+- **Observation (original):** Every WHERE clause includes `tenant_id = $...` from the request context (sourced via `tenant.FromContext` — Plan 3 removed the `X-Tenant-ID` header source). `cd_sequence_counters` had query-arg-only scoping with no RLS or GUC backstop; now closed.
+- **Evidence:** `db/baseline/0001_current_schema.sql:4687,4791`; `archive/migrations/post-baseline-2026-06-fold/0237_rls_all_tenant_tables.sql:179-183`; commits `ad70f641`, `fa5b6fd9`; `controlled-documents/_artifacts/04-persistence.md` §5; `controlled-documents/_artifacts/05-industry.md` IP-008 (stale — still shows T-005 open, needs separate refresh by wiki-curator).
+- **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-005`](../backlog/controlled-documents-refactor.md) (can be closed)
 - **Linked ADR:** missing-ADR
 
-### T-006    GetActiveDocument: no authz
-- **Severity:** major
-- **Surface:** `internal/modules/controlleddocuments/delivery/http/routes.go:266-439`
-- **Observation:** No `authz.Require` call; no `metaldocs.assert_caps`. Document content hashes, approval state, and published-revision IDs are returned to any authenticated caller. **Plan 3 resolved the header-trust sub-issue**     tenant is now sourced from `tenant.FromContext` via `injectTenant` middleware (`handler.go:48`); the `X-Tenant-ID` header is stripped by auth middleware. The outstanding gap is the missing read-policy authz enforcement. Pending a centralized read-policy ADR, defense-in-depth gap.
-- **Evidence:** `controlled-documents/_artifacts/02-flow-get-active.md`   2,   4
-- **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-006`](../backlog/controlled-documents-refactor.md)
-- **Linked ADR:** missing-ADR
+### T-006    GetActiveDocument: no authz     CLOSED 2026-07-01 (SEC-03)
+- **Severity:** major (closed)
+- **Surface (resolved):** tier-2 check lives in the application layer, not the handler: `Service.GetActiveInstance` (`internal/modules/controlleddocuments/application/service.go:643`) runs in-tx `authz.Require(CapDocumentView, "tenant")` after `SeedTxIdentity` (commit `b113ba51`, with deny/allow integration tests). The HTTP handler (`routes.go:276`) delegates to that service method, so the read path is capability-gated end-to-end.
+- **Observation (original):** No `authz.Require` call; no `metaldocs.assert_caps`. Document content hashes, approval state, and published-revision IDs were returned to any authenticated caller. Plan 3 had already resolved the header-trust sub-issue (tenant from `tenant.FromContext`); the residual read-policy gap is what SEC-03 closed.
+- **Evidence:** `controlled-documents/_artifacts/02-flow-get-active.md`   2,   4 (pre-fix trace)
+- **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-006`](../backlog/controlled-documents-refactor.md) (can be closed)
+- **Linked ADR:** ADR 0022 (two-tier PDP)
 
 ### T-007    OpenAPI spec/handler drift on 422 `template_invalid`     CLOSED 2026-05-12 (Plan 7)
 - **Severity:** major (closed)

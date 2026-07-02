@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/auth.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/auth-refactor.md`.
 
-**Last verified:** 2026-06-12 (Wave 2.12 sync — no debt rows opened or closed; loginCtxPort now panics on nil (was nil-guarded); InMemoryAuthFailureRateLimiter deleted — no new debt opened) | **Prior:** 2026-06-11 (Stage-1 adversarial verification pass — T-004 false-open corrected; T-009 behavior + anchor corrected; T-014 line anchors corrected)
+**Last verified:** 2026-07-01 (Grade-A simplification register reconciliation — T-012 closed as stale; OriginProtection middleware confirmed wired since commit 5d9f1884, register drift per commit fb0250e5) | **Prior:** 2026-06-12 (Wave 2.12 sync — no debt rows opened or closed; loginCtxPort now panics on nil (was nil-guarded); InMemoryAuthFailureRateLimiter deleted — no new debt opened) | **Prior:** 2026-06-11 (Stage-1 adversarial verification pass — T-004 false-open corrected; T-009 behavior + anchor corrected; T-014 line anchors corrected)
 
 ## Severity scale
 
@@ -101,12 +101,13 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - **Linked backlog row:** `backlog/auth-refactor.md#R-011`
 - **Linked ADR:** n/a
 
-### T-012 · OriginProtection config field unwired
-- **Severity:** minor
-- **Surface:** `internal/platform/authn/config.go:116`; `internal/modules/auth/delivery/http/middleware.go`
-- **Observation:** `OriginProtection` and `TrustedOrigins` are loaded into `authapp.Config` but no middleware path reads them to enforce same-origin / CSRF protection on state-changing routes. Latent: surface exists, no enforcement. Trigger fired: latent (surface exists, no caller hits it).
-- **Evidence:** `_artifacts/03-deps.md` §4 config surface.
-- **Linked backlog row:** `backlog/auth-refactor.md#R-012`
+### T-012 · OriginProtection config field unwired — CLOSED 2026-07-01 (register drift — already fixed by commit 5d9f1884)
+- **Severity:** minor (closed)
+- **Surface (resolved):** `internal/platform/authn/config.go:140-141` — `TrustedOrigins`/`OriginProtection` loaded from env into `authapp.Config`. `internal/platform/security/origin_protection.go:12-45` — `NewOriginProtection`/`OriginProtection.Wrap` implement same-origin enforcement gated on `cfg.Enabled` + session cookie presence. `apps/api/cmd/metaldocs-api/main.go:237-242` — `originProtection := security.NewOriginProtection(...)` wired with `authCfg.OriginProtection`/`authCfg.TrustedOrigins`/`authCfg.TrustedProxyCIDRs`; `main.go:643` — `originProtection.Wrap` mounted in the request middleware chain (`apiChain(...)`, between `cors.Wrap` and `loginRateLimit`).
+- **Observation (original):** `OriginProtection` and `TrustedOrigins` were loaded into `authapp.Config` but no middleware path read them to enforce same-origin / CSRF protection on state-changing routes.
+- **Resolution:** Middleware wiring landed in commit `5d9f1884` ("fix(api): Phase D review fixes — missed rate limiter, canonical origin code, RFC-correct Problem, harder lint", 2026-06-07) — `security/origin_protection.go` predates that commit and was already mounted at `main.go:643` at that point. This register row was stale; confirmed via commit `fb0250e5` (SEC-07 note: "middleware was already wired at main.go:643 since 5d9f1884; auth-tech-debt T-012 is register drift") and independently re-verified against current code 2026-07-01.
+- **Evidence:** `internal/platform/security/origin_protection.go:1-45`; `apps/api/cmd/metaldocs-api/main.go:237-242,643`; commits `5d9f1884`, `fb0250e5`.
+- **Linked backlog row:** `backlog/auth-refactor.md#R-012` (can be closed)
 - **Linked ADR:** missing-ADR
 
 ### T-014 · FE 401 interceptor conflated session-expiry with domain-401 — CLOSED 2026-05-28 (qa/fe-401-interceptor)

@@ -1,6 +1,7 @@
 # Phase 5 — Industry comparison (`documents`)
 
 **Date:** 2026-05-10
+**Last verified:** 2026-07-01 (Grade-A simplification register reconciliation — IP-004/T-003 corrected from stale asymmetric-defense-in-depth claim to resolved; other sections not re-audited in this pass, see `wiki/modules/documents-tech-debt.md` for current T-001/T-006 status)
 **Source of truth:** `.claude/skills/metaldocs-module-doc/references/industry-patterns-index.md`
 
 Each row: pattern ID → applies-here verdict → MetalDocs file:line anchor → gap (if any).
@@ -31,10 +32,10 @@ Each row: pattern ID → applies-here verdict → MetalDocs file:line anchor →
 ## IP-004 · Defense-in-depth (NIST SP 800-95 §4.3)
 
 - **Source:** NIST SP 800-95 (2007) — "Multiple layers of access control reduce single-point bypass risk."
-- **Applies here, asymmetrically:**
+- **Applies here — RESOLVED 2026-07-01 (was asymmetric, now layered on both surfaces):**
   - **Approval-instance writes** (full layered): tier-1 role gate at `handler.go:870`, tier-2 `authz.Require(ctx, tx, "doc.submit", areaCode)` at `submit_service.go:85`, Postgres tripwire trigger `trg_require_cap_asserted_instances` (`migrations/0142b_role_capabilities_v2_enforce.sql:201`) and `..._signoffs` (`:207`).
-  - **`documents` table writes** (single-layer): `CreateDocumentTx`, `UpdateDocumentName`, `UpdateDocumentStatus`, `MarkArchived`, `Unarchive` (`repository/repository.go:73, :216, :428, :1071, :1082`) have only tier-1 role gate. No `authz.Require` and no `enforce_capability_asserted` trigger attached to `documents`.
-- **Gap → debt:** T-003 (Major — documents table is the one regulated mutation surface without defense-in-depth).
+  - **`documents` table writes** (now full layered): `internal/modules/documents/repository/repository.go` — `CreateDocumentTx` (`:145`), `UpdateDocumentName`/rename path (`:207`, `:368`), `UpdateDocumentStatus` (`:638`), further mutation paths (`:856`, `:1678`) each call `authz.Require(ctx, mustSQLTx(tx)/tx, string(iamdomain.CapDocumentCreate|CapDocumentEdit), docArea)` in-tx before the mutating statement. Line numbers drift across refactors — verify against current `repository.go` rather than treating these as fixed anchors. Fixed via commits `2f44a29be` (`feat(documents): add authz.Require tier-2 to all document table mutations — T-003/R-003`, 2026-05-11), `88ab8f8dc` (`feat(documents): wrap RenameDocument rename+audit in single tx (T-005)`, 2026-05-11), and `6cc95955c` (`fix(audit): in-transaction audit/governance writes across taxonomy/templates/documents-core + cilint post-commit-audit guard`, 2026-06-11).
+- **Gap → debt:** T-003 in `wiki/modules/documents-tech-debt.md` is CLOSED 2026-05-11 (Plan 5) — this artifact was stale (still described the pre-fix asymmetric state as of 2026-05-10). Corrected 2026-07-01.
 
 ## IP-005 · OpenAPI source-of-truth
 
@@ -79,7 +80,7 @@ Each row: pattern ID → applies-here verdict → MetalDocs file:line anchor →
 | IP-001 RFC 9457 | mid-migration | T-001 |
 | IP-002 Idempotency | partial (finalize gap) | T-006 |
 | IP-003 Cursor pagination | not-applicable today | — |
-| IP-004 Defense-in-depth | asymmetric (documents table uncovered) | T-003 |
+| IP-004 Defense-in-depth | resolved 2026-07-01 (both surfaces layered) | T-003 (closed) |
 | IP-005 OpenAPI source-of-truth | drift (spec ↔ handlers) | T-002 |
 | IP-006 Forward-only migrations | satisfied | — |
 | IP-007 Observability | not-applicable (system-wide) | — |

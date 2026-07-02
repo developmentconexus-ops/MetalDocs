@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/templates.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates-refactor.md`.
 
-**Last verified:** 2026-06-12 (Wave 2.12 sync — db==nil dual-mode branches removed from all application services (single-mode); CreateTemplateTx areas/visibility/specific_areas columns dropped (migration 0236); nodualmode CI guard. Prior Wave 2 sync: typed CapTemplate* consts; upsertApprovalConfig fixed; publish tier-1 aligned; CompositionConfig deleted; AppendAuditTx in-tx. Prior: adversarial verification pass — corrected T-001 tripwire anchor to baseline DDL, added rename note for `templates_v2_*` → `templates_template*` history, fixed T-008 `ValidatePlaceholders` anchor to `schema.go:114`, fixed T-010 test file reference to `routes_contract_test.go:122`, fixed T-014 `schema.go:84` → `schema.go:114`, flagged stale line numbers in `_artifacts/02-flow-publish.md` in T-004 and T-007 evidence; prior: T-007 closed — transaction wrapping confirmed in code; 2026-06-10 Stage-1 backend audit drift patch; 2026-05-31 — fix/templates-publish-role-binding — T-004 fully closed; `PublishTemplateVersion` now enforces `pending_approver_role` binding parity with `Service.Approve`, denied attempts audited via `publish_forbidden_role`)
+**Last verified:** 2026-07-01 (Grade-A simplification register reconciliation — T-002 fully closed, GetVersion/GetVersionByID tenant-scoping residual gap confirmed fixed by commit 042d1504 (2026-05-25), was register drift since 2026-06-12 sync; T-008 closed, SEC-08 fail-fast resolver-registry guard confirmed at main.go:809-816 via commit fb0250e5) | **Prior:** 2026-06-12 (Wave 2.12 sync — db==nil dual-mode branches removed from all application services (single-mode); CreateTemplateTx areas/visibility/specific_areas columns dropped (migration 0236); nodualmode CI guard. Prior Wave 2 sync: typed CapTemplate* consts; upsertApprovalConfig fixed; publish tier-1 aligned; CompositionConfig deleted; AppendAuditTx in-tx. Prior: adversarial verification pass — corrected T-001 tripwire anchor to baseline DDL, added rename note for `templates_v2_*` → `templates_template*` history, fixed T-008 `ValidatePlaceholders` anchor to `schema.go:114`, fixed T-010 test file reference to `routes_contract_test.go:122`, fixed T-014 `schema.go:84` → `schema.go:114`, flagged stale line numbers in `_artifacts/02-flow-publish.md` in T-004 and T-007 evidence; prior: T-007 closed — transaction wrapping confirmed in code; 2026-06-10 Stage-1 backend audit drift patch; 2026-05-31 — fix/templates-publish-role-binding — T-004 fully closed; `PublishTemplateVersion` now enforces `pending_approver_role` binding parity with `Service.Approve`, denied attempts audited via `publish_forbidden_role`)
 
 ## Items
 
@@ -15,13 +15,14 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-001`
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md` (decision exists; module deviation is the debt)
 
-### T-002 · Cross-tenant version access — repo getters accept no tenant arg — PARTIALLY CLOSED 2026-05-11 (Plan 5)
-- **Severity:** critical → **partially resolved**
-- **Surface (resolved):** `internal/modules/templates/application/create.go:148` — `CreateNextVersion` now verifies `source.TemplateID != template.ID` and returns `domain.ErrNotFound` if the loaded version belongs to a different template. This closes the `CreateNextVersion` bypass path.
-- **Surface (residual):** `internal/modules/templates/repository/postgres.go` — `GetVersion(template_id, version_number)` and `GetVersionByID(version_id)` still have no `tenant_id` predicate. Callers that front these with `GetTemplate(tenant, template_id)` are safe; any future call site that forgets the gate is still vulnerable.
-- **Observation (original):** Both repository getters select by version primary keys with no `tenant_id` predicate. `CreateNextVersion` skipped the tenant gate when cloning from `PublishedVersionID`.
-- **Evidence:** `_artifacts/02-flow-update-schema.md`, `_artifacts/04-persistence.md` §1 (`templates_template_version` schema), `_artifacts/05-industry.md` IP-008.
-- **Linked backlog row:** `backlog/templates-refactor.md#R-002`
+### T-002 · Cross-tenant version access — repo getters accept no tenant arg — CLOSED 2026-07-01 (fully closed; residual gap fixed 2026-05-25, commit 042d1504)
+- **Severity:** critical → **resolved**
+- **Surface (resolved 2026-05-11 Plan 5):** `internal/modules/templates/application/create.go:148` — `CreateNextVersion` now verifies `source.TemplateID != template.ID` and returns `domain.ErrNotFound` if the loaded version belongs to a different template. This closed the `CreateNextVersion` bypass path.
+- **Surface (residual gap, now resolved):** `internal/modules/templates/repository/postgres.go:266-275` (`GetVersion`) and `:287-296` (`GetVersionByID`) both now take a `tenantID` parameter and join `templates_template_version v JOIN templates_template t ON t.id = v.template_id WHERE ... AND t.tenant_id = $N::uuid` — cross-tenant reads by primary key alone are no longer possible. All call sites pass a tenant ID: `application/autosave.go:38,60,84,115`, `application/create.go:126,135`, `application/lifecycle.go:29,117,206,340`, `application/queries.go:25,50`, `application/schema.go:28`, `delivery/http/routes_query.go:97,137,176` — verified 2026-07-01, no caller omits the tenant argument.
+- **Observation (original):** Both repository getters selected by version primary keys with no `tenant_id` predicate. `CreateNextVersion` skipped the tenant gate when cloning from `PublishedVersionID`.
+- **Resolution:** The residual repo-getter gap was closed by commit `042d1504` ("fix(templates): tenant scope version and audit reads", 2026-05-25) — predates the register's last "partially closed" sync (2026-06-12), so this was register drift rather than an open gap.
+- **Evidence:** `internal/modules/templates/repository/postgres.go:266-296`; commit `042d1504`; `_artifacts/02-flow-update-schema.md`, `_artifacts/04-persistence.md` §1 (`templates_template_version` schema), `_artifacts/05-industry.md` IP-008 (may need separate refresh by wiki-curator).
+- **Linked backlog row:** `backlog/templates-refactor.md#R-002` (can be closed)
 - **Linked ADR:** missing-ADR
 
 ### T-003 · `X-Tenant-ID` header trusted with `DevTenantID` fallback — **RESOLVED Plan 3**
@@ -69,12 +70,13 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-007` (can be closed)
 - **Linked ADR:** missing-ADR
 
-### T-008 · `ResolverRegistryReader` wired `nil` — `PHComputed.resolver_key` validation skipped
-- **Severity:** major
-- **Surface:** `internal/modules/templates/application/service.go:11` (`New` constructor accepts variadic `resolvers ResolverRegistryReader`); `apps/api/cmd/metaldocs-api/main.go:328` (does not pass the variadic). Validation site: `internal/modules/templates/application/schema.go:114` (`ValidatePlaceholders`).
-- **Observation:** The placeholder catalog gate enforces the 7-token `PHType` enum unconditionally. For `PHType == PHComputed`, the resolver_key string is intended to be checked against `ResolverRegistryReader.HasResolver(key)`. Composition root omits the variadic, leaving the registry reader nil. `ValidatePlaceholders` short-circuits the resolver check when reader is nil. A template author can save a schema with arbitrary `resolver_key` strings; the value propagates into every document instantiated from the published version (per `wiki/modules/documents.md §8.7` snapshot path). Template-injection blast radius is module-wide.
-- **Evidence:** `_artifacts/02-flow-update-schema.md`, `_artifacts/03-deps.md` §3.
-- **Linked backlog row:** `backlog/templates-refactor.md#R-008`
+### T-008 · `ResolverRegistryReader` wired `nil` — `PHComputed.resolver_key` validation skipped — CLOSED 2026-07-01 (fail-fast guard, commit fb0250e5, SEC-08)
+- **Severity:** major (closed)
+- **Surface (resolved):** `apps/api/cmd/metaldocs-api/main.go:798-823` (`buildTemplatesModule`) — a dedicated `templatesResolverReg := resolvers.NewRegistry()` is built and populated via `resolvers.RegisterBuiltins(...)` (`:807-808`), then a fail-fast guard at `:814-816` returns a startup error (`"templates resolver registry is nil or empty; resolver_key validation would be silently skipped (SEC-08 / T-008)"`) if the registry is nil or empty; the non-nil registry is passed into `templatesapp.New(..., templatesResolverReg)` at `:818`, satisfying the variadic `resolvers ResolverRegistryReader` parameter (`internal/modules/templates/application/service.go:11`). Validation site unchanged: `internal/modules/templates/application/schema.go:114` (`ValidatePlaceholders`).
+- **Observation (original):** The placeholder catalog gate enforces the 7-token `PHType` enum unconditionally. For `PHType == PHComputed`, the resolver_key string is intended to be checked against `ResolverRegistryReader.HasResolver(key)`. The register originally claimed the composition root omitted the variadic, leaving the registry reader nil and silently skipping the check.
+- **Resolution:** Commit `fb0250e5` ("fix(security/SEC-08,SEC-12,SEC-07): fail-fast resolver registry + honest 501s in memory mode") notes the registry wiring itself was already present and the original T-008 claim was stale; it adds the explicit boot-time fail-fast guard so a nil/empty registry now hard-stops startup instead of silently permitting arbitrary `resolver_key` values to propagate into published templates.
+- **Evidence:** `apps/api/cmd/metaldocs-api/main.go:809-816`; commit `fb0250e5`; `_artifacts/02-flow-update-schema.md`, `_artifacts/03-deps.md` §3 (original observation, now superseded).
+- **Linked backlog row:** `backlog/templates-refactor.md#R-008` (can be closed)
 - **Linked ADR:** missing-ADR
 
 ### T-009 · Idempotency replay coverage incomplete on generated POST routes
