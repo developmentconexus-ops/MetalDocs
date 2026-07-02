@@ -28,6 +28,7 @@ import (
 	iamauthz "metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	pgrepo "metaldocs/internal/modules/iam/infrastructure/postgres"
+	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -48,23 +49,36 @@ func (noopMembershipLogger) Log(_ context.Context, _ string, _ iamdomain.UserPro
 	return nil
 }
 
+func (noopMembershipLogger) LogTx(_ context.Context, _ platformdb.Tx, _ string, _ iamdomain.UserProcessArea) error {
+	return nil
+}
+
 func newAreaMembershipService(db *sql.DB) *iamapp.AreaMembershipService {
 	return iamapp.NewAreaMembershipService(pgrepo.NewUserAreaRepository(db), noopMembershipLogger{})
 }
 
-// seedIdentity inserts a minimal iam_users row (no tripwire on this table).
+// seedIdentity inserts a minimal iam_users row. SEC-05 / migration 0259:
+// iam_users now carries trg_require_cap_asserted (user.manage) on INSERT/DELETE
+// and on UPDATE of privileged columns (tenant_id among them) — seed via the
+// scheduler bypass GUC (the same hatch seedAreaAdminMembership below uses for
+// user_process_areas).
 func seedIdentity(t *testing.T, db *sql.DB, userID string) {
 	t.Helper()
-	if _, err := db.ExecContext(context.Background(),
-		`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
-		 VALUES ($1, $1, $2::uuid)
-		 ON CONFLICT (user_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id`,
-		userID, devTenant,
-	); err != nil {
-		t.Fatalf("seed iam_users %s: %v", userID, err)
-	}
+	withBypass(t, db, func(tx *sql.Tx) {
+		if _, err := tx.ExecContext(context.Background(),
+			`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
+			 VALUES ($1, $1, $2::uuid)
+			 ON CONFLICT (user_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id`,
+			userID, devTenant,
+		); err != nil {
+			t.Fatalf("seed iam_users %s: %v", userID, err)
+		}
+	})
 	t.Cleanup(func() {
-		db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE user_id = $1`, userID) //nolint:errcheck
+		_ = withBypassErr(db, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE user_id = $1`, userID)
+			return err
+		})
 	})
 }
 
@@ -294,7 +308,7 @@ func TestMembershipDirectory_AreaAdminScopedInSQL(t *testing.T) {
 		}
 	})
 
-	tenantWide, hasManaged, err := repo.MembershipDirectoryScope(ctx, devTenant, areaAdmin, string(iamdomain.CapMembershipManage))
+	tenantWide, hasManaged, err := repo.MembershipDirectoryScope(ctx, devTenant, areaAdmin, string(iamdomain.CapMembershipManage), time.Now().UTC())
 	if err != nil {
 		t.Fatalf("MembershipDirectoryScope(area_admin) = %v", err)
 	}
@@ -327,7 +341,7 @@ func TestMembershipDirectory_SystemAdminTenantWide(t *testing.T) {
 	seedIdentity(t, db, sysAdmin)
 	seedSystemAdminRole(t, db, sysAdmin)
 
-	tenantWide, _, err := repo.MembershipDirectoryScope(ctx, devTenant, sysAdmin, string(iamdomain.CapMembershipManage))
+	tenantWide, _, err := repo.MembershipDirectoryScope(ctx, devTenant, sysAdmin, string(iamdomain.CapMembershipManage), time.Now().UTC())
 	if err != nil {
 		t.Fatalf("MembershipDirectoryScope(system_admin) = %v", err)
 	}

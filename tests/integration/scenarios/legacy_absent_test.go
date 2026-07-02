@@ -157,16 +157,21 @@ func containsFixturePath(path string) bool {
 	return strings.Contains(normalized, "/fixture/") || strings.Contains(normalized, "/fixtures/")
 }
 
+// "archived" was reinstated as a live lifecycle status (draft -> under_review -> archived),
+// so only "finalized" remains a banned legacy literal. Lines that must mention it
+// (parse-boundary rejection, backward-compat rendering aliases) carry a
+// "cilint:allow-legacy" annotation and are exempt.
 func legacyLiteralViolationInGoLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
 	if trimmed == "" {
 		return false
 	}
-
-	if strings.HasPrefix(trimmed, "//") {
-		return commentLegacyViolation(trimmed)
+	if strings.Contains(line, "cilint:allow-legacy") {
+		return false
 	}
 
+	// Comments cannot reintroduce a status literal; only code counts.
+	// (Substring matching on comments false-positives on "finalizeDocument".)
 	codePart := line
 	if idx := strings.Index(codePart, "//"); idx >= 0 {
 		codePart = codePart[:idx]
@@ -178,6 +183,9 @@ func legacyLiteralViolationInGoLine(line string) bool {
 func legacyLiteralViolationInTSLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
 	if trimmed == "" {
+		return false
+	}
+	if strings.Contains(line, "cilint:allow-legacy") {
 		return false
 	}
 
@@ -192,25 +200,8 @@ func legacyLiteralViolationInTSLine(line string) bool {
 	return hasLegacyQuotedLiteral(codePart)
 }
 
-func commentLegacyViolation(comment string) bool {
-	lower := strings.ToLower(comment)
-	if !(strings.Contains(lower, "finalized") || strings.Contains(lower, "archived")) {
-		return false
-	}
-	if strings.Contains(lower, "legacy removed") ||
-		strings.Contains(lower, "legacy status") ||
-		strings.Contains(lower, "legacy") ||
-		strings.Contains(lower, "historical") {
-		return false
-	}
-	return true
-}
-
 func hasLegacyQuotedLiteral(s string) bool {
 	return strings.Contains(s, "'finalized'") ||
-		strings.Contains(s, "'archived'") ||
 		strings.Contains(s, "\"finalized\"") ||
-		strings.Contains(s, "\"archived\"") ||
-		strings.Contains(s, "`finalized`") ||
-		strings.Contains(s, "`archived`")
+		strings.Contains(s, "`finalized`")
 }

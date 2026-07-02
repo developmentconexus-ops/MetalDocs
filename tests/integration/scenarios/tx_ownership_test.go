@@ -13,13 +13,13 @@ import (
 
 func TestReflect_RepositoryNoBeginTx(t *testing.T) {
 	root := repoRootForIntegrationTests()
-	repoDir := filepath.Join(root, "internal", "modules", "documents_v2", "approval", "repository")
+	repoDir := filepath.Join(root, "internal", "modules", "documents", "approval", "repository")
 	assertNoForbiddenTxCalls(t, repoDir, []string{"db.BeginTx(", "tx.Commit(", "tx.Rollback("})
 }
 
 func TestHTTPHandlers_NoBeginTx(t *testing.T) {
 	root := repoRootForIntegrationTests()
-	httpDir := filepath.Join(root, "internal", "modules", "documents_v2", "approval", "http")
+	httpDir := filepath.Join(root, "internal", "modules", "documents", "approval", "http")
 	assertNoForbiddenTxCalls(t, httpDir, []string{"db.BeginTx("})
 }
 
@@ -32,6 +32,10 @@ func assertNoForbiddenTxCalls(t *testing.T, dir string, forbidden []string) {
 			return err
 		}
 		if d.IsDir() || filepath.Ext(path) != ".go" {
+			return nil
+		}
+		// Tx ownership is a production-code invariant; test fixtures may open txs.
+		if strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
 
