@@ -1,6 +1,7 @@
 //go:build integration
+// +build integration
 
-package infrastructure
+package controlleddocuments_test
 
 import (
 	"context"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	docrepo "metaldocs/internal/modules/documents/repository"
 	"metaldocs/tests/integration/testdb"
 )
@@ -20,6 +22,14 @@ import (
 // branch: active-only, published-only, under_review (+ derived in-progress
 // approval instance), and none. The raw baseline below is the verbatim SQL that
 // lived in GetActiveInstance at HEAD before the port replaced it.
+//
+// Relocated from internal/modules/controlleddocuments/infrastructure (TST-07):
+// that package cannot import tests/integration/testdb because testdb/factory.go
+// itself imports controlleddocuments/infrastructure (for NewCDFieldReaderPG),
+// which is an import cycle under `-tags integration`. This test only needs the
+// package's exported surface (NewPostgresControlledDocumentRepository), so it
+// lives here as a black-box _test package alongside the other module-scoped
+// testdb-driven integration suites.
 
 // rawGetActiveInstance replays the pre-port inline reads (the documents FULL
 // OUTER JOIN projection + the derived in_progress approval_instances lookup)
@@ -158,7 +168,7 @@ func assertActiveInstanceParity(t *testing.T, label string, want, got *controlle
 func TestActiveInstanceReader_ParityWithRawGetActiveInstance(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := context.Background()
-	repo := NewPostgresControlledDocumentRepository(db, docrepo.NewActiveInstanceReaderPG(db))
+	repo := cdinfra.NewPostgresControlledDocumentRepository(db, docrepo.NewActiveInstanceReaderPG(db))
 
 	t.Run("active_draft_only", func(t *testing.T) {
 		doc := testdb.NewDocument(t, db, testdb.WithStatus("draft"))

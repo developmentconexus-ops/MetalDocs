@@ -1,7 +1,7 @@
 //go:build integration
 // +build integration
 
-package infrastructure
+package controlleddocuments_test
 
 import (
 	"context"
@@ -31,6 +31,11 @@ import (
 // D6: GREEN proves view == raw baseline before F4.3 deletes the raw reads. The
 // revoked-member row is the drift discriminator: the active grantee view must
 // exclude it, exactly as `effective_to IS NULL` did.
+//
+// Relocated from internal/modules/controlleddocuments/infrastructure (TST-07) —
+// see active_instance_parity_test.go in this package for the import-cycle
+// rationale. seedCDVisibility/cdScenario live in membership_view_parity_test.go
+// in this same package.
 
 // rawSearchCanSeeCD runs the VERBATIM pre-M4 search-inlined CD visibility predicate
 // (reader.go:89-118 CD branch) over the raw base tables. The composed view decision

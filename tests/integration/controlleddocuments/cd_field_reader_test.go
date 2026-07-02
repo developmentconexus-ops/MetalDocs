@@ -1,6 +1,7 @@
 //go:build integration
+// +build integration
 
-package infrastructure
+package controlleddocuments_test
 
 import (
 	"context"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -19,6 +21,10 @@ import (
 // produce at the consumer sites being ported (B1 profile_code; B5/B6
 // process_area_code). The raw read MUST NOT be deleted until the matching parity
 // test here is green.
+//
+// Relocated from internal/modules/controlleddocuments/infrastructure (TST-07) —
+// see active_instance_parity_test.go in this package for the import-cycle
+// rationale.
 
 // rawProfileCode runs the literal B1 query
 // (documents/repository/repository.go:1701) and returns "" on no-row, matching
@@ -60,7 +66,7 @@ func rawProcessAreaCode(t *testing.T, db *sql.DB, tenantID, cdID string) (string
 
 func TestCDFieldReader_ProfileCode_ParityWithRawSQL(t *testing.T) {
 	db, _ := testdb.Open(t)
-	reader := NewCDFieldReaderPG()
+	reader := cdinfra.NewCDFieldReaderPG()
 	ctx := context.Background()
 
 	cd := testdb.NewControlledDoc(t, db)
@@ -99,7 +105,7 @@ func TestCDFieldReader_ProfileCode_ParityWithRawSQL(t *testing.T) {
 
 func TestCDFieldReader_ProcessAreaCode_ParityWithRawSQL(t *testing.T) {
 	db, _ := testdb.Open(t)
-	reader := NewCDFieldReaderPG()
+	reader := cdinfra.NewCDFieldReaderPG()
 	ctx := context.Background()
 
 	cd := testdb.NewControlledDoc(t, db)

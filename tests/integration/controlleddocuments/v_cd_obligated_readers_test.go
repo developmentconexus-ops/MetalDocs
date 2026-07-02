@@ -1,7 +1,7 @@
 //go:build integration
 // +build integration
 
-package infrastructure
+package controlleddocuments_test
 
 import (
 	"context"
@@ -22,6 +22,11 @@ import (
 // DISTINCT BY (tenant_id, cd, user_id) with source precedence
 // user_grant > area_grant > company_scope. Revoked area members MUST be excluded.
 // v_cd_grantee MUST NOT be modified.
+//
+// Relocated from internal/modules/controlleddocuments/infrastructure (TST-07) —
+// see active_instance_parity_test.go in this package for the import-cycle
+// rationale. seedCDVisibility/cdScenario live in membership_view_parity_test.go
+// in this same package.
 
 type obligatedRow struct {
 	UserID   string

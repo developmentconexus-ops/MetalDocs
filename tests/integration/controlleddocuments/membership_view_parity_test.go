@@ -1,7 +1,7 @@
 //go:build integration
 // +build integration
 
-package infrastructure
+package controlleddocuments_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -28,6 +29,12 @@ import (
 // post-repoint (view repo == raw baseline — parity). The REVOKED-membership row
 // is the drift discriminator: the active view must exclude it, exactly as
 // `effective_to IS NULL` did.
+//
+// Relocated from internal/modules/controlleddocuments/infrastructure (TST-07) —
+// see active_instance_parity_test.go in this package for the import-cycle
+// rationale. seedCDVisibility/cdScenario are also consumed by
+// cd_visibility_contract_parity_test.go and v_cd_obligated_readers_test.go in
+// this same package.
 
 type cdScenario struct {
 	tenantID     string
@@ -237,7 +244,7 @@ ORDER BY created_at DESC, id DESC`
 	return out
 }
 
-func repoListIDs(t *testing.T, repo *PostgresControlledDocumentRepository, tenantID, actor string) []string {
+func repoListIDs(t *testing.T, repo *cdinfra.PostgresControlledDocumentRepository, tenantID, actor string) []string {
 	t.Helper()
 	a := actor
 	limit := 50
@@ -264,7 +271,7 @@ func sortedSet(in []string) []string {
 func TestCanRead_ViewParityWithRaw(t *testing.T) {
 	db, _ := testdb.Open(t)
 	sc := seedCDVisibility(t, db)
-	repo := NewPostgresControlledDocumentRepository(db, nil)
+	repo := cdinfra.NewPostgresControlledDocumentRepository(db, nil)
 
 	actors := map[string]string{
 		"owner": sc.owner, "areaMember": sc.areaMember, "revokedMem": sc.revokedMem,
@@ -301,7 +308,7 @@ func TestCanRead_ViewParityWithRaw(t *testing.T) {
 func TestList_ViewParityWithRaw(t *testing.T) {
 	db, _ := testdb.Open(t)
 	sc := seedCDVisibility(t, db)
-	repo := NewPostgresControlledDocumentRepository(db, nil)
+	repo := cdinfra.NewPostgresControlledDocumentRepository(db, nil)
 
 	for an, actor := range map[string]string{
 		"owner": sc.owner, "areaMember": sc.areaMember, "revokedMem": sc.revokedMem,
