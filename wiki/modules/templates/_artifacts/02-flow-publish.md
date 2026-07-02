@@ -1,5 +1,15 @@
 # Operation Trace: publishTemplateVersionV2
 
+> **HISTORICAL ARTIFACT (pre-rework, traced 2026-05-10).** This trace predates the
+> templates lifecycle rework (ADR 0052 era / template↔document parity, merged 2026-06-30)
+> and no longer describes the live publish path. Superseded since the trace:
+> in-tx `authz.Require` now present in `application/lifecycle.go` (§4 tripwire
+> "VIOLATION" is closed), the concurrent-publish race is closed by a CAS
+> concurrent-transition guard, publish no longer auto-creates the next draft
+> (M1·T2), and the pending-approver role binding is enforced on publish.
+> For current behavior read `wiki/modules/templates.md` and the code. Kept as a
+> dated audit record only — do not cite its findings as open.
+
 Operation `publishTemplateVersionV2` (HTTP `POST /api/v1/templates/{id}/versions/{n}/publish`) in module `internal/modules/templates`.
 
 ## 1. Entry point
