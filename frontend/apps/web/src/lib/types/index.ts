@@ -47,19 +47,6 @@ export interface AreaMembership {
   grantedAt: string;
 }
 
-export interface DocumentTypeItem {
-  code: string;
-  name: string;
-  description: string;
-  reviewIntervalDays: number;
-}
-
-export interface DocumentFamilyItem {
-  code: string;
-  name: string;
-  description: string;
-}
-
 export interface DocumentProfileItem {
   code: string;
   familyCode: string;
@@ -74,25 +61,6 @@ export interface DocumentProfileItem {
   validityDays: number;
 }
 
-export interface ProcessAreaItem {
-  code: string;
-  name: string;
-  description: string;
-}
-
-export interface DocumentDepartmentItem {
-  code: string;
-  name: string;
-  description: string;
-}
-
-export interface SubjectItem {
-  code: string;
-  processAreaCode: string;
-  name: string;
-  description: string;
-}
-
 export interface MetadataFieldRuleItem {
   name: string;
   type: string;
@@ -105,28 +73,6 @@ export interface DocumentProfileSchemaItem {
   isActive: boolean;
   metadataRules: MetadataFieldRuleItem[];
   contentSchema?: Record<string, unknown>;
-}
-
-export interface DocumentProfileGovernanceItem {
-  profileCode: string;
-  workflowProfile: string;
-  reviewIntervalDays: number;
-  approvalRequired: boolean;
-  retentionDays: number;
-  validityDays: number;
-}
-
-export interface DocumentProfileBundleTaxonomy {
-  processAreas: ProcessAreaItem[];
-  documentDepartments: DocumentDepartmentItem[];
-  subjects: SubjectItem[];
-}
-
-export interface DocumentProfileBundleResponse {
-  profile: DocumentProfileItem;
-  schema: DocumentProfileSchemaItem;
-  governance: DocumentProfileGovernanceItem;
-  taxonomy: DocumentProfileBundleTaxonomy;
 }
 
 export interface DocumentListItem {

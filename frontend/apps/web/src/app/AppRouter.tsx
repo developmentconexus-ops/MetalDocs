@@ -1,7 +1,6 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom';
 import { AppRoot } from '../features/shell/pages/AppRoot';
 import { approvalRoutes } from '../features/approval/routes';
-import { contentBuilderRoutes } from '../features/content-builder/routes';
 import { dashboardRoutes } from '../features/dashboard/routes';
 import { documentsRoutes } from '../features/documents/routes';
 import { iamRoutes } from '../features/iam/routes';
@@ -32,7 +31,6 @@ export const router = createBrowserRouter([
           ...taxonomyRoutes,
           ...iamRoutes,
           ...approvalRoutes,
-          ...contentBuilderRoutes,
           ...passwordChangeRoutes,
           { path: '*', element: <Navigate to="/" replace /> },
         ],
