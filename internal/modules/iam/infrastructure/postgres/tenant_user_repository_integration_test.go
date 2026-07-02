@@ -4,6 +4,7 @@ package postgres_test
 
 import (
 	"context"
+	"database/sql"
 	"sort"
 	"testing"
 
@@ -50,26 +51,32 @@ func TestTenantUserRepository_TenantUserIDs_Live(t *testing.T) {
 	}
 
 	// Two members of tenantID — one deactivated; one member of otherTenantID.
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, tenant_id, created_at, updated_at)
-		 VALUES ($1, 'Active F45', TRUE, $3::uuid, now(), now()),
-		        ($2, 'Deactivated F45', TRUE, $3::uuid, now(), now())`,
-		userActive, userDeactivated, tenantID,
-	); err != nil {
-		t.Fatalf("insert tenant members: %v", err)
-	}
-	if _, err := db.ExecContext(ctx,
-		`UPDATE metaldocs.iam_users SET deactivated_at = now() WHERE user_id = $1`, userDeactivated,
-	); err != nil {
-		t.Fatalf("deactivate member: %v", err)
-	}
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, tenant_id, created_at, updated_at)
-		 VALUES ($1, 'Other Tenant F45', TRUE, $2::uuid, now(), now())`,
-		userOtherTenant, otherTenantID,
-	); err != nil {
-		t.Fatalf("insert other-tenant member: %v", err)
-	}
+	// SEC-05 / migration 0259: iam_users carries trg_require_cap_asserted
+	// (user.manage) on INSERT/DELETE and on UPDATE of privileged columns
+	// (including deactivated_at) — assert the cap tx-locally via seedWithCapsIAM.
+	seedWithCapsIAM(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, tenant_id, created_at, updated_at)
+			 VALUES ($1, 'Active F45', TRUE, $3::uuid, now(), now()),
+			        ($2, 'Deactivated F45', TRUE, $3::uuid, now(), now())`,
+			userActive, userDeactivated, tenantID,
+		)
+		return err
+	})
+	seedWithCapsIAM(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`UPDATE metaldocs.iam_users SET deactivated_at = now() WHERE user_id = $1`, userDeactivated,
+		)
+		return err
+	})
+	seedWithCapsIAM(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, tenant_id, created_at, updated_at)
+			 VALUES ($1, 'Other Tenant F45', TRUE, $2::uuid, now(), now())`,
+			userOtherTenant, otherTenantID,
+		)
+		return err
+	})
 
 	t.Run("returns_all_members_incl_deactivated_excludes_other_tenant", func(t *testing.T) {
 		ids, err := repo.TenantUserIDs(ctx, tenantID)

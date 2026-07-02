@@ -280,8 +280,10 @@ func SupersedeActiveDocumentForCD(t *testing.T, db *sql.DB, controlledDocumentID
 // tier-2) is satisfied via the system_admin inheritance bypass — without
 // granting per-area memberships. It upserts the iam_users row (display_name is
 // preserved for the iam UserDisplayNameReader port) and the iam_user_roles row.
-// iam_users carries no tripwire; iam_user_roles requires user.manage, so the
-// role write runs inside a user.manage transaction (pool-safe, tx-local).
+// SEC-05 / migration 0259: iam_users now carries trg_require_cap_asserted
+// (user.manage) on INSERT and on UPDATE of privileged columns (display_name,
+// tenant_id among them), same as iam_user_roles — both writes run inside a
+// user.manage transaction (pool-safe, tx-local).
 func SeedSystemAdmin(t *testing.T, db *sql.DB, tenantID, userID, displayName string) {
 	t.Helper()
 	ctx := context.Background()
@@ -299,14 +301,15 @@ func SeedSystemAdmin(t *testing.T, db *sql.DB, tenantID, userID, displayName str
 		t.Fatalf("SeedSystemAdmin: tenants: %v", err)
 	}
 
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO `+Qualified("", "iam_users")+` (user_id, display_name, tenant_id)
-		 VALUES ($1, $2, $3::uuid)
-		 ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name, tenant_id = EXCLUDED.tenant_id`,
-		userID, displayName, tenantID,
-	); err != nil {
-		t.Fatalf("SeedSystemAdmin: iam_users: %v", err)
-	}
+	seedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO `+Qualified("", "iam_users")+` (user_id, display_name, tenant_id)
+			 VALUES ($1, $2, $3::uuid)
+			 ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name, tenant_id = EXCLUDED.tenant_id`,
+			userID, displayName, tenantID,
+		)
+		return err
+	})
 
 	seedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,

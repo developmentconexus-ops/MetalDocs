@@ -4,6 +4,7 @@ package postgres_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
@@ -44,13 +45,16 @@ func TestUserDisplayNameRepository_DisplayName_Live(t *testing.T) {
 	}
 
 	// Seed user only in tenantID — not in otherTenantID.
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, tenant_id, created_at, updated_at)
-		 VALUES ($1, $2, TRUE, $3::uuid, now(), now())`,
-		userID, displayName, tenantID,
-	); err != nil {
-		t.Fatalf("insert iam_users: %v", err)
-	}
+	// SEC-05 / migration 0259: iam_users carries trg_require_cap_asserted
+	// (user.manage) on INSERT — assert the cap tx-locally via seedWithCapsIAM.
+	seedWithCapsIAM(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, tenant_id, created_at, updated_at)
+			 VALUES ($1, $2, TRUE, $3::uuid, now(), now())`,
+			userID, displayName, tenantID,
+		)
+		return err
+	})
 
 	t.Run("present_returns_value", func(t *testing.T) {
 		got, err := repo.DisplayName(ctx, tenantID, userID)
@@ -123,13 +127,17 @@ func TestUserDisplayNameRepository_DisplayNames_Live(t *testing.T) {
 	for _, s := range seeds {
 		// Use empty string (not NULL) — the schema enforces NOT NULL on display_name.
 		// The port query filters WHERE display_name <> '' so empty-string rows are omitted.
-		if _, err := db.ExecContext(ctx,
-			`INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, tenant_id, created_at, updated_at)
-			 VALUES ($1, $2, TRUE, $3::uuid, now(), now())`,
-			s.userID, s.displayName, tenantID,
-		); err != nil {
-			t.Fatalf("insert iam_users %s: %v", s.userID, err)
-		}
+		// SEC-05 / migration 0259: iam_users carries trg_require_cap_asserted
+		// (user.manage) on INSERT — assert the cap tx-locally via seedWithCapsIAM.
+		s := s
+		seedWithCapsIAM(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx,
+				`INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, tenant_id, created_at, updated_at)
+				 VALUES ($1, $2, TRUE, $3::uuid, now(), now())`,
+				s.userID, s.displayName, tenantID,
+			)
+			return err
+		})
 	}
 
 	t.Run("present_with_name_returned", func(t *testing.T) {

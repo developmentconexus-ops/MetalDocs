@@ -22,18 +22,21 @@ func SeedTenant(t *testing.T, ctx context.Context, db *sql.DB, schema, tenantID 
 	_ = tenantID
 }
 
-// SeedUser inserts an iam_users row.
+// SeedUser inserts an iam_users row. SEC-05 / migration 0259: iam_users now
+// carries trg_require_cap_asserted (user.manage) on INSERT — asserted tx-locally
+// via testdb.SeedWithCaps (pool-safe, matches the production authz layer).
 func SeedUser(t *testing.T, ctx context.Context, db *sql.DB, schema, userID, displayName string) {
 	t.Helper()
-	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
-		INSERT INTO %s (user_id, display_name, is_active, created_at, updated_at)
-		VALUES ($1, $2, true, now(), now())
-		ON CONFLICT (user_id) DO NOTHING`,
-		testdb.Qualified(schema, "iam_users")),
-		userID, displayName,
-	); err != nil {
-		t.Fatalf("SeedUser: %v", err)
-	}
+	testdb.SeedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, fmt.Sprintf(`
+			INSERT INTO %s (user_id, display_name, is_active, created_at, updated_at)
+			VALUES ($1, $2, true, now(), now())
+			ON CONFLICT (user_id) DO NOTHING`,
+			testdb.Qualified(schema, "iam_users")),
+			userID, displayName,
+		)
+		return err
+	})
 }
 
 // SeedDocument inserts a minimal documents row.

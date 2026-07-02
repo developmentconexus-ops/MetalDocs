@@ -204,8 +204,11 @@ func NewTenant(t *testing.T, db *sql.DB, opts ...Opt) Tenant {
 	return Tenant{ID: id}
 }
 
-// NewUser seeds a metaldocs.iam_users row (no tripwire) and, when WithRole is
-// given, the iam_user_roles row (user.manage tripwire, asserted tx-locally).
+// NewUser seeds a metaldocs.iam_users row (user.manage tripwire on
+// display_name/is_active/tenant_id/deactivated_at, migration 0259 — column-scoped
+// so the login-context/presence telemetry columns stay ungated) and, when WithRole
+// is given, the iam_user_roles row (user.manage tripwire, asserted tx-locally).
+// Both writes share one seedWithCaps tx since they require the same capability.
 func NewUser(t *testing.T, db *sql.DB, opts ...Opt) User {
 	t.Helper()
 	s := newSpec(opts)
@@ -223,12 +226,15 @@ func NewUser(t *testing.T, db *sql.DB, opts ...Opt) User {
 		display = "Test User " + userID
 	}
 
-	exec(t, db,
-		`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
-		 VALUES ($1, $2, $3::uuid)
-		 ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name, tenant_id = EXCLUDED.tenant_id`,
-		userID, display, tenantID,
-	)
+	seedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(),
+			`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
+			 VALUES ($1, $2, $3::uuid)
+			 ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name, tenant_id = EXCLUDED.tenant_id`,
+			userID, display, tenantID,
+		)
+		return err
+	})
 
 	if s.Role != "" {
 		seedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {

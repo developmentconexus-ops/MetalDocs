@@ -4,6 +4,7 @@ package postgres_test
 
 import (
 	"context"
+	"database/sql"
 	"sort"
 	"testing"
 
@@ -38,23 +39,28 @@ func TestUserTenantRepository_UserTenantIDs_Live(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	// userMulti: two roles in tenantA (DISTINCT must collapse) + one in tenantB.
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO metaldocs.iam_user_roles (user_id, role_code, tenant_id)
-		 VALUES ($1, 'author', $2::uuid),
-		        ($1, 'editor', $2::uuid),
-		        ($1, 'viewer', $3::uuid)`,
-		userMulti, tenantA, tenantB,
-	); err != nil {
-		t.Fatalf("insert userMulti roles: %v", err)
-	}
+	// SEC-05 / migration 0259 (and pre-existing since migration 0188):
+	// iam_user_roles carries trg_require_cap_asserted (user.manage) — assert the
+	// cap tx-locally via seedWithCapsIAM.
+	seedWithCapsIAM(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_user_roles (user_id, role_code, tenant_id)
+			 VALUES ($1, 'author', $2::uuid),
+			        ($1, 'editor', $2::uuid),
+			        ($1, 'viewer', $3::uuid)`,
+			userMulti, tenantA, tenantB,
+		)
+		return err
+	})
 	// userOther: a role in a third tenant — must not leak into userMulti's result.
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO metaldocs.iam_user_roles (user_id, role_code, tenant_id)
-		 VALUES ($1, 'viewer', $2::uuid)`,
-		userOther, otherTenant,
-	); err != nil {
-		t.Fatalf("insert userOther role: %v", err)
-	}
+	seedWithCapsIAM(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_user_roles (user_id, role_code, tenant_id)
+			 VALUES ($1, 'viewer', $2::uuid)`,
+			userOther, otherTenant,
+		)
+		return err
+	})
 
 	t.Run("distinct_sorted_tenants_for_user_excludes_others", func(t *testing.T) {
 		ids, err := repo.UserTenantIDs(ctx, userMulti)

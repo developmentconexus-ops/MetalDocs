@@ -74,31 +74,43 @@ func TestCapabilityService_UnknownUser_Denied(t *testing.T) {
 	}
 }
 
+// SEC-05 / migration 0259: iam_users/iam_user_roles carry
+// trg_require_cap_asserted (user.manage) — seed via the scheduler bypass GUC
+// (withBypass/withBypassErr, shared with membership_area_scope_test.go in this
+// package).
 func insertUserRole(t *testing.T, db *sql.DB, userID, role string) {
 	t.Helper()
 	ctx := context.Background()
 
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
-		 VALUES ($1, $2, $3::uuid)
-		 ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name, tenant_id = EXCLUDED.tenant_id`,
-		userID, userID, devTenant,
-	); err != nil {
-		t.Fatalf("insert iam_users: %v", err)
-	}
+	withBypass(t, db, func(tx *sql.Tx) {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
+			 VALUES ($1, $2, $3::uuid)
+			 ON CONFLICT (user_id) DO UPDATE SET display_name = EXCLUDED.display_name, tenant_id = EXCLUDED.tenant_id`,
+			userID, userID, devTenant,
+		); err != nil {
+			t.Fatalf("insert iam_users: %v", err)
+		}
 
-	// uq_iam_user_roles_user_tenant: UNIQUE(tenant_id, user_id) — one role per user
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO metaldocs.iam_user_roles (user_id, role_code, tenant_id, assigned_by)
-		 VALUES ($1, $2, $3::uuid, $1)
-		 ON CONFLICT (tenant_id, user_id) DO UPDATE SET role_code = EXCLUDED.role_code, assigned_by = EXCLUDED.assigned_by`,
-		userID, role, devTenant,
-	); err != nil {
-		t.Fatalf("insert iam_user_roles: %v", err)
-	}
+		// uq_iam_user_roles_user_tenant: UNIQUE(tenant_id, user_id) — one role per user
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_user_roles (user_id, role_code, tenant_id, assigned_by)
+			 VALUES ($1, $2, $3::uuid, $1)
+			 ON CONFLICT (tenant_id, user_id) DO UPDATE SET role_code = EXCLUDED.role_code, assigned_by = EXCLUDED.assigned_by`,
+			userID, role, devTenant,
+		); err != nil {
+			t.Fatalf("insert iam_user_roles: %v", err)
+		}
+	})
 
 	t.Cleanup(func() {
-		db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_user_roles WHERE user_id = $1`, userID)   //nolint:errcheck
-		db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE user_id = $1`, userID)        //nolint:errcheck
+		_ = withBypassErr(db, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_user_roles WHERE user_id = $1`, userID)
+			return err
+		})
+		_ = withBypassErr(db, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE user_id = $1`, userID)
+			return err
+		})
 	})
 }
