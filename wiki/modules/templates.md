@@ -1,4 +1,4 @@
-﻿# Module: templates
+# Module: templates
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams + ADR links.
 >
@@ -74,9 +74,9 @@ Frontend wiring (all under `frontend/apps/web/src/features/templates/`):
 
 - Language / runtime: Go (per repo defaults).
 - Persistence: Postgres; tables created in `migrations/0120_templates_init.sql`.
-- Authz: two-tier per `wiki/decisions/0007-two-tier-authz.md` � **applied Plan 5 and extended 2026-05-17** (`WithDB` builder + `authz.Require`; DOCX autosave/import commit now sets transaction GUCs before updating `templates_template_version`; DB tripwire on `templates_template` + `templates_template_version`; T-001 closed).
+- Authz: two-tier per `wiki/decisions/0007-two-tier-authz.md` — **applied Plan 5 and extended 2026-05-17** (`WithDB` builder + `authz.Require`; DOCX autosave/import commit now sets transaction GUCs before updating `templates_template_version`; DB tripwire on `templates_template` + `templates_template_version`; T-001 closed).
 - API contract: OpenAPI 3.0.3 generated via oapi-codegen; Plan 12.4 generated coverage includes the mounted template route set (see T-006 closed).
-- Error envelope: RFC 9457 Problem+JSON per `wiki/architecture/api-design-system.md` Ã¢â‚¬â€ **NOT applied** (see T-005).
+- Error envelope: RFC 9457 Problem+JSON per `wiki/architecture/api-design-system.md` — **NOT applied** (see T-005).
 - Placeholder syntax + catalog: per `wiki/concepts/placeholders.md` (fixed 8-type placeholder catalog) and `wiki/concepts/token-syntax.md` (`{name}` single-brace, eigenpal-native).
 - Editor: eigenpal `templatePlugin` for DOCX authoring (per ADR 0001 `wiki/decisions/0001-eigenpal-adoption.md`).
 
