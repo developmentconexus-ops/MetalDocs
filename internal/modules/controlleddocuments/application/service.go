@@ -605,6 +605,19 @@ func (s *ControlledDocumentService) Get(ctx context.Context, tenantID, id string
 // document identified by id, after verifying that the caller can read it.
 // Returns ErrNoActiveInstance when the caller cannot read the document (restored contract).
 // Returns nil, nil when the document is readable but has no active/published instance.
+//
+// SEC-03 (T-006): this is a sensitive read — it returns content hashes,
+// approval state, and published-revision IDs. Tier-1 (permissions.go) already
+// requires document.view for the GET route; this adds the tier-2 in-tx
+// capability check so the same read-policy floor documents/approval's
+// ReadService.LoadInstance and documents/application ViewService.GetViewURL
+// apply (ADR 0022: reason in capabilities, never roles — document.view is the
+// tenant-grade *.view read capability, so callers pass the "tenant" sentinel
+// to intentionally disable the area filter, exactly as those siblings do).
+// The visibility CanRead EXISTS check above stays first — it narrows by
+// document visibility_scope/grants; authz.Require then gates by capability.
+// Neither check holds a lock, so this does not trip H-PRE-1 (authz-recording
+// read inside a lock-holding tx).
 func (s *ControlledDocumentService) GetActiveInstance(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ActiveDocumentInstance, error) {
 	actorUserID, ok := authn.UserIDFromContext(ctx)
 	if !ok {
@@ -617,6 +630,24 @@ func (s *ControlledDocumentService) GetActiveInstance(ctx context.Context, tenan
 	if !canRead {
 		return nil, controlleddocumentsdomain.ErrNoActiveInstance
 	}
+
+	ctx = authz.WithCapCache(ctx)
+	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
+		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
+			return fmt.Errorf("controlled_documents: set authz context get active instance: %w", err)
+		}
+		// document.view is tenant-grade (iam/domain/capability_scope.go) — pass the
+		// "tenant" sentinel so the area filter is intentionally OFF, mirroring
+		// documents/approval/application/read_service.go LoadInstance and
+		// documents/application/view_service.go GetViewURL.
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
 	inst, err := s.docs.GetActiveInstance(ctx, tenantID, id)
 	if err != nil {
 		return nil, fmt.Errorf("controlled_documents: get active instance: %w", err)
