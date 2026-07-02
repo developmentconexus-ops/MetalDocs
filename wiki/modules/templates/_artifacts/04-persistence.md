@@ -36,7 +36,7 @@ All four tables are created in a single migration: `migrations/0120_templates_in
 | `id` | uuid | PRIMARY KEY |
 | `template_id` | uuid | NOT NULL; FK → `templates_template(id)` |
 | `version_number` | int | NOT NULL; UNIQUE (template_id, version_number) |
-| `status` | text | NOT NULL (`draft` / `in_review` / `approved` / `published` / `obsolete`) |
+| `status` | text | NOT NULL (`draft` / `under_review` / `approved` / `published` / `obsolete`) |
 | `docx_storage_key` | text | NOT NULL |
 | `content_hash` | text | NOT NULL (empty string sentinel until upload commit) |
 | `metadata_schema` | jsonb | NOT NULL |

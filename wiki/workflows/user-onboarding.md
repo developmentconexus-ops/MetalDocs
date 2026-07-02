@@ -1,6 +1,6 @@
 # Workflow: User Onboarding (End-to-End)
 
-> **Last verified:** 2026-05-07
+> **Last verified:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257; DOC-03 drift fix: computed-token catalog is 8 tokens per ADR 0050, `approval_date` added)
 > **Note (smoke test 2026-05-01):** Non-admin users require `user_process_areas` entries to exercise approval authz. See "Common pitfalls" below.
 > **Scope:** The full MetalDocs user journey from a brand-new tenant to a published, frozen document with PDF fanout. Written from the user's seat — what to click, in what order, why each step matters. Non-technical: no code, no API endpoints, no DB tables.
 > **Out of scope:** Implementation details (see `modules/*.md`), API reference, deployment.
@@ -32,10 +32,10 @@ Lifecycle terms (don't confuse them):
 | **Publish** | Template version becomes selectable when creating documents. Template-only term. |
 | **Approve** (template) | Template version reviewed and approved by required signers. Precedes publish. |
 | **Approve** (document) | Document version got all required signoffs. Triggers freeze automatically. |
-| **Freeze** | Document version becomes immutable. All 7 fixed tokens resolve to final values. DOCX rewritten with substitutions. |
+| **Freeze** | Document version becomes immutable. All 8 computed tokens resolve to final values. DOCX rewritten with substitutions. |
 | **Fanout** | After freeze, async PDF generation via Gotenberg. PDF stored in S3/MinIO. |
 
-The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`, `{author}`, `{effective_date}`, `{approvers}`, `{controlled_by_area}`. Templates use these literal names. They auto-resolve at freeze — users never type their values.
+The 8 computed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`, `{author}`, `{effective_date}`, `{approvers}`, `{controlled_by_area}`, `{approval_date}`. Templates use these literal names. They auto-resolve at freeze — users never type their values.
 
 ---
 
@@ -69,7 +69,7 @@ The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`,
 
 **In the author (eigenpal):**
 
-- Paste or type the layout. Use the 7 fixed tokens literally where you want substitutions: `{doc_code}` in the header, `{doc_title}` in the title block, `{author}` in the signature line, etc.
+- Paste or type the layout. Use the 8 computed tokens literally where you want substitutions: `{doc_code}` in the header, `{doc_title}` in the title block, `{author}` in the signature line, `{approval_date}` where you want the final approval date, etc.
 - You can import a starting `.docx` if you have one.
 - Save often — the **Save** button persists the current version's content as `draft`.
 
@@ -83,9 +83,9 @@ The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`,
 
 **Where:** Same template author page → **Versão** panel on the right.
 
-**Lifecycle:** `draft → in_review → approved → published`
+**Lifecycle:** `draft → under_review → approved → published`
 
-1. **Submit for review** — moves `draft → in_review`. Author can no longer edit content.
+1. **Submit for review** — moves `draft → under_review`. Author can no longer edit content.
 2. **Approve** — reviewer with `templates:approve` capability clicks Aprovar. State becomes `approved`.
 3. **Publish** — admin clicks Publicar. State becomes `published`. Now this version is the one new documents will clone.
 
@@ -157,7 +157,7 @@ The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`,
 
 - Type / paste the actual content for this document.
 - Apply formatting (headings, bold, lists, tables) as needed.
-- The 7 fixed tokens stay as chips — **do not type values for them**. They resolve automatically at freeze.
+- The 8 computed tokens stay as chips — **do not type values for them**. They resolve automatically at freeze.
 - Save often.
 
 **What you do NOT do:**
@@ -198,7 +198,7 @@ The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`,
 
 **What freeze does:**
 
-- Resolves the 7 fixed tokens to final values (`{doc_code}` → actual code, `{author}` → first signed-off author, `{effective_date}` → freeze timestamp, `{approvers}` → comma-separated approvers, etc.).
+- Resolves the 8 computed tokens to final values (`{doc_code}` → actual code, `{author}` → first signed-off author, `{effective_date}` → freeze timestamp, `{approvers}` → comma-separated approvers, `{approval_date}` → final approval date, etc.).
 - Rewrites the DOCX with all substitutions baked in.
 - Stores the frozen DOCX artifact in S3/MinIO.
 - Marks the document version `approved` and immutable. (`frozen` was the previous terminology — the domain status is now `approved` post-signoff; `values_frozen_at` timestamp is stored separately.)
@@ -214,7 +214,7 @@ The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`,
 
 - Document detail page shows state `approved`, `values_frozen_at` timestamp, hash fingerprints.
 - After ~30s the **PDF** download link appears **automatically** — the page polls the PDF status every 3s (no manual refresh needed). If PDF does not appear within 60s, check worker logs.
-- Open the PDF — all 7 tokens are real values, not chips.
+- Open the PDF — all 8 tokens are real values, not chips.
 - `{author}` and `{approvers}` resolve to **display names** (not UUIDs). `{controlled_by_area}` resolves to the area **name** (e.g. "Recursos Humanos"), not the code ("RH").
 
 ---

@@ -1,6 +1,6 @@
 # Architecture: Data Model
 
-> **Last verified:** 2026-06-08 (Phase F F4: ListDocumentsPaginated cursor migration; repository.go line anchors updated)
+> **Last verified:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257) | **Prior:** 2026-06-08 (Phase F F4: ListDocumentsPaginated cursor migration; repository.go line anchors updated)
 > **Status:** Stub. Expand with ERD + per-table schema notes when SQL stabilizes.
 > **Scope:** Postgres tables, key relationships, snapshot columns, hash columns.
 > **Out of scope:** Migration archaeology (the legacy DB-research notes were removed at the v1 re-baseline, commit `c7f06f2e`; retained historical `migrations/` evidence remains).
@@ -27,7 +27,7 @@ areas ───────────────────────┤  
   └── controlled_documents               │
                                          │
 templates                                │
-  └── template_versions (draft|in_review|approved|published)
+  └── template_versions (draft|under_review|approved|published)
        └── content (eigenpal JSON)
 
 controlled_documents

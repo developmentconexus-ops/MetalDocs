@@ -51,8 +51,8 @@ Operation `publishTemplateVersionV2` (HTTP `POST /api/v1/templates/{id}/versions
 | `TemplateVersion` (new row) | n/a | `draft` | `CreateNextVersion` side-effect | edge check `template.approve` |
 
 Precursor lifecycle ops (1-line each):
-- Submit: `SubmitForReviewCmd` (`application/lifecycle.go:9`) `draft -> in_review`.
-- Review: `ReviewCmd` (`application/lifecycle.go:66`) `in_review -> approved` (accept) or `in_review -> draft` (reject).
+- Submit: `SubmitForReviewCmd` (`application/lifecycle.go:9`) `draft -> under_review`.
+- Review: `ReviewCmd` (`application/lifecycle.go:66`) `under_review -> approved` (accept) or `under_review -> draft` (reject).
 - Approve: `ApproveCmd` (`application/lifecycle.go:150`) formal sign-off path, including publish on accept.
 - Publish (this trace): `PublishTemplateVersionCmd` (`application/lifecycle.go:253`) requires `draft`, sets `published`.
 

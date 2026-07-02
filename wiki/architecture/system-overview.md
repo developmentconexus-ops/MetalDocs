@@ -1,6 +1,6 @@
 ﻿# System Overview
 
-> **Last verified:** 2026-06-07 (Phase C dead-path prune: taxonomy module description updated — departments/subjects paths removed from spec; prior: 2026-06-01)
+> **Last verified:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257) | **Prior:** 2026-06-07 (Phase C dead-path prune: taxonomy module description updated — departments/subjects paths removed from spec; prior: 2026-06-01)
 > **Scope:** Services, ports, data flow, infra at a glance.
 > **Out of scope:** Per-module deep dives (see `modules/*`), DB schema details (see `data-model.md`).
 > **Key files:**
@@ -143,7 +143,7 @@ Shared packages:
 
 1. **Author** opens `TemplateEditorPage` -> loads schema + body DOCX
 2. Edits in eigenpal editor -> autosave (1500ms debounce) -> `PUT /templates/{id}/versions/{v}/body` (DOCX bytes) + schema PUT
-3. Author submits -> `POST /templates/{id}/versions/{v}/submit` -> status=in_review
+3. Author submits -> `POST /templates/{id}/versions/{v}/submit` -> status=under_review
 4. Reviewer approves -> `POST /approve` -> status=approved
 5. **Document creation:** end user picks a controlled doc -> wizard creates the `documents` row. `application.SnapshotService`, wired via `documents.Dependencies.SnapshotReader`/`SnapshotWriter`, populates `placeholder_schema_snapshot`, `placeholder_schema_hash`, `composition_config_snapshot`, `composition_config_hash`, `body_docx_snapshot_s3_key`, and `body_docx_hash`.
 6. For catalog-only templates, `composition_config_snapshot` stores `{}`. (composition deprecated 2026-04-27     see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27     column still written as `{}` for back-compat)

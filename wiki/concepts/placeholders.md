@@ -3,8 +3,8 @@
 > _Changelog: 2026-04-26 — rewritten for fixed-catalog model (ADR 0008); dropped legacy fill-in workflow content._
 > _Changelog: 2026-04-27 — composition system deprecated, UI removed (Phase 1)._
 >
-> **Last verified:** 2026-06-28 (SP-2: added `dictionary` value source and `PHDictionary` placeholder type)
-> **Scope:** What a placeholder is, the fixed 7-entry catalog, how tokens stay literal in the editor, and when substitution occurs.
+> **Last verified:** 2026-07-01 (DOC-03 drift fix: computed catalog is 8 entries per ADR 0050 — `approval_date` added; single source of truth is `render/domain.ComputedCatalog()`) | **Prior:** 2026-06-28 (SP-2: added `dictionary` value source and `PHDictionary` placeholder type)
+> **Scope:** What a placeholder is, the fixed 8-entry catalog, how tokens stay literal in the editor, and when substitution occurs.
 > **Out of scope:** Substitution engine internals (see `modules/render-fanout.md`), editor plugin wiring (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
 > - `packages/editor-ui/src/MetalDocsEditor.tsx:55` — eigenpal `templatePlugin` wired here (plugins array, mode-gated)
@@ -24,7 +24,7 @@ Tokens use single-brace `{name}` syntax — docxtemplater standard, detected nat
 
 ## The fixed catalog
 
-MetalDocs defines exactly 7 computed tokens. Template authors may only use names from this list for `PHComputed` placeholders. The backend rejects any other name at schema-save time (`ValidatePlaceholders`).
+MetalDocs defines exactly 8 computed tokens. Template authors may only use names from this list for `PHComputed` placeholders. The backend rejects any other name at schema-save time (`ValidatePlaceholders`). The single source of truth for this catalog is `render/domain.ComputedCatalog()` (ADR 0050); `templates` derives both the authoring palette (`GET /placeholder-catalog`) and `ValidatePlaceholders`'s accepted-name set from it, so drift between what authors can pick and what the backend accepts is structurally impossible.
 
 | Token | Resolver source |
 |---|---|
@@ -35,6 +35,7 @@ MetalDocs defines exactly 7 computed tokens. Template authors may only use names
 | `{effective_date}` | Effective date set during approval/freeze |
 | `{approvers}` | Approver names joined by `", "`; `"[aguardando aprovação]"` if none |
 | `{controlled_by_area}` | Area name (not code) from the document's taxonomy binding |
+| `{approval_date}` | Final approval date of the published document; `"[aguardando aprovação]"` before approval (added ADR 0050) |
 
 All catalog tokens are **computed** — no user input is required. There is no fill-in panel in the document editor.
 
@@ -112,6 +113,7 @@ The eigenpal `applyVariables` API (browser-side substitution) is intentionally n
 - **Pre-2026-04-25:** MetalDocs used `{{uuid}}` double-brace tokens and had user-fill types (text/date/number/select). See `decisions/0003-token-syntax-migration.md`.
 - **2026-04-25:** Migrated to `{name}` single-brace tokens; eigenpal authoring convergence.
 - **2026-04-26:** Replaced user-fill placeholder model with fixed 7-entry computed catalog. See `decisions/0008-placeholder-fixed-catalog.md`.
+- **2026-06-29:** Catalog grew to 8 entries (`approval_date` added) and its single source of truth moved to `render/domain.ComputedCatalog()`. See `decisions/0050-computed-token-catalog-single-source.md` (amends ADR 0008).
 
 ## Cross-refs
 
@@ -119,7 +121,8 @@ The eigenpal `applyVariables` API (browser-side substitution) is intentionally n
 - [modules/editor-ui-eigenpal.md](../modules/editor-ui-eigenpal.md) — how MetalDocsEditor wires eigenpal plugins; seam-isolation policy + mode-gate rule
 - [modules/editor-ui-eigenpal-tech-debt.md](../modules/editor-ui-eigenpal-tech-debt.md) — T-001 (tarball absent) + T-002 (`TemplateEditorPage` bypass) directly affect placeholder pipeline reliability
 - [modules/render-fanout.md](../modules/render-fanout.md) — server substitution code
-- [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — fixed catalog ADR
+- [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — fixed catalog ADR (amended by ADR 0050 — catalog is now 8 entries)
+- [decisions/0050-computed-token-catalog-single-source.md](../decisions/0050-computed-token-catalog-single-source.md) — single source of truth `render/domain.ComputedCatalog()`; `approval_date` added
 - [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — token syntax migration ADR
 - [decisions/0049-tenant-dictionary-token-substitution.md](../decisions/0049-tenant-dictionary-token-substitution.md) — SP-2 ADR: creation-time pinning, `PHDictionary`, reserved-name guard, author-overwrite guard
 - [modules/templates.md §8.8](../modules/templates.md) — backend enforcement: `ValidatePlaceholders` rejects non-catalog names at schema save; resolver registry wiring gap (T-008)
@@ -147,4 +150,4 @@ Backend untouched:
 
 Future: when standardized blocks (revision history table, approval signatures) genuinely need to return, implement as **rich-content resolvers** — `{revision_history_table}` resolver returns OOXML table. User drops the placeholder where they want it in the eigenpal editor. One mental model: everything is a placeholder.
 
-**Last verified:** 2026-06-01
+**Last verified:** 2026-07-01

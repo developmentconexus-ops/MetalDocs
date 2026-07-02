@@ -1,6 +1,6 @@
 # Frontend module: templates
 
-> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section)
+> **Last verified:** 2026-07-01 (ADR 0052 — manual versioning: `approveVersion`/`publishVersion` no longer return `next_draft*`; `CreateNextVersion` — "Criar nova versão" — is the sole revision path)
 > **Scope:** Template list, create-new wizard, eigenpal-based template editor with draft/review/approve lifecycle. Frontend slice of the backend [`templates`](../templates.md) module.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/templates.md`](../templates.md)
 
@@ -34,7 +34,7 @@ Lets template authors create, edit, submit for review, and approve template vers
 | `QK.templates.blank()` | `lib/queryKeys.ts:56` | `useBlankTemplateQuery` (documents wizard) |
 | `QK.templates.byProfile(code)` | `lib/queryKeys.ts:57` | `useTemplatesByProfileQuery` |
 
-**Invalidation:** publish / approve / submit-for-review mutations must invalidate `QK.templates.list()` and `QK.templates.byProfile(profileCode)`. Approve response returns `next_draft` (see [`templates.ts:326–336`](../../../frontend/apps/web/src/features/templates/api/templates.ts)) so the editor navigates `vN → vN+1` without a list refetch.
+**Invalidation:** publish / approve / submit-for-review mutations must invalidate `QK.templates.list()` and `QK.templates.byProfile(profileCode)`. Approve/publish transition status only and do not spawn a next version (ADR 0052); the editor stays on the current version. Starting a new revision is an explicit user action — "Criar nova versão" calls `createTemplateVersion` (`POST /api/v1/templates/{id}/versions`, `CreateNextVersion`), which the frontend then navigates to.
 
 ## 5. API endpoints consumed
 
@@ -51,8 +51,9 @@ Backend routes under `/api/v1/templates` and `/api/v1/templates/{id}/versions`. 
 | `saveDraft` | `PUT /api/v1/templates/{id}/versions/{n}` |
 | `submitForReview` | `POST .../submit` |
 | `reviewVersion` | `POST .../review` |
-| `approveVersion` | `POST .../approve` — returns `next_draft` |
-| `publishVersion` | `POST .../publish` |
+| `approveVersion` | `POST .../approve` — transitions status only (no `next_draft`, ADR 0052) |
+| `publishVersion` | `POST .../publish` — transitions status only (no `next_draft`, ADR 0052) |
+| `createTemplateVersion` | `POST /api/v1/templates/{id}/versions` — `CreateNextVersion`, the sole path to start a new revision (explicit "Criar nova versão" action) |
 | `getDocxURL` | resolves storage URL |
 | `getTemplateSchemas` | placeholder catalog |
 
@@ -74,7 +75,8 @@ Backend routes under `/api/v1/templates` and `/api/v1/templates/{id}/versions`. 
 
 - See backend [`templates-tech-debt.md`](../templates-tech-debt.md).
 - Placeholder catalog migration tracked in [`wiki/concepts/placeholders.md`](../../concepts/placeholders.md) — fixed 7-token catalog gap between eigenpal native and MetalDocs legacy.
-- Recent fixes on this branch: PR #36 friendly errors + idempotency, PR #41 next_draft return for approve, PR #42 `canPublish` gating on `template.approve`.
+- Recent fixes on this branch: PR #36 friendly errors + idempotency, PR #42 `canPublish` gating on `template.approve`.
+- ADR 0052 (2026-06-30) reverted the PR #41 auto-next-draft-on-approve behaviour: approve/publish transition status only; `CreateNextVersion` (`POST /api/v1/templates/{id}/versions`) is now the sole, explicit path to start a new revision.
 
 ## 9. Failure modes
 
@@ -85,7 +87,7 @@ Backend routes under `/api/v1/templates` and `/api/v1/templates/{id}/versions`. 
 | MinIO presigned-PUT fails during template autosave | Editor autosave indicator turns red; `commitAutosave` not invoked | `presignAutosave` returns OK but PUT to MinIO rejects | User retries; MinIO healthcheck / CORS audit |
 | `importTemplateDocx` 4xx (invalid docx) | Wizard surfaces friendly error from `resolveErrorMessage` | `ApiError.code` from backend templates module | User fixes source docx; PR #36 wired friendly errors here |
 | Idempotency replay on submit/review/approve | 200 with prior body; lifecycle state unchanged | Backend `Idempotency-Key` replay | Expected on network retry; no double-transition |
-| Approve response missing `next_draft` | Editor stays on vN instead of jumping to vN+1 | `approveVersion` response lacks `nextDraft` field | Backend regression — see PR #41 / `templates.ts:326–336`; refetch list and navigate manually |
+| `createTemplateVersion` fails after approve/publish | User cannot start a new revision; stuck on published version | `CreateNextVersion` 4xx/5xx from `POST /api/v1/templates/{id}/versions` | User retries "Criar nova versão"; this is the only revision path per ADR 0052 |
 
 ## 10. Cross-links
 

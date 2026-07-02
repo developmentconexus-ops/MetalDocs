@@ -72,7 +72,7 @@ sequenceDiagram
     Approver->>ApprovalSvc: submit signoff
     ApprovalSvc->>FreezePin: Pin(ctx, revisionID) [in same TX]
     note over FreezePin: ReadSnapshotWithFreezeAt<br/>already pinned? → return (idempotent)
-    FreezePin->>FreezePin: pinValidateAndHash()<br/>validate required placeholders<br/>resolve computed placeholders present in schema<br/>(catalog has exactly 7 tokens per ADR 0008;<br/>only tokens detected in the DOCX are in schema)<br/>upsert resolved values<br/>compute values_hash (SHA-256)
+    FreezePin->>FreezePin: pinValidateAndHash()<br/>validate required placeholders<br/>resolve computed placeholders present in schema<br/>(catalog has exactly 8 tokens per ADR 0050, amends ADR 0008;<br/>only tokens detected in the DOCX are in schema)<br/>upsert resolved values<br/>compute values_hash (SHA-256)
     FreezePin->>FreezePin: WriteFreeze (freeze marker in DB)
     FreezePin->>MatOutbox: INSERT into materialize_dispatch_outbox<br/>ON CONFLICT DO NOTHING
     note over ApprovalSvc,MatOutbox: TX commits — approval + pin + outbox row atomic

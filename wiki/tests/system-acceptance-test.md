@@ -1,6 +1,6 @@
 # System Acceptance Test — MetalDocs QMS
 
-> **Last verified:** 2026-06-08 (Phase F F4: repository.go archived_at filter anchor updated)
+> **Last verified:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257; DOC-03 drift fix: computed-token catalog is 8 tokens per ADR 0050) | **Prior:** 2026-06-08 (Phase F F4: repository.go archived_at filter anchor updated)
 > **Scope:** Full end-to-end manual acceptance run for the MetalDocs regulatory-grade QMS. Covers taxonomy bootstrap → template authoring → controlled-document creation → ISO-segregated approval → freeze → PDF fanout → archive. Exercises Groups A–E shipped fixes.
 > **Out of scope:** IAM admin flows (B1/A8), route-stage editing (A7/E8), multi-tenant isolation (B5/B6), Playwright e2e automation (see `references/how-to-run-tests.md`).
 > **Audience:** QA engineers, release approvers, on-call engineers validating a hot-fix deploy.
@@ -123,11 +123,11 @@ See `wiki/workflows/user-onboarding.md:229-253` for the canonical SQL and pitfal
 - [ ] Insert area line "`{controlled_by_area}`".
 - [ ] Body: 2–3 lorem ipsum paragraphs.
 - [ ] **Save**. F5 → content persists.
-- [ ] **Expected:** all 7 tokens recognized. No red/error chips.
+- [ ] **Expected:** all 8 tokens recognized. No red/error chips.
 
 ### B3. Submit → Approve → Publish
 
-- [ ] Version panel: **Submeter para revisão** → state `in_review`.
+- [ ] Version panel: **Submeter para revisão** → state `under_review`.
 - [ ] Logout `author-test` → login `admin` (or template approver).
 - [ ] **Templates → DC → v1 → Aprovar**. State `approved`.
 - [ ] **Publicar**. State `published`.
