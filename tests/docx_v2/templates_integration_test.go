@@ -23,7 +23,7 @@ func TestTemplatesModule_CreateAndPublish_Integration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	svc := application.New(repository.New(db), nil, nil)
+	svc := application.New(repository.New(db), nil, nil, nil)
 	_ = svc
 	// Real behaviour covered by repo + app tests; this file exists to satisfy
 	// governance rule (any internal/modules change requires a tests/ change).
