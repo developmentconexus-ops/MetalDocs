@@ -1,13 +1,41 @@
 # Module: Frontend UI Primitives (`components/ui/`)
 
-> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section; prior: 2026-05-13)
-> **Scope:** Generic, domain-agnostic UI primitives living in `frontend/apps/web/src/components/ui/`. Covers `SelectableCard` and `useRovingRadioGroup`. Other primitives (WorkspaceHeroHeader, TabBar, StatusPill, Stepper) are documented inline in the feature modules that introduced them.
+> **Last verified:** 2026-07-02 (DOC-07b - full components/ui export-surface inventory added; prior: 2026-06-01 P2 consolidation: added Failure modes section; prior: 2026-05-13)
+> **Scope:** Generic, domain-agnostic UI primitives living in `frontend/apps/web/src/components/ui/`. `SelectableCard` and `useRovingRadioGroup` are documented in full below (props, behavior, consumers). The full inventory table below covers the rest of the directory at a summary level; deep prop/behavior detail for those remains inline in the feature modules that introduced them.
 
 > **Maturity:** L2
 > **Key files:**
 > - `frontend/apps/web/src/components/ui/SelectableCard.tsx:17` Ã¢â‚¬â€ `forwardRef` card button; `role="radio"` + `aria-checked`; accepts external `tabIndex` + `onKeyDown` for roving-focus integration
 > - `frontend/apps/web/src/components/ui/SelectableCard.module.css:1` Ã¢â‚¬â€ `.idle`, `.selected`, `.disabled` state classes; brand border + pale fill on selected
 > - `frontend/apps/web/src/components/ui/useRovingRadioGroup.ts:26` Ã¢â‚¬â€ roving-tabIndex hook for ARIA radiogroup pattern; returns `groupProps` + `getItemProps(index)`
+
+---
+
+## Full `components/ui/` inventory (DOC-07b)
+
+Directory listing as of 2026-07-02: 15 component/hook source files (excluding `.module.css` and `primitives.test.tsx`). Barrel `index.ts` re-exports only 8 of them — the rest must be imported by direct path.
+
+| Primitive | File | Barrel-exported? | External consumers | Notes |
+|---|---|---|---|---|
+| `Icon` | `Icon.tsx` | yes | 19 files | `IconName` union, 36 named icons (`Icon.tsx:3-9`) |
+| `Avatar` | `Avatar.tsx` | yes | 15 files | size + color variants |
+| `CodeChip` | `CodeChip.tsx` | yes | 6 files | inline code/tag chip |
+| `StatusPill` | `StatusPill.tsx` | yes | 11 files | `DocumentStatus` union drives color |
+| `Stepper` | `Stepper.tsx` | yes | 2 files | `StepperStep[]` + current index, wizard step nav |
+| `SelectableCard` | `SelectableCard.tsx` | yes | multiple (see full section below) | documented in full below |
+| `TabBar` | `TabBar.tsx` | yes | 1 file | bespoke roving-focus logic (T-002 open — not migrated to `useRovingRadioGroup`) |
+| `WorkspaceHeroHeader` | `WorkspaceHeroHeader.tsx` | yes | 1 file | page hero/search header |
+| `Dialog` | `Dialog.tsx` | yes | 10 files | modal shell |
+| `SearchBar` | `SearchBar.tsx` | no | 2 files | not in barrel; imported by direct path |
+| `SelectMenu` | `SelectMenu.tsx` | no | 1 file (`features/documents/components/wizard/steps/StepAreaCodeVisibility/index.tsx`) + internal use by `FilterDropdown` | not in barrel |
+| `DrawerShell` | `DrawerShell.tsx` | no | 1 file (`features/iam/tabs/PeopleDetailDrawer.tsx`) | not in barrel |
+| `useRovingRadioGroup` | `useRovingRadioGroup.ts` | no | multiple (see full section below) | documented in full below |
+| `FilterDropdown` | `FilterDropdown.tsx` | no | 0 external — only used internally by `FormFieldBox.tsx` | dead if `FormFieldBox` stays unconsumed (see next row) |
+| `TextFieldBox` / `DropdownFieldBox` | `FormFieldBox.tsx` | no | 0 — no file in `src/` imports `FormFieldBox` | dead code candidate; not wired to any screen |
+| `TopbarDropdown` | `TopbarDropdown.tsx` | no | 0 — no file in `src/` imports it | dead code candidate |
+| `Logo` | `Logo.tsx` | yes (`index.ts` exports it) | 0 — barrel exports `Logo` but no consumer imports it | dead code candidate despite barrel export |
+
+Four files (`FormFieldBox.tsx`, `FilterDropdown.tsx`, `TopbarDropdown.tsx`, `Logo.tsx`) have zero consumers found in `frontend/apps/web/src/` as of this pass. Reported as an observation only — no deletion performed here (deletion is a code change, out of scope for this wiki pass; needs an owner decision on whether these are pre-built-ahead-of-use or genuinely obsolete).
 
 ---
 

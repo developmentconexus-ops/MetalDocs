@@ -5,6 +5,7 @@ Run after Phase 6.5 `tally_check.sh` PASS. Catches what mechanical grep cannot: 
 **Reviewer:** main agent (Opus 4.7), same session
 **Date:** 2026-05-11
 **Composed doc state at review:** Plan 4 structural sweep — deleted AuthorizationService, area_membership/ pkg, RoleCapabilities map; renamed authz.ErrCapDenied; collapsed capability namespaces. Tally: 2/5/5 (all items including closed); missing-ADR: 12/12.
+**Last verified:** 2026-07-02 (DOC-06 drift check) — this artifact is a point-in-time historical review composed against the pre-Plan-6a state; do not read the T-005 row below as current status. Plan 6a (commit `f27529e8`, same day, per `sync-log.md:69-79`) closed T-005 by wiring `recordAudit`/`RecordTx` into the role-upsert path. Current code confirms closure: `internal/modules/iam/delivery/http/admin_handler.go:337` calls `h.service.UpsertUserAndAssignRole`, which emits the audit event in-tx via `s.audit.RecordTx(ctx, tx, ev)` at `internal/modules/iam/application/admin_service.go:81`. Status of record is `wiki/modules/iam-tech-debt.md` T-005 (CLOSED 2026-05-11, Plan 6a) — that page is correct and was not changed by this pass.
 
 ## Checklist (8 items)
 

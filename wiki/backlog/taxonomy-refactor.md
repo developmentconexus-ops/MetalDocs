@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/taxonomy-tech-debt.md`.
 
-**Last verified:** 2026-07-02 (CON-08 closure — R-009 closed; R-012 unblocked). Prior: 2026-06-21 (verify-and-archive sweep — solved rows pruned; see _cleanup-2026-06-21.md)
+**Last verified:** 2026-07-02 (DOC-07c — R-017 closed; CON-08 closure — R-009 closed; R-012 unblocked). Prior: 2026-06-21 (verify-and-archive sweep — solved rows pruned; see _cleanup-2026-06-21.md)
 
 ## Rows
 
@@ -15,7 +15,14 @@
 | R-014 | Add Go doc comments to all 80 exported symbols under internal/modules/taxonomy/ | T-014 | M | Minor | — | — | open | — |
 | R-015 | Drop redundant PK on `code` alone; promote `(tenant_id, code)` to PK on document_profiles + document_process_areas | T-015 | M | Minor | R-002 | — | open | — |
 | R-016 | Author ADR for area hierarchy: self-FK + application-layer cycle prevention | T-016 | S | Minor | — | — | open | — |
-| R-017 | Retire the 2026-05-02 taxonomy stub references in cross-link search-results; verify the new doc renders correctly in the wiki index | maint:docs-link | XS | Minor | — | — | open | — |
+| R-017 | Retire the 2026-05-02 taxonomy stub references in cross-link search-results; verify the new doc renders correctly in the wiki index | maint:docs-link | XS | Minor | — | — | closed 2026-07-02 | — |
+
+## R-017 closure evidence (DOC-07c)
+
+- `wiki/modules/taxonomy.md` verified as the current living doc — Last verified 2026-06-12 (Wave 2.12), own changelog (`taxonomy.md:469`) correctly records it superseded the 2026-05-02 stub on 2026-05-11.
+- `wiki/modules/index.md:14` verified pointing to the live `taxonomy.md`/`taxonomy-tech-debt.md` (not any stub path) — renders correctly.
+- The stale cross-link was `wiki/modules/taxonomy/_artifacts/00-context.md:5` ("Stub: `wiki/modules/taxonomy.md` (Last verified 2026-05-02 — STALE)") — a Phase-0 historical artifact whose "STALE" label could be misread as describing current `taxonomy.md` state. Added a retirement/pointer note at the top of that file directing readers to the live doc; did not rewrite the historical Phase-0 content itself (artifact is a point-in-time record, same convention as `iam/_artifacts/06-selfreview.md`).
+- No other live cross-links to the 2026-05-02 stub found (`wiki/backend/roadmap.md` and `wiki/modules/taxonomy/_artifacts/05-industry.md` hits were unrelated "stub" mentions, not the 2026-05-02 date).
 
 ## Notes
 

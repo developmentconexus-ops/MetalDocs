@@ -1,8 +1,10 @@
 # Phase 0 — Context for module taxonomy
 
+> **Retirement note (DOC-07c, 2026-07-02):** this is a Phase-0 point-in-time artifact describing wiki state *before* the 2026-05-11 rewrite. The "Stub… STALE" line below is historical — it does not describe current state. `wiki/modules/taxonomy.md` was republished 2026-05-11 (superseding the 2026-05-02 stub per its own changelog, `taxonomy.md:469`) and has since been kept current through Wave 2.12 (Last verified 2026-06-12). Do not follow this line as a live pointer; if you landed here from a stale search hit, go to [`wiki/modules/taxonomy.md`](../../taxonomy.md) instead.
+
 ## Existing wiki state
 
-- Stub: `wiki/modules/taxonomy.md` (Last verified 2026-05-02 — STALE)
+- Stub: `wiki/modules/taxonomy.md` (Last verified 2026-05-02 — STALE) — **historical only, see retirement note above; superseded 2026-05-11**
 - Sibling shipped Arc42 docs: `iam.md`, `auth.md`, `documents.md`, `templates.md`, `approval.md`, `audit.md`, `registry.md`
 - `wiki/modules/controlled-documents.md` cross-refs taxonomy as the source of profiles + areas; CD code derives from `{profile_code}-{area_code}-{seq}`.
 
