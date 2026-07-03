@@ -215,9 +215,8 @@ Rules:
 // lib/api/client.ts
 import createClient from "openapi-fetch";
 import type { paths } from "../api-types";
-import { apiFetch } from "./apiFetch";
 
-export const api = createClient<paths>({ fetch: apiFetch });
+export const api = createClient<paths>({ baseUrl: API_BASE_URL, fetch: apiFetch });
 ```
 
 ```ts
@@ -233,7 +232,8 @@ export async function getDocument(id: string) {
 }
 ```
 
-- `apiFetch` (`lib/api/apiFetch.ts`) handles 401     auth bus, error normalization, JSON parsing, base URL.
+- Transport hierarchy (declared at the top of `lib/api/client.ts`, FE-13): (1) generated `api` client     canonical for every contracted route, typed off `lib/api-types/`; (2) `apiFetch`     sanctioned escape hatch for the ETag client and non-generated/not-yet-contracted routes (still gets credentials, tracing, problem+json handling); (3) `request`/`requestRaw`/`requestBlob`     legacy thin wrappers, shrink-only, no new callers. Never call raw `fetch()` against `/api/...` from feature code.
+- `apiFetch` (`lib/api/client.ts`) handles 401     auth bus, error normalization, JSON parsing, base URL.
 - `lib/api-types/` regenerated via `pnpm gen:api` (script added with codegen). Never hand-edit.
 - Feature `api/*.ts` files are thin wrappers     pure functions, no React.
 

@@ -5,6 +5,23 @@ import { dispatchAuthExpired } from "./authBus";
 import { ApiError } from "./errors";
 import { parseProblem } from "./problem";
 
+// TRANSPORT HIERARCHY (FE-13): this module exports more than one transport
+// on purpose — pick from the top down, not by habit.
+//   1. Generated `api` (below) — CANONICAL for every contracted route. It is
+//      typed off api-types (oapi-codegen output) and gives compile-time
+//      drift detection against api/openapi. Default choice for new call sites.
+//   2. `apiFetch` — the sanctioned escape hatch. Use it for (a) the ETag
+//      client (needs raw Response / header access the generated client
+//      doesn't expose) and (b) non-generated or not-yet-contracted routes
+//      (e.g. GET /feature-flags). It still gets credentials, tracing, and
+//      problem+json handling — the only thing it gives up is compile-time
+//      route/schema typing.
+//   3. `request` / `requestRaw` / `requestBlob` — legacy thin wrappers kept
+//      for existing call sites. Shrink-only: do not add new callers: use
+//      `api` or `apiFetch` directly instead.
+// Never call raw `fetch()` against `/api/...` from feature code — it skips
+// credentials, tracing, and RFC 9457 problem+json handling (see FE-13).
+
 // INVARIANT: API_BASE_URL must start with "/api/" (or be a full URL on another
 // origin). createClient receives it as `baseUrl` so openapi-fetch emits
 // /api/v1-prefixed paths; rewriteRequest then early-returns the Request

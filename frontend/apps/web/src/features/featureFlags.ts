@@ -3,6 +3,7 @@
 // When the window injection is absent, initFeatureFlags() fetches from
 // GET /api/v1/feature-flags and patches the exported featureFlags object.
 
+import { apiFetch } from "../lib/api/client";
 import { isInRolloutBucket } from "./feature-flags/rollout";
 
 type FeatureFlags = {
@@ -49,17 +50,20 @@ export const featureFlags: FeatureFlags = readFlags();
  * exported featureFlags object. Call once at app init (e.g. in main.tsx)
  * before render. Safe to call even when window injection is present — the
  * endpoint value overrides it.
+ *
+ * Routed through the shared apiFetch transport (not raw fetch) so this call
+ * gets credentials + problem+json handling like every other API call. Errors
+ * (network failure, non-2xx, malformed body) are swallowed on purpose — a
+ * flags fetch failure must never block app boot; defaults stand.
  */
 export async function initFeatureFlags(): Promise<void> {
   try {
-    const res = await fetch("/api/v1/feature-flags");
-    if (!res.ok) return;
-    const data = (await res.json()) as Partial<{
-      MDDM_NATIVE_EXPORT_ROLLOUT_PCT: number;
-    }>;
+    const data = await apiFetch<Partial<{ MDDM_NATIVE_EXPORT_ROLLOUT_PCT: number }>>(
+      "/api/v1/feature-flags",
+    );
     featureFlags.MDDM_NATIVE_EXPORT_ROLLOUT_PCT = clampPct(data.MDDM_NATIVE_EXPORT_ROLLOUT_PCT);
   } catch {
-    // Network error or non-JSON body — keep defaults
+    // Network error, non-2xx (ApiError), or non-JSON body — keep defaults
   }
 }
 
