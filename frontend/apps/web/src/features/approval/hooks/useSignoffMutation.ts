@@ -53,7 +53,7 @@ export function useSignoffMutation({
       // F-FE-NOINVALIDATE: a sign-off changes the inbox, the approval instance,
       // and the document's status — invalidate every affected cache subtree
       // instead of refetching a single query.
-      void queryClient.invalidateQueries({ queryKey: ['approval'] });
+      void queryClient.invalidateQueries({ queryKey: QK.approval.all });
       void queryClient.invalidateQueries({ queryKey: QK.documents.all });
       // FE-10: the controlled-documents root (list / detail / active-document /
       // preview) is a SEPARATE cache subtree from 'documents' — a sign-off changes

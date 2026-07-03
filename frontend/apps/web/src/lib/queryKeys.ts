@@ -71,6 +71,9 @@ export const QK = {
     list: () => ['tokens', 'list'] as const,
   },
   approval: {
+    // Root for whole-subtree invalidation (covers instance/routes below and
+    // the top-level inbox() key, which all share the 'approval' prefix).
+    all: ['approval'] as const,
     instance: (documentId: string) =>
       ['approval', 'instance', documentId] as const,
     routes: {
