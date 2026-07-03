@@ -341,18 +341,16 @@ func main() {
 	featureFlagsHandler.RegisterRoutes(mux)
 	auditHandler.RegisterRoutes(mux)
 	searchHandler.RegisterRoutes(mux)
-	iamAdminHandler.RegisterRoutes(mux)
-	if sessionsHandler != nil {
-		sessionsHandler.RegisterRoutes(mux)
-	}
+	// iamAdminHandler, sessionsHandler, observabilityHandler: mounted below via
+	// iamdelivery.Router.RegisterGenerated (CON-07 codegen rollout), once
+	// peopleHandler/membershipHandler/rolesCapsHandler/presenceHandler are also
+	// constructed. securityHandler is a separate module (not IAM) and keeps its
+	// own hand-written mount here.
 	if securityHandler != nil {
 		securityHandler.RegisterRoutes(mux)
 	}
-	if observabilityHandler != nil {
-		observabilityHandler.RegisterRoutes(mux)
-	}
 
-	presenceBump, presenceHub := startPresence(ctx, deps, mux, iamAdminHandler)
+	presenceBump, presenceHub, presenceHandler := startPresence(ctx, deps, mux, iamAdminHandler)
 
 	taxonomyModule := buildTaxonomyModule(deps)
 	taxonomyModule.RegisterRoutes(mux)
@@ -389,20 +387,31 @@ func main() {
 	if deps.SQLDB != nil {
 		peopleService.WithTxAudit(db.NewTxRunner(deps.SQLDB), deps.AuditWriter, authpg.NewRepository(deps.SQLDB, iampg.NewUserTenantRepository(deps.SQLDB)))
 	}
-	iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter).RegisterRoutes(mux)
+	peopleHandler := iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter)
 
 	// PR-1 (area-memberships rebuild): MembershipHandler now takes a
 	// cross-tenant verifier (PeopleService.VerifyUserInTenant) so cross-tenant
 	// probes return 404. Grant/revoke audit rows are written in-tx by the
 	// service's AuditMembershipLogger (wired above), not by the handler (H-3a).
-	iamdelivery.NewMembershipHandler(membershipService, peopleService).RegisterRoutes(mux)
+	membershipHandler := iamdelivery.NewMembershipHandler(membershipService, peopleService)
 
 	// PR-5: IAM Admin Center "Roles & Capabilities" tab: read-only matrix.
 	var roleCapsReader iamdelivery.RoleCapabilitiesReader
 	if deps.SQLDB != nil {
 		roleCapsReader = iampg.NewRoleCapabilitiesRepository(deps.SQLDB)
 	}
-	iamdelivery.NewRolesCapsHandler(roleCapsReader).RegisterRoutes(mux)
+	rolesCapsHandler := iamdelivery.NewRolesCapsHandler(roleCapsReader)
+
+	// CON-07 (ADR 0012 / target-arch N2): mount the full generated IAM
+	// ServerInterface — iamAdminHandler, sessionsHandler, observabilityHandler,
+	// peopleHandler, membershipHandler, rolesCapsHandler, and presenceHandler's
+	// HTTP snapshot route — in one call, replacing six independent
+	// RegisterRoutes(mux) sites. Route shapes on the wire are unchanged (same
+	// BaseURL "/api/v1" + spec-declared paths); tier-1 authz keys off
+	// r.Method/r.URL.Path (permissions.go), not mux dispatch mechanics, so this
+	// swap changes no auth behavior.
+	iamRouter := iamdelivery.NewRouter(iamAdminHandler, peopleHandler, membershipHandler, rolesCapsHandler, sessionsHandler, observabilityHandler, presenceHandler)
+	iamRouter.RegisterGenerated(mux)
 
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
@@ -846,28 +855,36 @@ func schedulerLeaderID() string {
 
 // startPresence initialises the PR-9 presence subsystem: hub goroutines, WebSocket
 // handler, HTTP snapshot fallback, bump middleware with cleanup, and wires the
-// presence reader into iamAdminHandler. Returns (nil, nil) when deps.SQLDB is nil
-// (in-memory mode). The returned Hub is captured by main for shutdown drain
+// presence reader into iamAdminHandler. Returns (nil, nil, nil) when deps.SQLDB is
+// nil (in-memory mode). The returned Hub is captured by main for shutdown drain
 // (Z-22, REQ-REL-2); the BumpMiddleware is wrapped into the outer request chain
 // so authenticated requests refresh last_seen_at (debounced 60s per user, PR-9).
+//
+// CON-07: the presence Handler's WebSocket /iam/presence/stream route is still
+// registered here directly (RegisterRoutes only mounts /stream — see
+// presence/handler.go), because streamPresence is excluded from server codegen
+// (cfg.yaml exclude-operation-ids). The HTTP-fallback snapshot route is NOT
+// mounted here anymore: the caller mounts it via iamdelivery.Router.
+// RegisterGenerated using the returned *iampresence.Handler (ServeSnapshot).
 func startPresence(
 	ctx context.Context,
 	deps bootstrap.APIDependencies,
 	mux *http.ServeMux,
 	iamAdminHandler *iamdelivery.AdminHandler,
-) (*iampresence.BumpMiddleware, *iampresence.Hub) {
+) (*iampresence.BumpMiddleware, *iampresence.Hub, *iampresence.Handler) {
 	if deps.SQLDB == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	presenceRepo := iampresence.NewPostgresRepository(deps.SQLDB)
 	presenceHub := iampresence.NewHub(presenceRepo, slog.Default())
 	go presenceHub.Run(ctx)
 	go presenceHub.RunHeartbeat(ctx)
-	iampresence.NewHandler(presenceHub, presenceRepo, slog.Default()).RegisterRoutes(mux)
+	presenceHandler := iampresence.NewHandler(presenceHub, presenceRepo, slog.Default())
+	presenceHandler.RegisterRoutes(mux)
 	presenceBump := iampresence.NewBumpMiddleware(presenceRepo, slog.Default())
 	presenceBump.StartCleanup(ctx)
 	iamAdminHandler.WithPresenceReader(presenceRepo)
-	return presenceBump, presenceHub
+	return presenceBump, presenceHub, presenceHandler
 }
 
 // buildFanoutComponents constructs the fanout client and freeze service when

@@ -62,10 +62,23 @@ func (h *Handler) WithAcceptOptions(opts *websocket.AcceptOptions) *Handler {
 	return h
 }
 
-// RegisterRoutes mounts the snapshot and stream endpoints on mux.
+// RegisterRoutes mounts the stream endpoint on mux. The HTTP-fallback
+// snapshot endpoint (GET /iam/presence/snapshot) is mounted separately by
+// the generated iamapi.ServerInterface router (CON-07: codegen rollout for
+// IAM) via ServeSnapshot below — streamPresence stays hand-mounted here
+// because it is a WebSocket upgrade, excluded from server codegen
+// (api/openapi/v1/openapi.yaml: exclude-operation-ids: streamPresence).
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc(http.MethodGet+" /api/v1/iam/presence/snapshot", h.handleSnapshot)
 	mux.HandleFunc(http.MethodGet+" /api/v1/iam/presence/stream", h.handleStream)
+}
+
+// ServeSnapshot is the exported entry point the generated
+// iamapi.ServerInterface router (internal/modules/iam/delivery/http/router.go)
+// delegates GetPresenceSnapshot to. Thin export of handleSnapshot so the
+// codegen adapter in the sibling httpdelivery package can reuse the existing,
+// already-tested snapshot logic without duplicating it.
+func (h *Handler) ServeSnapshot(w http.ResponseWriter, r *http.Request) {
+	h.handleSnapshot(w, r)
 }
 
 func (h *Handler) handleSnapshot(w http.ResponseWriter, r *http.Request) {
