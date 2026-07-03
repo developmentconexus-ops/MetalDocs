@@ -29,7 +29,7 @@ MetalDocs separates async concerns across four platform packages and one module-
 | `internal/platform/worker` | Poll-and-dispatch service: claims events, routes by `EventType`, calls handlers, manages retry/DLQ | `apps/worker/cmd/metaldocs-worker/main.go` |
 | `internal/platform/jobs/river` | River client factory (`ClientBundle`) wrapping `github.com/riverqueue/river` | `apps/jobs/cmd/metaldocs-jobs/main.go`, `apps/api/cmd/metaldocs-api/main.go`, `bootstrap/jobs.go` |
 | `internal/platform/servicebus` | External I/O adapters: `GotenbergPDFClient` (reads DOCX from MinIO, calls Gotenberg, writes PDF back to MinIO) | `platform/worker/pdf_job_runner.go`, `bootstrap/worker.go`, `bootstrap/api.go` |
-| `internal/modules/render/fanout` | Domain-level staging outbox repositories and relay workers: `PDFOutboxWorker`, `MaterializeOutboxWorker` | `apps/api/cmd/metaldocs-api/main.go` (started as goroutines), `apps/worker/cmd/metaldocs-worker/main.go` (PDFOutboxRepository) |
+| `internal/modules/render/fanout` | Domain-level staging outbox: generic `StagingOutboxRepository` + generic `StagingOutboxWorker` (one type, two instances — PDF and materialize) | `apps/api/cmd/metaldocs-api/main.go` (started as goroutines via `startOutboxWorkers`, `main.go:932`), `apps/worker/cmd/metaldocs-worker/main.go` (`NewPDFOutboxRepository`, `main.go:111`) |
 
 ---
 
@@ -85,14 +85,14 @@ No MetalDocs imports — depends only on stdlib, crypto, and the MinIO/Gotenberg
 
 This layer sits between domain writes and `outbox_events`. It is technically a module package, not a platform package, but it is architecturally part of the async substrate.
 
-Two symmetric relay workers run inside the API process:
+A single generic worker type, `StagingOutboxWorker` (`internal/modules/render/fanout/staging_outbox_worker.go:23`), runs as **two instances** inside the API process — one per staging table. The only per-instance difference is the `buildEvent` closure (event type, idempotency-key prefix, payload shape) supplied at construction in `startOutboxWorkers` (`apps/api/cmd/metaldocs-api/main.go:932`). Both instances share a generic repository, `StagingOutboxRepository` (`internal/modules/render/fanout/staging_outbox.go:33`), bound to its table via the allowlist-validated constructors `NewPDFOutboxRepository` / `NewMaterializeOutboxRepository`:
 
-| Worker | Source table | Event type published | Poll interval | Claim batch |
-|--------|-------------|---------------------|---------------|-------------|
-| `PDFOutboxWorker` | `metaldocs.pdf_dispatch_outbox` | `docgen_v2_pdf` | 5 s | 10 |
-| `MaterializeOutboxWorker` | `metaldocs.materialize_dispatch_outbox` | `docx_materialize` | 5 s | (symmetric) |
+| Instance (repo constructor) | Source table | Event type published |
+|-----------------------------|-------------|---------------------|
+| `NewPDFOutboxRepository` | `metaldocs.pdf_dispatch_outbox` | `docgen_v2_pdf` |
+| `NewMaterializeOutboxRepository` | `metaldocs.materialize_dispatch_outbox` | `docx_materialize` |
 
-Both workers follow the identical pattern: `ClaimPending` with `FOR UPDATE SKIP LOCKED`, call `Publisher.Publish` for each row inserting into `outbox_events`, then `MarkDispatched`. A `ResetStaleClaims` call recovers rows stuck in `processing` status after a crash.
+Both instances share one `StagingOutboxWorkerConfig` (defaults: 5 s poll, batch 10, max attempts 5, stale-after 300 s; overridable via `METALDOCS_STAGING_OUTBOX_*` env vars). The dispatch pattern is: `ClaimPending` with `FOR UPDATE SKIP LOCKED`, call `Publisher.Publish` for each row inserting into `outbox_events`, then `MarkDispatched`. A `ResetStaleClaims` call at the start of each tick recovers rows stuck in `processing` status after a crash.
 
 **Tenancy (ADR 0054).** `ClaimPending` intentionally selects across **all tenants** with no `tenant_id` predicate — sanctioned by [ADR 0054](../../decisions/0054-cross-tenant-outbox-claim.md), mirroring the platform `outbox_events` consumer (`internal/platform/messaging/outbox/postgres/consumer.go`). The code comment at `internal/modules/render/fanout/staging_outbox.go:68-72` cites the ADR directly. Tenancy is enforced at processing time: every claimed row carries its `tenant_id`, all per-row work after claim is scoped to that row's tenant, and the unscoped claim shape is permitted only inside this worker-internal path — never a request path. Closed as SEC-13 (commit b4302dbf); full contract in [async-job-pipeline.md §7](../flows/async-job-pipeline.md).
 
@@ -104,11 +104,11 @@ The presence of three distinct outbox tables is the principal structural overlap
 
 | Table | Written by | Consumed by | Purpose |
 |-------|-----------|-------------|---------|
-| `metaldocs.pdf_dispatch_outbox` | Domain code (approval handler, `MaterializeJobRunner`) inside transactions | `PDFOutboxWorker` (API goroutine) | Staging: durably capture PDF dispatch intent within the domain transaction |
-| `metaldocs.materialize_dispatch_outbox` | `FreezeService.Pin` inside the freeze transaction | `MaterializeOutboxWorker` (API goroutine) | Staging: durably capture materialize intent within the domain transaction |
+| `metaldocs.pdf_dispatch_outbox` | Domain code (approval handler, `MaterializeJobRunner`) inside transactions | `StagingOutboxWorker` PDF instance (API goroutine) | Staging: durably capture PDF dispatch intent within the domain transaction |
+| `metaldocs.materialize_dispatch_outbox` | `FreezeService.Pin` inside the freeze transaction | `StagingOutboxWorker` materialize instance (API goroutine) | Staging: durably capture materialize intent within the domain transaction |
 | `metaldocs.outbox_events` | `outbox/postgres/publisher.go` (called by the relay workers above) | `outbox/postgres/consumer.go` (called by `apps/worker`) | Generic relay: the `apps/worker` binary's actual input queue |
 
-This is a **two-stage outbox chain**: domain write → staging table → relay worker → `outbox_events` → external worker binary. The relay workers (`PDFOutboxWorker`, `MaterializeOutboxWorker`) exist solely to bridge the staging tables into `outbox_events`. The claim/fail/retry logic is partially duplicated across all three tables.
+This is a **two-stage outbox chain**: domain write → staging table → relay worker → `outbox_events` → external worker binary. The two `StagingOutboxWorker` instances exist solely to bridge the staging tables into `outbox_events`. The two staging tables now share one generic claim/fail/retry implementation (`StagingOutboxRepository`); residual duplication remains between that implementation and the platform consumer (`outbox/postgres/consumer.go`).
 
 The `platform/jobs/river` package and the `platform/worker` + `platform/messaging` stack are **completely independent subsystems**:
 
@@ -123,8 +123,8 @@ The `platform/jobs/river` package and the `platform/worker` + `platform/messagin
 ```mermaid
 graph TD
     subgraph API["apps/api (in-process)"]
-        PDFRelay["PDFOutboxWorker<br/>render/fanout"]
-        MatRelay["MaterializeOutboxWorker<br/>render/fanout"]
+        PDFRelay["StagingOutboxWorker (PDF)<br/>render/fanout"]
+        MatRelay["StagingOutboxWorker (materialize)<br/>render/fanout"]
         Scheduler["Scheduler<br/>modules/jobs/scheduler"]
         RiverEnq["RiverScheduledPublishEnqueuer"]
     end
@@ -174,11 +174,12 @@ graph TD
 
 | Flag | Severity | RF reference |
 |------|----------|-------------|
-| Two-stage outbox chain with duplicate claim/retry logic across three tables | Medium | RF-OB1 candidate |
+| Two-stage outbox chain; claim/retry logic duplicated between the staging repo (`StagingOutboxRepository`) and the platform consumer (`outbox/postgres/consumer.go`) | Medium | RF-OB1 candidate |
 | `TODO(phase11)` markers in outbox consumer and publisher | Low | — |
-| `startOutboxWorker` restart loop is dead code (workers never return non-nil) | Low | — |
 
-Closed flags: tenant-unscoped `pdf_dispatch_outbox`/`materialize_dispatch_outbox` claim is no longer an open flag as of [ADR 0054](../../decisions/0054-cross-tenant-outbox-claim.md) (2026-07-02) — the cross-tenant `ClaimPending` shape is sanctioned by design (closed as SEC-13, commit b4302dbf); see §2.6 above.
+Closed flags:
+- Tenant-unscoped `pdf_dispatch_outbox`/`materialize_dispatch_outbox` claim is no longer an open flag as of [ADR 0054](../../decisions/0054-cross-tenant-outbox-claim.md) (2026-07-02) — the cross-tenant `ClaimPending` shape is sanctioned by design (closed as SEC-13, commit b4302dbf); see §2.6 above.
+- `startOutboxWorker` dead-code restart loop: closed. The restart loop was removed when the workers were consolidated into the generic `StagingOutboxWorker`; the current `startOutboxWorkers` (`apps/api/cmd/metaldocs-api/main.go:932`) just starts each instance's `Run` in a WaitGroup-tracked goroutine — `Run` returns only nil on context cancellation, and shutdown joins the goroutines cleanly.
 
 Full flag registry: [../legacy-register.md](../legacy-register.md).
 
