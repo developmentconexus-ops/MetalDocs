@@ -1,3 +1,12 @@
+/* Approval-slate palette screen (see the "Approval-slate" note in
+   styles/tokens.css — intentionally not Wine-branded). The --color-* vars
+   below come from design-source/route-admin/index.html :root and are never
+   defined at runtime, so each var() resolves to its fallback hex; the
+   fallback is the source of truth and must match design-source. Do not
+   define --color-* globally without a visual-parity pass: two
+   --color-border-subtle sites drifted from the design value (0.06 and 0.1
+   vs 0.08) and a global definition would silently change them. */
+
 .page {
   display: flex;
   flex-direction: column;
@@ -22,13 +31,13 @@
 
 .subtitle {
   margin: 0;
-  color: var(--color-text-muted, #475569);
+  color: var(--slate-text-muted);
   font-size: 0.875rem;
   max-width: 720px;
 }
 
 .state {
-  color: var(--color-text-muted, #475569);
+  color: var(--slate-text-muted);
   font-size: 0.95rem;
 }
 
@@ -37,14 +46,14 @@
   border-radius: 10px;
   padding: 24px;
   text-align: center;
-  color: var(--color-text-muted, #475569);
+  color: var(--slate-text-muted);
 }
 
 .tableWrap {
   border: 1px solid var(--color-border-subtle, rgba(15, 23, 42, 0.08));
   border-radius: 12px;
   overflow: hidden;
-  background: var(--color-surface, #ffffff);
+  background: var(--surface);
 }
 
 .tableWrap[aria-busy='true'] {
@@ -68,7 +77,7 @@
 .table thead th {
   background: var(--color-surface-subtle, #f8fafc);
   font-weight: 600;
-  color: var(--color-text-muted, #475569);
+  color: var(--slate-text-muted);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -233,7 +242,7 @@
 
 .helpText {
   display: block;
-  color: var(--color-text-muted, #475569);
+  color: var(--slate-text-muted);
   font-size: 0.78rem;
   margin-top: -2px;
   margin-bottom: 6px;
