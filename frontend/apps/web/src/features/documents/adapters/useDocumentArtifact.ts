@@ -28,6 +28,7 @@ import { useAreasQuery } from '../queries/useAreasQuery';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { formatShortDate } from '../../../lib/format/dates';
 import { getDocumentStatusPresentation } from '../lib/documentStatusPresentation';
+import { parseDocumentStatus } from '../lib/parseDocumentStatus';
 import type { DocumentDetail } from '../api/documents';
 import type { fetchActiveDocumentInstance } from '../../controlled-documents/api/controlledDocuments';
 
@@ -117,7 +118,9 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
   const activeDocument = activeDocumentQuery.data ?? null;
 
   const code = doc?.code ?? null;
-  const status = (doc?.status ?? '') as LifecycleStatus;
+  // Parse-boundary narrowing (never cast): null = absent/unrecognized wire value,
+  // which downstream renders as the honest "sem status" presentation fallback.
+  const status: LifecycleStatus | null = parseDocumentStatus(doc?.status);
   const versionNumber = doc?.revision_number ?? 0;
   const revisionLabel = doc ? formatRevisionCode(doc.revision_number) : null;
   const areaCode = doc?.process_area_code_snapshot ?? '';
@@ -127,7 +130,7 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
 
   const publishedAt = formatPublishedAt(approval?.completed_at ?? undefined);
   const sinceDateHint = approval?.completed_at ? formatShortDate(approval.completed_at) : EM_DASH;
-  const statusPresentation = getDocumentStatusPresentation(status, publishedAt);
+  const statusPresentation = getDocumentStatusPresentation(status ?? '', publishedAt);
 
   // Owner name: created_by; if creator is the current user, use displayName (L217-222 parity).
   const ownerName = resolveOwnerDisplay(doc?.created_by, user) ?? EM_DASH;
@@ -178,7 +181,7 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     versionNumber: item.revision_number ?? 0,
     revisionNumber: item.revision_number ?? null,
     revisionLabel: formatRevisionCode(item.revision_number),
-    status: (item.status ?? '') as LifecycleStatus,
+    status: parseDocumentStatus(item.status),
     title: item.revision_title ?? null,
     createdAt: item.created_at ?? null,
     isCurrent: Boolean(item.is_current),

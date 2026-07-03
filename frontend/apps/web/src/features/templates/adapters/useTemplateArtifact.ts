@@ -72,7 +72,10 @@ export function useTemplateArtifact(templateId: string): TemplateArtifact {
   const template = query.data?.template;
   const version = query.data?.latest_version;
 
-  const status = (version?.status ?? '') as LifecycleStatus;
+  // No cast needed: the generated VersionDTO.status is already the narrow template
+  // enum (draft | under_review | approved | published | obsolete), a subset of
+  // LifecycleStatus. Null = no version loaded yet (honest absence, not '').
+  const status: LifecycleStatus | null = version?.status ?? null;
   const revisionLabel = version ? formatRevisionCode(version.revision_number) : null;
   const versionNumber = version?.revision_number ?? version?.version_number ?? 0;
   const badgeLabel = templateStatusLabel(version?.status ?? '');
@@ -160,6 +163,6 @@ export function useTemplateArtifact(templateId: string): TemplateArtifact {
     isLoading: query.isLoading,
     isError: query.isError || !query.data,
     refetch: () => { void query.refetch(); },
-    heroKind: resolveTemplateDetailHeroKind(status),
+    heroKind: resolveTemplateDetailHeroKind(status ?? ''),
   };
 }

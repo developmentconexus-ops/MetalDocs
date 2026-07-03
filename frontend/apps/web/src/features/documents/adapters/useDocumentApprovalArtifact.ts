@@ -10,13 +10,13 @@ import type {
   ArtifactAction,
   ArtifactDecisionModel,
   ArtifactViewModel,
-  LifecycleStatus,
 } from '../../shared/controlled-artifact/types';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
 import { TRANSITION_POLICY, type TransitionPolicy, toApprovalState, mapApprovalChain } from '../lib/approvalWorkflow';
 import { resolveOwnerDisplay } from '../../shared/controlled-artifact/resolveOwnerDisplay';
 import { buildDocumentSignoffDecision } from '../lib/documentSignoffDecision';
+import { parseDocumentStatus } from '../lib/parseDocumentStatus';
 
 /**
  * Route-supplied dialog/prompt openers bound to each emitted action's `run`.
@@ -238,7 +238,7 @@ export function useDocumentApprovalArtifact(
         id: documentId,
         code: doc.code ?? null,
         title: doc.name ?? doc.code ?? '',
-        status: (doc.status ?? '') as LifecycleStatus,
+        status: parseDocumentStatus(doc.status),
         versionNumber: doc.revision_number ?? 0,
         revisionLabel: formatRevisionCode(doc.revision_number),
         hero: {

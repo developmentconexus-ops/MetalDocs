@@ -143,7 +143,7 @@ export function ArtifactApprovalScreen({
             </div>
 
             <div className={styles.statusRow}>
-              <StatusPill status={model.status} />
+              {model.status != null && <StatusPill status={model.status} />}
               <span className={styles.versionTag}>v{model.versionNumber}</span>
               {model.revisionLabel != null && (
                 <>

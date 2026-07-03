@@ -21,6 +21,11 @@ export type ArtifactKind = "document" | "template";
 /**
  * Unified lifecycle status vocabulary. Aliases the canonical `DocumentStatus`
  * union from StatusPill — do NOT fork a parallel union.
+ *
+ * Adapters must narrow wire status strings through a parse boundary
+ * (`parseDocumentStatus` for documents; the generated `VersionStatus` enum for
+ * templates) — never cast. `null` is the honest representation of an absent or
+ * unrecognized wire value; consumers render EM_DASH / omit rather than fabricate.
  */
 export type LifecycleStatus = DocumentStatus;
 
@@ -183,7 +188,8 @@ export interface VersionHistoryItem {
   revisionNumber: number | null;
   /** Formatted revision label (output of `formatRevisionCode`, e.g. "REV01"). Null when not applicable. */
   revisionLabel: string | null;
-  status: LifecycleStatus;
+  /** Null when the wire status was absent or unrecognized (parse-boundary rejection). */
+  status: LifecycleStatus | null;
   /** Title of this revision snapshot. Null when not recorded. */
   title: string | null;
   /** ISO-8601 creation timestamp of this revision. */
@@ -355,7 +361,8 @@ export interface ArtifactViewModel {
    */
   code: string | null;
   title: string;
-  status: LifecycleStatus;
+  /** Null when the wire status was absent or unrecognized (parse-boundary rejection). */
+  status: LifecycleStatus | null;
   versionNumber: number;
   /**
    * Formatted revision label from `formatRevisionCode` (e.g. "REV02"). Null for
