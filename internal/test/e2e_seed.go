@@ -253,8 +253,17 @@ func (h *seedHandler) reset(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = tx.Rollback() }()
 
 	statements := []string{
+		// DB-10: legacy public.signoffs was removed from the reset list (2026-07-03).
+		// The table does not exist in the current canonical baseline
+		// (db/baseline/0001_current_schema.sql; grep-confirmed zero CREATE TABLE for
+		// a bare "signoffs" table anywhere in the live schema) — only
+		// public.approval_signoffs, deleted above, is live. The DELETE FROM signoffs
+		// statement previously here was a permanent no-op: every execution hit
+		// isUndefinedTable below and was swallowed by the `continue`. Confirmed zero
+		// runtime writers to a legacy "signoffs" table anywhere in the tree (grep
+		// across internal/ and tests/ for bare `signoffs` finds only this reset line,
+		// the approval_signoffs family, and the /signoffs HTTP route segment).
 		`DELETE FROM approval_signoffs s USING approval_instances i WHERE s.approval_instance_id = i.id AND i.tenant_id = $1`,
-		`DELETE FROM signoffs WHERE tenant_id = $1`,
 		`DELETE FROM approval_stage_instances s USING approval_instances i WHERE s.approval_instance_id = i.id AND i.tenant_id = $1`,
 		`DELETE FROM approval_instances WHERE tenant_id = $1`,
 		`DELETE FROM approval_route_stages rs USING approval_routes r WHERE rs.route_id = r.id AND r.tenant_id = $1`,

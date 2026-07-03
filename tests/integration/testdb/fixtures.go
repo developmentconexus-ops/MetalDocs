@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -16,6 +17,16 @@ import (
 //
 // Guarded writes (INSERT/UPDATE on public.documents) are wrapped in seedWithCaps
 // transaction-locally — pool-safe, never leaks session state.
+//
+// DB-01: seeds the CANONICAL templates_template / templates_template_version
+// family (mirrors TST-01's internal/test/e2e_seed.go ensureTemplateVersion,
+// commit 1ac5e530). Unlike the legacy public.templates / template_versions pair,
+// both canonical tables carry trg_require_cap_asserted (satisfied by the
+// template.create capability, asserted tx-locally via seedWithCaps) and
+// templates_template_version additionally carries
+// trg_template_version_tenant_consistent, which requires the tx-local
+// metaldocs.tenant_id GUC to be set and match the parent template's tenant —
+// set once per seed tx alongside the capability assertion.
 func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (docID, tenant string) {
 	t.Helper()
 	ctx := context.Background()
@@ -23,31 +34,53 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 	userID := DeterministicID(t, "user")
 	templateKey := "test-template-" + randomSuffix(t)
 
-	// Insert minimal stub template (no tripwire on public.templates).
-	var tplID string
-	if err := db.QueryRowContext(ctx,
-		`INSERT INTO `+Qualified(schema, "templates")+
-			` (tenant_id, key, name, created_by)
-		 VALUES ($1::uuid, $2, 'Test Template', $3::uuid)
-		 RETURNING id::text`,
-		tenantID, templateKey, userID,
-	).Scan(&tplID); err != nil {
-		t.Fatalf("InsertDraftDocument: insert template: %v", err)
-	}
+	// Insert minimal published template + version into the canonical family.
+	// content_hash must be 64-hex for any non-draft status
+	// (chk_template_version_content_hash_non_draft); docx_storage_key is
+	// globally unique (uq_templates_template_version_docx_storage_key), so key
+	// it off the minted template ID to stay collision-free across parallel tests.
+	var tplID, tvID string
+	docxStorageKey := "templates/test-seed/" + templateKey + "/body.docx"
+	contentHash := strings.Repeat("0", 64)
 
-	// Insert minimal published template version (no tripwire on public.template_versions).
-	var tvID string
-	if err := db.QueryRowContext(ctx,
-		`INSERT INTO `+Qualified(schema, "template_versions")+
-			` (template_id, version_num, status, docx_storage_key, schema_storage_key,
-			   docx_content_hash, schema_content_hash, created_by)
-		 VALUES ($1::uuid, 1, 'published', 'key/tpl.docx', 'key/schema.json',
-			   'aabbcc', 'ddeeff', $2::uuid)
-		 RETURNING id::text`,
-		tplID, userID,
-	).Scan(&tvID); err != nil {
-		t.Fatalf("InsertDraftDocument: insert template_version: %v", err)
-	}
+	seedWithCaps(t, db, `[{"cap":"template.create"}]`, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`SELECT set_config('metaldocs.tenant_id', $1, true)`, tenantID,
+		); err != nil {
+			return fmt.Errorf("set tenant_id GUC: %w", err)
+		}
+
+		if err := tx.QueryRowContext(ctx,
+			`INSERT INTO `+Qualified(schema, "templates_template")+
+				` (id, tenant_id, doc_type_code, key, name, description, latest_version, published_version_id, created_by, created_at)
+			 VALUES (gen_random_uuid(), $1::uuid, '', $2, 'Test Template', '', 1, NULL, $3::text, now())
+			 RETURNING id::text`,
+			tenantID, templateKey, userID,
+		).Scan(&tplID); err != nil {
+			return fmt.Errorf("insert templates_template: %w", err)
+		}
+
+		if err := tx.QueryRowContext(ctx,
+			`INSERT INTO `+Qualified(schema, "templates_template_version")+
+				` (id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash,
+				   metadata_schema, placeholder_schema, author_id, published_at)
+			 VALUES (gen_random_uuid(), $1::uuid, $2::uuid, 1, 'published', $3, $4,
+				   '{}'::jsonb, '{"placeholders":[]}'::jsonb, $5::text, now())
+			 RETURNING id::text`,
+			tenantID, tplID, docxStorageKey, contentHash, userID,
+		).Scan(&tvID); err != nil {
+			return fmt.Errorf("insert templates_template_version: %w", err)
+		}
+
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE `+Qualified(schema, "templates_template")+
+				` SET published_version_id = $2::uuid WHERE id = $1::uuid`,
+			tplID, tvID,
+		); err != nil {
+			return fmt.Errorf("update templates_template.published_version_id: %w", err)
+		}
+		return nil
+	})
 
 	// Insert document — guarded by document.create tripwire.
 	seedWithCaps(t, db, `[{"cap":"document.create"}]`, func(tx *sql.Tx) error {
