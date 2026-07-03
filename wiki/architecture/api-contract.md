@@ -2,7 +2,14 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-07-03 (approval instance-route wire-truth repair, same defect class as the 2026-07-02
+> **Last verified:** 2026-07-03 (ADR 0065 — `TemplateDTO` version pointers are now nested value objects:
+> `latest_version` (required) and `published_version` (required-and-nullable, present-and-null) are both
+> `TemplateVersionRef {id, number, revision_number, status}`; the four coupled flat scalars
+> `latest_revision_number`/`published_version_id`/`published_version_number`/`current_revision_number` are
+> removed from the compact `TemplateDTO`. The `getTemplate` DETAIL envelope (`GetTemplateResponse.data`) is
+> UNCHANGED — `latest_version` there still carries the full `VersionDTO`, distinct from the list/item ref. See
+> `wiki/decisions/0065-version-references-are-nested-value-objects.md`.
+> Prior: 2026-07-03 (approval instance-route wire-truth repair, same defect class as the 2026-07-02
 > cluster: `recordApprovalStageSignoff` got `SignoffApprovalStageRequest` (wire field `password_token`, unlike the
 > document-route's `password`) + shared `SignoffDocumentResponse`; `cancelApprovalInstance` got the shared
 > `CancelDocumentApprovalRequest`/`Response` + required `If-Match` (handler hard-requires it via `parseIfMatch`);
@@ -31,6 +38,8 @@
 > - `internal/modules/templates/api/cfg.yaml:1` - templates codegen config (include-tags: templates)
 > - `internal/modules/templates/api/gen.go:1` - `//go:generate` invocation for templates
 > - `internal/modules/templates/api/api.gen.go:1` - generated; DO NOT EDIT
+> - `internal/modules/templates/domain/read_model.go:1` - `VersionRef`/`TemplateRead` read model (ADR 0065)
+> - `internal/modules/templates/delivery/http/routes_mapping.go:122` - `toAPIVersionRef`/`toAPITemplateDTO` mappers (ADR 0065)
 > - `internal/modules/documents/api/cfg.yaml:1` - documents codegen config (include-tags: documents)
 > - `internal/modules/documents/api/gen.go:1` - `//go:generate` invocation for documents
 > - `internal/modules/documents/api/api.gen.go:1` - generated; DO NOT EDIT
@@ -196,6 +205,46 @@ as `page :=` / `payload :=`, on one line or many) to `writeJSON` / `writeFillInJ
 
 ---
 
+## 5c. Version references are nested value objects (ADR 0065)
+
+**Rule:** a wire-contract field set that references another resource's version/revision (id + counters +
+labels + status) is always ONE nested required object — a version-reference value object — never parallel
+scalars. When the pointer may not exist, the OBJECT is nullable as a whole (required, present-and-null,
+never absent); consumers gate on the single object, never on inner fields.
+
+**Templates cutover (2026-07-03, commits `d0b1ba84` backend / `15c0eeeb` frontend):** `TemplateDTO`
+(compact list/item shape, `api/openapi/v1/openapi.yaml:5788`) carries:
+- `latest_version: TemplateVersionRef` — required.
+- `published_version: TemplateVersionRef | null` — required-and-nullable (`api/openapi/v1/openapi.yaml:5805`);
+  the key is always present in the JSON body, `null` only when the template has never been published.
+
+`TemplateVersionRef` (`api/openapi/v1/openapi.yaml:5775`) = `{id, number, revision_number, status}`.
+Removed from `TemplateDTO`: the four coupled flat scalars `latest_revision_number`,
+`published_version_id`, `published_version_number`, `current_revision_number`.
+
+**Detail envelope unchanged.** `getTemplate`'s `GetTemplateResponse.data` (`api/openapi/v1/openapi.yaml:5946`)
+still declares `latest_version: VersionDTO` — the full version object, not the compact ref. Only the
+compact `TemplateDTO` used in list/item responses changed; `TemplateDTO.latest_version` and
+`GetTemplateResponse.data.latest_version` share a field name but not a type — this is deliberate (AIP view
+semantics: list view carries a compact ref, detail view carries the full object under the same key).
+
+**Backend implication — read/write model split.** `internal/modules/templates/domain/read_model.go` adds
+`VersionRef` (compact) and `TemplateRead` (embeds the write-side `Template` + `Latest`/`Published
+VersionRef`). `internal/modules/templates/repository/postgres.go` GetTemplate/GetTemplateByKey/ListTemplates
+double-join `templates_template_version` (`lv`/`pv` aliases) and return `*domain.TemplateRead`. The mapper
+(`internal/modules/templates/delivery/http/routes_mapping.go:122` `toAPIVersionRef`, `:147`
+`toAPITemplateDTO`) converts the read model to the wire shape.
+
+**Deferred: documents (Plan 2, not yet applied).** The same pattern applies to `DocumentSummary` /
+`DocumentDetailResponse`'s coupled `current_revision_id`/`revision_version`/`revision_number` triple →
+`current_revision: DocumentRevisionRef`. Pre-v1, not yet cut over — see
+`wiki/modules/documents.md` §8.8 and ADR 0065 §Consequences.
+
+See `wiki/decisions/0065-version-references-are-nested-value-objects.md` for full rationale (root-caused by
+the 2026-07-03 HIGH governance bug fixed in `9f86828b`).
+
+---
+
 ## 6. Frontend codegen - openapi-typescript v7
 
 ```bash
@@ -295,6 +344,7 @@ If any of these conflict, stop and resolve the prerequisite before feature imple
 
 - `wiki/architecture/backend-api-structure.md` - canonical backend/API structure rules and migration discipline
 - `wiki/decisions/0012-contract-first-api.md` - ADR: why spec-as-source-of-truth was adopted and root cause of the `documents.name` bug
+- `wiki/decisions/0065-version-references-are-nested-value-objects.md` - ADR: version pointers are nested value objects, never parallel scalars
 - `wiki/backlog/contract-first-followups.md` - deferred handler migrations + documents spec/handler gap inventory
 - `wiki/references/oapi-codegen.md` - operational how-to (regenerate, vendor mode, add module)
 - `wiki/architecture/frontend-structure.md section 7` - frontend API call patterns using generated types
