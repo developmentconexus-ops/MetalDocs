@@ -69,6 +69,25 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	}
 	out = append(out, rwTx...)
 
+	// M2 F2.1 (validation-contract.md §1.5) — TRIPWIRE-ARM-PARITY: TripwireArms
+	// caps must be registry-real and RenderMigration() must byte-equal the
+	// committed 0271 migration.
+	parity, err := checkTripwireArmParity(modulesRoot, strict)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, parity...)
+
+	// M2 F2.1 (validation-contract.md §1.5) — TRIPWIRE-ARM-DRIFT: a function
+	// that asserts a cap and writes a gated table must assert an arm-member cap
+	// for that table+op (the incident-class catcher; function-local generalization
+	// of checkTripwirePairing above from presence to arm-membership).
+	drift, err := checkTripwireArmDrift(modulesRoot, fset, strict)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, drift...)
+
 	return out, nil
 }
 
