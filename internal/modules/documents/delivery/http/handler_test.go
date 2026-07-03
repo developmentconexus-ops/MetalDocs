@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
+
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	approvalrepository "metaldocs/internal/modules/documents/approval/repository"
@@ -21,8 +23,8 @@ import (
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	"metaldocs/internal/platform/idempotency"
 	platformdb "metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -925,6 +927,81 @@ func TestFinalizeDocument_StaleRevision_Returns409(t *testing.T) {
 	}
 	if submitter.gotReq.RevisionVersion != 7 {
 		t.Fatalf("expected If-Match-derived RevisionVersion=7 threaded to submit service, got %d", submitter.gotReq.RevisionVersion)
+	}
+}
+
+// newFinalizeConflictMockDB scripts a *sql.DB (via sqlmock) so the real
+// idempotency.Store wired through h.idempFinalize hits ErrConflict on
+// BeginReplay: BeginTx -> INSERT ... ON CONFLICT DO NOTHING returns no row
+// (loser) -> SELECT ... FOR UPDATE returns a stored payload_hash that cannot
+// match the request's -> BeginReplay commits and returns ErrConflict ->
+// finalizeDocument maps that to 422 IDEMPOTENCY_KEY_REUSED. The INSERT
+// expectation pins arg 3 to the exact route template finalizeDocument's
+// h.idempFinalize store must have been constructed with
+// ("POST /api/v1/documents/{id}/finalize", the constant registered directly
+// on the mux in registerRoutes/finalizeRoutePattern) — mirrors
+// internal/modules/templates/delivery/http/routes_contract_test.go's
+// newConflictMockDB, adapted for documents' hand-rolled finalize idempotency
+// (finalizeIdempotencyStore.BeginReplay/CompleteReplay/FailReplay) rather
+// than the generic idempotency.Require middleware templates uses.
+func newFinalizeConflictMockDB(t *testing.T, routeTemplate string) *sql.DB {
+	t.Helper()
+	mockDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("newFinalizeConflictMockDB: sqlmock.New: %v", err)
+	}
+	t.Cleanup(func() { _ = mockDB.Close() })
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`INSERT INTO metaldocs\.idempotency_keys`).
+		WithArgs("tenant_1", "user_1", routeTemplate, "11111111-1111-4111-8111-111111111111", sqlmock.AnyArg()).
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery(`SELECT status, payload_hash`).
+		WithArgs("tenant_1", "user_1", routeTemplate, "11111111-1111-4111-8111-111111111111").
+		WillReturnRows(sqlmock.NewRows([]string{"status", "payload_hash", "response_status", "response_body", "expired"}).
+			AddRow("completed", "hash-that-cannot-match-any-request", nil, nil, false))
+	mock.ExpectCommit()
+	return mockDB
+}
+
+// TestFinalizeDocument_IdempotencyStoreEngaged proves finalizeDocument's
+// hand-rolled idempotency wiring (h.idempFinalize, backed by
+// idempotency.New(db, "POST /api/v1/documents/{id}/finalize") when no store
+// is injected — see NewHandlerWithSubmitAndFinalizeStore) actually reaches
+// the real Store.BeginReplay when the route is dispatched through
+// RegisterRoutes -> registerRoutes's direct mux.HandleFunc(finalizeRoutePattern, ...)
+// registration (CON-01/CON-12: finalize is deliberately excluded from the
+// HandlerWithOptions/skippingMux registration so its own If-Match handling
+// governs precondition semantics; this test proves that direct registration
+// still drives the same store a generated-wrapper route would). The
+// discriminator is the scripted hash-conflict: 422 IDEMPOTENCY_KEY_REUSED is
+// only producible by idempotency.Store.BeginReplay's ErrConflict path.
+func TestFinalizeDocument_IdempotencyStoreEngaged(t *testing.T) {
+	const routeTemplate = "POST /api/v1/documents/{id}/finalize"
+	db := newFinalizeConflictMockDB(t, routeTemplate)
+	store := idempotency.New(db, routeTemplate)
+
+	svc := &fakeSvc{}
+	submitter := &fakeApprovalSubmitter{}
+	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, db, submitter, store)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
+	withAuthHeaders(req, "editor")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+	req.Header.Set("If-Match", "\"v1\"")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 from the scripted idempotency conflict, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if body := rr.Body.String(); !strings.Contains(body, "IDEMPOTENCY_KEY_REUSED") {
+		t.Fatalf("expected IDEMPOTENCY_KEY_REUSED from the idempotency store path, got body=%s", body)
+	}
+	if submitter.called {
+		t.Fatal("submit service must not be called once the idempotency store reports a conflict")
 	}
 }
 

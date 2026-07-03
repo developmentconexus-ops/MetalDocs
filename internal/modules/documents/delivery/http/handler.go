@@ -195,6 +195,47 @@ func NewHandlerWithSubmitAndFinalizeStore(svc Service, database *sql.DB, submitS
 	return h
 }
 
+// finalizeRoutePattern is the net/http 1.22 mux pattern for the finalize
+// route, kept as a constant so the skip-set in registerRoutes and the direct
+// registration below can never drift apart.
+const finalizeRoutePattern = "POST /api/v1/documents/{id}/finalize"
+
+// rateLimitedRoutes maps each rate-limited route's method-qualified pattern
+// (as it appears on r.Pattern once matched by the generated router — see the
+// Middlewares closure below) to its ratelimit.RouteKey. CON-03/ARC-02: mounts
+// the generated ServerInterface via HandlerWithOptions instead of a
+// hand-written mux.HandleFunc list, so a route the spec adds can no longer
+// silently go unserved (missing ServerInterface methods fail to compile).
+// Mirrors the templates slice's idempotentRoutes map
+// (internal/modules/templates/delivery/http/handler.go).
+var rateLimitedRoutes = map[string]ratelimit.RouteKey{
+	"POST /api/v1/documents/{id}/autosave/presign": ratelimit.RouteAutosavePresign,
+	"POST /api/v1/documents/{id}/autosave/commit":  ratelimit.RouteAutosaveCommit,
+	"POST /api/v1/documents/{id}/export/pdf":       ratelimit.RouteExportPDF,
+}
+
+// skippingMux adapts *http.ServeMux to documentsapi.ServeMux (the minimal
+// interface HandlerWithOptions requires as its BaseRouter) while refusing to
+// register any pattern in skip. HandlerWithOptions registers every
+// ServerInterface route unconditionally with no per-route opt-out, but
+// finalizeRoutePattern must stay a direct registration (see the comment on
+// that mux.HandleFunc call below) — registering it twice on the same
+// *http.ServeMux panics at startup ("pattern ... conflicts with pattern
+// ..."). Routing the generated router's registration through this adapter
+// lets the direct route and the generated router share one real mux with no
+// wildcard/prefix mounting tricks and no registration-order dependency.
+type skippingMux struct {
+	*http.ServeMux
+	skip map[string]bool
+}
+
+func (m *skippingMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) {
+	if m.skip[pattern] {
+		return
+	}
+	m.ServeMux.HandleFunc(pattern, handler)
+}
+
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) { h.registerRoutes(mux, nil, nil) }
 
 func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
@@ -202,89 +243,53 @@ func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.
 }
 
 func (h *Handler) registerRoutes(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
-	wrapper := documentsapi.ServerInterfaceWrapper{
-		Handler: h,
+	rateLimited := rl != nil && userFn != nil
+
+	middleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// r.Pattern already carries the method prefix ("POST /api/v1/...")
+			// because the generated router registers method-qualified patterns —
+			// do NOT prepend r.Method again or the lookup silently misses (see
+			// templates/delivery/http/handler.go for the incident this guards).
+			if rateLimited {
+				if key, ok := rateLimitedRoutes[r.Pattern]; ok {
+					rl.Limit(key, userFn, next).ServeHTTP(w, r)
+					return
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	sm := &skippingMux{ServeMux: mux, skip: map[string]bool{finalizeRoutePattern: true}}
+	documentsapi.HandlerWithOptions(h, documentsapi.StdHTTPServerOptions{
+		BaseRouter: sm,
+		// AD-1: spec path keys are relative; the generated router prepends this
+		// base so served routes stay /api/v1/* and the codegen matches the spec.
+		BaseURL: "/api/v1",
+		Middlewares: []documentsapi.MiddlewareFunc{
+			middleware,
+		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			_ = problem.Write(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
 		},
-	}
-	rateLimited := rl != nil && userFn != nil
+	})
 
-	// Core unconditional routes.
-	mux.HandleFunc("GET /api/v1/documents", wrapper.ListDocuments)
-	mux.HandleFunc("GET /api/v1/documents/stats", wrapper.DocumentStats)
-	mux.HandleFunc("GET /api/v1/documents/{id}", wrapper.GetDocument)
-	mux.HandleFunc("PATCH /api/v1/documents/{id}", wrapper.RenameDocument)
-	// CON-01: registered directly (bypassing wrapper.FinalizeDocument) so the
-	// hand-written finalizeDocument's own If-Match parsing governs precondition
-	// semantics (428 missing / 400 malformed), mirroring how the canonical
-	// /documents/{id}/submit route bypasses its generated wrapper for the same
-	// reason (approvalhttp.RegisterRoutes registers h.SubmitHandler directly).
-	// Going through wrapper.FinalizeDocument would let oapi-codegen's generic
-	// required-header check short-circuit to a blanket 400 before reaching
-	// finalizeDocument, collapsing the missing-If-Match case to 400 instead of
-	// the 428 precondition-required status submit uses.
-	mux.HandleFunc("POST /api/v1/documents/{id}/finalize", h.finalizeDocument)
-	mux.HandleFunc("POST /api/v1/documents/{id}/archive", wrapper.ArchiveDocument)
-	mux.HandleFunc("POST /api/v1/documents/{id}/duplicate", wrapper.DuplicateDocument)
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/acquire", wrapper.AcquireDocumentSession)
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/heartbeat", wrapper.HeartbeatDocumentSession)
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/release", wrapper.ReleaseDocumentSession)
-	mux.HandleFunc("POST /api/v1/documents/{id}/session/force-release", wrapper.ForceReleaseDocumentSession)
-	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", wrapper.ListDocumentCheckpoints)
-	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", wrapper.CreateDocumentCheckpoint)
-	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints/{version}/restore", wrapper.RestoreDocumentCheckpoint)
-	mux.HandleFunc("GET /api/v1/documents/{id}/revision-history", wrapper.GetDocumentRevisionHistory)
-	mux.HandleFunc("GET /api/v1/documents/{id}/revisions/{rid}/url", wrapper.GetDocumentRevisionUrl)
-	mux.HandleFunc("GET /api/v1/documents/{id}/comments", wrapper.ListDocumentComments)
-	mux.HandleFunc("POST /api/v1/documents/{id}/comments", wrapper.CreateDocumentComment)
-	mux.HandleFunc("PATCH /api/v1/documents/{id}/comments/{library_id}", wrapper.UpdateDocumentComment)
-	mux.HandleFunc("DELETE /api/v1/documents/{id}/comments/{library_id}", wrapper.DeleteDocumentComment)
-
-	// Autosave routes — rate-limited when rl+userFn provided.
-	if rateLimited {
-		mux.Handle("POST /api/v1/documents/{id}/autosave/presign",
-			rl.Limit(ratelimit.RouteAutosavePresign, userFn, http.HandlerFunc(wrapper.PresignDocumentAutosave)))
-		mux.Handle("POST /api/v1/documents/{id}/autosave/commit",
-			rl.Limit(ratelimit.RouteAutosaveCommit, userFn, http.HandlerFunc(wrapper.CommitDocumentAutosave)))
-	} else {
-		mux.HandleFunc("POST /api/v1/documents/{id}/autosave/presign", wrapper.PresignDocumentAutosave)
-		mux.HandleFunc("POST /api/v1/documents/{id}/autosave/commit", wrapper.CommitDocumentAutosave)
-	}
-
-	// Export routes — guarded: only when export sub-handler is wired.
-	if h.export != nil {
-		mux.HandleFunc("GET /api/v1/documents/{id}/export/docx-url", wrapper.GetDocumentDocxURL)
-		if rateLimited {
-			mux.Handle("POST /api/v1/documents/{id}/export/pdf",
-				rl.Limit(ratelimit.RouteExportPDF, userFn, http.HandlerFunc(wrapper.ExportDocumentPDF)))
-		} else {
-			mux.HandleFunc("POST /api/v1/documents/{id}/export/pdf", wrapper.ExportDocumentPDF)
-		}
-	}
-
-	// Fill-in routes — unconditional: fillIn is a mandatory sub-handler (always wired at module.go).
-	mux.HandleFunc("GET /api/v1/documents/{id}/fill-in-schema", wrapper.GetDocumentFillInSchema)
-	mux.HandleFunc("GET /api/v1/documents/{id}/placeholders", wrapper.ListDocumentPlaceholderValues)
-	mux.HandleFunc("PUT /api/v1/documents/{id}/placeholders/{pid}", wrapper.PutDocumentPlaceholderValue)
-
-	// Placeholder-options route — guarded: only when placeholderOpts sub-handler is wired.
-	if h.placeholderOpts != nil {
-		mux.HandleFunc("GET /api/v1/documents/{id}/placeholder-options/{pid}", wrapper.GetDocumentPlaceholderOptions)
-	}
-
-	// View route — guarded: only when view sub-handler is wired.
-	if h.view != nil {
-		mux.HandleFunc("GET /api/v1/documents/{id}/view", wrapper.ViewDocument)
-	}
-
-	// Reconstruct route — guarded: only when reconstruct sub-handler is wired.
-	if h.reconstruct != nil {
-		mux.HandleFunc("POST /api/v1/documents/{id}/reconstruct", wrapper.ReconstructDocument)
-	}
+	// CON-01: registered directly on the real mux (bypassing wrapper.FinalizeDocument
+	// / documentsapi.ServerInterface.FinalizeDocument) so the hand-written
+	// finalizeDocument's own If-Match parsing governs precondition semantics (428
+	// missing / 400 malformed). Going through the generated wrapper would let
+	// oapi-codegen's generic required-header check short-circuit to a blanket 400
+	// before reaching finalizeDocument, collapsing the missing-If-Match case to 400
+	// instead of the 428 precondition-required status. finalizeRoutePattern is
+	// excluded from the HandlerWithOptions registration above via skippingMux so
+	// this is the only registration of the pattern (CON-12: PATCH /documents/{id}
+	// and every other route registers exactly once; this comment documents the one
+	// intentional exception to "everything through HandlerWithOptions").
+	mux.HandleFunc(finalizeRoutePattern, h.finalizeDocument)
 }
 
-func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request, params documentsapi.ListDocumentsParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
@@ -296,7 +301,7 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
-	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
+	opts, effectiveUserID, err := listOptionsFromParams(r, params, callerUserID, isAdmin)
 	if err != nil {
 		slog.Warn("documents listDocuments invalid query params", "err", err)
 		httpErr(w, http.StatusBadRequest, problem.CodeValidationError)
@@ -338,7 +343,7 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request, _ documentsapi.DocumentStatsParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
@@ -350,6 +355,13 @@ func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusInternalServerError, problem.CodeInternalError)
 		return
 	}
+	// DocumentStatsParams (operationId documentStats) is a strict subset of
+	// ListDocumentsParams (status / area_code / profile_code only — no
+	// cursor/limit/q/include_archived). parseListOptions already derives
+	// status/area_code/profile_code from the same raw query values the wrapper
+	// bound into params, including the repeated-?status= form the single-string
+	// params.Status cannot represent (see listOptionsFromParams), so there is no
+	// separate params-consuming path here to duplicate without diverging.
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
 		slog.Warn("documents documentStats invalid query params", "err", err)
@@ -394,22 +406,11 @@ func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (appli
 		opts.PageSize = limit
 	}
 
-	statusValues := query["status"]
-	if len(statusValues) > 0 {
-		statuses := make([]string, 0, len(statusValues))
-		for _, raw := range statusValues {
-			for _, split := range strings.Split(raw, ",") {
-				s := strings.TrimSpace(split)
-				if s != "" {
-					if !isKnownDocumentStatus(s) {
-						return opts, "", fmt.Errorf("invalid status %q", s)
-					}
-					statuses = append(statuses, s)
-				}
-			}
-		}
-		opts.Status = statuses
+	statuses, err := statusFilterFromParams(r)
+	if err != nil {
+		return opts, "", err
 	}
+	opts.Status = statuses
 
 	opts.AreaCode = strings.TrimSpace(query.Get("area_code"))
 	opts.ProfileCode = strings.TrimSpace(query.Get("profile_code"))
@@ -422,6 +423,89 @@ func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (appli
 			return opts, "", errors.New("include_archived must be a valid boolean")
 		}
 		opts.IncludeArchived = v
+	}
+
+	effectiveUserID := ""
+	if !isAdmin && callerUserID != "" {
+		opts.CreatedBy = callerUserID
+		effectiveUserID = callerUserID
+	}
+
+	return opts, effectiveUserID, nil
+}
+
+// statusFilterFromParams reads the `status` query parameter directly off the
+// request, honoring both a single CSV value ("draft,active") and repeated
+// occurrences (?status=draft&status=active) per the spec's documented
+// behavior for GET /documents (operationId listDocuments) and its statuses
+// query surface. Every known-status validation lives here so both
+// parseListOptions and listOptionsFromParams share one source of truth.
+func statusFilterFromParams(r *http.Request) ([]string, error) {
+	statusValues := r.URL.Query()["status"]
+	if len(statusValues) == 0 {
+		return nil, nil
+	}
+	statuses := make([]string, 0, len(statusValues))
+	for _, raw := range statusValues {
+		for _, split := range strings.Split(raw, ",") {
+			s := strings.TrimSpace(split)
+			if s == "" {
+				continue
+			}
+			if !isKnownDocumentStatus(s) {
+				return nil, fmt.Errorf("invalid status %q", s)
+			}
+			statuses = append(statuses, s)
+		}
+	}
+	return statuses, nil
+}
+
+// listOptionsFromParams builds application.ListOptions for listDocuments from the
+// generated ListDocumentsParams the wrapper has already bound and type-checked
+// (ARC-02 — no re-parsing r.URL.Query() for fields the typed params already carry).
+// The one exception is `status`: the spec documents it as "CSV, also accepts
+// repeated query params" (api/openapi/v1/openapi.yaml operationId listDocuments),
+// but ListDocumentsParams.Status is a single *string (the form binder only captures
+// one occurrence), so the repeated-param case is only observable via r.URL.Query()
+// directly — statusFilterFromParams reads that raw multi-value form, which is a
+// strict superset of params.Status's single-CSV-value case (identical result when
+// the client sends exactly one ?status= occurrence).
+func listOptionsFromParams(r *http.Request, params documentsapi.ListDocumentsParams, callerUserID string, isAdmin bool) (application.ListOptions, string, error) {
+	opts := application.ListOptions{PageSize: 20}
+
+	if params.Cursor != nil {
+		opts.Cursor = strings.TrimSpace(*params.Cursor)
+	}
+
+	if params.Limit != nil {
+		limit := *params.Limit
+		if limit < 1 {
+			return opts, "", errors.New("limit must be >= 1")
+		}
+		if limit > 100 {
+			return opts, "", errors.New("limit must be <= 100")
+		}
+		opts.PageSize = limit
+	}
+
+	statuses, err := statusFilterFromParams(r)
+	if err != nil {
+		return opts, "", err
+	}
+	opts.Status = statuses
+
+	if params.AreaCode != nil {
+		opts.AreaCode = strings.TrimSpace(*params.AreaCode)
+	}
+	if params.ProfileCode != nil {
+		opts.ProfileCode = strings.TrimSpace(*params.ProfileCode)
+	}
+	if params.Q != nil {
+		opts.Q = strings.TrimSpace(*params.Q)
+	}
+	if params.IncludeArchived != nil {
+		opts.IncludeArchived = *params.IncludeArchived
 	}
 
 	effectiveUserID := ""
