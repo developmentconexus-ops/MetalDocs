@@ -1,3 +1,5 @@
+import type { components } from '../../../lib/api-types';
+
 export type ApprovalState =
   | 'draft'
   | 'under_review'
@@ -16,34 +18,19 @@ export type SignatureMethod = 'password_reauth' | 'icp_brasil';
 // canonical FE rewrite — consumers now import the codegen types from
 // `lib/api-types` via `features/approval/api/routeAdminApi.ts`.
 
-export interface Signoff {
-  id: string;
-  actor_user_id: string;
-  decision: 'approve' | 'reject';
-  reason?: string;
-  signature_method: SignatureMethod;
-  signed_at: string;
-}
-
-export interface StageInstance {
-  id: string;
-  stage_index: number;
-  label: string;
-  status: 'pending' | 'active' | 'passed' | 'failed' | 'cancelled';
-  signoffs: Signoff[];
-}
-
-export interface ApprovalInstance {
-  id: string;
-  document_id: string;
-  route_id: string;
-  status: 'in_progress' | 'completed' | 'cancelled';
-  submitted_by: string;
-  submitted_at: string;
-  completed_at?: string;
-  stages: StageInstance[];
-  etag?: string;
-}
+// CON-10: the approval-instance read shape (id/document_id/route_id/tenant_id/
+// status/stages/actors/etag) is now generated from
+// `components['schemas']['ApprovalInstanceByDocumentResponse']` and friends —
+// never hand-rolled. The prior hand-written unions drifted from the runtime
+// values emitted by `mapInstanceResponse` (internal/modules/documents/approval/
+// http/doc_approval_handler.go): instance status is
+// `in_progress | approved | rejected | cancelled` (there is no `completed`
+// value), and the `actors` array was missing entirely. See
+// wiki/backlog/editor.md:254.
+export type ApprovalInstance = components['schemas']['ApprovalInstanceByDocumentResponse'];
+export type StageInstance = components['schemas']['ApprovalStageInstanceResponse'];
+export type StageActor = components['schemas']['ApprovalStageActorResponse'];
+export type Signoff = components['schemas']['ApprovalSignoffRecordResponse'];
 
 export interface InboxItem {
   instance_id: string;

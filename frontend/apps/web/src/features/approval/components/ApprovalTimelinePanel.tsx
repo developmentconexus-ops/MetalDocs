@@ -22,7 +22,18 @@ const DECISION_LABEL: Record<Signoff['decision'], string> = {
   reject: 'Rejeitou',
 };
 
-function formatDateTime(iso?: string): string {
+// Runtime instance status is `in_progress | approved | rejected | cancelled`
+// (see mapInstanceResponse in doc_approval_handler.go). There is no
+// `completed` value — CON-10 fixed a prior drift where this component
+// checked for a status the backend never emits, silently hiding the
+// "Status final" timeline node for every approved/rejected instance.
+const FINAL_STATUS_LABEL: Partial<Record<ApprovalInstance['status'], string>> = {
+  approved: 'Aprovado',
+  rejected: 'Rejeitado',
+  cancelled: 'Cancelado',
+};
+
+function formatDateTime(iso?: string | null): string {
   if (!iso) {
     return '-';
   }
@@ -104,14 +115,13 @@ export function ApprovalTimelinePanel({ instance, loading, error, onRetry }: App
             </li>
           ))}
 
-        {instance.status === 'completed' || instance.status === 'cancelled' ? (
+        {FINAL_STATUS_LABEL[instance.status] ? (
           <li className={styles.node}>
             <div className={styles.dot} aria-hidden="true" />
             <div className={styles.content}>
               <h3 className={styles.title}>Status final</h3>
               <p className={styles.meta}>
-                {instance.status === 'completed' ? 'Concluído' : 'Cancelado'} em{' '}
-                {formatDateTime(instance.completed_at)}
+                {FINAL_STATUS_LABEL[instance.status]} em {formatDateTime(instance.completed_at)}
               </p>
             </div>
           </li>
