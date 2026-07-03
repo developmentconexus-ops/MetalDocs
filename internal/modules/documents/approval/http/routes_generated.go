@@ -43,7 +43,7 @@ func (h *Handler) GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.R
 	h.GetInstanceByDocumentHandler(w, r)
 }
 
-func (h *Handler) ListApprovalInbox(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListApprovalInbox(w http.ResponseWriter, r *http.Request, params approvalapi.ListApprovalInboxParams) {
 	h.InboxHandler(w, r)
 }
 

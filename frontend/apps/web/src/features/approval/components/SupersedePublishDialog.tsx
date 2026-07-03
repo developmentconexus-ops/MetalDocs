@@ -23,7 +23,6 @@ const ERROR_MESSAGES: Record<Exclude<DialogState, 'idle' | 'submitting' | 'succe
 
 interface SupersedePublishDialogProps {
   documentId: string;
-  contentHash: string;
   revisionVersion?: number;
   publishedDocumentId?: string;
   onClose: () => void;
@@ -45,7 +44,6 @@ function toDateTimeLocalValue(date: Date): string {
 
 export function SupersedePublishDialog({
   documentId,
-  contentHash,
   revisionVersion,
   publishedDocumentId,
   onClose,
@@ -130,9 +128,9 @@ export function SupersedePublishDialog({
           superseded_document_id: publishedDocumentId,
         }, { ifMatch });
       } else {
-        await publish(documentId, {
-          content_hash: contentHash,
-        }, { ifMatch });
+        // Publish is bodyless on the wire — the server publishes the approved
+        // revision it already holds; only If-Match guards staleness.
+        await publish(documentId, { ifMatch });
       }
 
       setState('success');

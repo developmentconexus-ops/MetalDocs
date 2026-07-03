@@ -4,35 +4,31 @@ import { apiFetch, requestRaw } from '../../../lib/api';
 import type { components } from '../../../lib/api-types';
 import type {
   ApprovalInstance,
-  CancelRequest,
-  CancelResponse,
   ListInboxParams,
   ListInboxResponse,
-  ObsoleteRequest,
-  ObsoleteResponse,
-  PublishRequest,
-  PublishResponse,
-  SchedulePublishRequest,
-  SchedulePublishResponse,
-  SignoffRequest,
-  SignoffResponse,
-  SupersedeRequest,
-  SupersedeResponse,
 } from './approvalTypes';
 
-// FE-03: submit's request/response are now the generated
-// SubmitDocumentRequest/SubmitDocumentResponse (operations['submitDocumentForApproval'],
-// which targets this exact route: POST /documents/{id}/submit). Verified
-// field-for-field identical to the former hand-rolled SubmitRequest/SubmitResponse
-// in approvalTypes.ts. Unlike the other approval mutations below (signoff, publish,
-// schedule-publish, supersede, obsolete, cancel), this route's OpenAPI contract is
-// NOT drifted from its Go handler — those six remain hand-rolled in approvalTypes.ts
-// because api/openapi/v1/openapi.yaml genuinely declares them bodyless
-// (requestBody/response content: never) while their handlers read/write real JSON;
-// that is a contract defect out of this task's scope (backend/openapi are excluded),
-// flagged separately rather than papered over here.
+// Contract-first: every approval mutation's request/response body is the codegen
+// type from api/openapi/v1/openapi.yaml. The six document-mutation contracts
+// (signoff, publish, schedule-publish, supersede, obsolete, cancel) were repaired
+// in 32c5066e (previously declared bodyless while the Go handlers read/wrote real
+// JSON), so their former hand-rolled types in approvalTypes.ts are gone. Wire
+// facts the aliases encode: publish takes NO request body
+// (operations['publishDocument'].requestBody is never), and schedule-publish
+// returns the same PublishDocumentResponse as immediate publish (new_status +
+// optional effective_from — there is no scheduled_at field).
 type SubmitRequest = components['schemas']['SubmitDocumentRequest'];
 type SubmitResponse = components['schemas']['SubmitDocumentResponse'];
+type SignoffRequest = components['schemas']['SignoffDocumentRequest'];
+type SignoffResponse = components['schemas']['SignoffDocumentResponse'];
+type PublishResponse = components['schemas']['PublishDocumentResponse'];
+type SchedulePublishRequest = components['schemas']['SchedulePublishDocumentRequest'];
+type SupersedeRequest = components['schemas']['SupersedeDocumentRequest'];
+type SupersedeResponse = components['schemas']['SupersedeDocumentResponse'];
+type ObsoleteRequest = components['schemas']['ObsoleteDocumentRequest'];
+type ObsoleteResponse = components['schemas']['ObsoleteDocumentResponse'];
+type CancelRequest = components['schemas']['CancelDocumentApprovalRequest'];
+type CancelResponse = components['schemas']['CancelDocumentApprovalResponse'];
 
 const BASE = '/api/v1';
 
@@ -88,10 +84,9 @@ export function signoff(
 
 export function publish(
   documentId: string,
-  body: PublishRequest,
   opts?: MutateOptions,
 ): Promise<PublishResponse> {
-  return mutate('POST', `${BASE}/documents/${documentId}/publish`, body, {
+  return mutate('POST', `${BASE}/documents/${documentId}/publish`, undefined, {
     resourceId: documentId,
     ...opts,
   });
@@ -101,7 +96,7 @@ export function schedulePublish(
   documentId: string,
   body: SchedulePublishRequest,
   opts?: MutateOptions,
-): Promise<SchedulePublishResponse> {
+): Promise<PublishResponse> {
   return mutate('POST', `${BASE}/documents/${documentId}/schedule-publish`, body, {
     resourceId: documentId,
     ...opts,

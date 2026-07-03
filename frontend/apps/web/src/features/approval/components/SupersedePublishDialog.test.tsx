@@ -21,12 +21,11 @@ describe('SupersedePublishDialog', () => {
   it('publish now happy path', async () => {
     const onClose = vi.fn();
     const onSuccess = vi.fn();
-    vi.mocked(approvalApi.publish).mockResolvedValue({ document_id: 'doc-1' });
+    vi.mocked(approvalApi.publish).mockResolvedValue({ document_id: 'doc-1', new_status: 'published' });
 
     render(
       <SupersedePublishDialog
         documentId="doc-1"
-        contentHash="hash-1"
         revisionVersion={3}
         onClose={onClose}
         onSuccess={onSuccess}
@@ -39,7 +38,6 @@ describe('SupersedePublishDialog', () => {
     });
     expect(vi.mocked(approvalApi.publish)).toHaveBeenCalledWith(
       'doc-1',
-      { content_hash: 'hash-1' },
       { ifMatch: '"v3"' },
     );
   });
@@ -49,13 +47,13 @@ describe('SupersedePublishDialog', () => {
     const onSuccess = vi.fn();
     vi.mocked(approvalApi.schedulePublish).mockResolvedValue({
       document_id: 'doc-1',
-      scheduled_at: '2026-04-22T13:10:00.000Z',
+      new_status: 'scheduled',
+      effective_from: '2026-04-22T13:10:00.000Z',
     });
 
     render(
       <SupersedePublishDialog
         documentId="doc-1"
-        contentHash="hash-1"
         revisionVersion={3}
         onClose={onClose}
         onSuccess={onSuccess}
@@ -83,13 +81,13 @@ describe('SupersedePublishDialog', () => {
   it('past date shows validation error and blocks submit', async () => {
     vi.mocked(approvalApi.schedulePublish).mockResolvedValue({
       document_id: 'doc-1',
-      scheduled_at: '2026-04-22T13:10:00.000Z',
+      new_status: 'scheduled',
+      effective_from: '2026-04-22T13:10:00.000Z',
     });
 
     render(
       <SupersedePublishDialog
         documentId="doc-1"
-        contentHash="hash-1"
         revisionVersion={3}
         onClose={vi.fn()}
         onSuccess={vi.fn()}
@@ -108,12 +106,11 @@ describe('SupersedePublishDialog', () => {
   });
 
   it('supersede is mandatory when publishedDocumentId exists', async () => {
-    vi.mocked(approvalApi.supersede).mockResolvedValue({ document_id: 'doc-2' });
+    vi.mocked(approvalApi.supersede).mockResolvedValue({ document_id: 'doc-2', superseded_id: 'doc-published' });
 
     render(
       <SupersedePublishDialog
         documentId="doc-1"
-        contentHash="hash-2"
         revisionVersion={5}
         publishedDocumentId="doc-published"
         onClose={vi.fn()}
@@ -138,13 +135,13 @@ describe('SupersedePublishDialog', () => {
   it('schedule mode communicates replacement when publishedDocumentId exists', async () => {
     vi.mocked(approvalApi.schedulePublish).mockResolvedValue({
       document_id: 'doc-1',
-      scheduled_at: '2026-04-22T13:10:00.000Z',
+      new_status: 'scheduled',
+      effective_from: '2026-04-22T13:10:00.000Z',
     });
 
     render(
       <SupersedePublishDialog
         documentId="doc-1"
-        contentHash="hash-2"
         revisionVersion={5}
         publishedDocumentId="doc-published"
         onClose={vi.fn()}
@@ -162,13 +159,13 @@ describe('SupersedePublishDialog', () => {
   it('sends superseded_document_id when scheduling against an existing published head', async () => {
     vi.mocked(approvalApi.schedulePublish).mockResolvedValue({
       document_id: 'doc-1',
-      scheduled_at: '2026-04-22T13:10:00.000Z',
+      new_status: 'scheduled',
+      effective_from: '2026-04-22T13:10:00.000Z',
     });
 
     render(
       <SupersedePublishDialog
         documentId="doc-approved-1"
-        contentHash="hash-1"
         revisionVersion={2}
         publishedDocumentId="doc-published-1"
         onClose={vi.fn()}
@@ -195,12 +192,11 @@ describe('SupersedePublishDialog', () => {
   });
 
   it('capability gate render', async () => {
-    vi.mocked(approvalApi.publish).mockResolvedValue({ document_id: 'doc-1' });
+    vi.mocked(approvalApi.publish).mockResolvedValue({ document_id: 'doc-1', new_status: 'published' });
 
     render(
       <SupersedePublishDialog
         documentId="doc-1"
-        contentHash="hash-1"
         revisionVersion={3}
         onClose={vi.fn()}
         onSuccess={vi.fn()}
@@ -218,7 +214,6 @@ describe('SupersedePublishDialog', () => {
     render(
       <SupersedePublishDialog
         documentId="doc-approved-1"
-        contentHash="hash-1"
         revisionVersion={2}
         publishedDocumentId="doc-published-1"
         onClose={vi.fn()}
@@ -250,7 +245,6 @@ describe('SupersedePublishDialog', () => {
     render(
       <SupersedePublishDialog
         documentId="doc-approved-1"
-        contentHash="hash-1"
         revisionVersion={2}
         publishedDocumentId="doc-published-1"
         onClose={vi.fn()}

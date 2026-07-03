@@ -32,76 +32,22 @@ export type StageInstance = components['schemas']['ApprovalStageInstanceResponse
 export type StageActor = components['schemas']['ApprovalStageActorResponse'];
 export type Signoff = components['schemas']['ApprovalSignoffRecordResponse'];
 
-export interface InboxItem {
-  instance_id: string;
-  document_id: string;
-  controlled_document_id: string;
-  document_title: string;
-  area_code: string;
-  submitted_by: string;
-  submitted_at: string;
-  stage_label: string;
-  quorum_progress: string;
-}
+// Inbox read shape is generated from components['schemas']['ApprovalInboxItem']/
+// ['ApprovalInboxResponse'] — never hand-rolled. The listApprovalInbox contract
+// was repaired alongside the stage-signoff/cancel-instance operations (same
+// defect class as 32c5066e: handler wrote contracts.InboxResponse while the
+// spec declared a bare 200).
+export type InboxItem = components['schemas']['ApprovalInboxItem'];
 
 // FE-03: SubmitRequest/SubmitResponse (formerly hand-rolled here) moved to
 // approvalApi.ts as aliases of the generated
-// components['schemas']['SubmitDocumentRequest']/['SubmitDocumentResponse'] —
-// that route's contract is not drifted, unlike the six below.
-
-export interface SignoffRequest {
-  decision: 'approve' | 'reject';
-  reason?: string;
-  password: string;
-  content_hash: string;
-}
-
-export interface SignoffResponse {
-  signoff_id: string;
-  was_replay: boolean;
-}
-
-export interface PublishRequest {
-  content_hash: string;
-}
-
-export interface PublishResponse {
-  document_id: string;
-}
-
-export interface SchedulePublishRequest {
-  effective_from: string;
-  superseded_document_id?: string;
-}
-
-export interface SchedulePublishResponse {
-  document_id: string;
-  scheduled_at: string;
-}
-
-export interface SupersedeRequest {
-  superseded_document_id: string;
-}
-
-export interface SupersedeResponse {
-  document_id: string;
-}
-
-export interface ObsoleteRequest {
-  reason: string;
-}
-
-export interface ObsoleteResponse {
-  document_id: string;
-}
-
-export interface CancelRequest {
-  reason: string;
-}
-
-export interface CancelResponse {
-  document_id: string;
-}
+// components['schemas']['SubmitDocumentRequest']/['SubmitDocumentResponse'].
+// The six approval document-mutation pairs (signoff, publish, schedule-publish,
+// supersede, obsolete, cancel) followed once their OpenAPI contracts were
+// repaired (32c5066e declared real request/response bodies) — approvalApi.ts
+// now aliases the generated SignoffDocument*/PublishDocumentResponse/
+// SchedulePublishDocumentRequest/SupersedeDocument*/ObsoleteDocument*/
+// CancelDocumentApproval* schemas. Publish is bodyless on the wire.
 
 export interface ListInboxParams {
   area_code?: string;
@@ -109,7 +55,4 @@ export interface ListInboxParams {
   offset?: number;
 }
 
-export interface ListInboxResponse {
-  items: InboxItem[];
-  total: number;
-}
+export type ListInboxResponse = components['schemas']['ApprovalInboxResponse'];

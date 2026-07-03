@@ -3210,6 +3210,37 @@ export interface components {
             was_replay: boolean;
             outcome: string;
         };
+        SignoffApprovalStageRequest: {
+            /** @enum {string} */
+            decision: "approve" | "reject";
+            /** @description Required when decision is reject. */
+            reason?: string;
+            /** @description Re-authentication password for the signature (password_reauth method). */
+            password_token: string;
+            /** @description SHA-256 hex digest of the content being signed off. */
+            content_hash: string;
+        };
+        ApprovalInboxItem: {
+            /** Format: uuid */
+            instance_id: string;
+            /** Format: uuid */
+            document_id: string;
+            /** Format: uuid */
+            controlled_document_id: string;
+            document_title: string;
+            area_code: string;
+            submitted_by: string;
+            /** Format: date-time */
+            submitted_at: string;
+            stage_label: string;
+            /** @description Human-readable quorum progress for the actor's pending stage, e.g. "1/2". */
+            quorum_progress: string;
+        };
+        ApprovalInboxResponse: {
+            items: components["schemas"]["ApprovalInboxItem"][];
+            /** @description Total pending items for the actor across all pages. */
+            total: number;
+        };
         SchedulePublishDocumentRequest: {
             /**
              * Format: date-time
@@ -6816,14 +6847,20 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignoffApprovalStageRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SignoffDocumentResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -6978,20 +7015,28 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                "If-Match": string;
             };
             path: {
                 instance_id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelDocumentApprovalRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CancelDocumentApprovalResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -7055,7 +7100,12 @@ export interface operations {
     };
     listApprovalInbox: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Filter to a single process area. */
+                area_code?: string;
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7067,7 +7117,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ApprovalInboxResponse"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
