@@ -18,19 +18,32 @@ function New-ModuleConfig {
                 ModuleName = 'templates'
                 RuntimeFile = 'internal/modules/templates/delivery/http/handler.go'
                 RuntimeOwnerFiles = @('internal/modules/templates/delivery/http/handler.go')
-                RuntimePatterns = @('/api/v1/templates', 'generated.ListTemplates', 'generated.GetTemplate')
+                RuntimePatterns = @('templatesapi.HandlerWithOptions', '/api/v1/templates')
                 OpenApiFile = 'api/openapi/v1/openapi.yaml'
-                OpenApiPatterns = @('/api/v1/templates:', '/api/v1/templates/{id}/versions/{n}/submit:', '/api/v1/templates/placeholder-catalog:')
+                # AD-1: spec path keys are relative (servers.url already carries /api/v1).
+                OpenApiPatterns = @('/templates:', '/templates/{id}/versions/{n}/submit:', '/templates/placeholder-catalog:')
                 BackendFile = 'internal/modules/templates/api/api.gen.go'
                 BackendPatterns = @('ListTemplates', 'CreateTemplate', 'GetTemplate', 'SubmitTemplateVersion')
                 FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
-                FrontendTypesPatterns = @('"/api/v1/templates":', '"/api/v1/templates/{id}/versions/{n}/submit":', '"/api/v1/templates/placeholder-catalog":')
+                # Generated index.d.ts keys are also relative (same AD-1 migration).
+                FrontendTypesPatterns = @('"/templates":', '"/templates/{id}/versions/{n}/submit":', '"/templates/placeholder-catalog":')
                 FrontendWrapperFile = 'frontend/apps/web/src/features/templates/api/templates.ts'
                 FrontendWrapperPatterns = @('/api/v1/templates', 'submitForReview', 'approveVersion', 'putTemplateSchemas')
                 RouteFamilies = @('/api/v1/templates')
                 WikiFile = 'wiki/modules/templates.md'
                 UsesGeneratedBoundary = $true
                 OwnedOpenApiPaths = @('/api/v1/templates')
+                # Finite, named, shrink-only allowlist (same idiom as css-token-discipline /
+                # test-discipline) for local wire-adapter types that the F1.4 contract
+                # (docs/superpowers/milestones/global-maximum-remediation/milestone-1-contract-fe-gates/
+                # validation-contract.md, F1.4 Part B) explicitly adjudicated as genuine local
+                # view types, NOT overrides of a generated schema — the generated DTO types
+                # placeholder_schema as untyped JSON, so a local wire-format view type is
+                # required at that one call site. NOT a general escape hatch: adding an entry
+                # here requires the same explicit adjudication F1.4 gave these two. Owner:
+                # Leandro; trigger: remove an entry only when the type is deleted or replaced
+                # by a generated shape (never add without an equivalent recorded decision).
+                FrontendTypeAllowlist = @('TemplateSchemas', 'WirePlaceholder')
             }
         }
         'approval' {
@@ -72,7 +85,10 @@ function New-ModuleConfig {
         'documents' {
             return @{
                 ModuleName = 'documents'
-                RuntimeFile = 'internal/modules/documents/module.go'
+                # Runtime-truth (verified): the generated-boundary mount call
+                # (documentsapi.HandlerWithOptions) lives in delivery/http/handler.go,
+                # not module.go (module.go only wires deps + calls RegisterRoutes).
+                RuntimeFile = 'internal/modules/documents/delivery/http/handler.go'
                 RuntimeOwnerFiles = @(
                     'internal/modules/documents/delivery/http/handler.go',
                     'internal/modules/documents/delivery/http/export_handler.go',
@@ -81,15 +97,21 @@ function New-ModuleConfig {
                     'internal/modules/documents/http/reconstruct_handler.go',
                     'internal/modules/documents/http/view_handler.go'
                 )
-                RuntimePatterns = @('documentsapi.HandlerWithOptions', 'NewGeneratedServerAdapter', 'buildLegacyMux')
+                RuntimePatterns = @('documentsapi.HandlerWithOptions')
                 RuntimeForbiddenPatterns = @('mux.HandleFunc("GET /api/v1/documents"', 'mux.HandleFunc("POST /api/v1/documents/{id}/finalize"')
                 OpenApiFile = 'api/openapi/v1/openapi.yaml'
-                OpenApiPatterns = @('/api/v1/documents:', '/api/v1/documents/{id}:', '/api/v1/documents/{id}/finalize:')
-                OpenApiForbiddenPatterns = @("`n  /documents:")
+                # AD-1: spec path keys are relative.
+                OpenApiPatterns = @('/documents:', '/documents/{id}:', '/documents/{id}/finalize:')
+                # The old forbid ("`n  /documents:") matched the CORRECT relative key
+                # post-AD-1, inverting the check (it would always DRIFT on a clean spec).
+                # No legacy-duplicate hazard remains: PATH-BASE-PREFIX (scripts/api-lint)
+                # already rejects any /api/v1-prefixed path key, so an absolute-form
+                # duplicate cannot exist in a passing spec. Forbid retired.
+                OpenApiForbiddenPatterns = @()
                 BackendFile = 'internal/modules/documents/api/api.gen.go'
                 BackendPatterns = @('ListDocuments', 'GetDocument', 'FinalizeDocument')
                 FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
-                FrontendTypesPatterns = @('"/api/v1/documents":', '"/api/v1/documents/{id}":', '"/api/v1/documents/{id}/finalize":')
+                FrontendTypesPatterns = @('"/documents":', '"/documents/{id}":', '"/documents/{id}/finalize":')
                 FrontendWrapperFile = 'frontend/apps/web/src/features/documents/api/documents.ts'
                 FrontendWrapperPatterns = @('/api/v1/documents', 'listDocuments', 'getDocument', 'finalizeDocument')
                 RouteFamilies = @('/api/v1/documents')
@@ -106,11 +128,12 @@ function New-ModuleConfig {
                 RuntimePatterns = @('/api/v1/controlled-documents', 'controlleddocumentsapi.HandlerWithOptions', 'ErrorHandlerFunc')
                 RuntimeForbiddenPatterns = @('mux.Handle("GET /api/v1/controlled-documents", generated.ListControlledDocuments', 'mux.Handle("GET /api/v1/controlled-documents/{id}", generated.GetControlledDocument')
                 OpenApiFile = 'api/openapi/v1/openapi.yaml'
-                OpenApiPatterns = @('/api/v1/controlled-documents:', '/api/v1/controlled-documents/{id}:', '/api/v1/controlled-documents/{id}/revisions:')
+                # AD-1: spec path keys are relative.
+                OpenApiPatterns = @('/controlled-documents:', '/controlled-documents/{id}:', '/controlled-documents/{id}/revisions:')
                 BackendFile = 'internal/modules/controlleddocuments/api/api.gen.go'
                 BackendPatterns = @('ListControlledDocuments', 'AtomicCreateControlledDocument', 'GetControlledDocument')
                 FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
-                FrontendTypesPatterns = @('"/api/v1/controlled-documents":', '"/api/v1/controlled-documents/{id}":', '"/api/v1/controlled-documents/{id}/revisions":')
+                FrontendTypesPatterns = @('"/controlled-documents":', '"/controlled-documents/{id}":', '"/controlled-documents/{id}/revisions":')
                 FrontendWrapperFile = 'frontend/apps/web/src/features/controlled-documents/api/controlledDocuments.ts'
                 FrontendWrapperPatterns = @('/api/v1/controlled-documents', 'fetchControlledDocuments', 'createControlledDocumentAtomic')
                 RouteFamilies = @('/api/v1/controlled-documents')
@@ -127,11 +150,11 @@ function New-ModuleConfig {
                 RuntimePatterns = @('/api/v1/controlled-documents', 'controlleddocumentsapi.HandlerWithOptions', 'ErrorHandlerFunc')
                 RuntimeForbiddenPatterns = @('mux.Handle("GET /api/v1/controlled-documents", generated.ListControlledDocuments', 'mux.Handle("GET /api/v1/controlled-documents/{id}", generated.GetControlledDocument')
                 OpenApiFile = 'api/openapi/v1/openapi.yaml'
-                OpenApiPatterns = @('/api/v1/controlled-documents:', '/api/v1/controlled-documents/{id}:', '/api/v1/controlled-documents/{id}/revisions:')
+                OpenApiPatterns = @('/controlled-documents:', '/controlled-documents/{id}:', '/controlled-documents/{id}/revisions:')
                 BackendFile = 'internal/modules/controlleddocuments/api/api.gen.go'
                 BackendPatterns = @('ListControlledDocuments', 'AtomicCreateControlledDocument', 'GetControlledDocument')
                 FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
-                FrontendTypesPatterns = @('"/api/v1/controlled-documents":', '"/api/v1/controlled-documents/{id}":', '"/api/v1/controlled-documents/{id}/revisions":')
+                FrontendTypesPatterns = @('"/controlled-documents":', '"/controlled-documents/{id}":', '"/controlled-documents/{id}/revisions":')
                 FrontendWrapperFile = 'frontend/apps/web/src/features/controlled-documents/api/controlledDocuments.ts'
                 FrontendWrapperPatterns = @('/api/v1/controlled-documents', 'fetchControlledDocuments', 'createControlledDocumentAtomic')
                 RouteFamilies = @('/api/v1/controlled-documents')
@@ -148,13 +171,17 @@ function New-ModuleConfig {
                 RuntimePatterns = @('taxonomyapi.HandlerWithOptions', 'BaseRouter: mux')
                 RuntimeForbiddenPatterns = @('mux.HandleFunc("GET /api/v1/taxonomy/profiles"', 'mux.HandleFunc("POST /api/v1/taxonomy/families"')
                 OpenApiFile = 'api/openapi/v1/openapi.yaml'
-                OpenApiPatterns = @('/api/v1/taxonomy/profiles:', '/api/v1/taxonomy/areas:', '/api/v1/taxonomy/families:')
+                # AD-1: spec path keys are relative.
+                OpenApiPatterns = @('/taxonomy/profiles:', '/taxonomy/areas:', '/taxonomy/families:')
                 BackendFile = 'internal/modules/taxonomy/api/api.gen.go'
                 BackendPatterns = @('ListTaxonomyProfiles', 'ListTaxonomyAreas', 'ListTaxonomyFamilies')
                 FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
-                FrontendTypesPatterns = @('"/api/v1/taxonomy/profiles":', '"/api/v1/taxonomy/areas":', '"/api/v1/taxonomy/families":')
+                FrontendTypesPatterns = @('"/taxonomy/profiles":', '"/taxonomy/areas":', '"/taxonomy/families":')
                 FrontendWrapperFile = 'frontend/apps/web/src/features/taxonomy/api/taxonomy.ts'
-                FrontendWrapperPatterns = @('const BASE = "/api/v1/taxonomy"', '/profiles', '/areas', '/families')
+                # Wrapper now calls the generated `api` client (openapi-fetch) with
+                # relative operation paths directly (api.GET("/taxonomy/profiles", ...))
+                # instead of a hand-rolled BASE constant.
+                FrontendWrapperPatterns = @('api.GET("/taxonomy/profiles"', 'api.GET("/taxonomy/areas"', 'api.GET("/taxonomy/families"')
                 RouteFamilies = @('/api/v1/taxonomy')
                 OwnedOpenApiPaths = @('/api/v1/taxonomy/profiles', '/api/v1/taxonomy/areas', '/api/v1/taxonomy/families')
                 UsesGeneratedBoundary = $true
@@ -328,7 +355,10 @@ function Test-RuntimeRoutesHaveOpenApiPaths {
 }
 
 function Test-FrontendGeneratedTypeUsage {
-    param([string]$RelativePath)
+    param(
+        [string]$RelativePath,
+        [string[]]$Allowlist = @()
+    )
     $fullPath = Join-Path $root $RelativePath
     if (-not (Test-Path $fullPath)) {
         return @{ Status = 'MISSING'; Detail = $RelativePath }
@@ -336,11 +366,30 @@ function Test-FrontendGeneratedTypeUsage {
 
     $content = Get-Content $fullPath -Raw
     $customInterfaces = [regex]::Matches($content, '(?m)^\s*(export\s+)?interface\s+([A-Za-z_][A-Za-z0-9_]*)\b')
-    $customTypeAliases = [regex]::Matches($content, '(?m)^\s*(export\s+)?type\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?!.*(?:paths|components)\[).+$')
+    # Allow-list for generated-derived type aliases (F1.3 reconciliation):
+    #   - `paths[...]` / `components[...]` / `operations[...]` — direct generated-index access.
+    #   - `NonNullable<...>` wrapping any of the above (e.g. NonNullable<operations['x']['parameters']['query']>).
+    #   - `<GeneratedAlias>['prop']` — an indexed-access off another local alias (itself expected
+    #     to be generated-derived, e.g. `VersionDTO['status']` where VersionDTO = components[...]).
+    #     The regex can't chase the transitive definition, so it allow-lists the *shape*
+    #     (bare identifier immediately followed by an indexed-access); this still requires a
+    #     literal `['...']` / `[...]` on the RHS, so it does not blanket-exempt arbitrary aliases.
+    $genericAllow = '(?:NonNullable<\s*)?(?:paths|components|operations)\[|[A-Za-z_][A-Za-z0-9_]*\[[''"]'
+    $customTypeAliases = [regex]::Matches($content, "(?m)^\s*(export\s+)?type\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?!.*(?:$genericAllow)).+`$")
     $driftItems = New-Object System.Collections.Generic.List[string]
+    $allowSet = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($name in $Allowlist) { [void]$allowSet.Add($name) }
 
-    foreach ($m in $customInterfaces) { $driftItems.Add("interface $($m.Groups[2].Value)") }
-    foreach ($m in $customTypeAliases) { $driftItems.Add("type $($m.Groups[2].Value)") }
+    foreach ($m in $customInterfaces) {
+        $name = $m.Groups[2].Value
+        if ($allowSet.Contains($name)) { continue }
+        $driftItems.Add("interface $name")
+    }
+    foreach ($m in $customTypeAliases) {
+        $name = $m.Groups[2].Value
+        if ($allowSet.Contains($name)) { continue }
+        $driftItems.Add("type $name")
+    }
 
     if ($driftItems.Count -gt 0) {
         return @{ Status = 'DRIFT'; Detail = "$RelativePath handwritten frontend types: $($driftItems -join ', ')" }
@@ -590,7 +639,7 @@ if ($runtimeOwnerResult.Status -ne 'OK') {
 }
 Write-Host ("[{0}] {1} - {2}" -f $runtimeOwnerResult.Status, 'freeze: runtime routes without OpenAPI paths', $runtimeOwnerResult.Detail)
 
-$frontendTypeDriftResult = Test-FrontendGeneratedTypeUsage -RelativePath $config.FrontendWrapperFile
+$frontendTypeDriftResult = Test-FrontendGeneratedTypeUsage -RelativePath $config.FrontendWrapperFile -Allowlist $config.FrontendTypeAllowlist
 if ($frontendTypeDriftResult.Status -ne 'OK') {
     $hasIssues = $true
 }
