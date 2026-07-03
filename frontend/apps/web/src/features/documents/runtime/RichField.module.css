@@ -4,10 +4,10 @@
 }
 
 .editorShell {
-  border: 1px solid color-mix(in srgb, var(--brand) 14%, var(--cinza-300) 86%);
+  border: 1px solid color-mix(in srgb, var(--brand) 14%, var(--border-strong) 86%);
   border-radius: 16px;
   overflow: hidden;
-  background: var(--white);
+  background: var(--surface);
 }
 
 .toolbar {
@@ -36,10 +36,10 @@
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  border: 1px solid color-mix(in srgb, var(--brand) 14%, var(--cinza-300) 86%);
+  border: 1px solid color-mix(in srgb, var(--brand) 14%, var(--border-strong) 86%);
   border-radius: 999px;
   padding: 0.55rem 0.85rem;
-  background: color-mix(in srgb, var(--white) 92%, var(--brand) 8%);
+  background: color-mix(in srgb, var(--surface) 92%, var(--brand) 8%);
   color: var(--brand-deep);
   font: inherit;
   font-weight: 700;
@@ -99,7 +99,7 @@
 
 .editorBody :global(.ProseMirror th),
 .editorBody :global(.ProseMirror td) {
-  border: 1px solid color-mix(in srgb, var(--brand) 14%, var(--cinza-300) 86%);
+  border: 1px solid color-mix(in srgb, var(--brand) 14%, var(--border-strong) 86%);
   padding: 0.5rem 0.65rem;
 }
 
