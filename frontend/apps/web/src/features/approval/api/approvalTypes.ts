@@ -44,16 +44,10 @@ export interface InboxItem {
   quorum_progress: string;
 }
 
-export interface SubmitRequest {
-  route_id: string;
-  content_hash: string;
-}
-
-export interface SubmitResponse {
-  instance_id: string;
-  was_replay: boolean;
-  etag: string;
-}
+// FE-03: SubmitRequest/SubmitResponse (formerly hand-rolled here) moved to
+// approvalApi.ts as aliases of the generated
+// components['schemas']['SubmitDocumentRequest']/['SubmitDocumentResponse'] —
+// that route's contract is not drifted, unlike the six below.
 
 export interface SignoffRequest {
   decision: 'approve' | 'reject';

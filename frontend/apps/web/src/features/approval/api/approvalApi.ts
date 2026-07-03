@@ -1,6 +1,7 @@
 import { etagCache } from './etagCache';
 import { mutate, type MutateOptions } from './mutationClient';
 import { apiFetch, requestRaw } from '../../../lib/api';
+import type { components } from '../../../lib/api-types';
 import type {
   ApprovalInstance,
   CancelRequest,
@@ -15,11 +16,23 @@ import type {
   SchedulePublishResponse,
   SignoffRequest,
   SignoffResponse,
-  SubmitRequest,
-  SubmitResponse,
   SupersedeRequest,
   SupersedeResponse,
 } from './approvalTypes';
+
+// FE-03: submit's request/response are now the generated
+// SubmitDocumentRequest/SubmitDocumentResponse (operations['submitDocumentForApproval'],
+// which targets this exact route: POST /documents/{id}/submit). Verified
+// field-for-field identical to the former hand-rolled SubmitRequest/SubmitResponse
+// in approvalTypes.ts. Unlike the other approval mutations below (signoff, publish,
+// schedule-publish, supersede, obsolete, cancel), this route's OpenAPI contract is
+// NOT drifted from its Go handler — those six remain hand-rolled in approvalTypes.ts
+// because api/openapi/v1/openapi.yaml genuinely declares them bodyless
+// (requestBody/response content: never) while their handlers read/write real JSON;
+// that is a contract defect out of this task's scope (backend/openapi are excluded),
+// flagged separately rather than papered over here.
+type SubmitRequest = components['schemas']['SubmitDocumentRequest'];
+type SubmitResponse = components['schemas']['SubmitDocumentResponse'];
 
 const BASE = '/api/v1';
 

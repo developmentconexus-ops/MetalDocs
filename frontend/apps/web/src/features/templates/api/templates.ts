@@ -13,6 +13,22 @@ type CreateTemplateResponse =
 type ListTemplatesQuery = NonNullable<operations['listTemplates']['parameters']['query']>;
 type GeneratedTemplateDTO = components['schemas']['TemplateDTO'];
 type GeneratedVersionDTO = components['schemas']['VersionDTO'];
+// FE-15: response envelopes derived from the generated operations so the
+// envelope-vs-flat shape can never drift from api/openapi. Verified 1:1
+// against the Go handlers (internal/modules/templates/delivery/http/*.go):
+// getTemplate -> {data:{template,latest_version}}; getDocxURL -> {data:{url}};
+// submit/review -> TemplateVersionEnvelope {data:{version}}; approve ->
+// ApproveTemplateVersionResponse {data:{version}}; updateTemplateSchema ->
+// {data:{version}}.
+type GetTemplateResponse = operations['getTemplate']['responses'][200]['content']['application/json'];
+type GetTemplateDocxUrlResponse =
+  operations['getTemplateDocxUrl']['responses'][200]['content']['application/json'];
+type TemplateVersionEnvelope =
+  operations['submitTemplateVersion']['responses'][200]['content']['application/json'];
+type ApproveTemplateVersionResponse =
+  operations['approveTemplateVersion']['responses'][200]['content']['application/json'];
+type UpdateTemplateSchemaResponse =
+  operations['updateTemplateSchema']['responses'][200]['content']['application/json'];
 
 export type TemplateDTO = Omit<
   GeneratedTemplateDTO,
@@ -84,12 +100,11 @@ export async function createTemplate(cmd: {
     idempotencyKey: cmd.idempotencyKey,
     body: JSON.stringify(payload),
   });
-  const template = body.data.template as TemplateDTO;
-  const version = body.data.version as VersionDTO;
+  const { template, version } = body.data;
   if (!template || !version) {
     throw new Error('Resposta de criação de template não trouxe os dados esperados.');
   }
-  return { template, version };
+  return { template: template as TemplateDTO, version: version as VersionDTO };
 }
 
 export async function listTemplates(params?: {
@@ -117,10 +132,8 @@ export async function listTemplates(params?: {
 }
 
 export async function getTemplate(id: string): Promise<{ template: TemplateDTO; latest_version: VersionDTO }> {
-  const body = await apiFetch<{ data: { template: TemplateDTO; latest_version: VersionDTO } }>(
-    `/api/v1/templates/${id}`,
-  );
-  return body.data;
+  const body = await apiFetch<GetTemplateResponse>(`/api/v1/templates/${id}`);
+  return body.data as { template: TemplateDTO; latest_version: VersionDTO };
 }
 
 // F1.2 / ADR 0035 — flat typed bodies, no { data: { ... } } envelope.
@@ -180,7 +193,7 @@ export async function importTemplateDocx(
 }
 
 export async function getDocxURL(templateId: string, versionNum: number): Promise<string> {
-  const body = await apiFetch<{ data: { url: string } }>(
+  const body = await apiFetch<GetTemplateDocxUrlResponse>(
     `/api/v1/templates/${templateId}/versions/${versionNum}/docx-url`,
   );
   return body.data.url;
@@ -191,11 +204,11 @@ export async function submitForReview(
   versionNum: number,
   idempotencyKey: string,
 ): Promise<VersionDTO> {
-  const data = await apiFetch<{ data: { version: VersionDTO } }>(
+  const data = await apiFetch<TemplateVersionEnvelope>(
     `/api/v1/templates/${templateId}/versions/${versionNum}/submit`,
     { method: 'POST', idempotencyKey },
   );
-  return data.data.version;
+  return data.data.version as VersionDTO;
 }
 
 export async function reviewVersion(
@@ -205,11 +218,11 @@ export async function reviewVersion(
   idempotencyKey: string,
   reason?: string,
 ): Promise<VersionDTO> {
-  const data = await apiFetch<{ data: { version: VersionDTO } }>(
+  const data = await apiFetch<TemplateVersionEnvelope>(
     `/api/v1/templates/${templateId}/versions/${versionNum}/review`,
     { method: 'POST', idempotencyKey, body: JSON.stringify({ accept, reason: reason || '' }) },
   );
-  return data.data.version;
+  return data.data.version as VersionDTO;
 }
 
 export async function approveVersion(
@@ -219,16 +232,15 @@ export async function approveVersion(
   idempotencyKey: string,
   reason?: string,
 ): Promise<VersionDTO> {
-  const data = await apiFetch<{
-    data: {
-      version: VersionDTO;
-    };
-  }>(`/api/v1/templates/${templateId}/versions/${versionNum}/approve`, {
-    method: 'POST',
-    idempotencyKey,
-    body: JSON.stringify({ accept, reason: reason || '' }),
-  });
-  return data.data.version;
+  const data = await apiFetch<ApproveTemplateVersionResponse>(
+    `/api/v1/templates/${templateId}/versions/${versionNum}/approve`,
+    {
+      method: 'POST',
+      idempotencyKey,
+      body: JSON.stringify({ accept, reason: reason || '' }),
+    },
+  );
+  return data.data.version as VersionDTO;
 }
 
 // Wire-format types (backend snake_case)
@@ -296,6 +308,19 @@ export function deriveTemplateSchemas(
   };
 }
 
+// Thrown when the PUT .../schema 200 response doesn't carry a numeric
+// lock_version. FE-15: previously this case silently guessed
+// `expectedLockVersion + 1`, which can mask real concurrent-write drift (the
+// caller would believe its optimistic lock advanced by exactly one when the
+// server's actual value could differ). Fail loud instead so the editor
+// surfaces a hard error rather than silently trusting a fabricated CAS token.
+export class SchemaSaveResponseShapeError extends Error {
+  constructor(message?: string) {
+    super(message ?? 'Resposta inesperada ao salvar o schema do template: lock_version ausente.');
+    this.name = 'SchemaSaveResponseShapeError';
+  }
+}
+
 export async function putTemplateSchemas(
   templateId: string,
   versionNum: number,
@@ -303,7 +328,7 @@ export async function putTemplateSchemas(
   expectedLockVersion: number,
 ): Promise<{ lockVersion: number }> {
   try {
-    const body = await apiFetch<{ data?: { version?: { lock_version?: number } } }>(
+    const body = await apiFetch<UpdateTemplateSchemaResponse>(
       `/api/v1/templates/${templateId}/versions/${versionNum}/schema`,
       {
         method: 'PUT',
@@ -315,7 +340,10 @@ export async function putTemplateSchemas(
       },
     );
     const next = body?.data?.version?.lock_version;
-    return { lockVersion: typeof next === 'number' ? next : expectedLockVersion + 1 };
+    if (typeof next !== 'number') {
+      throw new SchemaSaveResponseShapeError();
+    }
+    return { lockVersion: next };
   } catch (err) {
     // The optimistic-lock conflict surfaces as RFC 9457 412/CONCURRENT_MODIFICATION
     // through the shared transport; re-raise as the typed domain error so the

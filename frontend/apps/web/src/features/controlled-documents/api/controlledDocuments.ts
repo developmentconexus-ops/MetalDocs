@@ -1,8 +1,19 @@
 import { apiFetch, ApiError } from "../../../lib/api";
-import type { components } from "../../../lib/api-types";
+import type { components, operations } from "../../../lib/api-types";
 import type { ControlledDocument } from "../types";
 
 const BASE = "/api/v1/controlled-documents";
+
+// FE-03: response type derived from the generated operation instead of a
+// hand-rolled `{ items: ControlledDocument[] }` inline type. The hand-rolled
+// version silently dropped the `page` cursor field from its type (the field
+// was present on the wire but invisible to callers/tsc). Verified against
+// internal/modules/controlleddocuments/delivery/http/routes.go
+// ListControlledDocuments, which writes ListControlledDocuments200JSONResponse
+// { Items, Page: {NextCursor, HasMore} } — a flat, non-enveloped body matching
+// operations['listControlledDocuments'] exactly.
+type ListControlledDocumentsResponse =
+  operations["listControlledDocuments"]["responses"][200]["content"]["application/json"];
 
 export async function fetchControlledDocuments(filter?: {
   profileCode?: string;
@@ -18,9 +29,9 @@ export async function fetchControlledDocuments(filter?: {
   if (filter?.limit != null) params.set("limit", String(filter.limit));
   if (filter?.cursor) params.set("cursor", filter.cursor);
   const qs = params.toString() ? `?${params.toString()}` : "";
-  // FD-2: response is now { items, page:{ next_cursor, has_more } }; this helper
+  // FD-2: response is { items, page:{ next_cursor, has_more } }; this helper
   // returns the first page's items (no paginated CD UI consumes the cursor yet).
-  const res = await apiFetch<{ items: ControlledDocument[] }>(`${BASE}${qs}`);
+  const res = await apiFetch<ListControlledDocumentsResponse>(`${BASE}${qs}`);
   return res.items;
 }
 
