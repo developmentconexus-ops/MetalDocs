@@ -40,6 +40,14 @@ BEGIN;
 ALTER TABLE public.templates_template
   ADD COLUMN updated_at timestamp with time zone NOT NULL DEFAULT now();
 
+-- The capability tripwire (trg_require_cap_asserted) fires on every
+-- templates_template UPDATE and requires metaldocs.asserted_caps to name one
+-- of the template.* capabilities — including for this migration's backfill
+-- when rows already exist (fresh baseline replays seed a template before
+-- migrations run; proven 2026-07-03, SQLSTATE P0001). Assert tx-locally,
+-- mirroring db/reference-data/0001_product_reference_data.sql.
+SELECT set_config('metaldocs.asserted_caps', '[{"cap":"template.edit"}]', true);
+
 -- Backfill existing rows to created_at (best-known "last touched" value).
 UPDATE public.templates_template
    SET updated_at = created_at;

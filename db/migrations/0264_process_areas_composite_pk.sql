@@ -37,12 +37,18 @@
 -- constraint shape — swapping the PK does not touch RLS policy definitions
 -- and the policy continues to apply identically after this migration.
 --
--- Mechanics: drop document_process_areas_pkey (code), drop the
--- now-fully-redundant ux_process_areas_tenant_code unique index (the new PK
--- provides the same (tenant_id, code) uniqueness + index), add a new PK
--- named document_process_areas_pkey on (tenant_id, code). Postgres auto-backs
--- the new PK with its own unique index, so there is no gap in query-plan
--- support for tenant-filtered code lookups.
+-- Mechanics: drop document_process_areas_pkey (code), then PROMOTE the
+-- existing ux_process_areas_tenant_code unique index into the new PK via
+-- ADD CONSTRAINT ... PRIMARY KEY USING INDEX. A plain DROP INDEX +
+-- ADD PRIMARY KEY sequence is NOT applyable: all five inbound composite FKs
+-- are bound to that index (pg_constraint.conindid), so DROP INDEX fails with
+-- SQLSTATE 2BP01 ("other objects depend on it") — proven on a fresh
+-- baseline replay 2026-07-03. USING INDEX keeps the index OID (FK bindings
+-- survive untouched) and Postgres renames the index to the constraint name,
+-- so the end state is identical to a fresh composite-PK creation: PK
+-- document_process_areas_pkey on (tenant_id, code), no redundant second
+-- index, no gap in query-plan support for tenant-filtered code lookups.
+-- Both columns are already NOT NULL in the baseline (0001 line 1050/1055).
 --
 -- Safety class: ACCESS EXCLUSIVE lock on metaldocs.document_process_areas
 -- for the duration of the migration (DROP CONSTRAINT + ADD CONSTRAINT
@@ -68,13 +74,11 @@ BEGIN;
 ALTER TABLE ONLY metaldocs.document_process_areas
     DROP CONSTRAINT document_process_areas_pkey;
 
-DROP INDEX IF EXISTS metaldocs.ux_process_areas_tenant_code;
-
 ALTER TABLE ONLY metaldocs.document_process_areas
-    ADD CONSTRAINT document_process_areas_pkey PRIMARY KEY (tenant_id, code);
+    ADD CONSTRAINT document_process_areas_pkey PRIMARY KEY USING INDEX ux_process_areas_tenant_code;
 
 INSERT INTO public.schema_migrations (version, description)
-VALUES ('0264', 'DB-08 (T-015/R-015) half A: promote metaldocs.document_process_areas PK from (code) to (tenant_id, code); drop redundant ux_process_areas_tenant_code unique index (superseded by the new PK''s backing index). All 5 inbound FKs were already composite (tenant_id, *) — zero re-pointing required. document_profiles half deferred (no DDL), see wiki/modules/taxonomy-tech-debt.md T-015 design note.')
+VALUES ('0264', 'DB-08 (T-015/R-015) half A: promote metaldocs.document_process_areas PK from (code) to (tenant_id, code) by converting the ux_process_areas_tenant_code unique index into the PK''s backing index (PRIMARY KEY USING INDEX — keeps the index OID so the 5 inbound composite FKs bound to it stay valid; index renamed to document_process_areas_pkey). document_profiles half deferred (no DDL), see wiki/modules/taxonomy-tech-debt.md T-015 design note.')
 ON CONFLICT (version) DO NOTHING;
 
 COMMIT;
