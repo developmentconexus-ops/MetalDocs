@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"metaldocs/tests/integration/fixtures"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -23,8 +22,8 @@ func TestMigration0153_TenantMismatchRejected(t *testing.T) {
 	docID := testdb.DeterministicID(t, "doc")
 	userID := testdb.DeterministicID(t, "user")
 
-	fixtures.SeedUser(t, ctx, db, schema, userID, "Tenant Mismatch User")
-	fixtures.SeedDocument(t, ctx, db, schema, docID, tenantA, userID)
+	testdb.SeedUser(t, ctx, db, schema, userID, "Tenant Mismatch User")
+	testdb.SeedDocument(t, ctx, db, schema, docID, tenantA, userID)
 
 	_, err := db.ExecContext(ctx,
 		`INSERT INTO `+testdb.Qualified(schema, "document_placeholder_values")+`
@@ -52,8 +51,8 @@ func TestMigration0153_TenantMatchAccepted(t *testing.T) {
 	docID := testdb.DeterministicID(t, "doc")
 	userID := testdb.DeterministicID(t, "user")
 
-	fixtures.SeedUser(t, ctx, db, schema, userID, "Tenant Match User")
-	fixtures.SeedDocument(t, ctx, db, schema, docID, tenantA, userID)
+	testdb.SeedUser(t, ctx, db, schema, userID, "Tenant Match User")
+	testdb.SeedDocument(t, ctx, db, schema, docID, tenantA, userID)
 
 	_, err := db.ExecContext(ctx,
 		`INSERT INTO `+testdb.Qualified(schema, "document_placeholder_values")+`
@@ -77,8 +76,8 @@ func TestMigration0153_ZoneContentTenantMismatchRejected(t *testing.T) {
 	docID := testdb.DeterministicID(t, "doc")
 	userID := testdb.DeterministicID(t, "user")
 
-	fixtures.SeedUser(t, ctx, db, schema, userID, "Zone Mismatch User")
-	fixtures.SeedDocument(t, ctx, db, schema, docID, tenantA, userID)
+	testdb.SeedUser(t, ctx, db, schema, userID, "Zone Mismatch User")
+	testdb.SeedDocument(t, ctx, db, schema, docID, tenantA, userID)
 
 	_, err := db.ExecContext(ctx,
 		`INSERT INTO `+testdb.Qualified(schema, "document_editable_zone_content")+`

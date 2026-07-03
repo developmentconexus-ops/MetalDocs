@@ -14,7 +14,6 @@ import (
 	"sync"
 	"testing"
 
-	"metaldocs/tests/integration/fixtures"
 	"metaldocs/tests/integration/testdb"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -79,8 +78,8 @@ func runSingleOCCRace(t *testing.T, ctx context.Context, db *sql.DB, suffix stri
 	docID := testdb.DeterministicID(t, "doc-"+suffix)
 	userID := testdb.DeterministicID(t, "user-"+suffix)
 
-	fixtures.SeedUser(t, ctx, db, "metaldocs", userID, "Race User")
-	fixtures.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, userID)
+	testdb.SeedUser(t, ctx, db, "metaldocs", userID, "Race User")
+	testdb.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, userID)
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.documents WHERE id = $1::uuid`, docID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE tenant_id = $1::uuid`, tenantID)
@@ -335,10 +334,10 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 	instanceID := testdb.DeterministicID(t, "instance-signoff")
 	stageID := testdb.DeterministicID(t, "stage-signoff")
 
-	fixtures.SeedUser(t, ctx, db, "metaldocs", authorID, "Doc Author")
-	fixtures.SeedUser(t, ctx, db, "metaldocs", actorID, "Signer")
-	fixtures.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, authorID)
-	fixtures.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "INT_SIGNOFF")
+	testdb.SeedUser(t, ctx, db, "metaldocs", authorID, "Doc Author")
+	testdb.SeedUser(t, ctx, db, "metaldocs", actorID, "Signer")
+	testdb.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, authorID)
+	testdb.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "INT_SIGNOFF")
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_signoffs WHERE approval_instance_id = $1::uuid`, instanceID)

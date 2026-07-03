@@ -6,6 +6,7 @@ package testdb
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 )
 
@@ -320,4 +321,62 @@ func SeedSystemAdmin(t *testing.T, db *sql.DB, tenantID, userID, displayName str
 		)
 		return err
 	})
+}
+
+// ---------------------------------------------------------------------------
+// Caller-controlled-ID seeders (folded in from tests/integration/fixtures/seed.go,
+// TST-12) — deterministic-ID variants used by callers that pin exact IDs (e.g.
+// via DeterministicID) instead of taking factory-minted UUIDs. Prefer the New*
+// builders above for new tests; these exist for callers that need a specific
+// ID/tenant pairing without the CD-governed lineage NewDocument requires.
+// ---------------------------------------------------------------------------
+
+// SeedUser inserts an iam_users row with a caller-supplied user ID. SEC-05 /
+// migration 0259: iam_users carries trg_require_cap_asserted (user.manage) on
+// INSERT — asserted tx-locally via seedWithCaps (pool-safe, matches the
+// production authz layer).
+func SeedUser(t *testing.T, ctx context.Context, db *sql.DB, schema, userID, displayName string) {
+	t.Helper()
+	seedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, fmt.Sprintf(`
+			INSERT INTO %s (user_id, display_name, is_active, created_at, updated_at)
+			VALUES ($1, $2, true, now(), now())
+			ON CONFLICT (user_id) DO NOTHING`,
+			Qualified(schema, "iam_users")),
+			userID, displayName,
+		)
+		return err
+	})
+}
+
+// SeedDocument inserts a minimal documents row with a caller-supplied document
+// ID (no CD-governed lineage — use NewDocument when the test needs a
+// controlled_documents parent).
+func SeedDocument(t *testing.T, ctx context.Context, db *sql.DB, schema, docID, tenantID, createdBy string) {
+	t.Helper()
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s (id, tenant_id, name, status, created_by, revision_version, created_at, updated_at)
+		VALUES ($1::uuid, $2::uuid, 'Test Document', 'draft', $3, 1, now(), now())
+		ON CONFLICT (id) DO NOTHING`,
+		Qualified(schema, "documents")),
+		docID, tenantID, createdBy,
+	); err != nil {
+		t.Fatalf("SeedDocument: %v", err)
+	}
+}
+
+// SeedRouteConfig inserts a minimal approval_routes row with a caller-supplied
+// route ID (no owner/taxonomy auto-wiring — use NewApprovalRoute when the test
+// needs a governed profile chain).
+func SeedRouteConfig(t *testing.T, ctx context.Context, db *sql.DB, schema, routeID, tenantID, profileCode string) {
+	t.Helper()
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO %s (id, tenant_id, name, profile_code, active, created_at, updated_at)
+		VALUES ($1::uuid, $2::uuid, 'Test Route', $3, true, now(), now())
+		ON CONFLICT (id) DO NOTHING`,
+		Qualified(schema, "approval_routes")),
+		routeID, tenantID, profileCode,
+	); err != nil {
+		t.Fatalf("SeedRouteConfig: %v", err)
+	}
 }

@@ -12,15 +12,35 @@ set -euo pipefail
 # This list MUST only shrink over time; additions require operator approval + reason.
 # ---------------------------------------------------------------------------
 # R3 allowlist (hardcoded DevTenantID literal — literal const value, not the Go name):
+# TST-11 (2026-07-02): all 3 entries reviewed; none migrated to testdb.Open — see
+# per-entry reason below. Kept as justified, not migrate-on-touch debt.
 R3_ALLOWLIST=(
+  # internal/modules/** importing tests/integration/testdb risks an import cycle:
+  # testdb/factory.go imports internal/modules/controlleddocuments/{domain,infrastructure};
+  # same constraint documented inline in role_provider_integration_test.go below.
   "internal/modules/auth/infrastructure/postgres/sessions_admin_integration_test.go"
+  # Import-cycle rationale already documented in-file (seedWithCapsIAM comment).
   "internal/modules/iam/infrastructure/postgres/role_provider_integration_test.go"
+  # Deliberately reuses pre-seeded dev-tenant reference data (profile_code 'dc')
+  # across a hand-rolled FK chain with savepoint rollback; testdb.Open's isolated
+  # per-test clone has no such ambient data — migrating is a behavioral redesign,
+  # not a mechanical swap.
   "tests/integration/approval/eligibility_test.go"
 )
 # R4 allowlist (bare unqualified `documents` table reference):
+# TST-11 (2026-07-02): all 3 entries reviewed; none migrated to testdb.Qualified —
+# see per-entry reason below. Kept as justified, not migrate-on-touch debt.
 R4_ALLOWLIST=(
+  # Same internal/modules/** import-cycle constraint as the R3 entry above; also
+  # depends on ambient fixture rows in the live dev DB ("requires fixture document
+  # row" skips), incompatible with testdb's isolated per-test clone model.
   "internal/modules/iam/integration_test.go"
+  # R4 false positive: the `documents` here is a `CREATE TEMP TABLE documents`
+  # (migration-shift-logic probe), not the real table — TEMP TABLE names cannot be
+  # schema-qualified. Also internal/platform/migrate importing tests/ is backwards
+  # layering (tests/ depends on internal/, not vice versa).
   "internal/platform/migrate/revision_number_zero_based_integration_test.go"
+  # Same ambient-fixture-data rationale as the R3 entry above.
   "tests/integration/approval/eligibility_test.go"
 )
 

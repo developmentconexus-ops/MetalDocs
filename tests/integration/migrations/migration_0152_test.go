@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"metaldocs/tests/integration/fixtures"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -85,14 +84,14 @@ func TestMigration0152_SnapshotTrigger(t *testing.T) {
 	tenantID := testdb.DeterministicID(t, "tenant")
 	userID := testdb.DeterministicID(t, "user")
 
-	fixtures.SeedUser(t, ctx, db, schema, userID, "Snapshot Test User")
+	testdb.SeedUser(t, ctx, db, schema, userID, "Snapshot Test User")
 
 	guardedStatuses := []string{"under_review", "approved", "scheduled", "published"}
 
 	for _, status := range guardedStatuses {
 		t.Run(status, func(t *testing.T) {
 			docID := testdb.DeterministicID(t, fmt.Sprintf("doc-%s", status))
-			fixtures.SeedDocument(t, ctx, db, schema, docID, tenantID, userID)
+			testdb.SeedDocument(t, ctx, db, schema, docID, tenantID, userID)
 
 			_, err := db.ExecContext(ctx, fmt.Sprintf(`
 				UPDATE %s SET status = $2
@@ -123,8 +122,8 @@ func TestMigration0152_PlaceholderValueInsert(t *testing.T) {
 	docID := testdb.DeterministicID(t, "doc")
 	userID := testdb.DeterministicID(t, "user")
 
-	fixtures.SeedUser(t, ctx, db, schema, userID, "PV Insert User")
-	fixtures.SeedDocument(t, ctx, db, schema, docID, tenantID, userID)
+	testdb.SeedUser(t, ctx, db, schema, userID, "PV Insert User")
+	testdb.SeedDocument(t, ctx, db, schema, docID, tenantID, userID)
 
 	_, err := db.ExecContext(ctx, fmt.Sprintf(`
 		INSERT INTO %s (tenant_id, revision_id, placeholder_id, source)

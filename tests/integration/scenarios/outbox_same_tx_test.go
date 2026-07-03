@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"metaldocs/tests/integration/fixtures"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -22,9 +21,9 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 	routeID := testdb.DeterministicID(t, "route")
 	instanceID := testdb.DeterministicID(t, "instance")
 
-	fixtures.SeedUser(t, ctx, db, "metaldocs", authorID, "Outbox Author")
-	fixtures.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, authorID)
-	fixtures.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "OUTBOX_FLOW")
+	testdb.SeedUser(t, ctx, db, "metaldocs", authorID, "Outbox Author")
+	testdb.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, authorID)
+	testdb.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "OUTBOX_FLOW")
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_instances WHERE id = $1::uuid`, instanceID)

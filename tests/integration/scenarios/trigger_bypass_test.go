@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"metaldocs/tests/integration/fixtures"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -33,8 +32,8 @@ func TestTriggerBypassBlocked(t *testing.T) {
 		tenantID := testdb.DeterministicID(t, "tenant")
 		docID := testdb.DeterministicID(t, "doc")
 		userID := testdb.DeterministicID(t, "user")
-		fixtures.SeedUser(t, ctx, db, schema, userID, "Trigger User")
-		fixtures.SeedDocument(t, ctx, db, schema, docID, tenantID, userID)
+		testdb.SeedUser(t, ctx, db, schema, userID, "Trigger User")
+		testdb.SeedDocument(t, ctx, db, schema, docID, tenantID, userID)
 
 		if _, err := tx.ExecContext(ctx, fmt.Sprintf(`
 			UPDATE %s
@@ -80,9 +79,8 @@ func TestIllegalTransitionBlocked(t *testing.T) {
 	docID := testdb.DeterministicID(t, "doc")
 	userID := testdb.DeterministicID(t, "user")
 
-	fixtures.SeedTenant(t, ctx, db, schema, tenantID)
-	fixtures.SeedUser(t, ctx, db, schema, userID, "Trigger Test User")
-	fixtures.SeedDocument(t, ctx, db, schema, docID, tenantID, userID)
+	testdb.SeedUser(t, ctx, db, schema, userID, "Trigger Test User")
+	testdb.SeedDocument(t, ctx, db, schema, docID, tenantID, userID)
 
 	_, err = tx.ExecContext(ctx, fmt.Sprintf(`
 		UPDATE %s SET status = 'published'

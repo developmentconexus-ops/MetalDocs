@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"metaldocs/tests/integration/fixtures"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -65,7 +64,7 @@ func TestGrantAreaMembershipFn(t *testing.T) {
 	granterID := testdb.DeterministicID(t, "granter")
 
 	for _, uid := range []string{userID, granterID} {
-		fixtures.SeedUser(t, ctx, db, schema, uid, uid)
+		testdb.SeedUser(t, ctx, db, schema, uid, uid)
 	}
 
 	_, err = tx.ExecContext(ctx, fmt.Sprintf(
@@ -109,7 +108,7 @@ func TestGrantAreaMembershipIdempotent(t *testing.T) {
 	granterID := testdb.DeterministicID(t, "granter-idem")
 
 	for _, uid := range []string{userID, granterID} {
-		fixtures.SeedUser(t, ctx, db, schema, uid, uid)
+		testdb.SeedUser(t, ctx, db, schema, uid, uid)
 	}
 
 	for i := 0; i < 2; i++ {
