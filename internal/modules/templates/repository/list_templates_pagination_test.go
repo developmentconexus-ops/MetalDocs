@@ -25,11 +25,11 @@ func TestListTemplates_OrderByHasStableTiebreaker(t *testing.T) {
 	rows := sqlmock.NewRows([]string{
 		"id", "tenant_id", "doc_type_code", "key", "name", "description",
 		"latest_version", "latest_revision_number", "published_version_id", "published_version_number", "current_revision_number",
-		"created_by", "system_owned", "created_at", "archived_at",
+		"created_by", "system_owned", "created_at", "updated_at", "archived_at",
 	}).AddRow(
 		"tpl-1", "tenant-1", "finance", "k1", "Template One", "",
 		1, nil, nil, nil, nil,
-		"user-1", false, time.Now().UTC(), nil,
+		"user-1", false, time.Now().UTC(), time.Now().UTC(), nil,
 	)
 
 	mock.ExpectQuery(`ORDER BY t\.created_at DESC, t\.id DESC`).
@@ -88,7 +88,7 @@ func TestListTemplates_ClampsLimitAndOffset(t *testing.T) {
 				WillReturnRows(sqlmock.NewRows([]string{
 					"id", "tenant_id", "doc_type_code", "key", "name", "description",
 					"latest_version", "latest_revision_number", "published_version_id", "published_version_number", "current_revision_number",
-					"created_by", "system_owned", "created_at", "archived_at",
+					"created_by", "system_owned", "created_at", "updated_at", "archived_at",
 				}))
 
 			_, err = repo.ListTemplates(context.Background(), application.ListFilter{

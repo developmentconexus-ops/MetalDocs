@@ -75,7 +75,7 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 		return
 	}
 
-	tplDTO, err := toAPITemplateDTO(res.Template)
+	tplDTO, err := toAPITemplateDTO(res.Template, h.resolveCreatedByDisplayName(r.Context(), tenantID, res.Template.CreatedBy))
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return

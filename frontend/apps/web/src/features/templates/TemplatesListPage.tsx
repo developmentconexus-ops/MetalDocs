@@ -51,7 +51,11 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
       : dto.published_version_id
         ? "published"
         : "draft";
-    const timestamp = isValidIsoDate(dto.created_at) ? dto.created_at : new Date().toISOString();
+    // FE-08: prefer updated_at (last-modified) when present; fall back to
+    // created_at for rows from before the column existed or when the API
+    // omits it.
+    const preferredTimestamp = dto.updated_at ?? dto.created_at;
+    const timestamp = isValidIsoDate(preferredTimestamp) ? preferredTimestamp : new Date().toISOString();
 
     // ADR 0013: chip shows the published revision when one exists, else falls back
     // to the latest working revision — so drafts render REV00, mirroring Documents.
@@ -64,7 +68,9 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
       title: dto.name || "Sem nome",
       version: versionLabel,
       status,
-      author: dto.created_by || "Usuario",
+      // FE-08: prefer the resolved display name; fall back to the raw
+      // created_by user id when the iam lookup has no display name for it.
+      author: dto.created_by_display_name || dto.created_by || "Usuario",
       updated: formatRelative(timestamp),
       latestVersion: dto.latest_version,
     };

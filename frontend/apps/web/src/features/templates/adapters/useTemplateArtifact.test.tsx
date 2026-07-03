@@ -149,6 +149,33 @@ describe('useTemplateArtifact', () => {
     expect(model.meta.ownerName).toBe('other-user');
   });
 
+  // FE-08: TemplateDTO.created_by_display_name is resolved server-side via the
+  // iam UserDisplayNameReader port and takes priority over both the raw
+  // created_by id and the current-user displayName override.
+  it('prefers created_by_display_name over the raw created_by when the API resolves it', () => {
+    vi.mocked(useTemplateDetailQuery).mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        template: { ...BASE_TEMPLATE, created_by: 'other-user', created_by_display_name: 'João Pereira' },
+        latest_version: BASE_VERSION,
+      },
+      refetch: vi.fn(),
+    } as never);
+
+    const { model } = renderHook(() => useTemplateArtifact('tpl-1')).result.current;
+
+    expect(model.meta.ownerName).toBe('João Pereira');
+  });
+
+  it('falls back to created_by (raw id / current-user override) when created_by_display_name is absent', () => {
+    // BASE_TEMPLATE has no created_by_display_name — covered by the two tests
+    // above this one, restated here for symmetry with the precedence contract.
+    const { model } = renderHook(() => useTemplateArtifact('tpl-1')).result.current;
+
+    expect(model.meta.ownerName).toBe('Administrator');
+  });
+
   it('sets meta.profileLabel from doc_type_code and leaves area/visibility/file meta null', () => {
     const { model } = renderHook(() => useTemplateArtifact('tpl-1')).result.current;
 

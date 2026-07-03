@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/objectstore"
 )
@@ -112,7 +113,7 @@ func TestBuildTemplatesModuleFailsWhenCapabilityServiceMissing(t *testing.T) {
 	t.Parallel()
 
 	presigner := objectstore.NewVerifiedStore(nil, nil, "metaldocs-attachments", 0)
-	_, _, _, err := buildTemplatesModule(bootstrap.APIDependencies{}, nil, presigner)
+	_, _, _, err := buildTemplatesModule(bootstrap.APIDependencies{}, nil, presigner, iamdomain.NoopUserDisplayNameReader{})
 	if err == nil {
 		t.Fatal("expected error for nil capability service")
 	}
@@ -125,7 +126,7 @@ func TestBuildTemplatesModuleFailsWhenCapabilityServiceMissing(t *testing.T) {
 func TestBuildTemplatesModuleFailsWhenPresignerMissing(t *testing.T) {
 	t.Parallel()
 
-	_, _, _, err := buildTemplatesModule(bootstrap.APIDependencies{}, nil, nil)
+	_, _, _, err := buildTemplatesModule(bootstrap.APIDependencies{}, nil, nil, iamdomain.NoopUserDisplayNameReader{})
 	if err == nil {
 		t.Fatal("expected error for nil presigner")
 	}

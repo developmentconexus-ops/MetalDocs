@@ -179,7 +179,7 @@ func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dto, err := toAPITemplateDTO(tpl)
+	dto, err := toAPITemplateDTO(tpl, h.resolveCreatedByDisplayName(r.Context(), tenantID, tpl.CreatedBy))
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return

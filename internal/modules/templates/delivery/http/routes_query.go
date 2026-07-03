@@ -62,9 +62,15 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request, params t
 		return
 	}
 
+	createdByIDs := make([]string, 0, len(templates))
+	for _, tpl := range templates {
+		createdByIDs = append(createdByIDs, tpl.CreatedBy)
+	}
+	displayNames := h.resolveCreatedByDisplayNames(r.Context(), tenantID, createdByIDs)
+
 	out := make([]templatesapi.TemplateDTO, 0, len(templates))
 	for _, tpl := range templates {
-		dto, err := toAPITemplateDTO(tpl)
+		dto, err := toAPITemplateDTO(tpl, displayNames[tpl.CreatedBy])
 		if err != nil {
 			writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 			return
@@ -140,7 +146,7 @@ func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tplDTO, err := toAPITemplateDTO(tpl)
+	tplDTO, err := toAPITemplateDTO(tpl, h.resolveCreatedByDisplayName(r.Context(), tenantID, tpl.CreatedBy))
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return

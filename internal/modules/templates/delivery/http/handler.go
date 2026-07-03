@@ -31,16 +31,72 @@ import (
 type AuthzFunc func(r *http.Request, tenantID, area string, action string) error
 
 type Handler struct {
-	svc   *application.Service
-	authz AuthzFunc
-	db    *sql.DB
+	svc               *application.Service
+	authz             AuthzFunc
+	db                *sql.DB
+	displayNameReader iamdomain.UserDisplayNameReader
 }
 
 func New(svc *application.Service, authz AuthzFunc, database *sql.DB) *Handler {
 	if authz == nil {
 		panic("templates http: authz function is required")
 	}
-	return &Handler{svc: svc, authz: authz, db: database}
+	return &Handler{svc: svc, authz: authz, db: database, displayNameReader: iamdomain.NoopUserDisplayNameReader{}}
+}
+
+// WithDisplayNameReader wires the iam-owned UserDisplayNameReader port (M4/F4.1)
+// used to resolve TemplateDTO.created_by_display_name without templates
+// querying iam tables/repos directly. Optional — defaults to
+// iamdomain.NoopUserDisplayNameReader{} (created_by_display_name omitted) when
+// never called, matching the pattern in documents/approval's handler wiring.
+func (h *Handler) WithDisplayNameReader(r iamdomain.UserDisplayNameReader) *Handler {
+	if r != nil {
+		h.displayNameReader = r
+	}
+	return h
+}
+
+// resolveCreatedByDisplayName resolves a single created_by display name via
+// the iam-owned port (FE-08). Returns "" (field omitted on the wire) on any
+// resolution failure or miss — display-name enrichment is best-effort and
+// must never fail the request that carries the real payload.
+func (h *Handler) resolveCreatedByDisplayName(ctx context.Context, tenantID, userID string) string {
+	if userID == "" {
+		return ""
+	}
+	name, err := h.displayNameReader.DisplayName(ctx, tenantID, userID)
+	if err != nil {
+		return ""
+	}
+	return name
+}
+
+// resolveCreatedByDisplayNames batch-resolves created_by display names for a
+// list of templates via the iam-owned port (FE-08), avoiding one DisplayName
+// call per row. Returns userID -> displayName; misses are simply absent, so
+// callers fall back to the raw id (mirrors resolveEligibleActorNames in
+// documents/approval/http/get_instance_handler.go).
+func (h *Handler) resolveCreatedByDisplayNames(ctx context.Context, tenantID string, userIDs []string) map[string]string {
+	unique := make(map[string]struct{}, len(userIDs))
+	ids := make([]string, 0, len(userIDs))
+	for _, id := range userIDs {
+		if id == "" {
+			continue
+		}
+		if _, ok := unique[id]; ok {
+			continue
+		}
+		unique[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return map[string]string{}
+	}
+	names, err := h.displayNameReader.DisplayNames(ctx, tenantID, ids)
+	if err != nil {
+		return map[string]string{}
+	}
+	return names
 }
 
 // idempotentRoutes lists the route templates (method + path, matching the

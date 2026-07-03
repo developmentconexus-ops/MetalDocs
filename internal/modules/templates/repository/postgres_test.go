@@ -144,7 +144,7 @@ func TestGetTemplateProjectsRevisionNumbers(t *testing.T) {
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
 	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
-	t.created_by, t.system_owned, t.created_at, t.archived_at
+	t.created_by, t.system_owned, t.created_at, t.updated_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
 LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
@@ -153,11 +153,11 @@ WHERE t.id = $1 AND t.tenant_id = $2::uuid`)).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "tenant_id", "doc_type_code", "key", "name", "description",
 			"latest_version", "revision_number", "published_version_id", "version_number", "revision_number",
-			"created_by", "system_owned", "created_at", "archived_at",
+			"created_by", "system_owned", "created_at", "updated_at", "archived_at",
 		}).AddRow(
 			"tpl-1", "tenant-a", "PROC", "blank", "Blank", "",
 			2, 1, "ver-published", 1, 0,
-			"admin", false, time.Date(2026, 5, 27, 19, 0, 0, 0, time.UTC), nil,
+			"admin", false, time.Date(2026, 5, 27, 19, 0, 0, 0, time.UTC), time.Date(2026, 5, 27, 19, 0, 0, 0, time.UTC), nil,
 		))
 
 	tmpl, err := repo.GetTemplate(context.Background(), "tenant-a", "tpl-1")

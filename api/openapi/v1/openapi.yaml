@@ -5736,7 +5736,25 @@ components:
             0-based (REV00, REV01, ...). Null when the template has never been
             published. ADR 0013.
         created_by: { type: string }
+        created_by_display_name:
+          type: string
+          nullable: true
+          description: >
+            Display name for created_by, resolved via the iam-owned
+            UserDisplayNameReader port (M4/F4.1). Omitted/null when the user
+            has no resolvable display name; callers fall back to created_by
+            (the raw user id). FE-08.
         created_at: { type: string, format: date-time }
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            Last-modified timestamp for the template row. Nullable only for
+            wire-compatibility with historical rows created before this field
+            existed (db/migrations/0267_templates_template_updated_at.sql
+            backfills all existing rows to created_at, so in practice this is
+            always present going forward). FE-08.
         archived_at: { type: string, format: date-time, nullable: true }
     VersionDTO:
       type: object

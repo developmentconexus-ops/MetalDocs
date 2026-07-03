@@ -77,8 +77,11 @@ export function useTemplateArtifact(templateId: string): TemplateArtifact {
   const versionNumber = version?.revision_number ?? version?.version_number ?? 0;
   const badgeLabel = templateStatusLabel(version?.status ?? '');
 
-  // Owner name: created_by; if creator is the current user, use displayName.
-  const ownerName = resolveOwnerDisplay(template?.created_by, user) ?? EM_DASH;
+  // Owner name: prefer the API-resolved created_by_display_name (FE-08); if
+  // absent, fall back to the shared created_by resolution (current-user
+  // displayName override, else the raw id).
+  const ownerName =
+    template?.created_by_display_name ?? resolveOwnerDisplay(template?.created_by, user) ?? EM_DASH;
 
   // Hero badges (push in order; skip when source missing).
   const badges: ArtifactBadge[] = [];

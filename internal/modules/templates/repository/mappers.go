@@ -24,7 +24,7 @@ func scanTemplate(row rowScanner) (*domain.Template, error) {
 	if err := row.Scan(
 		&t.ID, &t.TenantID, &t.DocTypeCode, &t.Key, &t.Name, &t.Description,
 		&t.LatestVersion, &latestRevisionNumber, &publishedVersionID, &publishedVersionNumber, &currentRevisionNumber,
-		&t.CreatedBy, &t.SystemOwned, &t.CreatedAt, &archivedAt,
+		&t.CreatedBy, &t.SystemOwned, &t.CreatedAt, &t.UpdatedAt, &archivedAt,
 	); err != nil {
 		return nil, err
 	}

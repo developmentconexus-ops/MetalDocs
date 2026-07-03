@@ -2902,8 +2902,15 @@ export interface components {
              */
             current_revision_number?: number | null;
             created_by: string;
+            /** @description Display name for created_by, resolved via the iam-owned UserDisplayNameReader port (M4/F4.1). Omitted/null when the user has no resolvable display name; callers fall back to created_by (the raw user id). FE-08. */
+            created_by_display_name?: string | null;
             /** Format: date-time */
             created_at: string;
+            /**
+             * Format: date-time
+             * @description Last-modified timestamp for the template row. Nullable only for wire-compatibility with historical rows created before this field existed (db/migrations/0267_templates_template_updated_at.sql backfills all existing rows to created_at, so in practice this is always present going forward). FE-08.
+             */
+            updated_at?: string | null;
             /** Format: date-time */
             archived_at?: string | null;
         };

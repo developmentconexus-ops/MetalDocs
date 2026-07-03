@@ -561,7 +561,7 @@ func main() {
 	// needs ControlledDocumentDuplicator), hence the post-construction setter.
 	controlledDocumentsModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
-	templatesModule, templatesRepo, templatesStore, err := buildTemplatesModule(deps, capabilityService, sharedPresigner)
+	templatesModule, templatesRepo, templatesStore, err := buildTemplatesModule(deps, capabilityService, sharedPresigner, displayNameRepo)
 	if err != nil {
 		slog.Error("build templates module", "err", err)
 		deps.Cleanup()
@@ -816,7 +816,7 @@ func buildTokensModule(deps bootstrap.APIDependencies) *tokens.Module {
 // orphan-object sweeper (F-T6) against the same instances the request path uses.
 // presigner is the shared VerifiedStore constructed once at the composition root
 // (STO-02) — templates does not construct its own instance.
-func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService, presigner *objectstore.VerifiedStore) (*templateshttp.Handler, *templatesrepo.Repository, *objectstore.VerifiedStore, error) {
+func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService, presigner *objectstore.VerifiedStore, displayNameReader iamdomain.UserDisplayNameReader) (*templateshttp.Handler, *templatesrepo.Repository, *objectstore.VerifiedStore, error) {
 	if capabilityService == nil {
 		return nil, nil, nil, errors.New("templates capability service is required")
 	}
@@ -844,7 +844,11 @@ func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iam
 		userID := iamdomain.UserIDFromContext(r.Context())
 		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
 	}
-	return templateshttp.New(templatesSvc, templatesAuthzFn, deps.SQLDB), templatesRepo, templatesPresigner, nil
+	// FE-08: resolve TemplateDTO.created_by_display_name via the iam-owned
+	// UserDisplayNameReader port (M4/F4.1) instead of templates querying
+	// iam_users directly.
+	templatesHandler := templateshttp.New(templatesSvc, templatesAuthzFn, deps.SQLDB).WithDisplayNameReader(displayNameReader)
+	return templatesHandler, templatesRepo, templatesPresigner, nil
 }
 
 func requireApprovalRuntimeSupport(fanoutURL string) error {

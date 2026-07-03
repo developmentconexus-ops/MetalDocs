@@ -75,7 +75,7 @@ func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*dom
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
 	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
-	t.created_by, t.system_owned, t.created_at, t.archived_at
+	t.created_by, t.system_owned, t.created_at, t.updated_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
 LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
@@ -96,7 +96,7 @@ func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string)
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
 	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
-	t.created_by, t.system_owned, t.created_at, t.archived_at
+	t.created_by, t.system_owned, t.created_at, t.updated_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
 LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
@@ -145,7 +145,7 @@ func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
 	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
-	t.created_by, t.system_owned, t.created_at, t.archived_at
+	t.created_by, t.system_owned, t.created_at, t.updated_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
 LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
@@ -201,7 +201,8 @@ SET
 	latest_version = $7,
 	published_version_id = $8,
 	system_owned = $9,
-	archived_at = $10
+	archived_at = $10,
+	updated_at = now()
 WHERE id = $1 AND tenant_id = $2::uuid`
 
 	res, err := r.db.ExecContext(ctx, q,
@@ -448,7 +449,8 @@ SET
 	latest_version = $7,
 	published_version_id = $8,
 	system_owned = $9,
-	archived_at = $10
+	archived_at = $10,
+	updated_at = now()
 WHERE id = $1 AND tenant_id = $2::uuid`
 	res, err := tx.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,

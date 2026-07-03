@@ -119,7 +119,13 @@ func placeholdersToSlice(ps []domain.Placeholder) (*[]map[string]interface{}, er
 // toAPITemplateDTO maps a domain.Template to the OpenAPI-generated TemplateDTO type.
 // F1.3 / ADR 0035 — flat typed wire shape. Mirrors the toAPIVersionDTO pattern.
 // SystemOwned is not present in TemplateDTO (not a public API field).
-func toAPITemplateDTO(t *domain.Template) (templatesapi.TemplateDTO, error) {
+//
+// displayName is the resolved display name for t.CreatedBy (FE-08). Pass ""
+// when unresolved/unavailable (e.g. iamdomain.NoopUserDisplayNameReader{} or a
+// miss in the batch lookup) — CreatedByDisplayName is left nil and callers
+// fall back to CreatedBy (the raw user id), matching the
+// UserDisplayNameReader port's documented miss behavior.
+func toAPITemplateDTO(t *domain.Template, displayName string) (templatesapi.TemplateDTO, error) {
 	if t == nil {
 		return templatesapi.TemplateDTO{}, fmt.Errorf("toAPITemplateDTO: nil template")
 	}
@@ -142,6 +148,13 @@ func toAPITemplateDTO(t *domain.Template) (templatesapi.TemplateDTO, error) {
 		LatestRevisionNumber: latestRevNum,
 		CreatedBy:            t.CreatedBy,
 		CreatedAt:            t.CreatedAt.UTC(),
+	}
+	if !t.UpdatedAt.IsZero() {
+		u := t.UpdatedAt.UTC()
+		dto.UpdatedAt = &u
+	}
+	if displayName != "" {
+		dto.CreatedByDisplayName = &displayName
 	}
 
 	if t.Description != "" {
