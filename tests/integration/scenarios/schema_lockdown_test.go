@@ -20,8 +20,8 @@ func TestWriterCannotDropTable(t *testing.T) {
 	}
 	defer tx.Rollback()
 
-	_, err = tx.ExecContext(ctx, `DROP TABLE metaldocs.documents`)
-	require42501OrSkip(t, err, "DROP TABLE metaldocs.documents")
+	_, err = tx.ExecContext(ctx, `DROP TABLE public.documents`)
+	require42501OrSkip(t, err, "DROP TABLE public.documents")
 }
 
 func TestWriterCannotAlterTable(t *testing.T) {
@@ -34,8 +34,8 @@ func TestWriterCannotAlterTable(t *testing.T) {
 	}
 	defer tx.Rollback()
 
-	_, err = tx.ExecContext(ctx, `ALTER TABLE metaldocs.documents ADD COLUMN _test_col text`)
-	require42501OrSkip(t, err, "ALTER TABLE metaldocs.documents")
+	_, err = tx.ExecContext(ctx, `ALTER TABLE public.documents ADD COLUMN _test_col text`)
+	require42501OrSkip(t, err, "ALTER TABLE public.documents")
 }
 
 func TestWriterCannotCreateTable(t *testing.T) {

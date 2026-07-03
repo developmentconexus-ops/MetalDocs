@@ -30,7 +30,7 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_instances WHERE id = $1::uuid`, instanceID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.governance_events WHERE tenant_id = $1::uuid AND event_type = 'doc.submitted' AND resource_id = $2`, tenantID, docID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_routes WHERE id = $1::uuid`, routeID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.documents WHERE id = $1::uuid`, docID)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.documents WHERE id = $1::uuid`, docID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE tenant_id = $1::uuid`, tenantID)
 	})
 

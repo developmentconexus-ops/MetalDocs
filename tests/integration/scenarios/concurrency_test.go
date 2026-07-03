@@ -82,7 +82,7 @@ func runSingleOCCRace(t *testing.T, ctx context.Context, db *sql.DB, suffix stri
 	fixtures.SeedUser(t, ctx, db, "metaldocs", userID, "Race User")
 	fixtures.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, userID)
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.documents WHERE id = $1::uuid`, docID)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.documents WHERE id = $1::uuid`, docID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE tenant_id = $1::uuid`, tenantID)
 	})
 
@@ -99,7 +99,7 @@ func runSingleOCCRace(t *testing.T, ctx context.Context, db *sql.DB, suffix stri
 			defer wg.Done()
 			<-start
 			res, err := db.ExecContext(ctx, `
-				UPDATE metaldocs.documents
+				UPDATE public.documents
 				   SET revision_version = revision_version + 1
 				 WHERE id = $1::uuid
 				   AND tenant_id = $2::uuid
@@ -345,7 +345,7 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_stage_instances WHERE id = $1::uuid`, stageID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_instances WHERE id = $1::uuid`, instanceID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_routes WHERE id = $1::uuid`, routeID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.documents WHERE id = $1::uuid`, docID)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.documents WHERE id = $1::uuid`, docID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE tenant_id = $1::uuid`, tenantID)
 	})
 
