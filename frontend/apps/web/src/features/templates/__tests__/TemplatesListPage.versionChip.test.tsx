@@ -4,13 +4,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { TemplatesListPage } from '../TemplatesListPage';
 import type { TemplateDTO } from '../api/templates';
 
-// ADR 0013 — Template Revision Labels.
-// Chip shows published revision when present, else latest working revision.
-// Fixtures cover the 4 chip states:
-//   1. Never published (latest_revision_number=0)                       → REV00 (working)
-//   2. Published v1 + auto-spawned v2 draft (current_revision_number=0) → REV00 (published)
-//   3. Published v1, no further draft (current_revision_number=0)       → REV00 (published)
-//   4. Archived with current_revision_number=1                          → REV01
+// ADR 0013 / ADR 0065 — Template Revision Labels.
+// Chip shows published_version.revision_number when present, else
+// latest_version.revision_number. Fixtures cover the 4 chip states:
+//   1. Never published (latest_version.revision_number=0)                    → REV00 (working)
+//   2. Published v1 + auto-spawned v2 draft (published_version.revision_number=0) → REV00 (published)
+//   3. Published v1, no further draft (published_version.revision_number=0) → REV00 (published)
+//   4. Archived with published_version.revision_number=1                    → REV01
 
 vi.mock('../queries/useTemplatesQuery', () => ({
   useTemplatesQuery: () => ({
@@ -29,11 +29,8 @@ const fixtures: TemplateDTO[] = [
     name: 'Never Published',
     doc_type_code: null,
     description: null,
-    latest_version: 1,
-    latest_revision_number: 0,
-    published_version_id: null,
-    published_version_number: null,
-    current_revision_number: null,
+    latest_version: { id: 'v1', number: 1, revision_number: 0, status: 'draft' },
+    published_version: null,
     created_by: 'u1',
     created_at: new Date().toISOString(),
     archived_at: null,
@@ -45,11 +42,8 @@ const fixtures: TemplateDTO[] = [
     name: 'Published With Draft',
     doc_type_code: null,
     description: null,
-    latest_version: 2,
-    latest_revision_number: 1,
-    published_version_id: 'ver-1',
-    published_version_number: 1,
-    current_revision_number: 0,
+    latest_version: { id: 'v2', number: 2, revision_number: 1, status: 'draft' },
+    published_version: { id: 'ver-1', number: 1, revision_number: 0, status: 'published' },
     created_by: 'u1',
     created_at: new Date().toISOString(),
     archived_at: null,
@@ -61,11 +55,8 @@ const fixtures: TemplateDTO[] = [
     name: 'Published No Draft',
     doc_type_code: null,
     description: null,
-    latest_version: 1,
-    latest_revision_number: 0,
-    published_version_id: 'ver-x',
-    published_version_number: 1,
-    current_revision_number: 0,
+    latest_version: { id: 'ver-x', number: 1, revision_number: 0, status: 'published' },
+    published_version: { id: 'ver-x', number: 1, revision_number: 0, status: 'published' },
     created_by: 'u1',
     created_at: new Date().toISOString(),
     archived_at: null,
@@ -77,11 +68,8 @@ const fixtures: TemplateDTO[] = [
     name: 'Archived',
     doc_type_code: null,
     description: null,
-    latest_version: 3,
-    latest_revision_number: 2,
-    published_version_id: 'ver-y',
-    published_version_number: 2,
-    current_revision_number: 1,
+    latest_version: { id: 'v3', number: 3, revision_number: 2, status: 'published' },
+    published_version: { id: 'ver-y', number: 2, revision_number: 1, status: 'published' },
     created_by: 'u1',
     created_at: new Date().toISOString(),
     archived_at: new Date().toISOString(),

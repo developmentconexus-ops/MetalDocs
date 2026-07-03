@@ -27,7 +27,7 @@ export function Component() {
     setError(null);
     getTemplate(templateId)
       .then((r) => {
-        if (!cancelled) setVersionNum(r.template.latest_version);
+        if (!cancelled) setVersionNum(r.template.latest_version.number);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));

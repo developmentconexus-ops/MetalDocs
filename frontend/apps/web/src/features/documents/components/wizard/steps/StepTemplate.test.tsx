@@ -11,11 +11,13 @@ const BASE_TEMPLATE = {
   created_by: 'user-1',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
-  latest_version: 1,
-  latest_revision_number: 0,
-  current_revision_number: null,
-  published_version_id: null,
-  published_version_number: null,
+  latest_version: {
+    id: 'v-base',
+    number: 1,
+    revision_number: 0,
+    status: 'draft',
+  },
+  published_version: null,
   archived_at: null,
 } as unknown as TemplateDTO;
 
@@ -52,37 +54,63 @@ describe('StepTemplate', () => {
     expect(onSelect).toHaveBeenCalledWith('blank-template', 'blank-tv-1');
   });
 
-  it('treats templates without published_version_id as unselectable, including wire-drift payloads missing the key entirely (bug 2026-07-03)', () => {
+  it('treats templates without a published_version as unselectable, including wire-drift payloads missing the key entirely (bug 2026-07-03)', () => {
     const onSelect = vi.fn();
 
-    // (a) simulates a legacy/drifted wire payload where the backend omits the
-    // key altogether — the generated TemplateDTO type is now non-optional, so
-    // this cast is deliberate: it forces the shape past the compiler to prove
-    // the component still guards against `undefined` at runtime.
+    // (d) simulates a legacy/drifted wire payload where the backend omits the
+    // key altogether — the generated TemplateDTO type has published_version as
+    // required-and-nullable, so this cast is deliberate: it forces the shape
+    // past the compiler to prove the component still guards against
+    // `undefined` at runtime (documents the "never absent" contract).
     const missingKey = { ...BASE_TEMPLATE } as unknown as Record<string, unknown>;
-    delete missingKey.published_version_id;
+    delete missingKey.published_version;
     const withoutKey = missingKey as unknown as TemplateDTO;
 
+    // (a) published_version: null case.
     const withNull: TemplateDTO = {
       ...BASE_TEMPLATE,
       id: 'tmpl-null',
       name: 'Template Null',
-      published_version_id: null,
+      published_version: null,
     };
 
+    // (b) full published-ref case.
     const published: TemplateDTO = {
       ...BASE_TEMPLATE,
       id: 'tmpl-pub',
       name: 'Template Publicado',
-      published_version_id: '11111111-1111-4111-8111-111111111111',
-      published_version_number: 1,
-      current_revision_number: 1,
+      latest_version: {
+        id: 'v-pub-latest',
+        number: 1,
+        revision_number: 1,
+        status: 'published',
+      },
+      published_version: {
+        id: '11111111-1111-4111-8111-111111111111',
+        number: 1,
+        revision_number: 1,
+        status: 'published',
+      },
+    };
+
+    // (c) latest_version.status: 'under_review' badge case.
+    const underReview: TemplateDTO = {
+      ...BASE_TEMPLATE,
+      id: 'tmpl-review',
+      name: 'Template Em Revisao',
+      latest_version: {
+        id: 'v-review',
+        number: 2,
+        revision_number: 0,
+        status: 'under_review',
+      },
+      published_version: null,
     };
 
     render(
       <StepTemplate
         profileLabel="Perfil PRC"
-        templates={[withoutKey, withNull, published]}
+        templates={[withoutKey, withNull, published, underReview]}
         isLoading={false}
         isError={false}
         error={null}
@@ -112,6 +140,10 @@ describe('StepTemplate', () => {
     expect(nullCard).toBeDisabled();
     fireEvent.click(nullCard);
     expect(onSelect).not.toHaveBeenCalled();
+
+    const reviewCard = screen.getByRole('radio', { name: /Template Em Revisao/i });
+    expect(reviewCard).toBeDisabled();
+    expect(screen.getByText('em revisão')).toBeTruthy();
 
     const publishedBadge = screen.getByText('publicada');
     expect(publishedBadge).toBeTruthy();

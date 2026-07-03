@@ -23,11 +23,8 @@ const BASE_TEMPLATE = {
   key: 'pop-onboarding-v1',
   name: 'Procedimento de Onboarding',
   description: 'Template de onboarding para novos colaboradores',
-  latest_version: 3,
-  latest_revision_number: 3,
-  published_version_id: 'ver-2',
-  published_version_number: 2,
-  current_revision_number: 2,
+  latest_version: { id: 'ver-3', number: 3, revision_number: 3, status: 'draft' },
+  published_version: { id: 'ver-2', number: 2, revision_number: 2, status: 'published' },
   created_by: 'admin-user',
   created_at: '2026-01-15T10:00:00.000Z',
   archived_at: null,
@@ -203,20 +200,20 @@ describe('useTemplateArtifact', () => {
     expect(cell?.hint).toBe('rascunho');
   });
 
-  it('returns publishedVersion KPI with published revision label when published_version_id is set', () => {
+  it('returns publishedVersion KPI with published revision label when published_version is set', () => {
     const { model } = renderHook(() => useTemplateArtifact('tpl-1')).result.current;
 
     const cell = model.kpis.find((k) => k.key === 'publishedVersion');
-    expect(cell?.value).toBe(formatRevisionCode(BASE_TEMPLATE.current_revision_number));
+    expect(cell?.value).toBe(formatRevisionCode(BASE_TEMPLATE.published_version!.revision_number));
     expect(cell?.hint).toBe('vigente');
   });
 
-  it('returns publishedVersion KPI with EM_DASH and "não publicada" when no published_version_id', () => {
+  it('returns publishedVersion KPI with EM_DASH and "não publicada" when no published_version', () => {
     vi.mocked(useTemplateDetailQuery).mockReturnValue({
       isLoading: false,
       isError: false,
       data: {
-        template: { ...BASE_TEMPLATE, published_version_id: null, current_revision_number: null },
+        template: { ...BASE_TEMPLATE, published_version: null },
         latest_version: BASE_VERSION,
       },
       refetch: vi.fn(),

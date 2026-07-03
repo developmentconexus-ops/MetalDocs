@@ -116,10 +116,10 @@ export function useTemplateArtifact(templateId: string): TemplateArtifact {
     {
       key: 'publishedVersion',
       label: 'Versão publicada',
-      value: template?.published_version_id != null
-        ? formatRevisionCode(template.current_revision_number ?? undefined)
+      value: template?.published_version != null
+        ? formatRevisionCode(template.published_version.revision_number)
         : EM_DASH,
-      hint: template?.published_version_id != null ? 'vigente' : 'não publicada',
+      hint: template?.published_version != null ? 'vigente' : 'não publicada',
     },
   ];
 

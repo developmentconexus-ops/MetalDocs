@@ -44,8 +44,8 @@ const BASE_TEMPLATE = {
   created_by: 'actor-1',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
-  published_version_id: null,
-  current_revision_number: null,
+  latest_version: { id: 'v1', number: 1, revision_number: 0, status: 'draft' },
+  published_version: null,
   archived_at: null,
 };
 

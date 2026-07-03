@@ -189,7 +189,7 @@ export function ProfileEditDialog({ mode, profile, onClose }: Props) {
                 >
                   <option value="" disabled>Selecione um template publicado</option>
                   {publishedTemplates.map((t) => (
-                    <option key={t.id} value={t.published_version_id!}>
+                    <option key={t.id} value={t.published_version.id}>
                       {t.name}{t.doc_type_code ? ` [${t.doc_type_code}]` : ""}
                     </option>
                   ))}

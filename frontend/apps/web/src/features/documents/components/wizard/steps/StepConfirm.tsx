@@ -72,13 +72,14 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
   const visibilityLabel = buildVisibilityLabel(visibility, visibilityAreaCodes, inviteeCount);
   const profileLabel = profile ? `${profile.code} — ${profile.name}` : '—';
   const areaLabel = area ? `${area.code} — ${area.name}` : '—';
-  // ADR 0013: render REV{nn} from the canonical contract field; fall back to a
-  // bare name label when the template has no published revision yet.
+  // ADR 0013 / ADR 0065: render REV{nn} from the nested published_version ref
+  // (whole-object gate); fall back to a bare name label when the template has
+  // no published version yet.
   const templateLabel = isBlankTemplateSelected
     ? blankTemplateName
     : template
-      ? template.current_revision_number != null
-        ? `${template.name} ${formatRevisionCode(template.current_revision_number)} (publicada)`
+      ? template.published_version != null
+        ? `${template.name} ${formatRevisionCode(template.published_version.revision_number)} (publicada)`
         : template.name
       : '—';
   const createdAtLabel = formatDateTime(createdAt);

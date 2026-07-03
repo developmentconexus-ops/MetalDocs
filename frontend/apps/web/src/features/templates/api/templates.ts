@@ -13,6 +13,9 @@ type CreateTemplateResponse =
 type ListTemplatesQuery = NonNullable<operations['listTemplates']['parameters']['query']>;
 type GeneratedTemplateDTO = components['schemas']['TemplateDTO'];
 type GeneratedVersionDTO = components['schemas']['VersionDTO'];
+// ADR 0065: nested version-ref value object (latest_version/published_version).
+// Re-exported so consumers don't reach into the generated api-types directly.
+export type VersionRef = components['schemas']['TemplateVersionRef'];
 // FE-15: response envelopes derived from the generated operations so the
 // envelope-vs-flat shape can never drift from api/openapi. Verified 1:1
 // against the Go handlers (internal/modules/templates/delivery/http/*.go):
@@ -32,15 +35,11 @@ type UpdateTemplateSchemaResponse =
 
 export type TemplateDTO = Omit<
   GeneratedTemplateDTO,
-  | 'archived_at'
-  | 'description'
-  | 'doc_type_code'
-  | 'published_version_id'
+  'archived_at' | 'description' | 'doc_type_code'
 > & {
   archived_at: string | null;
   description: string | null | undefined;
   doc_type_code: string | null;
-  published_version_id: string | null;
 };
 export type VersionDTO = Omit<
   GeneratedVersionDTO,

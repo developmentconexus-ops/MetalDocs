@@ -48,7 +48,7 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
   const templates = (data?.templates ?? []).map((dto) => {
     const status: TemplateStatus = dto.archived_at
       ? "archived"
-      : dto.published_version_id
+      : dto.published_version != null
         ? "published"
         : "draft";
     // FE-08: prefer updated_at (last-modified) when present; fall back to
@@ -57,10 +57,11 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
     const preferredTimestamp = dto.updated_at ?? dto.created_at;
     const timestamp = isValidIsoDate(preferredTimestamp) ? preferredTimestamp : new Date().toISOString();
 
-    // ADR 0013: chip shows the published revision when one exists, else falls back
-    // to the latest working revision — so drafts render REV00, mirroring Documents.
+    // ADR 0013 / ADR 0065: chip shows the published revision when one exists, else
+    // falls back to the latest working revision — so drafts render REV00, mirroring
+    // Documents.
     const versionLabel = formatRevisionCode(
-      dto.current_revision_number ?? dto.latest_revision_number,
+      dto.published_version?.revision_number ?? dto.latest_version.revision_number,
     );
 
     return {

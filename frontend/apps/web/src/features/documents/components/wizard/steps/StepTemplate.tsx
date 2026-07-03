@@ -77,17 +77,15 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
               <div className="caption">Nenhum template publicado para este perfil.</div>
             </div>
           ) : null}
-          {/* TODO(novo-documento:template-versions): only published version is
-              selectable; older versions rendered disabled with "Em breve" tooltip.
-              GET /api/v1/templates/:id/versions endpoint not yet shipped.
-              See wiki/backlog/novo-documento.md#template-versions. */}
+          {/* ADR 0065: selectability and badge text now gate on the nested
+              published_version / latest_version VersionRef objects — the whole
+              object is checked for null, never an inner field. */}
           {templates.map((template) => {
-            const publishedID = template.published_version_id;
-            // `!= null` guards both null and undefined — the wire may omit the
-            // key entirely on drift; `!== null` alone let undefined slip through
-            // as truthy (bug 2026-07-03).
-            const selectable = publishedID != null;
+            const publishedVersion = template.published_version;
+            const selectable = publishedVersion != null;
+            const publishedID = publishedVersion?.id ?? null;
             const selected = isTemplateSelected(template.id, publishedID, selectedTemplateID, selectedVersionID);
+            const unselectableBadgeText = badgeTextForStatus(template.latest_version.status);
             return (
               <SelectableCard
                 key={template.id}
@@ -95,8 +93,8 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                 disabled={!selectable}
                 title={selectable ? undefined : 'Em breve'}
                 onSelect={() => {
-                  if (!selectable) return;
-                  onSelect(template.id, publishedID);
+                  if (!selectable || !publishedVersion) return;
+                  onSelect(template.id, publishedVersion.id);
                 }}
               >
                 <div className={styles.templateRow}>
@@ -105,9 +103,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                     <div className={styles.templateLabelRow}>
                       <span className={styles.templateLabel}>{template.name}</span>
                       {/* ADR 0013: render REV{nn} from the canonical contract field. */}
-                      {template.current_revision_number != null && (
-                        <span className="pill mono">{formatRevisionCode(template.current_revision_number)}</span>
-                      )}
+                      <span className="pill mono">{formatRevisionCode(template.latest_version.revision_number)}</span>
                       {selectable ? (
                         <span className="pill pill-frozen">
                           <span className={styles.publishedDot} aria-hidden="true" />
@@ -115,7 +111,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                         </span>
                       ) : (
                         <span className="pill" title="Em breve">
-                          sem versão publicada
+                          {unselectableBadgeText}
                         </span>
                       )}
                     </div>
@@ -201,6 +197,17 @@ function isTemplateSelected(
     selectedVersionID !== null &&
     selectedVersionID === publishedVersionID
   );
+}
+
+function badgeTextForStatus(status: string): string {
+  switch (status) {
+    case 'under_review':
+      return 'em revisão';
+    case 'approved':
+      return 'aguardando publicação';
+    default:
+      return 'sem versão publicada';
+  }
 }
 
 function formatDate(iso: string): string {
