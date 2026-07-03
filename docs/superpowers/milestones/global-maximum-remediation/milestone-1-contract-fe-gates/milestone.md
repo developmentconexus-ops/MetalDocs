@@ -1,7 +1,7 @@
 # Milestone 1 — Contract & frontend governance gates
 
 > **Program:** global-maximum-remediation  ·  **Governing spec:** `../mission.md` (§7 M1)
-> **Status:** milestone-validator **PASS** (C1–C7, 2026-07-03) — HS-1 operator gate pending; commits local, not pushed. Verdict: [`qa/milestone-qa.md`](qa/milestone-qa.md).
+> **Status:** **PASSED** — milestone-validator PASS (C1–C7, 2026-07-03) + operator HS-1 approval (2026-07-03). Commits local, not pushed. Verdict: [`qa/milestone-qa.md`](qa/milestone-qa.md).
 > **Authored:** 2026-07-03 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** M1 is, **which features** it
