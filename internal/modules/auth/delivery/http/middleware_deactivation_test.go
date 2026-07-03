@@ -10,7 +10,7 @@ import (
 	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	"metaldocs/internal/modules/auth/infrastructure/memory"
-	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/iamtypes"
 	"metaldocs/internal/platform/tenant"
 
 	"golang.org/x/crypto/bcrypt"
@@ -19,13 +19,13 @@ import (
 // stubRoleProvider / stubLoginCtxPort are the minimal real collaborators needed to
 // mint a session via Authenticate. The inactive-resolve path returns before roles
 // are consulted, so the role set only matters for the initial (active) login.
-type stubRoleProvider struct{ roles []iamdomain.Role }
+type stubRoleProvider struct{ roles []iamtypes.Role }
 
-func (s stubRoleProvider) RolesByUserID(context.Context, string, string) ([]iamdomain.Role, error) {
+func (s stubRoleProvider) RolesByUserID(context.Context, string, string) ([]iamtypes.Role, error) {
 	return s.roles, nil
 }
-func (stubRoleProvider) RolesByUserIDs(context.Context, string, []string) (map[string][]iamdomain.Role, error) {
-	return map[string][]iamdomain.Role{}, nil
+func (stubRoleProvider) RolesByUserIDs(context.Context, string, []string) (map[string][]iamtypes.Role, error) {
+	return map[string][]iamtypes.Role{}, nil
 }
 func (stubRoleProvider) UserActiveInTenant(context.Context, string, string) (bool, error) {
 	return true, nil
@@ -73,7 +73,7 @@ func TestMiddleware_DeactivatedIdentity_Returns401(t *testing.T) {
 		AllowDevTenantFallback: true,
 		CookieSecure:           false,
 	}
-	svc, err := authapp.NewService(repo, stubRoleProvider{roles: []iamdomain.Role{iamdomain.RoleViewer}}, nil, stubLoginCtxPort{}, cfg)
+	svc, err := authapp.NewService(repo, stubRoleProvider{roles: []iamtypes.Role{iamtypes.RoleViewer}}, nil, stubLoginCtxPort{}, cfg)
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}

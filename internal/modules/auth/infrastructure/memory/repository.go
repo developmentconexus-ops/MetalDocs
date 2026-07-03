@@ -10,6 +10,7 @@ import (
 
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/iamtypes"
 )
 
 // Compile-time assertion that the in-memory adapter satisfies the auth port.
@@ -245,7 +246,7 @@ func (r *Repository) CreateUser(_ context.Context, params authdomain.CreateUserP
 		PasswordAlgo:       params.PasswordAlgo,
 		MustChangePassword: params.MustChangePassword,
 		IsActive:           params.IsActive,
-		Roles:              append([]iamdomain.Role(nil), params.Roles...),
+		Roles:              append([]iamtypes.Role(nil), params.Roles...),
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}
@@ -268,7 +269,7 @@ func (r *Repository) ListUsers(_ context.Context) ([]authdomain.ManagedUser, err
 			LastLoginAt:         identity.LastLoginAt,
 			FailedLoginAttempts: identity.FailedLoginAttempts,
 			LockedUntil:         identity.LockedUntil,
-			Roles:               append([]iamdomain.Role(nil), identity.Roles...),
+			Roles:               append([]iamtypes.Role(nil), identity.Roles...),
 			CreatedAt:           identity.CreatedAt,
 			UpdatedAt:           identity.UpdatedAt,
 		})
@@ -366,7 +367,7 @@ func (r *Repository) BootstrapAdmin(_ context.Context, params authdomain.Bootstr
 	}
 	for _, identity := range r.users {
 		for _, role := range identity.Roles {
-			if role == iamdomain.RoleSystemAdmin {
+			if role == iamtypes.RoleSystemAdmin {
 				return false, nil
 			}
 		}
@@ -385,14 +386,14 @@ func (r *Repository) BootstrapAdmin(_ context.Context, params authdomain.Bootstr
 		PasswordAlgo:       params.PasswordAlgo,
 		MustChangePassword: params.MustChangePassword,
 		IsActive:           true,
-		Roles:              []iamdomain.Role{iamdomain.RoleSystemAdmin},
+		Roles:              []iamtypes.Role{iamtypes.RoleSystemAdmin},
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}
 	return true, nil
 }
 
-func (r *Repository) RolesByUserID(_ context.Context, userID, _ string) ([]iamdomain.Role, error) {
+func (r *Repository) RolesByUserID(_ context.Context, userID, _ string) ([]iamtypes.Role, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	identity, ok := r.users[userID]
@@ -405,16 +406,16 @@ func (r *Repository) RolesByUserID(_ context.Context, userID, _ string) ([]iamdo
 	if len(identity.Roles) == 0 {
 		return nil, iamdomain.ErrNoRolesAssigned
 	}
-	return append([]iamdomain.Role(nil), identity.Roles...), nil
+	return append([]iamtypes.Role(nil), identity.Roles...), nil
 }
 
 // RolesByUserIDs resolves roles for multiple users in a single call (in-memory).
 // Mirrors batch semantics: inactive/absent users are omitted; active users with
 // no roles are present with an empty slice. M-6: tenantID is now honored.
-func (r *Repository) RolesByUserIDs(_ context.Context, tenantID string, userIDs []string) (map[string][]iamdomain.Role, error) {
+func (r *Repository) RolesByUserIDs(_ context.Context, tenantID string, userIDs []string) (map[string][]iamtypes.Role, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := make(map[string][]iamdomain.Role, len(userIDs))
+	out := make(map[string][]iamtypes.Role, len(userIDs))
 	for _, uid := range userIDs {
 		identity, ok := r.users[uid]
 		if !ok || !identity.IsActive {
@@ -424,7 +425,7 @@ func (r *Repository) RolesByUserIDs(_ context.Context, tenantID string, userIDs 
 		if !sliceContains(r.tenants[uid], tenantID) {
 			continue
 		}
-		clone := make([]iamdomain.Role, len(identity.Roles))
+		clone := make([]iamtypes.Role, len(identity.Roles))
 		copy(clone, identity.Roles)
 		out[uid] = clone
 	}
@@ -452,7 +453,7 @@ func sliceContains(s []string, v string) bool {
 	return false
 }
 
-func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, _ string, role iamdomain.Role, _ string) error {
+func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, _ string, role iamtypes.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -481,7 +482,7 @@ func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayN
 	return nil
 }
 
-func (r *Repository) HasAnyRole(_ context.Context, role iamdomain.Role, _ string) (bool, error) {
+func (r *Repository) HasAnyRole(_ context.Context, role iamtypes.Role, _ string) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -495,7 +496,7 @@ func (r *Repository) HasAnyRole(_ context.Context, role iamdomain.Role, _ string
 	return false, nil
 }
 
-func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, role iamdomain.Role, _ string) error {
+func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, role iamtypes.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -515,7 +516,7 @@ func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ 
 	if strings.TrimSpace(displayName) != "" {
 		identity.DisplayName = strings.TrimSpace(displayName)
 	}
-	identity.Roles = []iamdomain.Role{role}
+	identity.Roles = []iamtypes.Role{role}
 	identity.IsActive = true
 	identity.UpdatedAt = time.Now().UTC()
 	r.users[userID] = identity
@@ -524,13 +525,13 @@ func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ 
 
 // UpsertUserAndAssignRoleTx is the tx-aware variant. In the memory repo
 // (test fixture only) the *sql.Tx is ignored.
-func (r *Repository) UpsertUserAndAssignRoleTx(ctx context.Context, _ *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
+func (r *Repository) UpsertUserAndAssignRoleTx(ctx context.Context, _ *sql.Tx, userID, displayName, tenantID string, role iamtypes.Role, assignedBy string) error {
 	return r.UpsertUserAndAssignRole(ctx, userID, displayName, tenantID, role, assignedBy)
 }
 
 // ReplaceUserRolesTx is the tx-aware variant. In the memory repo
 // (test fixture only) the *sql.Tx is ignored.
-func (r *Repository) ReplaceUserRolesTx(ctx context.Context, _ *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
+func (r *Repository) ReplaceUserRolesTx(ctx context.Context, _ *sql.Tx, userID, displayName, tenantID string, role iamtypes.Role, assignedBy string) error {
 	return r.ReplaceUserRoles(ctx, userID, displayName, tenantID, role, assignedBy)
 }
 
@@ -563,11 +564,11 @@ func (r *Repository) GetTenantByID(_ context.Context, tenantID string) (authdoma
 }
 
 func cloneIdentity(identity authdomain.Identity) authdomain.Identity {
-	identity.Roles = append([]iamdomain.Role(nil), identity.Roles...)
+	identity.Roles = append([]iamtypes.Role(nil), identity.Roles...)
 	return identity
 }
 
-func containsRole(roles []iamdomain.Role, want iamdomain.Role) bool {
+func containsRole(roles []iamtypes.Role, want iamtypes.Role) bool {
 	for _, role := range roles {
 		if role == want {
 			return true

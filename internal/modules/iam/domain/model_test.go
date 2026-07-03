@@ -47,9 +47,14 @@ func TestAreaRoleRegistrySize(t *testing.T) {
 }
 
 func TestAreaRolesMatchesRegistryMinusSystemAdmin(t *testing.T) {
+	// Locked count: 8 canonical roles total (mirrors TestAreaRoleRegistrySize's
+	// 7 area roles = 8 - system_admin). validRoles is now unexported inside
+	// iamtypes (ARC-06 move), so this asserts against the same canonical-role
+	// count rather than reaching into the platform package's private map.
+	const wantCanonicalRoles = 8
 	got := AreaRoles()
-	if len(got) != len(validRoles)-1 {
-		t.Fatalf("AreaRoles must equal validRoles minus system_admin: got %d, validRoles %d", len(got), len(validRoles))
+	if len(got) != wantCanonicalRoles-1 {
+		t.Fatalf("AreaRoles must equal canonical roles minus system_admin: got %d, want %d", len(got), wantCanonicalRoles-1)
 	}
 	for _, r := range got {
 		if r == RoleSystemAdmin {

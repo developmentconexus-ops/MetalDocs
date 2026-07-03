@@ -21,6 +21,7 @@ import (
 	authpostgres "metaldocs/internal/modules/auth/infrastructure/postgres"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampostgres "metaldocs/internal/modules/iam/infrastructure/postgres"
+	"metaldocs/internal/platform/iamtypes"
 	"metaldocs/internal/platform/tenant"
 
 	"golang.org/x/crypto/bcrypt"
@@ -28,11 +29,11 @@ import (
 
 // mockRoleProvider implements iamdomain.RoleProvider for testing.
 type mockRoleProvider struct {
-	roles map[string][]iamdomain.Role
+	roles map[string][]iamtypes.Role
 	errs  map[string]error
 }
 
-func (m *mockRoleProvider) RolesByUserID(_ context.Context, userID, tenantID string) ([]iamdomain.Role, error) {
+func (m *mockRoleProvider) RolesByUserID(_ context.Context, userID, tenantID string) ([]iamtypes.Role, error) {
 	key := userID + ":" + tenantID
 	if err, ok := m.errs[key]; ok {
 		return nil, err
@@ -48,20 +49,20 @@ func (m *mockRoleProvider) UserActiveInTenant(_ context.Context, _, _ string) (b
 	return true, nil
 }
 
-func (m *mockRoleProvider) RolesByUserIDs(_ context.Context, tenantID string, userIDs []string) (map[string][]iamdomain.Role, error) {
-	out := make(map[string][]iamdomain.Role, len(userIDs))
+func (m *mockRoleProvider) RolesByUserIDs(_ context.Context, tenantID string, userIDs []string) (map[string][]iamtypes.Role, error) {
+	out := make(map[string][]iamtypes.Role, len(userIDs))
 	for _, uid := range userIDs {
 		key := uid + ":" + tenantID
 		if err, hasErr := m.errs[key]; hasErr {
 			// ErrNoRolesAssigned → user is active but has no roles: include with empty slice.
 			// Other errors (ErrUserNotFound, ErrUserInactive) → exclude.
 			if errors.Is(err, iamdomain.ErrNoRolesAssigned) {
-				out[uid] = []iamdomain.Role{}
+				out[uid] = []iamtypes.Role{}
 			}
 			continue
 		}
 		if roles, ok := m.roles[key]; ok {
-			clone := make([]iamdomain.Role, len(roles))
+			clone := make([]iamtypes.Role, len(roles))
 			copy(clone, roles)
 			out[uid] = clone
 		}
@@ -71,17 +72,17 @@ func (m *mockRoleProvider) RolesByUserIDs(_ context.Context, tenantID string, us
 
 func newMockRoleProvider() *mockRoleProvider {
 	return &mockRoleProvider{
-		roles: map[string][]iamdomain.Role{},
+		roles: map[string][]iamtypes.Role{},
 		errs:  map[string]error{},
 	}
 }
 
 // mockRoleAdminRepository implements iamdomain.RoleAdminRepository for testing.
 type mockRoleAdminRepository struct {
-	roles map[string][]iamdomain.Role
+	roles map[string][]iamtypes.Role
 }
 
-func (m *mockRoleAdminRepository) HasAnyRole(_ context.Context, role iamdomain.Role, _ string) (bool, error) {
+func (m *mockRoleAdminRepository) HasAnyRole(_ context.Context, role iamtypes.Role, _ string) (bool, error) {
 	for _, roles := range m.roles {
 		for _, r := range roles {
 			if r == role {
@@ -92,33 +93,33 @@ func (m *mockRoleAdminRepository) HasAnyRole(_ context.Context, role iamdomain.R
 	return false, nil
 }
 
-func (m *mockRoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
+func (m *mockRoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, tenantID string, role iamtypes.Role, assignedBy string) error {
 	key := userID + ":" + tenantID
 	m.roles[key] = append(m.roles[key], role)
 	return nil
 }
 
-func (m *mockRoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
+func (m *mockRoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, tenantID string, role iamtypes.Role, assignedBy string) error {
 	key := userID + ":" + tenantID
-	m.roles[key] = []iamdomain.Role{role}
+	m.roles[key] = []iamtypes.Role{role}
 	return nil
 }
 
-func (m *mockRoleAdminRepository) UpsertUserAndAssignRoleTx(_ context.Context, _ *sql.Tx, userID, _, tenantID string, role iamdomain.Role, _ string) error {
+func (m *mockRoleAdminRepository) UpsertUserAndAssignRoleTx(_ context.Context, _ *sql.Tx, userID, _, tenantID string, role iamtypes.Role, _ string) error {
 	key := userID + ":" + tenantID
 	m.roles[key] = append(m.roles[key], role)
 	return nil
 }
 
-func (m *mockRoleAdminRepository) ReplaceUserRolesTx(_ context.Context, _ *sql.Tx, userID, _, tenantID string, role iamdomain.Role, _ string) error {
+func (m *mockRoleAdminRepository) ReplaceUserRolesTx(_ context.Context, _ *sql.Tx, userID, _, tenantID string, role iamtypes.Role, _ string) error {
 	key := userID + ":" + tenantID
-	m.roles[key] = []iamdomain.Role{role}
+	m.roles[key] = []iamtypes.Role{role}
 	return nil
 }
 
 func newMockRoleAdminRepository() *mockRoleAdminRepository {
 	return &mockRoleAdminRepository{
-		roles: map[string][]iamdomain.Role{},
+		roles: map[string][]iamtypes.Role{},
 	}
 }
 
@@ -191,7 +192,7 @@ func TestAuthenticate_DevFallback_NoTenantClaim(t *testing.T) {
 	// Seed the role provider with the user having a role in the dev tenant.
 	// This is required because buildCurrentUser calls RolesByUserID and fails
 	// if the user has no roles.
-	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
+	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamtypes.Role{iamtypes.RoleViewer}
 
 	// Service with AllowDevTenantFallback=true
 	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
@@ -240,7 +241,7 @@ func TestAuthenticate_PreservesPasswordWhitespace(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
-	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
+	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamtypes.Role{iamtypes.RoleViewer}
 	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
@@ -569,7 +570,7 @@ func TestResolveSession_ReadsTenantFromSession(t *testing.T) {
 
 	// Mock role provider to return a role for this user in the dev tenant
 	// (when AllowDevTenantFallback=true, user will be logged into the dev tenant)
-	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
+	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamtypes.Role{iamtypes.RoleViewer}
 
 	// Service with AllowDevTenantFallback=true so user can login without X-Tenant-ID
 	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
@@ -643,7 +644,7 @@ func TestResolveSession_IdleTimeout(t *testing.T) {
 		}); err != nil {
 			t.Fatalf("CreateUser: %v", err)
 		}
-		roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
+		roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamtypes.Role{iamtypes.RoleViewer}
 
 		svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 			SessionCookieName:      "session",
@@ -828,7 +829,7 @@ func TestListUsers_FiltersByTenantMembership(t *testing.T) {
 			t.Fatalf("CreateUser(%s): %v", user, err)
 		}
 	}
-	roleProvider.roles["alice:tenant-a"] = []iamdomain.Role{iamdomain.RoleViewer}
+	roleProvider.roles["alice:tenant-a"] = []iamtypes.Role{iamtypes.RoleViewer}
 	roleProvider.errs["carol:tenant-a"] = iamdomain.ErrNoRolesAssigned
 
 	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
@@ -856,7 +857,7 @@ func TestListUsers_FiltersByTenantMembership(t *testing.T) {
 	if !ok {
 		t.Fatal("expected alice in tenant-a listing")
 	}
-	if len(alice.Roles) != 1 || alice.Roles[0] != iamdomain.RoleViewer {
+	if len(alice.Roles) != 1 || alice.Roles[0] != iamtypes.RoleViewer {
 		t.Fatalf("alice roles = %v, want [viewer]", alice.Roles)
 	}
 	carol, ok := byUserID["carol"]
@@ -885,7 +886,7 @@ func TestCreateUserWithInput_DefaultsUserIDFromUsername(t *testing.T) {
 	err := svc.CreateUserWithInput(context.Background(), authdomain.CreateUserInput{
 		Username: "new-user",
 		Password: authdomain.PlainPassword("Password123!"),
-		Roles:    []iamdomain.Role{iamdomain.RoleViewer},
+		Roles:    []iamtypes.Role{iamtypes.RoleViewer},
 	})
 	if err != nil {
 		t.Fatalf("CreateUserWithInput: %v", err)
@@ -917,7 +918,7 @@ func TestCreateUserWithInput_RejectsMultipleRoles(t *testing.T) {
 	err := svc.CreateUserWithInput(context.Background(), authdomain.CreateUserInput{
 		Username: "new-user",
 		Password: authdomain.PlainPassword("Password123!"),
-		Roles:    []iamdomain.Role{iamdomain.RoleViewer, iamdomain.RoleEditor},
+		Roles:    []iamtypes.Role{iamtypes.RoleViewer, iamtypes.RoleEditor},
 	})
 	if !errors.Is(err, iamdomain.ErrInvalidRole) {
 		t.Fatalf("CreateUserWithInput error = %v, want ErrInvalidRole", err)
@@ -1013,7 +1014,7 @@ SELECT EXISTS (
 		CookieSecure:           false,
 	})
 
-	err = svc.CreateUser(context.Background(), "alice", "alice", "alice@example.com", "Alice", "Password123!", tenantID, []iamdomain.Role{iamdomain.Role("author")}, "admin")
+	err = svc.CreateUser(context.Background(), "alice", "alice", "alice@example.com", "Alice", "Password123!", tenantID, []iamtypes.Role{iamtypes.Role("author")}, "admin")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -1062,7 +1063,7 @@ func TestChangePasswordForUser_RevokesSessions(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
-	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
+	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamtypes.Role{iamtypes.RoleViewer}
 
 	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
@@ -1116,7 +1117,7 @@ func f8_4NewActiveUserService(t *testing.T, userID string) (*Service, *memory.Re
 	}); err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
-	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
+	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamtypes.Role{iamtypes.RoleViewer}
 
 	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",

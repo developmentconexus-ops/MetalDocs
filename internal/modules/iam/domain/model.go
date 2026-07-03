@@ -2,42 +2,37 @@ package domain
 
 import (
 	"fmt"
-	"sort"
 	"strings"
+
+	"metaldocs/internal/platform/iamtypes"
 )
 
-type Role string
+// Role, its canonical constants, and the Role-only helpers (IsValidRole,
+// IsAreaRole, AreaRoles) now live in internal/platform/iamtypes — a neutral
+// platform package with no dependency on IAM's application/infrastructure
+// layers or on the auth module. This alias keeps every existing
+// `domain.Role` / `iamdomain.Role` call site across the codebase compiling
+// unchanged (ARC-06: closes the auth<->iam bidirectional module dependency
+// that existed solely because Role lived inside iam/domain). See
+// iamtypes.Role godoc for the canonical-roles source and rationale.
+type Role = iamtypes.Role
 
-// Canonical tenant roles (8). PR-5 will move this catalog to a dedicated file
-// (`canonical_roles.go`) when the Roles & Capabilities matrix lands; the three
-// area-only roles (signer / area_admin / qms_admin) are added here in PR-4 so
-// People-tab invite validation can accept area-membership.role values that
-// match the OpenAPI UserRole enum. Source: wiki/modules/iam.md §canonical-roles.
 const (
-	RoleApprover    Role = "approver"
-	RoleAreaAdmin   Role = "area_admin"
-	RoleAuthor      Role = "author"
-	RoleEditor      Role = "editor"
-	RoleQmsAdmin    Role = "qms_admin"
-	RoleSigner      Role = "signer"
-	RoleSystemAdmin Role = "system_admin"
-	RoleViewer      Role = "viewer"
+	RoleApprover    = iamtypes.RoleApprover
+	RoleAreaAdmin   = iamtypes.RoleAreaAdmin
+	RoleAuthor      = iamtypes.RoleAuthor
+	RoleEditor      = iamtypes.RoleEditor
+	RoleQmsAdmin    = iamtypes.RoleQmsAdmin
+	RoleSigner      = iamtypes.RoleSigner
+	RoleSystemAdmin = iamtypes.RoleSystemAdmin
+	RoleViewer      = iamtypes.RoleViewer
 )
 
-var validRoles = map[Role]struct{}{
-	RoleApprover:    {},
-	RoleAreaAdmin:   {},
-	RoleAuthor:      {},
-	RoleEditor:      {},
-	RoleQmsAdmin:    {},
-	RoleSigner:      {},
-	RoleSystemAdmin: {},
-	RoleViewer:      {},
-}
-
+// IsValidRole reports whether role is one of the eight canonical roles.
+// Forwards to iamtypes.IsValidRole; kept here so existing domain.IsValidRole
+// call sites are unaffected.
 func IsValidRole(role Role) bool {
-	_, ok := validRoles[role]
-	return ok
+	return iamtypes.IsValidRole(role)
 }
 
 func ParseRole(raw string) (Role, error) {
@@ -48,41 +43,17 @@ func ParseRole(raw string) (Role, error) {
 	return role, nil
 }
 
-// areaRoles is the subset of canonical roles assignable as an AREA membership
-// (a public.user_process_areas row). It is every canonical role EXCEPT
-// system_admin: system_admin is a tenant-wide tier-1 role that bypasses tier-2
-// and is never an area membership. This set is the Go single source of truth for
-// area-assignable roles and mirrors the user_process_areas role CHECK constraint
-// in the DB. Consumers that resolve actors by an area role (e.g. the approval
-// module's stage required_role, joined against user_process_areas.role) bind
-// against this set so a role no user can ever hold cannot be configured
-// (ADR 0022 — role strings are bound to the registry, never free text).
-var areaRoles = map[Role]struct{}{
-	RoleApprover:  {},
-	RoleAreaAdmin: {},
-	RoleAuthor:    {},
-	RoleEditor:    {},
-	RoleQmsAdmin:  {},
-	RoleSigner:    {},
-	RoleViewer:    {},
-}
-
 // IsAreaRole reports whether role can be held as an area membership
-// (user_process_areas). system_admin is intentionally excluded — it is tenant-wide.
+// (user_process_areas). system_admin is intentionally excluded — it is
+// tenant-wide. Forwards to iamtypes.IsAreaRole.
 func IsAreaRole(role Role) bool {
-	_, ok := areaRoles[role]
-	return ok
+	return iamtypes.IsAreaRole(role)
 }
 
-// AreaRoles returns the canonical area-assignable roles, sorted — for validation
-// messages and diagnostics.
+// AreaRoles returns the canonical area-assignable roles, sorted — for
+// validation messages and diagnostics. Forwards to iamtypes.AreaRoles.
 func AreaRoles() []Role {
-	out := make([]Role, 0, len(areaRoles))
-	for r := range areaRoles {
-		out = append(out, r)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
-	return out
+	return iamtypes.AreaRoles()
 }
 
 type Capability string

@@ -19,6 +19,7 @@ import (
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/iamtypes"
 	"metaldocs/internal/platform/requesttrace"
 	"metaldocs/internal/platform/security"
 	"metaldocs/internal/platform/tenant"
@@ -125,7 +126,7 @@ type createUserTxRepository interface {
 }
 
 type replaceUserRolesTxRepository interface {
-	ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error
+	ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, role iamtypes.Role, assignedBy string) error
 }
 
 type beginTxRepository interface {
@@ -178,7 +179,7 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 	}
 
 	// Bootstrap runs in single-tenant dev mode. Use the default tenant.
-	hasAdmin, err := s.roleAdmin.HasAnyRole(ctx, iamdomain.RoleSystemAdmin, tenant.DevTenantID)
+	hasAdmin, err := s.roleAdmin.HasAnyRole(ctx, iamtypes.RoleSystemAdmin, tenant.DevTenantID)
 	if err != nil {
 		return err
 	}
@@ -211,7 +212,7 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 		strings.TrimSpace(s.cfg.BootstrapAdminUserID),
 		strings.TrimSpace(s.cfg.BootstrapAdminName),
 		tenant.DevTenantID,
-		iamdomain.RoleSystemAdmin,
+		iamtypes.RoleSystemAdmin,
 		"bootstrap",
 	)
 }
@@ -555,7 +556,7 @@ func (s *Service) ListOnlineUsers(ctx context.Context, tenantID string, activeSi
 	return s.repo.ListOnlineUsers(ctx, tenantID, activeSince)
 }
 
-func (s *Service) CreateUser(ctx context.Context, userID, username, email, displayName, password, tenantID string, roles []iamdomain.Role, createdBy string) error {
+func (s *Service) CreateUser(ctx context.Context, userID, username, email, displayName, password, tenantID string, roles []iamtypes.Role, createdBy string) error {
 	return s.CreateUserWithInput(ctx, authdomain.CreateUserInput{
 		UserID:      authdomain.UserID(userID),
 		Username:    username,
@@ -955,7 +956,7 @@ type createUserFields struct {
 	displayName string
 	password    string
 	tenantID    string
-	role        iamdomain.Role
+	role        iamtypes.Role
 	createdBy   string
 }
 
@@ -984,7 +985,7 @@ func (s *Service) normalizeCreateUserInput(input authdomain.CreateUserInput) (cr
 	if len(input.Roles) != 1 {
 		return createUserFields{}, iamdomain.ErrInvalidRole
 	}
-	if !iamdomain.IsValidRole(input.Roles[0]) {
+	if !iamtypes.IsValidRole(input.Roles[0]) {
 		return createUserFields{}, iamdomain.ErrInvalidRole
 	}
 	fields.role = input.Roles[0]

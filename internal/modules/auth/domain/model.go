@@ -6,6 +6,7 @@ import (
 	"time"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/iamtypes"
 )
 
 // PasswordHash must only be set via bcrypt.GenerateFromPassword; never assign raw strings.
@@ -38,7 +39,7 @@ type Identity struct {
 	FailedLoginAttempts int
 	LockedUntil         *time.Time
 	IsActive            bool
-	Roles               []iamdomain.Role
+	Roles               []iamtypes.Role
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }
@@ -80,7 +81,7 @@ type ManagedUser struct {
 	LastLoginAt         *time.Time
 	FailedLoginAttempts int
 	LockedUntil         *time.Time
-	Roles               []iamdomain.Role
+	Roles               []iamtypes.Role
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 }
@@ -94,7 +95,7 @@ type CreateUserParams struct {
 	PasswordAlgo       string
 	MustChangePassword bool
 	IsActive           bool
-	Roles              []iamdomain.Role
+	Roles              []iamtypes.Role
 	CreatedBy          string
 }
 
@@ -105,7 +106,7 @@ type CreateUserInput struct {
 	DisplayName string
 	Password    PlainPassword
 	TenantID    TenantID
-	Roles       []iamdomain.Role
+	Roles       []iamtypes.Role
 	CreatedBy   string
 }
 
@@ -131,14 +132,14 @@ type BootstrapAdminParams struct {
 
 // CurrentUser fields are PII; do not log this struct directly.
 type CurrentUser struct {
-	UserID             string           `json:"user_id"`
-	TenantID           string           `json:"tenant_id"`
-	TenantName         string           `json:"tenant_name"`
-	Username           string           `json:"username"`
-	Email              string           `json:"email,omitempty"`
-	DisplayName        string           `json:"display_name"`
-	MustChangePassword bool             `json:"must_change_password"`
-	Roles              []iamdomain.Role `json:"roles"`
+	UserID             string          `json:"user_id"`
+	TenantID           string          `json:"tenant_id"`
+	TenantName         string          `json:"tenant_name"`
+	Username           string          `json:"username"`
+	Email              string          `json:"email,omitempty"`
+	DisplayName        string          `json:"display_name"`
+	MustChangePassword bool            `json:"must_change_password"`
+	Roles              []iamtypes.Role `json:"roles"`
 	// Capabilities is the union of capability codes the actor holds in the
 	// active tenant. UX hint only — backend remains the sole trust boundary
 	// (see wiki/concepts/authz-tiers.md). May be empty when no provider is

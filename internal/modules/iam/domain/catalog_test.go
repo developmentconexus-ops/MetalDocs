@@ -39,9 +39,9 @@ func TestCanonicalRolesShape(t *testing.T) {
 			t.Errorf("role %q has empty description", role.Code)
 		}
 	}
-	for code := range validRoles {
+	for code := range wantCategory {
 		if _, ok := seen[code]; !ok {
-			t.Errorf("validRoles contains %q but CanonicalRoles() does not", code)
+			t.Errorf("canonical role %q not returned by CanonicalRoles()", code)
 		}
 	}
 }
@@ -108,11 +108,11 @@ func TestCapabilityCatalogSortedByCode(t *testing.T) {
 
 func TestCapabilityCategoryDerivation(t *testing.T) {
 	tests := map[Capability]string{
-		"document.view":              "document",
-		"audit.read":                 "audit",
-		"session.manage":             "session",
+		"document.view":               "document",
+		"audit.read":                  "audit",
+		"session.manage":              "session",
 		"controlled_documents.create": "controlled_documents",
-		"general":                    "general",
+		"general":                     "general",
 	}
 	for cap, want := range tests {
 		if got := capabilityCategory(cap); got != want {
