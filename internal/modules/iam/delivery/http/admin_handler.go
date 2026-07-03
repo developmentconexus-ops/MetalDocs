@@ -384,7 +384,7 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, iamapi.ReplaceUserRolesResponse{
 		UserId:      userID,
 		DisplayName: strings.TrimSpace(req.DisplayName),
-		Roles:       []iamapi.ReplaceUserRolesResponseRoles{iamapi.ReplaceUserRolesResponseRoles(role)},
+		Roles:       []iamapi.UserRole{iamapi.UserRole(role)},
 	})
 	// Audit is now emitted in-tx by AdminService.ReplaceUserRoles (H-3b).
 }
