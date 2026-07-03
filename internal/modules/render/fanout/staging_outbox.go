@@ -65,9 +65,11 @@ ON CONFLICT (tenant_id, revision_id) DO NOTHING`, r.table),
 	return nil
 }
 
-// TODO(render): thread tenant scope through the worker claim path before adding
-// a tenant_id predicate here; the current worker intentionally drains the shared
-// outbox across tenants.
+// ClaimPending intentionally claims across ALL tenants — sanctioned by ADR 0054
+// (cross-tenant claim for background outbox consumers, mirroring the platform
+// consumer in internal/platform/messaging/outbox/postgres/consumer.go). Tenancy
+// is enforced at processing time: each returned row carries TenantID and the
+// consumer must scope all per-row work to it. Do not add a tenant_id predicate.
 func (r *StagingOutboxRepository) ClaimPending(ctx context.Context, limit, maxAttempts int) ([]OutboxRow, error) {
 	//nolint:gosec // table name is allowlist-validated at construction
 	rows, err := r.db.QueryContext(ctx, fmt.Sprintf(`
