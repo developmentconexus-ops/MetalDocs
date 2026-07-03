@@ -1,7 +1,7 @@
 # Milestone 2 — Authz enforcement generation & cap-name coherence
 
 > **Program:** global-maximum-remediation  ·  **Governing spec:** `../mission.md` (§7 M2)
-> **Status:** **IN-PROGRESS** — spec + `validation-contract.md` authored 2026-07-03, *before any implementation*.
+> **Status:** **VALIDATION-PENDING** — F2.1 + F2.2 implemented & committed (evidence complete); awaiting `milestone-validator`. Main session flips to PASSED only on validator PASS + HS-1 operator approval.
 > **Authored:** 2026-07-03 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** M2 is, **which features** it
