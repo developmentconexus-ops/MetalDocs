@@ -14,7 +14,7 @@ func (h *Handler) ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request, p
 	h.listProfiles(w, r)
 }
 
-func (h *Handler) CreateTaxonomyProfile(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateTaxonomyProfile(w http.ResponseWriter, r *http.Request, _ taxonomyapi.CreateTaxonomyProfileParams) {
 	h.createProfile(w, r)
 }
 
@@ -39,7 +39,7 @@ func (h *Handler) ListTaxonomyAreas(w http.ResponseWriter, r *http.Request, para
 	h.listAreas(w, r)
 }
 
-func (h *Handler) CreateTaxonomyArea(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateTaxonomyArea(w http.ResponseWriter, r *http.Request, _ taxonomyapi.CreateTaxonomyAreaParams) {
 	h.createArea(w, r)
 }
 
@@ -68,7 +68,7 @@ func (h *Handler) ListTaxonomyFamilies(w http.ResponseWriter, r *http.Request, p
 	h.listFamilies(w, r)
 }
 
-func (h *Handler) CreateTaxonomyFamily(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateTaxonomyFamily(w http.ResponseWriter, r *http.Request, _ taxonomyapi.CreateTaxonomyFamilyParams) {
 	h.createFamily(w, r)
 }
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/tenant"
 )
@@ -70,12 +71,14 @@ func TestFamiliesHandler_ListReturns200(t *testing.T) {
 }
 
 func TestFamiliesHandler_CreateUniqueViolationReturns409(t *testing.T) {
-	handler := &Handler{families: fakeFamilyService{createErr: &pgconn.PgError{Code: "23505"}}}
+	handler := NewHandler(fakeProfileService{}, fakeAreaService{}, fakeFamilyService{createErr: &pgconn.PgError{Code: "23505"}}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/families", strings.NewReader(`{"code":"F1","name":"Family"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-test", []iamdomain.Role{iamdomain.RoleSystemAdmin}))
+	req.Header.Set("Idempotency-Key", testIdempotencyKey)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -85,12 +88,14 @@ func TestFamiliesHandler_CreateUniqueViolationReturns409(t *testing.T) {
 }
 
 func TestFamiliesHandler_CreateConstraintViolationReturnsGenericValidationMessage(t *testing.T) {
-	handler := &Handler{families: fakeFamilyService{createErr: &pgconn.PgError{Code: "23514", Message: "sensitive detail"}}}
+	handler := NewHandler(fakeProfileService{}, fakeAreaService{}, fakeFamilyService{createErr: &pgconn.PgError{Code: "23514", Message: "sensitive detail"}}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/families", strings.NewReader(`{"code":"F1","name":"Family"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-test", []iamdomain.Role{iamdomain.RoleSystemAdmin}))
+	req.Header.Set("Idempotency-Key", testIdempotencyKey)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

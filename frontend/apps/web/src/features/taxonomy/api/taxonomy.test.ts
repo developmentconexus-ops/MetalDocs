@@ -132,6 +132,7 @@ describe('createProfile / updateProfile', () => {
     expect(profile.code).toBe('pop');
     expect(profile.reviewIntervalDays).toBe(180);
     expect(mockPost).toHaveBeenCalledWith('/taxonomy/profiles', {
+      params: { header: { 'Idempotency-Key': expect.any(String) } },
       body: {
         code: 'pop',
         family_code: 'sop',

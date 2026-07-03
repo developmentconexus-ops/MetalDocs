@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
@@ -100,12 +101,14 @@ func TestProfilesHandler_UpdateReturns404WhenProfileMissing(t *testing.T) {
 }
 
 func TestProfilesHandler_CreateUniqueViolationReturns409(t *testing.T) {
-	handler := &Handler{profiles: fakeProfileService{createErr: &pgconn.PgError{Code: "23505"}}}
+	handler := NewHandler(fakeProfileService{createErr: &pgconn.PgError{Code: "23505"}}, fakeAreaService{}, fakeFamilyService{}, newIdempotentMockDB(t))
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/profiles", strings.NewReader(`{"code":"P1","familyCode":"F1","name":"Profile"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-test", []iamdomain.Role{iamdomain.RoleSystemAdmin}))
+	req.Header.Set("Idempotency-Key", testIdempotencyKey)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

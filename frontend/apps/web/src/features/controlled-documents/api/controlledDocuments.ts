@@ -83,17 +83,19 @@ export async function previewCode(
   return apiFetch<PreviewCodeResponse>(`${BASE}/preview-code?${qs}`);
 }
 
-export async function obsoleteControlledDocument(id: string): Promise<void> {
+export async function obsoleteControlledDocument(id: string, idempotencyKey: string): Promise<void> {
   await apiFetch<void>(`${BASE}/${encodeURIComponent(id)}/obsolete`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
+    idempotencyKey,
   });
 }
 
-export async function supersedeControlledDocument(id: string): Promise<void> {
+export async function supersedeControlledDocument(id: string, idempotencyKey: string): Promise<void> {
   await apiFetch<void>(`${BASE}/${encodeURIComponent(id)}/supersede`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
+    idempotencyKey,
   });
 }
 

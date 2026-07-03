@@ -890,7 +890,7 @@ func TestObsoleteControlledDocument_UsesGeneratedPathParam(t *testing.T) {
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
-	handler.ObsoleteControlledDocument(rec, req, uuid.MustParse(cdID))
+	handler.ObsoleteControlledDocument(rec, req, uuid.MustParse(cdID), controlleddocumentsapi.ObsoleteControlledDocumentParams{})
 
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204; body = %s", rec.Code, rec.Body.String())
@@ -922,7 +922,7 @@ func TestSupersedeControlledDocument_UsesGeneratedPathParam(t *testing.T) {
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
-	handler.SupersedeControlledDocument(rec, req, uuid.MustParse(cdID))
+	handler.SupersedeControlledDocument(rec, req, uuid.MustParse(cdID), controlleddocumentsapi.SupersedeControlledDocumentParams{})
 
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204; body = %s", rec.Code, rec.Body.String())

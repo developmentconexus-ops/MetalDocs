@@ -95,7 +95,10 @@ export async function createProfile(req: CreateProfileRequest): Promise<Document
     review_interval_days: req.reviewIntervalDays,
     editable_by_role: req.editableByRole ?? "admin",
   };
-  const { data, error } = await api.POST("/taxonomy/profiles", { body });
+  const { data, error } = await api.POST("/taxonomy/profiles", {
+    params: { header: { "Idempotency-Key": crypto.randomUUID() } },
+    body,
+  });
   if (error) throw asApiError(error, "taxonomy.profiles.create_failed");
   if (!data) throw new ApiError("taxonomy.profiles.empty_response", 0, "Resposta vazia ao criar perfil.");
   return toDocumentProfile(data);
@@ -159,7 +162,10 @@ export async function createArea(req: CreateAreaRequest): Promise<ProcessArea> {
     parent_code: req.parentCode ?? null,
     default_approver_role: req.defaultApproverRole ?? null,
   };
-  const { data, error } = await api.POST("/taxonomy/areas", { body });
+  const { data, error } = await api.POST("/taxonomy/areas", {
+    params: { header: { "Idempotency-Key": crypto.randomUUID() } },
+    body,
+  });
   if (error) throw asApiError(error, "taxonomy.areas.create_failed");
   if (!data) throw new ApiError("taxonomy.areas.empty_response", 0, "Resposta vazia ao criar área.");
   return toProcessArea(data);
@@ -203,7 +209,10 @@ export async function createFamily(req: CreateFamilyRequest): Promise<DocumentFa
     name: req.name,
     description: req.description ?? "",
   };
-  const { data, error } = await api.POST("/taxonomy/families", { body });
+  const { data, error } = await api.POST("/taxonomy/families", {
+    params: { header: { "Idempotency-Key": crypto.randomUUID() } },
+    body,
+  });
   if (error) throw asApiError(error, "taxonomy.families.create_failed");
   if (!data) throw new ApiError("taxonomy.families.empty_response", 0, "Resposta vazia ao criar família.");
   return toDocumentFamily(data);

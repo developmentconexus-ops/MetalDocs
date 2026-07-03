@@ -290,8 +290,18 @@ type PreviewControlledDocumentCodeParams struct {
 	AreaCode    string `form:"area_code" json:"area_code"`
 }
 
+// ObsoleteControlledDocumentParams defines parameters for ObsoleteControlledDocument.
+type ObsoleteControlledDocumentParams struct {
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
 // CreateControlledDocumentRevisionParams defines parameters for CreateControlledDocumentRevision.
 type CreateControlledDocumentRevisionParams struct {
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
+// SupersedeControlledDocumentParams defines parameters for SupersedeControlledDocument.
+type SupersedeControlledDocumentParams struct {
 	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
 }
 
@@ -320,13 +330,13 @@ type ServerInterface interface {
 	GetActiveDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Mark controlled document as obsolete
 	// (PUT /controlled-documents/{id}/obsolete)
-	ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ObsoleteControlledDocumentParams)
 	// Create a new revision for a controlled document
 	// (POST /controlled-documents/{id}/revisions)
 	CreateControlledDocumentRevision(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params CreateControlledDocumentRevisionParams)
 	// Mark controlled document as superseded
 	// (PUT /controlled-documents/{id}/supersede)
-	SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SupersedeControlledDocumentParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -656,8 +666,36 @@ func (siw *ServerInterfaceWrapper) ObsoleteControlledDocument(w http.ResponseWri
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ObsoleteControlledDocumentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey openapi_types.UUID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ObsoleteControlledDocument(w, r, id)
+		siw.Handler.ObsoleteControlledDocument(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -748,8 +786,36 @@ func (siw *ServerInterfaceWrapper) SupersedeControlledDocument(w http.ResponseWr
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SupersedeControlledDocumentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey openapi_types.UUID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SupersedeControlledDocument(w, r, id)
+		siw.Handler.SupersedeControlledDocument(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1372,7 +1438,8 @@ func (response GetActiveDocument500ApplicationProblemPlusJSONResponse) VisitGetA
 }
 
 type ObsoleteControlledDocumentRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params ObsoleteControlledDocumentParams
 }
 
 type ObsoleteControlledDocumentResponseObject interface {
@@ -1463,6 +1530,22 @@ func (response ObsoleteControlledDocument409ApplicationProblemPlusJSONResponse) 
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ObsoleteControlledDocument422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response ObsoleteControlledDocument422ApplicationProblemPlusJSONResponse) VisitObsoleteControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1604,7 +1687,8 @@ func (response CreateControlledDocumentRevision500ApplicationProblemPlusJSONResp
 }
 
 type SupersedeControlledDocumentRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params SupersedeControlledDocumentParams
 }
 
 type SupersedeControlledDocumentResponseObject interface {
@@ -1695,6 +1779,22 @@ func (response SupersedeControlledDocument409ApplicationProblemPlusJSONResponse)
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SupersedeControlledDocument422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response SupersedeControlledDocument422ApplicationProblemPlusJSONResponse) VisitSupersedeControlledDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1910,10 +2010,11 @@ func (sh *strictHandler) GetActiveDocument(w http.ResponseWriter, r *http.Reques
 }
 
 // ObsoleteControlledDocument operation middleware
-func (sh *strictHandler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ObsoleteControlledDocumentParams) {
 	var request ObsoleteControlledDocumentRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ObsoleteControlledDocument(ctx, request.(ObsoleteControlledDocumentRequestObject))
@@ -1970,10 +2071,11 @@ func (sh *strictHandler) CreateControlledDocumentRevision(w http.ResponseWriter,
 }
 
 // SupersedeControlledDocument operation middleware
-func (sh *strictHandler) SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SupersedeControlledDocumentParams) {
 	var request SupersedeControlledDocumentRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.SupersedeControlledDocument(ctx, request.(SupersedeControlledDocumentRequestObject))
@@ -2000,66 +2102,66 @@ func (sh *strictHandler) SupersedeControlledDocument(w http.ResponseWriter, r *h
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

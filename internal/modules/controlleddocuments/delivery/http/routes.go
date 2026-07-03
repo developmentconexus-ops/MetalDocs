@@ -352,10 +352,13 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }
 
-// ObsoleteControlledDocument handles POST
+// ObsoleteControlledDocument handles PUT
 // /controlled-documents/{id}/obsolete: transitions the controlled
-// document from active to obsolete.
-func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+// document from active to obsolete. params.IdempotencyKey is consumed by
+// the router-level idempotency.Require middleware (handler.go); it is not
+// re-read here, mirroring the atomic-create/create-revision routes in this
+// same package.
+func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, _ controlleddocumentsapi.ObsoleteControlledDocumentParams) {
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
@@ -369,10 +372,13 @@ func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// SupersedeControlledDocument handles POST
+// SupersedeControlledDocument handles PUT
 // /controlled-documents/{id}/supersede: transitions the controlled
-// document from active to superseded.
-func (h *Handler) SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+// document from active to superseded. params.IdempotencyKey is consumed by
+// the router-level idempotency.Require middleware (handler.go); it is not
+// re-read here, mirroring the atomic-create/create-revision routes in this
+// same package.
+func (h *Handler) SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, _ controlleddocumentsapi.SupersedeControlledDocumentParams) {
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {

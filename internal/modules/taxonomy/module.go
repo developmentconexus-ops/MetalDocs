@@ -50,7 +50,7 @@ func New(deps Dependencies) *Module {
 	profileService := application.NewProfileService(profileRepo, tplChecker, logger)
 	areaService := application.NewAreaService(areaRepo, logger)
 	familyService := application.NewFamilyService(familyRepo, logger)
-	handler := thttp.NewHandler(profileService, areaService, familyService)
+	handler := thttp.NewHandler(profileService, areaService, familyService, deps.DB)
 
 	return &Module{Handler: handler}
 }
