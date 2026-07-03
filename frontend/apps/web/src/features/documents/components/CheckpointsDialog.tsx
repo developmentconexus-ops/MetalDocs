@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { CheckpointsPanel } from './CheckpointsPanel';
-import styles from './styles/DocumentEditorPage.module.css';
+import styles from './styles/CheckpointsDialog.module.css';
 
 export function CheckpointsDialog({
   open,

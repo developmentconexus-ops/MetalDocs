@@ -28,11 +28,12 @@ import {
   AutosaveStatus,
   type AutosaveState,
 } from '../../shared/components/editor-chrome';
-import { CodeChip, StatusPill, type DocumentStatus } from '../../../components/ui';
+import { CodeChip, StatusPill } from '../../../components/ui';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { useAreasQuery } from '../queries/useAreasQuery';
 import { useControlledDocumentDetailQuery } from '../../controlled-documents/queries/useControlledDocumentDetailQuery';
 import { buildVisibilityLabel, displayRevisionTitle, formatRevisionCode, hasSettledSidebarIdentity, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
+import { parseDocumentStatus } from '../lib/parseDocumentStatus';
 import styles from './styles/DocumentEditorPage.module.css';
 
 export type DocumentEditorPageProps = {
@@ -369,15 +370,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   // AutosaveState (7-state) is structurally identical to useDocumentAutosave.AutosaveStatus.
   const autosaveState: AutosaveState = autosave.status;
 
-  const statusForPill: DocumentStatus | null = (() => {
-    if (!docStatus) return null;
-    const allowed: DocumentStatus[] = [
-      'draft', 'review', 'under_review', 'approved', 'frozen',
-      'rejected', 'archived', 'finalized', 'scheduled', 'published', // cilint:allow-legacy: pre-cutover status aliases accepted for rendering
-      'superseded', 'obsolete',
-    ];
-    return (allowed as string[]).includes(docStatus) ? (docStatus as DocumentStatus) : null;
-  })();
+  const statusForPill = parseDocumentStatus(docStatus);
 
   const profileLabel = doc?.profile_code_snapshot && profilesQuery.data
     ? resolveProfileLabel(doc.profile_code_snapshot, profilesQuery.data)
