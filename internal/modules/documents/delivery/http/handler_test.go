@@ -922,6 +922,14 @@ func TestFinalizeDocument_StaleRevision_Returns409(t *testing.T) {
 	if rr.Code != http.StatusConflict {
 		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
 	}
+	// CON-05: pin the RFC 9457 envelope for the 409 path (Content-Type +
+	// machine code), not just the status.
+	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Fatalf("want application/problem+json, got %s", ct)
+	}
+	if !strings.Contains(rr.Body.String(), "CONCURRENT_MODIFICATION") {
+		t.Fatalf("expected CONCURRENT_MODIFICATION problem, got %s", rr.Body.String())
+	}
 	if !submitter.called {
 		t.Fatal("expected submit service to be called")
 	}
@@ -996,6 +1004,11 @@ func TestFinalizeDocument_IdempotencyStoreEngaged(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("expected 422 from the scripted idempotency conflict, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	// CON-05: pin the RFC 9457 envelope for the 422 path (Content-Type), not
+	// just the status + code substring already checked below.
+	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Fatalf("want application/problem+json, got %s", ct)
 	}
 	if body := rr.Body.String(); !strings.Contains(body, "IDEMPOTENCY_KEY_REUSED") {
 		t.Fatalf("expected IDEMPOTENCY_KEY_REUSED from the idempotency store path, got body=%s", body)

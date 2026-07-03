@@ -85,6 +85,19 @@ func TestReconstructHandler_NotFoundReturns404(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
+	// CON-05: pin the RFC 9457 problem+json envelope (Content-Type + machine
+	// code), not just the HTTP status, so a regression to a legacy
+	// {error:{...}} shape or a bare-status write fails this test.
+	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Fatalf("want application/problem+json, got %s", ct)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["code"] != "not_found.revision" {
+		t.Fatalf("code=%v, want not_found.revision", body["code"])
+	}
 }
 
 func TestReconstructHandler_InternalReturns500(t *testing.T) {
