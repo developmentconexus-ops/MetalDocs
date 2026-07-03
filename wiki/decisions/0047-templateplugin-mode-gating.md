@@ -1,7 +1,7 @@
 # 0047 — templatePlugin mode-gating
 
-- **Status:** Proposed
-- **Last verified:** 2026-06-23
+- **Status:** Accepted (DEC-04, 2026-07-02 — realization verified in code: `packages/editor-ui/src/MetalDocsEditor.tsx:184-185` assembles `templatePlugin` + filter-transaction-guard only when `props.mode === 'template-draft'`; pinned by `packages/editor-ui/test/templatePlugin.wiring.test.tsx`)
+- **Last verified:** 2026-07-02
 - **Scope:** When eigenpal's `templatePlugin` (placeholder authoring) is active in the MetalDocs editor.
 
 ## Context
