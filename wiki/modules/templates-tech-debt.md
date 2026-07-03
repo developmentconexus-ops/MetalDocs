@@ -135,6 +135,14 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-014`
 - **Linked ADR:** missing-ADR
 
+### T-015 · `POST /templates` requires a client-supplied `key` — decision made, not yet implemented (ADR 0057)
+- **Severity:** minor
+- **Surface:** `api/openapi/v1/openapi.yaml:1159-1172` (`key` required in request body, no format constraint); `internal/modules/templates/application/create.go:14-35` (`CreateTemplateCmd.Key`, `GetTemplateByKey` pre-check, `domain.ErrKeyConflict` on collision — `internal/modules/templates/domain/template.go:30`).
+- **Observation:** The wizard UX blocker at `wiki/backlog/novo-template-wizard.md:39-44` ("key-generation") is caused by the backend trusting a client-supplied `key` with no design-side input for it (`novo-template-wizard.md:40`: "Design has no key input — derived auto from name"). ADR 0057 decided the resolution (server-generated slug + uniqueness suffix, `key` dropped from the request contract, immutable post-creation) but explicitly scoped itself as decision-only — no contract, application, or UI change has shipped yet.
+- **Evidence:** `wiki/decisions/0057-template-key-server-generated-slug.md`.
+- **Linked backlog row:** `wiki/backlog/novo-template-wizard.md` "key-generation" section (to be closed once implemented).
+- **Linked ADR:** `wiki/decisions/0057-template-key-server-generated-slug.md`
+
 ---
 
 ## Coverage stats (computed at compose time)

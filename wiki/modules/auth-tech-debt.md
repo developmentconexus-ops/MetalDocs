@@ -88,13 +88,14 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - **Linked backlog row:** `backlog/auth-refactor.md#R-009`
 - **Linked ADR:** n/a
 
-### T-010 · Missing standalone ADR for session-cookie + bcrypt + lockout policy
-- **Severity:** minor
+### T-010 · Missing standalone ADR for session-cookie + bcrypt + lockout policy — CLOSED 2026-07-02 (ADR 0058)
+- **Severity:** minor (closed)
 - **Surface:** `internal/modules/auth/application/service.go:117-126,431-432`; `internal/platform/authn/config.go:101-116`
-- **Observation:** Session-cookie format (`<base64url(rand32)>.<base64url(HMAC-SHA256(secret,token))>` with `SHA-256(token)` stored as `session_id`), bcrypt cost 12 (`bcryptCost = 12` at `service.go:29`), and per-account lockout policy are enforced by code + tests but no standalone ADR captures the choice. ADR 0007 covers tier split, not credential mechanics. Trigger fired: missing standalone ADR for an enforced rule.
-- **Evidence:** `_artifacts/02-flow-login.md` §token mint + verify; `_artifacts/03-deps.md` §4 config surface.
-- **Linked backlog row:** `backlog/auth-refactor.md#R-010`
-- **Linked ADR:** missing-ADR
+- **Observation (original):** Session-cookie format (`<base64url(rand32)>.<base64url(HMAC-SHA256(secret,token))>` with `SHA-256(token)` stored as `session_id`), bcrypt cost 12 (`bcryptCost = 12` at `service.go:29`), and per-account lockout policy are enforced by code + tests but no standalone ADR captures the choice. ADR 0007 covers tier split, not credential mechanics. Trigger fired: missing standalone ADR for an enforced rule.
+- **Resolution:** ADR 0058 records the six binding values verified against current code: bcrypt cost 12 (fixed, not env-configurable), session TTL default 12h (env-overridable), sliding idle timeout default 30min (env-overridable, 0 disables), opaque HMAC-signed session token stored only as its SHA-256 digest, lockout default 5 failed attempts / 15min lock (both env-overridable with floors), password minimum length 8 (env floor cannot be lowered).
+- **Evidence:** `_artifacts/02-flow-login.md` §token mint + verify; `_artifacts/03-deps.md` §4 config surface; `wiki/decisions/0058-auth-session-bcrypt-lockout-policy.md`.
+- **Linked backlog row:** `backlog/auth-refactor.md#R-010` (can be closed)
+- **Linked ADR:** `wiki/decisions/0058-auth-session-bcrypt-lockout-policy.md`
 
 ### T-011 · Exported symbols undocumented
 - **Severity:** minor

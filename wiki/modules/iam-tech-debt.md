@@ -164,13 +164,14 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Linked backlog row:** `backlog/iam-refactor.md#R-010`
 - **Linked ADR:** missing-ADR
 
-### T-011 · Tenant-scoping rule lacks standalone ADR
-- **Severity:** minor
+### T-011 · Tenant-scoping rule lacks standalone ADR — CLOSED 2026-07-02 (ADR 0059)
+- **Severity:** minor (closed)
 - **Surface:** Multiple — migrations 0130, 0162, 0163; repository code at `role_provider.go:19`, `role_admin_repository.go:20,33,72`
-- **Observation:** The convention "every IAM-owned table carries `tenant_id` and every repo method filters by it" was enforced by Group B fix (audit 2026-05-03 B5/B6) but does not have a dedicated ADR. ADR 0007 references migration 0162 in its "Key files" but does not author the tenancy rule.
-- **Evidence:** `_artifacts/04-persistence.md` §1 (all tables); `wiki/decisions/0007-two-tier-authz.md` Key files; `wiki/bugs/audit-2026-05-03.md` B5/B6.
-- **Linked backlog row:** `backlog/iam-refactor.md#R-011`
-- **Linked ADR:** missing-ADR
+- **Observation (original):** The convention "every IAM-owned table carries `tenant_id` and every repo method filters by it" was enforced by Group B fix (audit 2026-05-03 B5/B6) but does not have a dedicated ADR. ADR 0007 references migration 0162 in its "Key files" but does not author the tenancy rule.
+- **Resolution:** ADR 0059 binds the rule: every IAM-owned table MUST carry `tenant_id`, every repo method MUST filter/set it explicitly, verified against `role_provider.go:28-38` (tenant-scoped join, not just outer predicate) and `role_admin_repository.go:24-31,37-80` (explicit tenant bind on upsert, tenant-scoped delete-then-reinsert for role replacement).
+- **Evidence:** `_artifacts/04-persistence.md` §1 (all tables); `wiki/decisions/0007-two-tier-authz.md` Key files; `wiki/bugs/audit-2026-05-03.md` B5/B6; `wiki/decisions/0059-iam-tenant-scoping-rule.md`.
+- **Linked backlog row:** `backlog/iam-refactor.md#R-011` (can be closed)
+- **Linked ADR:** `wiki/decisions/0059-iam-tenant-scoping-rule.md`
 
 ### T-012 · `RoleCapabilities` map duplicates `role_capabilities` table — CLOSED 2026-05-11 (Plan 4)
 - **Severity:** minor (closed)

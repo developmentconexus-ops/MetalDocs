@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/audit.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/audit-refactor.md`.
 
-**Last verified:** 2026-06-12 (Wave F — T-012 anchor corrected to service.go:183; ExportEvents governance drop now logged via slog.Warn at service.go:195 (Wave F fix). Prior: Wave 2.12 sync — Service.writer nil-check //cilint:allow-dualmode annotated; prior: 2026-06-11 adversarial verification pass 2: T-005 anchor corrected to admin_handler.go:403 + main.go:816; T-006 anchor corrected to admin_handler.go:404, claim updated from timestamp-based to uuid.NewString(); T-003/T-010 migration paths corrected to archive/migrations/; T-010 payload anchor corrected to admin_handler.go:403-414 + main.go:816-828; T-007 wording corrected — tenant_id filter is unconditional; prior: T-001/T-005/T-007 closed-item observations labeled (original); T-008 anchor corrected to openapi.yaml:741-745; 2026-06-10 Stage-1 drift patch T-009)
+**Last verified:** 2026-07-02 (DB-09 bounded audit hardening — T-010 closed by `db/migrations/0266_audit_events_hardening.sql` (payload size cap); T-013 added documenting the confirmed INSERT-only `metaldocs_app` grant posture (hardened, not newly invented) plus deferred rationale for partitioning / pg-cron retention / ULID-UUIDv7 ids. Prior: 2026-06-12 Wave F — T-012 anchor corrected to service.go:183; ExportEvents governance drop now logged via slog.Warn at service.go:195 (Wave F fix). Prior: Wave 2.12 sync — Service.writer nil-check //cilint:allow-dualmode annotated; prior: 2026-06-11 adversarial verification pass 2: T-005 anchor corrected to admin_handler.go:403 + main.go:816; T-006 anchor corrected to admin_handler.go:404, claim updated from timestamp-based to uuid.NewString(); T-003/T-010 migration paths corrected to archive/migrations/; T-010 payload anchor corrected to admin_handler.go:403-414 + main.go:816-828; T-007 wording corrected — tenant_id filter is unconditional; prior: T-001/T-005/T-007 closed-item observations labeled (original); T-008 anchor corrected to openapi.yaml:741-745; 2026-06-10 Stage-1 drift patch T-009)
 
 ## Severity scale
 
@@ -90,13 +90,26 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-009`
 - **Linked ADR:** missing-ADR
 
-### T-010 · No payload size constraint
-- **Severity:** minor
-- **Surface:** `archive/migrations/0004_init_audit_events.sql:8` (`payload JSONB NOT NULL DEFAULT '{}'::jsonb`); `internal/modules/iam/delivery/http/admin_handler.go:403-414` and `apps/api/cmd/metaldocs-api/main.go:816-828` (payload marshalled with no size check before passing to `audit.Record`)
-- **Observation:** `payload JSONB` has no `CHECK (octet_length(payload::text) < N)` constraint and no application-side size cap. A misbehaving consumer can emit unbounded payloads (e.g. dumping a full document body). Today consumer payloads are small (`map[string]any{}`-shaped), but the surface is open. Trigger fired: latent (surface exists; no caller hits it today).
+### T-010 · No payload size constraint — CLOSED 2026-07-02 (DB-09)
+- **Severity:** minor (closed)
+- **Surface (resolved):** `db/migrations/0266_audit_events_hardening.sql` adds `audit_events_payload_size_cap CHECK (octet_length(payload::text) <= 65536)` (64 KiB), added `NOT VALID` + `VALIDATE CONSTRAINT` for low-downtime rollout on the append-heavy live table, pre-checked by a RAISE-on-violation DO block so a bad deploy fails loudly instead of corrupting data.
+- **Observation (original):** `payload JSONB` had no `CHECK (octet_length(payload::text) < N)` constraint and no application-side size cap. A misbehaving consumer could emit unbounded payloads (e.g. dumping a full document body). Today consumer payloads are small (`map[string]any{}`-shaped), but the surface was open. Trigger fired: latent (surface exists; no caller hits it today).
 - **Evidence:** `_artifacts/04-persistence.md` §1 ("Payload size constraint fact").
 - **Linked backlog row:** `backlog/audit-refactor.md#R-010`
 - **Linked ADR:** missing-ADR
+
+### T-013 · DB-09 audit hardening — role posture confirmed, retention/partitioning/id-scheme deferred (2026-07-02)
+- **Severity:** minor
+- **Surface:** `db/migrations/0266_audit_events_hardening.sql`; role inventory across `archive/migrations/0005_grant_workflow_audit_privileges.sql`, `archive/migrations/0193_audit_events_hash_chain.sql:110`, `archive/migrations/0137_db_roles_security_definer.sql`.
+- **Observation:** DB-09 was scoped bounded — grant-posture verification + payload cap only, with retention/partitioning/id-scheme explicitly out of scope pending ops planning. Two items closed by 0266:
+  - **(a) INSERT-only grant posture** — confirmed, not invented. No distinct "audit writer" role exists; all 4 binaries connect as the single `metaldocs_app` role. `metaldocs_app`'s grant on `audit_events` has only ever been INSERT (0005) then INSERT+SELECT (0193, to serve the read API) — no migration in this repo's history ever granted UPDATE/DELETE to it. This is exactly the posture T-004 (closed) already relies on for tamper-evidence ("Append-only is enforced at the application role"). 0266 adds a defensive, idempotent `REVOKE UPDATE, DELETE, TRUNCATE ... FROM metaldocs_app` (precedent: `archive/migrations/0108_docx_v2_template_audit_log.sql`'s identical pattern) so the posture is self-documenting and survives an accidental future blanket-GRANT.
+  - **(b) Payload size cap** — closed, see T-010 above.
+  - **DEFERRED, with rationale (not started in this pass):**
+    - **Partitioning** (e.g. by `occurred_at` month/quarter) — needs an ops plan for partition creation/rollover automation (pg_partman or a scheduled job), a migration strategy for the existing hash-chain (partitioning a table with a strict insertion-order hash chain requires care that `audit_sequence` ordering and cross-partition `prev_hash` lookups stay correct), and a decision on query-pattern impact for `ListEvents`/exports. Sizing data to justify partitioning now (current row volume, growth rate) was not gathered in this bounded pass.
+    - **pg-cron retention/purge job** — T-003 (closed) already implements retention via an app-level goroutine, not `pg_cron`; introducing `pg_cron` alongside would be a second retention mechanism and needs a decision on which one is canonical, plus infra work (the `pg_cron` extension is not confirmed installed in this environment). Out of scope for a P3 bounded finding.
+    - **ULID/UUIDv7 ids** — `audit_events.id` is `text`, currently populated inconsistently (`"evt_" + uuid.NewString()` vs bare `uuid.NewString()`, tracked separately as open T-006). Switching to ULID/UUIDv7 is an ID-scheme migration touching every producer call site plus the hash-chain function's id-ordering assumptions (`metaldocs.audit_event_row_hash` and `audit_sequence` already provide monotonic ordering independent of `id`, so the benefit is narrower than in a system that orders by id) — needs its own scoped design pass, not a drive-by in a bounded audit-hardening migration.
+- **Linked backlog row:** none yet — deferred items should get their own `backlog/audit-refactor.md` rows if prioritized.
+- **Linked ADR:** missing-ADR (partitioning + retention-mechanism-of-record are both ADR-worthy decisions once scoped)
 
 ### T-012 · `Service.writer` nil-guarded by feature-gate (WithExports deferred) — OPEN
 - **Severity:** major (open — feature-gate nil, not a single-mode fallback)
@@ -106,13 +119,14 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** none yet
 - **Linked ADR:** missing-ADR
 
-### T-011 · Missing-ADR for append-only-by-grant + port-and-adapter shape
-- **Severity:** minor
+### T-011 · Missing-ADR for append-only-by-grant + port-and-adapter shape — CLOSED 2026-07-02 (ADR 0060)
+- **Severity:** minor (closed)
 - **Surface:** module shape itself — `internal/modules/audit/{domain,application,delivery,infrastructure}/`; `migrations/0005:2` (grant strategy)
-- **Observation:** Three load-bearing decisions are encoded in code with no ADR backing: (a) `Writer` and `Reader` as Go ports, with no transaction-accepting variant; (b) append-only enforced by `GRANT INSERT` only, not by trigger or RLS; (c) the same `*postgres.Writer` satisfies both ports. Each is defensible; none is documented. Future refactors (tamper-evidence, tenant scoping, tx-bundled emit) need an ADR to evaluate against. Trigger fired: missing standalone ADR for rules already enforced by code.
-- **Evidence:** `_artifacts/03-deps.md` §3 (DI wiring confirms same instance into both slots); `_artifacts/04-persistence.md` §3 (no triggers/RLS).
-- **Linked backlog row:** `backlog/audit-refactor.md#R-011`
-- **Linked ADR:** missing-ADR
+- **Observation (original):** Three load-bearing decisions are encoded in code with no ADR backing: (a) `Writer` and `Reader` as Go ports, with no transaction-accepting variant; (b) append-only enforced by `GRANT INSERT` only, not by trigger or RLS; (c) the same `*postgres.Writer` satisfies both ports. Each is defensible; none is documented.
+- **Resolution:** ADR 0060 records all three as binding: `GRANT INSERT ON TABLE metaldocs.audit_events TO metaldocs_app` (`archive/migrations/0005_grant_workflow_audit_privileges.sql`) is the sole enforcement mechanism (no trigger, no RLS on this table — contrasted against `user_process_areas`'s explicit no-delete trigger, a deliberate difference not an oversight); `Writer`/`Reader` stay transaction-free by design; one concrete adapter satisfying both ports is accepted, not a defect. Binding rule: no UPDATE/DELETE grant may be added to the application role without a superseding ADR.
+- **Evidence:** `_artifacts/03-deps.md` §3 (DI wiring confirms same instance into both slots); `_artifacts/04-persistence.md` §3 (no triggers/RLS); `wiki/decisions/0060-audit-append-only-by-grant.md`.
+- **Linked backlog row:** `backlog/audit-refactor.md#R-011` (can be closed)
+- **Linked ADR:** `wiki/decisions/0060-audit-append-only-by-grant.md`
 
 ### T-012 · No Go doc comments on exported symbols
 - **Severity:** minor
@@ -130,4 +144,4 @@ Pick highest trigger. Justify the call in `Observation`.
 - Operations missing C4 placement: 0 / 1 (`GET /api/v1/audit/events` is in §5.3 + §6.2)
 - Cross-deps missing in §5/§8: 0 / 3 (bootstrap, iam admin handler, documents adapter — all referenced)
 - State transitions missing in §6: 0 / 0 (n/a — append-only sink)
-- Decisions without ADR link: 11 / 12 (T-001..T-007, T-009..T-012 = 11 missing-ADR; T-008 links ADR 0012 as residual)
+- Decisions without ADR link: 12 / 13 (T-001..T-007, T-009..T-013 = 12 missing-ADR; T-008 links ADR 0012 as residual)

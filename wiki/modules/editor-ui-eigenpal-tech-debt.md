@@ -46,13 +46,14 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. Trigg
 - **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-007`
 - **Linked ADR:** ADR 0047 — decision recorded; implementation in Phase 3
 
-### T-008 · No ADR for Anti-Corruption Layer / wrapper-only consumption rule
-- **Severity:** minor
+### T-008 · No ADR for Anti-Corruption Layer / wrapper-only consumption rule — CLOSED (ADR 0046; ratified 2026-07-02 by ADR 0064)
+- **Severity:** minor (closed)
 - **Surface:** `packages/editor-ui/` as a whole; rule implied by ADR 0001 § Consequences ("All editor-related code consolidates in `packages/editor-ui/`"), `wiki/references/eigenpal-controlled-package.md` § "What belongs in MetalDocs docs".
-- **Observation:** No ADR explicitly mandates that all `@eigenpal/docx-editor-react` access in `frontend/apps/web` goes through `@metaldocs/editor-ui`. T-002 (TemplateEditorPage bypass) was a consequence of this gap — now resolved; the rule still lacks a formal decision record.
-- **Evidence:** `_artifacts/03-deps.md` direct-eigenpal IN-edges table.
-- **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-008`
-- **Linked ADR:** ADR 0046 — decision recorded; implementation in Phase 3
+- **Observation (original):** No ADR explicitly mandates that all `@eigenpal/docx-editor-react` access in `frontend/apps/web` goes through `@metaldocs/editor-ui`. T-002 (TemplateEditorPage bypass) was a consequence of this gap — now resolved; the rule still lacks a formal decision record.
+- **Resolution:** ADR 0046 (Status: Accepted, 2026-06-26) already fully answers this — its own Consequences section states it "closes tech-debt T-008." Enforcement is live via `eslint.config.mjs:16-25` (`no-restricted-imports` banning `@eigenpal/*` outside the two ACL walls) plus `packages/editor-ui/test/public-surface.test.ts`. ADR 0064 (2026-07-02) verified this and formally ratifies the closure — no second/competing ADR was written; this row's heading is updated to CLOSED to match its own "Linked ADR" field, which already named ADR 0046.
+- **Evidence:** `_artifacts/03-deps.md` direct-eigenpal IN-edges table; `eslint.config.mjs:16-25,62-63`; `wiki/decisions/0064-eigenpal-wrapper-only-already-decided.md`.
+- **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-008` (can be closed)
+- **Linked ADR:** `wiki/decisions/0046-eigenpal-anti-corruption-layer.md` (primary decision); `wiki/decisions/0064-eigenpal-wrapper-only-already-decided.md` (closure ratification)
 
 ### T-009 · Worker retry not wired on `*RenderError.Retryable()` — **RESOLVED 2026-06-26, test-hardened 2026-07-02 (APP-02)**
 - **Severity:** major → **resolved**

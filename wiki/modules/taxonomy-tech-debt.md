@@ -142,14 +142,28 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Evidence:** `_artifacts/04-persistence.md` §4 ("Note: profile + area carry PK on `code` alone … the broader PK is redundant").
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-015`
 - **Linked ADR:** missing-ADR
+- **Resolution status (2026-07-02, DB-08):** SPLIT. `document_process_areas` closed by `db/migrations/0264_process_areas_composite_pk.sql` — PK promoted to `(tenant_id, code)`, `ux_process_areas_tenant_code` dropped as redundant. All 5 inbound FKs were already composite `(tenant_id, area_code|parent_code)`, so no re-pointing was needed. `document_profiles` is **deferred** — see design note below; DO NOT repeat the "M-effort, do both together" framing from R-015, the two tables are architecturally different.
 
-### T-016 · Missing-ADR for cycle-prevention rule + area hierarchy shape
-- **Severity:** minor
-- **Surface:** `internal/modules/taxonomy/application/area_service.go` (`SetParent` invokes `ListAncestors` to reject `parent_code` cycles); `internal/modules/taxonomy/infrastructure/repository.go` (`ListAncestors` recursive walk); `migrations/0123:10-13` (self-FK `(tenant_id, parent_code) → (tenant_id, code)`)
-- **Observation:** Area hierarchy uses a self-FK + application-layer acyclicity check. Defensible (recursive CTE would also work; trigger could enforce it at the DB) but undocumented as an ADR. Future refactors (e.g. moving cycle check into a Postgres `assert_no_cycle` function, or switching to closure table) have no design context to evaluate against. Trigger fired: missing standalone ADR for a rule already enforced by code + tests.
-- **Evidence:** `_artifacts/03-deps.md` §5 (`application/area_service_test.go` covers archive rules); `_artifacts/04-persistence.md` §1 (`parent_code` self-FK).
-- **Linked backlog row:** `backlog/taxonomy-refactor.md#R-016`
-- **Linked ADR:** missing-ADR
+#### Design note: why `document_profiles` PK promotion is deferred (not a quick follow-up)
+
+Unlike `document_process_areas`, `document_profiles(code)` has **4 inbound single-column FKs** from tables that have **no `tenant_id` column at all** (verified against `db/baseline/0001_current_schema.sql`, no RLS/`ENABLE ROW LEVEL SECURITY` on any of the four):
+- `document_profile_governance` (PK `profile_code`) — `document_profile_governance_profile_code_fkey`
+- `document_profile_schema_versions` (PK `(profile_code, version)`) — `document_profile_schema_versions_profile_code_fkey`
+- `document_sequences` (PK `profile_code`) — `document_sequences_profile_code_fkey`
+- `template_drafts` (PK `template_key`) — `template_drafts_profile_code_fkey` (note: `template_drafts` was separately dropped as a dead MDDM-shadow table by `db/migrations/0260_dead_table_drops.sql`; the FK still existed in the schema at the time of this audit and is listed for completeness of the historical inventory)
+
+These four tables are **global registries keyed purely by `profile_code`** — one namespace across all tenants, not per-tenant data. Promoting `document_profiles` PK to `(tenant_id, code)` would break every one of these FKs, because `profile_code` alone would no longer uniquely identify a row once two tenants can share the same `code`. Re-pointing them to a composite FK is not a local fix: it requires **adding a `tenant_id` column to 4 more tables**, backfilling it, adding RLS to tables that currently have none, and re-deriving what "global governance/schema-version/sequence-counter row" even means once profile codes are tenant-scoped. That is a distinct architectural decision (does profile governance become per-tenant, or does `document_profiles.code` stay globally unique in practice even though the schema doesn't enforce it?), not a mechanical PK swap — out of bounds for a P3 bounded finding.
+
+**Recommendation:** either (a) leave `document_profiles` PK on `code` alone permanently — the `(tenant_id, code)` unique index is not "redundant" for this table, it is doing real defensive work for tenant-filtered query plans even though the single-column PK already guarantees uniqueness — and downgrade T-015's `document_profiles` half from "tech debt" to "accepted structural constraint"; or (b) open a dedicated ADR-scoped mission if the business ever needs cross-tenant duplicate profile codes (which the current global-registry tables don't support today regardless of this PK). No DDL is written for `document_profiles` in this pass — this design note is the entirety of the `document_profiles` deliverable for DB-08.
+
+### T-016 · Missing-ADR for cycle-prevention rule + area hierarchy shape — CLOSED 2026-07-02 (ADR 0061; finding corrected — no enforcement exists)
+- **Severity:** minor → **upgraded finding, not closed as originally scoped** — see Resolution
+- **Surface:** `internal/modules/taxonomy/application/area_service.go` (original claim: `SetParent` invokes `ListAncestors` to reject `parent_code` cycles — **this function does not exist**; actual mutation path is `AreaService.Update`, `area_service.go:84-131`); `internal/modules/taxonomy/infrastructure/repository.go:623-658,695-737` (`ListAncestors`/`ListAncestorsTx` recursive walk — exists but is never called from a mutation path); `db/baseline/0001_current_schema.sql:4029-4033` (self-FK `(tenant_id, parent_code) → (tenant_id, code)`, from `archive/migrations/0123_taxonomy_extend_process_areas.sql:31-44`)
+- **Observation (original, inaccurate):** Area hierarchy uses a self-FK + application-layer acyclicity check. Defensible (recursive CTE would also work; trigger could enforce it at the DB) but undocumented as an ADR.
+- **Resolution (2026-07-02, ADR 0061):** Verifying this against current code found the described acyclicity check **does not exist**. `AreaService.Update` overwrites `ParentCode` unconditionally with no call to `ListAncestors`. `domain.ErrAreaParentCycle` (`domain/area.go:24`) is defined and mapped to HTTP 400 (`routes_areas.go:166-167`) but is never raised anywhere — dead code giving a false impression of protection. No trigger/CHECK enforces acyclicity at the DB layer either. ADR 0061 records this corrected finding and closes the "missing-ADR" ask, but the underlying gap (no cycle prevention at all) remains open — a follow-up implementation item (wire `ListAncestors` into `AreaService.Update`, or a DB-level check) should be filed separately; this ADR is decisions-only and does not implement the fix.
+- **Evidence:** `_artifacts/03-deps.md` §5 (`application/area_service_test.go` covers archive rules, no cycle-rejection test); `_artifacts/04-persistence.md` §1 (`parent_code` self-FK); `wiki/decisions/0061-taxonomy-area-hierarchy-shape.md`.
+- **Linked backlog row:** `backlog/taxonomy-refactor.md#R-016` (documentation closed; a new implementation row should be opened for the enforcement gap)
+- **Linked ADR:** `wiki/decisions/0061-taxonomy-area-hierarchy-shape.md`
 
 ---
 

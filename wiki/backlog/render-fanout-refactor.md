@@ -1,12 +1,18 @@
 # Refactor Backlog - render-fanout
 
-**Last verified:** 2026-07-02 (APP-07 — R-002 closed)
+**Last verified:** 2026-07-02 (DOC-07a — R-001 closed; APP-07 — R-002 closed)
 
 | id | title | debt_id | effort | impact | blocked_by | owner | status | pr |
 |---|---|---|---|---|---|---|---|---|
-| R-001 | Promote render-fanout module page from stub to full living-doc shape | T-001 | M | major | - | - | open | - |
+| R-001 | Promote render-fanout module page from stub to full living-doc shape | T-001 | M | major | - | - | closed 2026-07-02 | - |
 | R-002 | Document and test outbox retry/finalization contract end-to-end | T-002 | M | major | - | - | closed 2026-07-02 | - |
-| R-003 | Record resolver registry/version compatibility policy in ADR | T-003 | S | minor | - | - | open | - |
+| R-003 | Record resolver registry/version compatibility policy in ADR | T-003 | S | minor | - | - | closed 2026-07-02 | - |
+
+## R-001 closure evidence (DOC-07a)
+
+- `wiki/modules/render-fanout.md` verified as a full living-doc module page (not a stub): Key files list, Computed-token catalog §, numbered Pipeline §, Failure modes table (5-row flow/error matrix with Symptom/Detection/Response), See-also cross-links, §11 risk tally.
+- Promotion work happened under earlier passes (ADR 0050, APP-01 outbox-consolidation) but the backlog/tech-debt rows were never flipped to match — DOC-07a closes the paperwork drift only; no doc content was rewritten.
+- See `wiki/modules/render-fanout-tech-debt.md` T-001 (closed) for full citation.
 
 ## R-002 closure evidence (APP-07)
 
