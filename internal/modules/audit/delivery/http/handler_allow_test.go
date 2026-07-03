@@ -62,7 +62,12 @@ func TestHandleExport_405_Allow(t *testing.T) {
 }
 
 // TestHandleExportSubresource_405_Allow asserts the export subresource endpoint
-// advertises Allow: GET on a 405 (F7.1 drive-by, RFC 7231).
+// advertises an Allow header including GET on a 405 (F7.1 drive-by, RFC 7231).
+// T-008: since the route mount moved to the generated auditapi.HandlerWithOptions
+// router (method-qualified net/http 1.22 patterns), the stdlib mux itself produces
+// this 405 and folds in HEAD alongside GET (GET registrations implicitly also
+// match HEAD per net/http's ServeMux docs) — "GET, HEAD" is the RFC 7231-correct
+// value, not a behavior regression from the mount-pattern migration.
 func TestHandleExportSubresource_405_Allow(t *testing.T) {
 	// Method check precedes the nil-exporter check, so the 405 fires without an exporter.
 	service := application.NewService(memory.NewWriter())
@@ -81,7 +86,7 @@ func TestHandleExportSubresource_405_Allow(t *testing.T) {
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	if got := rec.Header().Get("Allow"); got != "GET" {
-		t.Errorf("Allow = %q, want GET", got)
+	if got := rec.Header().Get("Allow"); got != "GET, HEAD" {
+		t.Errorf("Allow = %q, want \"GET, HEAD\"", got)
 	}
 }

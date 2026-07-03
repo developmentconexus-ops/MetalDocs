@@ -56,10 +56,68 @@ func (h *Handler) WithExporter(exporter AuditExporter) *Handler {
 	return h
 }
 
+// RegisterRoutes mounts the audit module's routes onto mux via the generated
+// auditapi.ServerInterface router (HandlerWithOptions), replacing the prior
+// hand-written mux.HandleFunc registrations (T-008, residual of CON-09).
+// Handler satisfies auditapi.ServerInterface directly (see the adapter
+// methods below) — each one delegates straight through to the existing,
+// already-tested private handler methods (handleEvents / handleExport /
+// handleExportSubresource) unchanged. Mirrors the controlleddocuments
+// pattern (internal/modules/controlleddocuments/delivery/http/handler.go)
+// and the templates/approval CON-03 migrations
+// (internal/modules/templates/delivery/http/handler.go,
+// internal/modules/documents/approval/http/router.go).
+//
+// Audit has no per-route Idempotency-Key requirement (list is a GET, export
+// creates a job but the spec does not mark it idempotent), so no Middlewares
+// closure is needed here — unlike templates/approval. Tier-1 capability
+// gating (CapAuditRead) lives in apps/api/cmd/metaldocs-api/permissions.go
+// and keys off method + path, which the generated router preserves
+// byte-for-byte (AD-1: BaseURL "/api/v1" + spec's relative paths), so it is
+// unaffected by this mount-mechanism swap.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/v1/audit/events", h.handleEvents)
-	mux.HandleFunc("/api/v1/audit/events/export", h.handleExport)
-	mux.HandleFunc("/api/v1/audit/events/export/", h.handleExportSubresource)
+	auditapi.HandlerWithOptions(h, auditapi.StdHTTPServerOptions{
+		BaseRouter: mux,
+		BaseURL:    "/api/v1",
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
+		},
+	})
+}
+
+// ─── auditapi.ServerInterface adapter ──────────────────────────────────────
+//
+// Thin delegation only: each method below hands off to the pre-existing
+// private handler (unchanged) rather than reimplementing parsing/response
+// logic. The generated wrapper already validates/binds typed params before
+// calling these, but the delegated-to methods keep parsing directly from `r`
+// themselves (same as the iam Router precedent, e.g. RevokeSession) — the Go
+// 1.22 mux guarantees r.URL.Path and the wrapper's bound params agree for the
+// same request, so there is no behavior drift, only a redundant (harmless)
+// re-parse.
+
+// ListAuditEvents adapts GET /audit/events to the existing list handler.
+func (h *Handler) ListAuditEvents(w http.ResponseWriter, r *http.Request, _ auditapi.ListAuditEventsParams) {
+	h.handleEvents(w, r)
+}
+
+// ExportAuditEvents adapts POST /audit/events/export to the existing export handler.
+func (h *Handler) ExportAuditEvents(w http.ResponseWriter, r *http.Request) {
+	h.handleExport(w, r)
+}
+
+// GetAuditExportStatus adapts GET /audit/events/export/{export_id} to the
+// existing subresource dispatcher, which already distinguishes status from
+// download by inspecting the request path tail.
+func (h *Handler) GetAuditExportStatus(w http.ResponseWriter, r *http.Request, _ string) {
+	h.handleExportSubresource(w, r)
+}
+
+// DownloadAuditExport adapts GET /audit/events/export/{export_id}/download to
+// the same existing subresource dispatcher as GetAuditExportStatus — it
+// already routes to handleExportDownload once it sees the "/download" tail.
+func (h *Handler) DownloadAuditExport(w http.ResponseWriter, r *http.Request, _ string, _ auditapi.DownloadAuditExportParams) {
+	h.handleExportSubresource(w, r)
 }
 
 func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
