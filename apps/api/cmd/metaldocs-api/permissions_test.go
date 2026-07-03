@@ -652,3 +652,69 @@ func TestEveryCapSeededOrDeferred(t *testing.T) {
 		}
 	}
 }
+
+// TestTier1Tier2CapabilityCoherence_F4Sites pins the ADR 0022 Phase 11 (F4)
+// coherence fix for the two tier-1/tier-2 capability sites that were
+// historically divergent (see ADR 0022 §349-351, "Amendment — Phase 1-7 final
+// review" open follow-ups). This is a NARROW regression lock on exactly these
+// two named routes — it must NOT be broadened into a blanket "tier-1 == tier-2
+// for all /approval/ routes" assertion: the generic /approval/ prefix
+// (document.submit at tier-1) legitimately diverges from the fine-grained
+// tier-2 checks inside individual approval operations (e.g. document.signoff)
+// by design (coarse route gate vs. fine in-tx business capability), and that
+// divergence is NOT a defect.
+//
+// Tier-2 truth for each site (hand-verified against source, not re-derived):
+//   - force-release: internal/modules/documents/repository/repository.go
+//     ForceReleaseSession/ForceReleaseSessionTx call
+//     authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), docArea).
+//   - approval-route management: internal/modules/documents/approval/application/
+//     route_admin_service.go calls
+//     authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant").
+//
+// This test only pins the tier-1 side (this package cannot import the
+// tier-2 packages without an import cycle risk); the tier-2 capability
+// constants above are asserted by literal reference to the same typed
+// iamdomain consts the tier-2 call sites use, so any rename of either const
+// is a compile error here, and any future rename of ONLY the tier-1 route
+// row's capability (leaving tier-2 unchanged) fails this test at runtime.
+func TestTier1Tier2CapabilityCoherence_F4Sites(t *testing.T) {
+	t.Parallel()
+
+	resolver := newPermissionResolver()
+
+	// Tier-2 truth, pinned by direct reference to the same typed consts the
+	// tier-2 call sites use (repository.go / route_admin_service.go).
+	const tier2ForceRelease = iamdomain.CapMembershipManage
+	const tier2ApprovalRouteManage = iamdomain.CapRouteManage
+
+	cases := []struct {
+		name      string
+		method    string
+		path      string
+		wantTier2 iamdomain.Capability
+	}{
+		{
+			name:      "force-release session: tier-1 must equal tier-2 CapMembershipManage",
+			method:    http.MethodPost,
+			path:      "/api/v1/documents/d1/session/force-release",
+			wantTier2: tier2ForceRelease,
+		},
+		{
+			name:      "approval routes create: tier-1 must equal tier-2 CapRouteManage",
+			method:    http.MethodPost,
+			path:      "/api/v1/approval/routes",
+			wantTier2: tier2ApprovalRouteManage,
+		},
+	}
+
+	for _, tc := range cases {
+		gotCap, gotVis := resolver(tc.method, tc.path)
+		if gotVis != iamdelivery.VisibilityPermissionGuarded {
+			t.Errorf("%s: %s %s: visibility=%v want PermissionGuarded", tc.name, tc.method, tc.path, gotVis)
+		}
+		if gotCap != tc.wantTier2 {
+			t.Errorf("%s: %s %s: tier-1 cap=%q diverges from tier-2 cap=%q (ADR 0022 F4 regression)", tc.name, tc.method, tc.path, gotCap, tc.wantTier2)
+		}
+	}
+}

@@ -196,6 +196,7 @@ A 3-lens review panel (Go correctness · security/authz · architecture/ADR-conf
 - **Branch:** `feat/authz-coherence-p7-scope-runtime-binding`.
 - **Gates (all green):** AST guard proven bite (17) → green (0); `go build ./...` ✓; `go test ./internal/modules/documents/... ./internal/modules/controlleddocuments/... ./internal/modules/iam/... ./apps/api/... ./scripts/api-lint/... -count=1` ✓ (sole failures = pre-existing `TestListDocumentsPaginated` Scan-arg drift, confirmed failing identically on base `426cc00dc`, unrelated to authz); `go run ./scripts/api-lint` → **455 violations, unchanged vs Phase-5 baseline** (new guard clean-state-zero) ✓; `npx @redocly/cli lint` → valid (no shape change) ✓.
 - **Open follow-ups (out of Phase 7 boundary, reported not fixed — tier-1 route-cap questions surfaced by the self-maintaining derivation):** `forceReleaseDocumentSession` resolves to tier-1 `membership.manage` while its tier-2 check uses `document.edit` (cross-tier cap divergence); approval-route-management ops (`createApprovalRoute`/`updateApprovalRoute`/`deactivateApprovalRoute`) resolve to tier-1 `document.submit`. Both pre-existing tier-1 mappings; neither changed here.
+  > **RESOLVED in Phase 11 F4 (see §349-351).** Force-release tier-2 was changed to `CapMembershipManage` (matching tier-1); explicit `/api/v1/approval/routes` tier-1 rows were added resolving to `CapRouteManage` (matching tier-2), ordered before the generic `/approval/` fallback. Regression-pinned by `TestTier1Tier2CapabilityCoherence_F4Sites` (`apps/api/cmd/metaldocs-api/permissions_test.go`).
 
 ## Amendment — Phase 1-7 final review: Phase 8 added (raw-string dialect), Phase 6 resequenced again (2026-06-03)
 
@@ -248,6 +249,7 @@ After Phase 8 merged (PR #65), a 4-lens read-only audit (dead-code residue · ca
 - **F2 — HIGH.** Phase 8's security fix (closing raw-string phantom dead-grants) was correct, but it **minted 4 redundant capabilities** instead of routing those tier-2 sites through existing consts: `doc.edit_draft`, `doc.reconstruct`, `workflow.instance.cancel` carry grant sets identical to `document.edit` (and their HTTP surfaces are already tier-1-routed under `document.edit` at `permissions.go:182,190,191`); `doc.view_published` is identical to `document.view`. No authorization differentiation today — the "adapt instead of question" pattern.
 - **F3 — MED.** Naming incoherence: `doc.*` / `document.*` / `controlled_documents.*` for one document aggregate — the clearest deviation from the industry `resource.action` discipline (AWS/GitHub). Splits the Admin Center catalogue (`catalog.go:162`).
 - **F4 — MED.** Tier-1/tier-2 capability divergence (fail-*closed* dead-ends, not holes): `forceReleaseDocumentSession` (tier-1 `membership.manage` vs tier-2 `document.edit`) and approval-route CRUD (tier-1 `document.submit` vs tier-2 `route.manage`). The latter is the source of the 8 real OpenAPI `AUTHZ-DRIFT`/`PAGINATION-DRIFT` lint hits.
+  > RESOLVED in Phase 11 F4 (see §349-351).
 - **F5 — MED.** The "455 violations unchanged" metric across all 8 phases is misleading: ~447 are dormant `tripwire-pairing` noise (no call-graph) **plus ~28 phantom dupes from a stale `.claude/worktrees/...` detached worktree** the tripwire walker fails to `SkipDir` (unlike the other walkers). It launders **8 genuinely actionable** approval-route spec-drift items. Normalization-of-deviance risk.
 - **F6 — LOW/MED.** Dead scaffolding: `authz-call-present` lint (`code_rules.go:111-175`) is **fully dormant** (both `x-authz-area` ops also carry `x-authz-skip-area`; `custom` branch unreachable; expects a codegen handler shape no module uses). Dead file `documents/api/security_context.go`. The stale `permissions.go:226` comment about `canManageMembershipTarget` was removed in Phase C cleanup.
 - **F7 — MED.** Three near-identical `loadDocumentArea*` helpers with **opposite empty-area semantics** (`fillin_authz.go:37` & `submit_service.go:317` return `""`=deny; `read_service.go:357` `COALESCE(...,'tenant')`=wide-open) — copy-paste fail-open reintroduction risk. The `"tenant"` sentinel (`authz.go:110`) is the load-bearing area-filter switch with no DB reservation that `area_code='tenant'` cannot be a real area.
@@ -337,6 +339,7 @@ All 3 area-grade sites already passed the resource's real area (P7/P8 made them 
 
 ### Phase 11 — Coherence cleanup (MED, F4·F5·F6·F7 + F8 backend)
 - F4: align the two tier-1/tier-2 divergences (pick one model per route, document it) + declare the 8 approval-route ops' authz/pagination in the spec.
+  > RESOLVED in Phase 11 F4 (see §349-351).
 - F5: make the tripwire walker `SkipDir` `.git/.claude/node_modules/vendor`; snapshot the remaining tripwire baseline to an allow-list so the live count is **0** and any new violation is a hard red.
 - F6: delete dead file/scaffolding (or wire `authz-call-present` if activation is intended); fix stale comments; dispatch the wiki drift to Phase 6.
 - F7: consolidate the three `loadDocumentArea*` helpers into one `("", found bool)` form; add a DB CHECK/seed guard reserving `area_code='tenant'`.
@@ -445,6 +448,7 @@ The 2026-06-04 final review found that Principle 5 ("the model is bound by CI, n
 - Code review (go-reviewer): **no CRITICAL/HIGH**. APPROVE — strict threading complete (no swallow branch missed), exit-code logic correct, classification correct, e2e genuinely exercises the real composition. One MEDIUM (`os.IsNotExist` vs `errors.Is`) is style-only and matches the existing codebase idiom — left unchanged (surgical).
 
 **Bounded defers / flags (NOT done here — separate follow-ups):** F4 cross-tier test; `controlled_documents.{obsolete,supersede}` collapse; F7 repo-helper fold; stale `capability_scope.go:31-35` comment; pre-existing `TestListDocumentsPaginated_*` base failure (`Scan 14 vs 18`, unrelated). Phase 6 wiki sync still runs LAST.
+> F4 cross-tier test: RESOLVED — `TestTier1Tier2CapabilityCoherence_F4Sites` (`apps/api/cmd/metaldocs-api/permissions_test.go`) narrowly pins tier-1 == tier-2 for the force-release and approval-route-management sites only (not a blanket assertion; the coarse/fine `/approval/` divergence documented elsewhere remains intentional).
 
 ## Amendment — F6 closed: `authz-call-present` deleted, honest positive markers (2026-06-08, api-contract-hardening Phase F · FD-1)
 

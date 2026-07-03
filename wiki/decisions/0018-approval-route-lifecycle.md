@@ -86,6 +86,8 @@ Rationale: Update is an in-place edit on an `active=true` route — version bump
 
 ### 6. Tier-1 cap split for route admin reads is deferred to F-001 follow-up
 
+> **SUPERSEDED by ADR 0022 Phase 11 (F4), 2026-06-04.** This section's `CapRouteView` split was never implemented. Instead, ADR 0022 Phase 11 F4 resolved a *different, more pressing* problem on this same surface — a tier-1/tier-2 capability-name divergence (tier-1 fell through to the generic `document.submit`-gated `/approval/` prefix while tier-2 required `route.manage`) — by adding explicit tier-1 rows (incl. the GET list) that all map to `CapRouteManage`, matching tier-2. `CapRouteView`/`route.view` was never created in the Go registry; the read/write split proposed below did not happen and is not currently planned. See `wiki/decisions/0022-authz-capability-coherence.md` §349-351, `wiki/concepts/approval-routes.md` §"Relationship to other concepts", and `wiki/modules/approval-tech-debt.md` BE-9 (closed 2026-07-02, grade-A finding APP-05).
+
 The Tier-1 declarative table at `apps/api/cmd/metaldocs-api/permissions.go` currently gates `GET /api/v1/approval/routes` and the `POST`/`PUT`/`DELETE` route admin verbs with the same `route.admin` (manage-grade) cap. This conflates read and write per the F-001 audit pattern (see [ADR 0016](0016-view-grade-capabilities.md) for the four view-grade caps that unblocked the F-001 split elsewhere).
 
 The principled fix is to:
