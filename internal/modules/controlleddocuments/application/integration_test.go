@@ -9,18 +9,10 @@ import (
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 )
 
-func TestFullFlow_CreateProfile_SetTemplate_CreateCD_CreateDocument(t *testing.T) {
-	t.Skip("requires live DB")
-}
-
-func TestBackfill_SeedLegacyDocs_RunBackfill_AssertAllLinked(t *testing.T) {
-	t.Skip("requires live DB")
-}
-
-func TestBackfill_ReRunIsNoop(t *testing.T) {
-	t.Skip("requires live DB")
-}
-
+// TestCrossProfileOverride_Rejected pins a real domain invariant: an override
+// template belonging to a different profile than the resolution input must be
+// rejected with ErrTemplateProfileMismatch. Does not require a live DB; the
+// integration build tag is kept only to match this file's existing scope.
 func TestCrossProfileOverride_Rejected(t *testing.T) {
 	input := controlleddocumentsdomain.TemplateResolutionInput{
 		ProfileCode: "po",
@@ -35,8 +27,3 @@ func TestCrossProfileOverride_Rejected(t *testing.T) {
 		t.Fatalf("expected ErrTemplateProfileMismatch, got %v", err)
 	}
 }
-
-func TestRename_Flow(t *testing.T) {
-	t.Skip("requires live DB")
-}
-
