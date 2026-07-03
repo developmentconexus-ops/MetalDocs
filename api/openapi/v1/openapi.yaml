@@ -2588,6 +2588,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /documents/{id}/archive:
@@ -4222,6 +4224,12 @@ components:
             $ref: '#/components/schemas/Problem'
     PreconditionFailed:
       description: Pre-condicao falhou (ETag/lock version desatualizado)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionRequired:
+      description: Pre-condicao obrigatoria ausente (header If-Match nao enviado)
       content:
         application/problem+json:
           schema:

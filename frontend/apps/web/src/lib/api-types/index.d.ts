@@ -3516,6 +3516,15 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description Pre-condicao obrigatoria ausente (header If-Match nao enviado) */
+        PreconditionRequired: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description Recurso expirado ou nao mais disponivel */
         Gone: {
             headers: {
@@ -6015,6 +6024,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
