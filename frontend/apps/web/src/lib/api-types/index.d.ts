@@ -2085,7 +2085,7 @@ export interface components {
             email?: string;
             display_name: string;
             must_change_password: boolean;
-            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
+            roles: components["schemas"]["UserRole"][];
             /**
              * @description Capability codes the actor holds in the active tenant. UX hint only —
              *     backend remains the sole authorization boundary (see
@@ -2366,7 +2366,7 @@ export interface components {
             email?: string;
             display_name: string;
             password: string;
-            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer" | "signer" | "area_admin" | "qms_admin")[];
+            roles: components["schemas"]["UserRole"][];
         };
         CreateManagedUserResponse: {
             user_id: string;
@@ -2398,12 +2398,12 @@ export interface components {
         ReplaceUserRolesRequest: {
             display_name: string;
             assigned_by?: string;
-            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
+            roles: components["schemas"]["UserRole"][];
         };
         ReplaceUserRolesResponse: {
             user_id: string;
             display_name: string;
-            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
+            roles: components["schemas"]["UserRole"][];
         };
         /** @description Fill-in schema envelope. The placeholder item shape is owned by the templates domain (templatesdomain.Placeholder) and is surfaced opaquely here (items left unconstrained); the contract pins the envelope. */
         DocumentFillInSchemaResponse: {
@@ -2799,8 +2799,7 @@ export interface components {
         };
         UpsertUserRoleRequest: {
             display_name?: string;
-            /** @enum {string} */
-            role: "system_admin" | "approver" | "author" | "editor" | "viewer";
+            role: components["schemas"]["UserRole"];
             assigned_by?: string;
         };
         UpsertUserRoleResponse: {
@@ -3195,6 +3194,71 @@ export interface components {
             instance_id: string;
             was_replay: boolean;
             etag: string;
+        };
+        SignoffDocumentRequest: {
+            /** @enum {string} */
+            decision: "approve" | "reject";
+            /** @description Required when decision is reject. */
+            reason?: string;
+            /** @description Re-authentication password for the signature (password_reauth method). */
+            password: string;
+            /** @description SHA-256 hex digest of the content being signed off. */
+            content_hash: string;
+        };
+        SignoffDocumentResponse: {
+            signoff_id: string;
+            was_replay: boolean;
+            outcome: string;
+        };
+        SchedulePublishDocumentRequest: {
+            /**
+             * Format: date-time
+             * @description RFC3339 UTC timestamp the publish takes effect; non-UTC offsets are rejected.
+             */
+            effective_from: string;
+            /**
+             * Format: uuid
+             * @description Optional document to supersede when the scheduled publish fires.
+             */
+            superseded_document_id?: string;
+        };
+        PublishDocumentResponse: {
+            /** Format: uuid */
+            document_id: string;
+            /** @description published for immediate publish; scheduled for schedule-publish. */
+            new_status: string;
+            /**
+             * Format: date-time
+             * @description Present only for schedule-publish; RFC3339 UTC effective date.
+             */
+            effective_from?: string;
+        };
+        ObsoleteDocumentRequest: {
+            reason: string;
+        };
+        ObsoleteDocumentResponse: {
+            /** Format: uuid */
+            document_id: string;
+        };
+        CancelDocumentApprovalRequest: {
+            reason: string;
+        };
+        CancelDocumentApprovalResponse: {
+            /** Format: uuid */
+            document_id: string;
+        };
+        SupersedeDocumentRequest: {
+            /**
+             * Format: uuid
+             * @description Published document this document supersedes.
+             */
+            superseded_document_id: string;
+        };
+        SupersedeDocumentResponse: {
+            /** Format: uuid */
+            document_id: string;
+            /** Format: uuid */
+            superseded_id: string;
         };
         DocumentRevisionHistoryItem: {
             /** Format: uuid */
@@ -6774,6 +6838,8 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                "If-Match": string;
             };
             path: {
                 id: string;
@@ -6787,7 +6853,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PublishDocumentResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -6802,20 +6870,28 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                "If-Match": string;
             };
             path: {
                 id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SchedulePublishDocumentRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PublishDocumentResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -6830,20 +6906,28 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                "If-Match": string;
             };
             path: {
                 id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupersedeDocumentRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SupersedeDocumentResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -6858,20 +6942,28 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                "If-Match": string;
             };
             path: {
                 id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObsoleteDocumentRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ObsoleteDocumentResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -6995,14 +7087,20 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignoffDocumentRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SignoffDocumentResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
@@ -7017,20 +7115,28 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                "If-Match": string;
             };
             path: {
                 id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelDocumentApprovalRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CancelDocumentApprovalResponse"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];

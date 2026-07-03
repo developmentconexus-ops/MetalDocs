@@ -82,6 +82,9 @@ func TestGeneratedApprovalRoutes_IdempotencyStoreEngaged(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-1111-1111-111111111111/publish", bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "33333333-3333-4333-8333-333333333333")
+	// If-Match is contract-required on publish (wire-truth spec repair); the
+	// generated wrapper rejects its absence before the idempotency store runs.
+	req.Header.Set("If-Match", "v1")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-a", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()

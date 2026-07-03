@@ -2,7 +2,12 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-06-20 (M8 / F8.6 — §5b H-D gate **widened to the full public-route surface**
+> **Last verified:** 2026-07-02 (approval document-mutation cluster wire-truth repair: 6 operations —
+> `recordDocumentSignoff`, `publishDocument`, `scheduleDocumentPublish`, `obsoleteDocument`,
+> `cancelDocumentApproval`, `supersedeDocument` — got declared `requestBody`/200 schemas matching
+> `approval/http/contracts` (ADR 0035 flat bodies); required `If-Match` header declared on the 5
+> operations whose handlers hard-require it; BE (`approval/api`) + FE (`gen:api`) codegen regenerated.
+> Prior: 2026-06-20 M8 / F8.6 — §5b H-D gate **widened to the full public-route surface**
 > (presence, observability, approval/http — not just `delivery/http/`); recorded health + declared-dynamic
 > metrics exemptions; **mechanical CI guard** added (`tools/cilint` `noresponsemap`, laundering-resistant).
 > Prior: 2026-06-20 M7 / F7.1–F7.5 — HS-2 contract completion: audit/auth/search/documents 200 bodies typed

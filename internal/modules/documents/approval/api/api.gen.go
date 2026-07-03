@@ -182,6 +182,24 @@ func (e QuorumKind) Valid() bool {
 	}
 }
 
+// Defines values for SignoffDocumentRequestDecision.
+const (
+	Approve SignoffDocumentRequestDecision = "approve"
+	Reject  SignoffDocumentRequestDecision = "reject"
+)
+
+// Valid indicates whether the value is a known member of the SignoffDocumentRequestDecision enum.
+func (e SignoffDocumentRequestDecision) Valid() bool {
+	switch e {
+	case Approve:
+		return true
+	case Reject:
+		return true
+	default:
+		return false
+	}
+}
+
 // ApprovalInstanceByDocumentResponse defines model for ApprovalInstanceByDocumentResponse.
 type ApprovalInstanceByDocumentResponse struct {
 	CompletedAt *time.Time                               `json:"completed_at,omitempty"`
@@ -239,6 +257,16 @@ type ApprovalStageInstanceResponse struct {
 // ApprovalStageInstanceResponseStatus defines model for ApprovalStageInstanceResponse.Status.
 type ApprovalStageInstanceResponseStatus string
 
+// CancelDocumentApprovalRequest defines model for CancelDocumentApprovalRequest.
+type CancelDocumentApprovalRequest struct {
+	Reason string `json:"reason"`
+}
+
+// CancelDocumentApprovalResponse defines model for CancelDocumentApprovalResponse.
+type CancelDocumentApprovalResponse struct {
+	DocumentId openapi_types.UUID `json:"document_id"`
+}
+
 // CreateRouteRequest defines model for CreateRouteRequest.
 type CreateRouteRequest struct {
 	Name                 string                 `json:"name"`
@@ -272,6 +300,16 @@ type ListRoutesResponse struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// ObsoleteDocumentRequest defines model for ObsoleteDocumentRequest.
+type ObsoleteDocumentRequest struct {
+	Reason string `json:"reason"`
+}
+
+// ObsoleteDocumentResponse defines model for ObsoleteDocumentResponse.
+type ObsoleteDocumentResponse struct {
+	DocumentId openapi_types.UUID `json:"document_id"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	// Code Machine-readable code from canonical taxonomy
@@ -282,6 +320,17 @@ type Problem struct {
 	Status   int           `json:"status"`
 	Title    string        `json:"title"`
 	Type     *string       `json:"type,omitempty"`
+}
+
+// PublishDocumentResponse defines model for PublishDocumentResponse.
+type PublishDocumentResponse struct {
+	DocumentId openapi_types.UUID `json:"document_id"`
+
+	// EffectiveFrom Present only for schedule-publish; RFC3339 UTC effective date.
+	EffectiveFrom *time.Time `json:"effective_from,omitempty"`
+
+	// NewStatus published for immediate publish; scheduled for schedule-publish.
+	NewStatus string `json:"new_status"`
 }
 
 // QuorumKind Quorum policy applied to a stage. `m_of_n` requires `quorum_m`.
@@ -309,6 +358,38 @@ type RouteSummary struct {
 	// Version Monotonic version bumped on each update or deactivation.
 	Version              int                    `json:"version"`
 	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// SchedulePublishDocumentRequest defines model for SchedulePublishDocumentRequest.
+type SchedulePublishDocumentRequest struct {
+	// EffectiveFrom RFC3339 UTC timestamp the publish takes effect; non-UTC offsets are rejected.
+	EffectiveFrom time.Time `json:"effective_from"`
+
+	// SupersededDocumentId Optional document to supersede when the scheduled publish fires.
+	SupersededDocumentId *openapi_types.UUID `json:"superseded_document_id,omitempty"`
+}
+
+// SignoffDocumentRequest defines model for SignoffDocumentRequest.
+type SignoffDocumentRequest struct {
+	// ContentHash SHA-256 hex digest of the content being signed off.
+	ContentHash string                         `json:"content_hash"`
+	Decision    SignoffDocumentRequestDecision `json:"decision"`
+
+	// Password Re-authentication password for the signature (password_reauth method).
+	Password string `json:"password"`
+
+	// Reason Required when decision is reject.
+	Reason *string `json:"reason,omitempty"`
+}
+
+// SignoffDocumentRequestDecision defines model for SignoffDocumentRequest.Decision.
+type SignoffDocumentRequestDecision string
+
+// SignoffDocumentResponse defines model for SignoffDocumentResponse.
+type SignoffDocumentResponse struct {
+	Outcome   string `json:"outcome"`
+	SignoffId string `json:"signoff_id"`
+	WasReplay bool   `json:"was_replay"`
 }
 
 // StageRequest defines model for StageRequest.
@@ -363,6 +444,18 @@ type SubmitDocumentResponse struct {
 	Etag       string             `json:"etag"`
 	InstanceId openapi_types.UUID `json:"instance_id"`
 	WasReplay  bool               `json:"was_replay"`
+}
+
+// SupersedeDocumentRequest defines model for SupersedeDocumentRequest.
+type SupersedeDocumentRequest struct {
+	// SupersededDocumentId Published document this document supersedes.
+	SupersededDocumentId openapi_types.UUID `json:"superseded_document_id"`
+}
+
+// SupersedeDocumentResponse defines model for SupersedeDocumentResponse.
+type SupersedeDocumentResponse struct {
+	DocumentId   openapi_types.UUID `json:"document_id"`
+	SupersededId openapi_types.UUID `json:"superseded_id"`
 }
 
 // UpdateRouteRequest defines model for UpdateRouteRequest.
@@ -430,21 +523,33 @@ type DeactivateApprovalRouteParams struct {
 // CancelDocumentApprovalParams defines parameters for CancelDocumentApproval.
 type CancelDocumentApprovalParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
+
+	// IfMatch Expected revision version ETag in the form "v<N>", or "*" to skip the check
+	IfMatch string `json:"If-Match"`
 }
 
 // ObsoleteDocumentParams defines parameters for ObsoleteDocument.
 type ObsoleteDocumentParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
+
+	// IfMatch Expected revision version ETag in the form "v<N>", or "*" to skip the check
+	IfMatch string `json:"If-Match"`
 }
 
 // PublishDocumentParams defines parameters for PublishDocument.
 type PublishDocumentParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
+
+	// IfMatch Expected revision version ETag in the form "v<N>", or "*" to skip the check
+	IfMatch string `json:"If-Match"`
 }
 
 // ScheduleDocumentPublishParams defines parameters for ScheduleDocumentPublish.
 type ScheduleDocumentPublishParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
+
+	// IfMatch Expected revision version ETag in the form "v<N>", or "*" to skip the check
+	IfMatch string `json:"If-Match"`
 }
 
 // RecordDocumentSignoffParams defines parameters for RecordDocumentSignoff.
@@ -466,6 +571,9 @@ type SubmitDocumentForApprovalParams struct {
 // SupersedeDocumentParams defines parameters for SupersedeDocument.
 type SupersedeDocumentParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
+
+	// IfMatch Expected revision version ETag in the form "v<N>", or "*" to skip the check
+	IfMatch string `json:"If-Match"`
 }
 
 // CreateApprovalRouteJSONRequestBody defines body for CreateApprovalRoute for application/json ContentType.
@@ -477,8 +585,23 @@ type UpdateApprovalRouteJSONRequestBody = UpdateRouteRequest
 // DeactivateApprovalRouteJSONRequestBody defines body for DeactivateApprovalRoute for application/json ContentType.
 type DeactivateApprovalRouteJSONRequestBody = DeactivateRouteRequest
 
+// CancelDocumentApprovalJSONRequestBody defines body for CancelDocumentApproval for application/json ContentType.
+type CancelDocumentApprovalJSONRequestBody = CancelDocumentApprovalRequest
+
+// ObsoleteDocumentJSONRequestBody defines body for ObsoleteDocument for application/json ContentType.
+type ObsoleteDocumentJSONRequestBody = ObsoleteDocumentRequest
+
+// ScheduleDocumentPublishJSONRequestBody defines body for ScheduleDocumentPublish for application/json ContentType.
+type ScheduleDocumentPublishJSONRequestBody = SchedulePublishDocumentRequest
+
+// RecordDocumentSignoffJSONRequestBody defines body for RecordDocumentSignoff for application/json ContentType.
+type RecordDocumentSignoffJSONRequestBody = SignoffDocumentRequest
+
 // SubmitDocumentForApprovalJSONRequestBody defines body for SubmitDocumentForApproval for application/json ContentType.
 type SubmitDocumentForApprovalJSONRequestBody = SubmitDocumentRequest
+
+// SupersedeDocumentJSONRequestBody defines body for SupersedeDocument for application/json ContentType.
+type SupersedeDocumentJSONRequestBody = SupersedeDocumentRequest
 
 // Getter for additional properties for CreateRouteRequest. Returns the specified
 // element and whether it was found
@@ -1943,6 +2066,29 @@ func (siw *ServerInterfaceWrapper) CancelDocumentApproval(w http.ResponseWriter,
 		return
 	}
 
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CancelDocumentApproval(w, r, id, params)
 	}))
@@ -2000,6 +2146,29 @@ func (siw *ServerInterfaceWrapper) ObsoleteDocument(w http.ResponseWriter, r *ht
 	} else {
 		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
 		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
 		return
 	}
 
@@ -2063,6 +2232,29 @@ func (siw *ServerInterfaceWrapper) PublishDocument(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PublishDocument(w, r, id, params)
 	}))
@@ -2120,6 +2312,29 @@ func (siw *ServerInterfaceWrapper) ScheduleDocumentPublish(w http.ResponseWriter
 	} else {
 		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
 		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
 		return
 	}
 
@@ -2346,6 +2561,29 @@ func (siw *ServerInterfaceWrapper) SupersedeDocument(w http.ResponseWriter, r *h
 	} else {
 		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
 		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
 		return
 	}
 
@@ -3389,18 +3627,25 @@ func (response GetApprovalInstanceByDocument500ApplicationProblemPlusJSONRespons
 type CancelDocumentApprovalRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	Params CancelDocumentApprovalParams
+	Body   *CancelDocumentApprovalJSONRequestBody
 }
 
 type CancelDocumentApprovalResponseObject interface {
 	VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error
 }
 
-type CancelDocumentApproval200Response struct {
-}
+type CancelDocumentApproval200JSONResponse CancelDocumentApprovalResponse
 
-func (response CancelDocumentApproval200Response) VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error {
+func (response CancelDocumentApproval200JSONResponse) VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type CancelDocumentApproval400ApplicationProblemPlusJSONResponse struct {
@@ -3502,18 +3747,25 @@ func (response CancelDocumentApproval500ApplicationProblemPlusJSONResponse) Visi
 type ObsoleteDocumentRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	Params ObsoleteDocumentParams
+	Body   *ObsoleteDocumentJSONRequestBody
 }
 
 type ObsoleteDocumentResponseObject interface {
 	VisitObsoleteDocumentResponse(w http.ResponseWriter) error
 }
 
-type ObsoleteDocument200Response struct {
-}
+type ObsoleteDocument200JSONResponse ObsoleteDocumentResponse
 
-func (response ObsoleteDocument200Response) VisitObsoleteDocumentResponse(w http.ResponseWriter) error {
+func (response ObsoleteDocument200JSONResponse) VisitObsoleteDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ObsoleteDocument400ApplicationProblemPlusJSONResponse struct {
@@ -3621,12 +3873,18 @@ type PublishDocumentResponseObject interface {
 	VisitPublishDocumentResponse(w http.ResponseWriter) error
 }
 
-type PublishDocument200Response struct {
-}
+type PublishDocument200JSONResponse PublishDocumentResponse
 
-func (response PublishDocument200Response) VisitPublishDocumentResponse(w http.ResponseWriter) error {
+func (response PublishDocument200JSONResponse) VisitPublishDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type PublishDocument400ApplicationProblemPlusJSONResponse struct {
@@ -3728,18 +3986,25 @@ func (response PublishDocument500ApplicationProblemPlusJSONResponse) VisitPublis
 type ScheduleDocumentPublishRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	Params ScheduleDocumentPublishParams
+	Body   *ScheduleDocumentPublishJSONRequestBody
 }
 
 type ScheduleDocumentPublishResponseObject interface {
 	VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error
 }
 
-type ScheduleDocumentPublish200Response struct {
-}
+type ScheduleDocumentPublish200JSONResponse PublishDocumentResponse
 
-func (response ScheduleDocumentPublish200Response) VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error {
+func (response ScheduleDocumentPublish200JSONResponse) VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ScheduleDocumentPublish400ApplicationProblemPlusJSONResponse struct {
@@ -3841,18 +4106,25 @@ func (response ScheduleDocumentPublish500ApplicationProblemPlusJSONResponse) Vis
 type RecordDocumentSignoffRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	Params RecordDocumentSignoffParams
+	Body   *RecordDocumentSignoffJSONRequestBody
 }
 
 type RecordDocumentSignoffResponseObject interface {
 	VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error
 }
 
-type RecordDocumentSignoff200Response struct {
-}
+type RecordDocumentSignoff200JSONResponse SignoffDocumentResponse
 
-func (response RecordDocumentSignoff200Response) VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error {
+func (response RecordDocumentSignoff200JSONResponse) VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type RecordDocumentSignoff400ApplicationProblemPlusJSONResponse struct {
@@ -4084,18 +4356,25 @@ func (response SubmitDocumentForApproval500ApplicationProblemPlusJSONResponse) V
 type SupersedeDocumentRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
 	Params SupersedeDocumentParams
+	Body   *SupersedeDocumentJSONRequestBody
 }
 
 type SupersedeDocumentResponseObject interface {
 	VisitSupersedeDocumentResponse(w http.ResponseWriter) error
 }
 
-type SupersedeDocument200Response struct {
-}
+type SupersedeDocument200JSONResponse SupersedeDocumentResponse
 
-func (response SupersedeDocument200Response) VisitSupersedeDocumentResponse(w http.ResponseWriter) error {
+func (response SupersedeDocument200JSONResponse) VisitSupersedeDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type SupersedeDocument400ApplicationProblemPlusJSONResponse struct {
@@ -4541,6 +4820,13 @@ func (sh *strictHandler) CancelDocumentApproval(w http.ResponseWriter, r *http.R
 	request.Id = id
 	request.Params = params
 
+	var body CancelDocumentApprovalJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CancelDocumentApproval(ctx, request.(CancelDocumentApprovalRequestObject))
 	}
@@ -4567,6 +4853,13 @@ func (sh *strictHandler) ObsoleteDocument(w http.ResponseWriter, r *http.Request
 
 	request.Id = id
 	request.Params = params
+
+	var body ObsoleteDocumentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ObsoleteDocument(ctx, request.(ObsoleteDocumentRequestObject))
@@ -4622,6 +4915,13 @@ func (sh *strictHandler) ScheduleDocumentPublish(w http.ResponseWriter, r *http.
 	request.Id = id
 	request.Params = params
 
+	var body ScheduleDocumentPublishJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ScheduleDocumentPublish(ctx, request.(ScheduleDocumentPublishRequestObject))
 	}
@@ -4648,6 +4948,13 @@ func (sh *strictHandler) RecordDocumentSignoff(w http.ResponseWriter, r *http.Re
 
 	request.Id = id
 	request.Params = params
+
+	var body RecordDocumentSignoffJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.RecordDocumentSignoff(ctx, request.(RecordDocumentSignoffRequestObject))
@@ -4710,6 +5017,13 @@ func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Reques
 	request.Id = id
 	request.Params = params
 
+	var body SupersedeDocumentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.SupersedeDocument(ctx, request.(SupersedeDocumentRequestObject))
 	}
@@ -4735,83 +5049,90 @@ func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"2ROw+izo7afb/wsAAP//",
+	"7D3bchu3kr/SNZsHOeFwJNs5VZGffElyvCeJtZbzFHsZcKaHxBEGmAAYSoxKVfu0H7C1X3i+5BQucyWG",
+	"pBxZVlJ8kmYGl0bfu9EAr6NUFKXgyLWKTq8jiaoUXKF9eEGyt/hbhUqbp1Rwjdz+S8qS0ZRoKnhSSjFn",
+	"WHz1TyW4+abSJRbE/PeFxDw6jf4jaadI3FeVnLle0c3NzSTKUKWSlma46DQyU1JFUyKA8hVhNCPRzSR6",
+	"KXjOaHqvoLg5tYAMAZUmmTCQfCfknGYZ8vsE5RwLKFEWVClioXjNNUpO2DnKFcpvpRTyPuExEwK1MAjI",
+	"BCiUK5oJaUD7SejvRMWz++WatJJKACcCkJtZpSfXz5xUeikk/R3vFaKfiABSmaloakG5mfhBrXA9L0sp",
+	"VoS95koTnuKL9SuRVgVy/dbLoGlVSlGi1NQJpAGAocZsRiz8uZCF+S/KiMZY0wKjScQrxsicYXSqZYWT",
+	"SK9LjE4jpSXlC4OQzM8zo1lvkKqiWRRoj5osTMOND3v2l6LSuO9kSpOFWyzVWKhd+K+xeG661ahsEHjT",
+	"TECkJGs/vq7ssMirIjr9JaJ8VkqxkKhUNDEsIcUKDWwS/4mptv+mZljGMIs+hGCu5gXVO8iypdd8HUSv",
+	"Rk72pZJBs9Gb0vD4L5Ft0qVzhwrdgRt8DMAZrKkhi2eGFglibnBkoG0oQRdc5PlbTIXMxlmZpFrIWaVQ",
+	"+gVusimmVFEnjDWtPHUa4gTJsS9bIvGivkkauuBEVxJnBeqlyEYb3YrkIRr10dBZdACI7pRbKWBo9dwM",
+	"PI7+fZG7W5lQVTKynnFSYBhNGwIXFjGSamonvyRUm74h0o7zywC5HYx2AWzA2Ym/DV0S5uCP1FR96gTU",
+	"1J48zMgc2Sh3ijz/CPiC8hvWpAucUZ7hlRm7oJwWhsAnTVPjHixQhrmgRJ4ZWDuUL4lSlhdyQtlOvRsS",
+	"py5MNXa6Oq5GyqSmXogPXtpJa2tc46XjCff5oNUjBeU/IF/oZRcJI+D6XreZf1SWb2XPB3B0OweBkUg0",
+	"vjXGo4MBkmXUuDmEnXVAcSqiD1ytFwpyVePm8fHxZDuu7CA5ZThLRTbs/renw94l0cYPjU6j//6FxL8f",
+	"x9/M4g9ffXEH7oUV1nrdN3be167fyVAgBnjtLWAStdrHTB9C9Cu0cvCHkN2yYt8V/V6sTKzAUwTXBKQV",
+	"b8zgkuolZPXcVHDAFXI9jSZdnH+9k2T7s/crSXN9JhhN15uQvsAlWVFRSbC+uQFwiRwIByuwwIRCBcjo",
+	"gs4po3oNBc1ii1YDcq1cJGZVirPfKiGrwiuUmW0VTaILxHKmOCnVUoQ9iO8osqwJqYY+eBY2dLnptLmi",
+	"/zx/8xOUwoZKICRkQkNJ9DLEnQUqZWDcad7cXJPIc1fdL4TuH6jSlqNUV4Pcgqds370lxk51XhUFketN",
+	"qzHkEjf2JNJCExYE/81cCRPytMHRfanhzZk/iwKuI8xRRuyz248kXVKOsUSSGccNTDPIpSggJVxwmhIG",
+	"mlwJLop1iAcz1ISGfQo0ErE/K3SkKOTheAdrh9NYkCvnVnz9zTeT1sl4ahTSppuhqWbhEd2LLnEk3Ukb",
+	"N1zHgbA4D1KpmjOqlnfNK5MI8xytfzQzNNyk95lEhVyD4GwNuZBgsJ9VDOPSgfQM3n738smTJ9/Az+9e",
+	"QjMcmEDFqMz9glWOl7OWKH0Q/ESY2flpUWBGiUZoAKhByoIATm8lIj1QQpT4L6vz/0F5QBe7b1Ba49NY",
+	"GC2AgDMh8GsxE/mM/wp+fgW/OiMyK37tGhjC17OTmciNJ8mY+8d1DRoUb9I/Rv+a5a5Q1sHaIMeEl2CV",
+	"KPgmQHJjZwioKk1RqbxiUJWW1vDGBfSWCKl165LG8FtW2O7C3yKNE1LzY/qtZzBuhRkfN7TSPheCIeFm",
+	"VLe+2yVk9pTI0Uh36LPeifM5akpvlx+aRI4LboeRUb77UXChjTFp+G5eFSVmYPxHki49z1l/p+Nb7mKy",
+	"UEjnPeduzmrgWzfxYw1uJ13V4YMeCkKceO4V04YuH/E4dqnmrt41GFaaFCXoZaMZQZML483acZ4BFzw2",
+	"bU2EiloBkcZddwmS/TW1qkqUCjPMZgNb04fuTemkDOpWRg82nZ3bbWBtlXcNdW70Yg+gvbTAAF1BCrj4",
+	"fCfmfQp/tiRqubmy878/jx9//TdY4hVkdIFKg8jtWnw/mCPlC3DZNIPuQbQziDDN491lJ0ui1KWQAYq8",
+	"xZhUeuk2DGwoVre1KtsSo84JwlH9bSbR9AKXJHzkRWxbbD0WJb71xHK0rxcIVHku3MNQt9nLZpmTPrX2",
+	"IvuY8yQqnYqxPKMbZCybfEnUTGLJyDpkMAbr6IzV6zlpIAguo5ssuJ0lk0juPNWRmTh7VjaB9jZT043J",
+	"OyZuKygbEwqZodxkq5N4ThRmzsMCITPKCZvCj5XSgL9VhIHN1311stsF8fH8jsV0PMCmz6zYxe/ez/vV",
+	"8HvtBT6DwkA5RxDedxJ6ifKSqn38JT/8LCUlccmK25L3Q03jD1++fz/1D9PZhy/9vx++CG9s+ImlYHfI",
+	"UQMZcdRu7HN/0vDqJx1Gb4g5YNRRwfo4F7ErWJ9CQsaF4NNycnf0kT2a3ay4m3MeDgvY7cj7cgzqvU84",
+	"IpUWiqwwNtSpNHoDeztfoRs59SF67mJx4nP8PpazjpgBAciCUK707Z2tzm7vbvM7wO2Y9R2vA/CpnH1D",
+	"kVvZ4u7gA2M8uhd9XruxOxlmX2/5rMlxtO7ykqr2qRnoIzzjESD2XNldZZo6UPzRPOZwsNBKfrbB2L1v",
+	"LN3bBtCuHR8DC6aVpHptAs/C8yMq40C/FOKCBrK75+4zpPY7UKUqzGC+hrM35+8gISVNVieJiQcSJhbU",
+	"BtzUdHQdal19GhWoCctEqmZ+xpa+pKT/wLWraKI8FwGtdfYaKKcptdEj/GjGeiVSBUerk0dT+FalohRA",
+	"tPHtFBa2TGwhSUoEpKKA18+n7+18Llkbtf2fn73uhPGn0cn0eHpsrWqJnJQ0Oo2eTI+nT2x8oZcWY0mt",
+	"PBPK58JuRS/Q8pLhFhtHvc6iU7sP0tZcmZaTfrXj4+PjzaWKCzP90+OTMUZphkh6dWa205PdndpawptJ",
+	"9LWDYHuPUN2fZabaP7IrbU0K9WvVZKHaINXttlzFJVlQbpEU4xUWpa6FLfAprgPH6IWoeIYZlChjty9n",
+	"ZzHW1G/r20g1FnlugkddSRNoUw55xdjUgtslm1PwKrnu6PqbUUJ+j3pYO2f5QZICNUqzyGvH9H6bzbN8",
+	"35C0ourW25b77VJ7H8J8M1JWeLtywj2KAgOVhvfKpE+Pn+7u0VSA3h1Xf489pm4Iv8nXe7FX4kpLrNkU",
+	"KsBmrgrjs3LaxI++RNJxtE+j1xkWpdDI03VsVPW2Ofbk3jBD7UG4To34A+bBp8ff7O7QVJjfHdM6JrpT",
+	"vnUORXLtS53Mm06pV5iXXTFXrwLN59w+Cz/3R68X8uBEZTIUi2+vSpuMB4krlxutdz++fUcWxr6ZWNKA",
+	"Cu+j1fvq+PhJ+pP9g++j2hPbgDCPfyQ6XR6k+MFKsROfVopdJlM1EhR2rQx6fo+JROJII+kKM79V1ERL",
+	"alpKkaJSsyYv0pQmwVFOGJuT9MLmJ6RgrBMhBno+MlwltOGU5xJJbPxwzCAlJSDPhUwxA6JBU5Tx45pd",
+	"9VXMyBqlO8GRIqwoAQv71CdIXY2YaWtmAolKsBVmrqjEvG6CYCku4egHQbKmeFEieWkgewYcVyhdH2J3",
+	"11FpsHVMUzgTSi8kKtCSlpdmyqOCLpwCg+OTp4/nj4AqO5dBh9KiNJGNEpVMzWr1lXOLWu3ZVi3tDAbe",
+	"1kVIn8yrC5RgfW4v7o9Jho9brb0YRKy/fDDKaSwYcWRptrPczi24vd1PGKO4CRowYpdmSwXP6QIU6mcg",
+	"K65pgT5YcaxmghXz1fO/0IRNgAuwB41kwmhB9RReYcqIUcvQAgOXomIZzBFUiWmc09S+PeIC1JKUCOmS",
+	"8AW6A1020Ug5PH/1Fo6PHz9+NLXbhGGn1G5n9zh3xILfuc9oBfaFyNZ3JhaB0uKbfhbFAHazIZgndwZB",
+	"vywnIJO+fOCh29F7NYu3EH5HYVu9289w768AQmo9ufb5gbIKyIhLLO4jIwMv90/lgfaKvj6L+3n3CiGQ",
+	"Et5LIRzfn0I4+NT3pjwcNwSUxxHHy5r1H91OaXQKHsej5fYkxkGJ/PmUyMg5mhuvSQ6K4y+vOFoO2FQe",
+	"W9RFlVGd2MNPhjuGrxK8KoXU41+Sa/fX713s0SrJxCVngmRNc71MXGQQd6oEm092R2/wQlS6+8ZuiTZP",
+	"Hk8q9C659v914G2zDHGTZdjyKSklrihexr7AZrTd9fYpnGZ2rmDzdmd74Y/n7GxYJ+vUzpbNprVvOURC",
+	"21xpEnjbWedwcXXk2T31su/uVrsJdB8m6LC99XC2t2C+bpJr45pryGsyXbpzEaGPvp7JgFlQvaNRKVHR",
+	"BQ+32m8DbXiM+S/oRX3EZsAEhIT30ZfvI1vsdUHduYB0ienFn8HJ2n5E/p6Dth3n5Q/O2Cff32w2AEgr",
+	"5fspK8vx9nS0GtEybYPk2kuYselKCzmi44xqw/EB/dfkmtG5JHI9G7XaGTVyNK8c1+xqkaRihdId397V",
+	"VGJKSzoOZFY5YRgZy/uSmUiv4kqyrY3KLA9/zykz/kjcCFmwDSeM/j4CRscFG7EBwzPUB+3/V9D+Y2fy",
+	"71nvjx7QP2j8T6fxa6Rv90sP+9+fZ/97oKBLRlJcCpahjIUVBZVcl6P2rtNc7W6xdSRXLj9uGAZnbA92",
+	"4f7twifSymM3YRyU8qdTyh7nB538J9DJElPBlZZVOpJ9qTVHvKQmyFlvb6WSa2meR8OA4XUr4zq5vv+g",
+	"RpTnqoNu/iv47Dsut7hn1/1gJO7fSNQc0KrGshHwg7V4oNbCb9IlJLULGVHxvpFFUCyRIVE7mi6RSD1H",
+	"orc32z6WL4DeceygxuStThwcTgM8AJMRvo3nnk3F2OUwB1PxyQ88tIfbD0cdHryhsJc4dHXx4KdMmss/",
+	"M0ly/a///b+KZyhnroTD3TfhzpYjz+x+Cxy9+vZlfHzyaAovCWMoFaiqLNka6sslgPAMutdLAF4ZMaea",
+	"rZ85QhKlW5xmWEpMidGZ7rz6yG7DBC6XNF3W6FcwF3ppiYYyVjRDIAqImWCFnCJPES4lKUuUIAzm7c0M",
+	"ihQIjT0yOBxEO71bL74T8rBD/aczUMFLYe75DMHI7SlbDhNMPFItKIYUI/d6flSUKjFnmGrKF+6mQaF0",
+	"7C+TqQesrxO1emWUZjcHU3onUZfDfWM3ciG375If7OkDsadtLeBYvmx4F8/BcvwlMmVjl0fdd+AzetXT",
+	"IfT5lPq6vgH3sJny8LW0iV18cipHezFunDNLLPtuiYTpZcLaclj/RiLJ6o0VSoqEZAXliQkeOiPaDwbN",
+	"BRZzlGpJS7XlU3Ltf3TqJrluKHbT6dBcg+huMKtfX5S081Ta+/xTTJofKAl90xJJ0fkiBcN4ZHzzrftc",
+	"qbZGzT232/3NczKv2MXGS8pXVG/0bRc+/iUJ43DYyixQDw8/BBtuLKr/veJMpPUCCtSSpnVzLjTNvUoO",
+	"vrPcERPGgh8rbj+nomoOKfQb+O255liHQiLT5cZhgvpES2IAFdXm+yIn8aCksPlm74FmdZf65zwsS4Zf",
+	"Jtddbmy+5aSgrGWXjfcj3fwF7Grs/Y5u/nOSYU4qpmONRcnaYsf6UQ2fe/UsKdGEicVGG7VWGotkzgi/",
+	"2PjYOaHRf9me0HC3Aow06pXWDz9WWVNQP/jkvSe1/WtyzW92t0jqW8b3aBks9t+rR7/yf1sXV4RaMkGy",
+	"Ti3q7h57NW33rHe1dHmsPRr2yl13N7zd0posnG0oLrCluX1oGHC/I23WS3GRhJ0/8jc8Ruard0rGrogc",
+	"XCX/r//5f7AHyCbgjo1NbPbOeuaVlMh1bJQnlFLM7eXW3jM3w0SbEcLrzIyt13YQYn9qBArCyQKtn2Bm",
+	"syp5AlZTT6BrnCZQn0JzQFivo2MgOtNTUgRmf+fv8zASF9vzdeBMoh3OFT6r3iKMaG6Oc+5J0OYJlQWd",
+	"pFa9Q62a7bA1vcAr3874DSlDU9isZevf+WtHKu/8mJG96wLWdekM22sZGPtVcxVtzZKTOlAzOHZxhEdx",
+	"fbSoN2ZnrlbpbpvHa3KLpFqbTyz9/Dy14eiOXP/Y1ObALzeP4gGjOabrlKHPLmcIhDGRDgEOHlbcAruP",
+	"YPiix31e302gPhYwgW6N42SEobbNGFpUt/gfaqNusWgEUMwZXdi0uGFUm88+ypCLgnKihbS/7fQMeFUY",
+	"JhUSSiIvMJvA81dv4+Pjp48fdSHrnlnYBO4MZdwcPoCu4+Kv8DQwGecFVCVzYiBhVGlIoOv3QAIFkRf2",
+	"R8YeTeFMCvcrJc77XzS/NjhzZ1+b6z5qfMQtkecVzxjCkV/Lk0dTOEeWu9Cms66+1zaqEqyahcxduEOk",
+	"41RH+jjDnHKb1KiU/Wm0azP2DcQucwErwip7K5DSxIRf8LK5tzx2a8IMjuwMU7tpkrjpZu10U6cDH03h",
+	"BUkvkGfud7mIhvOz+KQrFM42bK7jef+qpElzFtBIdH2nqmPLgMhoSbiyFyj31F8dtgaYVQqlWj51vmpP",
+	"s5kXgY4/0BVyo/UNJIYPqH2y5qM7twu4AgO8qVUuYfD3d+/OwHvpnb5ibixgfXX8zYebfwcAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

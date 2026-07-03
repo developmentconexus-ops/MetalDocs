@@ -3403,9 +3403,14 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishDocumentResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3434,9 +3439,20 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchedulePublishDocumentRequest'
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishDocumentResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3465,9 +3481,20 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupersedeDocumentRequest'
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupersedeDocumentResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3496,9 +3523,20 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ObsoleteDocumentRequest'
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObsoleteDocumentResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3609,9 +3647,19 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignoffDocumentRequest'
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignoffDocumentResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3632,9 +3680,20 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelDocumentApprovalRequest'
       responses:
         '200':
           description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CancelDocumentApprovalResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -4155,8 +4214,7 @@ components:
         roles:
           type: array
           items:
-            type: string
-            enum: [system_admin, approver, author, editor, viewer]
+            $ref: '#/components/schemas/UserRole'
         capabilities:
           type: array
           description: |
@@ -4669,8 +4727,7 @@ components:
           minItems: 1
           maxItems: 1
           items:
-            type: string
-            enum: [system_admin, approver, author, editor, viewer, signer, area_admin, qms_admin]
+            $ref: '#/components/schemas/UserRole'
     CreateManagedUserResponse:
       type: object
       required: [user_id]
@@ -4732,8 +4789,7 @@ components:
           minItems: 1
           maxItems: 1
           items:
-            type: string
-            enum: [system_admin, approver, author, editor, viewer]
+            $ref: '#/components/schemas/UserRole'
     ReplaceUserRolesResponse:
       type: object
       required: [user_id, display_name, roles]
@@ -4745,8 +4801,7 @@ components:
         roles:
           type: array
           items:
-            type: string
-            enum: [system_admin, approver, author, editor, viewer]
+            $ref: '#/components/schemas/UserRole'
     DocumentFillInSchemaResponse:
       type: object
       required: [data]
@@ -5484,8 +5539,7 @@ components:
         display_name:
           type: string
         role:
-          type: string
-          enum: [system_admin, approver, author, editor, viewer]
+          $ref: '#/components/schemas/UserRole'
         assigned_by:
           type: string
     UpsertUserRoleResponse:
@@ -6029,6 +6083,107 @@ components:
           type: boolean
         etag:
           type: string
+    SignoffDocumentRequest:
+      type: object
+      required: [decision, password, content_hash]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        reason:
+          type: string
+          description: Required when decision is reject.
+        password:
+          type: string
+          minLength: 1
+          description: Re-authentication password for the signature (password_reauth method).
+        content_hash:
+          type: string
+          minLength: 64
+          maxLength: 64
+          description: SHA-256 hex digest of the content being signed off.
+    SignoffDocumentResponse:
+      type: object
+      required: [signoff_id, was_replay, outcome]
+      properties:
+        signoff_id:
+          type: string
+        was_replay:
+          type: boolean
+        outcome:
+          type: string
+    SchedulePublishDocumentRequest:
+      type: object
+      required: [effective_from]
+      properties:
+        effective_from:
+          type: string
+          format: date-time
+          description: RFC3339 UTC timestamp the publish takes effect; non-UTC offsets are rejected.
+        superseded_document_id:
+          type: string
+          format: uuid
+          description: Optional document to supersede when the scheduled publish fires.
+    PublishDocumentResponse:
+      type: object
+      required: [document_id, new_status]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        new_status:
+          type: string
+          description: published for immediate publish; scheduled for schedule-publish.
+        effective_from:
+          type: string
+          format: date-time
+          description: Present only for schedule-publish; RFC3339 UTC effective date.
+    ObsoleteDocumentRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+    ObsoleteDocumentResponse:
+      type: object
+      required: [document_id]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+    CancelDocumentApprovalRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+    CancelDocumentApprovalResponse:
+      type: object
+      required: [document_id]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+    SupersedeDocumentRequest:
+      type: object
+      required: [superseded_document_id]
+      properties:
+        superseded_document_id:
+          type: string
+          format: uuid
+          description: Published document this document supersedes.
+    SupersedeDocumentResponse:
+      type: object
+      required: [document_id, superseded_id]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        superseded_id:
+          type: string
+          format: uuid
     DocumentRevisionHistoryItem:
       type: object
       required: [document_id, revision_number, revision_title, status, created_at, is_current]
