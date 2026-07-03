@@ -56,7 +56,6 @@ func (r *supersedeSingleValueRows) Next(dest []driver.Value) error {
 	return nil
 }
 
-
 type supersedeTestStmt struct {
 	conn  *supersedeTestConn
 	query string
@@ -302,6 +301,56 @@ func TestPublishSuperseding_OCC_PriorConflict(t *testing.T) {
 	}
 	if len(emitter.Events) != 0 {
 		t.Errorf("no governance event should be emitted on OCC conflict; got %d", len(emitter.Events))
+	}
+}
+
+// TestPublishSuperseding_CapabilityAssertPairsBeforeGatedWrite pins the
+// tripwire pairing invariant (APP-04 / T-006) for the cutover/supersede path.
+// supersedeTestStmt.Exec (line ~78) rejects any "UPDATE documents" unless
+// metaldocs.asserted_caps already recorded "document.edit" — PublishSuperseding
+// asserts CapDocumentSupersede then CapDocumentEdit via authz.Require before
+// either OCC UPDATE runs, so this only passes because that call order holds
+// in supersede_service.go. Mirrors
+// TestCancelInstance_CapabilityAssertPairsBeforeGatedWrite in
+// cancel_service_test.go.
+func TestPublishSuperseding_CapabilityAssertPairsBeforeGatedWrite(t *testing.T) {
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+	svc := &SupersedeService{emitter: emitter, clock: clock}
+
+	conn := &supersedeTestConn{
+		newDocRowsAffected:   1,
+		priorDocRowsAffected: 1,
+		authzGranted:         true,
+		areaCode:             "QA",
+		actorID:              "user-1",
+		tenantID:             tenant.DevTenantID,
+	}
+	name := fmt.Sprintf("supersede_pairing_test_%p", conn)
+	sql.Register(name, &supersedeTestDriver{conn: conn})
+	db, err := sql.Open(name, "")
+	if err != nil {
+		t.Fatalf("open supersede pairing test db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	req := SupersedeRequest{
+		TenantID:             "tenant-uuid-1",
+		NewDocumentID:        "doc-new-pairing-1",
+		PriorDocumentID:      "doc-prior-pairing-1",
+		SupersededBy:         "user-1",
+		NewRevisionVersion:   1,
+		PriorRevisionVersion: 1,
+	}
+
+	if _, err := svc.PublishSuperseding(context.Background(), newTxRunner(db), req); err != nil {
+		t.Fatalf("PublishSuperseding: unexpected error (pairing broken?): %v", err)
+	}
+	if !conn.hasAssertedCap("document.edit") {
+		t.Error("expected document.edit to be recorded in metaldocs.asserted_caps by end of tx")
+	}
+	if !conn.hasAssertedCap("document.supersede") {
+		t.Error("expected document.supersede to be recorded in metaldocs.asserted_caps by end of tx")
 	}
 }
 

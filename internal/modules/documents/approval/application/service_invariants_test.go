@@ -21,7 +21,7 @@ package application
 //
 // All tests use the shared fakes defined in the sibling *_test.go files
 // (decision_service_test.go, submit_service_test.go, publish_service_test.go,
-// obsolete_service_test.go, membership_tx_test.go).
+// obsolete_service_test.go, recording_driver_test.go).
 
 import (
 	"context"

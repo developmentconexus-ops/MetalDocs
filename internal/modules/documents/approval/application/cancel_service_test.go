@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -88,12 +89,38 @@ type cancelTestStmt struct {
 func (s *cancelTestStmt) Close() error  { return nil }
 func (s *cancelTestStmt) NumInput() int { return -1 }
 
-func (s *cancelTestStmt) Exec(_ []driver.Value) (driver.Result, error) {
+func (s *cancelTestStmt) Exec(args []driver.Value) (driver.Result, error) {
 	lower := strings.ToLower(s.query)
+	// Pairing pin (APP-04): set_config('metaldocs.asserted_caps', ...) records
+	// the capability authz.Require just asserted. Any later gated write must
+	// see it recorded first — mirrors supersedeTestStmt.Exec's enforcement.
+	// metaldocs.bypass_authz mirrors the DB tripwire's own bypass short-circuit
+	// (db/migrations/0259_iam_documents_tripwire.sql:171-201: v_bypass checked
+	// before v_asserted_raw) so SystemCancelInstance's authz.BypassSystem path
+	// legitimately skips the asserted_caps requirement.
+	if strings.Contains(lower, "set_config('metaldocs.asserted_caps'") {
+		if len(args) > 0 {
+			if raw, ok := args[0].(string); ok {
+				s.conn.setAssertedCaps(raw)
+			}
+		}
+		return cancelTestResult{rowsAffected: 1}, nil
+	}
+	if strings.Contains(lower, "set_config('metaldocs.bypass_authz'") {
+		s.conn.bypassSet = true
+		return cancelTestResult{rowsAffected: 1}, nil
+	}
+	gated := s.conn.bypassSet || s.conn.hasAssertedCap("document.edit")
+	if strings.Contains(lower, "update approval_stage_instances") && !gated {
+		return nil, fmt.Errorf("ErrCapabilityNotAsserted: document.edit required on approval_stage_instances")
+	}
 	if strings.Contains(lower, "update documents") {
+		if !gated {
+			return nil, fmt.Errorf("ErrCapabilityNotAsserted: document.edit required on documents")
+		}
 		return cancelTestResult{rowsAffected: s.conn.docUpdateRows}, nil
 	}
-	// stage cancel, governance_events INSERT — always succeed
+	// governance_events INSERT — always succeeds
 	return cancelTestResult{rowsAffected: 1}, nil
 }
 
@@ -139,6 +166,37 @@ type cancelTestConn struct {
 	actorID       string
 	tenantID      string
 	docUpdateRows int64
+	assertedCaps  []string
+	bypassSet     bool
+}
+
+func (c *cancelTestConn) setAssertedCaps(raw string) {
+	if strings.TrimSpace(raw) == "" {
+		c.assertedCaps = nil
+		return
+	}
+	var asserted []map[string]string
+	if err := json.Unmarshal([]byte(raw), &asserted); err != nil {
+		c.assertedCaps = nil
+		return
+	}
+	caps := make([]string, 0, len(asserted))
+	for _, item := range asserted {
+		capability := strings.TrimSpace(item["cap"])
+		if capability != "" {
+			caps = append(caps, capability)
+		}
+	}
+	c.assertedCaps = caps
+}
+
+func (c *cancelTestConn) hasAssertedCap(capability string) bool {
+	for _, asserted := range c.assertedCaps {
+		if asserted == capability {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *cancelTestConn) Prepare(query string) (driver.Stmt, error) {
@@ -280,6 +338,38 @@ func TestSystemCancelInstance_BypassesUserCapability(t *testing.T) {
 	}
 	if len(emitter.Events) != 1 {
 		t.Fatalf("events = %d; want 1", len(emitter.Events))
+	}
+}
+
+// TestCancelInstance_CapabilityAssertPairsBeforeGatedWrite pins the tripwire
+// pairing invariant (APP-04 / T-006): the fake driver's UPDATE documents and
+// UPDATE approval_stage_instances handlers reject the write unless
+// metaldocs.asserted_caps already recorded "document.edit" (see
+// cancelTestStmt.Exec). authz.Require records that GUC in the same tx before
+// CancelInstance's stage-cancel/document-revert writes run, so this test only
+// passes because the real call order in cancel_service.go pairs
+// authz.Require ahead of both gated writes. Mirrors
+// TestPublishSuperseding_HappyPath's equivalent pairing enforcement in
+// supersede_service_test.go.
+func TestCancelInstance_CapabilityAssertPairsBeforeGatedWrite(t *testing.T) {
+	conn := &cancelTestConn{authzGranted: true, docUpdateRows: 1}
+	db := newCancelTestDB(t, conn)
+
+	repo := &cancelFakeRepo{instance: buildCancelInstance()}
+	svc := &CancelService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
+
+	_, err := svc.CancelInstance(context.Background(), newTxRunner(db), CancelInput{
+		TenantID:                "tenant-1",
+		InstanceID:              "inst-1",
+		ExpectedRevisionVersion: 2,
+		ActorUserID:             "user-1",
+		Reason:                  "pairing check",
+	})
+	if err != nil {
+		t.Fatalf("CancelInstance: unexpected error (pairing broken?): %v", err)
+	}
+	if !conn.hasAssertedCap("document.edit") {
+		t.Error("expected document.edit to be recorded in metaldocs.asserted_caps by end of tx")
 	}
 }
 
