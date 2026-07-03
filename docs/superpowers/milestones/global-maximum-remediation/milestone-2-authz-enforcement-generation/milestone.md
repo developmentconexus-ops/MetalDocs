@@ -1,7 +1,7 @@
 # Milestone 2 — Authz enforcement generation & cap-name coherence
 
 > **Program:** global-maximum-remediation  ·  **Governing spec:** `../mission.md` (§7 M2)
-> **Status:** **VALIDATION-PENDING** — F2.1 + F2.2 implemented & committed (evidence complete); awaiting `milestone-validator`. Main session flips to PASSED only on validator PASS + HS-1 operator approval.
+> **Status:** **VALIDATOR PASS — HS-1 OPERATOR GATE PENDING** — F2.1 + F2.2 implemented & committed; `milestone-validator` returned PASS (C1–C7, [qa/milestone-qa.md](qa/milestone-qa.md), 2026-07-03). Not "passed" until operator approves HS-1. Not pushed. M3 only in a fresh session after approval.
 > **Authored:** 2026-07-03 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** M2 is, **which features** it

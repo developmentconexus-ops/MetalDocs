@@ -1,7 +1,7 @@
 # Program: Global Maximum Remediation
 
 > **Governing spec:** `./mission.md`
-> **Status:** M0 + M1 passed (operator-approved HS-1, 2026-07-03). M2 features implemented + committed; awaiting milestone-validator then HS-1. Commits local, not pushed.
+> **Status:** M0 + M1 passed (operator-approved HS-1, 2026-07-03). M2 milestone-validator PASS; awaiting HS-1 operator approval. Commits local, not pushed.
 > **Owner / operator:** Leandro
 
 Convert every finding of the 2026-07-03 final architecture review (commit 778f494a) into shipped, gate-enforced remediation: enforcement automation for the hand-sync defect class, kernel correctness, async consolidation onto River, the two ISO-core eQMS product gaps, tenant lifecycle, ops readiness, and governance hygiene. Terminal acceptance: an independent re-run of the 10-dimension review reaching CONFIRMED on every in-scope dimension, plus every mission-installed CI gate green from clean state with negative proof — judged by `mission-validator`.
@@ -12,7 +12,7 @@ Convert every finding of the 2026-07-03 final architecture review (commit 778f49
 |---|-----------|----------------------|--------|-------------|
 | 0 | `milestone-0-versionref-contract` | Land the planned VersionRef nested-ref contract cutover + ADR 0065 | passed (2026-07-03) | [PASS](milestone-0-versionref-contract/qa/milestone-qa.md) |
 | 1 | `milestone-1-contract-fe-gates` | oasdiff CI gate, nullable⇒required lint, blocking contract-sync, ESLint feature boundaries | passed (2026-07-03) | [PASS](milestone-1-contract-fe-gates/qa/milestone-qa.md) |
-| 2 | `milestone-2-authz-enforcement-generation` | Tripwire arms generated from capability registry + CI drift check; cap-name divergences closed | in-progress | validation-pending |
+| 2 | `milestone-2-authz-enforcement-generation` | Tripwire arms generated from capability registry + CI drift check; cap-name divergences closed | validator-pass, HS-1 pending | [PASS](milestone-2-authz-enforcement-generation/qa/milestone-qa.md) |
 | 3 | `milestone-3-tenancy-chokepoint` | TxRunner auto-seed GUCs; RLS backstop covers worker/jobs; ADR 0027 amended | planned | — |
 | 4 | `milestone-4-versioning-kernel` | Unified 9-status state machine; publish race proven safe; concurrency idiom unified | planned | — |
 | 5 | `milestone-5-async-river-consolidation` | Janitors + staging outbox onto River; lease scheduler retired; outbox retention; fanout ordering | planned | — |
