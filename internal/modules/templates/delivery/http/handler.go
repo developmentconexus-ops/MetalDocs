@@ -43,44 +43,58 @@ func New(svc *application.Service, authz AuthzFunc, database *sql.DB) *Handler {
 	return &Handler{svc: svc, authz: authz, db: database}
 }
 
+// idempotentRoutes lists the route templates (method + path, matching the
+// net/http 1.22 mux pattern syntax) that require an Idempotency-Key per
+// api/openapi/v1/openapi.yaml. Kept as a set so the Middlewares closure below
+// can dispatch per-route without hand-registering each mutation separately —
+// CON-03 templates slice: mounts the generated ServerInterface via
+// HandlerWithOptions instead of a hand-written route list, so a spec'd route
+// can no longer silently go unserved (missing ServerInterface methods fail
+// to compile). Mirrors the controlleddocuments pattern
+// (internal/modules/controlleddocuments/delivery/http/handler.go).
+var idempotentRoutes = map[string]bool{
+	"POST /api/v1/templates":                           true,
+	"POST /api/v1/templates/{id}/versions/{n}/publish": true,
+	"POST /api/v1/templates/{id}/versions/{n}/submit":  true,
+	"POST /api/v1/templates/{id}/versions/{n}/review":  true,
+	"POST /api/v1/templates/{id}/versions/{n}/approve": true,
+}
+
 func (h *Handler) Register(mux *http.ServeMux) {
-	generated := templatesapi.ServerInterfaceWrapper{
-		Handler: h,
+	middleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// r.Pattern already carries the method prefix ("POST /api/v1/...")
+			// because the generated router registers method-qualified patterns —
+			// do NOT prepend r.Method again or the lookup silently misses.
+			routeTemplate := r.Pattern
+			if idempotentRoutes[routeTemplate] {
+				h.idempotent(routeTemplate, next).ServeHTTP(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	templatesapi.HandlerWithOptions(h, templatesapi.StdHTTPServerOptions{
+		BaseRouter: mux,
+		// AD-1: spec path keys are relative; the generated router prepends this
+		// base so served routes stay /api/v1/* and the codegen matches the spec.
+		BaseURL: "/api/v1",
+		Middlewares: []templatesapi.MiddlewareFunc{
+			middleware,
+		},
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeErr(w, http.StatusBadRequest, codeTplInvalidRequest, err.Error())
 		},
-	}
-
-mux.HandleFunc("GET /api/v1/templates", generated.ListTemplates)
-	mux.Handle("POST /api/v1/templates", h.idempotent("POST /api/v1/templates", generated.CreateTemplate))
-	mux.HandleFunc("GET /api/v1/templates/{id}/versions/{n}", generated.GetTemplateVersion)
-	mux.HandleFunc("POST /api/v1/templates/{id}/versions/{n}/docx-upload-url", generated.PresignTemplateDocxUploadUrl)
-	mux.HandleFunc("POST /api/v1/templates/{id}/versions/{n}/schema-upload-url", generated.PresignTemplateSchemaUploadUrl)
-	mux.Handle("POST /api/v1/templates/{id}/versions/{n}/publish", h.idempotent("POST /api/v1/templates/{id}/versions/{n}/publish", generated.PublishTemplateVersion))
-
-	mux.HandleFunc("POST /api/v1/templates/{id}/versions", generated.CreateTemplateVersion)
-	mux.HandleFunc("PUT /api/v1/templates/{id}/versions/{n}/schema", generated.UpdateTemplateSchema)
-	mux.HandleFunc("POST /api/v1/templates/{id}/versions/{n}/autosave/presign", generated.PresignTemplateAutosave)
-	mux.HandleFunc("POST /api/v1/templates/{id}/versions/{n}/autosave/commit", generated.CommitTemplateAutosave)
-	mux.Handle("POST /api/v1/templates/{id}/versions/{n}/submit", h.idempotent("POST /api/v1/templates/{id}/versions/{n}/submit", generated.SubmitTemplateVersion))
-	mux.Handle("POST /api/v1/templates/{id}/versions/{n}/review", h.idempotent("POST /api/v1/templates/{id}/versions/{n}/review", generated.ReviewTemplateVersion))
-	mux.Handle("POST /api/v1/templates/{id}/versions/{n}/approve", h.idempotent("POST /api/v1/templates/{id}/versions/{n}/approve", generated.ApproveTemplateVersion))
-	mux.HandleFunc("POST /api/v1/templates/{id}/archive", generated.ArchiveTemplate)
-	mux.HandleFunc("PUT /api/v1/templates/{id}/approval-config", generated.UpsertTemplateApprovalConfig)
-
-	mux.HandleFunc("GET /api/v1/templates/{id}", generated.GetTemplate)
-	mux.HandleFunc("GET /api/v1/templates/system/blank", generated.GetSystemBlankTemplate)
-	mux.HandleFunc("GET /api/v1/templates/{id}/versions/{n}/docx-url", generated.GetTemplateDocxUrl)
-	mux.HandleFunc("GET /api/v1/templates/{id}/audit", generated.ListTemplateAudit)
-	mux.HandleFunc("GET /api/v1/templates/placeholder-catalog", generated.ListTemplatePlaceholderCatalog)
+	})
 }
 
-func (h *Handler) idempotent(routeTemplate string, next http.HandlerFunc) http.Handler {
+func (h *Handler) idempotent(routeTemplate string, next http.Handler) http.Handler {
 	store := idempotency.New(h.db, routeTemplate)
 	return idempotency.Require(store, func(ctx context.Context) (string, string) {
 		tenantID, _ := tenant.FromContext(ctx)
 		return tenantID, iamdomain.UserIDFromContext(ctx)
-	})(http.HandlerFunc(next))
+	})(next)
 }
 
 var (
