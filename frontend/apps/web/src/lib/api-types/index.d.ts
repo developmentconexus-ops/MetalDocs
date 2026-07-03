@@ -6862,6 +6862,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -6899,6 +6900,8 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -6931,6 +6934,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -6967,6 +6971,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -7003,6 +7008,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -7039,6 +7045,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -7075,6 +7082,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -7191,6 +7199,8 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -7227,6 +7237,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -7317,6 +7328,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
@@ -7353,6 +7365,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
     };
