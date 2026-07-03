@@ -2,12 +2,18 @@
 // never roles). This test drives the route-level hero action button (the only
 // place `canInitiateRevision`/`canCreateRevision`/`canPublish` become observable
 // UI) through `useHasCapability('document.edit')` instead of a role check.
+//
+// FE-02: DocumentDetailRoute no longer runs its own document/approval/active-document/
+// distribution queries or re-derives gating — it consumes `useDocumentArtifact`'s
+// `doc` / `activeDocument` / `obligatedCount` / `gating` exports directly. This test
+// mocks only that one adapter hook (matching the useDocumentApprovalArtifact pattern).
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DocumentDetailRoute } from './DocumentDetailRoute';
+import type { DocumentDetailGating } from '../adapters/useDocumentArtifact';
 
 const hasCapMock = vi.fn();
 vi.mock('../../iam/hooks/useHasCapability', () => ({
@@ -17,24 +23,8 @@ vi.mock('../../iam/hooks/useHasCapability', () => ({
 vi.mock('../adapters/useDocumentArtifact', () => ({
   useDocumentArtifact: vi.fn(),
 }));
-vi.mock('../queries/useDocumentDetailQuery', () => ({
-  useDocumentDetailQuery: vi.fn(),
-}));
-vi.mock('../queries/useApprovalInstanceQuery', () => ({
-  useApprovalInstanceQuery: vi.fn(),
-}));
-vi.mock('../queries/useControlledDocumentActiveDocumentQuery', () => ({
-  useControlledDocumentActiveDocumentQuery: vi.fn(),
-}));
-vi.mock('../queries/useDistributionSummaryQuery', () => ({
-  useDistributionSummaryQuery: vi.fn(),
-}));
 
 import { useDocumentArtifact } from '../adapters/useDocumentArtifact';
-import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
-import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
-import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
-import { useDistributionSummaryQuery } from '../queries/useDistributionSummaryQuery';
 
 const BASE_DOC = {
   id: 'doc-1',
@@ -78,6 +68,46 @@ function baseModel(status: string) {
   };
 }
 
+function baseGating(overrides: Partial<DocumentDetailGating> = {}): DocumentDetailGating {
+  return {
+    isObsolete: false,
+    isApproved: false,
+    isPublished: true,
+    canInitiateRevision: true,
+    canCreateRevision: true,
+    canPublish: false,
+    activeSiblingDocumentId: null,
+    activeSiblingState: null,
+    activeSiblingCtaLabel: 'Iniciar revisão',
+    activeSiblingDestination: null,
+    publishContextNotice: null,
+    ...overrides,
+  };
+}
+
+function mockArtifact(overrides: {
+  status?: string;
+  gating?: Partial<DocumentDetailGating>;
+  doc?: Record<string, unknown>;
+  activeDocument?: Record<string, unknown> | null;
+} = {}) {
+  const status = overrides.status ?? 'published';
+  vi.mocked(useDocumentArtifact).mockReturnValue({
+    model: baseModel(status),
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+    doc: { ...BASE_DOC, status, ...overrides.doc },
+    activeDocument:
+      overrides.activeDocument === null
+        ? null
+        : { document_id: 'doc-1', content_hash: 'hash-1', approval_state: status, ...overrides.activeDocument },
+    obligatedCount: '3',
+    gating: baseGating(overrides.gating),
+    refetchAll: vi.fn(),
+  } as never);
+}
+
 function renderRoute() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -94,38 +124,14 @@ function renderRoute() {
 describe('DocumentDetailRoute — FE-11 capability gating', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useDocumentDetailQuery).mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: BASE_DOC,
-      refetch: vi.fn(),
-    } as never);
-    vi.mocked(useApprovalInstanceQuery).mockReturnValue({
-      data: { completed_at: '2026-05-19T23:39:00.000Z', stages: [] },
-      isLoading: false,
-      refetch: vi.fn(),
-    } as never);
-    vi.mocked(useControlledDocumentActiveDocumentQuery).mockReturnValue({
-      data: { document_id: 'doc-1', content_hash: 'hash-1', approval_state: 'published' },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
-    vi.mocked(useDistributionSummaryQuery).mockReturnValue({
-      data: { total_targets: 3 },
-      isError: false,
-      isLoading: false,
-    } as never);
-    vi.mocked(useDocumentArtifact).mockReturnValue({
-      model: baseModel('published'),
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
   });
 
   it('enables "Iniciar revisão" when the user holds document.edit', async () => {
     hasCapMock.mockImplementation((cap: string) => cap === 'document.edit');
+    mockArtifact({
+      status: 'published',
+      gating: { canInitiateRevision: true, canCreateRevision: true },
+    });
 
     renderRoute();
 
@@ -139,6 +145,10 @@ describe('DocumentDetailRoute — FE-11 capability gating', () => {
 
   it('soft-disables "Iniciar revisão" without document.edit (capability, not role)', async () => {
     hasCapMock.mockReturnValue(false);
+    mockArtifact({
+      status: 'published',
+      gating: { canInitiateRevision: false, canCreateRevision: false },
+    });
 
     renderRoute();
 
@@ -152,18 +162,16 @@ describe('DocumentDetailRoute — FE-11 capability gating', () => {
 
   it('gates "Publicar / Agendar" on document.edit for approved documents', async () => {
     hasCapMock.mockReturnValue(false);
-    vi.mocked(useDocumentDetailQuery).mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: { ...BASE_DOC, status: 'approved' },
-      refetch: vi.fn(),
-    } as never);
-    vi.mocked(useDocumentArtifact).mockReturnValue({
-      model: baseModel('approved'),
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as never);
+    mockArtifact({
+      status: 'approved',
+      gating: {
+        isApproved: true,
+        isPublished: false,
+        canInitiateRevision: false,
+        canCreateRevision: false,
+        canPublish: false,
+      },
+    });
 
     renderRoute();
 
@@ -175,13 +183,23 @@ describe('DocumentDetailRoute — FE-11 capability gating', () => {
     expect(btn).toHaveAttribute('title', 'Sem permissão para publicar');
   });
 
-  it('queries the document.edit capability (not roles) for the revision gate', async () => {
+  it('delegates the document.edit capability gate to useDocumentArtifact (not a route-level role check)', async () => {
+    // FE-02: `document.edit` gating now lives entirely inside useDocumentArtifact
+    // (see useDocumentArtifact.test.tsx for the capability-driven gating coverage).
+    // The route only consumes `gating.canInitiateRevision`/`canCreateRevision` —
+    // this test pins that the route renders the adapter's decision faithfully.
     hasCapMock.mockReturnValue(true);
+    mockArtifact({
+      status: 'published',
+      gating: { canInitiateRevision: true, canCreateRevision: true },
+    });
 
     renderRoute();
 
     await waitFor(() => {
-      expect(hasCapMock).toHaveBeenCalledWith('document.edit');
+      expect(useDocumentArtifact).toHaveBeenCalledWith('doc-1');
     });
+    const btn = screen.getByRole('button', { name: /Iniciar revisão/i });
+    expect(btn).toHaveAttribute('aria-disabled', 'false');
   });
 });

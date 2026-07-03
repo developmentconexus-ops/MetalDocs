@@ -5,6 +5,7 @@ import { formatSignedAt } from '../../../lib/format/dates';
 import { useAuthStore } from '../../../store/auth.store';
 import { useDocumentCommentsQuery } from '../../documents/queries/useDocumentCommentsQuery';
 import { useDocumentDetailQuery } from '../../documents/queries/useDocumentDetailQuery';
+import { useControlledDocumentActiveDocumentQuery } from '../../documents/queries/useControlledDocumentActiveDocumentQuery';
 import {
   useDocumentApprovalArtifact,
   type DocumentApprovalHandlers,
@@ -17,7 +18,7 @@ import { ReviewDocumentCanvas, type ReviewDocumentCanvasRef } from '../component
 import { SupersedePublishDialog } from '../components/SupersedePublishDialog';
 import { useSignoffMutation } from '../hooks/useSignoffMutation';
 import { commentPlainText } from '../lib/commentPlainText';
-import type { ArtifactDecisionModel, ArtifactViewModel } from '../../shared/controlled-artifact/types';
+import type { ArtifactViewModel } from '../../shared/controlled-artifact/types';
 import styles from './SignoffDetailPage.module.css';
 
 type Tab = 'documento' | 'comentarios';
@@ -47,6 +48,9 @@ export function SignoffDetailPage() {
 
   const [tab, setTab] = useState<Tab>('documento');
   const canvasRef = useRef<ReviewDocumentCanvasRef>(null);
+  // Bridges the one-hop ordering cycle: decisionSubmit (built before the adapter
+  // call) needs refetchInstance (returned BY the adapter call). See below.
+  const refetchInstanceRef = useRef<() => Promise<void>>(async () => {});
 
   const [showPublish, setShowPublish] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
@@ -71,12 +75,39 @@ export function SignoffDetailPage() {
     openPublish: () => setShowPublish(true),
   };
 
+  // The signoff mutation needs contentHash/revisionVersion BEFORE the adapter call
+  // (the adapter now takes the sign submit callback as an input — FE-02), so this
+  // route reads the active-document context directly here. Same query key as the
+  // one `useDocumentApprovalArtifact` reads internally; react-query deduplicates,
+  // so this adds no extra network request.
+  const contextQuery = useControlledDocumentActiveDocumentQuery(doc?.controlled_document_id ?? '');
+  const contentHash = contextQuery.data?.content_hash ?? null;
+  const revisionVersion = contextQuery.data?.revision_version ?? doc?.revision_version ?? 0;
+
+  const { signOff } = useSignoffMutation({
+    documentId,
+    contentHash: contentHash ?? '',
+    revisionVersion,
+  });
+
+  const decisionSubmit = async (input: { optionKey: string; reason: string; password: string }) => {
+    try {
+      await flushSave();
+    } catch {
+      throw new Error('Não foi possível salvar as alterações antes de registrar a decisão.');
+    }
+    await signOff({
+      decision: input.optionKey === 'approve' ? 'approve' : 'reject',
+      reason: input.reason || undefined,
+      password: input.password,
+    });
+    await refetchInstanceRef.current();
+  };
+
   const {
     model,
     instance,
     approvalState,
-    contentHash,
-    revisionVersion,
     lockedByInstanceId,
     publishedDocumentId,
     policy,
@@ -85,13 +116,15 @@ export function SignoffDetailPage() {
     noActiveContext,
     refetchInstance,
     isStale,
-  } = useDocumentApprovalArtifact(documentId, handlers);
-
-  const { signOff } = useSignoffMutation({
-    documentId,
-    contentHash: contentHash ?? '',
-    revisionVersion,
+  } = useDocumentApprovalArtifact(documentId, handlers, {
+    defaultOptionKey: initialSignoffDecision ?? null,
+    submit: decisionSubmit,
   });
+
+  // `decisionSubmit` needs `refetchInstance`, which only exists after the adapter
+  // call above — a ref bridges this one-hop ordering cycle without re-deriving
+  // any adapter-owned state in the route.
+  refetchInstanceRef.current = refetchInstance;
 
   // Sidebar is "loading" once the document is present but the active context has
   // not yet resolved (no error, no confirmed/absent context).
@@ -153,65 +186,12 @@ export function SignoffDetailPage() {
     );
   }
 
-  // The document sign-off carries legal e-signature weight: a password re-auth + a
-  // legal-effect confirmation. Offered only when the active context is confirmed and
-  // policy allows signing on a locked instance. The panel owns password/reason state.
-  const signoffOffered =
-    sidebarReady && policy.actions.signoff && lockedByInstanceId != null && instance != null && contentHash != null;
-
-  const decision: ArtifactDecisionModel | undefined = signoffOffered
-    ? {
-        kicker: 'Assinatura requerida',
-        heading: 'Registrar decisão',
-        description:
-          'Sua decisão é registrada com efeito de assinatura eletrônica na trilha de auditoria do documento.',
-        options: [
-          {
-            key: 'approve',
-            label: 'Assinar e aprovar',
-            description: 'Aprova o documento e avança o fluxo de aprovação.',
-            tone: 'approve',
-            submitLabel: 'Assinar e aprovar',
-            requiresReason: false,
-          },
-          {
-            key: 'reject',
-            label: 'Assinar e devolver',
-            description: 'Devolve o documento ao autor · requer justificativa.',
-            tone: 'reject',
-            submitLabel: 'Assinar e devolver',
-            requiresReason: true,
-          },
-        ],
-        reasonLabel: 'Justificativa',
-        reasonPlaceholder: 'Comentário visível na trilha de auditoria…',
-        password: { label: 'Senha' },
-        legal: {
-          text: 'Confirmo que revisei o conteúdo integralmente e que esta decisão tem efeito de assinatura eletrônica conforme a MP 2.200-2/2001.',
-        },
-        signer: currentUser
-          ? {
-              name: currentUser.displayName,
-              detail: currentUser.email ?? currentUser.username,
-              note: 'Assinatura digital gerada no ato da confirmação.',
-            }
-          : null,
-        defaultOptionKey: initialSignoffDecision ?? null,
-        submit: async ({ optionKey, reason, password }) => {
-          try {
-            await flushSave();
-          } catch {
-            throw new Error('Não foi possível salvar as alterações antes de registrar a decisão.');
-          }
-          await signOff({
-            decision: optionKey === 'approve' ? 'approve' : 'reject',
-            reason: reason || undefined,
-            password,
-          });
-          await refetchInstance();
-        },
-      }
-    : undefined;
+  // The document sign-off decision model (password re-auth + legal-effect
+  // confirmation) is now constructed by the adapter via `buildDocumentSignoffDecision`
+  // (FE-02) — this route only supplied the `submit` sequencing above (flushSave →
+  // signOff → refetchInstance) since that depends on route-owned state (canvas ref,
+  // the lifted signoff mutation).
+  const decision = model.decision;
 
   // Suppress the action buttons until the sidebar is ready. Signing is not among
   // model.actions (it routes through the DecisionPanel), so no filtering is needed.
@@ -299,7 +279,6 @@ export function SignoffDetailPage() {
       {showPublish && contentHash != null ? (
         <SupersedePublishDialog
           documentId={documentId}
-          contentHash={contentHash}
           publishedDocumentId={publishedDocumentId}
           onClose={() => setShowPublish(false)}
           onSuccess={() => void refetchInstance()}

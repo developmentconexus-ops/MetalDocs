@@ -96,6 +96,7 @@ function setupPublished() {
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
+    heroKind: "newVersion",
   });
   mockUseTemplateDetailQuery.mockReturnValue({
     data: {
@@ -114,6 +115,7 @@ function setupDraft() {
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
+    heroKind: "editOnly",
   });
   mockUseTemplateDetailQuery.mockReturnValue({
     data: {
@@ -132,6 +134,7 @@ function setupUnderReview() {
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
+    heroKind: "review",
   });
   mockUseTemplateDetailQuery.mockReturnValue({
     data: {
@@ -150,6 +153,7 @@ function setupApproved() {
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
+    heroKind: "publish",
   });
   mockUseTemplateDetailQuery.mockReturnValue({
     data: {

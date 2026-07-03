@@ -18,7 +18,7 @@ import { TemplateReviewCanvas } from "../components/TemplateReviewCanvas";
 import { TemplateApprovalExtras } from "../components/TemplateApprovalExtras";
 import { QK } from "../../../lib/queryKeys";
 import { resolveQueryError } from "../../../lib/api";
-import type { ArtifactDecisionModel, ArtifactViewModel } from "../../shared/controlled-artifact/types";
+import type { ArtifactViewModel } from "../../shared/controlled-artifact/types";
 import styles from "./TemplateApprovalRoute.module.css";
 
 /**
@@ -94,7 +94,25 @@ export function TemplateApprovalRoute() {
     },
   };
 
-  const { model, version, isLoading, isError } = useTemplateApprovalArtifact(templateId, handlers);
+  // A decision is offered only when the actor can actually act on a review/approve
+  // state — the adapter's `buildTemplateApprovalDecision` reuses the gate it already
+  // computed (accept.available) rather than re-deriving capability logic here. This
+  // route only supplies the raw submit call — it knows `versionNum` + which of
+  // reviewVersion/approveVersion applies (FE-02: single decision-model construction
+  // path, owned by the adapter/lib, not duplicated in the route).
+  const underReview = status === "under_review";
+  const hasReviewer = detailQuery.data?.latest_version.pending_reviewer_role != null;
+  const isReview = underReview && hasReviewer;
+
+  const decisionSubmit = async (accept: boolean, reason: string) => {
+    if (versionNum == null) return;
+    const call = isReview
+      ? () => reviewVersion(templateId, versionNum, accept, crypto.randomUUID(), reason)
+      : () => approveVersion(templateId, versionNum, accept, crypto.randomUUID(), reason);
+    await runDecision(call);
+  };
+
+  const { model, isLoading, isError } = useTemplateApprovalArtifact(templateId, handlers, decisionSubmit);
 
   if (isLoading) {
     return <div className={styles.state} role="status" aria-live="polite">Carregando aprovação…</div>;
@@ -103,57 +121,7 @@ export function TemplateApprovalRoute() {
     return <div className={styles.state} role="alert">Não foi possível carregar esta versão do modelo.</div>;
   }
 
-  // A decision is offered only when the actor can actually act on a review/approve
-  // state — reuse the gate the adapter already computed (accept.available) rather
-  // than re-deriving capability logic here.
-  const underReview = status === "under_review";
-  const hasReviewer = version?.pending_reviewer_role != null;
-  const isReview = underReview && hasReviewer;
-  const acceptAvailable = model.actions.find((a) => a.key === "accept")?.available ?? false;
-  const offerDecision = (underReview || status === "approved") && acceptAvailable;
-  const acceptLabel = isReview ? "Aprovar revisão" : "Publicar";
-
-  const decision: ArtifactDecisionModel | undefined = offerDecision
-    ? {
-        kicker: "Decisão requerida",
-        heading: "Registrar decisão",
-        description: isReview
-          ? "Revise o conteúdo do modelo e registre sua decisão de revisão."
-          : "Confirme para publicar esta versão do modelo.",
-        options: [
-          {
-            key: "accept",
-            label: acceptLabel,
-            description: isReview
-              ? "Aprova a revisão técnica e avança o fluxo."
-              : "Publica esta versão do modelo.",
-            tone: "approve",
-            submitLabel: acceptLabel,
-            requiresReason: false,
-          },
-          {
-            key: "reject",
-            label: "Rejeitar",
-            description: "Devolve o modelo para rascunho · requer motivo.",
-            tone: "reject",
-            submitLabel: "Rejeitar",
-            requiresReason: true,
-          },
-        ],
-        reasonLabel: "Motivo",
-        reasonPlaceholder: "Comentário registrado na trilha do modelo…",
-        password: null,
-        legal: null,
-        signer: null,
-        submit: async ({ optionKey, reason }) => {
-          const accept = optionKey === "accept";
-          const call = isReview
-            ? () => reviewVersion(templateId, versionNum, accept, crypto.randomUUID(), reason)
-            : () => approveVersion(templateId, versionNum, accept, crypto.randomUUID(), reason);
-          await runDecision(call);
-        },
-      }
-    : undefined;
+  const decision = model.decision;
 
   // When a decision is offered the panel owns accept/reject, so strip those from the
   // plain actions band. Otherwise disable the fallback buttons while busy.

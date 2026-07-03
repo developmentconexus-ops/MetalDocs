@@ -83,6 +83,10 @@ function makeHandlers(): TemplateApprovalHandlers {
   };
 }
 
+function makeDecisionSubmit() {
+  return vi.fn().mockResolvedValue(undefined);
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -100,7 +104,7 @@ describe('useTemplateApprovalArtifact', () => {
 
   it('returns model.kind === "template" and a 3-step submit→review→approve chain', () => {
     const { result } = renderHook(() =>
-      useTemplateApprovalArtifact('tpl-1', makeHandlers()),
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
     );
     expect(result.current.model.kind).toBe('template');
     // Templates are not signoff-less: the adapter builds the same ApprovalChainItem[]
@@ -131,7 +135,7 @@ describe('useTemplateApprovalArtifact', () => {
     } as never);
 
     const { result } = renderHook(() =>
-      useTemplateApprovalArtifact('tpl-1', makeHandlers()),
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
     );
 
     const { actions } = result.current.model;
@@ -154,7 +158,7 @@ describe('useTemplateApprovalArtifact', () => {
     } as never);
 
     const { result } = renderHook(() =>
-      useTemplateApprovalArtifact('tpl-1', makeHandlers()),
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
     );
 
     expect(result.current.model.actions).toEqual([]);
@@ -172,7 +176,7 @@ describe('useTemplateApprovalArtifact', () => {
     } as never);
 
     const { result } = renderHook(() =>
-      useTemplateApprovalArtifact('tpl-1', makeHandlers()),
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
     );
 
     expect(result.current.version?.status).toBe('under_review');
@@ -189,7 +193,7 @@ describe('useTemplateApprovalArtifact', () => {
     } as never);
 
     const { result } = renderHook(() =>
-      useTemplateApprovalArtifact('tpl-1', makeHandlers()),
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
     );
 
     expect(result.current.isLoading).toBe(true);
@@ -204,9 +208,97 @@ describe('useTemplateApprovalArtifact', () => {
     } as never);
 
     const { result } = renderHook(() =>
-      useTemplateApprovalArtifact('tpl-1', makeHandlers()),
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
     );
 
     expect(result.current.isError).toBe(true);
+  });
+
+  // ── FE-02: model.decision is the single ArtifactDecisionModel construction path
+  // (previously built inline in TemplateApprovalRoute) ─────────────────────────
+
+  it('for under_review WITH reviewer + fully-capable actor → model.decision offers accept/reject with no password/legal/signer', () => {
+    vi.mocked(useTemplateDetailQuery).mockReturnValue({
+      data: {
+        template: BASE_TEMPLATE,
+        latest_version: makeVersion({
+          status: 'under_review',
+          pending_reviewer_role: 'reviewer',
+          pending_approver_role: 'approver',
+        }),
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+
+    const { result } = renderHook(() =>
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
+    );
+
+    const { decision } = result.current.model;
+    expect(decision).toBeDefined();
+    expect(decision?.options.map((o) => o.key)).toEqual(['accept', 'reject']);
+    expect(decision?.options.find((o) => o.key === 'accept')?.label).toBe('Aprovar revisão');
+    expect(decision?.options.find((o) => o.key === 'reject')?.requiresReason).toBe(true);
+    expect(decision?.password).toBeNull();
+    expect(decision?.legal).toBeNull();
+    expect(decision?.signer).toBeNull();
+  });
+
+  it('for approved status → model.decision offers "Publicar" as the accept label', () => {
+    vi.mocked(useTemplateDetailQuery).mockReturnValue({
+      data: {
+        template: BASE_TEMPLATE,
+        latest_version: makeVersion({ status: 'approved' }),
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+
+    const { result } = renderHook(() =>
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
+    );
+
+    expect(result.current.model.decision?.options.find((o) => o.key === 'accept')?.label).toBe('Publicar');
+  });
+
+  it('for published version → model.decision is undefined (accept.available is false: no actions)', () => {
+    vi.mocked(useTemplateDetailQuery).mockReturnValue({
+      data: {
+        template: BASE_TEMPLATE,
+        latest_version: makeVersion({ status: 'published' }),
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+
+    const { result } = renderHook(() =>
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), makeDecisionSubmit()),
+    );
+
+    expect(result.current.model.decision).toBeUndefined();
+  });
+
+  it('decision.submit calls the injected decisionSubmit with (accept, reason)', async () => {
+    vi.mocked(useTemplateDetailQuery).mockReturnValue({
+      data: {
+        template: BASE_TEMPLATE,
+        latest_version: makeVersion({ status: 'approved' }),
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as never);
+
+    const decisionSubmit = makeDecisionSubmit();
+    const { result } = renderHook(() =>
+      useTemplateApprovalArtifact('tpl-1', makeHandlers(), decisionSubmit),
+    );
+
+    await result.current.model.decision?.submit({ optionKey: 'reject', reason: 'Conteúdo incorreto', password: '' });
+    expect(decisionSubmit).toHaveBeenCalledWith(false, 'Conteúdo incorreto');
   });
 });

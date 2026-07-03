@@ -77,6 +77,10 @@ const handlers: DocumentApprovalHandlers = {
   openPublish: vi.fn(),
 };
 
+function makeDecisionInputs() {
+  return { defaultOptionKey: null, submit: vi.fn().mockResolvedValue(undefined) };
+}
+
 function mockContext(approvalState: string, overrides: Record<string, unknown> = {}) {
   vi.mocked(useControlledDocumentActiveDocumentQuery).mockReturnValue({
     data: {
@@ -106,7 +110,7 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('emits ONLY the submit action in draft state', async () => {
     mockContext('draft', { approval_instance_id: undefined });
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -116,7 +120,7 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('emits ONLY the cancel action in under_review (signing routes through the decision panel)', async () => {
     mockContext('under_review');
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -128,7 +132,7 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('emits ONLY the publish action in approved state', async () => {
     mockContext('approved');
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -137,7 +141,7 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('emits ONLY the publish action in published state', async () => {
     mockContext('published');
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -148,7 +152,7 @@ describe('useDocumentApprovalArtifact', () => {
     'emits NO actions in read-only / terminal state %s',
     async (state) => {
       mockContext(state);
-      const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+      const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
 
       await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -158,7 +162,7 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('binds each action run to the supplied route handlers', async () => {
     mockContext('under_review');
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -169,7 +173,7 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('maps the approval instance stages/signoffs into approvalChain', async () => {
     mockContext('under_review');
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -194,7 +198,7 @@ describe('useDocumentApprovalArtifact', () => {
       isError: true,
     } as never);
 
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
     expect(result.current.contextError).toBe(true);
   });
 
@@ -205,7 +209,71 @@ describe('useDocumentApprovalArtifact', () => {
       isError: false,
     } as never);
 
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
     expect(result.current.noActiveContext).toBe(true);
+  });
+
+  // ── FE-02: model.decision is the single ArtifactDecisionModel construction path
+  // (previously built inline in SignoffDetailPage) ──────────────────────────────
+
+  it('under_review with a resolved context + locked instance → model.decision offers approve/reject with password+legal+signer', async () => {
+    mockContext('under_review');
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+
+    await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+    const { decision } = result.current.model!;
+    expect(decision).toBeDefined();
+    expect(decision?.options.map((o) => o.key)).toEqual(['approve', 'reject']);
+    expect(decision?.options.find((o) => o.key === 'reject')?.requiresReason).toBe(true);
+    expect(decision?.password).toEqual({ label: 'Senha' });
+    expect(decision?.legal).not.toBeNull();
+    expect(decision?.signer).toEqual({
+      name: 'Administrator',
+      detail: undefined,
+      note: 'Assinatura digital gerada no ato da confirmação.',
+    });
+  });
+
+  it('draft state (signoff not allowed by policy) → model.decision is undefined', async () => {
+    mockContext('draft', { approval_instance_id: undefined });
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+
+    await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+    expect(result.current.model?.decision).toBeUndefined();
+  });
+
+  it('no active context → model.decision is undefined (sidebar not ready)', () => {
+    vi.mocked(useControlledDocumentActiveDocumentQuery).mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+    } as never);
+
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    expect(result.current.model?.decision).toBeUndefined();
+  });
+
+  it('decision.submit delegates to the injected decisionInputs.submit with (optionKey, reason, password)', async () => {
+    mockContext('under_review');
+    const decisionInputs = makeDecisionInputs();
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, decisionInputs));
+
+    await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+    await result.current.model?.decision?.submit({ optionKey: 'reject', reason: 'Falha', password: 'secret' });
+    expect(decisionInputs.submit).toHaveBeenCalledWith({ optionKey: 'reject', reason: 'Falha', password: 'secret' });
+  });
+
+  it('passes defaultOptionKey through from decisionInputs (e.g. from a ?decision= deep-link)', async () => {
+    mockContext('under_review');
+    const { result } = renderHook(() =>
+      useDocumentApprovalArtifact('doc-1', handlers, { defaultOptionKey: 'reject', submit: vi.fn() }),
+    );
+
+    await waitFor(() => expect(result.current.instance).not.toBeNull());
+
+    expect(result.current.model?.decision?.defaultOptionKey).toBe('reject');
   });
 });

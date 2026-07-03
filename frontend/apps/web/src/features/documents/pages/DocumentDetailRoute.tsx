@@ -9,49 +9,27 @@ import { createRevision } from '../../controlled-documents/api/controlledDocumen
 import { exportPDF } from '../api/exports';
 import { SupersedePublishDialog } from '../../approval/components/SupersedePublishDialog';
 import { useHasCapability } from '../../iam/hooks/useHasCapability';
-import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
-import { useDistributionSummaryQuery } from '../queries/useDistributionSummaryQuery';
-import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
-import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
-import {
-  ACTIVE_SIBLING_STATES,
-  getActiveSiblingCtaLabel,
-  getActiveSiblingDestination,
-  type ActiveSiblingState,
-} from '../lib/documentWorkflow';
 import styles from './DocumentDetailRoute.module.css';
 
 /**
- * Document-specific route wrapper for the shared ArtifactDetailView. Owns all
- * document-specific state (revision composer, publish dialog, PDF export, copy link)
- * and injects them as heroActions / aside / extras slots. No kind logic leaks into
- * the shared view — it receives only a composed ArtifactViewModel + ReactNode slots.
+ * Document-specific route wrapper for the shared ArtifactDetailView. Owns only
+ * interactive/dialog UI state (revision composer, publish dialog, PDF export, copy
+ * link) and injects it as heroActions / aside / extras slots. All queries and
+ * lifecycle/capability gating are owned by `useDocumentArtifact` (FE-02) — the route
+ * no longer re-fetches the document/approval/active-document/distribution queries or
+ * re-derives gating; it consumes `gating` + the raw `doc`/`activeDocument` the adapter
+ * already resolved. No kind logic leaks into the shared view — it receives only a
+ * composed ArtifactViewModel + ReactNode slots.
  */
 export function DocumentDetailRoute() {
   const { documentId: rawDocumentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
   const canViewObsolete = useHasCapability('document.obsolete');
-  // FE-11: revision-initiate gate is capability-based (ADR 0022), not role-based.
-  // 'document.edit' matches the backend's tier-1/tier-2 gate on
-  // POST /controlled-documents/{id}/revisions (see documentWorkflow.ts header comment).
-  const canInitiateRevision = useHasCapability('document.edit');
 
   const documentId = rawDocumentId ?? '';
 
-  // TODO(T11): drop these once model.actions carries the wired run() handlers and the route consumes model.actions.
-  // Tracked: wiki/backlog/controlled-artifact-shared-cockpit.md (finding M-2).
-  const scheduledLifecycleRefetchInterval = 5_000;
-  const docQuery = useDocumentDetailQuery(documentId, { pollScheduledLifecycle: true });
-  const shouldPollScheduledLifecycle = docQuery.data?.status === 'scheduled';
-  const approvalQuery = useApprovalInstanceQuery(documentId);
-  const controlledDocumentId = docQuery.data?.controlled_document_id ?? null;
-  const activeDocumentQuery = useControlledDocumentActiveDocumentQuery(controlledDocumentId, {
-    refetchInterval: shouldPollScheduledLifecycle ? scheduledLifecycleRefetchInterval : false,
-  });
-  const distributionSummaryQuery = useDistributionSummaryQuery(documentId);
-
-  // The adapter composes all other queries (revision history, areas, profiles) and the model.
-  const { model, isLoading, isError, refetch } = useDocumentArtifact(documentId);
+  const { model, isLoading, isError, refetch, doc, activeDocument, obligatedCount, gating, refetchAll } =
+    useDocumentArtifact(documentId);
 
   const [linkCopied, setLinkCopied] = useState(false);
   const [showRevisionForm, setShowRevisionForm] = useState(false);
@@ -89,52 +67,20 @@ export function DocumentDetailRoute() {
     );
   }
 
-  const doc = docQuery.data;
-  const approval = approvalQuery.data ?? null;
-  const activeDocument = activeDocumentQuery.data ?? null;
-
   const code = model.code ?? '—';
   const docName = doc?.name ?? code;
-  const status = model.status;
-  const isObsolete = status === 'obsolete';
-  const isApproved = status === 'approved';
-  const isPublished = status === 'published';
-
-  const activeSiblingDocumentId =
-    activeDocument?.document_id &&
-    activeDocument.document_id !== documentId &&
-    ACTIVE_SIBLING_STATES.includes(activeDocument.approval_state as ActiveSiblingState)
-      ? activeDocument.document_id
-      : null;
-  const activeSiblingStateCandidate = activeDocument?.approval_state as ActiveSiblingState | undefined;
-  const activeSiblingState =
-    activeSiblingDocumentId && activeSiblingStateCandidate && ACTIVE_SIBLING_STATES.includes(activeSiblingStateCandidate)
-      ? activeSiblingStateCandidate
-      : null;
-  const activeSiblingCtaLabel = activeSiblingState ? getActiveSiblingCtaLabel(activeSiblingState) : 'Iniciar revisão';
-  const activeSiblingDestination =
-    activeSiblingDocumentId && activeSiblingState
-      ? getActiveSiblingDestination(activeSiblingDocumentId, activeSiblingState)
-      : null;
-
-  const canCreateRevision =
-    canInitiateRevision &&
-    isPublished &&
-    Boolean(doc?.controlled_document_id) &&
-    activeSiblingDocumentId == null;
-  const canPublish = canInitiateRevision && isApproved && Boolean(activeDocument?.content_hash);
-  const publishContextNotice =
-    isApproved && !canInitiateRevision
-      ? 'Seu perfil atual não pode publicar esta revisão.'
-      : isApproved && activeDocumentQuery.isError
-        ? 'Não foi possível confirmar o contexto ativo de publicação. Atualize a página e tente novamente antes de publicar.'
-        : isApproved && !activeDocument?.content_hash
-          ? 'A publicação está bloqueada porque o contexto ativo desta revisão ainda não foi confirmado.'
-          : null;
-
-  const obligatedCount = distributionSummaryQuery.isError
-    ? '—'
-    : (distributionSummaryQuery.data?.total_targets ?? '—');
+  const {
+    isObsolete,
+    isApproved,
+    isPublished,
+    canCreateRevision,
+    canPublish,
+    canInitiateRevision,
+    activeSiblingDocumentId,
+    activeSiblingCtaLabel,
+    activeSiblingDestination,
+    publishContextNotice,
+  } = gating;
 
   const handleDownloadPDF = async () => {
     setPdfStatus({ kind: 'pending' });
@@ -183,9 +129,7 @@ export function DocumentDetailRoute() {
   };
 
   const handlePublishSuccess = () => {
-    void docQuery.refetch();
-    void approvalQuery.refetch();
-    void activeDocumentQuery.refetch();
+    refetchAll();
   };
 
   const handleCreateRevision = async () => {
@@ -387,7 +331,6 @@ export function DocumentDetailRoute() {
       {showPublishDialog && activeDocument?.content_hash ? (
         <SupersedePublishDialog
           documentId={documentId}
-          contentHash={activeDocument.content_hash}
           revisionVersion={activeDocument.revision_version}
           publishedDocumentId={activeDocument.published_document_id ?? undefined}
           onClose={() => setShowPublishDialog(false)}

@@ -22,7 +22,7 @@ export function TemplateDetailRoute() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { model, isLoading, isError } = useTemplateArtifact(templateId);
+  const { model, isLoading, isError, heroKind } = useTemplateArtifact(templateId);
 
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -71,9 +71,11 @@ export function TemplateDetailRoute() {
   // draft → edit the working draft; under_review/approved → the dedicated approval
   // screen (parity with documents → /approvals/:id); published → manually spawn the
   // next version (the only revision path since M1 dropped auto-spawn — ADR 0052).
+  // The status→heroKind derivation is owned by `useTemplateArtifact` (FE-02) — this
+  // route only maps each kind to its button JSX + local handlers.
   let heroActions: ReactNode;
-  switch (model.status) {
-    case "under_review":
+  switch (heroKind) {
+    case "review":
       heroActions = (
         <div className={styles.heroActions}>
           <button className="btn btn-primary btn-lg" type="button" onClick={handleReview}>
@@ -87,7 +89,7 @@ export function TemplateDetailRoute() {
         </div>
       );
       break;
-    case "approved":
+    case "publish":
       heroActions = (
         <div className={styles.heroActions}>
           <button className="btn btn-primary btn-lg" type="button" onClick={handleReview}>
@@ -101,7 +103,7 @@ export function TemplateDetailRoute() {
         </div>
       );
       break;
-    case "published":
+    case "newVersion":
       heroActions = (
         <div className={styles.heroActions}>
           <button
@@ -120,7 +122,7 @@ export function TemplateDetailRoute() {
         </div>
       );
       break;
-    case "draft":
+    case "editOnly":
       heroActions = (
         <div className={styles.heroActions}>
           <button className="btn btn-primary btn-lg" type="button" onClick={handleEdit}>
@@ -141,7 +143,7 @@ export function TemplateDetailRoute() {
       );
       break;
     default:
-      // obsolete / unknown: read-only entry only.
+      // readOnly: obsolete / unknown status — read-only entry only.
       heroActions = (
         <div className={styles.heroActions}>
           <button className="btn" type="button" onClick={handleEdit}>

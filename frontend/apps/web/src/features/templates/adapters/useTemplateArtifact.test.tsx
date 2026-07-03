@@ -237,4 +237,24 @@ describe('useTemplateArtifact', () => {
     const result = renderHook(() => useTemplateArtifact('tpl-1')).result.current;
     expect(result.isError).toBe(true);
   });
+
+  // ── FE-02: status→heroKind derivation (was a route-level switch(status)) ────
+
+  it.each([
+    ['under_review', 'review'],
+    ['approved', 'publish'],
+    ['published', 'newVersion'],
+    ['draft', 'editOnly'],
+    ['obsolete', 'readOnly'],
+  ] as const)('derives heroKind=%s → %s from the version status', (status, expectedKind) => {
+    vi.mocked(useTemplateDetailQuery).mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { template: BASE_TEMPLATE, latest_version: { ...BASE_VERSION, status } },
+      refetch: vi.fn(),
+    } as never);
+
+    const result = renderHook(() => useTemplateArtifact('tpl-1')).result.current;
+    expect(result.heroKind).toBe(expectedKind);
+  });
 });

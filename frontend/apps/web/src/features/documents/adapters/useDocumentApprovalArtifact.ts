@@ -8,6 +8,7 @@ import { useAuthStore } from '../../../store/auth.store';
 import type {
   ApprovalChainItem,
   ArtifactAction,
+  ArtifactDecisionModel,
   ArtifactViewModel,
   LifecycleStatus,
 } from '../../shared/controlled-artifact/types';
@@ -15,6 +16,7 @@ import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
 import { TRANSITION_POLICY, type TransitionPolicy, toApprovalState, mapApprovalChain } from '../lib/approvalWorkflow';
 import { resolveOwnerDisplay } from '../../shared/controlled-artifact/resolveOwnerDisplay';
+import { buildDocumentSignoffDecision } from '../lib/documentSignoffDecision';
 
 /**
  * Route-supplied dialog/prompt openers bound to each emitted action's `run`.
@@ -29,6 +31,20 @@ export interface DocumentApprovalHandlers {
   cancelInstance: () => void;
   /** Open the SupersedePublishDialog. */
   openPublish: () => void;
+}
+
+/**
+ * Route-owned inputs to the sign-off decision (FE-02). The route keeps ownership of
+ * the review-canvas ref (`flushSave`) and the signoff mutation (the actual submit
+ * sequence) since those are interactive/imperative concerns outside the adapter's
+ * query+gating responsibility; the adapter only decides WHETHER to offer the
+ * decision and constructs its shape via `buildDocumentSignoffDecision`.
+ */
+export interface DocumentSignoffDecisionInputs {
+  /** Preselects a decision option from the `?decision=` query param. */
+  defaultOptionKey: 'approve' | 'reject' | null;
+  /** Flush pending canvas edits, call the signoff mutation, then refetch the instance. */
+  submit: (input: { optionKey: string; reason: string; password: string }) => Promise<void>;
 }
 
 export interface DocumentApprovalArtifact {
@@ -75,6 +91,7 @@ export interface DocumentApprovalArtifact {
 export function useDocumentApprovalArtifact(
   documentId: string,
   handlers: DocumentApprovalHandlers,
+  decisionInputs: DocumentSignoffDecisionInputs,
 ): DocumentApprovalArtifact {
   const user = useAuthStore((s) => s.user);
   const docQuery = useDocumentDetailQuery(documentId);
@@ -182,6 +199,30 @@ export function useDocumentApprovalArtifact(
     });
   }
 
+  // Same gates the route (SignoffDetailPage) used to compute inline: the sidebar
+  // decision panel is only ready once the document loaded, the active-context query
+  // settled with a confirmed context (not loading/error/absent), and the instance
+  // fetch itself didn't error.
+  const noActiveContext = Boolean(doc) && !contextQuery.isLoading && !contextQuery.isError && !hasActiveContext;
+  const contextLoading = Boolean(doc) && !contextQuery.isError && !noActiveContext && contentHash == null;
+  const sidebarReady = !contextLoading && !contextQuery.isError && !noActiveContext && !instanceError && contentHash != null;
+
+  // The document sign-off carries legal e-signature weight: a password re-auth + a
+  // legal-effect confirmation. Offered only when the active context is confirmed and
+  // policy allows signing on a locked instance (FE-02: single decision construction
+  // path, owned by `buildDocumentSignoffDecision` — was inline in SignoffDetailPage).
+  const signoffOffered =
+    sidebarReady && policy.actions.signoff && lockedByInstanceId != null && instance != null && contentHash != null;
+
+  const decision: ArtifactDecisionModel | undefined = buildDocumentSignoffDecision({
+    offered: signoffOffered,
+    signer: user
+      ? { displayName: user.displayName, email: user.email ?? null, username: user.username }
+      : null,
+    defaultOptionKey: decisionInputs.defaultOptionKey,
+    submit: decisionInputs.submit,
+  });
+
   // The approval cockpit deliberately builds a REDUCED ArtifactViewModel here
   // rather than composing `useDocumentArtifact` (the way `useTemplateApprovalArtifact`
   // composes `useTemplateArtifact`). The cockpit hero uses an "Aprovações" breadcrumb,
@@ -227,6 +268,7 @@ export function useDocumentApprovalArtifact(
         lineage: [],
         tabs: [],
         actions,
+        decision,
       }
     : null;
 
@@ -242,7 +284,7 @@ export function useDocumentApprovalArtifact(
     loading: docQuery.isLoading || (hasActiveContext && instanceLoading && instance == null),
     error: instanceError,
     contextError: contextQuery.isError,
-    noActiveContext: Boolean(doc) && !contextQuery.isLoading && !contextQuery.isError && !hasActiveContext,
+    noActiveContext,
     refetchInstance,
     isStale,
   };

@@ -3,7 +3,12 @@ import { useHasCapability } from '../../iam/hooks/useHasCapability';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import { formatPageCount, formatPublishedAt, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
 import { resolveOwnerDisplay } from '../../shared/controlled-artifact/resolveOwnerDisplay';
-import { ACTIVE_SIBLING_STATES, type ActiveSiblingState } from '../lib/documentWorkflow';
+import {
+  ACTIVE_SIBLING_STATES,
+  getActiveSiblingCtaLabel,
+  getActiveSiblingDestination,
+  type ActiveSiblingState,
+} from '../lib/documentWorkflow';
 import { mapApprovalChain } from '../lib/approvalWorkflow';
 import type {
   ApprovalChainItem,
@@ -23,23 +28,65 @@ import { useAreasQuery } from '../queries/useAreasQuery';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { formatShortDate } from '../../../lib/format/dates';
 import { getDocumentStatusPresentation } from '../lib/documentStatusPresentation';
+import type { DocumentDetail } from '../api/documents';
+import type { fetchActiveDocumentInstance } from '../../controlled-documents/api/controlledDocuments';
+
+type ControlledDocumentActiveDocument = Awaited<ReturnType<typeof fetchActiveDocumentInstance>>;
 
 const EM_DASH = '—';
+
+/**
+ * Lifecycle/capability gating derived by the adapter for the detail hero's action
+ * buttons. The route owns all interactive/dialog state (revision composer, publish
+ * dialog, PDF export, copy link) and renders the hero JSX itself — `ArtifactDetailView`
+ * takes `heroActions` as a raw ReactNode slot, not a generic action-button list — but
+ * the adapter decides WHICH gates are open in the current state so the route consumes
+ * these booleans/labels instead of re-deriving them from a second set of queries.
+ */
+export interface DocumentDetailGating {
+  isObsolete: boolean;
+  isApproved: boolean;
+  isPublished: boolean;
+  /** True when the user holds the `document.edit` capability (ADR 0022). */
+  canInitiateRevision: boolean;
+  /** Gated on canInitiateRevision + isPublished + controlled_document_id + no active sibling. */
+  canCreateRevision: boolean;
+  /** Gated on canInitiateRevision + isApproved + confirmed active-document content hash. */
+  canPublish: boolean;
+  activeSiblingDocumentId: string | null;
+  activeSiblingState: ActiveSiblingState | null;
+  activeSiblingCtaLabel: string;
+  activeSiblingDestination: string | null;
+  /** Human copy explaining why publish is blocked when isApproved and !canPublish. Null when not applicable. */
+  publishContextNotice: string | null;
+}
 
 export interface DocumentArtifact {
   model: ArtifactViewModel;
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
+  /** Raw document detail (route needs doc.name/controlled_document_id/template_version_id/current_revision_id
+   *  for the revision composer + PDF export + "Visualizar documento" link — not worth normalizing into the
+   *  kind-agnostic model). Null until loaded. */
+  doc: DocumentDetail | null;
+  /** Raw active-document context (route needs content_hash/revision_version/published_document_id for the
+   *  SupersedePublishDialog props). Null when no active context. */
+  activeDocument: ControlledDocumentActiveDocument | null;
+  /** Distribution coverage count, pre-formatted (EM_DASH on error/missing) — same value as the coverage KPI cell. */
+  obligatedCount: string;
+  /** Gating booleans + sibling-CTA copy the route's hero-actions JSX renders directly. */
+  gating: DocumentDetailGating;
+  /** Imperative refetch bundle for the route's publish-success handler. */
+  refetchAll: () => void;
 }
 
 /**
  * Document-kind adapter for the shared controlled-artifact view layer. Composes the
- * existing document queries into a kind-agnostic `ArtifactViewModel`.
- *
- * Lifecycle/capability flags drive the action-set `available` booleans; the full
- * interactive run() handlers are dialog-driven and owned by the route wrapper
- * (DocumentDetailRoute) — completed in T11.
+ * existing document queries into a kind-agnostic `ArtifactViewModel` AND owns the
+ * lifecycle/capability gating derivation the detail route consumes for its hero
+ * actions — the route no longer re-runs these queries or re-derives gating itself
+ * (FE-02).
  */
 export function useDocumentArtifact(documentId: string): DocumentArtifact {
   const user = useAuthStore((s) => s.user);
@@ -146,9 +193,27 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     ACTIVE_SIBLING_STATES.includes(activeDocument.approval_state as ActiveSiblingState)
       ? activeDocument.document_id
       : null;
+  const activeSiblingStateCandidate = activeDocument?.approval_state as ActiveSiblingState | undefined;
+  const activeSiblingState =
+    activeSiblingDocumentId && activeSiblingStateCandidate && ACTIVE_SIBLING_STATES.includes(activeSiblingStateCandidate)
+      ? activeSiblingStateCandidate
+      : null;
+  const activeSiblingCtaLabel = activeSiblingState ? getActiveSiblingCtaLabel(activeSiblingState) : 'Iniciar revisão';
+  const activeSiblingDestination =
+    activeSiblingDocumentId && activeSiblingState
+      ? getActiveSiblingDestination(activeSiblingDocumentId, activeSiblingState)
+      : null;
   const canCreateRevision =
     canInitiateRevision && isPublished && Boolean(doc?.controlled_document_id) && activeSiblingDocumentId == null;
   const canPublish = canInitiateRevision && isApproved && Boolean(activeDocument?.content_hash);
+  const publishContextNotice =
+    isApproved && !canInitiateRevision
+      ? 'Seu perfil atual não pode publicar esta revisão.'
+      : isApproved && activeDocumentQuery.isError
+        ? 'Não foi possível confirmar o contexto ativo de publicação. Atualize a página e tente novamente antes de publicar.'
+        : isApproved && !activeDocument?.content_hash
+          ? 'A publicação está bloqueada porque o contexto ativo desta revisão ainda não foi confirmado.'
+          : null;
 
   // KPI strip cells — fully composed here so the shared view has zero kind awareness.
   // Cell order matches DocumentPublishedPage L579-608: currentVersion, coverage, nextReview, pages.
@@ -220,12 +285,35 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     actions,
   };
 
+  const gating: DocumentDetailGating = {
+    isObsolete,
+    isApproved,
+    isPublished,
+    canInitiateRevision,
+    canCreateRevision,
+    canPublish,
+    activeSiblingDocumentId,
+    activeSiblingState,
+    activeSiblingCtaLabel,
+    activeSiblingDestination,
+    publishContextNotice,
+  };
+
   return {
     model,
     isLoading: docQuery.isLoading,
     isError: docQuery.isError || !doc,
     refetch: () => {
       void docQuery.refetch();
+    },
+    doc: doc ?? null,
+    activeDocument,
+    obligatedCount,
+    gating,
+    refetchAll: () => {
+      void docQuery.refetch();
+      void approvalQuery.refetch();
+      void activeDocumentQuery.refetch();
     },
   };
 }

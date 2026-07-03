@@ -61,12 +61,18 @@ const MOCK_MODEL: ArtifactViewModel = {
   actions: [],
 };
 
+const capturedDecisionSubmit: { current: ((accept: boolean, reason: string) => Promise<void>) | null } = {
+  current: null,
+};
+
 vi.mock("../adapters/useTemplateApprovalArtifact", () => ({
   useTemplateApprovalArtifact: (
     _templateId: string,
     handlers: import("../adapters/useTemplateApprovalArtifact").TemplateApprovalHandlers,
+    decisionSubmit: (accept: boolean, reason: string) => Promise<void>,
   ) => {
     capturedHandlers.current = handlers;
+    capturedDecisionSubmit.current = decisionSubmit;
     return {
       model: {
         ...MOCK_MODEL,
@@ -86,6 +92,39 @@ vi.mock("../adapters/useTemplateApprovalArtifact", () => ({
             run: () => handlers.runApprove(false),
           },
         ],
+        // Mirrors buildTemplateApprovalDecision's shape for status=approved — the
+        // route now only supplies `submit`; construction lives in the adapter/lib.
+        decision: {
+          kicker: "Decisão requerida",
+          heading: "Registrar decisão",
+          description: "Confirme para publicar esta versão do modelo.",
+          options: [
+            {
+              key: "accept",
+              label: "Publicar",
+              description: "Publica esta versão do modelo.",
+              tone: "approve" as const,
+              submitLabel: "Publicar",
+              requiresReason: false,
+            },
+            {
+              key: "reject",
+              label: "Rejeitar",
+              description: "Devolve o modelo para rascunho · requer motivo.",
+              tone: "reject" as const,
+              submitLabel: "Rejeitar",
+              requiresReason: true,
+            },
+          ],
+          reasonLabel: "Motivo",
+          reasonPlaceholder: "Comentário registrado na trilha do modelo…",
+          password: null,
+          legal: null,
+          signer: null,
+          submit: async ({ optionKey, reason }: { optionKey: string; reason: string }) => {
+            await decisionSubmit(optionKey === "accept", reason);
+          },
+        },
       },
       version: { version_number: 2, status: "approved" },
       isLoading: false,
