@@ -2591,8 +2591,12 @@ export interface components {
         };
         DocumentFamilyItem: {
             code: string;
+            tenant_id: string;
             name: string;
             description: string;
+            is_active: boolean;
+            /** Format: date-time */
+            created_at: string;
         };
         ListDocumentFamiliesResponse: {
             items: components["schemas"]["DocumentFamilyItem"][];
@@ -2615,11 +2619,46 @@ export interface components {
         };
         ProcessAreaItem: {
             code: string;
+            tenant_id: string;
             name: string;
             description: string;
+            parent_code: string | null;
+            owner_user_id: string | null;
+            default_approver_role: string | null;
+            /** Format: date-time */
+            archived_at: string | null;
+            /** Format: date-time */
+            created_at: string;
         };
         ListProcessAreasResponse: {
             items: components["schemas"]["ProcessAreaItem"][];
+        };
+        TaxonomyProfileUpsertRequest: {
+            code: string;
+            family_code: string;
+            name: string;
+            description: string;
+            alias?: string;
+            review_interval_days: number;
+            default_template_version_id?: string | null;
+            owner_user_id?: string | null;
+            editable_by_role: string;
+        };
+        SetTaxonomyProfileDefaultTemplateRequest: {
+            template_version_id: string;
+        };
+        TaxonomyAreaUpsertRequest: {
+            code: string;
+            name: string;
+            description: string;
+            parent_code?: string | null;
+            owner_user_id?: string | null;
+            default_approver_role?: string | null;
+        };
+        TaxonomyFamilyUpsertRequest: {
+            code: string;
+            name: string;
+            description: string;
         };
         AuditEventItem: {
             id: string;
@@ -5058,7 +5097,9 @@ export interface operations {
     };
     listTaxonomyProfiles: {
         parameters: {
-            query?: never;
+            query?: {
+                include_archived?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5086,7 +5127,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxonomyProfileUpsertRequest"];
+            };
+        };
         responses: {
             /** @description created */
             201: {
@@ -5165,7 +5210,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxonomyProfileUpsertRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
@@ -5192,7 +5241,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetTaxonomyProfileDefaultTemplateRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
@@ -5211,7 +5264,9 @@ export interface operations {
     };
     listTaxonomyAreas: {
         parameters: {
-            query?: never;
+            query?: {
+                include_archived?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5239,7 +5294,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxonomyAreaUpsertRequest"];
+            };
+        };
         responses: {
             /** @description created */
             201: {
@@ -5292,7 +5351,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxonomyAreaUpsertRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
@@ -5369,7 +5432,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxonomyFamilyUpsertRequest"];
+            };
+        };
         responses: {
             /** @description created */
             201: {
@@ -5448,7 +5515,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxonomyFamilyUpsertRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
