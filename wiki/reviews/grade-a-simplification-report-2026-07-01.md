@@ -192,8 +192,8 @@ Split itself is DECIDED (ADR 0053) — these are gaps inside each engine.
 
 | ID | Decision | Recommendation |
 |---|---|---|
-| DEC-01 | finalize vs submit canonical (CON-01) | `submit` canonical (explicit OCC + correct capability); finalize becomes deprecated alias with corrected gate, removed next minor |
-| DEC-02 | `document_families` tenancy (SEC-01) | Tenant-scope it; global taxonomy contradicts pooled-tenant invariant |
+| DEC-01 | ~~open~~ **DECIDED + EXECUTED 2026-07-01 (b1c4f3bf, via CON-01)** — finalize vs submit canonical | `submit` canonical (explicit OCC + correct capability); finalize rebuilt as deprecated convenience wrapper (`deprecated: true`, CapDocumentSubmit tier-1, mandatory If-Match), removed next minor |
+| DEC-02 | ~~open~~ **DECIDED + EXECUTED 2026-07-01 (via SEC-01)** — `document_families` tenancy | Tenant-scoped: migration 0258 (`tenant_id` + backfill + `UNIQUE(tenant_id,code)` + RLS + tripwire) + full-stack tenant threading; sentinel-catalog pattern mirrors document_profiles |
 | DEC-03 | `auth_identities` tenancy (SEC-10) | **DECIDED 2026-07-02 per recommendation:** identity global, sessions tenant-scoped — ADR 0055 (extends ADR 0027, which already declared the schema half) records 4 binding rules (f99c34c0) |
 | DEC-04 | ~~open~~ **DECIDED 2026-07-02 (3cb95b2b)** — both ACCEPTED | 0046 file was already Accepted (index row stale-Proposed, fixed; also fixed stale 'two entrypoints' summary — single `.` entrypoint, React door = editor-ui pkg); 0047 realization code-verified (MetalDocsEditor.tsx:184-185 gates templatePlugin + filter-transaction-guard on mode==='template-draft', pinned by templatePlugin.wiring.test.tsx) |
 | DEC-05 | ~~open~~ **DECIDED 2026-07-02 (8efaa088)** — ADR 0056 | Defers generic comments platform (YAGNI, one consumer); template comments reuse document_comments table shape scoped to template_version_id; promote to platform only on 3rd consumer |
