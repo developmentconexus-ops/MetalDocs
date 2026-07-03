@@ -1,7 +1,7 @@
 # Program: Global Maximum Remediation
 
 > **Governing spec:** `./mission.md`
-> **Status:** Planning (operator gate pending)
+> **Status:** M0 validator PASS — HS-1 operator gate pending (no next milestone, no push, until approved)
 > **Owner / operator:** Leandro
 
 Convert every finding of the 2026-07-03 final architecture review (commit 778f494a) into shipped, gate-enforced remediation: enforcement automation for the hand-sync defect class, kernel correctness, async consolidation onto River, the two ISO-core eQMS product gaps, tenant lifecycle, ops readiness, and governance hygiene. Terminal acceptance: an independent re-run of the 10-dimension review reaching CONFIRMED on every in-scope dimension, plus every mission-installed CI gate green from clean state with negative proof — judged by `mission-validator`.
@@ -10,7 +10,7 @@ Convert every finding of the 2026-07-03 final architecture review (commit 778f49
 
 | # | Milestone | Objective (one line) | Status | Gate result |
 |---|-----------|----------------------|--------|-------------|
-| 0 | `milestone-0-versionref-contract` | Land the planned VersionRef nested-ref contract cutover + ADR 0065 | in-progress | — |
+| 0 | `milestone-0-versionref-contract` | Land the planned VersionRef nested-ref contract cutover + ADR 0065 | validator PASS · HS-1 pending | [PASS](milestone-0-versionref-contract/qa/milestone-qa.md) |
 | 1 | `milestone-1-contract-fe-gates` | oasdiff CI gate, nullable⇒required lint, blocking contract-sync, ESLint feature boundaries | planned | — |
 | 2 | `milestone-2-authz-enforcement-generation` | Tripwire arms generated from capability registry + CI drift check; cap-name divergences closed | planned | — |
 | 3 | `milestone-3-tenancy-chokepoint` | TxRunner auto-seed GUCs; RLS backstop covers worker/jobs; ADR 0027 amended | planned | — |
