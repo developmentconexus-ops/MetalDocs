@@ -29,7 +29,7 @@ Before improving/fixing/extending anything, judge the foundation first.
 - Docx workspace build/test/typecheck: `npm run build:docx-v2`, `npm run test:docx-v2`, `npm run typecheck:docx-v2`
 
 ## System Facts (hold these before planning anything)
-MetalDocs is a **modular monolith**, 4 binaries: `metaldocs-api` (sync + authz, stateless), `metaldocs-worker` (async outbox consumers), `metaldocs-jobs` (recurring janitors), `docx-renderer` (internal only).
+MetalDocs is a **modular monolith**, 4 binaries: `metaldocs-api` (sync + authz, stateless; also hosts the 4 leader-elected janitors — stuck-instance-watchdog, idempotency-janitor, audit-integrity-validator, lease-reaper), `metaldocs-worker` (async outbox consumers), `metaldocs-jobs` (async schedules via River — scheduled-publish + notifications fanout), `docx-renderer` (internal only).
 
 **14 bounded-context modules** under `internal/modules/`: audit · auth · controlleddocuments · distribution · docs · documents · iam · jobs · notifications · render · search · security · taxonomy · templates. Cross-module access goes through a module's application service or published Go interface — **never** another module's repository, SQL, or domain internals.
 

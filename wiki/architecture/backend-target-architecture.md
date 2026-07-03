@@ -13,9 +13,9 @@ MetalDocs is and remains a **modular monolith** with plane separation expressed 
 
 | Binary | Plane | Behavior contract |
 |---|---|---|
-| `metaldocs-api` | data + control plane | Stateless. All synchronous business logic + authz. No precious local state. |
+| `metaldocs-api` | data + control plane | Stateless. All synchronous business logic + authz. No precious local state. Also hosts the 4 leader-elected janitors (stuck-instance-watchdog, idempotency-janitor, audit-integrity-validator, lease-reaper) via an in-process scheduler with DB-backed lease/heartbeat single-runner semantics. |
 | `metaldocs-worker` | async data plane | Consumes outboxes/queues. Every consumer idempotent. |
-| `metaldocs-jobs` | management plane | Recurring janitors/publishers/watchdogs. Single-runner semantics per job. |
+| `metaldocs-jobs` | management plane | Async schedules via River — scheduled-publish (approval) + notifications fanout. |
 | `docx-renderer` | internal service | Reached only via authenticated internal calls; never exposed at the edge. |
 
 - **REQ-TOP-1** Modules under `internal/modules/` are bounded contexts. Cross-module access goes through a module's application service or published Go interface — never another module's repository, SQL, or domain internals. (MUST)

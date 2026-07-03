@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/auth.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/auth-refactor.md`.
 
-**Last verified:** 2026-07-01 (Grade-A simplification register reconciliation — T-012 closed as stale; OriginProtection middleware confirmed wired since commit 5d9f1884, register drift per commit fb0250e5) | **Prior:** 2026-06-12 (Wave 2.12 sync — no debt rows opened or closed; loginCtxPort now panics on nil (was nil-guarded); InMemoryAuthFailureRateLimiter deleted — no new debt opened) | **Prior:** 2026-06-11 (Stage-1 adversarial verification pass — T-004 false-open corrected; T-009 behavior + anchor corrected; T-014 line anchors corrected)
+**Last verified:** 2026-07-02 (T-008 closed by-design — ADR 0027 schema decision + new ADR 0055 binding session/lookup/cross-tenant-probe rules; closes grade-A SEC-10/DEC-03) | **Prior:** 2026-07-01 (Grade-A simplification register reconciliation — T-012 closed as stale; OriginProtection middleware confirmed wired since commit 5d9f1884, register drift per commit fb0250e5) | **Prior:** 2026-06-12 (Wave 2.12 sync — no debt rows opened or closed; loginCtxPort now panics on nil (was nil-guarded); InMemoryAuthFailureRateLimiter deleted — no new debt opened) | **Prior:** 2026-06-11 (Stage-1 adversarial verification pass — T-004 false-open corrected; T-009 behavior + anchor corrected; T-014 line anchors corrected)
 
 ## Severity scale
 
@@ -69,13 +69,14 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md`
 - **Linked backlog row:** `backlog/auth-refactor.md#R-007`
 
-### T-008 · auth_identities lacks tenant_id (latent multi-tenant identity sharing) — auth_sessions partially resolved
-- **Severity:** minor
-- **Surface:** `migrations/0021_init_auth_identities_and_sessions.sql`; `migrations/0036_decouple_auth_identity_from_iam_user_tables.sql`
-- **Observation:** `auth_identities` carries no `tenant_id` column — identity is tenant-global. **Partially resolved (2026-05-11, Plan 3):** `auth_sessions.tenant_id` was added by migration `0184_auth_sessions_tenant_id.sql`; session-bound tenant is now the authoritative source for all downstream handlers. The remaining gap is `auth_identities` itself — if true per-identity tenant isolation is required in a multi-tenant deployment, `auth_identities` would need backfilling too. Today this is latent (single-tenant install; roles enforce per-tenant boundary via IAM). Trigger fired: latent (surface exists, no caller hits it under current single-tenant deployment).
-- **Evidence:** `_artifacts/04-persistence.md` §3 columns; `_artifacts/05-industry.md` IP-008.
-- **Linked backlog row:** `backlog/auth-refactor.md#R-008`
-- **Linked ADR:** `wiki/architecture/tenant-context.md` (sessions portion), missing-ADR (identities portion)
+### T-008 · auth_identities lacks tenant_id (latent multi-tenant identity sharing) — CLOSED 2026-07-02 (by-design, ADR 0027 + ADR 0055)
+- **Severity:** minor (closed)
+- **Surface (resolved):** `db/baseline/0001_current_schema.sql:966-982` (`auth_identities`, no `tenant_id`); `db/baseline/0001_current_schema.sql:989-996,3246-3249,4045-4049` (`auth_sessions.tenant_id` + FK + index, added by migration `0184_auth_sessions_tenant_id.sql`); `internal/modules/auth/application/service.go:344-366` (`resolveLoginTenant` fixes tenant at login from verified `iam_users` membership); `internal/modules/auth/application/service.go:368-400` (`ResolveSession` reads tenancy off the session row only).
+- **Observation (original):** `auth_identities` carries no `tenant_id` column — identity is tenant-global. **Partially resolved (2026-05-11, Plan 3):** `auth_sessions.tenant_id` was added by migration `0184_auth_sessions_tenant_id.sql`; session-bound tenant is now the authoritative source for all downstream handlers. The remaining gap was that `auth_identities` itself had no standalone ADR binding the session/lookup/cross-tenant-probe behavior that makes the global-identity model safe.
+- **Resolution:** ADR 0027 already decided (2026-06-13) that `auth_identities` is tenant-global by design — one identity, N tenant memberships via `iam_users.tenant_id`. ADR 0055 (2026-07-02) converts that narrative decision into binding numbered rules verified against current runtime code: sessions MUST be tenant-scoped (rule 1), identity lookups never bypass tenant checks on resources they unlock (rule 2), cross-tenant probes still 404 (rule 3), any future per-tenant identity requirement is a new ADR (rule 4). No schema or code change was required — both ADRs document verified existing behavior.
+- **Evidence:** `_artifacts/04-persistence.md` §3 columns; `_artifacts/05-industry.md` IP-008; `wiki/decisions/0027-rls-adoption-sequencing.md`; `wiki/decisions/0055-global-auth-identities.md`.
+- **Linked backlog row:** `backlog/auth-refactor.md#R-008` (can be closed)
+- **Linked ADR:** `wiki/decisions/0027-rls-adoption-sequencing.md` (schema decision), `wiki/decisions/0055-global-auth-identities.md` (binding rules)
 
 ### T-009 · Logout cannot distinguish "no session" from "tampered cookie"
 - **Severity:** minor
@@ -133,4 +134,4 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - Operations missing C4 placement: 0 / 4
 - Cross-deps missing in §5/§8: 0 / 16
 - State transitions missing in §6: 0 / 3
-- Decisions without ADR link: 8
+- Decisions without ADR link: 7
