@@ -13,6 +13,9 @@ import (
 	"metaldocs/internal/modules/templates/domain"
 )
 
+// UpdateSchemasCmd carries the replacement metadata and placeholder schemas
+// for a draft template version, guarded by optimistic concurrency via
+// ExpectedLockVersion.
 type UpdateSchemasCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	VersionNumber                     int
@@ -21,6 +24,14 @@ type UpdateSchemasCmd struct {
 	ExpectedLockVersion               int
 }
 
+// UpdateSchemas validates and replaces a draft version's metadata schema and
+// placeholder schema. The version must still be a draft. Placeholders are
+// validated via ValidatePlaceholders (IDs, names, resolver keys against the
+// known resolver registry, select-type option requirements, and visibility
+// dependency cycles). The update is applied via a compare-and-swap against
+// ExpectedLockVersion (stale lock is surfaced as a domain error) and an
+// AuditSaved event ("kind": "schema") is appended, atomically in one
+// transaction.
 func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*domain.TemplateVersion, error) {
 	if _, err := s.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return nil, wrapAppErr("templates update schemas: get template", err)
@@ -113,6 +124,15 @@ func computedCatalogSet() map[string]struct{} {
 	return set
 }
 
+// ValidatePlaceholders validates a placeholder schema in full: non-empty
+// unique IDs, unique names matching the placeholder-name pattern, dictionary
+// placeholders that don't collide with native/computed names and carry no
+// resolver, computed placeholders that ARE in the computed catalog (ADR
+// 0050) and carry a matching resolver_key, well-formed regex/min-max/date
+// constraints, computed placeholders requiring a resolver_key, valid
+// visibility operators, and (via DetectVisibilityCycle) an acyclic
+// visibility dependency graph. nativeNames is the set of known native/
+// computed resolver keys used to reject reserved dictionary names.
 func ValidatePlaceholders(phs []domain.Placeholder, nativeNames map[string]int) error {
 	seen := make(map[string]struct{}, len(phs))
 	seenNames := make(map[string]struct{}, len(phs))

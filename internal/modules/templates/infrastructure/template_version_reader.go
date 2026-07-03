@@ -1,3 +1,6 @@
+// Package infrastructure holds the templates module's read-only, DB-backed
+// adapters that other modules consume through published interfaces rather
+// than the templates repository directly.
 package infrastructure
 
 import (
@@ -17,10 +20,17 @@ const templateVersionQuery = `
 	  AND t.tenant_id = $2::uuid
 `
 
+// TemplateVersionReader is a read-only, tenant-scoped accessor for template
+// version publication state, backed directly by the templates_template_version
+// and templates_template tables. It exists so other modules (e.g.
+// controlled-documents) can query template version state without depending on
+// the templates module's repository or domain internals.
 type TemplateVersionReader struct {
 	db *sql.DB
 }
 
+// NewTemplateVersionReader constructs a TemplateVersionReader backed by db. It
+// panics if db is nil.
 func NewTemplateVersionReader(db *sql.DB) *TemplateVersionReader {
 	if db == nil {
 		panic("templates: template version reader db must not be nil")
@@ -28,6 +38,9 @@ func NewTemplateVersionReader(db *sql.DB) *TemplateVersionReader {
 	return &TemplateVersionReader{db: db}
 }
 
+// IsPublished reports whether versionID (scoped to the tenant carried on ctx)
+// is in the published state, along with the owning template's doc_type_code.
+// It returns (false, "", nil) when the version does not exist in this tenant.
 func (r *TemplateVersionReader) IsPublished(ctx context.Context, versionID string) (bool, string, error) {
 	tenantID, err := tenant.FromContext(ctx)
 	if err != nil {

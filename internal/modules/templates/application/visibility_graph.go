@@ -13,6 +13,11 @@ const (
 	nodeBlack = 2
 )
 
+// DetectVisibilityCycle walks each placeholder's VisibleIf dependency (a
+// conditional-visibility reference to another placeholder by ID) using
+// three-color DFS and returns domain.ErrPlaceholderCycle if any dependency
+// chain cycles back on itself. It also returns domain.ErrInvalidConstraint
+// if a VisibleIf references a placeholder ID that doesn't exist in phs.
 func DetectVisibilityCycle(phs []domain.Placeholder) error {
 	placeholdersByID := make(map[string]domain.Placeholder, len(phs))
 	for _, p := range phs {

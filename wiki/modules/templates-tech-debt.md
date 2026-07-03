@@ -131,13 +131,14 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-013` (close)
 - **Linked ADR:** missing-ADR
 
-### T-014 · Exported symbols lack Go doc comments
-- **Severity:** minor
+### T-014 · Exported symbols lack Go doc comments — **RESOLVED 2026-07-03 (TST-06)**
+- **Severity:** minor (closed)
 - **Surface:** all files under `internal/modules/templates/{domain,application,delivery,repository}/`.
-- **Observation:** Per `_artifacts/01-surface.md` §3, every exported type, function, method, and constant in the module is undocumented (no leading `// SymbolName ...` doc comment). `golint` / `revive` exported-rule would flag the module wholesale. Reader of `Service.PublishTemplateVersion` must read the body to learn it skips SoD; reader of `ResolverRegistryReader` must read `schema.go:114` (`ValidatePlaceholders`) to learn it gates resolver_key. Hexagonal layout itself also lacks an ADR (`domain/application/delivery/repository` split is convention-only, same as `documents` and `auth`).
-- **Evidence:** `_artifacts/01-surface.md` §3.
+- **Observation (as found):** Per `_artifacts/01-surface.md` §3, every exported type, function, method, and constant in the module was undocumented (no leading `// SymbolName ...` doc comment). Reader of `Service.PublishTemplateVersion` had to read the body to learn its SoD behavior; reader of `ResolverRegistryReader` had to read `schema.go:114` to learn it gates resolver_key.
+- **Resolution:** grade-A TST-06 final slice — 179 undocumented exported symbols (application 43, delivery/http 24, domain 84, infrastructure 3, repository 25) documented across 22 files; 6 package-level docs added (one per package). Comments-only verified by whitespace-insensitive pairing check; build/vet/tests green (156 PASS). The hexagonal-layout ADR gap noted in the original observation is NOT closed by this sweep and is not covered by the DEC-07 batch (ADRs 0058-0064 cover other decisions) — it remains an open missing-ADR cell.
+- **Evidence:** `_artifacts/01-surface.md` §3 (historical); TST-06 commit.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-014`
-- **Linked ADR:** missing-ADR
+- **Linked ADR:** missing-ADR (hexagonal-layout convention still un-ratified; doc-comment half of this row resolved)
 
 ### T-015 · `POST /templates` requires a client-supplied `key` — decision made, not yet implemented (ADR 0057)
 - **Severity:** minor

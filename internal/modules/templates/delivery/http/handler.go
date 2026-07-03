@@ -1,3 +1,8 @@
+// Package http implements the templates module's HTTP delivery layer: it
+// adapts the generated templatesapi.ServerInterface (oapi-codegen, from
+// api/openapi) to the application.Service use cases, performing tier-1
+// capability authz, request/response mapping to the OpenAPI-generated DTOs,
+// and error translation to RFC 9457 problem+json responses.
 package http
 
 import (
@@ -30,6 +35,10 @@ import (
 // (F-T6 part b: documents the deliberate area mismatch flagged by the audit.)
 type AuthzFunc func(r *http.Request, tenantID, area string, action string) error
 
+// Handler implements the templates module's HTTP delivery layer. It wires
+// the application.Service to the generated templatesapi.ServerInterface,
+// enforcing tier-1 capability authz via AuthzFunc and mapping between the
+// domain and the OpenAPI-generated wire DTOs.
 type Handler struct {
 	svc               *application.Service
 	authz             AuthzFunc
@@ -37,6 +46,9 @@ type Handler struct {
 	displayNameReader iamdomain.UserDisplayNameReader
 }
 
+// New constructs a Handler wired to the given application service, tier-1
+// authz function, and database handle (used for idempotency-key storage).
+// Panics if authz is nil, since every route depends on it.
 func New(svc *application.Service, authz AuthzFunc, database *sql.DB) *Handler {
 	if authz == nil {
 		panic("templates http: authz function is required")
@@ -116,6 +128,9 @@ var idempotentRoutes = map[string]bool{
 	"POST /api/v1/templates/{id}/versions/{n}/approve": true,
 }
 
+// Register mounts the generated templates routes onto mux via
+// templatesapi.HandlerWithOptions, applying an idempotency-key middleware to
+// the mutation routes listed in idempotentRoutes.
 func (h *Handler) Register(mux *http.ServeMux) {
 	middleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

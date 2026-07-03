@@ -33,6 +33,10 @@ const (
 	codeTplInvalidParam           = problem.CodeValidationError
 )
 
+// MapErr translates a domain/application error from the templates module into
+// the HTTP status and problem+json code that should be returned to the
+// caller. A nil err maps to 200 OK with an empty code; unrecognized errors
+// fall back to 500 Internal Server Error.
 func MapErr(err error) (httpStatus int, code problem.Code) {
 	switch {
 	case err == nil:

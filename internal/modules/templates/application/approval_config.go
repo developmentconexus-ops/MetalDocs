@@ -10,12 +10,21 @@ import (
 	"metaldocs/internal/modules/templates/domain"
 )
 
+// UpsertApprovalConfigCmd carries the reviewer/approver role bindings to set
+// for a template's approval workflow.
 type UpsertApprovalConfigCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	ReviewerRole                      *string
 	ApproverRole                      string
 }
 
+// UpsertApprovalConfig creates or replaces the template's approval
+// configuration (reviewer role is optional, approver role is required). It
+// enforces the elevation rule from ADR 0051 / REQ-AUTHZ-5: templates that
+// have ever published, or that the actor did not create, require
+// template.manage in addition to the base template.edit capability. The
+// config write and the resulting AuditApprovalConfigUpdated event are
+// persisted atomically in a single transaction.
 func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalConfigCmd) (*domain.ApprovalConfig, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {

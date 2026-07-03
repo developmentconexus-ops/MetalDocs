@@ -38,7 +38,7 @@
 | P4 | 9 | Transactional + idempotency hardening + template workflow alignment | ~6 | done 2026-05-13 (Plan 9R) |
 | P4 | 10 | Legacy purge + rename sweep (`templates → templates`, `v2 → v1`) | ~6 | done (R-101 `/api/v1` flip residual, open-deferred) |
 | P5 | 12 | Screen finalization × 7 (per `metaldocs-screen-implementation`) | ~7 | pending |
-| P5 | 13 | Doc-comment + ADR sweep | ~3 | done 2026-07-02 (via grade-A DEC-07 + TST-06) |
+| P5 | 13 | Doc-comment + ADR sweep | ~3 | done 2026-07-03 (doc-comments full; ADRs partial via DEC-07) |
 
 **Closes by end of P2:** 21 / 21 Critical rows. **Closes by end of P4:** 44 / 44 Major rows.
 
@@ -161,7 +161,7 @@ See above (P1, parallel to Plan 4).
 - **Closes:** every remaining `missing-ADR` link across all 10 tech-debt registers (~80 cells) + every doc-comment R-row.
 - **Critical rows closed:** 0.
 - **Blockers:** ratifies decisions Plans 3–10 made — do last.
-- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`. Roadmap correction (2026-07-02, DOC-05): this stamp reused Plan 10's commit list and was false at the time — neither half was done. Both halves actually closed 2026-07-02 under the grade-A program: missing-ADR cells retired by the DEC-07 ADR batch (ADRs 0058–0064), doc-comment sweep executed as TST-06. Table row updated to `done 2026-07-02 (via grade-A DEC-07 + TST-06)`.
+- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`. Roadmap correction (2026-07-02, DOC-05): this stamp reused Plan 10's commit list and was false at the time — neither half was done. Actual closure under the grade-A program: doc-comment half fully swept 2026-07-03 (TST-06 — approval/auth/taxonomy/cd/audit/iam/templates, every exported symbol documented); ADR half partially closed by the DEC-05/06/07 batch (ADRs 0055–0064) — residual `missing-ADR` cells (~100 across module registers, e.g. hexagonal-layout convention) remain open and tracked per register; the Plan's "every remaining missing-ADR link" goal was deliberately scoped down to the decision-worthy subset. Table row updated to `done 2026-07-03 (doc-comments full; ADRs partial via DEC-07)`.
 
 ---
 

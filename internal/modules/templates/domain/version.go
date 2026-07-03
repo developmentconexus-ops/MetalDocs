@@ -5,16 +5,32 @@ import (
 	"time"
 )
 
+// VersionStatus is the lifecycle state of a template version.
 type VersionStatus string
 
+// Lifecycle states of a template version, in forward order.
 const (
-	VersionStatusDraft       VersionStatus = "draft"
+	// VersionStatusDraft is the initial state of a newly created version,
+	// editable by its author.
+	VersionStatusDraft VersionStatus = "draft"
+	// VersionStatusUnderReview marks a version submitted for review/approval
+	// and no longer editable by its author.
 	VersionStatusUnderReview VersionStatus = "under_review"
-	VersionStatusApproved    VersionStatus = "approved"
-	VersionStatusPublished   VersionStatus = "published"
-	VersionStatusObsolete    VersionStatus = "obsolete"
+	// VersionStatusApproved marks a version that has passed review and is
+	// awaiting publication.
+	VersionStatusApproved VersionStatus = "approved"
+	// VersionStatusPublished marks a version that is the live, in-force
+	// revision of its template.
+	VersionStatusPublished VersionStatus = "published"
+	// VersionStatusObsolete marks a version that has been superseded by a
+	// later published version.
+	VersionStatusObsolete VersionStatus = "obsolete"
 )
 
+// TemplateVersion is one immutable-content revision of a Template moving
+// through the review/approval lifecycle. It carries the DOCX storage key and
+// content hash, the metadata and placeholder schemas, the role bindings and
+// actor IDs collected at each transition, and an optimistic-lock version.
 type TemplateVersion struct {
 	ID                  string
 	TenantID            string
@@ -40,6 +56,8 @@ type TemplateVersion struct {
 	CreatedAt           time.Time
 }
 
+// NewTemplateVersionDraft constructs a new version in draft status with an
+// empty content hash; the hash is set once the DOCX content is persisted.
 func NewTemplateVersionDraft(id, tenantID, templateID, authorID, docxStorageKey string, versionNumber int, metadata MetadataSchema, placeholders []Placeholder, createdAt time.Time) *TemplateVersion {
 	return &TemplateVersion{
 		ID:                id,
@@ -77,6 +95,11 @@ func (v *TemplateVersion) RoleBindingFor(transition VersionStatus) string {
 	return ""
 }
 
+// CanTransition reports whether moving from the version's current status to
+// next is a legal lifecycle transition. hasReviewer selects the review path:
+// with a reviewer, under_review must pass through approved before publish;
+// without one, under_review may publish directly. Returns
+// ErrInvalidStateTransition when the move is not allowed.
 func (v *TemplateVersion) CanTransition(next VersionStatus, hasReviewer bool) error {
 	switch v.Status {
 	case VersionStatusDraft:
@@ -106,8 +129,16 @@ func (v *TemplateVersion) CanTransition(next VersionStatus, hasReviewer bool) er
 }
 
 var (
+	// ErrInvalidStateTransition is returned when a lifecycle move is not
+	// permitted from the version's current status.
 	ErrInvalidStateTransition = errors.New("templates: invalid_state_transition")
-	ErrContentHashMismatch    = errors.New("templates: content_hash_mismatch")
-	ErrStaleBase              = errors.New("templates: stale_base")
-	ErrStaleLockVersion       = errors.New("templates: stale_lock_version")
+	// ErrContentHashMismatch is returned when uploaded content does not match
+	// the expected content hash.
+	ErrContentHashMismatch = errors.New("templates: content_hash_mismatch")
+	// ErrStaleBase is returned when an autosave is based on an outdated
+	// revision of the draft.
+	ErrStaleBase = errors.New("templates: stale_base")
+	// ErrStaleLockVersion is returned when an optimistic-lock check fails
+	// because the version row changed since it was read.
+	ErrStaleLockVersion = errors.New("templates: stale_lock_version")
 )

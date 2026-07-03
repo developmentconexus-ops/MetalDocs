@@ -5,23 +5,40 @@ import (
 	"time"
 )
 
+// AuditAction identifies the kind of template/template-version lifecycle
+// event an AuditEvent records.
 type AuditAction string
 
 const (
-	AuditCreated               AuditAction = "created"
-	AuditSaved                 AuditAction = "saved"
-	AuditSubmitted             AuditAction = "submitted"
-	AuditReviewed              AuditAction = "reviewed"
-	AuditApproved              AuditAction = "approved"
-	AuditRejected              AuditAction = "rejected"
-	AuditPublished             AuditAction = "published"
-	AuditObsoleted             AuditAction = "obsoleted"
-	AuditArchived              AuditAction = "archived"
-	AuditRestored              AuditAction = "restored"
+	// AuditCreated marks that a template was created.
+	AuditCreated AuditAction = "created"
+	// AuditSaved marks that a template version draft was saved.
+	AuditSaved AuditAction = "saved"
+	// AuditSubmitted marks that a template version was submitted for review/approval.
+	AuditSubmitted AuditAction = "submitted"
+	// AuditReviewed marks that a template version was reviewed.
+	AuditReviewed AuditAction = "reviewed"
+	// AuditApproved marks that a template version was approved.
+	AuditApproved AuditAction = "approved"
+	// AuditRejected marks that a template version was rejected.
+	AuditRejected AuditAction = "rejected"
+	// AuditPublished marks that a template version was published.
+	AuditPublished AuditAction = "published"
+	// AuditObsoleted marks that a template version was made obsolete.
+	AuditObsoleted AuditAction = "obsoleted"
+	// AuditArchived marks that a template was archived.
+	AuditArchived AuditAction = "archived"
+	// AuditRestored marks that an archived template was restored.
+	AuditRestored AuditAction = "restored"
+	// AuditApprovalConfigUpdated marks that a template's ApprovalConfig was updated.
 	AuditApprovalConfigUpdated AuditAction = "approval_config_updated"
-	AuditPublishForbiddenRole  AuditAction = "publish_forbidden_role"
+	// AuditPublishForbiddenRole marks that a publish attempt was denied because
+	// the actor did not hold the role bound to the transition.
+	AuditPublishForbiddenRole AuditAction = "publish_forbidden_role"
 )
 
+// AuditEvent records a single lifecycle action taken against a template or
+// template version, for the templates audit trail.
 type AuditEvent struct {
 	TenantID   string
 	TemplateID string
@@ -32,6 +49,8 @@ type AuditEvent struct {
 	OccurredAt time.Time
 }
 
+// NewAuditEvent creates a new AuditEvent, requiring non-empty tenantID,
+// templateID, and actorID.
 func NewAuditEvent(tenantID, templateID, actorID string, versionID *string, action AuditAction, details map[string]any, occurredAt time.Time) (AuditEvent, error) {
 	if tenantID == "" {
 		return AuditEvent{}, errors.New("audit event: tenantID required")

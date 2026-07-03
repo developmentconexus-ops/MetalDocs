@@ -13,10 +13,16 @@ import (
 
 var _ templatesapi.ServerInterface = (*Handler)(nil)
 
+// ListTemplates handles GET /templates, delegating to the underlying
+// h.listTemplates use case which authorizes, applies pagination/doc-type
+// filters, and returns the tenant's templates.
 func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request, params templatesapi.ListTemplatesParams) {
 	h.listTemplates(w, r, params)
 }
 
+// CreateTemplate handles POST /templates: authorizes CapTemplateCreate,
+// validates the required key/name fields, applies the approver/reviewer
+// role defaults, and creates a new template with its initial draft version.
 func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templatesapi.CreateTemplateParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -102,12 +108,20 @@ func missingCreateTemplateField(req templatesapi.CreateTemplateJSONRequestBody) 
 	}
 }
 
+// GetTemplateVersion handles GET /templates/{id}/versions/{n}, delegating to
+// h.getVersion after re-populating the path values (this variant of the
+// generated interface receives id/n as typed parameters rather than via
+// r.PathValue).
 func (h *Handler) GetTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int) {
 	r.SetPathValue("id", id)
 	r.SetPathValue("n", intString(n))
 	h.getVersion(w, r)
 }
 
+// PresignTemplateDocxUploadUrl handles POST for presigning a DOCX upload URL
+// for the given template version, delegating to h.presignTemplateUpload
+// (authorizes CapTemplateEdit and asks the application service for a
+// presigned upload URL and storage key).
 func (h *Handler) PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
 	url, key, ok := h.presignTemplateUpload(w, r, id, n)
 	if !ok {
@@ -119,6 +133,9 @@ func (h *Handler) PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Re
 	})
 }
 
+// PresignTemplateSchemaUploadUrl handles POST for presigning a schema-file
+// upload URL for the given template version: authorizes CapTemplateEdit and
+// returns a presigned URL and storage key from the application service.
 func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -174,7 +191,10 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 	return res.UploadURL, res.StorageKey, true
 }
 
-
+// PublishTemplateVersion handles POST /templates/{id}/versions/{n}/publish:
+// authorizes CapTemplatePublish, requires a non-blank schema_key in the
+// request body, and publishes the given approved version via the
+// application service, returning the published version's id.
 func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -221,54 +241,82 @@ func intString(v int) string {
 	return strconv.Itoa(v)
 }
 
+// CreateTemplateVersion handles POST /templates/{id}/versions, delegating to
+// the underlying create-next-version use case (h.createNextVersion).
 func (h *Handler) CreateTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.createNextVersion(w, r)
 }
 
+// UpdateTemplateSchema handles PUT/PATCH for a template version's schema,
+// delegating to the underlying update-schemas use case (h.updateSchemas).
 func (h *Handler) UpdateTemplateSchema(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
 	h.updateSchemas(w, r)
 }
 
+// PresignTemplateAutosave handles the autosave presign route, delegating to
+// the underlying presign-autosave use case (h.presignAutosave).
 func (h *Handler) PresignTemplateAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
 	h.presignAutosave(w, r)
 }
 
+// CommitTemplateAutosave handles the autosave commit route, delegating to
+// the underlying commit-autosave use case (h.commitAutosave).
 func (h *Handler) CommitTemplateAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
 	h.commitAutosave(w, r)
 }
 
+// SubmitTemplateVersion handles POST /templates/{id}/versions/{n}/submit,
+// delegating to the underlying submit-for-review use case (h.submitForReview).
 func (h *Handler) SubmitTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.SubmitTemplateVersionParams) {
 	h.submitForReview(w, r)
 }
 
+// ReviewTemplateVersion handles POST /templates/{id}/versions/{n}/review,
+// delegating to the underlying review use case (h.review).
 func (h *Handler) ReviewTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ReviewTemplateVersionParams) {
 	h.review(w, r)
 }
 
+// ApproveTemplateVersion handles POST /templates/{id}/versions/{n}/approve,
+// delegating to the underlying approve use case (h.approve).
 func (h *Handler) ApproveTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ApproveTemplateVersionParams) {
 	h.approve(w, r)
 }
 
+// ArchiveTemplate handles the archive-template route, delegating to the
+// underlying archive-template use case (h.archiveTemplate).
 func (h *Handler) ArchiveTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.archiveTemplate(w, r)
 }
 
+// UpsertTemplateApprovalConfig handles the approval-config upsert route,
+// delegating to the underlying upsert-approval-config use case
+// (h.upsertApprovalConfig).
 func (h *Handler) UpsertTemplateApprovalConfig(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.upsertApprovalConfig(w, r)
 }
 
+// GetTemplate handles GET /templates/{id}, delegating to the underlying
+// get-template use case (h.getTemplate).
 func (h *Handler) GetTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.getTemplate(w, r)
 }
 
+// GetTemplateDocxUrl handles the DOCX download-URL route for a template
+// version, delegating to the underlying get-docx-URL use case (h.getDocxURL).
 func (h *Handler) GetTemplateDocxUrl(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
 	h.getDocxURL(w, r)
 }
 
+// ListTemplateAudit handles the template audit-log listing route,
+// delegating to the underlying list-audit use case (h.listAudit).
 func (h *Handler) ListTemplateAudit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.listAudit(w, r)
 }
 
+// ListTemplatePlaceholderCatalog handles the placeholder-catalog listing
+// route, delegating to the underlying list-placeholder-catalog use case
+// (h.listPlaceholderCatalog).
 func (h *Handler) ListTemplatePlaceholderCatalog(w http.ResponseWriter, r *http.Request) {
 	h.listPlaceholderCatalog(w, r)
 }

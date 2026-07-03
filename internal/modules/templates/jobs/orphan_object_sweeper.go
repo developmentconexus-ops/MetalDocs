@@ -1,3 +1,6 @@
+// Package jobs holds the templates module's background janitors — long-running
+// reconciliation processes that run outside the request lifecycle (e.g. the
+// orphaned template object sweeper) started at process bootstrap.
 package jobs
 
 import (

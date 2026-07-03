@@ -85,6 +85,10 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request, params t
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// GetSystemBlankTemplate handles GET /templates/system-blank, returning the
+// identifiers and name of the tenant-agnostic system "blank" template
+// (fixed template/tenant IDs) and its latest version, for callers that need
+// a starting point unrelated to any tenant-authored template.
 func (h *Handler) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

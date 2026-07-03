@@ -1,3 +1,6 @@
+// Package repository implements the templates module's PostgreSQL persistence
+// layer: the Repository type backing application.Repository, plus the row
+// scanning and mapping helpers it depends on.
 package repository
 
 import (
@@ -33,13 +36,19 @@ func rowsAffected(res sql.Result) (int64, error) {
 	return n, nil
 }
 
+// Repository implements the templates application.Repository port against
+// PostgreSQL, using database/sql for its own operations and accepting a
+// caller-supplied db.Tx for the *Tx variants of its methods.
 type Repository struct {
 	db    *sql.DB
 	audit auditdomain.Writer
 }
 
+// New constructs a Repository backed by the given database handle.
 func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
+// WithAudit attaches an audit event writer to the Repository and returns it
+// for chaining. Without a writer, AppendAudit and AppendAuditTx are no-ops.
 func (r *Repository) WithAudit(w auditdomain.Writer) *Repository {
 	r.audit = w
 	return r
@@ -47,6 +56,9 @@ func (r *Repository) WithAudit(w auditdomain.Writer) *Repository {
 
 var _ application.Repository = (*Repository)(nil)
 
+// CreateTemplate inserts a new template row for the tenant, executing
+// directly against the repository's database handle. It maps a unique-key
+// violation on (tenant_id, key) to domain.ErrKeyConflict.
 func (r *Repository) CreateTemplate(ctx context.Context, t *domain.Template) error {
 	const q = `
 INSERT INTO templates_template (
@@ -70,6 +82,9 @@ INSERT INTO templates_template (
 	return nil
 }
 
+// GetTemplate loads a template by ID, scoped to the tenant, joining in the
+// latest and published version's revision numbers. It returns
+// domain.ErrNotFound when the row is missing or id is not a valid UUID.
 func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*domain.Template, error) {
 	const q = `
 SELECT
@@ -91,6 +106,9 @@ WHERE t.id = $1 AND t.tenant_id = $2::uuid`
 	return tmpl, nil
 }
 
+// GetTemplateByKey loads a template by its tenant-scoped unique key, joining
+// in the latest and published version's revision numbers. It returns
+// domain.ErrNotFound when no matching row exists.
 func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string) (*domain.Template, error) {
 	const q = `
 SELECT
@@ -140,6 +158,10 @@ func clampTemplatesLimit(limit int) int {
 	return limit
 }
 
+// ListTemplates returns non-system templates for the tenant, optionally
+// filtered by doc type code (a nil filter also always includes generic
+// templates, i.e. those with an empty doc_type_code), newest first, clamped
+// to the /templates contract's pagination bounds via clampTemplatesLimit.
 func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter) ([]*domain.Template, error) {
 	const q = `
 SELECT
@@ -190,6 +212,9 @@ LIMIT $3 OFFSET $4`
 	return out, rows.Err()
 }
 
+// UpdateTemplate updates a template's mutable fields, scoped to the tenant,
+// executing directly against the repository's database handle. It returns
+// domain.ErrNotFound when no row matches (id, tenant_id).
 func (r *Repository) UpdateTemplate(ctx context.Context, t *domain.Template) error {
 	const q = `
 UPDATE templates_template
@@ -222,6 +247,9 @@ WHERE id = $1 AND tenant_id = $2::uuid`
 	return nil
 }
 
+// CreateVersion inserts a new template version, executing directly against
+// the repository's database handle. The revision_number is allocated
+// atomically per template_id (ADR 0013) and scanned back into v.
 func (r *Repository) CreateVersion(ctx context.Context, v *domain.TemplateVersion) error {
 	metadataJSON, placeholderJSON, err := marshalVersionSchemas(v)
 	if err != nil {
@@ -262,6 +290,8 @@ RETURNING revision_number`
 	return nil
 }
 
+// CreateVersionTx inserts a new template version using the caller-supplied
+// transaction. Same revision_number allocation (ADR 0013) as CreateVersion.
 func (r *Repository) CreateVersionTx(ctx context.Context, tx db.Tx, v *domain.TemplateVersion) error {
 	metadataJSON, placeholderJSON, err := marshalVersionSchemas(v)
 	if err != nil {
@@ -298,6 +328,9 @@ RETURNING revision_number`
 	return nil
 }
 
+// GetVersion loads a template version by its (templateID, version_number)
+// pair, scoped to the tenant via a join on templates_template. It returns
+// domain.ErrNotFound when the row is missing or an id is not a valid UUID.
 func (r *Repository) GetVersion(ctx context.Context, tenantID, templateID string, n int) (*domain.TemplateVersion, error) {
 	const q = `
 SELECT
@@ -319,6 +352,9 @@ WHERE v.template_id = $1 AND v.version_number = $2 AND t.tenant_id = $3::uuid`
 	return v, nil
 }
 
+// GetVersionByID loads a template version by its own ID, scoped to the
+// tenant via a join on templates_template. It returns domain.ErrNotFound
+// when the row is missing or id is not a valid UUID.
 func (r *Repository) GetVersionByID(ctx context.Context, tenantID, id string) (*domain.TemplateVersion, error) {
 	const q = `
 SELECT
@@ -340,10 +376,19 @@ WHERE v.id = $1 AND t.tenant_id = $2::uuid`
 	return v, nil
 }
 
+// UpdateVersion updates a template version's workflow fields, scoped to the
+// tenant, executing directly against the repository's database handle. It
+// uses optimistic concurrency on lock_version: the WHERE clause requires the
+// caller's v.LockVersion to still match, returning domain.ErrStaleLockVersion
+// when it does not and domain.ErrNotFound when the row does not exist at
+// all. On success v.LockVersion is incremented in place.
 func (r *Repository) UpdateVersion(ctx context.Context, tenantID string, v *domain.TemplateVersion) error {
 	return updateVersion(ctx, r.db, tenantID, v)
 }
 
+// CreateTemplateTx inserts a new template row for the tenant using the
+// caller-supplied transaction. It maps a unique-key violation on
+// (tenant_id, key) to domain.ErrKeyConflict.
 func (r *Repository) CreateTemplateTx(ctx context.Context, tx db.Tx, t *domain.Template) error {
 	const q = `
 INSERT INTO templates_template (
@@ -438,6 +483,9 @@ SELECT EXISTS (
 	return domain.ErrStaleLockVersion
 }
 
+// UpdateTemplateTx updates a template's mutable fields, scoped to the
+// tenant, using the caller-supplied transaction. It returns
+// domain.ErrNotFound when no row matches (id, tenant_id).
 func (r *Repository) UpdateTemplateTx(ctx context.Context, tx db.Tx, t *domain.Template) error {
 	const q = `
 UPDATE templates_template
@@ -469,6 +517,9 @@ WHERE id = $1 AND tenant_id = $2::uuid`
 	return nil
 }
 
+// UpdateVersionTx updates a template version's workflow fields, scoped to
+// the tenant, using the caller-supplied transaction. Same optimistic
+// concurrency semantics on lock_version as UpdateVersion.
 func (r *Repository) UpdateVersionTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion) error {
 	return updateVersion(ctx, tx, tenantID, v)
 }
@@ -478,10 +529,19 @@ type draftCASExecutor interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
+// UpdateVersionSchemaCAS compare-and-swaps a template version's metadata and
+// placeholder schemas, executing directly against the repository's database
+// handle. The UPDATE's WHERE clause requires lock_version to equal
+// expectedLockVersion; on a mismatch it returns domain.ErrStaleLockVersion
+// (or domain.ErrNotFound if the version does not exist), and on success it
+// sets v.LockVersion to expectedLockVersion+1.
 func (r *Repository) UpdateVersionSchemaCAS(ctx context.Context, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
 	return updateVersionSchemaCAS(ctx, r.db, tenantID, v, expectedLockVersion)
 }
 
+// UpdateVersionSchemaCASTx compare-and-swaps a template version's metadata
+// and placeholder schemas using the caller-supplied transaction. Same
+// lock_version CAS semantics as UpdateVersionSchemaCAS.
 func (r *Repository) UpdateVersionSchemaCASTx(ctx context.Context, tx db.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
 	return updateVersionSchemaCAS(ctx, tx, tenantID, v, expectedLockVersion)
 }
@@ -534,6 +594,11 @@ SELECT EXISTS (
 	return domain.ErrStaleLockVersion
 }
 
+// ObsoletePreviousPublished marks every other published version of
+// templateID as obsolete (keeping keepVersionID untouched), executing
+// directly against the repository's database handle. The UPDATE joins back
+// to templates_template on tenant_id so it cannot cross tenant boundaries
+// even if upstream validation is bypassed (F-DB5).
 func (r *Repository) ObsoletePreviousPublished(ctx context.Context, tenantID, templateID, keepVersionID string) error {
 	// Explicit tenant predicate via JOIN to the parent templates_template row so
 	// the UPDATE cannot cross tenant boundaries even if upstream validation is
@@ -558,6 +623,11 @@ WHERE v.template_id = $1
 	return nil
 }
 
+// ObsoletePreviousPublishedTx marks every other published version of
+// templateID as obsolete (keeping keepVersionID untouched), using the
+// caller-supplied transaction. This is the primary production path, called
+// inside the publish/approve transaction; same tenant guard as
+// ObsoletePreviousPublished (F-DB5).
 func (r *Repository) ObsoletePreviousPublishedTx(ctx context.Context, tx db.Tx, tenantID, templateID, keepVersionID string) error {
 	// Same tenant guard as ObsoletePreviousPublished — applied here because this
 	// path is the primary production path (called inside the publish/approve tx).
@@ -580,6 +650,10 @@ WHERE v.template_id = $1
 	return nil
 }
 
+// GetApprovalConfig loads the reviewer/approver role configuration for a
+// template, scoped to the tenant via a subquery on templates_template. It
+// returns domain.ErrNotFound when no config row exists or templateID is not
+// a valid UUID.
 func (r *Repository) GetApprovalConfig(ctx context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {
 	const q = `
 SELECT template_id::text, reviewer_role, approver_role
@@ -603,6 +677,9 @@ WHERE template_id = $1
 	return &cfg, nil
 }
 
+// UpsertApprovalConfig inserts or updates a template's reviewer/approver
+// role configuration, executing directly against the repository's database
+// handle (ON CONFLICT (template_id) DO UPDATE).
 func (r *Repository) UpsertApprovalConfig(ctx context.Context, c *domain.ApprovalConfig) error {
 	const q = `
 INSERT INTO templates_approval_config (template_id, reviewer_role, approver_role)
@@ -620,6 +697,9 @@ SET reviewer_role = EXCLUDED.reviewer_role,
 	return nil
 }
 
+// UpsertApprovalConfigTx inserts or updates a template's reviewer/approver
+// role configuration using the caller-supplied transaction (ON CONFLICT
+// (template_id) DO UPDATE).
 func (r *Repository) UpsertApprovalConfigTx(ctx context.Context, tx db.Tx, c *domain.ApprovalConfig) error {
 	const q = `
 INSERT INTO templates_approval_config (template_id, reviewer_role, approver_role)
@@ -637,6 +717,9 @@ SET reviewer_role = EXCLUDED.reviewer_role,
 	return nil
 }
 
+// AppendAudit records a template audit event via the repository's attached
+// audit.Writer, executing directly (not inside a caller transaction). It is
+// a no-op returning nil when no writer was attached via WithAudit.
 func (r *Repository) AppendAudit(ctx context.Context, entry *domain.AuditEvent) error {
 	if r.audit == nil {
 		return nil
@@ -648,6 +731,10 @@ func (r *Repository) AppendAudit(ctx context.Context, entry *domain.AuditEvent) 
 	return r.audit.Record(ctx, event)
 }
 
+// AppendAuditTx records a template audit event via the repository's
+// attached audit.Writer, using the caller-supplied transaction so the audit
+// row commits atomically with the rest of the transaction's writes. It is a
+// no-op returning nil when no writer was attached via WithAudit.
 func (r *Repository) AppendAuditTx(ctx context.Context, tx db.Tx, entry *domain.AuditEvent) error {
 	if r.audit == nil {
 		return nil

@@ -15,22 +15,31 @@ import (
 
 const autosaveUploadTTL = 10 * time.Minute
 
+// PresignAutosaveCmd identifies the draft template version to presign an
+// autosave upload URL for.
 type PresignAutosaveCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	VersionNumber                     int
 }
 
+// PresignAutosaveResult carries a presigned upload URL, the object-store key
+// it targets, and when the URL expires.
 type PresignAutosaveResult struct {
 	UploadURL  string
 	StorageKey string
 	ExpiresAt  time.Time
 }
 
+// PresignTemplateUploadCmd identifies the draft template version to presign
+// a docx upload URL for.
 type PresignTemplateUploadCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	VersionNumber                     int
 }
 
+// PresignTemplateUpload issues a time-limited presigned PUT URL for the
+// version's canonical docx object key. The version must still be a draft;
+// any other status is rejected as an invalid state transition.
 func (s *Service) PresignTemplateUpload(ctx context.Context, cmd PresignTemplateUploadCmd) (*PresignAutosaveResult, error) {
 	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return nil, wrapAppErr("templates presign upload: get template", err)
@@ -53,6 +62,10 @@ func (s *Service) PresignTemplateUpload(ctx context.Context, cmd PresignTemplate
 	}, nil
 }
 
+// PresignTemplateSchemaUpload issues a time-limited presigned PUT URL for the
+// version's derived schema object key (metadata/placeholder schema JSON,
+// never stored in a DB column). The version must still be a draft; any other
+// status is rejected as an invalid state transition.
 func (s *Service) PresignTemplateSchemaUpload(ctx context.Context, cmd PresignTemplateUploadCmd) (*PresignAutosaveResult, error) {
 	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return nil, wrapAppErr("templates presign schema upload: get template", err)
@@ -76,6 +89,10 @@ func (s *Service) PresignTemplateSchemaUpload(ctx context.Context, cmd PresignTe
 	}, nil
 }
 
+// PresignAutosave issues a time-limited presigned PUT URL for autosaving the
+// draft version's docx content to its canonical object key. The version must
+// still be a draft; any other status is rejected as an invalid state
+// transition.
 func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (*PresignAutosaveResult, error) {
 	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return nil, wrapAppErr("templates presign autosave: get template", err)
@@ -101,12 +118,23 @@ func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (
 	}, nil
 }
 
+// CommitAutosaveCmd identifies the draft version whose presigned upload
+// should be confirmed, along with the content hash the caller expects the
+// uploaded object to have.
 type CommitAutosaveCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	VersionNumber                     int
 	ExpectedContentHash               string
 }
 
+// CommitAutosave confirms a previously presigned docx upload against the
+// object store (verifying the object exists, its hash matches, and it is
+// within size limits), records the resulting content hash on the draft
+// version, and appends an AuditSaved event — all inside one transaction.
+// Object-store confirmation errors are translated to domain errors
+// (ErrUploadMissing, ErrContentHashMismatch, ErrUploadTooLarge). A CAS
+// conflict from a concurrent commit or lifecycle transition is remapped to
+// ErrConcurrentTransition so the HTTP layer returns 409 instead of 412.
 func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*domain.TemplateVersion, error) {
 	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return nil, wrapAppErr("templates commit autosave: get template", err)

@@ -11,6 +11,8 @@ import (
 	"metaldocs/internal/modules/templates/domain"
 )
 
+// CreateTemplateCmd carries the fields needed to create a new template plus
+// the initial approval role bindings for its first draft version.
 type CreateTemplateCmd struct {
 	TenantID     string
 	ActorUserID  string
@@ -22,11 +24,18 @@ type CreateTemplateCmd struct {
 	ReviewerRole *string
 }
 
+// CreateTemplateResult holds the newly created template and its initial
+// draft version.
 type CreateTemplateResult struct {
 	Template *domain.Template
 	Version  *domain.TemplateVersion
 }
 
+// CreateTemplate creates a new template together with its first draft
+// version (version 1) and approval configuration, and records an
+// AuditCreated event, all inside one transaction. The template key must be
+// unique within the tenant; an existing key is rejected with
+// ErrKeyConflict.
 func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*CreateTemplateResult, error) {
 	if _, err := s.repo.GetTemplateByKey(ctx, cmd.TenantID, cmd.Key); err == nil {
 		return nil, domain.ErrKeyConflict
@@ -103,12 +112,19 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 	}, nil
 }
 
+// CreateVersionCmd identifies the template to spawn a new draft version for.
 type CreateVersionCmd struct {
 	TenantID    string
 	ActorUserID string
 	TemplateID  string
 }
 
+// CreateNextVersion spawns a new draft version as a byte-copy of the
+// template's currently published version (or its latest version, if none has
+// ever published), numbered above both the template's latest version and the
+// source version. The template must not be system-owned or archived. The new
+// version, the updated template.LatestVersion pointer, and an AuditCreated
+// event are persisted atomically in one transaction.
 func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (*domain.TemplateVersion, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {

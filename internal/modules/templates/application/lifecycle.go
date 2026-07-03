@@ -12,11 +12,21 @@ import (
 	"metaldocs/internal/modules/templates/domain"
 )
 
+// SubmitForReviewCmd identifies the draft template version to submit into
+// the review/approval workflow.
 type SubmitForReviewCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	VersionNumber                     int
 }
 
+// SubmitForReview transitions a draft version to under-review, snapshotting
+// the template's current approval configuration onto the version's pending
+// reviewer/approver role bindings. The version must be a draft with a
+// committed content hash (ErrUploadMissing otherwise); the transition itself
+// is validated against domain.CanTransition, which accounts for whether a
+// reviewer stage is configured. Appends an AuditSubmitted event in the same
+// transaction as the status update. A CAS conflict from a concurrent
+// transition is remapped to ErrConcurrentTransition (409 instead of 412).
 func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (*domain.TemplateVersion, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
@@ -96,6 +106,8 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 	return version, nil
 }
 
+// ReviewCmd carries the reviewer's decision (Accept or reject with Reason)
+// on a template version that is under review.
 type ReviewCmd struct {
 	TenantID, ActorUserID string
 	ActorRoles            []string
@@ -105,6 +117,13 @@ type ReviewCmd struct {
 	Reason                string
 }
 
+// Review records the reviewer stage decision for a version that is
+// under-review. The version must have a pending reviewer role, and the actor
+// must hold that role and pass segregation-of-duties (reviewer must not be
+// the author). On accept, the version moves to approved and an
+// AuditReviewed event is appended; on reject, it reverts to draft and an
+// AuditRejected event (stage "reviewer") is appended. The status update and
+// audit append happen atomically via updateVersionWithAuthzAndAudit.
 func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVersion, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
@@ -178,6 +197,9 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 	return version, nil
 }
 
+// ApproveCmd carries the approver's decision (Accept or reject with Reason)
+// on a template version that has cleared review (or is under review, when
+// no reviewer stage is configured).
 type ApproveCmd struct {
 	TenantID, ActorUserID string
 	ActorRoles            []string
@@ -195,6 +217,21 @@ type ApproveResult struct {
 	Version *domain.TemplateVersion
 }
 
+// Approve records the approver stage decision, publishing the version on
+// accept or reverting it to draft on reject. The required source status
+// depends on whether a reviewer stage is configured (approved vs.
+// under-review); the actor must hold the version's pending approver role
+// binding and pass segregation-of-duties against the author and reviewer.
+// On accept, the version's content hash must already be committed
+// (ErrContentHashMismatch otherwise); the version is published, the
+// template's PublishedVersionID/PublishedVersionNumber/CurrentRevisionNumber
+// are updated, the previously published version (if any) is transitioned to
+// obsolete, and AuditPublished (plus AuditObsoleted when applicable) events
+// are appended — all atomically in one transaction. On reject, the version
+// reverts to draft and an AuditRejected event (stage "approver") is
+// appended. A CAS conflict from a concurrent transition is remapped to
+// ErrConcurrentTransition (409 instead of 412). Approve no longer spawns the
+// next revision (M1·T2); callers use CreateNextVersion for that.
 func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
@@ -329,10 +366,14 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 	return &ApproveResult{Version: version}, nil
 }
 
+// ArchiveCmd identifies the template to archive.
 type ArchiveCmd struct {
 	TenantID, ActorUserID, TemplateID string
 }
 
+// PublishTemplateVersionCmd identifies the draft template version to publish
+// directly (bypassing the review/approve workflow), along with the derived
+// schema object key to record on the resulting AuditPublished event.
 type PublishTemplateVersionCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	ActorRoles                        []string
@@ -347,6 +388,20 @@ type PublishTemplateVersionResult struct {
 	PublishedVersion *domain.TemplateVersion
 }
 
+// PublishTemplateVersion publishes a draft version directly, without going
+// through the review/approve workflow. The version must be a draft with a
+// committed content hash (ErrContentHashMismatch otherwise) and the actor
+// must pass segregation-of-duties (publisher must not be the author or
+// reviewer) and hold the version's pending approver role binding — a role
+// mismatch is audited as AuditPublishForbiddenRole (best-effort, non-fatal)
+// before returning ErrForbiddenRole. On success, the version is published,
+// the template's PublishedVersionID/PublishedVersionNumber/
+// CurrentRevisionNumber are updated, the previously published version (if
+// any) is transitioned to obsolete, and AuditPublished (plus AuditObsoleted
+// when applicable) events are appended — all atomically in one transaction.
+// A CAS conflict from a concurrent transition is remapped to
+// ErrConcurrentTransition (409 instead of 412). Publish no longer spawns the
+// next revision (M1·T2); callers use CreateNextVersion for that.
 func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplateVersionCmd) (*PublishTemplateVersionResult, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
@@ -502,6 +557,10 @@ func (s *Service) spawnNextDraft(ctx context.Context, tenantID, templateID, acto
 	), nil
 }
 
+// ArchiveTemplate soft-archives a template by stamping ArchivedAt and
+// appending an AuditArchived event, atomically in one transaction. The
+// template must not be system-owned. Archiving an already-archived template
+// is a no-op that returns the template unchanged.
 func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.Template, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
