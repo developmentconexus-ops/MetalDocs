@@ -28,7 +28,12 @@ func TestRegisterRoutes_AllRoutesRegistered(t *testing.T) {
 		{method: http.MethodGet, path: "/api/v1/approval/inbox"},
 		{method: http.MethodPost, path: "/api/v1/approval/routes"},
 		{method: http.MethodPut, path: "/api/v1/approval/routes/r-1"},
-		{method: http.MethodDelete, path: "/api/v1/approval/routes/r-1"},
+		// F-DELETE-SHAPE (api-contract-hardening Phase E2): deactivation carries a
+		// reason body + If-Match/Idempotency headers, so it is a POST action
+		// sub-resource rather than a DELETE-with-body — the spec's route is POST
+		// .../deactivate, not DELETE (the prior DELETE entry here passed only
+		// because an unregistered method 405s, which also satisfies "!= 404").
+		{method: http.MethodPost, path: "/api/v1/approval/routes/r-1/deactivate"},
 		{method: http.MethodGet, path: "/api/v1/approval/routes"},
 	}
 

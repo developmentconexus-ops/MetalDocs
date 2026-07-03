@@ -116,16 +116,19 @@ func tenantIDFromReq(r *http.Request) (string, error) {
 	return tenant.FromContext(r.Context())
 }
 
-// idempotent wraps next with the platform idempotency middleware, keyed to
-// routeTemplate (used to scope the replay store, matching the templates sibling
-// pattern). It validates presence + UUID format and provides replay-on-retry;
-// callers no longer need to manually extract or validate the header.
-func (h *Handler) idempotent(routeTemplate string, next http.HandlerFunc) http.Handler {
+// idempotentHandler wraps next with the platform idempotency middleware, keyed
+// to routeTemplate (used to scope the replay store, matching the templates
+// sibling pattern). It validates presence + UUID format and provides
+// replay-on-retry; callers no longer need to manually extract or validate the
+// header. Named distinctly from the generated ServerInterface method set (no
+// collision today, but router.go's Middlewares closure and this method both
+// live on *Handler, so an explicit name keeps the two call paths unambiguous).
+func (h *Handler) idempotentHandler(routeTemplate string, next http.Handler) http.Handler {
 	store := idempotency.New(h.db, routeTemplate)
 	return idempotency.Require(store, func(ctx context.Context) (string, string) {
 		tenantID, _ := tenant.FromContext(ctx)
 		return tenantID, iamdomain.UserIDFromContext(ctx)
-	})(http.HandlerFunc(next))
+	})(next)
 }
 
 func parseIfMatch(header string) (int, error) {

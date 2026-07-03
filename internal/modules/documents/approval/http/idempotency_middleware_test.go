@@ -57,11 +57,11 @@ func newIdempNoopDB(t *testing.T) *sql.DB {
 	return db
 }
 
-// idempTestMux builds a mux that routes through h.idempotent() for the given
-// route, exactly as router.go does in production.
+// idempTestMux builds a mux that routes through h.idempotentHandler() for the
+// given route, exactly as router.go's Middlewares closure does in production.
 func idempTestMux(h *Handler, method, pattern string, inner http.HandlerFunc) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.Handle(method+" "+pattern, h.idempotent(method+" "+pattern, inner))
+	mux.Handle(method+" "+pattern, h.idempotentHandler(method+" "+pattern, inner))
 	return mux
 }
 
