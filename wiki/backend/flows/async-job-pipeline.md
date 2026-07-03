@@ -229,9 +229,38 @@ Both use `authz.WithBackgroundBypass`. No restart logic — if the goroutine exi
 
 River manages retries internally. A `ScheduledPublishWorker.Work` returning an error triggers River's built-in retry with configurable backoff. Stale-job no-ops return `nil` and are counted as success.
 
-### Staging outbox tables
+### Staging outbox tables — retry/terminal contract (APP-07)
 
-`pdf_dispatch_outbox` and `materialize_dispatch_outbox` use a `status` enum (`pending` → `processing` → `dispatched` / `failed`). `ResetStaleClaims` recovers rows stuck in `processing` status after a worker crash (rows where `claimed_at < now() - threshold`). These tables do not have a DLQ concept.
+`pdf_dispatch_outbox` and `materialize_dispatch_outbox` (`db/baseline/0001_current_schema.sql:1484-1498`) share one schema and are driven by the generic `fanout.StagingOutboxRepository` (`internal/modules/render/fanout/staging_outbox.go`) through the generic `fanout.StagingOutboxWorker` (`staging_outbox_worker.go`). Both tables are wired with the **same** `config.StagingOutboxWorkerConfig` instance (`apps/api/cmd/metaldocs-api/main.go:526,947,963`), so poll interval, batch size, `MaxAttempts`, and stale-claim threshold are identical for PDF and materialize dispatch.
+
+**State machine.** `status` is a DB-checked enum: `pending → processing → dispatched | failed` (`pdf_dispatch_outbox_status_check`). Columns: `attempts`, `next_retry_at`, `claimed_at`, `dispatched_at`, `dead_lettered_at`, `last_error`.
+
+| Transition | Trigger | Repo call | Effect |
+|---|---|---|---|
+| (insert) → `pending` | Caller enqueues inside its own business tx (approval/freeze tx) | `Enqueue(ctx, tx, tenantID, revisionID, contentHash)` | `INSERT ... ON CONFLICT (tenant_id, revision_id) DO NOTHING` — idempotent enqueue; tx MUST be non-nil (fails loud otherwise) so the row is atomic with the domain write |
+| `pending` → `processing` | Worker tick, before dispatch | `ClaimPending(ctx, limit, maxAttempts)` | `FOR UPDATE SKIP LOCKED` CTE selects `status='pending' AND next_retry_at <= NOW() AND attempts < maxAttempts`, order by `next_retry_at ASC`, sets `status='processing', claimed_at=NOW()` |
+| `processing` → `dispatched` | `Publisher.Publish` into `outbox_events` succeeds | `MarkDispatched(ctx, id)` | Sets `status='dispatched', dispatched_at=NOW()`. Terminal success state — no further claim possible (`status != 'pending'`) |
+| `processing` → `pending` (retry) | `Publish` fails, OR `Publish` succeeds but `MarkDispatched` itself errors (F-R4 fallback) | `MarkFailed(ctx, id, errStr, nextRetryAt, finalize=false)` | Sets `status='pending', last_error=$2, attempts=attempts+1, next_retry_at=$3, claimed_at=NULL` — row becomes reclaimable once `next_retry_at` elapses |
+| `processing` → `failed` (dead-letter) | `Publish` fails and the **worker**, not the repo, decides `r.Attempts+1 >= maxAttempt` | `MarkFailed(ctx, id, errStr, nextRetryAt, finalize=true)` | Sets `status='failed', last_error=$2, attempts=attempts+1, dead_lettered_at=NOW()` — terminal; `next_retry_at`/`claimed_at` untouched, `ClaimPending`'s `attempts < maxAttempts` predicate excludes it going forward even if `status` were reset |
+| `processing` → `pending` (crash recovery) | Periodic, every tick, before claiming | `ResetStaleClaims(ctx, olderThan)` | `UPDATE ... SET status='pending', claimed_at=NULL WHERE status='processing' AND claimed_at < NOW() - olderThan` — only rows still `processing`; never touches `pending`, `dispatched`, or `failed` rows |
+
+**Choreography (who decides what).** The repository is a dumb CAS/state-transition layer — it never decides retry-vs-finalize itself; every `MarkFailed` call site passes an explicit `finalize` bool computed by the caller. The only caller is `StagingOutboxWorker.dispatchOne` (`staging_outbox_worker.go:85-114`):
+
+1. `tick()` calls `ResetStaleClaims` first, then `ClaimPending`, then loops `dispatchOne` per row.
+2. `dispatchOne` computes `finalize := r.Attempts+1 >= w.maxAttempt` — the **worker**, not the repo, owns the finalize decision, using the row's pre-claim `Attempts` snapshot (not a re-read).
+3. Backoff formula (`staging_outbox_worker.go:93-95,103-105`): `min(30min, 30s * 2^cappedAttempts)`, where `cappedAttempts = min(max(r.Attempts, 0), 30)` (0-based, capped to prevent overflow). This is a distinct formula from the platform worker-service backoff in §7 above (`min(base * 2^(attempt-1), max)`, base=10s/max=300s) — the two outbox layers do not share retry-timing code.
+4. `MaxAttempts` source: `config.StagingOutboxWorkerConfig.MaxAttempts`, default 5, overridable via `METALDOCS_STAGING_OUTBOX_MAX_ATTEMPTS` (`internal/platform/config/staging_outbox_worker.go`). Same value gates both `ClaimPending`'s `attempts < maxAttempts` predicate (belt) and the worker's `finalize` decision (suspenders) — a row that reaches `attempts == maxAttempts` without having been explicitly finalized (e.g. a crash between `MarkFailed` and the next tick) is still excluded from future claims by the `ClaimPending` predicate, so it cannot be reprocessed past the limit even if `status` were somehow left as `pending`.
+5. Stale-claim reset: `w.staleAfter` from `StagingOutboxWorkerConfig.StaleAfterSeconds`, default 300 s / `METALDOCS_STAGING_OUTBOX_STALE_AFTER_SECONDS`. `ResetStaleClaims` runs unconditionally at the top of every tick (not a separate janitor) — same worker goroutine that claims and dispatches also reclaims its own (or a crashed sibling's) stuck rows.
+
+**Dead-letter visibility.** `CountDeadLettered(ctx)` (`staging_outbox.go:165-175`) returns `COUNT(*) WHERE dead_lettered_at IS NOT NULL` — mirrors the `dead_lettered_at` visibility pattern of the platform consumer (`internal/platform/messaging/outbox/postgres/consumer.go`). No dedicated alerting/dashboard consumer of this count exists yet in the module; it is a query primitive only. Unlike `outbox_events`, these staging tables have no separate DLQ table — `failed` rows stay in place with `dead_lettered_at` set.
+
+**Idempotency expectations.** `Enqueue`'s `ON CONFLICT (tenant_id, revision_id) DO NOTHING` makes re-enqueue from the same domain event a no-op. Downstream, `MarkDispatched`'s `Publish` call writes to `outbox_events` with a content-derived `IdempotencyKey` (`"docgen_v2_pdf:{tenantID}:{revisionID}"` / `"materialize_fanout:{tenantID}:{revisionID}"`, `ON CONFLICT DO NOTHING` on insert — see `buildPDFEvent`/`buildMaterializeEvent`, `pdf_outbox_worker_test.go:73-101`), so a row that gets claimed twice (e.g. after `ResetStaleClaims` reclaims a row whose `Publish` actually landed before a worker crash) cannot double-insert into `outbox_events`. Consumers reading `outbox_events` (worker binary, Flow 1 Stage B) rely on that same idempotency key, not on staging-outbox state, for exactly-once effect.
+
+**Tenancy (ADR 0054).** `ClaimPending` intentionally selects across **all tenants** with no `tenant_id` predicate — sanctioned by [ADR 0054](../../decisions/0054-cross-tenant-outbox-claim.md), which mirrors the platform `outbox_events` consumer (`internal/platform/messaging/outbox/postgres/consumer.go`). Compensating rules binding on this contract: (1) `ClaimPending` returns `OutboxRow.TenantID` on every row; (2) all per-row processing after claim (dispatch payload, blob access) is scoped to that row's tenant; (3) the tenant-unscoped claim shape is permitted only inside this worker-internal code path, never a request path; (4) consumers stay idempotent regardless of claim scoping. `MarkDispatched`/`MarkFailed`/`ResetStaleClaims` operate by row `id` (already tenant-resolved at claim time) and do not themselves re-check tenant — that is by design under ADR 0054, not a gap.
+
+**Table allowlist.** `StagingOutboxRepository` is constructed only via `NewPDFOutboxRepository`/`NewMaterializeOutboxRepository`, which bind to a table name validated against `stagingOutboxAllowlist` (`metaldocs.pdf_dispatch_outbox`, `metaldocs.materialize_dispatch_outbox`) at construction time — `NewStagingOutboxRepository` panics on an unlisted table, closing the `fmt.Sprintf` table-name injection surface for any third table added later without updating the allowlist.
+
+Test coverage: `internal/modules/render/fanout/pdf_outbox_repository_test.go` (repo-level, sqlmock) and `internal/modules/render/fanout/pdf_outbox_worker_test.go` (worker-level, fake repo) pin the transitions and choreography above — see file for the current matrix.
 
 ---
 
@@ -244,8 +273,9 @@ River manages retries internally. A `ScheduledPublishWorker.Work` returning an e
 | Two-stage outbox chaining with duplicate claim/retry logic across three tables | Medium | [../platform/async-messaging.md](../platform/async-messaging.md) |
 | `METALDOCS_WORKER_REVIEW_REMINDER_DAYS` loaded but never consumed | Medium | [../binaries/worker.md](../binaries/worker.md) |
 | `startOutboxWorker` restart loop is dead code | Low | [../binaries/worker.md](../binaries/worker.md) |
-| No tenant predicate in `pdf_dispatch_outbox` claim (`TODO(render)`) | Low | [../platform/async-messaging.md](../platform/async-messaging.md) |
 | Outbox claim lease vs. materialization duration: 5-min claimLease may allow duplicate materialization execution for slow docx-renderer calls [runtime-unverified] | Low | Flow 2, Stage B |
+
+Closed flags: tenant-unscoped `pdf_dispatch_outbox`/`materialize_dispatch_outbox` claim is no longer an open flag as of ADR 0054 (2026-07-02) — the cross-tenant `ClaimPending` shape is sanctioned by design; see §7 "Staging outbox tables" above.
 
 Full flag registry: [../legacy-register.md](../legacy-register.md).
 
