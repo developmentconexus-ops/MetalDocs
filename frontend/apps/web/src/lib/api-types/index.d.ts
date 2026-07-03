@@ -4596,6 +4596,8 @@ export interface operations {
                 offset?: number;
                 /** @description Optional profile code filter (e.g. DC, POP). Returns templates scoped to this profile PLUS generic templates (created with no profile scope), since generic templates apply to every profile. Omit to list every non-system template (management view). */
                 doc_type?: string;
+                /** @description When true, return only templates that currently have a published version (published_version != null) — the selectable-to-clone set for the new-document wizard. Omit or false for the management view, which lists templates in every lifecycle status. */
+                published?: boolean;
             };
             header?: never;
             path?: never;

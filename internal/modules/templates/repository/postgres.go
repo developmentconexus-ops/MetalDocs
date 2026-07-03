@@ -162,8 +162,10 @@ func clampTemplatesLimit(limit int) int {
 
 // ListTemplates returns non-system templates for the tenant, optionally
 // filtered by doc type code (a nil filter also always includes generic
-// templates, i.e. those with an empty doc_type_code), newest first, clamped
-// to the /templates contract's pagination bounds via clampTemplatesLimit.
+// templates, i.e. those with an empty doc_type_code) and, when
+// f.PublishedOnly is true, restricted to templates that currently have a
+// published version, newest first, clamped to the /templates contract's
+// pagination bounds via clampTemplatesLimit.
 func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter) ([]*domain.TemplateRead, error) {
 	const q = `
 SELECT
@@ -182,6 +184,10 @@ WHERE t.tenant_id = $1::uuid
   -- genéricos aparecem para todos os perfis". A NULL filter returns every
   -- non-system template (management listing).
   AND ($2::text IS NULL OR t.doc_type_code = $2 OR t.doc_type_code = '')
+  -- published=true ($5) restricts to templates that currently have a
+  -- published version (the selectable-to-clone set for the new-document
+  -- wizard); false/omitted keeps the management view (every status).
+  AND ($5::bool IS NOT TRUE OR t.published_version_id IS NOT NULL)
 ORDER BY t.created_at DESC, t.id DESC
 LIMIT $3 OFFSET $4`
 
@@ -198,6 +204,7 @@ LIMIT $3 OFFSET $4`
 		f.DocTypeCode,
 		limit,
 		offset,
+		f.PublishedOnly,
 	)
 	if err != nil {
 		return nil, err

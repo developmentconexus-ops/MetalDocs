@@ -76,6 +76,12 @@ type ListFilter struct {
 	TenantID    string
 	DocTypeCode *string
 	Status      *domain.VersionStatus
-	Limit       int
-	Offset      int
+	// PublishedOnly, when true, restricts the result to templates that
+	// currently have a published version (published_version_id IS NOT
+	// NULL) — the selectable-to-clone set for the new-document wizard.
+	// False (default) keeps the management view: templates in every
+	// lifecycle status.
+	PublishedOnly bool
+	Limit         int
+	Offset        int
 }

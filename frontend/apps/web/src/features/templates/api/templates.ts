@@ -110,11 +110,13 @@ export async function listTemplates(params?: {
   limit?: number;
   offset?: number;
   doc_type?: string;
+  published?: boolean;
 }): Promise<{ templates: TemplateDTO[]; meta: { limit: number; offset: number } }> {
   const query: ListTemplatesQuery = {};
   if (params?.limit !== undefined) query.limit = params.limit;
   if (params?.offset !== undefined) query.offset = params.offset;
   if (params?.doc_type) query.doc_type = params.doc_type;
+  if (params?.published) query.published = true;
 
   const { data, error } = await api.GET('/templates', { params: { query } });
   if (error) {

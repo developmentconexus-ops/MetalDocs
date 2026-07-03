@@ -77,23 +77,19 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
               <div className="caption">Nenhum template publicado para este perfil.</div>
             </div>
           ) : null}
-          {/* ADR 0065: selectability and badge text now gate on the nested
-              published_version / latest_version VersionRef objects — the whole
-              object is checked for null, never an inner field. */}
+          {/* Backend now returns only templates with a published version
+              (GET /templates?published=true), so every card here is
+              selectable — no disabled/status-badge branch needed. */}
           {templates.map((template) => {
             const publishedVersion = template.published_version;
-            const selectable = publishedVersion != null;
             const publishedID = publishedVersion?.id ?? null;
             const selected = isTemplateSelected(template.id, publishedID, selectedTemplateID, selectedVersionID);
-            const unselectableBadgeText = badgeTextForStatus(template.latest_version.status);
             return (
               <SelectableCard
                 key={template.id}
                 selected={selected}
-                disabled={!selectable}
-                title={selectable ? undefined : 'Em breve'}
                 onSelect={() => {
-                  if (!selectable || !publishedVersion) return;
+                  if (!publishedVersion) return;
                   onSelect(template.id, publishedVersion.id);
                 }}
               >
@@ -104,16 +100,10 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                       <span className={styles.templateLabel}>{template.name}</span>
                       {/* ADR 0013: render REV{nn} from the canonical contract field. */}
                       <span className="pill mono">{formatRevisionCode(template.latest_version.revision_number)}</span>
-                      {selectable ? (
-                        <span className="pill pill-frozen">
-                          <span className={styles.publishedDot} aria-hidden="true" />
-                          publicada
-                        </span>
-                      ) : (
-                        <span className="pill" title="Em breve">
-                          {unselectableBadgeText}
-                        </span>
-                      )}
+                      <span className="pill pill-frozen">
+                        <span className={styles.publishedDot} aria-hidden="true" />
+                        publicada
+                      </span>
                     </div>
                     <p className="caption">{template.description ?? ''}</p>
                     <div className={styles.templateMeta}>
@@ -197,17 +187,6 @@ function isTemplateSelected(
     selectedVersionID !== null &&
     selectedVersionID === publishedVersionID
   );
-}
-
-function badgeTextForStatus(status: string): string {
-  switch (status) {
-    case 'under_review':
-      return 'em revisão';
-    case 'approved':
-      return 'aguardando publicação';
-    default:
-      return 'sem versão publicada';
-  }
 }
 
 function formatDate(iso: string): string {

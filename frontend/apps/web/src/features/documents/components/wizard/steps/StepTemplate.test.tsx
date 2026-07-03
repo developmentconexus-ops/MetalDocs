@@ -54,27 +54,10 @@ describe('StepTemplate', () => {
     expect(onSelect).toHaveBeenCalledWith('blank-template', 'blank-tv-1');
   });
 
-  it('treats templates without a published_version as unselectable, including wire-drift payloads missing the key entirely (bug 2026-07-03)', () => {
+  it('renders every returned template as selectable, since the backend now only returns published templates (published=true)', () => {
     const onSelect = vi.fn();
 
-    // (d) simulates a legacy/drifted wire payload where the backend omits the
-    // key altogether — the generated TemplateDTO type has published_version as
-    // required-and-nullable, so this cast is deliberate: it forces the shape
-    // past the compiler to prove the component still guards against
-    // `undefined` at runtime (documents the "never absent" contract).
-    const missingKey = { ...BASE_TEMPLATE } as unknown as Record<string, unknown>;
-    delete missingKey.published_version;
-    const withoutKey = missingKey as unknown as TemplateDTO;
-
-    // (a) published_version: null case.
-    const withNull: TemplateDTO = {
-      ...BASE_TEMPLATE,
-      id: 'tmpl-null',
-      name: 'Template Null',
-      published_version: null,
-    };
-
-    // (b) full published-ref case.
+    // (a) full published-ref case.
     const published: TemplateDTO = {
       ...BASE_TEMPLATE,
       id: 'tmpl-pub',
@@ -93,24 +76,29 @@ describe('StepTemplate', () => {
       },
     };
 
-    // (c) latest_version.status: 'under_review' badge case.
-    const underReview: TemplateDTO = {
+    // (b) a second published template to prove multiple cards all render enabled.
+    const publishedTwo: TemplateDTO = {
       ...BASE_TEMPLATE,
-      id: 'tmpl-review',
-      name: 'Template Em Revisao',
+      id: 'tmpl-pub-2',
+      name: 'Template Publicado Dois',
       latest_version: {
-        id: 'v-review',
+        id: 'v-pub-2-latest',
         number: 2,
-        revision_number: 0,
-        status: 'under_review',
+        revision_number: 2,
+        status: 'published',
       },
-      published_version: null,
+      published_version: {
+        id: '22222222-2222-4222-8222-222222222222',
+        number: 2,
+        revision_number: 2,
+        status: 'published',
+      },
     };
 
     render(
       <StepTemplate
         profileLabel="Perfil PRC"
-        templates={[withoutKey, withNull, published, underReview]}
+        templates={[published, publishedTwo]}
         isLoading={false}
         isError={false}
         error={null}
@@ -128,29 +116,21 @@ describe('StepTemplate', () => {
       />,
     );
 
-    const disabledBadges = screen.getAllByText('sem versão publicada');
-    expect(disabledBadges).toHaveLength(2);
+    const publishedBadges = screen.getAllByText('publicada');
+    expect(publishedBadges).toHaveLength(2);
 
-    const missingKeyCard = screen.getByRole('radio', { name: /Template Sem Chave/i });
-    expect(missingKeyCard).toBeDisabled();
-    fireEvent.click(missingKeyCard);
-    expect(onSelect).not.toHaveBeenCalled();
-
-    const nullCard = screen.getByRole('radio', { name: /Template Null/i });
-    expect(nullCard).toBeDisabled();
-    fireEvent.click(nullCard);
-    expect(onSelect).not.toHaveBeenCalled();
-
-    const reviewCard = screen.getByRole('radio', { name: /Template Em Revisao/i });
-    expect(reviewCard).toBeDisabled();
-    expect(screen.getByText('em revisão')).toBeTruthy();
-
-    const publishedBadge = screen.getByText('publicada');
-    expect(publishedBadge).toBeTruthy();
-
-    const publishedCard = screen.getByRole('radio', { name: /Template Publicado/i });
+    const publishedCard = screen.getByRole('radio', { name: /Template Publicado(?! Dois)/i });
     expect(publishedCard).toBeEnabled();
     fireEvent.click(publishedCard);
     expect(onSelect).toHaveBeenCalledWith('tmpl-pub', '11111111-1111-4111-8111-111111111111');
+
+    const publishedTwoCard = screen.getByRole('radio', { name: /Template Publicado Dois/i });
+    expect(publishedTwoCard).toBeEnabled();
+    fireEvent.click(publishedTwoCard);
+    expect(onSelect).toHaveBeenCalledWith('tmpl-pub-2', '22222222-2222-4222-8222-222222222222');
+
+    // The blank/start-from-scratch option is always present alongside published templates.
+    const blankCard = screen.getByRole('radio', { name: /Em branco/i });
+    expect(blankCard).toBeEnabled();
   });
 });

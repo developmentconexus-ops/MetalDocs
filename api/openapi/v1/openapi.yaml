@@ -1134,6 +1134,15 @@ paths:
             every non-system template (management view).
           schema:
             type: string
+        - name: published
+          in: query
+          description: >-
+            When true, return only templates that currently have a published
+            version (published_version != null) — the selectable-to-clone set for
+            the new-document wizard. Omit or false for the management view, which
+            lists templates in every lifecycle status.
+          schema:
+            type: boolean
       responses:
         '200':
           description: ok

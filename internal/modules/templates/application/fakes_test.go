@@ -128,6 +128,9 @@ func (r *fakeRepo) ListTemplates(_ context.Context, f application.ListFilter) ([
 		if f.TenantID != "" && t.TenantID != f.TenantID {
 			continue
 		}
+		if f.PublishedOnly && t.PublishedVersionID == nil {
+			continue
+		}
 		out = append(out, readOf(t))
 	}
 	if len(out) == 0 {

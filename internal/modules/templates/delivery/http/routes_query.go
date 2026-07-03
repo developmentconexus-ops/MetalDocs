@@ -52,10 +52,11 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request, params t
 	}
 
 	templates, err := h.svc.ListTemplates(r.Context(), application.ListFilter{
-		TenantID:    tenantID,
-		DocTypeCode: docTypeCode,
-		Limit:       limit,
-		Offset:      offset,
+		TenantID:      tenantID,
+		DocTypeCode:   docTypeCode,
+		PublishedOnly: params.Published != nil && *params.Published,
+		Limit:         limit,
+		Offset:        offset,
 	})
 	if err != nil {
 		writeMappedErr(w, err)

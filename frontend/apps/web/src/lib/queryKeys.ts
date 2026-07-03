@@ -68,6 +68,11 @@ export const QK = {
     blank: () => ['templates', 'blank'] as const,
     byProfile: (profileCode: string) =>
       ['templates', 'by-profile', profileCode] as const,
+    // Wizard-only: published-only subset for a profile (Step 3 template
+    // picker). Distinct key from byProfile/list so it can never collide with
+    // the admin management page's all-status cache for the same profile.
+    byProfilePublished: (profileCode: string) =>
+      ['templates', 'by-profile', profileCode, 'published'] as const,
     placeholderCatalog: () => ['templates', 'placeholder-catalog'] as const,
     detail: (id: string) => ['templates', 'detail', id] as const,
   },

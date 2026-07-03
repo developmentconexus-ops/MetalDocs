@@ -35,7 +35,7 @@ func TestListTemplates_OrderByHasStableTiebreaker(t *testing.T) {
 	)
 
 	mock.ExpectQuery(`ORDER BY t\.created_at DESC, t\.id DESC`).
-		WithArgs("tenant-1", nil, 50, 0).
+		WithArgs("tenant-1", nil, 50, 0, false).
 		WillReturnRows(rows)
 
 	out, err := repo.ListTemplates(context.Background(), application.ListFilter{
@@ -86,7 +86,7 @@ func TestListTemplates_ClampsLimitAndOffset(t *testing.T) {
 			repo := New(db)
 
 			mock.ExpectQuery(`FROM templates_template t`).
-				WithArgs("tenant-1", nil, tc.wantLimit, tc.wantOffset).
+				WithArgs("tenant-1", nil, tc.wantLimit, tc.wantOffset, false).
 				WillReturnRows(sqlmock.NewRows([]string{
 					"id", "tenant_id", "doc_type_code", "key", "name", "description",
 					"latest_version", "lv_id", "lv_revision_number", "lv_status",
@@ -104,6 +104,56 @@ func TestListTemplates_ClampsLimitAndOffset(t *testing.T) {
 			}
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unmet expectations (limit/offset not clamped as expected): %v", err)
+			}
+		})
+	}
+}
+
+// TestListTemplates_PublishedOnlyEmitsPredicate pins the published=true
+// query-param contract: PublishedOnly=true must emit the
+// published_version_id IS NOT NULL guard (via the $5 bool arg), restricting
+// results to templates that currently have a published version. False
+// (default) must pass false so the guard is a no-op and the management view
+// (every status) is preserved.
+func TestListTemplates_PublishedOnlyEmitsPredicate(t *testing.T) {
+	cases := []struct {
+		name          string
+		publishedOnly bool
+	}{
+		{"published true passes true arg", true},
+		{"published false passes false arg", false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("sqlmock.New: %v", err)
+			}
+			defer db.Close()
+
+			repo := New(db)
+
+			mock.ExpectQuery(`published_version_id IS NOT NULL`).
+				WithArgs("tenant-1", nil, 50, 0, tc.publishedOnly).
+				WillReturnRows(sqlmock.NewRows([]string{
+					"id", "tenant_id", "doc_type_code", "key", "name", "description",
+					"latest_version", "lv_id", "lv_revision_number", "lv_status",
+					"published_version_id", "pv_version_number", "pv_revision_number", "pv_status",
+					"created_by", "system_owned", "created_at", "updated_at", "archived_at",
+				}))
+
+			_, err = repo.ListTemplates(context.Background(), application.ListFilter{
+				TenantID:      "tenant-1",
+				PublishedOnly: tc.publishedOnly,
+				Limit:         50,
+				Offset:        0,
+			})
+			if err != nil {
+				t.Fatalf("ListTemplates: %v", err)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unmet expectations: %v", err)
 			}
 		})
 	}

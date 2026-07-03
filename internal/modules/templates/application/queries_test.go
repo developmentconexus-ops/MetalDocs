@@ -89,17 +89,19 @@ func TestListTemplates_Happy(t *testing.T) {
 
 func TestListTemplates_SelectionFilterPassThrough(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	publishedVerID := "ver-1"
+	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a", PublishedVersionID: &publishedVerID}
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	status := domain.VersionStatusDraft
 	docType := "CONTRACT"
 	filter := application.ListFilter{
-		TenantID:    "tenant-a",
-		DocTypeCode: &docType,
-		Status:      &status,
-		Limit:       10,
-		Offset:      2,
+		TenantID:      "tenant-a",
+		DocTypeCode:   &docType,
+		Status:        &status,
+		PublishedOnly: true,
+		Limit:         10,
+		Offset:        2,
 	}
 
 	_, err := svc.ListTemplates(context.Background(), filter)
@@ -112,8 +114,50 @@ func TestListTemplates_SelectionFilterPassThrough(t *testing.T) {
 	if repo.receivedFilter.DocTypeCode == nil || *repo.receivedFilter.DocTypeCode != docType {
 		t.Fatalf("expected DocTypeCode %q, got %v", docType, repo.receivedFilter.DocTypeCode)
 	}
+	if repo.receivedFilter.PublishedOnly != true {
+		t.Fatalf("expected PublishedOnly true, got %v", repo.receivedFilter.PublishedOnly)
+	}
 	if repo.receivedFilter.Limit != filter.Limit || repo.receivedFilter.Offset != filter.Offset {
 		t.Fatalf("expected limit/offset %d/%d, got %d/%d", filter.Limit, filter.Offset, repo.receivedFilter.Limit, repo.receivedFilter.Offset)
+	}
+}
+
+// TestListTemplates_PublishedOnlyFiltersUnpublished proves the published=true
+// contract at the application layer: PublishedOnly=true must exclude
+// templates with no published version (PublishedVersionID == nil) and keep
+// only those that have one. PublishedOnly=false (default) must return every
+// status — the management view.
+func TestListTemplates_PublishedOnlyFiltersUnpublished(t *testing.T) {
+	repo := newFakeRepo()
+	publishedVerID := "ver-1"
+	repo.templates["tpl-published"] = &domain.Template{
+		ID: "tpl-published", TenantID: "tenant-a", PublishedVersionID: &publishedVerID,
+	}
+	repo.templates["tpl-draft"] = &domain.Template{
+		ID: "tpl-draft", TenantID: "tenant-a", PublishedVersionID: nil,
+	}
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	got, err := svc.ListTemplates(context.Background(), application.ListFilter{
+		TenantID:      "tenant-a",
+		PublishedOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("ListTemplates returned error: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "tpl-published" {
+		t.Fatalf("expected only tpl-published, got %+v", got)
+	}
+
+	gotAll, err := svc.ListTemplates(context.Background(), application.ListFilter{
+		TenantID: "tenant-a",
+	})
+	if err != nil {
+		t.Fatalf("ListTemplates (management view) returned error: %v", err)
+	}
+	if len(gotAll) != 2 {
+		t.Fatalf("expected both templates in management view, got %+v", gotAll)
 	}
 }
 

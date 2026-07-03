@@ -5,9 +5,9 @@ import { STALE_FIVE_MINUTES } from './_constants';
 
 export function useTemplatesByProfileQuery(profileCode: string | null) {
   return useQuery({
-    queryKey: profileCode ? QK.templates.byProfile(profileCode) : QK.templates.list(),
+    queryKey: profileCode ? QK.templates.byProfilePublished(profileCode) : QK.templates.list(),
     // Safe: `enabled` blocks queryFn while profileCode is null.
-    queryFn: () => listTemplates({ doc_type: profileCode! }),
+    queryFn: () => listTemplates({ doc_type: profileCode!, published: true }),
     enabled: profileCode !== null,
     staleTime: STALE_FIVE_MINUTES,
   });

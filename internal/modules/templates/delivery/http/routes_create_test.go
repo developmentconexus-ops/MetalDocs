@@ -193,9 +193,13 @@ func (r *fakeRepo) GetTemplateByKey(_ context.Context, tenantID, key string) (*d
 func (r *fakeRepo) ListTemplates(_ context.Context, f application.ListFilter) ([]*domain.TemplateRead, error) {
 	out := make([]*domain.TemplateRead, 0, len(r.templates))
 	for _, t := range r.templates {
-		if t.TenantID == f.TenantID {
-			out = append(out, r.readOf(t))
+		if t.TenantID != f.TenantID {
+			continue
 		}
+		if f.PublishedOnly && t.PublishedVersionID == nil {
+			continue
+		}
+		out = append(out, r.readOf(t))
 	}
 	return out, nil
 }
