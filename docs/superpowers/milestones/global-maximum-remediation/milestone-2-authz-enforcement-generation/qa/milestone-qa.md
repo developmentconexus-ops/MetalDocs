@@ -1,84 +1,142 @@
-# Milestone 2 — Validation Verdict (C1–C7)
+# Milestone 2 — Validation Verdict (C1–C7) — RE-VALIDATION after live-QA correction
 
 > **Written by:** the `milestone-validator` subagent — *not* the main session (separation of powers).
 > **Validates against:** `../milestone.md` + `../validation-contract.md` (D4, binding; HS-7) + each feature's `spec.md`.
 > **Binding procedure:** `.claude/skills/milestone/references/milestone-end-validation.md`.
-> **Run:** 2026-07-03 · **Verdict:** see C7 → **PASS**.
-> Validator judged from a clean tree (only untracked `docs/release/`); re-ran every gate itself; reproduced both negative proofs independently and left the tree clean.
+> **Run:** 2026-07-03 (RE-VALIDATION) · **Verdict:** see C7 → **PASS**.
+> This supersedes the prior PASS. That verdict accepted a **bounded defer** (F2.1 integration drives
+> compile-verified / live-run deferred). The operator required an actual live QA; running it caught a
+> real defect (the deferred drives were **non-functional** — drove the full application stack and died
+> at fixture setup before reaching the tripwire arm) and corrected it (rewrite to the proven sibling
+> DB-arm idiom + live RED→GREEN). Only two artifacts changed since the prior PASS: the rewritten test
+> and its evidence (commit `5e5b50e3`). The tripwire generation core is **byte-identical** to the prior
+> PASS and re-spot-checked green. Validator judged from a clean tree, **independently reproduced the
+> live RED→GREEN** against the running container, and left the tree + dev DB clean.
 
 ## Inputs loaded (none missing)
 
-`milestone.md`, `validation-contract.md` (D4), `f2.1/{spec,plan,evidence}.md`, `f2.2/{spec,plan,evidence}.md`, program `README.md`, governing `mission.md` (linked), aggregate diff `git diff 1a86f419..HEAD` (22 files, +2579/−2 — matches declared scope: tripwire source+gen+migration, api-lint rules, integration drives, F2.2 pin + 3 doc-truth files, milestone artifacts).
+`milestone.md`, `validation-contract.md` (D4), `f2.1/{spec,plan,evidence}.md`, `f2.2/{spec,plan,evidence}.md`,
+program `README.md`, governing `mission.md` (linked). Aggregate diff since prior milestone close
+`git diff 1a86f419..HEAD`. **Focused re-review** on the changed artifact: `git show 5e5b50e3`
+(2 files: `tests/integration/documents/tripwire_documents_test.go` −185/+55 net rewrite,
+`f2.1/evidence.md` reworked "Integration drives" section). Core diff `git diff f170e4e6..5e5b50e3 --
+internal/platform/tripwire/ scripts/api-lint/tripwire_arm_rules.go db/migrations/` = **empty** (core
+untouched by the correction).
 
 ## C1 — Spec & plan conformance (per feature)
 
-Both feature `spec.md`/`plan.md`/`evidence.md` exist and are execution-shaped (plans carry task lists, files, ordering, test strategy — not re-spec). Approval line filled (2026-07-03) on both; the binding D4 contract was committed (`4a815be9`) **before** the first code commit (`70c2803b`). Consumer contract (CI + DB trigger for F2.1; CI + future maintainers for F2.2) declared and honored — verified from source, not the reverse.
+Both feature `spec.md`/`plan.md`/`evidence.md` exist and are execution-shaped. Approval lines filled
+(2026-07-03); binding D4 contract committed (`4a815be9`) before first code (`70c2803b`). Consumer
+contract honored — verified from source.
+
+**Deviation (documented, sound, not a dodge).** Contract §1.5.b named the drive
+`TestTripwire_ForceReleaseWritesDocumentRow` (application-stack-driven). The live QA proved that
+construction **non-functional** (tier-2 `document.create` denial + `process_area_code_snapshot`
+NULL-scan at fixture setup — died before the arm). The drives were renamed/rewritten to
+`TestTripwire_DocumentsUpdate_{MembershipManageArm,DocumentObsoleteArm}`, driving the guarded
+`documents` UPDATE **directly** (proven sibling idiom, `tests/integration/templates/tripwire_caps_test.go`).
+The deviation carries a full written rationale in `evidence.md` (the "Correction" callout) → satisfies
+C1.7. This is a correctness upgrade, not scope drift: the test now tests the **DB arm** (the thing
+under contract) instead of the application authz grant machinery (not the thing under contract).
 
 | Feature | Consumer contract honored? | Acceptance met? | Non-goals respected? | Evidence |
 |---------|----------------------------|-----------------|----------------------|----------|
-| F2.1 | ✅ `TripwireArms` == contract §1.2 (18 entries, verified line-by-line); 0271 generated from the map; both lint rules blocking | ✅ all §1.7 exit criteria met (re-run below) | ✅ no arm tightening (`template.submit` retained, §1.3 defer); no cross-layer call-graph; function-body swap only | `arms.go`, `render.go`, `0271_*.sql`, `tripwire_arm_rules.go` |
-| F2.2 | ✅ tier-1 `permissions.go:157`==tier-2 `repository.go:798,828`==`membership.manage`; `/approval/routes`==`route.manage`; pin targeted to the two routes only | ✅ §2.3 (verify + pin RED/GREEN + doc-truth) | ✅ deliberate coarse/fine `/approval/` split recorded intentional, not "aligned"; no behavior change | `permissions_test.go` pin, ADR 0022/0018 + module-iam.md annotations |
+| F2.1 | ✅ `TripwireArms` == contract §1.2 (entry #6 == `{document.edit, document.obsolete, membership.manage}`, verified line-by-line `arms.go:82-88` vs §1.2/§1.7 row #6); 0271 generated from the map; both lint rules blocking; **live drives now genuinely exercise the arm** | ✅ §1.7 exit criteria met, **defer #1 DISCHARGED** (validator reproduced live RED→GREEN, below) | ✅ additive arm widen only; no tightening (`template.submit` superset retained → M9); no cross-layer graph | `arms.go`, `render.go`, `0271_*.sql`, `tripwire_arm_rules.go`, `tripwire_documents_test.go` |
+| F2.2 | ✅ tier-1==tier-2==`membership.manage`; pin targeted to the two routes | ✅ §2.3 (verify + pin RED/GREEN + doc-truth) | ✅ coarse/fine `/approval/` split recorded intentional | `permissions_test.go` pin, ADR 0022/0018 annotations |
 
-HS-7 map/contract diff: `TripwireArms` matches contract §1.2 **exactly** (entry #6 widened to `{document.edit, document.obsolete, membership.manage}`; #13 retains `template.submit`). Pinned in code by `TestTripwireArms_MatchesContractTable`. 0271-vs-0270 diff shows the **only** CASE-branch delta is the documents(UPDATE) `v_required_caps` literal (plus header/ledger/comment). No divergence → no HS-7.
+**HS-7 clean.** `arms.go` `TripwireArms` == contract §1.2 exactly (entry #6 verified against
+`validation-contract.md:30` and `:93`). 0271-vs-0270 delta is only the documents(UPDATE)
+`v_required_caps` literal (confirmed via the byte-pinned golden test + PARITY rule, both green). Pinned
+in code by `TestTripwireArms_MatchesContractTable`. No divergence → no HS-7.
 
-## C2 — Gates re-run, isolated (validator-run from clean tree, not trusted from evidence)
+## C2 — Gates re-run, isolated (validator-run; live half INDEPENDENTLY REPRODUCED, not trusted)
 
 | Feature | Command re-run | Real output | Pass? |
 |---------|----------------|-------------|-------|
-| both | `go build ./...` | exit 0 | ✅ |
-| F2.1 | `go test ./internal/platform/tripwire/... -v` | `TestTripwireArms_CapsAreRegistryReal`, `TestTripwireArms_MatchesContractTable`, `TestRenderMigration_MatchesCommittedFile` (golden), `TestRenderMigration_Deterministic` — all PASS | ✅ |
-| F2.1 | `go test ./scripts/api-lint/... -run TripwireArm -v` | 12 rule tests PASS: parity clean-green + non-registry-cap RED + mutated-migration RED; drift clean-green + synthetic-unarmed RED + match-one green + force-release-shape reproduction | ✅ |
-| F2.1 | `go test ./internal/modules/iam/domain -run TestCapabilityRegistrySize -v` | `--- PASS` (`const want = 34`, confirmed in `model_test.go:96`) | ✅ |
-| F2.1 | `go run ./scripts/api-lint -strict api/openapi/v1/openapi.yaml .` | `0 violation(s)` (both new rules registered in `RunCodeRules`, blocking — exit 1 on any hit) | ✅ |
-| F2.1 (neg) | revert arm→`{CapDocumentEdit}`, `go run ./scripts/api-lint -only TRIPWIRE-ARM-DRIFT …` | `3 violation(s)` at `obsolete_service.go:93`, `repository.go:811`, `repository.go:841` — each: "the DB tripwire will reject this write with P0001 for every actor"; `git checkout` → `0 violation(s)`. Tree left clean. | ✅ |
-| F2.1 | `go vet -tags integration ./tests/integration/documents/` | exit 0 (drives compile under the integration tag) | ✅ |
-| F2.2 | `go test ./apps/api/cmd/metaldocs-api/ -run TestTier1Tier2CapabilityCoherence_F4Sites -v` | `--- PASS` | ✅ |
-| F2.2 (neg) | flip `permissions.go:157` force-release cap→`CapDocumentView`, re-run pin | `--- FAIL … tier-1 cap="document.view" diverges from tier-2 cap="membership.manage" (ADR 0022 F4 regression)` (permissions_test.go:717); `git checkout` → PASS. Tree left clean. | ✅ |
+| F2.1 | `go vet -tags integration ./tests/integration/documents/` | exit 0 (rewritten drives compile) | ✅ |
+| F2.1 (**live GREEN vs 0271**) | ephemeral role `qa_val`, `METALDOCS_DATABASE_URL=… go test -tags integration -run TestTripwire_DocumentsUpdate_ -v -count=1 ./tests/integration/documents/` | `--- PASS: …MembershipManageArm (78.69s)`, `--- PASS: …DocumentObsoleteArm (2.16s)`, `ok … 83.721s` | ✅ |
+| F2.1 (**live RED vs 0270**) | `mv 0271_*.sql /tmp/`, re-run same | `--- FAIL: …MembershipManageArm: ErrCapabilityNotAsserted: none of {document.edit} present in asserted_caps on documents (SQLSTATE P0001)` + identical FAIL on `…DocumentObsoleteArm`; then `mv` back → tree byte-clean | ✅ (fails for the right reason: the cap arm, not a fixture crash) |
+| F2.1 | `go test ./internal/platform/tripwire/...` | `ok` (golden `RenderMigration()==0271` bytes; parity; determinism) | ✅ |
+| F2.1 | `go test ./scripts/api-lint/... -run TripwireArm` | `ok 1.686s` (tripwire-arm rule tests) | ✅ |
+| F2.1 | `go run ./scripts/api-lint -strict api/openapi/v1/openapi.yaml .` | `0 violation(s)` (both new rules blocking, clean tree) | ✅ |
 
-## C3 — Senior review of the aggregate milestone diff
+**The RED half is the load-bearing new proof.** The *prior* broken drives died at fixture setup with a
+different error class (tier-2 denial / NULL-scan). This RED reproduces the exact contract failure mode
+— `SQLSTATE P0001 … none of {document.edit}` raised by `enforce_capability_asserted()` on the live
+`trg_require_cap_asserted` trigger — proving the test reaches and exercises the cap arm. GREEN vs 0271
+proves the widened arm clears it. Byte-identical to the evidence transcript (lines 88-101).
 
-- **No split-brain.** `render.go` produces every arm literal from `TripwireArms` via `findArm()/renderArray()`; the committed `0271_*.sql` is byte-pinned to `RenderMigration()` by both the golden test and the `TRIPWIRE-ARM-PARITY` api-lint rule. The Go map is the sole source of truth; the SQL is generated output. This is a genuine structural closure of the hand-sync defect class (0269/0270), not a re-hand-sync.
-- **No dead code / no feature-cross-break.** F2.1 (tripwire files) and F2.2 (permissions test + docs) are disjoint. F2.1's single behavior change is additive (arm widened) — no `document.edit` writer can regress (match-one). Pre-existing `tests/integration/templates/tripwire_caps_test.go` (0269/0270 guard) is **unchanged** since M1 close (verified `git diff 1a86f419..HEAD` empty for that path).
-- **Drift rule is not a tautology.** Independently reproduced: it fires on exactly the two real latent write-paths (three call sites) when the arm is narrowed, and is silent on the clean tree. It catches the real incident class.
+## C3 — Senior review of the aggregate milestone diff (focus: the changed test)
+
+- **The rewrite genuinely exercises the DB arm, not the application stack.** The UPDATE is
+  `SET active_session_id = NULL, updated_at = now()` with `status` unchanged. I verified the live BEFORE
+  trigger order on `public.documents` (alphabetical): `enforce_snapshot_on_submit_trg` →
+  `trg_documents_legal_transition` → `trg_documents_revision_version_monotonic` → `trg_require_cap_asserted`
+  (cap fires **last**). Inspecting the three pre-cap function bodies from the live DB:
+  `enforce_document_transition` gates on `OLD.status IS DISTINCT FROM NEW.status` (skipped — status
+  unchanged); `enforce_revision_version_monotonic` only raises on `NEW.revision_version < OLD` (unchanged
+  → passes); `enforce_snapshot_on_submit` only fires for `status IN (under_review,approved,scheduled,published)`
+  (seeded doc is `draft`, unchanged → skipped). So a neutral-column update cleanly reaches the cap arm.
+  Isolating from the legal-transition machine by holding `status` is **sound**, not a dodge — those
+  triggers are out of scope for a cap-arm test, and driving them would reintroduce the exact
+  application-fixture fragility that broke the first attempt.
+- **The `RowsAffected==1` assertion closes the RLS-false-green hole.** A row hidden by RLS yields a
+  0-row UPDATE; a BEFORE trigger never fires on 0 rows, so without this assert an RLS-hidden row would
+  masquerade as a pass. `driveGuardedDocumentUpdate` returns an error (→ `t.Fatalf` via `SeedWithCaps`)
+  on `n != 1`. Verified against `SeedWithCaps`/`seedWithCaps` in `testdb/fixtures.go` — caps asserted
+  tx-locally (`is_local=true`), pool-safe, discarded on commit, and any P0001 surfaces as the test
+  failure. `InsertDraftDocument` seeds a real `draft` doc through the canonical template family.
+- **No split-brain, no dead code, no feature-cross-break.** Core unchanged since prior PASS
+  (`git diff f170e4e6..5e5b50e3` on core = empty); SQL still generated from the one Go map, byte-pinned.
+  The sibling `tripwire_caps_test.go` is untouched. The rewrite deletes the non-functional
+  application-driver scaffolding (net −130 lines) — dead-code removal, not accumulation.
 - **Findings:** none blocking.
-- Staff-engineer bar met? ✅
+- Staff-engineer bar met? ✅ (the correction is exactly what a senior reviewer would demand:
+  compile ≠ works; test the layer under contract; fail for the right reason.)
 
 ## C4 — Workflow-class QA + regression (backend-api authz / DB-invariant class)
 
 | Check | Outcome | Notes |
 |-------|---------|-------|
-| Canonical checklist (backend-api authz/DB-invariant) | pass | Deterministic gates green from clean tree: `go build`, api-lint strict `0 violation(s)`, tripwire golden/parity/determinism, drift RED/GREEN negative proof, registry-size 34. Live integration = bounded defer (below). |
-| Regression vs M0 (VersionRef) + M1 (contract/FE gates) | all still pass | `go build ./...` green; `go run ./scripts/api-lint -strict … .` = `0 violation(s)` (the 5 authz lints + M1's nullable/contract-sync blocking rules all green under the same run); no route/contract shape changed (net code diff = additive arm + test + docs). `TestCapabilityRegistrySize`(34) unchanged. |
-
-**Bounded defer — integration live run (legitimate, per contract §1.6/§4).** Confirmed `METALDOCS_DATABASE_URL` and `DATABASE_URL` both unset in the process env; `scripts/test.ps1` is a bare `go test ./...` with no integration tag and no env load; creds live only in `.env` (forbidden to read). Drives are **authored + compile-verified** (`go vet -tags integration` clean) with a recorded run-trigger. Compensating control: the `TRIPWIRE-ARM-DRIFT` static proof — which I reproduced independently — demonstrates those same two write paths were fail-closed P0001 pre-0271 and covered post-0271. Adequate per §1.6/§4; matches M1's env-risk precedent.
+| Canonical checklist (backend-api authz/DB-invariant) | **pass (no remaining defer)** | Deterministic gates green from clean tree; **live integration now discharged** — RED→GREEN reproduced by the validator against the running `metaldocs-postgres` container. The one bounded defer from the prior verdict is closed. |
+| Regression vs M0 (VersionRef) + M1 (contract/FE gates) | all still pass | `go run ./scripts/api-lint -strict … .` = `0 violation(s)` (the 5 authz lints + M1's nullable/contract-sync blocking rules all green in the same run); no route/contract shape changed (correction is test+doc only). Tripwire golden/parity/determinism green. |
 
 ## C5 — Quality-bar re-measure + retrospective
 
 | Bar / class | Before | After | Root-cause-fixed evidence |
 |-------------|--------|-------|---------------------------|
-| Hand-sync tripwire arm defect class (review Dim-2 finding #1; shipped 0269, 0270) | DEBT — arms hand-typed per migration; two prod P0001 incidents + two latent | Structurally closed toward CONFIRMED | Arms generated from `TripwireArms` (same registry the services read); `TRIPWIRE-ARM-PARITY` byte-pins SQL↔map; `TRIPWIRE-ARM-DRIFT` catches a new unarmed gated write. Both blocking. Root cause (no single source of truth) removed, not symptom-patched. |
-| Two latent P0001 incidents (force-release, obsolete) | Live fail-closed for every actor | Fixed **by the generation** (arm widened via the map), not a one-off patch | 0271 diff-minimal vs 0270; drift rule fires on exactly those 3 sites pre-fix (reproduced). |
-| F2.2 tier-1↔tier-2 coherence | Review claimed 2 open divergences | Confirmed already code-resolved (ADR 0022 Phase 11 F4); pinned + doc-truth restored | Pin GREEN on HEAD / RED on synthetic re-divergence (reproduced); ADR 0022/0018 + module-iam.md back-annotated RESOLVED. Not a hidden HS-2 — no redesign, verify-and-pin only. |
+| Hand-sync tripwire arm defect class (0269/0270) | DEBT — arms hand-typed per migration | **CONFIRMED closed** | Arms generated from `TripwireArms`; PARITY byte-pins SQL↔map; DRIFT catches a new unarmed gated write. Both blocking, unchanged and re-green. Root cause (no single source of truth) removed. |
+| Two latent P0001 incidents (force-release, obsolete) | Live fail-closed for every actor | **Fixed by the generation AND now proven live** | Validator reproduced: 0270 arm → `P0001 none of {document.edit}` for both `membership.manage` and `document.obsolete`; 0271 arm → both PASS. No longer inferred from a static drift proof — demonstrated on the real trigger. |
+| **Live-QA integrity of the defer itself** | Prior PASS trusted a compile-only defer | **Corrected** | The defer was the weak point; running it exposed non-functional drives (application-stack death) and forced the DB-arm rewrite. The proof is now end-to-end, not fixture-shaped. |
 
-- **Could it be built better?** Minor construction note (not unsound, not a FAIL): `render.go` inlines 0270's SQL body as Go string concatenation rather than reading the prior migration file as a literal template, so the non-arm SQL text is transcribed into Go. It is fully protected today (golden test + PARITY rule byte-compare against the committed 0271, and the 0270↔0271 diff confirms byte-faithfulness), so there is no live drift risk — but a future regeneration could read the prior migration as the template. Record as input to M9 arm-hygiene (alongside the already-recorded superset-prune defer). Does not affect the verdict.
+- **Could it be built better?** The `render.go` note from the prior verdict (inlines 0270 SQL body as
+  Go string concatenation rather than reading the prior migration as a template) still stands — fully
+  protected by golden + PARITY today, recorded as M9 arm-hygiene input, not a FAIL. No new construction
+  concern from the correction; the rewrite is the better construction. No blocking retrospective.
 
 ## C6 — Forbidden-list (any hit = FAIL)
 
-- [ ] Suite-green reported as a pass without per-feature acceptance mapped to evidence — *clean; each acceptance mapped to a re-run command.*
-- [ ] Fixture/mock passed off as real-provider proof — *clean; integration live run is an explicit, legitimate bounded defer with a static compensating control, labeled as such.*
-- [ ] Consumer contract guessed rather than read from the consumer — *clean; map/migration/pin verified against source consumer sites.*
-- [ ] Split-brain — *clean; SQL is generated from the one Go map, byte-pinned.*
-- [ ] Self-judged close / validator edited or fixed code — *clean; validator only judged, reverted its two temporary probes via `git checkout`, left tree clean, and writes only this file.*
-- [ ] Scope drift — *clean; the two latent incidents + F2.2 reframing were surfaced up-front in `milestone.md`/contract as HS-6 discovered truth with rationale; aggregate diff matches declared scope.*
-- [ ] Symptom-patch — *clean; root cause (hand-sync) structurally removed; drift power proven live, not gutted.*
+- [ ] Suite-green reported as a pass — *clean; each acceptance mapped to a re-run command, live half reproduced.*
+- [ ] **Fixture/mock passed off as real-provider proof** — *clean, and materially stronger than the prior verdict: the earlier compile-only defer was the risk here; it is now discharged with a real-trigger live RED→GREEN the validator reproduced. This is the exact class the re-validation was ordered to close, and it is closed.*
+- [ ] Consumer contract guessed — *clean; map/migration/pin/arm verified against source.*
+- [ ] Split-brain — *clean; SQL generated from the one Go map, byte-pinned; core unchanged.*
+- [ ] Self-judged close / validator edited or fixed code — *clean; validator only judged, ran the drives via an ephemeral role, reverted the temporary 0271 move, dropped `qa_val` + both `metaldocs_test*` clones, left tree and real `metaldocs` DB clean, writes only this file.*
+- [ ] Scope drift — *clean; the test rename/rewrite is a documented correctness correction with written rationale (C1.7), not new scope.*
+- [ ] Symptom-patch — *clean; root cause (hand-sync) structurally removed; the correction fixed a non-functional test (real defect) rather than masking it.*
 
 (All unchecked = clean.)
 
 ## C7 — Verdict
 
 - **VERDICT: PASS**
-- Both dimensions pass: **code-wise** (senior-level, contract-clean, single source of truth, no dead code, no guessed contract) and **function-wise** (arms generated + both incident-class incidents fixed by the generation; drift + parity rules blocking and proven; F2.2 coherence pinned and doc-truth restored). HS-7 clean (map == contract §1.2; 0271 diff-minimal vs 0270). Live integration is a legitimately-recorded bounded defer with an adequate reproduced static compensating control.
-- Handed back to the main session to flip M2 status (README + milestone.md) and present the **HS-1** operator gate. Validator does not flip status.
+- Both dimensions pass: **code-wise** (senior-level, single source of truth, no dead code, no guessed
+  contract; core byte-unchanged and re-green) and **function-wise** (arms generated + both incident-class
+  P0001s now proven fixed on the **live trigger**, RED→GREEN independently reproduced by the validator;
+  the rewritten drives genuinely exercise the documents(UPDATE) cap arm with `RowsAffected==1` closing
+  the RLS-false-green hole; status-held isolation from the legal-transition triggers verified sound).
+  HS-7 clean (arms == contract §1.2; 0271 diff-minimal vs 0270). The prior bounded defer is **DISCHARGED**.
+- Handed back to the main session to flip M2 status and present the **HS-1** operator gate. Validator
+  does not flip status.
 
 > **Main-session actions (post-verdict, NOT the validator's):**
 > - Operator gate (HS-1): pending

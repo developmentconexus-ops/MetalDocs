@@ -1,7 +1,7 @@
 # Milestone 2 — Authz enforcement generation & cap-name coherence
 
 > **Program:** global-maximum-remediation  ·  **Governing spec:** `../mission.md` (§7 M2)
-> **Status:** **VALIDATOR PASS — HS-1 OPERATOR GATE PENDING** — F2.1 + F2.2 implemented & committed; `milestone-validator` returned PASS (C1–C7, [qa/milestone-qa.md](qa/milestone-qa.md), 2026-07-03). Not "passed" until operator approves HS-1. Not pushed. M3 only in a fresh session after approval.
+> **Status:** **PASSED** — operator-approved HS-1 (2026-07-03). `milestone-validator` PASS twice: initial (C1–C7) + re-validation after operator-demanded live QA, which caught & fixed non-functional integration drives and proved live RED→GREEN on the real container trigger ([qa/milestone-qa.md](qa/milestone-qa.md)). Commits local, not pushed. M3 starts in a fresh session.
 > **Authored:** 2026-07-03 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** M2 is, **which features** it
