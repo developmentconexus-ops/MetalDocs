@@ -14,7 +14,7 @@
   max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;
-  background: #ffffff;
+  background: var(--surface);
   border-radius: 12px;
   padding: 24px;
 }
@@ -44,7 +44,7 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #374151;
+  color: var(--slate-text-muted-2);
 }
 
 .field {
@@ -60,19 +60,19 @@
 
 .input {
   width: 100%;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--slate-border-2);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 14px;
 }
 
 .input:focus {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--slate-accent);
   border-color: transparent;
 }
 
 .inlineError {
-  color: #991b1b;
+  color: var(--slate-danger-text);
   font-size: 13px;
   margin: 6px 0 0;
 }
@@ -93,8 +93,8 @@
 }
 
 .btnPrimary {
-  background: #3b82f6;
-  color: #ffffff;
+  background: var(--slate-accent);
+  color: var(--surface);
 }
 
 .btnPrimary:disabled {
@@ -103,16 +103,16 @@
 }
 
 .btnSecondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--slate-surface-muted);
+  color: var(--slate-text-muted-2);
 }
 
 .errorBox {
-  background: #fee2e2;
-  border: 1px solid #fca5a5;
+  background: var(--slate-danger-bg);
+  border: 1px solid var(--slate-danger-border);
   border-radius: 8px;
   padding: 10px 14px;
-  color: #991b1b;
+  color: var(--slate-danger-text);
   font-size: 13px;
   margin-bottom: 16px;
 }

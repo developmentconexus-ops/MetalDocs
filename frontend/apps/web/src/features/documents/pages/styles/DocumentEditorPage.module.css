@@ -40,7 +40,7 @@
   background: var(--brand);
   border: 0;
   border-radius: var(--r-2);
-  color: #fff;
+  color: var(--text-on-brand);
   cursor: pointer;
   transition: background 150ms ease;
   flex-shrink: 0;
@@ -53,7 +53,7 @@
   top: 50%;
   transform: translateY(-50%);
   background: var(--text);
-  color: #fff;
+  color: var(--text-on-brand);
   font-size: 11px;
   padding: 4px 8px;
   border-radius: var(--r-1);
@@ -131,27 +131,27 @@
   padding: 24px;
   border-radius: 24px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
 }
 
 .dialogTitle {
   margin: 0;
-  color: #0f172a;
+  color: var(--slate-text);
   font-size: 1.25rem;
   font-weight: 700;
 }
 
 .dialogText {
   margin: 0;
-  color: #475569;
+  color: var(--slate-text-muted);
   line-height: 1.5;
 }
 
 .dialogField {
   display: grid;
   gap: 8px;
-  color: #0f172a;
+  color: var(--slate-text);
   font-size: 0.95rem;
   font-weight: 600;
 }
@@ -159,7 +159,7 @@
 .dialogField input {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--slate-border);
   border-radius: 14px;
   font: inherit;
 }
@@ -186,13 +186,13 @@
 }
 
 .dialogSecondaryBtn {
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  color: #0f172a;
+  border: 1px solid var(--slate-border);
+  background: var(--surface);
+  color: var(--slate-text);
 }
 
 .dialogPrimaryBtn {
   border: 1px solid #0f766e;
   background: #0f766e;
-  color: #fff;
+  color: var(--surface);
 }

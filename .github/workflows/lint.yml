@@ -9,9 +9,11 @@ on:
     paths:
       - '**/*.ts'
       - '**/*.tsx'
+      - '**/*.module.css'
       - 'eslint.config.mjs'
       - 'pnpm-lock.yaml'
       - '.github/workflows/lint.yml'
+      - 'scripts/check-css-token-discipline.sh'
   push:
     branches: [main]
 
@@ -26,3 +28,12 @@ jobs:
         with: { node-version: 20.11.0, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
+
+  # FE-18 — forbids new raw hex color literals in frontend/apps/web
+  # module.css files; tokens.css is the source of truth for colors.
+  # Pre-existing offenders are grandfathered in a shrink-only allowlist.
+  css-token-discipline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-css-token-discipline.sh

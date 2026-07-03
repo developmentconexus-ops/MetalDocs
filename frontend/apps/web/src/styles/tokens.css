@@ -45,6 +45,27 @@
   --info: #1a3a7a;
   --info-bg: #e8eef8;
 
+  /* Approval-slate — a pre-existing, non-brand Tailwind-derived palette used
+     by the approval feature's status/severity chips and dialogs (StateBadge,
+     ApprovalTimelinePanel, RouteAdmin, DocumentApprovalExtras, Cancel/Supersede
+     dialogs, DocumentEditorPage). Not part of the Wine brand palette above —
+     named/tokenized (FE-18) so repeated literals have one source of truth,
+     not to endorse starting a second design system. Values unchanged. */
+  --slate-text: #0f172a;
+  --slate-text-2: #1f2a3d;
+  --slate-text-muted: #475569;
+  --slate-text-muted-2: #374151;
+  --slate-border: #cbd5e1;
+  --slate-border-2: #d1d5db;
+  --slate-border-3: #b8c4d8;
+  --slate-surface-muted: #f3f4f6;
+  --slate-accent: #3b82f6;
+  --slate-danger-text: #991b1b;
+  --slate-danger-border: #fca5a5;
+  --slate-danger-bg: #fee2e2;
+  --slate-danger-bg-2: #fef2f2;
+  --slate-success-border: #86efac;
+
   /* Shadow */
   --shadow-1: 0 1px 2px rgba(74, 33, 33, 0.06);
   --shadow-2: 0 8px 24px rgba(74, 33, 33, 0.08);

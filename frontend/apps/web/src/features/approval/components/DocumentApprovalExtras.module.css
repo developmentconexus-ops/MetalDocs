@@ -4,7 +4,7 @@
   padding: 16px;
   border: 1px solid #d6deea;
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .topRow {
@@ -52,7 +52,7 @@
 .actionButton {
   border: 1px solid #0b66e4;
   background: #0b66e4;
-  color: #fff;
+  color: var(--surface);
   border-radius: 8px;
   padding: 8px 12px;
   cursor: pointer;
@@ -64,18 +64,18 @@
 }
 
 .actionButtonSecondary {
-  border: 1px solid #b8c4d8;
-  background: #fff;
-  color: #1f2a3d;
+  border: 1px solid var(--slate-border-3);
+  background: var(--surface);
+  color: var(--slate-text-2);
   border-radius: 8px;
   padding: 8px 12px;
   cursor: pointer;
 }
 
 .smallButton {
-  border: 1px solid #b8c4d8;
-  background: #fff;
-  color: #1f2a3d;
+  border: 1px solid var(--slate-border-3);
+  background: var(--surface);
+  color: var(--slate-text-2);
   border-radius: 6px;
   padding: 4px 8px;
   cursor: pointer;
@@ -116,11 +116,11 @@
 }
 
 .select {
-  border: 1px solid #b8c4d8;
+  border: 1px solid var(--slate-border-3);
   border-radius: 6px;
   padding: 8px;
-  background: #fff;
-  color: #1f2a3d;
+  background: var(--surface);
+  color: var(--slate-text-2);
 }
 
 .inlineActions {
@@ -135,5 +135,5 @@
   padding: 14px;
   border: 1px solid #d6deea;
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
 }

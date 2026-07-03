@@ -107,11 +107,11 @@
 .badgeActive {
   color: #14532d;
   background: #dcfce7;
-  border: 1px solid #86efac;
+  border: 1px solid var(--slate-success-border);
 }
 
 .badgeInactive {
-  color: #475569;
+  color: var(--slate-text-muted);
   background: #f1f5f9;
   border: 1px solid #cbd5f5;
 }
@@ -141,7 +141,7 @@
 
 .primaryButton {
   background: var(--color-accent, #2563eb);
-  color: #ffffff;
+  color: var(--surface);
   border-color: var(--color-accent, #2563eb);
 }
 .primaryButton:hover:not(:disabled) {
@@ -149,7 +149,7 @@
 }
 
 .secondaryButton {
-  background: #ffffff;
+  background: var(--surface);
   color: var(--color-text, #1e293b);
   border-color: var(--color-border, rgba(15, 23, 42, 0.16));
 }
@@ -158,12 +158,12 @@
 }
 
 .warnButton {
-  background: #fef2f2;
-  color: #991b1b;
+  background: var(--slate-danger-bg-2);
+  color: var(--slate-danger-text);
   border-color: #fecaca;
 }
 .warnButton:hover:not(:disabled) {
-  background: #fee2e2;
+  background: var(--slate-danger-bg);
 }
 
 .ghostButton {
@@ -214,7 +214,7 @@
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--color-border, rgba(15, 23, 42, 0.16));
-  background: #ffffff;
+  background: var(--surface);
   font: inherit;
   color: var(--color-text, #1e293b);
 }
@@ -275,9 +275,9 @@
 }
 
 .errorBox {
-  background: #fef2f2;
+  background: var(--slate-danger-bg-2);
   border: 1px solid #fecaca;
-  color: #991b1b;
+  color: var(--slate-danger-text);
   padding: 10px 12px;
   border-radius: 8px;
   font-size: 0.9rem;

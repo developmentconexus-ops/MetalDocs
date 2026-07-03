@@ -1,7 +1,7 @@
 .panel {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--surface);
   padding: 16px;
 }
 
@@ -29,7 +29,7 @@
   height: 10px;
   border-radius: 999px;
   background: #2563eb;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--surface);
   box-shadow: 0 0 0 2px #dbe3ee;
 }
 
@@ -41,13 +41,13 @@
 .title {
   margin: 0;
   font-size: 0.95rem;
-  color: #0f172a;
+  color: var(--slate-text);
 }
 
 .meta {
   margin: 0;
   font-size: 0.875rem;
-  color: #475569;
+  color: var(--slate-text-muted);
 }
 
 .stageHeader {
@@ -67,8 +67,8 @@
 
 .stage_pending {
   background: #f8fafc;
-  color: #475569;
-  border-color: #cbd5e1;
+  color: var(--slate-text-muted);
+  border-color: var(--slate-border);
 }
 
 .stage_active {
@@ -80,13 +80,13 @@
 .stage_passed {
   background: #ecfdf5;
   color: #047857;
-  border-color: #86efac;
+  border-color: var(--slate-success-border);
 }
 
 .stage_failed {
-  background: #fef2f2;
+  background: var(--slate-danger-bg-2);
   color: #b91c1c;
-  border-color: #fca5a5;
+  border-color: var(--slate-danger-border);
 }
 
 .stage_cancelled {
@@ -111,7 +111,7 @@
 }
 
 .state {
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--slate-border);
   border-radius: 12px;
   padding: 16px;
   color: #334155;
