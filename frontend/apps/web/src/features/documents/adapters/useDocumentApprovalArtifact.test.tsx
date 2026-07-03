@@ -11,15 +11,15 @@ vi.mock('../../../store/auth.store', () => ({
 vi.mock('../queries/useDocumentDetailQuery', () => ({
   useDocumentDetailQuery: vi.fn(),
 }));
-vi.mock('../../approval/queries/useActiveDocumentContextQuery', () => ({
-  useActiveDocumentContextQuery: vi.fn(),
+vi.mock('../queries/useControlledDocumentActiveDocumentQuery', () => ({
+  useControlledDocumentActiveDocumentQuery: vi.fn(),
 }));
 vi.mock('../../approval/api/approvalApi', () => ({
   getInstance: vi.fn(),
 }));
 
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
-import { useActiveDocumentContextQuery } from '../../approval/queries/useActiveDocumentContextQuery';
+import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
 import { getInstance } from '../../approval/api/approvalApi';
 import {
   useDocumentApprovalArtifact,
@@ -73,7 +73,7 @@ const handlers: DocumentApprovalHandlers = {
 };
 
 function mockContext(approvalState: string, overrides: Record<string, unknown> = {}) {
-  vi.mocked(useActiveDocumentContextQuery).mockReturnValue({
+  vi.mocked(useControlledDocumentActiveDocumentQuery).mockReturnValue({
     data: {
       document_id: 'doc-1',
       approval_state: approvalState,
@@ -183,7 +183,7 @@ describe('useDocumentApprovalArtifact', () => {
   });
 
   it('reports contextError when the active-document context query errors', () => {
-    vi.mocked(useActiveDocumentContextQuery).mockReturnValue({
+    vi.mocked(useControlledDocumentActiveDocumentQuery).mockReturnValue({
       data: undefined,
       isLoading: false,
       isError: true,
@@ -194,7 +194,7 @@ describe('useDocumentApprovalArtifact', () => {
   });
 
   it('reports noActiveContext when the document has no active approval context', () => {
-    vi.mocked(useActiveDocumentContextQuery).mockReturnValue({
+    vi.mocked(useControlledDocumentActiveDocumentQuery).mockReturnValue({
       data: null,
       isLoading: false,
       isError: false,

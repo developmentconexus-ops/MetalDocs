@@ -1,6 +1,6 @@
 # Frontend module: controlled-documents
 
-> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section)
+> **Last verified:** 2026-07-02 (FE-10: consolidated duplicate active-document fetch into this module; approval's forked copy deleted)
 > **Scope:** Read-side query/API surface for controlled documents (the regulated wrapper around a document family). No standalone pages — consumed by `documents` and `approval` slices.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/controlled-documents.md`](../controlled-documents.md)
 
@@ -51,7 +51,16 @@ None. The slice is queries + API only.
 **Imported by:**
 - `features/documents/pages/NewDocumentWizardPage.tsx` — atomic create + preview code.
 - `features/documents/pages/DocumentPublishedPage.tsx` — recovers publish context via `active-document` lookup.
-- `features/approval/api/approvalApi.ts:181` — `getActiveDocumentContext`.
+- `features/approval/pages/InboxPage.tsx` — `fetchActiveDocumentInstance` (imperative lookup for the two inbox open-document/open-decision handlers).
+- `features/documents/adapters/useDocumentApprovalArtifact.ts` — `useControlledDocumentActiveDocumentQuery` (approval cockpit active-document context).
+
+FE-10 (2026-07): the approval feature previously forked its own copy of this fetch
+(`approvalApi.ts` `getActiveDocumentContext` / `useActiveDocumentContextQuery`, keyed
+under `QK.approval.activeDocument`) — a second cache root for the same endpoint that
+the sign-off mutation never invalidated. That fork is deleted; every consumer now goes
+through this module's `fetchActiveDocumentInstance` / `useControlledDocumentActiveDocumentQuery`
+under the single `QK.controlledDocuments.activeDocument(id)` key, and `useSignoffMutation`
+invalidates `QK.controlledDocuments.all` on success.
 
 ## 7. Invariants
 

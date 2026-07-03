@@ -11,6 +11,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { signoff } from '../api/approvalApi';
 import { mapSignoffError } from '../lib/signoffErrors';
+import { QK } from '../../../lib/queryKeys';
 
 export interface SignoffInput {
   decision: 'approve' | 'reject';
@@ -53,7 +54,13 @@ export function useSignoffMutation({
       // and the document's status — invalidate every affected cache subtree
       // instead of refetching a single query.
       void queryClient.invalidateQueries({ queryKey: ['approval'] });
-      void queryClient.invalidateQueries({ queryKey: ['documents'] });
+      void queryClient.invalidateQueries({ queryKey: QK.documents.all });
+      // FE-10: the controlled-documents root (list / detail / active-document /
+      // preview) is a SEPARATE cache subtree from 'documents' — a sign-off changes
+      // the active-document context (content_hash/approval_state) that CD detail,
+      // the document detail adapter, and the inbox all read. Without this, those
+      // screens keep serving a stale active-document snapshot post-signoff.
+      void queryClient.invalidateQueries({ queryKey: QK.controlledDocuments.all });
     },
   });
 

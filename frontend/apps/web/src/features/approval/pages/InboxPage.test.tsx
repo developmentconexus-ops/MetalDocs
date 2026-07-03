@@ -5,7 +5,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getNextSelectedIdx, InboxPage } from './InboxPage';
 import type { InboxItem } from '../api/approvalTypes';
-import { getActiveDocumentContext } from '../api/approvalApi';
+import { fetchActiveDocumentInstance } from '../../controlled-documents/api/controlledDocuments';
 
 const navigateMock = vi.fn();
 
@@ -17,11 +17,13 @@ vi.mock('../queries/useInboxQuery', () => ({
   useInboxQuery: vi.fn(),
 }));
 
-vi.mock('../api/approvalApi', async () => {
-  const actual = await vi.importActual<typeof import('../api/approvalApi')>('../api/approvalApi');
+vi.mock('../../controlled-documents/api/controlledDocuments', async () => {
+  const actual = await vi.importActual<typeof import('../../controlled-documents/api/controlledDocuments')>(
+    '../../controlled-documents/api/controlledDocuments',
+  );
   return {
     ...actual,
-    getActiveDocumentContext: vi.fn(),
+    fetchActiveDocumentInstance: vi.fn(),
   };
 });
 
@@ -206,11 +208,11 @@ describe('InboxPage', () => {
   });
 
   it('Abrir documento navigates to the modern editor route', async () => {
-    vi.mocked(getActiveDocumentContext).mockResolvedValue({
+    vi.mocked(fetchActiveDocumentInstance).mockResolvedValue({
       document_id: 'doc-123',
       content_hash: 'hash-123',
       approval_instance_id: 'inst-123',
-    } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
+    } as Awaited<ReturnType<typeof fetchActiveDocumentInstance>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
       isLoading: false,
@@ -222,17 +224,17 @@ describe('InboxPage', () => {
     fireEvent.click(screen.getByText('Abrir documento'));
 
     await waitFor(() => {
-      expect(getActiveDocumentContext).toHaveBeenCalledWith('cd-123');
+      expect(fetchActiveDocumentInstance).toHaveBeenCalledWith('cd-123');
     });
     expect(navigateMock).toHaveBeenCalledWith('/documents/doc-123/edit');
   });
 
   it('Abrir documento keeps navigation in modern editor flow', async () => {
-    vi.mocked(getActiveDocumentContext).mockResolvedValue({
+    vi.mocked(fetchActiveDocumentInstance).mockResolvedValue({
       document_id: 'doc-modern',
       content_hash: 'hash-modern',
       approval_instance_id: 'inst-modern',
-    } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
+    } as Awaited<ReturnType<typeof fetchActiveDocumentInstance>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-modern' })], total: 1 },
       isLoading: false,
@@ -244,14 +246,14 @@ describe('InboxPage', () => {
     fireEvent.click(screen.getByText('Abrir documento'));
 
     await waitFor(() => {
-      expect(getActiveDocumentContext).toHaveBeenCalledWith('cd-modern');
+      expect(fetchActiveDocumentInstance).toHaveBeenCalledWith('cd-modern');
     });
     expect(navigateMock).toHaveBeenCalledWith('/documents/doc-modern/edit');
     expect(navigateMock).not.toHaveBeenCalledWith('/controlled-documents/cd-modern');
   });
 
   it('Abrir documento shows modern-flow error when active context is unavailable', async () => {
-    vi.mocked(getActiveDocumentContext).mockRejectedValue(new Error('context unavailable'));
+    vi.mocked(fetchActiveDocumentInstance).mockRejectedValue(new Error('context unavailable'));
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-fail' })], total: 1 },
       isLoading: false,
@@ -269,12 +271,12 @@ describe('InboxPage', () => {
   });
 
   it('approve action navigates to the signoff cockpit with decision=approve', async () => {
-    vi.mocked(getActiveDocumentContext).mockResolvedValue({
+    vi.mocked(fetchActiveDocumentInstance).mockResolvedValue({
       document_id: 'doc-1',
       content_hash: 'hash-1',
       approval_instance_id: 'inst-1',
       revision_version: 0,
-    } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
+    } as Awaited<ReturnType<typeof fetchActiveDocumentInstance>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
       isLoading: false,
@@ -286,14 +288,14 @@ describe('InboxPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Aprovar e assinar/i }));
 
     await waitFor(() => {
-      expect(getActiveDocumentContext).toHaveBeenCalledWith('cd-123');
+      expect(fetchActiveDocumentInstance).toHaveBeenCalledWith('cd-123');
       expect(navigateMock).toHaveBeenCalledWith('/approvals/doc-1?decision=approve');
     });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('approve action shows alert when active-document lookup fails', async () => {
-    vi.mocked(getActiveDocumentContext).mockRejectedValue(new Error('network failure'));
+    vi.mocked(fetchActiveDocumentInstance).mockRejectedValue(new Error('network failure'));
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
       isLoading: false,
@@ -312,12 +314,12 @@ describe('InboxPage', () => {
   });
 
   it('reject action navigates to the cockpit with decision=reject', async () => {
-    vi.mocked(getActiveDocumentContext).mockResolvedValue({
+    vi.mocked(fetchActiveDocumentInstance).mockResolvedValue({
       document_id: 'doc-9',
       content_hash: 'hash-9',
       approval_instance_id: 'inst-9',
       revision_version: 2,
-    } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
+    } as Awaited<ReturnType<typeof fetchActiveDocumentInstance>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-9' })], total: 1 },
       isLoading: false,

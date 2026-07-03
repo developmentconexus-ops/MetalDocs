@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SignoffDetailPage } from './SignoffDetailPage';
 import * as approvalApi from '../api/approvalApi';
+import * as controlledDocumentsApi from '../../controlled-documents/api/controlledDocuments';
 import * as documentsApi from '../../documents/api/documents';
 
 vi.mock('../components/ReviewDocumentCanvas', () => ({
@@ -38,7 +39,7 @@ function makeContext() {
     content_hash: 'hash-abc',
     revision_version: 3,
     approval_instance_id: 'inst-1',
-  } as Awaited<ReturnType<typeof approvalApi.getActiveDocumentContext>>;
+  } as Awaited<ReturnType<typeof controlledDocumentsApi.fetchActiveDocumentInstance>>;
 }
 
 function renderAt(url = '/approvals/doc-1') {
@@ -58,7 +59,7 @@ describe('SignoffDetailPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc());
-    vi.spyOn(approvalApi, 'getActiveDocumentContext').mockResolvedValue(makeContext());
+    vi.spyOn(controlledDocumentsApi, 'fetchActiveDocumentInstance').mockResolvedValue(makeContext());
     vi.spyOn(approvalApi, 'getInstance').mockResolvedValue({
       id: 'inst-1',
       document_id: 'doc-1',
@@ -112,7 +113,7 @@ describe('SignoffDetailPage', () => {
   });
 
   it('shows the sidebar error state when the active-document-context query errors', async () => {
-    vi.spyOn(approvalApi, 'getActiveDocumentContext').mockRejectedValue(
+    vi.spyOn(controlledDocumentsApi, 'fetchActiveDocumentInstance').mockRejectedValue(
       new Error('context boom'),
     );
     renderAt();
@@ -124,7 +125,7 @@ describe('SignoffDetailPage', () => {
   });
 
   it('shows the inactive-flow message when there is no active approval context', async () => {
-    vi.spyOn(approvalApi, 'getActiveDocumentContext').mockResolvedValue(null);
+    vi.spyOn(controlledDocumentsApi, 'fetchActiveDocumentInstance').mockResolvedValue(null);
     renderAt();
     await waitFor(() => {
       expect(

@@ -1,7 +1,6 @@
 import { etagCache } from './etagCache';
 import { mutate, type MutateOptions } from './mutationClient';
-import { apiFetch, ApiError, requestRaw } from '../../../lib/api';
-import type { components } from '../../../lib/api-types';
+import { apiFetch, requestRaw } from '../../../lib/api';
 import type {
   ApprovalInstance,
   CancelRequest,
@@ -129,19 +128,8 @@ export function cancel(
   });
 }
 
-export type ActiveDocumentContext = components['schemas']['ActiveDocumentResponse'];
-
-export async function getActiveDocumentContext(
-  controlledDocumentId: string,
-): Promise<ActiveDocumentContext | null> {
-  try {
-    return await apiFetch<ActiveDocumentContext>(
-      `/api/v1/controlled-documents/${encodeURIComponent(controlledDocumentId)}/active-document`,
-    );
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 404) {
-      return null;
-    }
-    throw err;
-  }
-}
+// F-FE-10: the active-document fetch is owned by the controlled-documents feature
+// (features/controlled-documents/api/controlledDocuments.ts — fetchActiveDocumentInstance).
+// Approval consumers import that hook/fn directly instead of forking a second copy
+// under a second cache root; see useActiveDocumentContextQuery (deleted) and
+// QK.controlledDocuments.activeDocument.

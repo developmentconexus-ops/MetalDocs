@@ -8,7 +8,6 @@ import { useDocumentArtifact } from '../adapters/useDocumentArtifact';
 import { createRevision } from '../../controlled-documents/api/controlledDocuments';
 import { exportPDF } from '../api/exports';
 import { SupersedePublishDialog } from '../../approval/components/SupersedePublishDialog';
-import { useAuthStore } from '../../../store/auth.store';
 import { useHasCapability } from '../../iam/hooks/useHasCapability';
 import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
 import { useDistributionSummaryQuery } from '../queries/useDistributionSummaryQuery';
@@ -16,7 +15,6 @@ import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
 import {
   ACTIVE_SIBLING_STATES,
-  canInitiateRevision as canInitiateRevisionGate,
   getActiveSiblingCtaLabel,
   getActiveSiblingDestination,
   type ActiveSiblingState,
@@ -32,8 +30,11 @@ import styles from './DocumentDetailRoute.module.css';
 export function DocumentDetailRoute() {
   const { documentId: rawDocumentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
-  const user = useAuthStore((s) => s.user);
   const canViewObsolete = useHasCapability('document.obsolete');
+  // FE-11: revision-initiate gate is capability-based (ADR 0022), not role-based.
+  // 'document.edit' matches the backend's tier-1/tier-2 gate on
+  // POST /controlled-documents/{id}/revisions (see documentWorkflow.ts header comment).
+  const canInitiateRevision = useHasCapability('document.edit');
 
   const documentId = rawDocumentId ?? '';
 
@@ -116,7 +117,6 @@ export function DocumentDetailRoute() {
       ? getActiveSiblingDestination(activeSiblingDocumentId, activeSiblingState)
       : null;
 
-  const canInitiateRevision = canInitiateRevisionGate(user);
   const canCreateRevision =
     canInitiateRevision &&
     isPublished &&

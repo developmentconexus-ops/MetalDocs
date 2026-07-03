@@ -12,7 +12,7 @@ import type {
   LifecycleStatus,
 } from '../../shared/controlled-artifact/types';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
-import { useActiveDocumentContextQuery } from '../../approval/queries/useActiveDocumentContextQuery';
+import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
 import { TRANSITION_POLICY, type TransitionPolicy, toApprovalState, mapApprovalChain } from '../lib/approvalWorkflow';
 import { resolveOwnerDisplay } from '../../shared/controlled-artifact/resolveOwnerDisplay';
 
@@ -81,7 +81,7 @@ export function useDocumentApprovalArtifact(
   const doc = docQuery.data ?? null;
   const controlledDocumentId = doc?.controlled_document_id ?? '';
 
-  const contextQuery = useActiveDocumentContextQuery(controlledDocumentId);
+  const contextQuery = useControlledDocumentActiveDocumentQuery(controlledDocumentId);
   const context = contextQuery.data ?? null;
 
   const [instance, setInstance] = useState<ApprovalInstance | null>(null);

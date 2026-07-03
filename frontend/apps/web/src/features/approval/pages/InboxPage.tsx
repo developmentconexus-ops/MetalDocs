@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getActiveDocumentContext } from '../api/approvalApi';
+import { fetchActiveDocumentInstance } from '../../controlled-documents/api/controlledDocuments';
 import type { InboxItem } from '../api/approvalTypes';
 import { useInboxQuery } from '../queries/useInboxQuery';
 import { InboxStack } from '../components/InboxStack';
@@ -48,7 +48,7 @@ export function InboxPage() {
   async function openDocument(item: InboxItem) {
     setActionError(null);
     try {
-      const active = await getActiveDocumentContext(item.controlled_document_id);
+      const active = await fetchActiveDocumentInstance(item.controlled_document_id);
       if (!active?.document_id) {
         setActionError('Documento indisponivel no editor moderno no momento.');
         return;
@@ -62,7 +62,7 @@ export function InboxPage() {
   async function openDecisionFlow(item: InboxItem, decision: 'approve' | 'reject') {
     setActionError(null);
     try {
-      const active = await getActiveDocumentContext(item.controlled_document_id);
+      const active = await fetchActiveDocumentInstance(item.controlled_document_id);
       if (!active?.document_id) {
         setActionError('Fluxo de aprovação indisponível para este documento no momento.');
         return;

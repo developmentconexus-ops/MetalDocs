@@ -1,12 +1,9 @@
 import { useAuthStore } from '../../../store/auth.store';
+import { useHasCapability } from '../../iam/hooks/useHasCapability';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import { formatPageCount, formatPublishedAt, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
 import { resolveOwnerDisplay } from '../../shared/controlled-artifact/resolveOwnerDisplay';
-import {
-  ACTIVE_SIBLING_STATES,
-  canInitiateRevision as canInitiateRevisionGate,
-  type ActiveSiblingState,
-} from '../lib/documentWorkflow';
+import { ACTIVE_SIBLING_STATES, type ActiveSiblingState } from '../lib/documentWorkflow';
 import { mapApprovalChain } from '../lib/approvalWorkflow';
 import type {
   ApprovalChainItem,
@@ -46,6 +43,10 @@ export interface DocumentArtifact {
  */
 export function useDocumentArtifact(documentId: string): DocumentArtifact {
   const user = useAuthStore((s) => s.user);
+  // FE-11: revision-initiate gate is capability-based (ADR 0022), not role-based.
+  // 'document.edit' is the same capability the backend enforces on
+  // POST /controlled-documents/{id}/revisions (see documentWorkflow.ts header comment).
+  const canInitiateRevision = useHasCapability('document.edit');
 
   const docQuery = useDocumentDetailQuery(documentId, { pollScheduledLifecycle: true });
   const shouldPollScheduledLifecycle = docQuery.data?.status === 'scheduled';
@@ -145,7 +146,6 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     ACTIVE_SIBLING_STATES.includes(activeDocument.approval_state as ActiveSiblingState)
       ? activeDocument.document_id
       : null;
-  const canInitiateRevision = canInitiateRevisionGate(user);
   const canCreateRevision =
     canInitiateRevision && isPublished && Boolean(doc?.controlled_document_id) && activeSiblingDocumentId == null;
   const canPublish = canInitiateRevision && isApproved && Boolean(activeDocument?.content_hash);
