@@ -144,15 +144,18 @@ METALDOCS_DOCX_RENDERER_SERVICE_TOKEN=<same value as DOCX_RENDERER_SERVICE_TOKEN
 | field | admin | approver | author-test | approver-test |
 |---|---|---|---|---|
 | identifier | `admin` | `approver` | `author-test` | `approver-test` |
-| password | `AdminMetalDocs123!` | `ApproverMetalDocs123!` | _(curated seed)_ | `ApproverTest123!` |
-| roles | `system_admin` | `admin` (full caps) | `author` | `approver` (limited caps) |
-| use case | full admin / wizard / list QA | template approve + publish QA (satisfies SoD vs admin author) — preferred for editor lifecycle drive | draft authoring | capability-gate QA: role `approver` holds `template.approve` + `template.review` + `template.view`, lacks `template.submit` / `template.publish` |
+| password | `AdminMetalDocs123!` | `ApproverMetalDocs123!` | `AuthorTest123!` | `ApproverTest123!` |
+| iam_user_roles | `system_admin` | `approver` | `author` | `approver` |
+| user_process_areas (rh) | `qms_admin` | `approver` + `qms_admin` | `author` | `approver` |
+| use case | full admin / wizard / list QA; tenant-wide `authz.Require` bypass (ADR 0022), so it must NOT also be the template's author when driving approve/publish (self-bypass would pass SoD's `actorID == authorID` check and defeat the real-path proof) | template author→approve→**publish** QA (satisfies SoD vs an `admin`-authored template) — preferred identity for the full editor lifecycle drive, including templates with a reviewer stage configured (two-call approve-then-publish path) | draft authoring; pair with `approver` (or `admin`) as the approving identity | capability-gate QA only: holds `template.approve` + `template.review` + `template.view`, intentionally lacks `template.submit` / `template.publish` — use to prove a 403 `FORBIDDEN_CAPABILITY` on publish, not to drive a full lifecycle |
 
 Login endpoint: `POST /api/v1/auth/login`, body field `identifier` (NOT `username`).
 
 The curated local bootstrap creates these users when `scripts/dev-bootstrap-baseline.ps1 -WithDevSeed` runs. First-boot bootstrap admin is separate and opt-in.
 
-**SoD note:** templates lifecycle requires the approver's `userId` to differ from the author's `userId`. `admin` authors → `approver` approves (or `approver-test` for capability-gate-only checks). Two distinct seeded admin-role users (`admin` + `approver`) exist solely to satisfy this segregation locally; see [`migrations/0159_seed_dev_approver_user.sql`](../../migrations/0159_seed_dev_approver_user.sql).
+**SoD note:** templates lifecycle requires the approver's `userId` to differ from the author's `userId` (`domain.CheckSegregation`, `internal/modules/templates/domain/approval.go:37`). `admin` authors → `approver` approves (or `approver-test` for capability-gate-only checks). Two distinct seeded admin-role users (`admin` + `approver`) exist solely to satisfy this segregation locally; see [`migrations/0159_seed_dev_approver_user.sql`](../../migrations/0159_seed_dev_approver_user.sql).
+
+**Publish-capability note (TST-03):** `template.publish` is granted only to the `qms_admin` and `system_admin` `role_capabilities` rows (`db/reference-data/0001_product_reference_data.sql`) — the plain `approver` UPA role covers only `template.approve` / `template.review` / `template.view`. When a template's approval config has a reviewer stage (`hasReviewer=true`), `Approve(accept=true)` stops at status `approved` and a separate `POST /templates/{id}/versions/{v}/publish` call (gated on `CapTemplatePublish`) is required to reach `published`. The seeded `approver` user therefore also carries a `qms_admin` `user_process_areas` row (same `rh` area) so it can drive that second call without becoming `admin` and without weakening SoD — see `db/dev-seeds/0001_local_dev_seed.sql`.
 
 `approver-test` password was reset to `ApproverTest123!` on 2026-05-31 (template-editor QA Preview drive) via `PATCH /api/v1/iam/users/approver-test` `{"new_password":"ApproverTest123!","must_change_password":false}` — required `Origin: http://localhost:8081` to bypass CSRF check.
 

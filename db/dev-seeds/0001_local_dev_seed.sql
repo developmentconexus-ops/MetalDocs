@@ -170,6 +170,28 @@ VALUES
     'admin-local',
     NULL
   ),
+  -- TST-03: 'template.publish' is granted only to role_capabilities rows
+  -- ('qms_admin', 'template.publish') / ('system_admin', 'template.publish')
+  -- (db/reference-data/0001_product_reference_data.sql) — the plain 'approver'
+  -- UPA role above never carries it. Templates configured with a reviewer stage
+  -- (hasReviewer=true) leave Approve() at status 'approved' and require a
+  -- SEPARATE PublishTemplateVersion call gated on CapTemplatePublish, so an
+  -- actor holding only the 'approver' UPA role 403s on that second call. Grant
+  -- 'approver' an additional 'qms_admin' UPA row (same 'rh' area as its
+  -- 'approver' row) so the same distinct-from-'admin' identity can drive
+  -- approve AND publish end-to-end without weakening the domain.CheckSegregation
+  -- author != approver check (SoD compares user_id, not role — a second role
+  -- row for the same user does not touch that comparison).
+  (
+    'approver',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'rh',
+    'qms_admin',
+    now(),
+    NULL,
+    'admin-local',
+    NULL
+  ),
   -- Qualidade: varied roles so the tenant directory shows multiple users/areas.
   (
     'admin',
