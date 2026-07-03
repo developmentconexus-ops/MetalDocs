@@ -415,7 +415,15 @@ func main() {
 
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
-	docPresigner := objectstore.NewVerifiedStore(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
+	// STO-02: single shared VerifiedStore instance for the composition root. The
+	// documents and templates modules previously each constructed their own
+	// NewVerifiedStore with identical args (same minio clients, same bucket, same
+	// 25 MiB cap) — two kernel instances wrapping the same underlying bucket with
+	// no shared state to justify separate objects. Construct once here and inject
+	// into both consumers (docPresigner below; templatesPresigner via
+	// buildTemplatesModule's presigner parameter).
+	sharedPresigner := objectstore.NewVerifiedStore(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
+	docPresigner := sharedPresigner
 	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
 
 	// Fanout/eigenpal client — enabled when METALDOCS_FANOUT_URL is set.
@@ -553,7 +561,7 @@ func main() {
 	// needs ControlledDocumentDuplicator), hence the post-construction setter.
 	controlledDocumentsModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
-	templatesModule, templatesRepo, templatesStore, err := buildTemplatesModule(deps, capabilityService)
+	templatesModule, templatesRepo, templatesStore, err := buildTemplatesModule(deps, capabilityService, sharedPresigner)
 	if err != nil {
 		slog.Error("build templates module", "err", err)
 		deps.Cleanup()
@@ -806,11 +814,16 @@ func buildTokensModule(deps bootstrap.APIDependencies) *tokens.Module {
 // buildTemplatesModule returns the templates HTTP handler plus the repository and
 // object store it is built on, so the composition root can wire the background
 // orphan-object sweeper (F-T6) against the same instances the request path uses.
-func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService) (*templateshttp.Handler, *templatesrepo.Repository, *objectstore.VerifiedStore, error) {
+// presigner is the shared VerifiedStore constructed once at the composition root
+// (STO-02) — templates does not construct its own instance.
+func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService, presigner *objectstore.VerifiedStore) (*templateshttp.Handler, *templatesrepo.Repository, *objectstore.VerifiedStore, error) {
 	if capabilityService == nil {
 		return nil, nil, nil, errors.New("templates capability service is required")
 	}
-	templatesPresigner := objectstore.NewVerifiedStore(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
+	if presigner == nil {
+		return nil, nil, nil, errors.New("templates object store presigner is required")
+	}
+	templatesPresigner := presigner
 	// Build a dedicated builtins registry so the D5 reserved-name guard fires in
 	// production. Mirrors the pattern in reserved_names.go (SP-2 §5.1). The 8 static
 	// builtins are cheap; a separate instance here keeps this independent of the

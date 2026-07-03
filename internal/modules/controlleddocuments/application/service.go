@@ -325,6 +325,17 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			span.SetStatus(codes.Error, err.Error())
 			return nil, fmt.Errorf("controlled_documents: ensure template artifact: %w", err)
 		}
+		// ARC-05 hardening: ensureTemplateArtifact above already fails closed via
+		// ErrTemplateArtifactInvariantUnconfigured when s.docInit is nil, so this
+		// guard is unreachable on the current call order. It is kept explicit
+		// (mirrors the :482 and :764 guards on the other two docInit call paths)
+		// so a future reorder of these two calls fails with a named error instead
+		// of a nil-pointer panic — the wiring-layer construction-order contract
+		// (WithDocumentInitializer, see main.go) stays enforced at every call site,
+		// not just this one incidentally.
+		if s.docInit == nil {
+			return nil, ErrTemplateArtifactInvariantUnconfigured
+		}
 		resolvedTemplateVersionID, err := s.docInit.ResolveTemplateVersionID(ctx, cmd.TenantID, cmd.ProfileCode, cmd.TemplateVersionID)
 		if err != nil {
 			span.RecordError(err)

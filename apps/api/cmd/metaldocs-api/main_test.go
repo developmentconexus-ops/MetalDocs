@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"metaldocs/internal/platform/bootstrap"
+	"metaldocs/internal/platform/objectstore"
 )
 
 // TestShutdownServer_ServerErrorJoinsScheduler reproduces the C3 regression:
@@ -110,9 +111,23 @@ func TestShutdownServer_ContextCancellation(t *testing.T) {
 func TestBuildTemplatesModuleFailsWhenCapabilityServiceMissing(t *testing.T) {
 	t.Parallel()
 
-	_, _, _, err := buildTemplatesModule(bootstrap.APIDependencies{}, nil)
+	presigner := objectstore.NewVerifiedStore(nil, nil, "metaldocs-attachments", 0)
+	_, _, _, err := buildTemplatesModule(bootstrap.APIDependencies{}, nil, presigner)
 	if err == nil {
 		t.Fatal("expected error for nil capability service")
+	}
+}
+
+// TestBuildTemplatesModuleFailsWhenPresignerMissing guards the STO-02 wiring
+// change: buildTemplatesModule no longer constructs its own VerifiedStore, so a
+// nil presigner must fail fast at construction instead of surfacing as a later
+// nil-pointer panic on first object-store use.
+func TestBuildTemplatesModuleFailsWhenPresignerMissing(t *testing.T) {
+	t.Parallel()
+
+	_, _, _, err := buildTemplatesModule(bootstrap.APIDependencies{}, nil, nil)
+	if err == nil {
+		t.Fatal("expected error for nil presigner")
 	}
 }
 

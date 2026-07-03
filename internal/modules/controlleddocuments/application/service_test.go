@@ -695,6 +695,64 @@ func TestControlledDocumentService_Create_TemplateArtifactInvariantUnconfigured_
 	}
 }
 
+// TestControlledDocumentService_Create_AutoPath_NilDocInitAfterArtifactCheck_FailsClosed
+// is a white-box regression test for the ARC-05 hardening: Create's auto-code
+// path used to call s.docInit.ResolveTemplateVersionID immediately after
+// ensureTemplateArtifact with no guard of its own, relying entirely on
+// ensureTemplateArtifact having already failed closed when docInit is nil. That
+// made the ordering of the two calls a hidden contract — if ensureTemplateArtifact
+// were ever reordered after the ResolveTemplateVersionID call (or removed), a nil
+// docInit would nil-pointer-panic instead of returning an error. This test nils
+// out the service's docInit as a side effect of the LAST call ensureTemplateArtifact
+// makes (Exists), so by the time control reaches the ResolveTemplateVersionID call
+// only the dedicated guard added directly above it can prevent a panic.
+func TestControlledDocumentService_Create_AutoPath_NilDocInitAfterArtifactCheck_FailsClosed(t *testing.T) {
+	repo := newFakeControlledDocumentRepository()
+	seq := &fakeSequenceAllocator{next: 7}
+	svc := NewControlledDocumentService(newTxRunner(newPermissiveMockDB(t)), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
+
+	docInit := &nilOnExistsDocumentInitializer{svc: svc, exists: true}
+	svc.docInit = docInit
+
+	templateVersionID := "00000000-0000-0000-0000-000000000102"
+	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+		TenantID:          "tenant-a",
+		ProfileCode:       "dc",
+		ProcessAreaCode:   "rh",
+		Title:             "HR Policy",
+		OwnerUserID:       "owner-1",
+		ActorUserID:       "actor-1",
+		DocumentName:      "HR Policy v1",
+		TemplateVersionID: &templateVersionID,
+	})
+	if err == nil {
+		t.Fatalf("expected invariant configuration error, got nil")
+	}
+	if !errors.Is(err, ErrTemplateArtifactInvariantUnconfigured) {
+		t.Fatalf("expected ErrTemplateArtifactInvariantUnconfigured, got %v", err)
+	}
+	if repo.created != nil {
+		t.Fatalf("expected controlled document not to persist when invariant is unconfigured")
+	}
+}
+
+// nilOnExistsDocumentInitializer wraps fakeDocumentInitializer and nils out the
+// owning service's docInit field when Exists is called — the last hook
+// ensureTemplateArtifact invokes before returning success. This simulates a
+// docInit that goes missing between the artifact pre-flight and the
+// ResolveTemplateVersionID call it guards, isolating the :328 guard from the
+// ensureTemplateArtifact guard it normally sits behind.
+type nilOnExistsDocumentInitializer struct {
+	fakeDocumentInitializer
+	svc    *ControlledDocumentService
+	exists bool
+}
+
+func (f *nilOnExistsDocumentInitializer) Exists(ctx context.Context, storageKey string) (bool, error) {
+	f.svc.docInit = nil
+	return f.exists, nil
+}
+
 func TestControlledDocumentService_Create_ManualCodeReasonWinsBeforeArtifactCheck(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	seq := &fakeSequenceAllocator{next: 6}
