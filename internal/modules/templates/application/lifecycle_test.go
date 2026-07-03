@@ -369,8 +369,31 @@ func TestApprove_Accept_WithReviewer(t *testing.T) {
 	if template.PublishedVersionNumber == nil || *template.PublishedVersionNumber != version.VersionNumber {
 		t.Fatalf("expected PublishedVersionNumber %d, got %v", version.VersionNumber, template.PublishedVersionNumber)
 	}
-	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublished {
-		t.Fatalf("expected one %q audit event, got %v", domain.AuditPublished, repo.audit)
+	// ARC-09: the obsolete side-effect on the previously-published version must
+	// emit its own AuditObsoleted event, in the same tx as the AuditPublished
+	// event for the newly-approved version.
+	if len(repo.audit) != 2 {
+		t.Fatalf("expected 2 audit events (published + obsoleted), got %v", repo.audit)
+	}
+	var sawPublished, sawObsoleted bool
+	for _, a := range repo.audit {
+		switch a.Action {
+		case domain.AuditPublished:
+			sawPublished = true
+			if a.VersionID == nil || *a.VersionID != version.ID {
+				t.Fatalf("expected published audit versionID %q, got %v", version.ID, a.VersionID)
+			}
+		case domain.AuditObsoleted:
+			sawObsoleted = true
+			if a.VersionID == nil || *a.VersionID != oldPublished.ID {
+				t.Fatalf("expected obsoleted audit versionID %q, got %v", oldPublished.ID, a.VersionID)
+			}
+		default:
+			t.Fatalf("unexpected audit action %q", a.Action)
+		}
+	}
+	if !sawPublished || !sawObsoleted {
+		t.Fatalf("expected both published and obsoleted audit events, got %v", repo.audit)
 	}
 	// M1·T2: no auto next-draft. LatestVersion must NOT be bumped by approve
 	// (no new draft was allocated); it stays at the template's prior value —
@@ -921,5 +944,190 @@ func TestPublishTemplateVersion_NoAutoNextDraft(t *testing.T) {
 	// LatestVersion must remain 1 (the published version) — no new draft allocated.
 	if repo.UpdateTemplateTxCalls[0] != 1 {
 		t.Fatalf("UpdateTemplateTx called with LatestVersion=%d, want 1", repo.UpdateTemplateTxCalls[0])
+	}
+}
+
+// TestPublishTemplateVersion_ObsoletesPreviousAndAudits pins ARC-09: when
+// PublishTemplateVersion republishes over an already-published version, the
+// obsolete side-effect (ObsoletePreviousPublishedTx) must be accompanied by an
+// AuditObsoleted event referencing the superseded version, committed in the
+// same tx as the new AuditPublished event.
+func TestPublishTemplateVersion_ObsoletesPreviousAndAudits(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{
+		ID:                 "tpl-1",
+		TenantID:           "tenant-a",
+		LatestVersion:      2,
+		PublishedVersionID: strPtr("ver-old"),
+	}
+	oldPublished := &domain.TemplateVersion{
+		ID:            "ver-old",
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		Status:        domain.VersionStatusPublished,
+		AuthorID:      "author-0",
+	}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-new",
+		TemplateID:          template.ID,
+		VersionNumber:       2,
+		Status:              domain.VersionStatusDraft,
+		DocxStorageKey:      "templates/tpl-1/versions/2.docx",
+		ContentHash:         "hash_ok",
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[oldPublished.ID] = oldPublished
+	repo.versions[version.ID] = version
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	res, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
+		TemplateID:    template.ID,
+		VersionNumber: 2,
+		SchemaKey:     "templates/tpl-1/versions/2.schema.json",
+	})
+	if err != nil {
+		t.Fatalf("PublishTemplateVersion returned error: %v", err)
+	}
+	if res.PublishedVersion.Status != domain.VersionStatusPublished {
+		t.Fatalf("expected published status, got %q", res.PublishedVersion.Status)
+	}
+	if oldPublished.ObsoletedAt == nil {
+		t.Fatal("expected previously published version to be obsoleted")
+	}
+	if len(repo.audit) != 2 {
+		t.Fatalf("expected 2 audit events (published + obsoleted), got %v", repo.audit)
+	}
+	var sawPublished, sawObsoleted bool
+	for _, a := range repo.audit {
+		switch a.Action {
+		case domain.AuditPublished:
+			sawPublished = true
+			if a.VersionID == nil || *a.VersionID != version.ID {
+				t.Fatalf("expected published audit versionID %q, got %v", version.ID, a.VersionID)
+			}
+		case domain.AuditObsoleted:
+			sawObsoleted = true
+			if a.VersionID == nil || *a.VersionID != oldPublished.ID {
+				t.Fatalf("expected obsoleted audit versionID %q, got %v", oldPublished.ID, a.VersionID)
+			}
+			if got := a.Details["superseded_by_version_id"]; got != version.ID {
+				t.Fatalf("expected superseded_by_version_id=%q, got %v", version.ID, got)
+			}
+		default:
+			t.Fatalf("unexpected audit action %q", a.Action)
+		}
+	}
+	if !sawPublished || !sawObsoleted {
+		t.Fatalf("expected both published and obsoleted audit events, got %v", repo.audit)
+	}
+}
+
+// TestPublishTemplateVersion_FirstPublishNoObsoletedAudit pins the negative
+// case: a template's FIRST publish (no prior PublishedVersionID) must NOT
+// emit an AuditObsoleted event — there is nothing to obsolete.
+func TestPublishTemplateVersion_FirstPublishNoObsoletedAudit(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          "tpl-1",
+		VersionNumber:       1,
+		Status:              domain.VersionStatusDraft,
+		DocxStorageKey:      "templates/tpl-1/versions/1.docx",
+		ContentHash:         "hash_ok",
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(newPermissiveMockDB(t)))
+
+	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
+	})
+	if err != nil {
+		t.Fatalf("PublishTemplateVersion returned error: %v", err)
+	}
+	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublished {
+		t.Fatalf("expected exactly 1 published audit event (no obsoleted), got %v", repo.audit)
+	}
+}
+
+// TestApprove_Accept_ObsoletesInSameTxCommitEnvelope pins ARC-09 at the tx
+// boundary: using a real sqlmock DB (not the permissive one), the obsolete
+// audit append must happen INSIDE the single Begin/Commit envelope that also
+// carries the authz assertion and the published audit — i.e. mock.ExpectCommit
+// only fires (and ExpectationsWereMet passes) if AppendAuditTx for the
+// obsoleted event succeeded without erroring out of the closure.
+func TestApprove_Accept_ObsoletesInSameTxCommitEnvelope(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repo := newFakeRepo()
+	template := &domain.Template{
+		ID:                 "tpl-1",
+		TenantID:           "tenant-a",
+		PublishedVersionID: strPtr("ver-old"),
+	}
+	reviewerRole := "reviewer"
+	oldPublished := &domain.TemplateVersion{
+		ID:            "ver-old",
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		Status:        domain.VersionStatusPublished,
+		AuthorID:      "author-0",
+	}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-2",
+		TemplateID:          template.ID,
+		VersionNumber:       2,
+		Status:              domain.VersionStatusApproved,
+		AuthorID:            "author-1",
+		PendingReviewerRole: &reviewerRole,
+		PendingApproverRole: "approver",
+		ReviewerID:          strPtr("reviewer-1"),
+		ContentHash:         "deadbeef",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[oldPublished.ID] = oldPublished
+	repo.versions[version.ID] = version
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithRunner(newTxRunner(db))
+	mock.ExpectBegin()
+	expectTemplateAuthz(mock, "approver-1", "tenant-a", "template.approve")
+	mock.ExpectCommit()
+
+	_, err = svc.Approve(context.Background(), application.ApproveCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
+		TemplateID:    template.ID,
+		VersionNumber: 2,
+		Accept:        true,
+	})
+	if err != nil {
+		t.Fatalf("Approve: %v", err)
+	}
+	// Commit only fires if every step inside the closure (including the
+	// obsoleted-audit append) returned nil — proves same-tx atomicity.
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+	if len(repo.audit) != 2 {
+		t.Fatalf("expected 2 audit events (published + obsoleted), got %v", repo.audit)
 	}
 }

@@ -238,6 +238,12 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 		version.ApprovedAt = &now
 		version.PublishedAt = &now
 
+		// Capture the template's currently-published version (if any) BEFORE
+		// overwriting the pointer below — this is the version ObsoletePreviousPublishedTx
+		// is about to transition to 'obsolete', and it's what the AuditObsoleted
+		// event must reference.
+		obsoletedVersionID := template.PublishedVersionID
+
 		template.PublishedVersionID = &version.ID
 		approvedNum := version.VersionNumber
 		template.PublishedVersionNumber = &approvedNum
@@ -250,6 +256,13 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 		if err != nil {
 			return nil, err
 		}
+		var obsoletedAudit *domain.AuditEvent
+		if obsoletedVersionID != nil {
+			obsoletedAudit, err = newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, obsoletedVersionID, domain.AuditObsoleted, map[string]any{"superseded_by_version_id": version.ID}, s.clock.Now())
+			if err != nil {
+				return nil, err
+			}
+		}
 		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 			if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 				return fmt.Errorf("templates approve: setAuthzGUC: %w", err)
@@ -259,6 +272,11 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 			}
 			if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TenantID, cmd.TemplateID, version.ID); err != nil {
 				return err
+			}
+			if obsoletedAudit != nil {
+				if err := s.repo.AppendAuditTx(ctx, tx, obsoletedAudit); err != nil {
+					return wrapAppErr("templates approve: append obsoleted audit", err)
+				}
 			}
 			if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
 				return err
@@ -386,6 +404,13 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	version.Status = domain.VersionStatusPublished
 	version.PublishedAt = &now
 	version.ApprovedAt = &now
+
+	// Capture the template's currently-published version (if any) BEFORE
+	// overwriting the pointer below — this is the version ObsoletePreviousPublishedTx
+	// is about to transition to 'obsolete', and it's what the AuditObsoleted
+	// event must reference.
+	obsoletedVersionID := template.PublishedVersionID
+
 	template.PublishedVersionID = &version.ID
 	publishedNum := version.VersionNumber
 	template.PublishedVersionNumber = &publishedNum
@@ -397,6 +422,13 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	if err != nil {
 		return nil, err
 	}
+	var obsoletedAudit *domain.AuditEvent
+	if obsoletedVersionID != nil {
+		obsoletedAudit, err = newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, obsoletedVersionID, domain.AuditObsoleted, map[string]any{"superseded_by_version_id": version.ID}, now)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 			return fmt.Errorf("templates publish: setAuthzGUC: %w", err)
@@ -406,6 +438,11 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 		}
 		if err := s.repo.ObsoletePreviousPublishedTx(ctx, tx, cmd.TenantID, cmd.TemplateID, version.ID); err != nil {
 			return err
+		}
+		if obsoletedAudit != nil {
+			if err := s.repo.AppendAuditTx(ctx, tx, obsoletedAudit); err != nil {
+				return wrapAppErr("templates publish: append obsoleted audit", err)
+			}
 		}
 		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
 			return err

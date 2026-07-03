@@ -147,6 +147,15 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 			return fmt.Errorf("templates commit autosave: authz: %w", err)
 		}
 		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+			// CAS lost to a concurrent commit on the same version (TOCTOU: the
+			// unlocked GetVersion read above raced a concurrent CommitAutosave/
+			// lifecycle transition that landed first). Reclassify so the HTTP
+			// layer returns 409 (conflict, matches the OpenAPI contract for this
+			// route) rather than 412 (precondition failed) — same remap as every
+			// other status-transition path in lifecycle.go (F-T3).
+			if errors.Is(err, domain.ErrStaleLockVersion) {
+				return domain.ErrConcurrentTransition
+			}
 			return wrapAppErr("templates commit autosave: update version", err)
 		}
 		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
