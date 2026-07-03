@@ -1,7 +1,7 @@
 # Document Render Pipeline — End-to-End Flow
 
-> **Last verified:** 2026-07-02 (StagingOutboxWorker consolidation: `PDFOutboxWorker`/`MaterializeOutboxWorker` and their per-table repos replaced by generic `fanout.StagingOutboxWorker` + `StagingOutboxRepository` — §12 clone flags resolved) | **Prior:** 2026-07-01 (ARC-01: §7 template reader fallback flipped canonical-first; legacy `TemplateReader` is now fallback-only with a residual-hit counter + WARN log. APP-01: §4 legacy synchronous freeze + `PDFDispatcher`/`PDFDispatchAdapter` removed — PDF dispatch outbox-only), 2026-06-11
-> **Scope:** The complete render pipeline: from approval trigger through placeholder resolution (Pin), async DOCX materialization (Materialize), PDF conversion, to frozen artifact storage. Covers all five flows: primary async freeze, legacy synchronous freeze, PDF conversion, forensic reconstruction, and template reader fallback. Includes all actors: Go API binary, Go worker binary, docx-renderer sidecar, Gotenberg, and MinIO.
+> **Last verified:** 2026-07-03 (DB-01 closed: §7 dual-reader fallback deleted — `TemplatesTemplateReader` is the only template reader; legacy `template_versions`/`templates` dropped by migration 0268) | **Prior:** 2026-07-02 (StagingOutboxWorker consolidation: `PDFOutboxWorker`/`MaterializeOutboxWorker` and their per-table repos replaced by generic `fanout.StagingOutboxWorker` + `StagingOutboxRepository` — §12 clone flags resolved), 2026-07-01 (ARC-01 canonical-first flip; APP-01: §4 legacy synchronous freeze + `PDFDispatcher`/`PDFDispatchAdapter` removed — PDF dispatch outbox-only), 2026-06-11
+> **Scope:** The complete render pipeline: from approval trigger through placeholder resolution (Pin), async DOCX materialization (Materialize), PDF conversion, to frozen artifact storage. Covers all five flows: primary async freeze, legacy synchronous freeze, PDF conversion, forensic reconstruction, and the canonical template read. Includes all actors: Go API binary, Go worker binary, docx-renderer sidecar, Gotenberg, and MinIO.
 > **Key files:**
 > - `internal/modules/documents/application/freeze_service.go`
 > - `internal/modules/render/fanout/staging_outbox_worker.go:23` — generic staging outbox relay worker (PDF + materialize instances)
@@ -204,24 +204,13 @@ sequenceDiagram
 
 ---
 
-## 7. Flow 5: template reader fallback (docgenv2 dual-reader)
+## 7. Flow 5: template read (docgenv2 canonical reader)
 
-This is not a user-visible flow but an infrastructure-layer branching path used each time a materialize job needs the template DOCX.
+This is not a user-visible flow but an infrastructure-layer read used each time a materialize job needs the template DOCX.
 
-**ARC-01 (2026-07-01): canonical-first.** `FanoutTemplateReader` reads the canonical `templates_template_version`/`templates_template` family first; the legacy `template_versions`/`templates` reader is fallback-only, invoked only on `sql.ErrNoRows` from the canonical read.
+**DB-01 closed (2026-07-03): canonical only.** `TemplatesTemplateReader.GetPublishedVersion` (`platform/docgenv2/templates_reader.go`) reads `templates_template_version`/`templates_template` directly — `sql.ErrNoRows` surfaces as not-found, any other error surfaces unchanged, schema always returns `""`.
 
-```mermaid
-flowchart TD
-    A["FreezeService.Materialize\ncalls SnapshotReader or TplRead"] --> B["FanoutTemplateReader.GetPublishedVersion\n(platform/docgenv2/templates_reader.go)"]
-    B --> C["TemplatesTemplateReader.GetPublishedVersion\n(canonical: templates_template_version / templates_template)\nSchema always ''"]
-    C -->|"sql.ErrNoRows"| D["TemplateReader.GetPublishedVersion\n(legacy: template_versions / templates)\nSchema JSON fetched from MinIO"]
-    C -->|"any other error"| E["return error — no fallback"]
-    C -->|"found"| F["return version, schema = ''"]
-    D -->|"found"| G["return version with schema JSON\n(increments legacyTemplateReadTotal + WARN log)"]
-    D -->|"not found"| H["return sql.ErrNoRows"]
-```
-
-This fallback exists because the codebase is mid-migration between two template schemas. Every legacy-fallback hit is counted (`docgenv2.LegacyTemplateReadCount()`) and logged at WARN with `tenant_id`/`template_version_id`, so a full run window can prove zero residual legacy reads. Once that run-window proof holds, DB-01 removes `TemplateReader`, the `FanoutTemplateReader` chain, and the legacy `template_versions`/`templates` tables.
+The former dual-reader design (`FanoutTemplateReader` canonical-first with a legacy `template_versions`/`templates` fallback on `sql.ErrNoRows`, ARC-01 2026-07-01) was deleted together with the legacy tables (migration 0268) after the gating run-window proof: `docgenv2.LegacyTemplateReadCount()`/WARN-log grep showed zero legacy fallback reads across the full Goal-3 QA window, and both legacy tables were empty on the canonical bootstrap.
 
 ---
 
@@ -259,8 +248,9 @@ The `FOR UPDATE SKIP LOCKED` claim pattern makes the outbox workers safe to run 
 | `documents` (freeze columns) | `metaldocs` | `FreezeFinalizer.WriteFreeze`, `FinalDocxWriter.WriteFinalDocx`, `PDFPersister.WritePDF` | `FanoutInputsReader.ReadForReconstruction`, `RevisionReader`, `DocumentContextBuilder` |
 | `documents.reconstruction_attempts` (JSONB) | `metaldocs` | `ReconstructionWriter.AppendReconstruction` | (read by forensics/audit consumers) |
 | `approval_signoffs`, `approval_instances` | `metaldocs` | approval module | `WorkflowReader.GetApprovers`, `GetFinalApprovalDate` (`resolver_readers.go:66-103`) |
-| `template_versions`, `templates` | legacy | templates module (legacy) | `TemplateReader.GetPublishedVersion` |
-| `templates_template_version`, `templates_template` | new | templates module (new) | `TemplatesTemplateReader`, `TemplatesSnapshotReader` |
+| `templates_template_version`, `templates_template` | canonical | templates module | `TemplatesTemplateReader`, `TemplatesSnapshotReader` |
+
+(Legacy `template_versions`/`templates` dropped by migration 0268, DB-01.)
 
 ### MinIO object keys
 

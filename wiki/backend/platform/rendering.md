@@ -1,11 +1,10 @@
 # Platform Rendering — render & docgenv2 Packages
 
-> **Last verified:** 2026-07-01 (ARC-01: `FanoutTemplateReader` flipped from legacy-first to canonical-first — `TemplatesTemplateReader` (`templates_template_version`) is now primary, legacy `TemplateReader` (`template_versions`) is fallback-only on `sql.ErrNoRows`; residual legacy hits are counted via `docgenv2.LegacyTemplateReadCount()` and logged at WARN — pending DB-01 to remove the legacy reader/tables once the counter proves zero across a run window. The former "no interface boundary for unit testing" TODO is resolved: `FanoutTemplateReader` now has dedicated sqlmock-based unit tests in `fanout_template_reader_test.go`.)
-> **Prior:** 2026-06-11
+> **Last verified:** 2026-07-03 (DB-01 CLOSED: legacy `TemplateReader`, `FanoutTemplateReader`, and the `LegacyTemplateReadCount()` counter are deleted; `TemplatesTemplateReader` is the only template reader, wired directly as `docDeps.TplRead`. Run-window proof collected before deletion: zero legacy fallback reads across the full Goal-3 QA window, legacy tables empty on canonical bootstrap. Legacy `public.templates`/`public.template_versions` tables dropped by migration 0268.)
+> **Prior:** 2026-07-01 (ARC-01 canonical-first flip), 2026-06-11
 > **Scope:** `internal/platform/render/gotenberg/`, `internal/platform/docgenv2/` — the two platform packages that bridge domain-module rendering needs to external infrastructure (Gotenberg, MinIO, and the two template schemas). This page covers only the platform layer; the end-to-end flow lives in [../flows/render-pipeline.md](../flows/render-pipeline.md) and the TypeScript sidecar is documented in [../binaries/docx-renderer.md](../binaries/docx-renderer.md).
 > **Key files:**
 > - `internal/platform/render/gotenberg/client.go`
-> - `internal/platform/docgenv2/template_reader.go`
 > - `internal/platform/docgenv2/templates_reader.go`
 > - `internal/platform/docgenv2/templates_snapshot_reader.go`
 
@@ -58,7 +57,7 @@ func (c *Client) ConvertDocxToPDFWithOptions(ctx context.Context, docxContent []
 
 ### Role
 
-Provides template and snapshot readers for use by the `documents` application layer. The package exists because the codebase is mid-migration between two template schemas: the legacy `template_versions`/`templates` tables and the new `templates_template_version`/`templates_template` tables. Both readers are held here so the documents module is insulated from the schema duality.
+Provides template and snapshot readers for use by the `documents` application layer. Historically the package bridged two template schemas (legacy `template_versions`/`templates` vs canonical `templates_template_version`/`templates_template`); the migration completed 2026-07-03 (DB-01, migration 0268) — the legacy tables are dropped and only the canonical readers remain.
 
 ### Naming note — docgen v1 vs v2
 
@@ -68,61 +67,40 @@ There is no "docgen v1" remnant in the codebase. The package name `docgenv2` is 
 
 | File | Role |
 |---|---|
-| `template_reader.go` | `TemplateReader` — reads DOCX key and schema JSON from legacy `template_versions`/`templates` tables; fetches schema JSON from MinIO (1 MiB cap); uses `systemTemplateTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` for system-owned templates |
-| `templates_reader.go` | `TemplatesTemplateReader` — reads published DOCX key from new `templates_template_version`/`templates_template` tables; schema always returns `""`; `FanoutTemplateReader` chains primary (`TemplatesTemplateReader`, canonical) → secondary (`TemplateReader`, legacy) with `sql.ErrNoRows` fallback (ARC-01, 2026-07-01) |
+| `templates_reader.go` | `TemplatesTemplateReader` — reads published DOCX key from `templates_template_version`/`templates_template`; schema always returns `""`; carries `systemTemplateTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` for system-owned templates (relocated here when the legacy reader was deleted, DB-01) |
 | `templates_snapshot_reader.go` | `TemplatesSnapshotReader` — implements `documents/application.SnapshotTemplateReader`; loads `placeholder_schema` JSON and DOCX key from `templates_template_version`; `CompositionJSON` hardcoded to `{}` [runtime-unverified: whether this is intentional or a missing feature] |
-| `template_reader_test.go` | Unit tests for `TemplateReader` |
+| `templates_reader_test.go` | Unit tests for `TemplatesTemplateReader` (system-template tenant allowance) |
 | `templates_snapshot_reader_test.go` | Unit tests for `TemplatesSnapshotReader` |
-| `fanout_template_reader_test.go` | Unit tests for `FanoutTemplateReader` — canonical-hit, canonical-notfound→legacy-fallback (asserts `LegacyTemplateReadCount` increments), canonical-error (asserts no fallback attempted), both-notfound |
 
 ### Public surface
 
 ```
-type TemplateReader struct { ... }
-func NewTemplateReader(db *sql.DB, client *minio.Client, bucket string) *TemplateReader
-
 type TemplatesTemplateReader struct { ... }
 func NewTemplatesTemplateReader(db *sql.DB) *TemplatesTemplateReader
-
-type FanoutTemplateReader struct { ... }
-func NewFanoutTemplateReader(primary *TemplatesTemplateReader, secondary *TemplateReader) *FanoutTemplateReader
 
 type TemplatesSnapshotReader struct { ... }
 func NewTemplatesSnapshotReader(db *sql.DB) *TemplatesSnapshotReader
 ```
 
 Wired in `apps/api/cmd/metaldocs-api/main.go`:
-- `TemplateReader` (legacy) and `TemplatesTemplateReader` (canonical) constructed inline at the `docDeps.TplRead` call site (~`main.go:434-437`).
-- `FanoutTemplateReader` assigned as `docDeps.TplRead`, canonical reader passed as `primary`, legacy reader as `secondary`.
+- `TemplatesTemplateReader` constructed directly as `docDeps.TplRead` (~`main.go:448-455`).
 - `TemplatesSnapshotReader` assigned as `docSnapshotReader` a few lines above the `docDeps` construction.
 
-### Template reader fallback flow (ARC-01, 2026-07-01: canonical-first)
+### Template reader flow (DB-01 closed 2026-07-03: canonical only)
 
-```mermaid
-flowchart TD
-    A["FanoutTemplateReader.GetPublishedVersion()"] --> B["TemplatesTemplateReader.GetPublishedVersion()\n(canonical: templates_template_version/templates_template)"]
-    B -->|"sql.ErrNoRows"| C["TemplateReader.GetPublishedVersion()\n(legacy: template_versions/templates)"]
-    B -->|"any other error"| D["return error — no fallback"]
-    B -->|"found"| E["return version (schema = empty string)"]
-    C -->|"found"| F["return version (schema JSON from MinIO); increments legacyTemplateReadTotal + WARN log"]
-    C -->|"not found"| G["return sql.ErrNoRows"]
-```
+`TemplatesTemplateReader.GetPublishedVersion()` reads `templates_template_version`/`templates_template` directly; `sql.ErrNoRows` surfaces as not-found, any other error surfaces unchanged. The former `FanoutTemplateReader` (canonical-first with legacy `sql.ErrNoRows` fallback, ARC-01) and its `LegacyTemplateReadCount()` counter + WARN log were deleted together with the legacy tables (migration 0268) after the run-window proof: zero legacy fallback reads across the full Goal-3 QA window, legacy tables empty on canonical bootstrap.
 
-- Canonical reads first: `TemplatesTemplateReader` is now `primary`; the legacy `TemplateReader` is `secondary`, invoked ONLY when the canonical lookup returns `sql.ErrNoRows`. Any other canonical-side error (a real DB failure) surfaces immediately with no fallback attempt, so a live DB outage can never be silently masked as "check the legacy table."
-- Schema JSON is only available through the legacy path (fetched from MinIO). The canonical `TemplatesTemplateReader` always returns `""` for schema.
-- **Observability:** every legacy-fallback hit increments a process-wide atomic counter (`docgenv2.LegacyTemplateReadCount()`) and emits a `slog.Warn` structured log line (`tenant_id`, `template_version_id`, running counter value). No Prometheus/metrics-exporter plumbing reaches this reader today (the platform's lightweight-metrics idiom — see `internal/platform/observability/http.go` `routeMetrics` — is scoped to HTTP routes), so the counter is not yet wired into `/api/v1/metrics`; it exists for tests and as the future wiring point. This is the run-window proof gating DB-01 (drop the legacy reader + tables once the counter stays at zero).
+- Schema JSON: the canonical reader always returns `""` (the legacy MinIO-backed schema fetch died with the legacy reader).
 - `TemplatesSnapshotReader` maps `sql.ErrNoRows` to `domain.ErrSnapshotTemplateNotFound` (`templates_snapshot_reader.go:40`).
 
 ### Persistence — tables accessed
 
 | Table | Schema | Access type | Reader |
 |---|---|---|---|
-| `template_versions` | legacy | read | `TemplateReader` |
-| `templates` | legacy | read | `TemplateReader` |
-| `templates_template_version` | new | read | `TemplatesTemplateReader`, `TemplatesSnapshotReader` |
-| `templates_template` | new | read | `TemplatesTemplateReader`, `TemplatesSnapshotReader` |
+| `templates_template_version` | canonical | read | `TemplatesTemplateReader`, `TemplatesSnapshotReader` |
+| `templates_template` | canonical | read | `TemplatesTemplateReader`, `TemplatesSnapshotReader` |
 
-MinIO: schema JSON object fetched by `TemplateReader.GetPublishedVersion` (`template_reader.go:47`); capped at 1 MiB.
+(Legacy `template_versions`/`templates` dropped by migration 0268; MinIO schema fetch removed with the legacy reader.)
 
 ---
 
@@ -135,10 +113,11 @@ MinIO: schema JSON object fetched by `TemplateReader.GetPublishedVersion` (`temp
 - No internal MetalDocs imports
 
 **`internal/platform/docgenv2`**
-- `github.com/minio/minio-go/v7` — schema file read from MinIO
 - `database/sql` — template and snapshot queries
 - `metaldocs/internal/modules/documents/application` — `SnapshotTemplateReader` interface
 - `metaldocs/internal/modules/documents/domain` — `TemplateSnapshot`, `ErrSnapshotTemplateNotFound`
+
+(minio-go import removed with the legacy reader, DB-01.)
 
 ### Inbound (who imports these packages)
 
@@ -155,7 +134,7 @@ MinIO: schema JSON object fetched by `TemplateReader.GetPublishedVersion` (`temp
 
 These packages are domain-free platform adapters (REQ-TOP-2 in [../../architecture/backend-target-architecture.md](../../architecture/backend-target-architecture.md)) and correctly carry no business logic. The import of `documents/application` and `documents/domain` interfaces in `docgenv2` is the correct direction (platform implements a domain-defined port). The reverse (a platform package importing a module and knowing its internal state) would be a layering violation.
 
-**Resolved (2026-07-01, ARC-01):** `FanoutTemplateReader` previously had no interface boundary for unit testing — the two concrete types were directly embedded, and the prior TODO noted the struct was untestable without real DB/S3 deps. It is now covered by `fanout_template_reader_test.go` using sqlmock against both concrete readers (same idiom as `template_reader_test.go`), so the fallback-order semantics are exercised without a live DB. The struct itself is still two concrete types (no formal interface extraction) — that remains a minor design-debt item, but it no longer blocks testing.
+**Resolved (2026-07-03, DB-01):** the whole fanout/fallback design-debt cluster is gone — `FanoutTemplateReader`, the legacy `TemplateReader`, and their test harnesses were deleted once the run-window proof showed zero legacy reads. The surviving `TemplatesTemplateReader` is a single concrete type with sqlmock unit coverage (`templates_reader_test.go`).
 
 ---
 
@@ -163,11 +142,10 @@ These packages are domain-free platform adapters (REQ-TOP-2 in [../../architectu
 
 | Flag | Location | Description | RF ref |
 |---|---|---|---|
-| Package name `docgenv2` is misleading | `internal/platform/docgenv2/` | Name reflects the "docgen v2" era; the service it references is now `docx-renderer`; `FanoutTemplateReader` is about template reading, not fanout dispatch | — |
-| Magic sentinel UUID for system templates | `template_reader.go:13` | `systemTemplateTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` baked as a package constant; no named domain concept | — |
-| `FanoutTemplateReader` has no interface boundary | `templates_reader.go` (struct fields) | Concrete types directly embedded (no port interface); RESOLVED for testability 2026-07-01 via sqlmock unit tests, formal interface extraction still open | — |
+| Package name `docgenv2` is misleading | `internal/platform/docgenv2/` | Name reflects the "docgen v2" era; the service it references is now `docx-renderer` | — |
+| Magic sentinel UUID for system templates | `templates_reader.go` | `systemTemplateTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` baked as a package constant; no named domain concept | — |
 | Schema always `""` in new template path | `templates_snapshot_reader.go:48` | `CompositionJSON` hardcoded to `{}` [runtime-unverified: whether composition config is intentionally absent for the templates module] | — |
-| Dual-schema fallback is temporary | `templates_reader.go` (`FanoutTemplateReader.GetPublishedVersion`) | `FanoutTemplateReader` exists to bridge the migration; flipped canonical-first 2026-07-01 (ARC-01) with a residual-legacy-hit counter (`LegacyTemplateReadCount`) + WARN log gating removal; once the counter proves zero across a run window, DB-01 deletes `TemplateReader`, the fallback chain, and the legacy `template_versions`/`templates` tables | DB-01 |
+| ~~Dual-schema fallback is temporary~~ | — | CLOSED 2026-07-03 (DB-01): run-window proof collected (zero legacy fallback reads); `FanoutTemplateReader` + legacy `TemplateReader` deleted, legacy `template_versions`/`templates` tables dropped (migration 0268) | DB-01 |
 
 See also [../_artifacts/stage1/synthesis-legacy.md](../_artifacts/stage1/synthesis-legacy.md) for the full cross-cutting legacy register.
 

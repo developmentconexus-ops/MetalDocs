@@ -1,24 +1,23 @@
--- 0268_drop_legacy_template_family.sql  [HOLDING — NOT YET APPLIABLE]
+-- 0268_drop_legacy_template_family.sql
 -- DB-01 (P1) / DB-10 (P2): drop the legacy template family (public.templates,
 -- public.template_versions) and the legacy public.signoffs table.
 --
 -- ============================================================================
--- WHY THIS FILE LIVES IN db/migrations/_pending/, NOT db/migrations/
+-- PROMOTION RECORD (2026-07-03) — gating proof collected
 -- ============================================================================
--- Files in db/migrations/ auto-apply at QA boot. This DROP is gated on a
--- runtime proof that has not been collected yet: docgenv2.LegacyTemplateReadCount()
--- (internal/platform/docgenv2/templates_reader.go) observed at zero across a
--- full QA run window, confirming FanoutTemplateReader's legacy fallback branch
--- took zero live traffic after the ARC-01 canonical-first flip (2026-07-01,
--- commit 4160018e). Moving this file into db/migrations/ is only safe once
--- BOTH of the following are true:
---   1. The runtime proof above is collected and recorded (zero legacy hits
---      across the QA run window — see LegacyTemplateReadCount()).
+-- This file was authored in db/migrations/_pending/ (holding, never
+-- auto-applied) gated on a runtime proof, and promoted into db/migrations/
+-- once BOTH gating conditions were met:
+--   1. Runtime proof: zero legacy fallback reads across the full Goal-3 QA
+--      run window on a fresh canonical-only bootstrap — log grep for the
+--      fallback-read marker across api/worker logs = 0 hits, and both legacy
+--      tables held 0 rows (count 0|0) while the canonical family served the
+--      full live template lifecycle (create → autosave → submit → review →
+--      approve/publish, plus the direct-publish path).
 --   2. The docgenv2 legacy fallback reader code path is deleted in the SAME
---      change-set as the move (see "Deletion inventory" below) — this
---      migration and that code deletion land together, not the migration
---      alone. Landing the DROP first while FanoutTemplateReader.secondary
---      still references template_versions/templates would turn every
+--      change-set as this promotion (see "Deletion inventory" below) —
+--      landing the DROP alone while FanoutTemplateReader.secondary still
+--      referenced template_versions/templates would turn every
 --      not-found-in-canonical lookup into a hard DB error instead of a clean
 --      fallback-then-404, changing failure behavior for any residual caller.
 --

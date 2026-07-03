@@ -624,14 +624,11 @@ func mapRoleToMembership(role string) string {
 // ensureTemplateVersion seeds a published template + version in the CANONICAL
 // templates_template / templates_template_version family (TST-01). The finalize/
 // snapshot flow this harness exercises over HTTP resolves docx_storage_key via
-// docgenv2.FanoutTemplateReader, which — as of ARC-01 (2026-07-01) — reads the
-// canonical templates_template / templates_template_version family FIRST and
-// falls back to the legacy public.templates / template_versions tables only on
-// sql.ErrNoRows. Seeding exclusively the canonical family (no legacy rows)
-// exercises the live primary path end-to-end and proves zero legacy-fallback
-// hits for this harness (see docgenv2.LegacyTemplateReadCount / the
-// "served published template version from legacy fallback reader" WARN log,
-// which the run-window proof for DB-01 watches).
+// docgenv2.TemplatesTemplateReader — the only template reader since DB-01
+// closed (2026-07-03): the legacy fallback chain (FanoutTemplateReader +
+// legacy TemplateReader) was deleted and the legacy public.templates /
+// template_versions tables dropped (migration 0268) after the run-window
+// proof showed zero legacy fallback reads.
 //
 // templates_template_version carries an extra trigger beyond the tier-3 capability
 // tripwire (enforce_capability_asserted, satisfied by e2eAssertedCaps' template.create):

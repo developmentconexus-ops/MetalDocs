@@ -1,6 +1,6 @@
 # Local Dev Credentials
 
-**Last verified:** 2026-06-11 (Wave 0 item 0.1 / D-4a: secret value redacted — referenced by location only; prior: 2026-06-03)
+**Last verified:** 2026-07-03 (DB-01: `public.templates`/`public.template_versions` dropped by migration 0268 — corrected stale "Template tables" line below to canonical-only) | **Prior:** 2026-06-11 (Wave 0 item 0.1 / D-4a: secret value redacted — referenced by location only; prior: 2026-06-03)
 
 ## API login
 
@@ -50,7 +50,7 @@ docker exec metaldocs-postgres psql -U metaldocs_app -d metaldocs -c "<query>"
 
 User tables: `metaldocs.auth_identities`, `metaldocs.iam_users`, `metaldocs.iam_user_roles`
 Document tables: `public.documents`, `public.controlled_documents` (note: `public.documents_v2` was dropped by migration 0168)
-Template tables: `public.templates`, `public.template_versions`, `public.templates_template`, `public.templates_template_version`
+Template tables: `public.templates_template`, `public.templates_template_version` (canonical, sole store since ARC-01/migration 0268 — legacy `public.templates`/`public.template_versions` dropped 2026-07-03, see `wiki/database/tables/templates.md`)
 
 ## Process-area roles (approval authz)
 

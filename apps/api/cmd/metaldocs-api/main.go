@@ -46,14 +46,14 @@ import (
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	distributionhttp "metaldocs/internal/modules/distribution/delivery/http"
 	distributioninfra "metaldocs/internal/modules/distribution/infrastructure"
-	notificationshttp "metaldocs/internal/modules/notifications/delivery/http"
-	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	iampresence "metaldocs/internal/modules/iam/presence"
+	notificationshttp "metaldocs/internal/modules/notifications/delivery/http"
+	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/resolvers"
 	searchapp "metaldocs/internal/modules/search/application"
@@ -65,8 +65,8 @@ import (
 	"metaldocs/internal/modules/taxonomy"
 	taxonomyapp "metaldocs/internal/modules/taxonomy/application"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
-	"metaldocs/internal/modules/tokens"
 	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
+	"metaldocs/internal/modules/tokens"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
@@ -448,12 +448,11 @@ func main() {
 	docDeps := documents.Dependencies{
 		DB:      deps.SQLDB,
 		Presign: docPresigner,
-		// ARC-01: canonical templates_template_version read first; legacy
-		// template_versions is fallback-only (docgenv2.FanoutTemplateReader).
-		TplRead: docgenv2.NewFanoutTemplateReader(
-			docgenv2.NewTemplatesTemplateReader(deps.SQLDB),
-			docgenv2.NewTemplateReader(deps.SQLDB, docPresigner),
-		),
+		// ARC-01/DB-01: legacy public.templates/template_versions fallback
+		// reader removed (2026-07-03) after a full QA window proved zero
+		// legacy-fallback reads; templates_template_version is now the only
+		// read path.
+		TplRead:                      docgenv2.NewTemplatesTemplateReader(deps.SQLDB),
 		FormVal:                      formval.NewGojsonschema(),
 		Audit:                        wiring.NewDocumentsAuditSink(deps.AuditWriter),
 		ExportPresign:                docPresigner,

@@ -1,6 +1,6 @@
 # Database Dictionary Index
 
-> **Last verified:** 2026-07-02 (DB-08/status-tighten/DB-09: migration `0264` promotes `document_process_areas` PK to `(tenant_id, code)` — `document_profiles` PK deliberately left as `code` alone, see its table page + `wiki/modules/taxonomy-tech-debt.md` T-015; migration `0265` tightens `documents_status_check` to 9 live values, drops dead `'finalized'`; migration `0266` adds `audit_events_payload_size_cap` (64 KiB) + hardens `metaldocs_app`'s already-INSERT/SELECT-only grant on `audit_events`) | **Prior:** 2026-07-02 (DB-06: migration 0262 drop — `templates_audit_log` table retired, audit sink unified on `metaldocs.audit_events`) | **Prior:** 2026-06-12 (FE-5: migration 0236 dead-schema drop — `document_subjects` table retired; `templates_template.areas/visibility/specific_areas` + `document_profiles.is_active` columns dropped)
+> **Last verified:** 2026-07-03 (DB-01/DB-10: migration `0268` drop — legacy template family `public.templates` + `public.template_versions` retired (canonical successor `templates_template`/`templates_template_version` is the sole live template store since ARC-01, commit `4160018e`); safety-net drop of `public.signoffs` (no-op, table absent from canonical baseline)) | **Prior:** 2026-07-02 (DB-08/status-tighten/DB-09: migration `0264` promotes `document_process_areas` PK to `(tenant_id, code)` — `document_profiles` PK deliberately left as `code` alone, see its table page + `wiki/modules/taxonomy-tech-debt.md` T-015; migration `0265` tightens `documents_status_check` to 9 live values, drops dead `'finalized'`; migration `0266` adds `audit_events_payload_size_cap` (64 KiB) + hardens `metaldocs_app`'s already-INSERT/SELECT-only grant on `audit_events`) | **Prior:** 2026-07-02 (DB-06: migration 0262 drop — `templates_audit_log` table retired, audit sink unified on `metaldocs.audit_events`) | **Prior:** 2026-06-12 (FE-5: migration 0236 dead-schema drop — `document_subjects` table retired; `templates_template.areas/visibility/specific_areas` + `document_profiles.is_active` columns dropped)
 > **Source:** `db/baseline/0001_current_schema.sql`
 
 | Table | Schema | Owner | Page |
@@ -66,8 +66,8 @@
 | `governance_events` | `public` | audit | `wiki/database/tables/governance_events.md` |
 | `schema_migrations` | `public` | platform/db tooling | `wiki/database/tables/schema_migrations.md` |
 | `template_audit_log` | `public` | templates | `wiki/database/tables/template_audit_log.md` |
-| `template_versions` | `public` | templates | `wiki/database/tables/template_versions.md` |
-| `templates` | `public` | templates | `wiki/database/tables/templates.md` |
+| `template_versions` | `public` | templates | `wiki/database/tables/template_versions.md` (RETIRED 2026-07-03, migration 0268 — canonical successor is `templates_template_version`) |
+| `templates` | `public` | templates | `wiki/database/tables/templates.md` (RETIRED 2026-07-03, migration 0268 — canonical successor is `templates_template`) |
 | `templates_approval_config` | `public` | templates | `wiki/database/tables/templates_approval_config.md` |
 | `templates_audit_log` | `public` | templates | `wiki/database/tables/templates_audit_log.md` (RETIRED 2026-07-02, migration 0262 — audit sink is `metaldocs.audit_events`) |
 | `templates_template` | `public` | templates | `wiki/database/tables/templates_template.md` |

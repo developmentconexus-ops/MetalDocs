@@ -1,6 +1,6 @@
 # Architecture: Data Model
 
-> **Last verified:** 2026-07-02 (DB-06: templates audit sink is fully canonical — `public.templates_audit_log` retired via `db/migrations/0262_drop_templates_audit_log.sql`; both `AppendAudit`/`AppendAuditTx` writes and `ListAudit` reads go through `metaldocs.audit_events`) | **Prior:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257) | **Prior-2:** 2026-06-08 (Phase F F4: ListDocumentsPaginated cursor migration; repository.go line anchors updated)
+> **Last verified:** 2026-07-03 (DB-01: legacy template family `public.templates`/`public.template_versions` retired via `db/migrations/0268_drop_legacy_template_family.sql`; `public.templates_template`/`public.templates_template_version` is now the only template store — `internal/platform/docgenv2` reads canonical only, `FanoutTemplateReader` and the legacy fallback reader deleted in the same change-set) | **Prior:** 2026-07-02 (DB-06: templates audit sink is fully canonical — `public.templates_audit_log` retired via `db/migrations/0262_drop_templates_audit_log.sql`; both `AppendAudit`/`AppendAuditTx` writes and `ListAudit` reads go through `metaldocs.audit_events`) | **Prior:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257) | **Prior-2:** 2026-06-08 (Phase F F4: ListDocumentsPaginated cursor migration; repository.go line anchors updated)
 > **Status:** Stub. Expand with ERD + per-table schema notes when SQL stabilizes.
 > **Scope:** Postgres tables, key relationships, snapshot columns, hash columns.
 > **Out of scope:** Migration archaeology (the legacy DB-research notes were removed at the v1 re-baseline, commit `c7f06f2e`; retained historical `migrations/` evidence remains).
@@ -26,8 +26,8 @@ document_families (global, no tenant_id)
 areas ───────────────────────┤           │
   └── controlled_documents               │
                                          │
-templates                                │
-  └── template_versions (draft|under_review|approved|published)
+templates_template                       │
+  └── templates_template_version (draft|under_review|approved|published)
        └── content (eigenpal JSON)
 
 controlled_documents
@@ -68,6 +68,10 @@ See [modules/taxonomy.md](../modules/taxonomy.md) for full entity detail and API
 ## public.documents_v2 — dropped (migration 0168)
 
 `public.documents_v2` was the W1 scaffold table created in migration 0103. Migration 0110 replaced it with `public.documents` (W3 schema). The table was orphaned — no Go code wrote to it after migration 0110. Migration 0168 drops it. Do not reference this table in new code or queries.
+
+## public.templates / public.template_versions — dropped (migration 0268)
+
+The legacy template family (`public.templates`, `public.template_versions`) was superseded by the canonical `public.templates_template` / `public.templates_template_version` pair at the ARC-01 canonical-first cutover (commit `4160018e`). Since ARC-01, `internal/platform/docgenv2.FanoutTemplateReader` tried the canonical reader first and fell back to the legacy pair only on `sql.ErrNoRows`. `db/migrations/0268_drop_legacy_template_family.sql` drops both legacy tables (plus a safety-net `DROP TABLE IF EXISTS public.signoffs`, a no-op — that table was absent from the canonical baseline), gated on runtime proof that `docgenv2.LegacyTemplateReadCount()` observed zero legacy fallback reads across a full QA run window. The `docgenv2` legacy fallback reader code (`template_reader.go`, the `FanoutTemplateReader` indirection, `LegacyTemplateReadCount()`) is deleted in the same change-set as this migration's promotion out of `db/migrations/_pending/`. `internal/platform/docgenv2` now reads the canonical template tables only. Do not reference `public.templates`/`public.template_versions` in new code or queries — see `wiki/database/tables/templates.md` and `wiki/database/tables/template_versions.md` (both RETIRED) and `wiki/modules/templates-tech-debt.md` DB-01 (closed).
 
 ## Snapshot columns (documents)
 
