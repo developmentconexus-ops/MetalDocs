@@ -9,7 +9,8 @@ import (
 
 var _ taxonomyapi.ServerInterface = (*Handler)(nil)
 
-func (h *Handler) ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request, params taxonomyapi.ListTaxonomyProfilesParams) {
+	applyIncludeArchivedParam(r, params.IncludeArchived)
 	h.listProfiles(w, r)
 }
 
@@ -33,7 +34,8 @@ func (h *Handler) SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter, r *ht
 	h.setDefaultTemplate(w, r)
 }
 
-func (h *Handler) ListTaxonomyAreas(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListTaxonomyAreas(w http.ResponseWriter, r *http.Request, params taxonomyapi.ListTaxonomyAreasParams) {
+	applyIncludeArchivedParam(r, params.IncludeArchived)
 	h.listAreas(w, r)
 }
 
@@ -80,4 +82,22 @@ func (h *Handler) UpdateTaxonomyFamily(w http.ResponseWriter, r *http.Request, c
 
 func (h *Handler) DeactivateTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string) {
 	h.deactivateFamily(w, r)
+}
+
+// applyIncludeArchivedParam rewrites r.URL.RawQuery with the typed
+// include_archived value from the generated params struct so downstream
+// handlers (listProfiles, listAreas — parseIncludeArchived in
+// routes_profiles.go) keep reading it via r.URL.Query(), matching the
+// ListTaxonomyFamilies/include_inactive adapter pattern above.
+func applyIncludeArchivedParam(r *http.Request, includeArchived *bool) {
+	if includeArchived == nil {
+		return
+	}
+	q, _ := url.ParseQuery(r.URL.RawQuery)
+	if *includeArchived {
+		q.Set("include_archived", "true")
+	} else {
+		q.Set("include_archived", "false")
+	}
+	r.URL.RawQuery = q.Encode()
 }

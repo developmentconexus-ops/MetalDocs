@@ -1721,6 +1721,10 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-tenant taxonomy profile set returned in full.'
       tags: [taxonomy]
       operationId: listTaxonomyProfiles
+      parameters:
+        - name: include_archived
+          in: query
+          schema: { type: boolean }
       responses:
         '200':
           description: ok
@@ -1738,6 +1742,12 @@ paths:
       summary: Create taxonomy profile
       tags: [taxonomy]
       operationId: createTaxonomyProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyProfileUpsertRequest'
       responses:
         '201':
           description: created
@@ -1783,6 +1793,12 @@ paths:
       operationId: updateTaxonomyProfile
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyProfileUpsertRequest'
       responses:
         '200':
           description: ok
@@ -1828,6 +1844,12 @@ paths:
       operationId: setTaxonomyProfileDefaultTemplate
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetTaxonomyProfileDefaultTemplateRequest'
       responses:
         '200':
           description: ok
@@ -1850,6 +1872,10 @@ paths:
       x-pagination-exempt-reason: 'Bounded per-tenant taxonomy area set returned in full.'
       tags: [taxonomy]
       operationId: listTaxonomyAreas
+      parameters:
+        - name: include_archived
+          in: query
+          schema: { type: boolean }
       responses:
         '200':
           description: ok
@@ -1867,6 +1893,12 @@ paths:
       summary: Create taxonomy area
       tags: [taxonomy]
       operationId: createTaxonomyArea
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyAreaUpsertRequest'
       responses:
         '201':
           description: created
@@ -1912,6 +1944,12 @@ paths:
       operationId: updateTaxonomyArea
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyAreaUpsertRequest'
       responses:
         '200':
           description: ok
@@ -1980,6 +2018,12 @@ paths:
       summary: Create taxonomy family
       tags: [taxonomy]
       operationId: createTaxonomyFamily
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyFamilyUpsertRequest'
       responses:
         '201':
           description: created
@@ -2025,6 +2069,12 @@ paths:
       operationId: updateTaxonomyFamily
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyFamilyUpsertRequest'
       responses:
         '200':
           description: ok
@@ -5049,14 +5099,21 @@ components:
             format: int64
     DocumentFamilyItem:
       type: object
-      required: [code, name, description]
+      required: [code, tenant_id, name, description, is_active, created_at]
       properties:
         code:
+          type: string
+        tenant_id:
           type: string
         name:
           type: string
         description:
           type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
     ListDocumentFamiliesResponse:
       type: object
       required: [items]
@@ -5107,14 +5164,32 @@ components:
             $ref: '#/components/schemas/DocumentProfileItem'
     ProcessAreaItem:
       type: object
-      required: [code, name, description]
+      required: [code, tenant_id, name, description, parent_code, owner_user_id, default_approver_role, archived_at, created_at]
       properties:
         code:
+          type: string
+        tenant_id:
           type: string
         name:
           type: string
         description:
           type: string
+        parent_code:
+          type: string
+          nullable: true
+        owner_user_id:
+          type: string
+          nullable: true
+        default_approver_role:
+          type: string
+          nullable: true
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
     ListProcessAreasResponse:
       type: object
       required: [items]
@@ -5123,6 +5198,68 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProcessAreaItem'
+    TaxonomyProfileUpsertRequest:
+      type: object
+      required: [code, family_code, name, description, review_interval_days, editable_by_role]
+      properties:
+        code:
+          type: string
+        family_code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        alias:
+          type: string
+          minLength: 1
+          maxLength: 24
+        review_interval_days:
+          type: integer
+          minimum: 1
+        default_template_version_id:
+          type: string
+          nullable: true
+        owner_user_id:
+          type: string
+          nullable: true
+        editable_by_role:
+          type: string
+    SetTaxonomyProfileDefaultTemplateRequest:
+      type: object
+      required: [template_version_id]
+      properties:
+        template_version_id:
+          type: string
+    TaxonomyAreaUpsertRequest:
+      type: object
+      required: [code, name, description]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        parent_code:
+          type: string
+          nullable: true
+        owner_user_id:
+          type: string
+          nullable: true
+        default_approver_role:
+          type: string
+          nullable: true
+    TaxonomyFamilyUpsertRequest:
+      type: object
+      required: [code, name, description]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
     AuditEventItem:
       type: object
       required: [id, occurred_at, actor_id, action, resource_type, resource_id, payload, trace_id]

@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/taxonomy.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/taxonomy-refactor.md`.
 
-**Last verified:** 2026-06-12 (Wave 2.12 sync — T-010 fully closed: DBGovernanceLogger deleted, AuditGovernanceAdapter is sole GovernanceLogger; new CI guards nosqltxindomain + nodualmode; prior Wave 2 sync)
+**Last verified:** 2026-07-02 (CON-08 closure — T-009 evidence refreshed: closed the remaining spec/wire-truth drift, not "no spec at all" as CON-08 assumed; see T-009 row). Prior: 2026-06-12 (Wave 2.12 sync — T-010 fully closed: DBGovernanceLogger deleted, AuditGovernanceAdapter is sole GovernanceLogger; new CI guards nosqltxindomain + nodualmode; prior Wave 2 sync)
 
 ## Severity scale
 
@@ -83,10 +83,16 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-009 · No OpenAPI spec; raw `http.ServeMux` instead of oapi-codegen — **CLOSED**
 - **Severity:** major → **resolved**
-- **Surface (resolved):** `internal/modules/taxonomy/api/` — `api.gen.go`, `cfg.yaml`, `gen.go`; `internal/modules/taxonomy/delivery/http/handler.go:42-51` calls `taxonomyapi.HandlerWithOptions`; `internal/modules/taxonomy/delivery/http/routes_generated.go:10` — compile-time `var _ taxonomyapi.ServerInterface = (*Handler)(nil)` assertion.
+- **Surface (resolved):** `internal/modules/taxonomy/api/` — `api.gen.go`, `cfg.yaml`, `gen.go`; `internal/modules/taxonomy/delivery/http/handler.go:42-51` calls `taxonomyapi.HandlerWithOptions`; `internal/modules/taxonomy/delivery/http/routes_generated.go:10` — compile-time `var _ taxonomyapi.ServerInterface = (*Handler)(nil)` assertion; `internal/modules/taxonomy/delivery/http/router_test.go` — registration pin test (every spec route != 404), mirrors `internal/modules/documents/approval/http/router_test.go`.
 - **Observation (original):** All 16 routes were mounted on raw `net/http.ServeMux` with no operationId or OpenAPI spec; ADR 0012 contract-first commitment was unmet; taxonomy was the residual unmigrated module.
-- **Evidence:** `_artifacts/01-surface.md` (original evidence — stale post-resolution); `handler.go:42-51`; `routes_generated.go:10`.
-- **Linked backlog row:** `backlog/taxonomy-refactor.md#R-009`
+- **CON-08 re-audit (2026-07-02):** the grade-A finding re-asserted "NO OpenAPI spec at all" — false; spec/codegen/mount had already landed pre-existing (this row was already CLOSED). What the re-audit actually surfaced was residual **wire-truth drift** inside the existing spec, now closed additively:
+  - `GET /taxonomy/profiles` and `GET /taxonomy/areas` read `include_archived` from the query string (`routes_profiles.go:51`, `routes_areas.go:28`) but the spec declared no such parameter — added `parameters: [include_archived]` to both operations (`api/openapi/v1/openapi.yaml`).
+  - `createTaxonomyProfile`/`updateTaxonomyProfile`/`setTaxonomyProfileDefaultTemplate`/`createTaxonomyArea`/`updateTaxonomyArea`/`createTaxonomyFamily`/`updateTaxonomyFamily` decoded a JSON body (`profileUpsertRequest`, `setDefaultTemplateRequest`, `areaUpsertRequest`, `familyUpsertRequest` in `routes_profiles.go`/`routes_areas.go`/`routes_families.go`) but declared no `requestBody` — added `TaxonomyProfileUpsertRequest`, `SetTaxonomyProfileDefaultTemplateRequest`, `TaxonomyAreaUpsertRequest`, `TaxonomyFamilyUpsertRequest` schemas + wired them.
+  - `listAreas`/`getArea`/`createArea`/`updateArea` and `listFamilies`/`getFamily`/`createFamily`/`updateFamily` marshal the raw `domain.ProcessArea` / `domain.DocumentFamily` structs directly (`writeJSON(w, ..., area)` / `writeJSON(w, ..., f)`), so the wire response included `tenant_id`, `parent_code`, `owner_user_id`, `default_approver_role`, `archived_at`, `created_at` (areas) and `tenant_id`, `is_active`, `created_at` (families) that `ProcessAreaItem`/`DocumentFamilyItem` did not declare — both schemas expanded to match `domain/area.go:9-19` and `domain/family.go:9-17` exactly. `DocumentProfileItem` was already accurate (profiles go through the `toDocumentProfileItem` mapper in `routes_mapping.go:8`, not raw marshaling).
+  - Regenerated `internal/modules/taxonomy/api/api.gen.go` (`GOFLAGS=-mod=mod go generate ./internal/modules/taxonomy/api/...`); `ListTaxonomyProfiles`/`ListTaxonomyAreas` gained a `params` argument in `ServerInterface` (mirroring the pre-existing `ListTaxonomyFamilies`/`include_inactive` pattern) — `routes_generated.go` updated with a shared `applyIncludeArchivedParam` adapter.
+  - Added `router_test.go` (16-route registration pin) — the module previously had per-resource error-envelope contract tests but no single "every spec route is reachable" pin.
+- **Evidence:** `_artifacts/01-surface.md` (original evidence — stale post-resolution); `handler.go:42-51`; `routes_generated.go:10`; `router_test.go` (16/16 routes pass, `go test -run TestRegisterRoutes_AllRoutesRegistered ./internal/modules/taxonomy/delivery/http/...`).
+- **Linked backlog row:** `backlog/taxonomy-refactor.md#R-009` (closed 2026-07-02)
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md` (taxonomy is the residual unmigrated module)
 
 ### T-010 · `DBGovernanceLogger` is a module-local parallel audit sink — FULLY CLOSED 2026-06-12 (Wave 2.12)

@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
@@ -28,9 +29,12 @@ const (
 
 // DocumentFamilyItem defines model for DocumentFamilyItem.
 type DocumentFamilyItem struct {
-	Code        string `json:"code"`
-	Description string `json:"description"`
-	Name        string `json:"name"`
+	Code        string    `json:"code"`
+	CreatedAt   time.Time `json:"created_at"`
+	Description string    `json:"description"`
+	IsActive    bool      `json:"is_active"`
+	Name        string    `json:"name"`
+	TenantId    string    `json:"tenant_id"`
 }
 
 // DocumentProfileItem defines model for DocumentProfileItem.
@@ -86,9 +90,50 @@ type Problem struct {
 
 // ProcessAreaItem defines model for ProcessAreaItem.
 type ProcessAreaItem struct {
+	ArchivedAt          *time.Time `json:"archived_at"`
+	Code                string     `json:"code"`
+	CreatedAt           time.Time  `json:"created_at"`
+	DefaultApproverRole *string    `json:"default_approver_role"`
+	Description         string     `json:"description"`
+	Name                string     `json:"name"`
+	OwnerUserId         *string    `json:"owner_user_id"`
+	ParentCode          *string    `json:"parent_code"`
+	TenantId            string     `json:"tenant_id"`
+}
+
+// SetTaxonomyProfileDefaultTemplateRequest defines model for SetTaxonomyProfileDefaultTemplateRequest.
+type SetTaxonomyProfileDefaultTemplateRequest struct {
+	TemplateVersionId string `json:"template_version_id"`
+}
+
+// TaxonomyAreaUpsertRequest defines model for TaxonomyAreaUpsertRequest.
+type TaxonomyAreaUpsertRequest struct {
+	Code                string  `json:"code"`
+	DefaultApproverRole *string `json:"default_approver_role,omitempty"`
+	Description         string  `json:"description"`
+	Name                string  `json:"name"`
+	OwnerUserId         *string `json:"owner_user_id,omitempty"`
+	ParentCode          *string `json:"parent_code,omitempty"`
+}
+
+// TaxonomyFamilyUpsertRequest defines model for TaxonomyFamilyUpsertRequest.
+type TaxonomyFamilyUpsertRequest struct {
 	Code        string `json:"code"`
 	Description string `json:"description"`
 	Name        string `json:"name"`
+}
+
+// TaxonomyProfileUpsertRequest defines model for TaxonomyProfileUpsertRequest.
+type TaxonomyProfileUpsertRequest struct {
+	Alias                    *string `json:"alias,omitempty"`
+	Code                     string  `json:"code"`
+	DefaultTemplateVersionId *string `json:"default_template_version_id,omitempty"`
+	Description              string  `json:"description"`
+	EditableByRole           string  `json:"editable_by_role"`
+	FamilyCode               string  `json:"family_code"`
+	Name                     string  `json:"name"`
+	OwnerUserId              *string `json:"owner_user_id,omitempty"`
+	ReviewIntervalDays       int     `json:"review_interval_days"`
 }
 
 // BadRequest defines model for BadRequest.
@@ -112,16 +157,47 @@ type Unauthorized = Problem
 // sessionCookieContextKey is the context key for sessionCookie security scheme
 type sessionCookieContextKey string
 
+// ListTaxonomyAreasParams defines parameters for ListTaxonomyAreas.
+type ListTaxonomyAreasParams struct {
+	IncludeArchived *bool `form:"include_archived,omitempty" json:"include_archived,omitempty"`
+}
+
 // ListTaxonomyFamiliesParams defines parameters for ListTaxonomyFamilies.
 type ListTaxonomyFamiliesParams struct {
 	IncludeInactive *bool `form:"include_inactive,omitempty" json:"include_inactive,omitempty"`
 }
 
+// ListTaxonomyProfilesParams defines parameters for ListTaxonomyProfiles.
+type ListTaxonomyProfilesParams struct {
+	IncludeArchived *bool `form:"include_archived,omitempty" json:"include_archived,omitempty"`
+}
+
+// CreateTaxonomyAreaJSONRequestBody defines body for CreateTaxonomyArea for application/json ContentType.
+type CreateTaxonomyAreaJSONRequestBody = TaxonomyAreaUpsertRequest
+
+// UpdateTaxonomyAreaJSONRequestBody defines body for UpdateTaxonomyArea for application/json ContentType.
+type UpdateTaxonomyAreaJSONRequestBody = TaxonomyAreaUpsertRequest
+
+// CreateTaxonomyFamilyJSONRequestBody defines body for CreateTaxonomyFamily for application/json ContentType.
+type CreateTaxonomyFamilyJSONRequestBody = TaxonomyFamilyUpsertRequest
+
+// UpdateTaxonomyFamilyJSONRequestBody defines body for UpdateTaxonomyFamily for application/json ContentType.
+type UpdateTaxonomyFamilyJSONRequestBody = TaxonomyFamilyUpsertRequest
+
+// CreateTaxonomyProfileJSONRequestBody defines body for CreateTaxonomyProfile for application/json ContentType.
+type CreateTaxonomyProfileJSONRequestBody = TaxonomyProfileUpsertRequest
+
+// UpdateTaxonomyProfileJSONRequestBody defines body for UpdateTaxonomyProfile for application/json ContentType.
+type UpdateTaxonomyProfileJSONRequestBody = TaxonomyProfileUpsertRequest
+
+// SetTaxonomyProfileDefaultTemplateJSONRequestBody defines body for SetTaxonomyProfileDefaultTemplate for application/json ContentType.
+type SetTaxonomyProfileDefaultTemplateJSONRequestBody = SetTaxonomyProfileDefaultTemplateRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// List taxonomy areas
 	// (GET /taxonomy/areas)
-	ListTaxonomyAreas(w http.ResponseWriter, r *http.Request)
+	ListTaxonomyAreas(w http.ResponseWriter, r *http.Request, params ListTaxonomyAreasParams)
 	// Create taxonomy area
 	// (POST /taxonomy/areas)
 	CreateTaxonomyArea(w http.ResponseWriter, r *http.Request)
@@ -151,7 +227,7 @@ type ServerInterface interface {
 	UpdateTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string)
 	// List taxonomy profiles
 	// (GET /taxonomy/profiles)
-	ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request)
+	ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request, params ListTaxonomyProfilesParams)
 	// Create taxonomy profile
 	// (POST /taxonomy/profiles)
 	CreateTaxonomyProfile(w http.ResponseWriter, r *http.Request)
@@ -181,14 +257,33 @@ type MiddlewareFunc func(http.Handler) http.Handler
 // ListTaxonomyAreas operation middleware
 func (siw *ServerInterfaceWrapper) ListTaxonomyAreas(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListTaxonomyAreasParams
+
+	// ------------- Optional query parameter "include_archived" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_archived", r.URL.Query(), &params.IncludeArchived, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "include_archived"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include_archived", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListTaxonomyAreas(w, r)
+		siw.Handler.ListTaxonomyAreas(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -472,14 +567,33 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyFamily(w http.ResponseWriter, r
 // ListTaxonomyProfiles operation middleware
 func (siw *ServerInterfaceWrapper) ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
 	ctx := r.Context()
 
 	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
 
 	r = r.WithContext(ctx)
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListTaxonomyProfilesParams
+
+	// ------------- Optional query parameter "include_archived" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_archived", r.URL.Query(), &params.IncludeArchived, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "include_archived"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include_archived", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListTaxonomyProfiles(w, r)
+		siw.Handler.ListTaxonomyProfiles(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -790,6 +904,7 @@ type NotFoundApplicationProblemPlusJSONResponse Problem
 type UnauthorizedApplicationProblemPlusJSONResponse Problem
 
 type ListTaxonomyAreasRequestObject struct {
+	Params ListTaxonomyAreasParams
 }
 
 type ListTaxonomyAreasResponseObject interface {
@@ -859,6 +974,7 @@ func (response ListTaxonomyAreas500ApplicationProblemPlusJSONResponse) VisitList
 }
 
 type CreateTaxonomyAreaRequestObject struct {
+	Body *CreateTaxonomyAreaJSONRequestBody
 }
 
 type CreateTaxonomyAreaResponseObject interface {
@@ -1159,6 +1275,7 @@ func (response GetTaxonomyArea500ApplicationProblemPlusJSONResponse) VisitGetTax
 
 type UpdateTaxonomyAreaRequestObject struct {
 	Code string `json:"code"`
+	Body *UpdateTaxonomyAreaJSONRequestBody
 }
 
 type UpdateTaxonomyAreaResponseObject interface {
@@ -1346,6 +1463,7 @@ func (response ListTaxonomyFamilies500ApplicationProblemPlusJSONResponse) VisitL
 }
 
 type CreateTaxonomyFamilyRequestObject struct {
+	Body *CreateTaxonomyFamilyJSONRequestBody
 }
 
 type CreateTaxonomyFamilyResponseObject interface {
@@ -1646,6 +1764,7 @@ func (response GetTaxonomyFamily500ApplicationProblemPlusJSONResponse) VisitGetT
 
 type UpdateTaxonomyFamilyRequestObject struct {
 	Code string `json:"code"`
+	Body *UpdateTaxonomyFamilyJSONRequestBody
 }
 
 type UpdateTaxonomyFamilyResponseObject interface {
@@ -1747,6 +1866,7 @@ func (response UpdateTaxonomyFamily500ApplicationProblemPlusJSONResponse) VisitU
 }
 
 type ListTaxonomyProfilesRequestObject struct {
+	Params ListTaxonomyProfilesParams
 }
 
 type ListTaxonomyProfilesResponseObject interface {
@@ -1816,6 +1936,7 @@ func (response ListTaxonomyProfiles500ApplicationProblemPlusJSONResponse) VisitL
 }
 
 type CreateTaxonomyProfileRequestObject struct {
+	Body *CreateTaxonomyProfileJSONRequestBody
 }
 
 type CreateTaxonomyProfileResponseObject interface {
@@ -2116,6 +2237,7 @@ func (response GetTaxonomyProfile500ApplicationProblemPlusJSONResponse) VisitGet
 
 type UpdateTaxonomyProfileRequestObject struct {
 	Code string `json:"code"`
+	Body *UpdateTaxonomyProfileJSONRequestBody
 }
 
 type UpdateTaxonomyProfileResponseObject interface {
@@ -2218,6 +2340,7 @@ func (response UpdateTaxonomyProfile500ApplicationProblemPlusJSONResponse) Visit
 
 type SetTaxonomyProfileDefaultTemplateRequestObject struct {
 	Code string `json:"code"`
+	Body *SetTaxonomyProfileDefaultTemplateJSONRequestBody
 }
 
 type SetTaxonomyProfileDefaultTemplateResponseObject interface {
@@ -2410,8 +2533,10 @@ type strictHandler struct {
 }
 
 // ListTaxonomyAreas operation middleware
-func (sh *strictHandler) ListTaxonomyAreas(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ListTaxonomyAreas(w http.ResponseWriter, r *http.Request, params ListTaxonomyAreasParams) {
 	var request ListTaxonomyAreasRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListTaxonomyAreas(ctx, request.(ListTaxonomyAreasRequestObject))
@@ -2436,6 +2561,13 @@ func (sh *strictHandler) ListTaxonomyAreas(w http.ResponseWriter, r *http.Reques
 // CreateTaxonomyArea operation middleware
 func (sh *strictHandler) CreateTaxonomyArea(w http.ResponseWriter, r *http.Request) {
 	var request CreateTaxonomyAreaRequestObject
+
+	var body CreateTaxonomyAreaJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CreateTaxonomyArea(ctx, request.(CreateTaxonomyAreaRequestObject))
@@ -2515,6 +2647,13 @@ func (sh *strictHandler) UpdateTaxonomyArea(w http.ResponseWriter, r *http.Reque
 
 	request.Code = code
 
+	var body UpdateTaxonomyAreaJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.UpdateTaxonomyArea(ctx, request.(UpdateTaxonomyAreaRequestObject))
 	}
@@ -2564,6 +2703,13 @@ func (sh *strictHandler) ListTaxonomyFamilies(w http.ResponseWriter, r *http.Req
 // CreateTaxonomyFamily operation middleware
 func (sh *strictHandler) CreateTaxonomyFamily(w http.ResponseWriter, r *http.Request) {
 	var request CreateTaxonomyFamilyRequestObject
+
+	var body CreateTaxonomyFamilyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CreateTaxonomyFamily(ctx, request.(CreateTaxonomyFamilyRequestObject))
@@ -2643,6 +2789,13 @@ func (sh *strictHandler) UpdateTaxonomyFamily(w http.ResponseWriter, r *http.Req
 
 	request.Code = code
 
+	var body UpdateTaxonomyFamilyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.UpdateTaxonomyFamily(ctx, request.(UpdateTaxonomyFamilyRequestObject))
 	}
@@ -2664,8 +2817,10 @@ func (sh *strictHandler) UpdateTaxonomyFamily(w http.ResponseWriter, r *http.Req
 }
 
 // ListTaxonomyProfiles operation middleware
-func (sh *strictHandler) ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request, params ListTaxonomyProfilesParams) {
 	var request ListTaxonomyProfilesRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListTaxonomyProfiles(ctx, request.(ListTaxonomyProfilesRequestObject))
@@ -2690,6 +2845,13 @@ func (sh *strictHandler) ListTaxonomyProfiles(w http.ResponseWriter, r *http.Req
 // CreateTaxonomyProfile operation middleware
 func (sh *strictHandler) CreateTaxonomyProfile(w http.ResponseWriter, r *http.Request) {
 	var request CreateTaxonomyProfileRequestObject
+
+	var body CreateTaxonomyProfileJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CreateTaxonomyProfile(ctx, request.(CreateTaxonomyProfileRequestObject))
@@ -2769,6 +2931,13 @@ func (sh *strictHandler) UpdateTaxonomyProfile(w http.ResponseWriter, r *http.Re
 
 	request.Code = code
 
+	var body UpdateTaxonomyProfileJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.UpdateTaxonomyProfile(ctx, request.(UpdateTaxonomyProfileRequestObject))
 	}
@@ -2795,6 +2964,13 @@ func (sh *strictHandler) SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter
 
 	request.Code = code
 
+	var body SetTaxonomyProfileDefaultTemplateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.SetTaxonomyProfileDefaultTemplate(ctx, request.(SetTaxonomyProfileDefaultTemplateRequestObject))
 	}
@@ -2820,56 +2996,60 @@ func (sh *strictHandler) SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"gMEE0f71/n8BAAD//w==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

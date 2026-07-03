@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/taxonomy-tech-debt.md`.
 
-**Last verified:** 2026-06-21 (verify-and-archive sweep — solved rows pruned; see _cleanup-2026-06-21.md)
+**Last verified:** 2026-07-02 (CON-08 closure — R-009 closed; R-012 unblocked). Prior: 2026-06-21 (verify-and-archive sweep — solved rows pruned; see _cleanup-2026-06-21.md)
 
 ## Rows
 
@@ -10,8 +10,8 @@
 |---|---|---|---|---|---|---|---|---|
 | R-002 | Add ADR + migration: backfill tenant_id on document_families OR document the global-by-design choice with a threat model and lock-down policy | T-002 | L | Critical | — | — | open | — |
 | R-006 | Add tier-2 authz.Require + DB tripwire (assert_caps) on document_profiles, document_process_areas, document_families | T-006 | L | Major | R-001, R-002 | — | merged (partial) | Plan 5 (2026-05-11): Create+Update methods + tripwire on all 3 tables done; archive/deactivate paths residual |
-| R-009 | Author OpenAPI spec for /api/v1/taxonomy/* and re-mount routes via oapi-codegen | T-009 | L | Major | — | — | open | — |
-| R-012 | Add cursor pagination to listProfiles / listAreas / listFamilies | T-012 | M | Minor | R-009 | — | open | — |
+| R-009 | Author OpenAPI spec for /api/v1/taxonomy/* and re-mount routes via oapi-codegen | T-009 | L | Major | — | — | closed | CON-08 (2026-07-02): spec/codegen/mount were already landed pre-existing; this pass closed the residual wire-truth drift — `include_archived` query param + `TaxonomyProfileUpsertRequest`/`TaxonomyAreaUpsertRequest`/`TaxonomyFamilyUpsertRequest`/`SetTaxonomyProfileDefaultTemplateRequest` request bodies + full `ProcessAreaItem`/`DocumentFamilyItem` field sets were undeclared; regenerated `api.gen.go`; added `router_test.go` registration pin test |
+| R-012 | Add cursor pagination to listProfiles / listAreas / listFamilies | T-012 | M | Minor | — | — | open | R-009 closed 2026-07-02; no longer blocked |
 | R-014 | Add Go doc comments to all 80 exported symbols under internal/modules/taxonomy/ | T-014 | M | Minor | — | — | open | — |
 | R-015 | Drop redundant PK on `code` alone; promote `(tenant_id, code)` to PK on document_profiles + document_process_areas | T-015 | M | Minor | R-002 | — | open | — |
 | R-016 | Author ADR for area hierarchy: self-FK + application-layer cycle prevention | T-016 | S | Minor | — | — | open | — |
@@ -19,4 +19,4 @@
 
 ## Notes
 
-- R-002 / R-006 / R-009 are `L`-effort — split before opening PRs.
+- R-002 / R-006 are `L`-effort — split before opening PRs.
