@@ -1,6 +1,6 @@
 # Platform: Async Messaging
 
-> **Last verified:** 2026-06-10
+> **Last verified:** 2026-07-02
 > **Scope:** The four platform packages that form the async execution substrate — `internal/platform/jobs/river`, `internal/platform/worker`, `internal/platform/messaging`, and `internal/platform/servicebus` — plus the in-module staging outbox relay under `internal/modules/render/fanout`. This document covers responsibilities, inter-package relationships, and explicit overlap facts. It does not cover the in-API scheduler jobs (`internal/modules/jobs/scheduler`), which are documented in [../binaries/worker.md](../binaries/worker.md) under the in-API async subsystems section.
 > **Key files:**
 > - `internal/platform/jobs/river/client.go` — River client factory
@@ -12,8 +12,8 @@
 > - `internal/platform/messaging/outbox/postgres/consumer.go` — Postgres claim/mark implementation
 > - `internal/platform/messaging/outbox/postgres/publisher.go` — Postgres publish implementation
 > - `internal/platform/servicebus/gotenberg_pdf.go` — Gotenberg/MinIO PDF converter adapter
-> - `internal/modules/render/fanout/pdf_outbox_worker.go` — staging outbox relay (PDF)
-> - `internal/modules/render/fanout/materialize_outbox_worker.go` — staging outbox relay (DOCX)
+> - `internal/modules/render/fanout/staging_outbox_worker.go` — staging outbox relay worker (PDF + DOCX instances)
+> - `internal/modules/render/fanout/staging_outbox.go` — staging outbox repository (both staging tables)
 
 ---
 
@@ -94,7 +94,7 @@ Two symmetric relay workers run inside the API process:
 
 Both workers follow the identical pattern: `ClaimPending` with `FOR UPDATE SKIP LOCKED`, call `Publisher.Publish` for each row inserting into `outbox_events`, then `MarkDispatched`. A `ResetStaleClaims` call recovers rows stuck in `processing` status after a crash.
 
-The `pdf_dispatch_outbox` table has an open `TODO(render)` at `pdf_outbox_repository.go:43`: the claim query lacks a tenant predicate, meaning tenant isolation at the outbox claim layer is absent.
+**Tenancy (ADR 0054).** `ClaimPending` intentionally selects across **all tenants** with no `tenant_id` predicate — sanctioned by [ADR 0054](../../decisions/0054-cross-tenant-outbox-claim.md), mirroring the platform `outbox_events` consumer (`internal/platform/messaging/outbox/postgres/consumer.go`). The code comment at `internal/modules/render/fanout/staging_outbox.go:68-72` cites the ADR directly. Tenancy is enforced at processing time: every claimed row carries its `tenant_id`, all per-row work after claim is scoped to that row's tenant, and the unscoped claim shape is permitted only inside this worker-internal path — never a request path. Closed as SEC-13 (commit b4302dbf); full contract in [async-job-pipeline.md §7](../flows/async-job-pipeline.md).
 
 ---
 
@@ -175,9 +175,10 @@ graph TD
 | Flag | Severity | RF reference |
 |------|----------|-------------|
 | Two-stage outbox chain with duplicate claim/retry logic across three tables | Medium | RF-OB1 candidate |
-| `pdf_dispatch_outbox` claim lacks tenant predicate (`TODO(render)`) | Low | — |
 | `TODO(phase11)` markers in outbox consumer and publisher | Low | — |
 | `startOutboxWorker` restart loop is dead code (workers never return non-nil) | Low | — |
+
+Closed flags: tenant-unscoped `pdf_dispatch_outbox`/`materialize_dispatch_outbox` claim is no longer an open flag as of [ADR 0054](../../decisions/0054-cross-tenant-outbox-claim.md) (2026-07-02) — the cross-tenant `ClaimPending` shape is sanctioned by design (closed as SEC-13, commit b4302dbf); see §2.6 above.
 
 Full flag registry: [../legacy-register.md](../legacy-register.md).
 
