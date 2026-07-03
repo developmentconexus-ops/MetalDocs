@@ -1,3 +1,9 @@
+/* Template-approval gray palette (see the "Approval-slate" note in
+   styles/tokens.css). --color-text-muted is never defined at runtime — nor
+   in any design-source :root — so the fallback is the source of truth; no
+   value-identical token exists (#6b7280). Do not define --color-* globally —
+   the same name carries a different fallback (#475569) in Dialog. */
+
 .state {
   display: flex;
   flex-direction: column;

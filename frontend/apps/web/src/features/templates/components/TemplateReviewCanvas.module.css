@@ -1,3 +1,11 @@
+/* Template-approval gray palette (Tailwind gray/amber, not Wine — see the
+   "Approval-slate" note in styles/tokens.css for the decoupling rationale).
+   The remaining --color-* vars are never defined at runtime — nor in any
+   design-source :root — so each var() resolves to its fallback; the fallback
+   is the source of truth. Fallbacks value-identical to an existing token
+   were swapped to it (FE-18); do not define --color-* globally — the same
+   names carry different fallbacks in Dialog/RouteAdmin. */
+
 .state {
   display: flex;
   flex-direction: column;
@@ -13,15 +21,15 @@
 .retry {
   padding: 0.25rem 0.75rem;
   font-size: 0.75rem;
-  border: 1px solid var(--color-border, #d1d5db);
+  border: 1px solid var(--slate-border-2);
   border-radius: 0.25rem;
   background: transparent;
   cursor: pointer;
-  color: var(--color-text-secondary, #374151);
+  color: var(--slate-text-muted-2);
 }
 
 .retry:hover {
-  background: var(--color-bg-hover, #f3f4f6);
+  background: var(--slate-surface-muted);
 }
 
 .canvas {

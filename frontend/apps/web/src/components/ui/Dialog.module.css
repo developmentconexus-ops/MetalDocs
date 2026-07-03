@@ -1,3 +1,12 @@
+/* Approval-slate palette component (see the "Approval-slate" note in
+   styles/tokens.css). The remaining --color-* vars are never defined at
+   runtime, so each var() resolves to its fallback; the fallback is the
+   source of truth (values from design-source/route-admin/index.html :root,
+   except --color-text #1a1a1a which predates it). Fallbacks value-identical
+   to an existing token were swapped to it (FE-18); do not define --color-*
+   globally — the same names carry different fallbacks in the templates
+   feature. */
+
 .dialog {
   border: none;
   border-radius: 12px;
@@ -5,7 +14,7 @@
   max-width: min(640px, calc(100vw - 32px));
   width: 100%;
   max-height: calc(100vh - 64px);
-  background: var(--color-surface, #ffffff);
+  background: var(--surface);
   color: var(--color-text, #1a1a1a);
   box-shadow:
     0 10px 38px rgba(0, 0, 0, 0.18),
@@ -50,7 +59,7 @@
   padding: 4px 8px;
   border-radius: 6px;
   cursor: pointer;
-  color: var(--color-text-muted, #475569);
+  color: var(--slate-text-muted);
 }
 
 .closeButton:hover,
@@ -63,7 +72,7 @@
 .description {
   margin: 0;
   padding: 12px 24px 0;
-  color: var(--color-text-muted, #475569);
+  color: var(--slate-text-muted);
   font-size: 0.9rem;
   line-height: 1.5;
 }

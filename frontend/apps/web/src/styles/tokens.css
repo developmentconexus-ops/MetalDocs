@@ -48,9 +48,14 @@
   /* Approval-slate — a pre-existing, non-brand Tailwind-derived palette used
      by the approval feature's status/severity chips and dialogs (StateBadge,
      ApprovalTimelinePanel, RouteAdmin, DocumentApprovalExtras, Cancel/Supersede
-     dialogs, DocumentEditorPage). Not part of the Wine brand palette above —
-     named/tokenized (FE-18) so repeated literals have one source of truth,
-     not to endorse starting a second design system. Values unchanged. */
+     dialogs, DocumentEditorPage, the Dialog primitive, and the template-approval
+     screens: TemplateReviewCanvas, TemplateApprovalExtras, TemplateApprovalRoute).
+     Not part of the Wine brand palette above — named/tokenized (FE-18) so
+     repeated literals have one source of truth, not to endorse starting a
+     second design system. Values unchanged. Residual var(--color-X, #fallback)
+     sites in those files resolve to their fallbacks (the --color-* namespace is
+     never defined at runtime); the same --color-* name carries different
+     fallbacks across files, so never define --color-* globally. */
   --slate-text: #0f172a;
   --slate-text-2: #1f2a3d;
   --slate-text-muted: #475569;
@@ -92,7 +97,7 @@
   --r-pill: 999px;
 
   /* Spacing */
-  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-0-5: 2px; --sp-1: 4px;  --sp-1-5: 6px; --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
   --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 40px; --sp-9: 56px;
 
   /* Avatar sizes */
@@ -103,10 +108,21 @@
 
   /* Font sizes */
   --font-size-2xs: 9.5px;
+  --font-size-2xs-2: 10.5px;  /* FE-06/FE-07: densifies the 9.5→11 gap (VersionBadge) */
   --font-size-xs:  11px;
+  --font-size-xs-2: 12px;   /* FE-06/FE-07: densifies the 11→12.5 gap (chrome ghost/primary buttons, doc meta) */
   --font-size-sm:  12.5px;
+  --font-size-sm-2: 13px;   /* FE-06/FE-07: densifies the 12.5→14 gap (profile card labels, chrome center text) */
   --font-size-md:  14px;
+  --font-size-md-2: 15px;  /* FE-06/FE-07: densifies the 14→22 gap (chrome doc title) */
+  --font-size-md-3: 16px;  /* FE-06/FE-07: densifies the 14→22 gap (wizard confirm doc title) */
   --font-size-lg:  22px;
   --font-size-xl:  32px;
   --font-size-2xl: 36px;
+
+  /* Button / control heights — FE-06 T-005 densification (editor-chrome
+     26px controls had no matching --sp token; --sp-1..--sp-9 are a 4/8/12/16
+     spacing scale, not a control-height scale). */
+  --ctl-h-sm: 26px;
+  --ctl-h-md: 28px;
 }
