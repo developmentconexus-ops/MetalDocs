@@ -113,7 +113,7 @@ A tenant configures a route for `profile_code = "engineering-procedure"`:
 
 - **Eligibility snapshot (J1):** routes *declare* who is eligible by role + area + cap; the snapshot at submit *materializes* the actor list. See `wiki/workflows/approval.md` §J1.
 - **SoD:** the submitter cannot sign any stage of their own submission, independent of the route's role/cap config. See [`iso-segregation.md`](iso-segregation.md).
-- **Authz tiers:** route admin operations require `route.admin` (manage-grade) cap today; a deferred Tier-1 split will introduce `route.view` for read paths — see [`authz-tiers.md`](authz-tiers.md) "Tier-1 rule authoring rules" and [`wiki/decisions/0018-approval-route-lifecycle.md`](../decisions/0018-approval-route-lifecycle.md) §6.
+- **Authz tiers:** all route admin operations — including the `GET /api/v1/approval/routes` list read — require `cap:route.manage` at both tier-1 and tier-2 (`apps/api/cmd/metaldocs-api/permissions.go:228-240`, `internal/modules/documents/approval/application/route_admin_service.go`). ADR 0018 §6 originally proposed a Tier-1 read/write split introducing `route.view`; ADR 0022 Phase 11 (F4) superseded that plan and unified tier-1/tier-2 on `route.manage` instead, closing the divergence at the root. See [`authz-tiers.md`](authz-tiers.md) "Tier-1 rule authoring rules" and [`wiki/decisions/0018-approval-route-lifecycle.md`](../decisions/0018-approval-route-lifecycle.md) §6.
 
 ## See also
 
