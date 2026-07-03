@@ -328,6 +328,11 @@ These are the reusable QA checklists for default close-out across feature classe
 
 Compatibility breadcrumbs remain under `wiki/references/documents-approval-deep-qa/` for existing path consumers.
 
+### CI gates
+
+- `.github/workflows/e2e-coverage-gate.yml` runs on PRs touching approval/documents/jobs paths. Its "all invariants have >=1 spec ID" check and the axe-baseline integrity checks are real automated gates.
+- Its "PR template checkbox present" step is **advisory by design, not enforcing**: it greps the PR body for a literal `- [x] coverage map updated` string and only hard-fails when `COVERAGE.md` itself is in the diff. It does not verify that a PR's actual code changes have matching E2E coverage. See the header comment in the workflow file for what a diff-based enforcing version would require. Do not cite this gate as proof that new approval/documents behavior has E2E coverage — use the runbook/matrix in `deep-qa/` for that evidence instead.
+
 ## Rollout plan
 
 The QA operating system is only partially promoted until the following work is complete.

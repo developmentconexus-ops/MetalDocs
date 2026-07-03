@@ -330,7 +330,7 @@ The entire `internal/api/v2/` package (`types_gen.go` + `contract_test.go`) was 
 | `golangci-lint.yml` | PR + push to main | golangci-lint v2.11 on `apps/api/...` + `internal/...` + `tools/...`, diff-only on PRs |
 | `governance-check.yml` | PR → main | Contract governance (`check-governance.ps1`), docx-v2 CK5 isolation guard |
 | `module-boundaries.yml` | PR → main | `check-module-boundaries.ps1` cross-module import enforcement |
-| `e2e-coverage-gate.yml` | PR touching approval/documents paths + push to main | E2E coverage map check, axe baseline integrity, E2E Playwright smoke |
+| `e2e-coverage-gate.yml` | PR touching approval/documents paths + push to main | E2E coverage map check, axe baseline integrity, E2E Playwright smoke — PR-checkbox step is advisory-only, see `wiki/quality/qa-operating-system.md#ci-gates` |
 | `perf.yml` | PR touching approval/jobs paths + push to main | k6 perf benchmarks (reduced on PR, full on main) |
 | `phase3-hardening-gate.yml` | PR → main | gosec + govulncheck gate |
 | `release-readiness.yml` | Manual dispatch | Full release readiness (`phase3-release-readiness.ps1`) + artifact upload |

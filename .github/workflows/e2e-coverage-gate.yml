@@ -1,5 +1,21 @@
 name: E2E Coverage Gate
 
+# ADVISORY BY DESIGN (TST-15, wiki/reviews/grade-a-simplification-report-2026-07-01.md).
+# The "Check PR template checkbox present" step below (job coverage-map-check) only
+# greps the PR body for a literal "- [x] coverage map updated" string; it does not
+# parse which invariants a PR's diff actually touches. It hard-fails (exit 1) ONLY
+# when frontend/apps/web/e2e/COVERAGE.md itself is part of the diff — i.e. it enforces
+# nothing about whether new/changed approval or documents flows got E2E coverage,
+# just that anyone who edits COVERAGE.md remembers to tick the box. Treat this gate
+# as a reminder, not a coverage guarantee.
+#
+# To make it enforcing instead of advisory, replace the PR-body grep with a diff-based
+# rule, e.g.: compute the set of changed files under the `paths:` globs above, map them
+# to required COVERAGE.md invariant rows (or spec IDs), and hard-fail when a touched
+# invariant has no ✅ row in the same PR diff — instead of keying off a checkbox string.
+#
+# The "coverage-map-check" job's OTHER step ("Check all invariants have >=1 spec ID")
+# and the axe-baseline-check job below it are real automated checks, not advisory.
 on:
   pull_request:
     paths:
