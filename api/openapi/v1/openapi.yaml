@@ -5774,7 +5774,12 @@ components:
             offset: { type: integer }
     TemplateDTO:
       type: object
-      required: [id, tenant_id, key, name, latest_version, latest_revision_number, created_by, created_at]
+      # Nullable governance fields are required (present-and-null, never absent):
+      # consumers gate on published_version_id to decide clonability, and an
+      # absent key defeats `!== null` checks (ADR 0035 optional-vs-null drift).
+      required: [id, tenant_id, doc_type_code, key, name, latest_version, latest_revision_number,
+                 published_version_id, published_version_number, current_revision_number,
+                 created_by, created_at, archived_at]
       properties:
         id: { type: string, format: uuid }
         tenant_id: { type: string, format: uuid }

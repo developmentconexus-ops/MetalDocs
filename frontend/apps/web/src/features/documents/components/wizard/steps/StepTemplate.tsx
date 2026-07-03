@@ -83,7 +83,10 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
               See wiki/backlog/novo-documento.md#template-versions. */}
           {templates.map((template) => {
             const publishedID = template.published_version_id;
-            const selectable = publishedID !== null;
+            // `!= null` guards both null and undefined — the wire may omit the
+            // key entirely on drift; `!== null` alone let undefined slip through
+            // as truthy (bug 2026-07-03).
+            const selectable = publishedID != null;
             const selected = isTemplateSelected(template.id, publishedID, selectedTemplateID, selectedVersionID);
             return (
               <SelectableCard

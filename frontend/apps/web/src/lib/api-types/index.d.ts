@@ -2883,7 +2883,7 @@ export interface components {
             id: string;
             /** Format: uuid */
             tenant_id: string;
-            doc_type_code?: string | null;
+            doc_type_code: string | null;
             key: string;
             name: string;
             description?: string | null;
@@ -2894,13 +2894,13 @@ export interface components {
              */
             latest_revision_number: number;
             /** Format: uuid */
-            published_version_id?: string | null;
-            published_version_number?: number | null;
+            published_version_id: string | null;
+            published_version_number: number | null;
             /**
              * Format: int32
              * @description Regulated revision number of the currently published template version. 0-based (REV00, REV01, ...). Null when the template has never been published. ADR 0013.
              */
-            current_revision_number?: number | null;
+            current_revision_number: number | null;
             created_by: string;
             /** @description Display name for created_by, resolved via the iam-owned UserDisplayNameReader port (M4/F4.1). Omitted/null when the user has no resolvable display name; callers fall back to created_by (the raw user id). FE-08. */
             created_by_display_name?: string | null;
@@ -2912,7 +2912,7 @@ export interface components {
              */
             updated_at?: string | null;
             /** Format: date-time */
-            archived_at?: string | null;
+            archived_at: string | null;
         };
         VersionDTO: {
             /** Format: uuid */
