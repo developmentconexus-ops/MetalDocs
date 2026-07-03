@@ -19,7 +19,11 @@ R3_ALLOWLIST=(
   # testdb/factory.go imports internal/modules/controlleddocuments/{domain,infrastructure};
   # same constraint documented inline in role_provider_integration_test.go below.
   "internal/modules/auth/infrastructure/postgres/sessions_admin_integration_test.go"
-  # Import-cycle rationale already documented in-file (seedWithCapsIAM comment).
+  # Live-DB ambient probe: the dev-tenant literal IS the probe's subject (asserts
+  # the pre-seeded admin is active in that exact tenant); factory data can't
+  # substitute. (Historical import-cycle claim corrected 2026-07-02: the cycle
+  # applies only to controlleddocuments/infrastructure; this package now imports
+  # testdb and delegates seedWithCapsIAM to testdb.SeedWithCaps.)
   "internal/modules/iam/infrastructure/postgres/role_provider_integration_test.go"
   # Deliberately reuses pre-seeded dev-tenant reference data (profile_code 'dc')
   # across a hand-rolled FK chain with savepoint rollback; testdb.Open's isolated
@@ -42,6 +46,22 @@ R4_ALLOWLIST=(
   "internal/platform/migrate/revision_number_zero_based_integration_test.go"
   # Same ambient-fixture-data rationale as the R3 entry above.
   "tests/integration/approval/eligibility_test.go"
+)
+# R2 allowlist (is_local=false set_config — session-level GUC required by design):
+# Both entries reviewed 2026-07-02; each carries a full in-file justification
+# comment. These are NOT tripwire asserted_caps writes (R2's rationale) — they
+# set tenant_id / bypass_authz GUCs where tx-local scoping is structurally
+# impossible. This list MUST only shrink; additions require operator approval.
+R2_ALLOWLIST=(
+  # RLS probe: SET ROLE + tenant_id GUC + policy-filtered SELECTs must share ONE
+  # pinned *sql.Conn across multiple statements with no wrapping tx — a tx-local
+  # GUC would be discarded before the reads the test exists to make.
+  "internal/modules/templates/repository/tenant_id_rls_integration_test.go"
+  # applyMigrationWithBypass: the migration script under test carries its own
+  # BEGIN/COMMIT, so a tx-local GUC set from a wrapping Go tx cannot survive
+  # into it; bypass is set session-locally on a pinned conn and explicitly
+  # cleared afterwards (see in-file doc comment).
+  "tests/integration/iam/migration_0170_test.go"
 )
 
 in_allowlist() {
@@ -87,12 +107,14 @@ for f in "${FILES[@]}"; do
   # F4c.1 invariant: tripwire writes must be tx-local (is_local=true) to avoid
   # leaking session state across the pool. Use testdb.SetCapsOnDB only when the
   # SUT takes *sql.DB directly and is known safe (MaxOpenConns=1, isolated DB).
-  while IFS= read -r hit; do
-    [[ -z "$hit" ]] && continue
-    line=$(echo "$hit" | cut -d: -f1)
-    text=$(echo "$hit" | cut -d: -f2-)
-    report "$f" "$line" "R2" "$text"
-  done < <(grep -nE "set_config\([^)]*,[[:space:]]*false[[:space:]]*\)" "$f" 2>/dev/null || true)
+  if ! in_allowlist "$f" "${R2_ALLOWLIST[@]}"; then
+    while IFS= read -r hit; do
+      [[ -z "$hit" ]] && continue
+      line=$(echo "$hit" | cut -d: -f1)
+      text=$(echo "$hit" | cut -d: -f2-)
+      report "$f" "$line" "R2" "$text"
+    done < <(grep -nE "set_config\([^)]*,[[:space:]]*false[[:space:]]*\)" "$f" 2>/dev/null || true)
+  fi
 
   # R3 — no hardcoded DevTenantID literal (ffffffff-...).
   # Tests must use factory.NewTenant(...) or tenant.DevTenantID constant, not the raw UUID.

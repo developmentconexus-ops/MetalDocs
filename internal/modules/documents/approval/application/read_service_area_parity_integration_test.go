@@ -19,7 +19,7 @@ import (
 //
 //	SELECT COALESCE(asi.area_code_snapshot, d.process_area_code_snapshot, cd.process_area_code, '')
 //	  FROM approval_instances ai
-//	  JOIN documents d ON d.id = ai.document_id AND d.tenant_id = ai.tenant_id
+//	  JOIN public.documents d ON d.id = ai.document_id AND d.tenant_id = ai.tenant_id
 //	  LEFT JOIN controlled_documents cd ON cd.id = d.controlled_document_id
 //	  LEFT JOIN approval_stage_instances asi
 //	    ON asi.approval_instance_id = ai.id AND asi.status = 'active'
@@ -34,7 +34,7 @@ func rawInstanceAreaCode(t *testing.T, db *sql.DB, tenantID, instanceID string) 
 	err := db.QueryRowContext(context.Background(), `
 		SELECT COALESCE(asi.area_code_snapshot, d.process_area_code_snapshot, cd.process_area_code, '')
 		  FROM approval_instances ai
-		  JOIN documents d
+		  JOIN public.documents d
 		    ON d.id = ai.document_id
 		   AND d.tenant_id = ai.tenant_id
 		  LEFT JOIN controlled_documents cd

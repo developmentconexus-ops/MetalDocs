@@ -56,7 +56,7 @@ func (f *fakeOrphanStore) Delete(_ context.Context, key string) error {
 
 // seedTemplateWithVersion inserts a templates_template + templates_template_version
 // row pair under tenantID, asserting the real template.* tripwire capability
-// tx-locally (mirroring testdb.seedWithCaps, which is unexported). docxKey is the
+// tx-locally via the canonical testdb.SetCapsOnTx helper. docxKey is the
 // version's stored docx_storage_key.
 func seedTemplateWithVersion(t *testing.T, db *sql.DB, tenantID, templateID string, versionNumber int, docxKey string) {
 	t.Helper()
@@ -67,12 +67,7 @@ func seedTemplateWithVersion(t *testing.T, db *sql.DB, tenantID, templateID stri
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`,
-		`[{"cap":"template.create"}]`,
-	); err != nil {
-		t.Fatalf("seed assert caps: %v", err)
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"template.create"}]`)
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO public.templates_template
 		   (id, tenant_id, doc_type_code, key, name, description,

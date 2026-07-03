@@ -22,6 +22,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	"metaldocs/tests/integration/testdb"
 )
 
 func openLiveIAMDB(t *testing.T) *sql.DB {
@@ -47,31 +48,13 @@ func openLiveIAMDB(t *testing.T) *sql.DB {
 // (SEC-05 / migration 0259: metaldocs.iam_users and metaldocs.iam_user_roles now
 // carry trg_require_cap_asserted, requiring user.manage for INSERT/DELETE and for
 // UPDATE of privileged columns) then runs fn inside that same transaction and
-// commits. Pool-safe local equivalent of tests/integration/testdb/fixtures.go's
-// seedWithCaps — this package (postgres_test, package-local live-DB probes) does
-// not import the tests/integration/testdb framework to avoid an import cycle
-// (that framework itself exercises this package's repositories).
+// commits. Thin package-local alias for the canonical testdb.SeedWithCaps helper
+// (importing tests/integration/testdb from here is cycle-free: the framework's
+// only internal/modules dependency is controlleddocuments/{domain,infrastructure};
+// the historical import-cycle constraint applies to THAT package only).
 func seedWithCapsIAM(t *testing.T, db *sql.DB, capsJSON string, fn func(tx *sql.Tx) error) {
 	t.Helper()
-	ctx := context.Background()
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("seedWithCapsIAM: begin tx: %v", err)
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`, capsJSON,
-	); err != nil {
-		t.Fatalf("seedWithCapsIAM: assert caps %s: %v", capsJSON, err)
-	}
-	if err := fn(tx); err != nil {
-		t.Fatalf("seedWithCapsIAM: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("seedWithCapsIAM: commit: %v", err)
-	}
+	testdb.SeedWithCaps(t, db, capsJSON, fn)
 }
 
 // TestRoleProvider_UserActiveInTenant_Live exercises the EXISTS query against

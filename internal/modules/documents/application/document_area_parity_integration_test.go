@@ -18,7 +18,7 @@ import (
 // produced —
 //
 //	SELECT COALESCE(d.process_area_code_snapshot, cd.process_area_code, '')
-//	  FROM documents d LEFT JOIN controlled_documents cd
+//	  FROM public.documents d LEFT JOIN controlled_documents cd
 //	    ON cd.id = d.controlled_document_id AND cd.tenant_id = d.tenant_id
 //	 WHERE d.id = $1 AND d.tenant_id = $2
 //
@@ -32,7 +32,7 @@ func rawDocumentAreaCode(t *testing.T, db *sql.DB, tenantID, documentID string) 
 	var area string
 	err := db.QueryRowContext(context.Background(), `
 		SELECT COALESCE(d.process_area_code_snapshot, cd.process_area_code, '')
-		  FROM documents d
+		  FROM public.documents d
 		  LEFT JOIN controlled_documents cd
 		    ON cd.id = d.controlled_document_id AND cd.tenant_id = d.tenant_id
 		 WHERE d.id = $1 AND d.tenant_id = $2`,

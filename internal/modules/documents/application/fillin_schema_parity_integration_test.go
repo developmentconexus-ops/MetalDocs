@@ -24,7 +24,7 @@ import (
 //
 //	SELECT tv.placeholder_schema
 //	  FROM templates_template_version tv
-//	  JOIN documents d ON d.template_version_id = tv.id
+//	  JOIN public.documents d ON d.template_version_id = tv.id
 //	 WHERE d.id = $1::uuid AND d.tenant_id = $2::uuid
 //
 // across present-schema / absent-document / null-schema.
@@ -35,7 +35,7 @@ func rawFillInSchema(t *testing.T, db *sql.DB, tenantID, docID string) []templat
 	err := db.QueryRowContext(context.Background(), `
 		SELECT tv.placeholder_schema
 		  FROM templates_template_version tv
-		  JOIN documents d ON d.template_version_id = tv.id
+		  JOIN public.documents d ON d.template_version_id = tv.id
 		 WHERE d.id = $1::uuid AND d.tenant_id = $2::uuid`,
 		docID, tenantID,
 	).Scan(&pRaw)

@@ -54,13 +54,13 @@ SELECT active.id,
        active.status,
        pub.id::text
   FROM (SELECT id, content_hash_at_submit, revision_version, status
-          FROM documents
+          FROM public.documents
          WHERE tenant_id = $1::uuid
            AND controlled_document_id = $2::uuid
            AND status IN ('draft','under_review','approved','rejected','scheduled')
          LIMIT 1) active
   FULL OUTER JOIN
-       (SELECT id FROM documents
+       (SELECT id FROM public.documents
          WHERE tenant_id = $1::uuid
            AND controlled_document_id = $2::uuid
            AND status = 'published'
