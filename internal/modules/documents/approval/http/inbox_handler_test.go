@@ -54,6 +54,19 @@ func (f *fakeReadServiceInbox) ListInboxItems(_ context.Context, _ db.TxRunner, 
 	return f.views, nil
 }
 
+func (f *fakeReadServiceInbox) ListInboxItemsWithTotal(_ context.Context, _ db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, int, error) {
+	f.called = true
+	f.gotTenantID = tenantID
+	f.gotActorID = actorID
+	f.gotAreaCode = areaCode
+	f.gotLimit = limit
+	f.gotOffset = offset
+	if f.err != nil {
+		return nil, 0, f.err
+	}
+	return f.views, f.total, nil
+}
+
 func (f *fakeReadServiceInbox) CountPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string) (int, error) {
 	if f.err != nil {
 		return 0, f.err

@@ -111,10 +111,14 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-011`
 - **Linked ADR:** missing-ADR
 
-### T-012 · No pagination on list endpoints
-- **Severity:** minor
-- **Surface:** `internal/modules/taxonomy/delivery/http/routes_families.go:20-31` (listFamilies returns `{"items":[...]}` unbounded); same shape on listProfiles, listAreas; `family_repository.go:38-45` (SELECT ORDER BY code, no LIMIT)
-- **Observation:** Full ordered slice returned. Cardinality expected to stay small (profiles + areas under ~50 per tenant; families ~10 global). No current driver to paginate, but the surface scales linearly with catalog growth. Trigger fired: latent (no observable caller impact today).
+### T-012 · No pagination on list endpoints — SAFETY-BOUNDED 2026-07-02
+- **Severity:** minor (unchanged — full-catalog-return is a deliberate contract exemption; this closes only the "no LIMIT at all" gap on `FamilyRepository.List`)
+- **Surface:** `internal/modules/taxonomy/delivery/http/routes_families.go:20-31` (listFamilies returns `{"items":[...]}` unbounded, delivery unchanged — out of scope for this fix); `internal/modules/taxonomy/infrastructure/family_repository.go` (`FamilyRepository.List`); same shape on listProfiles, listAreas.
+- **Observation (historical):** `ProfileRepository.List` / `AreaRepository.List` in `internal/modules/taxonomy/infrastructure/repository.go` already capped at `maxTaxonomyListRows` (1000) with an explicit `// TODO: add pagination` comment. `FamilyRepository.List` (`family_repository.go`) was the odd one out: `ORDER BY code ASC` with **no LIMIT clause at all** — worse than its siblings, not just unpaginated.
+- **Fix (CON-11/APP-03):** Applied the same `maxTaxonomyListRows` safety cap already used by Profile/Area repos: `ORDER BY code ASC LIMIT 1000`. This is a defensive safety bound, not real pagination — `/taxonomy/profiles` (and the family/area siblings) are `x-pagination-exempt: true` in `api/openapi/v1/openapi.yaml` ("Bounded per-tenant taxonomy profile set returned in full"), a deliberate contract decision. Scope was restricted to `internal/modules/taxonomy/application` + `infrastructure` per the task boundary — delivery (`routes_families.go`) was explicitly out of scope and untouched.
+- **Tests:** `internal/modules/taxonomy/infrastructure/family_repository_test.go` — `TestFamilyRepository_List_HasSafetyLimit` pins the `LIMIT 1000` clause via sqlmock query-regex match.
+- **Verification:** `go build ./...`, `go vet`, `gofmt -l` clean; `go test -count=1 ./internal/modules/taxonomy/...` all green.
+- **Deferred (out of scope):** Cardinality is expected to stay small (profiles + areas under ~50/tenant; families ~10 global), so real pagination is still not warranted. If a tenant ever approaches the 1000-row safety cap, that is itself a signal to revisit the "return in full" exemption in the spec (new `limit`/`cursor` params + delivery-layer wiring), not to silently raise the cap.
 - **Evidence:** `_artifacts/02-flow-list-families.md` §5 ("No `next_cursor` / pagination fields"); `_artifacts/05-industry.md` IP-003 "not applicable".
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-012`
 - **Linked ADR:** missing-ADR

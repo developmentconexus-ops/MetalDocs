@@ -38,13 +38,11 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	views, err := h.readSvc.ListInboxItems(r.Context(), h.runner, tenantID, actorID, areaCode, limit, offset)
-	if err != nil {
-		WriteError(w, err)
-		return
-	}
-
-	total, err := h.readSvc.CountPendingForActor(r.Context(), h.runner, tenantID, actorID, areaCode)
+	// Single query/tx computes the page and the total together (T-005): the
+	// prior two independent queries (ListInboxItems then CountPendingForActor)
+	// could observe different snapshots if a signoff committed in between,
+	// producing total < len(items) or vice versa on the wire.
+	views, total, err := h.readSvc.ListInboxItemsWithTotal(r.Context(), h.runner, tenantID, actorID, areaCode, limit, offset)
 	if err != nil {
 		WriteError(w, err)
 		return

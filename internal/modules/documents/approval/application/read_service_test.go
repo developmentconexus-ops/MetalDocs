@@ -67,10 +67,10 @@ func TestListInboxItems_PopulatesTitleAndQuorumProgress(t *testing.T) {
 
 	rows := sqlmock.NewRows([]string{
 		"id", "document_id", "controlled_document_id", "doc_title", "area_code",
-		"submitted_by", "submitted_at", "stage_label", "required", "signed",
+		"submitted_by", "submitted_at", "stage_label", "required", "signed", "total_count",
 	}).AddRow(
 		"inst-1", "doc-1", "CD-001", "Doc One", "finance",
-		"user-1", submittedAt, "Stage 1", 2, 1,
+		"user-1", submittedAt, "Stage 1", 2, 1, 0,
 	)
 
 	mock.ExpectBegin()
@@ -124,11 +124,14 @@ func TestListInboxItems_FiltersByActor(t *testing.T) {
 	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
 		WithArgs("tenant-1", "actor-xyz").
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	// limit=0 clamps to pagination.DefaultLimit (20), not the old handler-only
+	// default of 25 — the service layer now owns clamping via
+	// internal/platform/pagination.ClampLimit (T-005 hardening).
 	mock.ExpectQuery(`asi\.eligible_actor_ids @> \$2::jsonb`).
-		WithArgs("tenant-1", []byte(`["actor-xyz"]`), "", 25, 0).
+		WithArgs("tenant-1", []byte(`["actor-xyz"]`), "", 20, 0).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "document_id", "doc_title", "area_code",
-			"submitted_by", "submitted_at", "stage_label", "required", "signed",
+			"submitted_by", "submitted_at", "stage_label", "required", "signed", "total_count",
 		}))
 	mock.ExpectCommit()
 
@@ -139,6 +142,156 @@ func TestListInboxItems_FiltersByActor(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// TestListInboxItemsWithTotal_SingleQueryCarriesTotal pins the T-005 fix: the
+// total is read via COUNT(*) OVER() on the SAME query/snapshot as the page,
+// not a second independent query. It also pins the ai.id DESC ORDER BY
+// tiebreaker added to prevent OFFSET-page interleaving on submitted_at ties.
+func TestListInboxItemsWithTotal_SingleQueryCarriesTotal(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	submittedAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+
+	rows := sqlmock.NewRows([]string{
+		"id", "document_id", "controlled_document_id", "doc_title", "area_code",
+		"submitted_by", "submitted_at", "stage_label", "required", "signed", "total_count",
+	}).AddRow(
+		"inst-1", "doc-1", "CD-001", "Doc One", "finance",
+		"user-1", submittedAt, "Stage 1", 2, 1, 5,
+	).AddRow(
+		"inst-2", "doc-2", "CD-002", "Doc Two", "finance",
+		"user-2", submittedAt, "Stage 1", 1, 1, 5,
+	)
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`COUNT\(\*\) OVER\(\) AS total_count[\s\S]+ORDER BY ai\.submitted_at DESC, ai\.id DESC`).
+		WithArgs("tenant-1", sqlmock.AnyArg(), "finance", 25, 0).
+		WillReturnRows(rows)
+	mock.ExpectCommit()
+
+	svc := &ReadService{}
+	items, total, err := svc.ListInboxItemsWithTotal(context.Background(), newTxRunner(db), "tenant-1", "actor-1", "finance", 25, 0)
+	if err != nil {
+		t.Fatalf("ListInboxItemsWithTotal: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("got %d items, want 2", len(items))
+	}
+	if total != 5 {
+		t.Errorf("total = %d, want 5 (from COUNT(*) OVER(), not len(items))", total)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// TestListInboxItemsWithTotal_EmptyPageFallsBackToCount pins the empty-page
+// edge case: COUNT(*) OVER() never appears when zero rows match (e.g. offset
+// past the end), so the total must fall back to CountPendingForActor rather
+// than silently reporting 0.
+func TestListInboxItemsWithTotal_EmptyPageFallsBackToCount(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`FROM approval_instances ai`).
+		WithArgs("tenant-1", sqlmock.AnyArg(), "finance", 25, 1000).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "document_id", "controlled_document_id", "doc_title", "area_code",
+			"submitted_by", "submitted_at", "stage_label", "required", "signed", "total_count",
+		}))
+	mock.ExpectCommit()
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`SELECT COUNT\(DISTINCT ai\.id\)`).
+		WithArgs("tenant-1", sqlmock.AnyArg(), "finance").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
+	mock.ExpectCommit()
+
+	svc := &ReadService{}
+	items, total, err := svc.ListInboxItemsWithTotal(context.Background(), newTxRunner(db), "tenant-1", "actor-1", "finance", 25, 1000)
+	if err != nil {
+		t.Fatalf("ListInboxItemsWithTotal: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("got %d items, want 0", len(items))
+	}
+	if total != 3 {
+		t.Errorf("total = %d, want 3 (from CountPendingForActor fallback)", total)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// TestListInboxItemsWithTotal_ClampsLimit pins pagination.ClampLimit behavior:
+// limit<=0 clamps to DefaultLimit (20), limit>MaxLimit clamps to MaxLimit
+// (100), negative offset clamps to 0.
+func TestListInboxItemsWithTotal_ClampsLimit(t *testing.T) {
+	cases := []struct {
+		name       string
+		inLimit    int
+		inOffset   int
+		wantLimit  int
+		wantOffset int
+	}{
+		{"zero limit clamps to default", 0, 0, 20, 0},
+		{"negative limit clamps to default", -5, 0, 20, 0},
+		{"over-max limit clamps to max", 500, 0, 100, 0},
+		{"in-range limit passes through", 40, 0, 40, 0},
+		{"negative offset clamps to zero", 10, -1, 10, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("sqlmock.New: %v", err)
+			}
+			defer db.Close()
+
+			mock.ExpectBegin()
+			mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+				WithArgs("tenant-1", "actor-1").
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectQuery(`FROM approval_instances ai`).
+				WithArgs("tenant-1", sqlmock.AnyArg(), "", tc.wantLimit, tc.wantOffset).
+				WillReturnRows(sqlmock.NewRows([]string{
+					"id", "document_id", "controlled_document_id", "doc_title", "area_code",
+					"submitted_by", "submitted_at", "stage_label", "required", "signed", "total_count",
+				}).AddRow(
+					"inst-1", "doc-1", "CD-001", "Doc One", "finance",
+					"user-1", time.Now().UTC(), "Stage 1", 1, 0, 1,
+				))
+			mock.ExpectCommit()
+
+			svc := &ReadService{}
+			_, _, err = svc.ListInboxItemsWithTotal(context.Background(), newTxRunner(db), "tenant-1", "actor-1", "", tc.inLimit, tc.inOffset)
+			if err != nil {
+				t.Fatalf("ListInboxItemsWithTotal: %v", err)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unmet expectations (limit/offset not clamped as expected): %v", err)
+			}
+		})
 	}
 }
 

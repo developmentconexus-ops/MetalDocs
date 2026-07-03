@@ -14,6 +14,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/pagination"
 )
 
 // InboxView is the read-model projection for the inbox UI.
@@ -221,20 +222,54 @@ func (s *ReadService) ListPendingForActor(ctx context.Context, runner db.TxRunne
 // ListInboxItems returns inbox view rows for the given tenant + actor.
 // Single JOIN against documents and a signoff-count subquery so the UI can
 // render document titles and quorum progress without N+1 lookups.
+//
+// Deprecated: callers that also need the total pending count should use
+// ListInboxItemsWithTotal instead, which computes both in one query/tx and
+// therefore cannot observe the snapshot drift a signoff committed between two
+// independent queries can cause (T-005). Retained for existing callers/tests
+// that only need the page of items.
 func (s *ReadService) ListInboxItems(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]InboxView, error) {
-	if limit <= 0 {
-		limit = 25
+	items, _, err := s.listInboxItems(ctx, runner, tenantID, actorID, areaCode, limit, offset, false)
+	return items, err
+}
+
+// ListInboxItemsWithTotal returns the inbox page and the total pending count
+// for the given tenant + actor in a single query executed inside one
+// transaction (T-005 fix). Using COUNT(*) OVER() instead of a second
+// LIMIT/OFFSET-free COUNT query eliminates the snapshot-drift window where a
+// signoff committed between two independent queries could make
+// total < len(items) or vice versa. limit is clamped via the shared platform
+// pagination bounds (internal/platform/pagination.ClampLimit); offset < 0 is
+// treated as 0.
+func (s *ReadService) ListInboxItemsWithTotal(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]InboxView, int, error) {
+	return s.listInboxItems(ctx, runner, tenantID, actorID, areaCode, limit, offset, true)
+}
+
+func (s *ReadService) listInboxItems(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, limit, offset int, withTotal bool) ([]InboxView, int, error) {
+	limit = pagination.ClampLimit(limit)
+	if offset < 0 {
+		offset = 0
 	}
 
 	actorJSON, err := json.Marshal([]string{actorID})
 	if err != nil {
-		return nil, fmt.Errorf("list inbox: marshal actor: %w", err)
+		return nil, 0, fmt.Errorf("list inbox: marshal actor: %w", err)
 	}
 
 	var items []InboxView
+	var total int
 	err = runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 			return fmt.Errorf("list inbox: %w", err)
+		}
+
+		// COUNT(*) OVER() piggybacks the total-matching-rows count onto the same
+		// result set as the page, so the page and the total are always read from
+		// the same MVCC snapshot inside this transaction — no second round-trip
+		// that a concurrent signoff could land between (T-005).
+		totalSelect := "0 AS total_count"
+		if withTotal {
+			totalSelect = "COUNT(*) OVER() AS total_count"
 		}
 
 		rows, err := tx.QueryContext(ctx, `
@@ -260,7 +295,8 @@ func (s *ReadService) ListInboxItems(ctx context.Context, runner db.TxRunner, te
 					  AND s.stage_instance_id = asi.id
 					  AND s.actor_tenant_id = ai.tenant_id
 					  AND s.decision = 'approve'
-				), 0) AS signed
+				), 0) AS signed,
+				`+totalSelect+`
 			FROM approval_instances ai
 			JOIN approval_stage_instances asi
 			  ON asi.approval_instance_id = ai.id
@@ -271,7 +307,7 @@ func (s *ReadService) ListInboxItems(ctx context.Context, runner db.TxRunner, te
 			  AND ai.status = 'in_progress'
 			  AND asi.eligible_actor_ids @> $2::jsonb
 			  AND ($3 = '' OR asi.area_code_snapshot = $3)
-			ORDER BY ai.submitted_at DESC
+			ORDER BY ai.submitted_at DESC, ai.id DESC
 			LIMIT $4 OFFSET $5`,
 			tenantID, actorJSON, areaCode, limit, offset,
 		)
@@ -281,17 +317,18 @@ func (s *ReadService) ListInboxItems(ctx context.Context, runner db.TxRunner, te
 
 		for rows.Next() {
 			var v InboxView
-			var signed, required int
+			var signed, required, rowTotal int
 			if err := rows.Scan(
 				&v.InstanceID, &v.DocumentID, &v.ControlledDocumentID, &v.DocumentTitle,
 				&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
-				&v.StageLabel, &required, &signed,
+				&v.StageLabel, &required, &signed, &rowTotal,
 			); err != nil {
 				rows.Close()
 				return fmt.Errorf("list inbox: scan: %w", err)
 			}
 			v.QuorumProgress = fmt.Sprintf("%d/%d", signed, required)
 			items = append(items, v)
+			total = rowTotal
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
@@ -301,9 +338,22 @@ func (s *ReadService) ListInboxItems(ctx context.Context, runner db.TxRunner, te
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return items, nil
+	if withTotal && len(items) == 0 {
+		// COUNT(*) OVER() only appears on returned rows; an empty page (e.g. an
+		// offset past the end, or genuinely zero pending items) must fall back to
+		// a real count so the caller doesn't report total=0 for an out-of-range
+		// page. This is a second query (like the pre-fix behavior) but only for
+		// the empty-page edge case — the common (non-empty) case reads both the
+		// page and the total from one snapshot, closing the T-005 drift window.
+		count, err := s.CountPendingForActor(ctx, runner, tenantID, actorID, areaCode)
+		if err != nil {
+			return nil, 0, err
+		}
+		total = count
+	}
+	return items, total, nil
 }
 
 // CountPendingForActor returns the total number of pending approval instances

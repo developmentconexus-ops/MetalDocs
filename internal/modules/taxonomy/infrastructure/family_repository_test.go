@@ -82,6 +82,38 @@ SELECT EXISTS (
 		WillReturnResult(sqlmock.NewResult(0, 1))
 }
 
+// TestFamilyRepository_List_HasSafetyLimit pins the T-012 hardening: List
+// previously issued `ORDER BY code ASC` with NO LIMIT at all (worse than the
+// sibling Profile/Area repos in this package, which already cap at
+// maxTaxonomyListRows). /taxonomy/families is x-pagination-exempt: true by
+// deliberate contract design ("return the full per-tenant catalog"), so this
+// is a defensive safety bound, not real pagination — delivery is out of scope
+// for this fix.
+func TestFamilyRepository_List_HasSafetyLimit(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repo := NewFamilyRepository(db)
+	ctx := iamdomain.WithAuthContext(tenant.WithTenantID(context.Background(), "tenant-a"), "actor-1", nil)
+
+	mock.ExpectBegin()
+	expectDocumentViewAuthz(mock, "actor-1", "tenant-a")
+	mock.ExpectQuery(`ORDER BY code ASC LIMIT 1000`).
+		WithArgs("tenant-a").
+		WillReturnRows(sqlmock.NewRows([]string{"code", "tenant_id", "name", "description", "is_active", "created_at"}))
+	mock.ExpectRollback()
+
+	if _, err := repo.List(ctx, "tenant-a", false); err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations (List must issue a bounded LIMIT): %v", err)
+	}
+}
+
 func family(code string) *domain.DocumentFamily {
 	return &domain.DocumentFamily{
 		Code:        domain.FamilyCode(code),

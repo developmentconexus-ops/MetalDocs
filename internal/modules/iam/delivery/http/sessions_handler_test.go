@@ -3,8 +3,10 @@ package httpdelivery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +20,12 @@ type fakeSessionAdmin struct {
 	revoked  []string
 }
 
+// ListActiveSessions mirrors the real authpg.Repository behavior relevant to
+// the handler's over-fetch-by-one has_more logic (security-tech-debt.md #7):
+// it truncates to q.Limit when set (>0), so tests can pin has_more=true (more
+// matching sessions than the requested page) and has_more=false (all
+// sessions fit). Rows are sorted by SessionID for deterministic pagination in
+// tests, unlike production's last_seen_at DESC ordering.
 func (f *fakeSessionAdmin) ListActiveSessions(_ context.Context, q authdomain.SessionAdminQuery) ([]authdomain.SessionListItem, error) {
 	out := make([]authdomain.SessionListItem, 0)
 	for _, s := range f.sessions {
@@ -25,6 +33,10 @@ func (f *fakeSessionAdmin) ListActiveSessions(_ context.Context, q authdomain.Se
 			continue
 		}
 		out = append(out, authdomain.SessionListItem{SessionID: s.SessionID, UserID: s.UserID})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].SessionID < out[j].SessionID })
+	if q.Limit > 0 && len(out) > q.Limit {
+		out = out[:q.Limit]
 	}
 	return out, nil
 }
@@ -165,6 +177,95 @@ func TestSessionsHandler_ListEnrichesDisplayNameViaPort(t *testing.T) {
 	}
 	if !strings.Contains(body, `"display_name":"user-2"`) {
 		t.Fatalf("user-2 should fall back to user_id; body=%s", body)
+	}
+}
+
+// TestSessionsHandler_ListHasMoreTrueWhenExtraRowExists pins the
+// over-fetch-by-one fix (security-tech-debt.md #7): with more matching
+// sessions than the requested page size, the handler must report
+// has_more=true and must NOT leak the extra (limit+1'th) row onto the wire.
+func TestSessionsHandler_ListHasMoreTrueWhenExtraRowExists(t *testing.T) {
+	sessions := make(map[string]authdomain.Session, 3)
+	for i := 0; i < 3; i++ {
+		id := fmt.Sprintf("sess-%d", i)
+		sessions[id] = authdomain.Session{SessionID: id, UserID: fmt.Sprintf("user-%d", i), TenantID: "tenant-a"}
+	}
+	fake := &fakeSessionAdmin{sessions: sessions}
+	h := NewSessionsHandler(fake, nil)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions?limit=2", "tenant-a"))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("list: want 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `"has_more":true`) {
+		t.Fatalf("expected has_more:true with 3 sessions and limit=2; body=%s", body)
+	}
+	if strings.Contains(body, "sess-2") {
+		t.Fatalf("the limit+1'th row (sess-2) must be truncated, not leaked onto the wire; body=%s", body)
+	}
+	if got := strings.Count(body, `"session_id"`); got != 2 {
+		t.Fatalf("expected exactly 2 items in the page, got %d; body=%s", got, body)
+	}
+}
+
+// TestSessionsHandler_ListHasMoreFalseWhenAllSessionsFit pins the honest
+// has_more=false case: when the tenant has fewer matching sessions than the
+// requested page size, has_more must be false and every session must appear.
+func TestSessionsHandler_ListHasMoreFalseWhenAllSessionsFit(t *testing.T) {
+	fake := &fakeSessionAdmin{
+		sessions: map[string]authdomain.Session{
+			"sess-1": {SessionID: "sess-1", UserID: "user-1", TenantID: "tenant-a"},
+			"sess-2": {SessionID: "sess-2", UserID: "user-2", TenantID: "tenant-a"},
+		},
+	}
+	h := NewSessionsHandler(fake, nil)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions?limit=10", "tenant-a"))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("list: want 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `"has_more":false`) {
+		t.Fatalf("expected has_more:false when all sessions fit in one page; body=%s", body)
+	}
+	if !strings.Contains(body, "sess-1") || !strings.Contains(body, "sess-2") {
+		t.Fatalf("expected both sessions present; body=%s", body)
+	}
+}
+
+// TestSessionsHandler_ListDefaultLimitAppliedWhenOmitted pins that the
+// default page size (50, mirroring authpg.ListActiveSessions's own default)
+// is still applied server-side even though the handler now always requests
+// limit+1 from the port — omitting ?limit must not change observable
+// behavior for tenants with a small number of sessions.
+func TestSessionsHandler_ListDefaultLimitAppliedWhenOmitted(t *testing.T) {
+	fake := &fakeSessionAdmin{
+		sessions: map[string]authdomain.Session{
+			"sess-1": {SessionID: "sess-1", UserID: "user-1", TenantID: "tenant-a"},
+		},
+	}
+	h := NewSessionsHandler(fake, nil)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, newSessionsRequest(http.MethodGet, "/api/v1/auth/sessions", "tenant-a"))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("list: want 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `"has_more":false`) {
+		t.Fatalf("expected has_more:false for a single session with default limit; body=%s", body)
+	}
+	if !strings.Contains(body, "sess-1") {
+		t.Fatalf("expected sess-1 present; body=%s", body)
 	}
 }
 

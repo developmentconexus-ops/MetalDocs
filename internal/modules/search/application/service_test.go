@@ -8,15 +8,16 @@ import (
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/search/domain"
+	"metaldocs/internal/platform/pagination"
 )
 
 type stubReader struct {
-	called      bool
-	lastQuery   domain.Query
-	lastLimit   int
-	lastOffset  int
-	docs        []domain.Document
-	listErr     error
+	called     bool
+	lastQuery  domain.Query
+	lastLimit  int
+	lastOffset int
+	docs       []domain.Document
+	listErr    error
 }
 
 func (r *stubReader) ListDocuments(_ context.Context, query domain.Query, limit, offset int) ([]domain.Document, error) {
@@ -61,8 +62,8 @@ func TestSearchDocumentsForwardsActorAndTenantToReader(t *testing.T) {
 	if reader.lastQuery.ActorUserID != "user-1" {
 		t.Fatalf("actor = %q, want user-1 forwarded for data-layer visibility", reader.lastQuery.ActorUserID)
 	}
-	if reader.lastLimit != defaultLimit {
-		t.Fatalf("limit = %d, want %d", reader.lastLimit, defaultLimit)
+	if reader.lastLimit != pagination.DefaultLimit {
+		t.Fatalf("limit = %d, want %d", reader.lastLimit, pagination.DefaultLimit)
 	}
 	if reader.lastOffset != 0 {
 		t.Fatalf("offset = %d, want 0 (visibility filtered in SQL, no paging loop)", reader.lastOffset)
@@ -73,12 +74,12 @@ func TestSearchDocumentsCapsLimit(t *testing.T) {
 	reader := &stubReader{}
 	svc := NewService(reader)
 
-	_, err := svc.SearchDocuments(authedCtx("user-1"), domain.Query{TenantID: "tenant-1", Limit: maxLimit + 1})
+	_, err := svc.SearchDocuments(authedCtx("user-1"), domain.Query{TenantID: "tenant-1", Limit: pagination.MaxLimit + 1})
 	if err != nil {
 		t.Fatalf("SearchDocuments: %v", err)
 	}
-	if reader.lastLimit != maxLimit {
-		t.Fatalf("limit = %d, want %d", reader.lastLimit, maxLimit)
+	if reader.lastLimit != pagination.MaxLimit {
+		t.Fatalf("limit = %d, want %d", reader.lastLimit, pagination.MaxLimit)
 	}
 }
 

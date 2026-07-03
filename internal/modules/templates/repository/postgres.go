@@ -112,6 +112,34 @@ WHERE t.tenant_id = $1::uuid AND t.key = $2`
 	return t, nil
 }
 
+// templatesDefaultLimit / templatesMaxLimit mirror the /templates OpenAPI
+// contract's declared bounds (limit: min 1, max 200, default 50 — see
+// api/openapi/v1/openapi.yaml), which are deliberately wider than the
+// platform-wide internal/platform/pagination defaults (20/100). /templates is
+// x-pagination-exempt: true ("a permanent bounded-list exemption, not a
+// deferred cursor migration"), so this repo clamps defensively to the
+// contract's own bounds rather than adopting the platform primitive, which
+// would silently narrow the wire-promised max=200 down to 100 (T-011).
+const (
+	templatesDefaultLimit = 50
+	templatesMaxLimit     = 200
+)
+
+// clampTemplatesLimit bounds limit to the /templates contract's declared
+// range: <=0 -> default (50), >200 -> 200. The HTTP handler already rejects
+// limit>200 with a 400 before reaching the repo; this clamp is a defensive
+// second line so no caller (handler or otherwise) can send an unbounded or
+// zero/negative LIMIT to Postgres.
+func clampTemplatesLimit(limit int) int {
+	if limit <= 0 {
+		return templatesDefaultLimit
+	}
+	if limit > templatesMaxLimit {
+		return templatesMaxLimit
+	}
+	return limit
+}
+
 func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter) ([]*domain.Template, error) {
 	const q = `
 SELECT
@@ -129,16 +157,22 @@ WHERE t.tenant_id = $1::uuid
   -- genéricos aparecem para todos os perfis". A NULL filter returns every
   -- non-system template (management listing).
   AND ($2::text IS NULL OR t.doc_type_code = $2 OR t.doc_type_code = '')
-ORDER BY t.created_at DESC
+ORDER BY t.created_at DESC, t.id DESC
 LIMIT $3 OFFSET $4`
+
+	limit := clampTemplatesLimit(f.Limit)
+	offset := f.Offset
+	if offset < 0 {
+		offset = 0
+	}
 
 	rows, err := r.db.QueryContext(
 		ctx,
 		q,
 		f.TenantID,
 		f.DocTypeCode,
-		f.Limit,
-		f.Offset,
+		limit,
+		offset,
 	)
 	if err != nil {
 		return nil, err

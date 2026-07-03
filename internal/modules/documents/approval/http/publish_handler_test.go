@@ -40,6 +40,10 @@ func (f *fakeReadServicePublish) ListInboxItems(_ context.Context, _ db.TxRunner
 	return nil, nil
 }
 
+func (f *fakeReadServicePublish) ListInboxItemsWithTotal(_ context.Context, _ db.TxRunner, _, _, _ string, _, _ int) ([]application.InboxView, int, error) {
+	return nil, 0, nil
+}
+
 func (f *fakeReadServicePublish) CountPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string) (int, error) {
 	return 0, nil
 }

@@ -24,6 +24,13 @@ import (
 	"metaldocs/internal/platform/useragent"
 )
 
+// defaultSessionsPageLimit mirrors authpg.ListActiveSessions's own default
+// (limit<=0 -> 50) so behavior is unchanged when the caller omits ?limit.
+// Kept local to the iam delivery layer rather than importing the auth
+// module's repository (module boundary: iam depends on auth only through the
+// SessionAdmin port below, never its internals).
+const defaultSessionsPageLimit = 50
+
 // SessionAdmin is the narrow port the SessionsHandler depends on. The
 // production implementation is *authpg.Repository (Postgres). Memory mode
 // returns 501 from the handler so dev/test paths don't pay for an in-memory
@@ -108,20 +115,37 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 		}
 		q.IncludeRevoked = !active
 	}
+	// requestedLimit is the caller-facing page size (contract: 1-100, default 50
+	// — matches authpg.ListActiveSessions's own default so behavior is unchanged
+	// when the param is omitted). We ask the port for one extra row
+	// (requestedLimit+1) purely to detect has_more without a second round trip;
+	// the extra row (if returned) is truncated below before it ever reaches the
+	// wire (security-tech-debt.md #7).
+	requestedLimit := defaultSessionsPageLimit
 	if v := strings.TrimSpace(r.URL.Query().Get("limit")); v != "" {
 		limit, perr := strconv.Atoi(v)
 		if perr != nil || limit < 1 || limit > 100 {
 			h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, "limit must be between 1 and 100"))
 			return
 		}
-		q.Limit = limit
+		requestedLimit = limit
 	}
+	q.Limit = requestedLimit + 1
 
 	items, err := h.sessions.ListActiveSessions(r.Context(), q)
 	if err != nil {
 		slog.Error("iam sessions: list failed", "err", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to list sessions"))
 		return
+	}
+
+	// Truthful has_more via the "over-fetch by one" trick: we asked for
+	// requestedLimit+1 rows above. If the port returned that many, there is at
+	// least one more row beyond this page — truncate the extra row before it
+	// reaches the response (security-tech-debt.md #7; was hardcoded false).
+	hasMore := len(items) > requestedLimit
+	if hasMore {
+		items = items[:requestedLimit]
 	}
 
 	// Enrich auth-owned session rows with iam-owned display names via the port
@@ -172,11 +196,13 @@ func (h *SessionsHandler) handleSessions(w http.ResponseWriter, r *http.Request)
 		out = append(out, si)
 	}
 
-	// Cursor pagination is deferred (see authpg.ListActiveSessions doc).
-	// has_more=false is honest for the limit-only MVP.
+	// Full cursor pagination (opaque next_cursor) is still deferred (see
+	// authpg.ListActiveSessions doc) — that would need a new contract param.
+	// has_more is now truthful within the existing limit-only response shape
+	// via the over-fetch-by-one truncation above (security-tech-debt.md #7).
 	writeJSON(w, http.StatusOK, iamapi.ListSessionsResponse{
 		Items: out,
-		Page:  iamapi.CursorPage{HasMore: false},
+		Page:  iamapi.CursorPage{HasMore: hasMore},
 	})
 }
 
@@ -270,7 +296,6 @@ func (h *SessionsHandler) handleSessionByID(w http.ResponseWriter, r *http.Reque
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
 
 // resolveDisplayNames batches the unique user_ids of the session rows and looks
 // up their display names through the iam-owned port. Returns user_id -> name for

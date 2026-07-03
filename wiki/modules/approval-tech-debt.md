@@ -47,10 +47,15 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Linked backlog row:** `backlog/approval-refactor.md#R-004`
 - **Linked ADR:** missing-ADR
 
-### T-005 · Inbox uses two-query `LIMIT/OFFSET + COUNT` with snapshot drift
-- **Severity:** major
-- **Surface:** `internal/modules/documents/approval/application/read_service.go:237` (`ListInboxItems`) + `:326` (`CountPendingForActor`)
-- **Observation:** Both SELECTs use raw `db.QueryContext`, no enclosing tx. A signoff committed between the two queries can produce `Total < len(Items) + 1` or vice versa. Pagination via `LIMIT/OFFSET` only — no cursor (IP-003 drift). Same shape as documents list per `wiki/architecture/data-model.md` "two-query LIMIT/OFFSET+COUNT pattern".
+### T-005 · Inbox uses two-query `LIMIT/OFFSET + COUNT` with snapshot drift — FIXED 2026-07-02
+- **Severity:** ~~major~~ fixed
+- **Surface:** `internal/modules/documents/approval/application/read_service.go` — `ListInboxItemsWithTotal` (new) + `listInboxItems` private helper; `ListInboxItems` retained as a thin deprecated wrapper for existing callers that only need the page.
+- **Observation (historical):** Both SELECTs used raw `db.QueryContext`, no enclosing tx. A signoff committed between the two queries could produce `Total < len(Items)` or vice versa.
+- **Fix (CON-11/APP-03):** Collapsed into one query inside one `runner.Do` tx: the page and `COUNT(*) OVER() AS total_count` are read from the same MVCC snapshot, closing the drift window. Empty pages (offset past the end) fall back to the pre-existing `CountPendingForActor` query, since `COUNT(*) OVER()` can't be observed on zero rows — a second query only in that edge case, not the common path. Also added the `ai.id DESC` tiebreaker to `ORDER BY ai.submitted_at DESC` to prevent OFFSET-page interleaving on `submitted_at` ties, and clamps `limit` via `internal/platform/pagination.ClampLimit` (was previously unclamped in this path; e.g. `limit=0` now clamps to 20 instead of passing through as a literal `LIMIT 0`).
+- **HTTP wiring:** `internal/modules/documents/approval/http/inbox_handler.go`'s `InboxHandler` now calls `ListInboxItemsWithTotal` once instead of `ListInboxItems` + `CountPendingForActor` sequentially. Wire response shape (`contracts.InboxResponse{Items, Total}`) unchanged — no contract edit.
+- **Tests:** `internal/modules/documents/approval/application/read_service_test.go` — `TestListInboxItemsWithTotal_SingleQueryCarriesTotal` (pins COUNT(*) OVER() + ORDER BY tiebreaker), `TestListInboxItemsWithTotal_EmptyPageFallsBackToCount` (pins the fallback), `TestListInboxItemsWithTotal_ClampsLimit` (pins `pagination.ClampLimit` bounds). Pre-existing `TestListInboxItems_PopulatesTitleAndQuorumProgress` / `TestListInboxItems_FiltersByActor` updated for the new `total_count` column and the `limit=0` clamp behavior change (20, not the old handler-only default of 25).
+- **Verification:** `go build ./...`, `go vet`, `gofmt -l` clean; `go test -count=1 ./internal/modules/documents/approval/...` all green.
+- **Deferred (out of scope):** True cursor pagination for `/approval/inbox` was not adopted — the route is `x-pagination-exempt: true` ("Bounded per-actor inbox of pending sign-offs returned in full") in `api/openapi/v1/openapi.yaml`, a deliberate exemption, not oversight. If the inbox ever needs cursor paging, the spec would need a `cursor` query param + opaque-cursor response field; the `internal/platform/pagination.EncodeCursor`/`DecodeCursor` primitive already exists for that migration.
 - **Evidence:** `wiki/modules/approval/_artifacts/02-flow-inbox.md` §2 + §6; `wiki/modules/approval/_artifacts/05-industry.md` IP-003 not-applicable row.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-005`
 - **Linked ADR:** missing-ADR

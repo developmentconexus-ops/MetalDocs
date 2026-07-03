@@ -102,10 +102,14 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-010` (close)
 - **Linked ADR:** missing-ADR
 
-### T-011 · `ListTemplates` is unbounded — no LIMIT / OFFSET / cursor
-- **Severity:** minor
-- **Surface:** `internal/modules/templates/repository/postgres.go:114-127` (`ListTemplates`).
-- **Observation:** Query applies `LIMIT $3 OFFSET $4` populated from `ListFilter.Limit` / `ListFilter.Offset`. LIMIT/OFFSET pagination is present; keyset/cursor pagination is not. Plan 2 cursor primitive (`feat(pagination): cursor primitive with sort + filter_hash validation`, commit 7effa430) exists but is not consumed here. At large offset values performance degrades (full scan to skip rows). Severity remains minor.
+### T-011 · `ListTemplates` is unbounded — no LIMIT / OFFSET / cursor — HARDENED 2026-07-02
+- **Severity:** minor (unchanged — hardening closes the unbounded-limit gap; cursor migration remains a deliberate non-goal, see below)
+- **Surface:** `internal/modules/templates/repository/postgres.go` (`ListTemplates`, `clampTemplatesLimit`).
+- **Observation (historical):** Query applied `LIMIT $3 OFFSET $4` populated directly from `ListFilter.Limit` / `ListFilter.Offset` with zero clamping in the repo layer — a caller passing `Limit<=0` would issue `LIMIT 0` (empty result, confusing) and the repo trusted the handler's own bound entirely. `ORDER BY t.created_at DESC` had no tiebreaker, so OFFSET pages could interleave/duplicate rows on `created_at` ties.
+- **Fix (CON-11/APP-03):** Added `clampTemplatesLimit` (`<=0` → 50, `>200` → 200 — mirrors the `/templates` OpenAPI contract's own declared bounds, `min 1 / max 200 / default 50`, deliberately NOT `internal/platform/pagination.ClampLimit`'s 20/100 platform default, since narrowing to 100 would silently break the wire-promised max=200) and an `offset<0 → 0` defensive clamp, both applied inside the repo as a second line behind the HTTP handler's existing `limit>200` 400 rejection. Added `t.id DESC` tiebreaker: `ORDER BY t.created_at DESC, t.id DESC`.
+- **Tests:** `internal/modules/templates/repository/list_templates_pagination_test.go` — `TestListTemplates_OrderByHasStableTiebreaker`, `TestListTemplates_ClampsLimitAndOffset` (table-driven over zero/negative/over-max/in-range/negative-offset), `TestClampTemplatesLimit` (pure function table test).
+- **Verification:** `go build ./...`, `go vet`, `gofmt -l` clean; `go test -count=1 ./internal/modules/templates/...` all green.
+- **Deferred (out of scope) — nuance:** `/templates` GET is `x-pagination-exempt: true` in `api/openapi/v1/openapi.yaml` with an explicit note: "a permanent bounded-list exemption, not a deferred cursor migration." Unlike the other 4 CON-11/APP-03 surfaces, cursor adoption here is arguably NOT the recommended direction per the spec author's own stated intent — the existing LIMIT/OFFSET contract (already spec-declared, max 200) is the sanctioned design for what is meant to be a small, bounded per-tenant catalog. If that assumption ever breaks (tenants routinely hitting 200 templates), the correct move is revisiting the exemption itself, not silently bolting on a cursor.
 - **Evidence:** `_artifacts/02-flow-list.md`, `_artifacts/05-industry.md` IP-003.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-011`
 - **Linked ADR:** missing-ADR

@@ -7,11 +7,7 @@ import (
 
 	"metaldocs/internal/modules/search/domain"
 	"metaldocs/internal/platform/authn"
-)
-
-const (
-	defaultLimit = 20
-	maxLimit     = 100
+	"metaldocs/internal/platform/pagination"
 )
 
 var ErrTenantRequired = errors.New("search: tenant id required")
@@ -49,7 +45,12 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 	}
 	normalized.Limit = q.Limit
 
-	limit := effectiveLimit(q.Limit)
+	// Search offset is not yet wired end-to-end: domain.Query has no Offset
+	// field and the OpenAPI /search/documents contract declares no offset
+	// param, so this always requests the first page (CON-11/APP-03 finding —
+	// reported, not fixed here; a contract change would be needed to expose
+	// paging beyond the first `limit` results).
+	limit := pagination.ClampLimit(q.Limit)
 	docs, err := s.reader.ListDocuments(ctx, normalized, limit, 0)
 	if err != nil {
 		return nil, err
@@ -58,14 +59,4 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 		return []domain.Document{}, nil
 	}
 	return docs, nil
-}
-
-func effectiveLimit(limit int) int {
-	if limit <= 0 {
-		return defaultLimit
-	}
-	if limit > maxLimit {
-		return maxLimit
-	}
-	return limit
 }

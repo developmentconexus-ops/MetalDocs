@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -90,7 +91,14 @@ WHERE tenant_id = $1`
 	if !includeInactive {
 		q += " AND is_active = TRUE"
 	}
-	q += " ORDER BY code ASC"
+	// /taxonomy/families is x-pagination-exempt: true — a deliberate bounded
+	// "return the full per-tenant catalog" contract, matching Profile/Area
+	// repos in this package. Unlike those two, this query previously had NO
+	// LIMIT at all (T-012): a safety bound (not real pagination — delivery is
+	// out of scope for this fix) so a pathological tenant catalog can't return
+	// an unbounded result set. maxTaxonomyListRows is the shared safety cap
+	// defined in repository.go (also used by ProfileRepository/AreaRepository).
+	q += " ORDER BY code ASC LIMIT " + strconv.Itoa(maxTaxonomyListRows) // TODO: add pagination instead of returning the full family catalog.
 
 	rows, err := tx.QueryContext(ctx, q, tenantID)
 	if err != nil {
