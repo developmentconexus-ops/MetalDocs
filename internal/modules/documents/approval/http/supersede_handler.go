@@ -8,6 +8,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/strictjson"
 )
 
 func (h *Handler) publishSuperseding(ctx context.Context, runner db.TxRunner, req application.SupersedeRequest) (application.SupersedeResult, error) {
@@ -32,7 +33,7 @@ func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body contracts.SupersedeRequest
-	if err := contracts.Decode(r, &body); err != nil {
+	if err := strictjson.Decode(r, &body); err != nil {
 		WriteError(w, err)
 		return
 	}

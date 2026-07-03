@@ -10,6 +10,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/platform/strictjson"
 )
 
 func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +27,7 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req contracts.CreateRouteRequest
-	if err := contracts.Decode(r, &req); err != nil {
+	if err := strictjson.Decode(r, &req); err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -79,7 +80,7 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req contracts.UpdateRouteRequest
-	if err := contracts.Decode(r, &req); err != nil {
+	if err := strictjson.Decode(r, &req); err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -134,7 +135,7 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	var body contracts.DeactivateRouteRequest
-	if err := contracts.Decode(r, &body); err != nil {
+	if err := strictjson.Decode(r, &body); err != nil {
 		WriteError(w, err)
 		return
 	}

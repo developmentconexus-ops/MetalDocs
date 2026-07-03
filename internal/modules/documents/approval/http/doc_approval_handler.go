@@ -12,6 +12,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/strictjson"
 )
 
 type mutationByDocumentReadService interface {
@@ -108,7 +109,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	var body docSignoffRequest
-	if err := contracts.Decode(r, &body); err != nil {
+	if err := strictjson.Decode(r, &body); err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -223,7 +224,7 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	var body contracts.CancelRequest
-	if err := contracts.Decode(r, &body); err != nil {
+	if err := strictjson.Decode(r, &body); err != nil {
 		WriteError(w, err)
 		return
 	}

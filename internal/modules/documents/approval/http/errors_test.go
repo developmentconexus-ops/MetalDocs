@@ -13,12 +13,12 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/http/contracts"
 	approvalsignature "metaldocs/internal/modules/documents/approval/infrastructure/signature"
 	"metaldocs/internal/modules/documents/approval/repository"
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/problem"
+	"metaldocs/internal/platform/strictjson"
 )
 
 func TestMapErrorToResponse(t *testing.T) {
@@ -192,25 +192,25 @@ func TestMapErrorToResponse(t *testing.T) {
 			wantTitle:  io.EOF.Error(),
 		},
 		{
-			name:       "contracts content type",
-			err:        contracts.ErrContentType,
+			name:       "strictjson content type",
+			err:        strictjson.ErrContentType,
 			wantStatus: http.StatusUnsupportedMediaType,
 			wantCode:   "validation.content_type",
-			wantTitle:  contracts.ErrContentType.Error(),
+			wantTitle:  strictjson.ErrContentType.Error(),
 		},
 		{
-			name:       "contracts body too large",
-			err:        contracts.ErrBodyTooLarge,
+			name:       "strictjson body too large",
+			err:        strictjson.ErrBodyTooLarge,
 			wantStatus: http.StatusRequestEntityTooLarge,
 			wantCode:   "validation.body_too_large",
-			wantTitle:  contracts.ErrBodyTooLarge.Error(),
+			wantTitle:  strictjson.ErrBodyTooLarge.Error(),
 		},
 		{
-			name:       "contracts empty body",
-			err:        contracts.ErrEmptyBody,
+			name:       "strictjson empty body",
+			err:        strictjson.ErrEmptyBody,
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "validation.empty_body",
-			wantTitle:  contracts.ErrEmptyBody.Error(),
+			wantTitle:  strictjson.ErrEmptyBody.Error(),
 		},
 		{
 			name:       "if-match required",

@@ -8,6 +8,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/strictjson"
 )
 
 func (h *Handler) markObsolete(ctx context.Context, runner db.TxRunner, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error) {
@@ -33,7 +34,7 @@ func (h *Handler) ObsoleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body contracts.ObsoleteRequest
-	if err := contracts.Decode(r, &body); err != nil {
+	if err := strictjson.Decode(r, &body); err != nil {
 		WriteError(w, err)
 		return
 	}

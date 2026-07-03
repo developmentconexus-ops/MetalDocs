@@ -10,6 +10,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/strictjson"
 )
 
 var (
@@ -91,7 +92,7 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	var body contracts.SchedulePublishRequest
-	if err := contracts.Decode(r, &body); err != nil {
+	if err := strictjson.Decode(r, &body); err != nil {
 		WriteError(w, err)
 		return
 	}

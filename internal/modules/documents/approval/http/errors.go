@@ -19,6 +19,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
+	"metaldocs/internal/platform/strictjson"
 )
 
 const internalErrorMessage = "internal error"
@@ -237,13 +238,13 @@ func MapErrorToResponse(err error) *problem.Problem {
 		case errors.Is(err, io.EOF):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationEmptyBody
-		case errors.Is(err, contracts.ErrContentType):
+		case errors.Is(err, strictjson.ErrContentType):
 			statusCode = http.StatusUnsupportedMediaType
 			code = approvalCodeValidationContentType
-		case errors.Is(err, contracts.ErrBodyTooLarge):
+		case errors.Is(err, strictjson.ErrBodyTooLarge):
 			statusCode = http.StatusRequestEntityTooLarge
 			code = approvalCodeValidationBodyTooLarge
-		case errors.Is(err, contracts.ErrEmptyBody):
+		case errors.Is(err, strictjson.ErrEmptyBody):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationEmptyBody
 		case errors.Is(err, contracts.ErrValidation):

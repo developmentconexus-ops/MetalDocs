@@ -1,9 +1,6 @@
 package contracts
 
 import (
-	"encoding/json"
-	"errors"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -257,68 +254,4 @@ func TestUpdateRouteRequestValidate(t *testing.T) {
 	if err := badDrift.Validate(); err == nil {
 		t.Fatalf("expected error for invalid drift_policy")
 	}
-}
-
-func TestDecode(t *testing.T) {
-	t.Run("valid json", func(t *testing.T) {
-		var dst struct {
-			RouteID string `json:"route_id"`
-		}
-		req := httptest.NewRequest("POST", "/", strings.NewReader(`{"route_id":"abc"}`))
-		req.Header.Set("Content-Type", "application/json")
-		if err := Decode(req, &dst); err != nil {
-			t.Fatalf("expected nil error, got %v", err)
-		}
-	})
-
-	t.Run("wrong content type", func(t *testing.T) {
-		var dst map[string]any
-		req := httptest.NewRequest("POST", "/", strings.NewReader(`{"a":1}`))
-		req.Header.Set("Content-Type", "text/plain")
-		if err := Decode(req, &dst); !errors.Is(err, ErrContentType) {
-			t.Fatalf("expected ErrContentType, got %v", err)
-		}
-	})
-
-	t.Run("body too large", func(t *testing.T) {
-		var dst map[string]any
-		payload := `{"v":"` + strings.Repeat("a", 70*1024) + `"}`
-		req := httptest.NewRequest("POST", "/", strings.NewReader(payload))
-		req.Header.Set("Content-Type", "application/json")
-		if err := Decode(req, &dst); !errors.Is(err, ErrBodyTooLarge) {
-			t.Fatalf("expected ErrBodyTooLarge, got %v", err)
-		}
-	})
-
-	t.Run("empty body", func(t *testing.T) {
-		var dst map[string]any
-		req := httptest.NewRequest("POST", "/", strings.NewReader(""))
-		req.Header.Set("Content-Type", "application/json")
-		if err := Decode(req, &dst); !errors.Is(err, ErrEmptyBody) {
-			t.Fatalf("expected ErrEmptyBody, got %v", err)
-		}
-	})
-
-	t.Run("malformed json", func(t *testing.T) {
-		var dst map[string]any
-		req := httptest.NewRequest("POST", "/", strings.NewReader(`{"a":}`))
-		req.Header.Set("Content-Type", "application/json")
-		err := Decode(req, &dst)
-		var syntaxErr *json.SyntaxError
-		if !errors.As(err, &syntaxErr) {
-			t.Fatalf("expected *json.SyntaxError, got %T (%v)", err, err)
-		}
-	})
-
-	t.Run("unknown field", func(t *testing.T) {
-		var dst struct {
-			RouteID string `json:"route_id"`
-		}
-		req := httptest.NewRequest("POST", "/", strings.NewReader(`{"route_id":"abc","unknown":1}`))
-		req.Header.Set("Content-Type", "application/json")
-		err := Decode(req, &dst)
-		if err == nil || !strings.Contains(err.Error(), "unknown field") {
-			t.Fatalf("expected unknown field error, got %v", err)
-		}
-	})
 }

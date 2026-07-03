@@ -9,6 +9,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/strictjson"
 )
 
 func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +39,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req contracts.SubmitRequest
-	if err := contracts.Decode(r, &req); err != nil {
+	if err := strictjson.Decode(r, &req); err != nil {
 		WriteError(w, err)
 		return
 	}

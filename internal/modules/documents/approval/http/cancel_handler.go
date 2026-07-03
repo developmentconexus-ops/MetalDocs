@@ -8,6 +8,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/strictjson"
 )
 
 func (h *Handler) cancelInstance(ctx context.Context, runner db.TxRunner, req application.CancelInput) (application.CancelResult, error) {
@@ -33,7 +34,7 @@ func (h *Handler) CancelHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body contracts.CancelRequest
-	if err := contracts.Decode(r, &body); err != nil {
+	if err := strictjson.Decode(r, &body); err != nil {
 		WriteError(w, err)
 		return
 	}
