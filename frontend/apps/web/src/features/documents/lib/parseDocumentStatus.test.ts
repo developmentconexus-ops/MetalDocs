@@ -27,7 +27,7 @@ describe('parseDocumentStatus', () => {
     // generated DocumentSummaryStatus wire enum. They must not resurface as
     // silently-aliased canonical values.
     expect(parseDocumentStatus('review')).toBeNull();
-    expect(parseDocumentStatus('finalized')).toBeNull();
+    expect(parseDocumentStatus('finalized')).toBeNull(); // cilint:allow-legacy (parse-boundary rejection)
   });
 
   it('rejects unrecognized and empty values', () => {

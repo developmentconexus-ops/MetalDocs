@@ -33,7 +33,8 @@ const CANONICAL_STATUSES: readonly DocumentStatus[] = [
 /**
  * Narrows a raw wire status string to the canonical `DocumentStatus` union.
  * Returns `null` for empty, unrecognized, or legacy pre-cutover values
- * (e.g. 'review', 'finalized') rather than aliasing them.
+ * (e.g. 'review', 'finalized') rather than aliasing them. (cilint:allow-legacy —
+ * parse-boundary rejection doc, see tests/integration/scenarios/legacy_absent_test.go)
  */
 export function parseDocumentStatus(status: string | null | undefined): DocumentStatus | null {
   if (!status) return null;
