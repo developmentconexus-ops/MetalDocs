@@ -38,35 +38,65 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 
 	tenantID := tenant.DevTenantID
 	profileCode := "seqtest" + strings.ToLower(time.Now().UTC().Format("150405"))
+	areaCode := "rh"
 
-	_, err = db.ExecContext(context.Background(), `
-		INSERT INTO metaldocs.document_profiles
-			(code, tenant_id, family_code, name, description, review_interval_days, editable_by_role)
-		VALUES
-			($1, $2, 'procedure', 'Seq Test', 'integration sequence test', 30, 'admin')`,
-		profileCode, tenantID,
-	)
+	// The taxonomy tables (document_profiles, document_process_areas) and the
+	// cd_sequence_counters table each carry the capability tripwire
+	// (trg_require_cap_asserted): document_profiles/process_areas require
+	// taxonomy.manage, cd_sequence_counters requires controlled_documents.create.
+	// The service layer normally asserts these tx-locally via authz.Require; this
+	// raw-SQL setup must do the same or every INSERT trips P0001. Seed all three
+	// rows in ONE tx that asserts both caps. This also replaces the old
+	// allocator.EnsureCounter call, which ran on the pool (autocommit) and so
+	// could never carry a tx-local assertion.
+	setupTx, err := db.BeginTx(context.Background(), nil)
 	if err != nil {
+		t.Fatalf("begin setup tx: %v", err)
+	}
+	if _, err := setupTx.ExecContext(context.Background(),
+		`SELECT set_config('metaldocs.asserted_caps',
+			'[{"cap":"taxonomy.manage"},{"cap":"controlled_documents.create"}]', true)`,
+	); err != nil {
+		_ = setupTx.Rollback()
+		t.Fatalf("assert setup caps: %v", err)
+	}
+	if _, err := setupTx.ExecContext(context.Background(), `
+		INSERT INTO metaldocs.document_profiles
+			(code, tenant_id, family_code, name, description, review_interval_days, editable_by_role, alias)
+		VALUES
+			($1, $2, 'quality', 'Seq Test', 'integration sequence test', 30, 'admin', $1)`,
+		profileCode, tenantID,
+	); err != nil {
+		_ = setupTx.Rollback()
 		t.Fatalf("insert profile: %v", err)
 	}
-
-	areaCode := "rh"
-	_, err = db.ExecContext(context.Background(), `
+	if _, err := setupTx.ExecContext(context.Background(), `
 		INSERT INTO metaldocs.document_process_areas
 			(code, tenant_id, name, description)
 		VALUES
 			($1, $2, 'Resources & HR', 'integration test area')
 		ON CONFLICT (tenant_id, code) DO NOTHING`,
 		areaCode, tenantID,
-	)
-	if err != nil {
+	); err != nil {
+		_ = setupTx.Rollback()
 		t.Fatalf("insert process area: %v", err)
+	}
+	if _, err := setupTx.ExecContext(context.Background(), `
+		INSERT INTO public.cd_sequence_counters
+			(tenant_id, profile_code, process_area_code, next_seq)
+		VALUES
+			($1, $2, $3, 1)
+		ON CONFLICT (tenant_id, profile_code, process_area_code) DO NOTHING`,
+		tenantID, profileCode, areaCode,
+	); err != nil {
+		_ = setupTx.Rollback()
+		t.Fatalf("seed counter: %v", err)
+	}
+	if err := setupTx.Commit(); err != nil {
+		t.Fatalf("commit setup tx: %v", err)
 	}
 
 	allocator := infrastructure.NewPostgresSequenceAllocator(db)
-	if err := allocator.EnsureCounter(context.Background(), tenantID, profileCode, areaCode); err != nil {
-		t.Fatalf("ensure counter: %v", err)
-	}
 
 	const workers = 50
 	results := make([]int, 0, workers)
@@ -84,6 +114,17 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 			tx, err := db.BeginTx(context.Background(), nil)
 			if err != nil {
 				t.Errorf("begin tx: %v", err)
+				return
+			}
+			// NextAndIncrement writes cd_sequence_counters (ensure-INSERT + locked
+			// UPDATE), both gated by the controlled_documents.create tripwire — the
+			// service asserts it tx-locally, so the test must too.
+			if _, err := tx.ExecContext(context.Background(),
+				`SELECT set_config('metaldocs.asserted_caps',
+					'[{"cap":"controlled_documents.create"}]', true)`,
+			); err != nil {
+				_ = tx.Rollback()
+				t.Errorf("assert worker cap: %v", err)
 				return
 			}
 			next, err := allocator.NextAndIncrement(context.Background(), tx, tenantID, profileCode, areaCode)
