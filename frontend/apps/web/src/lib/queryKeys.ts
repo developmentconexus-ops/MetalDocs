@@ -55,6 +55,7 @@ export const QK = {
       ['controlled-documents', 'preview', profileCode, areaCode] as const,
   },
   taxonomy: {
+    all: ['taxonomy'] as const,
     profiles: (params: { includeArchived?: boolean } = {}) =>
       ['taxonomy', 'profiles', params] as const,
     areas: (params: { includeArchived?: boolean } = {}) =>

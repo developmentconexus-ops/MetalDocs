@@ -21,12 +21,14 @@ import type {
   UpdateFamilyRequest,
   UpdateProfileRequest,
 } from '../types';
+import { QK } from '../../../lib/queryKeys';
+
 // Taxonomy admin mutations. Every mutation invalidates the whole 'taxonomy'
 // cache subtree on success — the admin page, and every cross-feature picker
 // that reads active profiles/areas (documents, templates, approval), must
 // see the change immediately rather than serving a stale cached list.
 function invalidateTaxonomy(queryClient: ReturnType<typeof useQueryClient>) {
-  void queryClient.invalidateQueries({ queryKey: ['taxonomy'] });
+  void queryClient.invalidateQueries({ queryKey: QK.taxonomy.all });
 }
 
 export function useCreateProfileMutation() {
