@@ -1,1 +1,1 @@
-export { TaxonomyAdminPage } from "./TaxonomyAdminPage";
+export { TaxonomyAdminPage } from "./pages/TaxonomyAdminPage";

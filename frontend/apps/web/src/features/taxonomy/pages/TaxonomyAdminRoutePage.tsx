@@ -1,4 +1,4 @@
-import { TaxonomyAdminPage } from "../TaxonomyAdminPage";
+import { TaxonomyAdminPage } from "./TaxonomyAdminPage";
 
 export function Component() {
   return <TaxonomyAdminPage />;
