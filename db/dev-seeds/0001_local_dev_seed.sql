@@ -159,29 +159,21 @@ VALUES
   -- F-IAM1: 'approver' (the wiki QA approval account) needs a tier-2 membership.
   -- It had iam_user_roles but no user_process_areas, so authz.Require (which
   -- reads only UPA) returned 403 FORBIDDEN_CAPABILITY on every approve/publish
-  -- even though /auth/me listed the capability. Mirrors approver-test/rh above.
-  (
-    'approver',
-    'ffffffff-ffff-ffff-ffff-ffffffffffff',
-    'rh',
-    'approver',
-    now(),
-    NULL,
-    'admin-local',
-    NULL
-  ),
-  -- TST-03: 'template.publish' is granted only to role_capabilities rows
-  -- ('qms_admin', 'template.publish') / ('system_admin', 'template.publish')
+  -- even though /auth/me listed the capability.
+  -- TST-03: the row's role is 'qms_admin', not 'approver'. 'template.publish'
+  -- is granted only to role_capabilities rows ('qms_admin' / 'system_admin')
   -- (db/reference-data/0001_product_reference_data.sql) — the plain 'approver'
-  -- UPA role above never carries it. Templates configured with a reviewer stage
-  -- (hasReviewer=true) leave Approve() at status 'approved' and require a
-  -- SEPARATE PublishTemplateVersion call gated on CapTemplatePublish, so an
-  -- actor holding only the 'approver' UPA role 403s on that second call. Grant
-  -- 'approver' an additional 'qms_admin' UPA row (same 'rh' area as its
-  -- 'approver' row) so the same distinct-from-'admin' identity can drive
-  -- approve AND publish end-to-end without weakening the domain.CheckSegregation
-  -- author != approver check (SoD compares user_id, not role — a second role
-  -- row for the same user does not touch that comparison).
+  -- role never carries it, so a reviewer-stage template (hasReviewer=true),
+  -- whose Approve() stops at status 'approved' and requires a SEPARATE
+  -- PublishTemplateVersion call gated on CapTemplatePublish, would 403 on that
+  -- second call. A second 'approver'-role row is impossible: partial unique
+  -- index ux_user_process_areas_one_active allows ONE active row per
+  -- (user, tenant, area). qms_admin's capability set is a superset of
+  -- approver's document/template caps (template.approve, template.review,
+  -- document.signoff, ...), so this single row lets the same
+  -- distinct-from-'admin' identity drive approve AND publish end-to-end.
+  -- domain.CheckSegregation is untouched (SoD compares user_id, not role);
+  -- role='approver' coverage stays exercised by approver-test above.
   (
     'approver',
     'ffffffff-ffff-ffff-ffff-ffffffffffff',
