@@ -143,7 +143,8 @@ func TestGetTemplateProjectsRevisionNumbers(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
-	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
+	t.latest_version, lv.id::text, lv.revision_number, lv.status,
+	t.published_version_id::text, pv.version_number, pv.revision_number, pv.status,
 	t.created_by, t.system_owned, t.created_at, t.updated_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
@@ -152,11 +153,13 @@ WHERE t.id = $1 AND t.tenant_id = $2::uuid`)).
 		WithArgs("tpl-1", "tenant-a").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "tenant_id", "doc_type_code", "key", "name", "description",
-			"latest_version", "revision_number", "published_version_id", "version_number", "revision_number",
+			"latest_version", "lv_id", "lv_revision_number", "lv_status",
+			"published_version_id", "pv_version_number", "pv_revision_number", "pv_status",
 			"created_by", "system_owned", "created_at", "updated_at", "archived_at",
 		}).AddRow(
 			"tpl-1", "tenant-a", "PROC", "blank", "Blank", "",
-			2, 1, "ver-published", 1, 0,
+			2, "ver-latest", 1, "under_review",
+			"ver-published", 1, 0, "published",
 			"admin", false, time.Date(2026, 5, 27, 19, 0, 0, 0, time.UTC), time.Date(2026, 5, 27, 19, 0, 0, 0, time.UTC), nil,
 		))
 
@@ -164,14 +167,14 @@ WHERE t.id = $1 AND t.tenant_id = $2::uuid`)).
 	if err != nil {
 		t.Fatalf("GetTemplate: %v", err)
 	}
-	if tmpl.LatestRevisionNumber != 1 {
-		t.Fatalf("LatestRevisionNumber = %d, want 1", tmpl.LatestRevisionNumber)
+	if tmpl.Latest.RevisionNumber != 1 {
+		t.Fatalf("Latest.RevisionNumber = %d, want 1", tmpl.Latest.RevisionNumber)
 	}
-	if tmpl.CurrentRevisionNumber == nil || *tmpl.CurrentRevisionNumber != 0 {
-		t.Fatalf("CurrentRevisionNumber = %v, want 0", tmpl.CurrentRevisionNumber)
+	if tmpl.Published == nil || tmpl.Published.RevisionNumber != 0 {
+		t.Fatalf("Published.RevisionNumber = %v, want 0", tmpl.Published)
 	}
-	if tmpl.PublishedVersionNumber == nil || *tmpl.PublishedVersionNumber != 1 {
-		t.Fatalf("PublishedVersionNumber = %v, want 1", tmpl.PublishedVersionNumber)
+	if tmpl.Published == nil || tmpl.Published.Number != 1 {
+		t.Fatalf("Published.Number = %v, want 1", tmpl.Published)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("sqlmock expectations: %v", err)

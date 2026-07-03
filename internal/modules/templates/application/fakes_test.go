@@ -86,7 +86,19 @@ func (r *fakeRepo) CreateTemplate(_ context.Context, t *domain.Template) error {
 	return nil
 }
 
-func (r *fakeRepo) GetTemplate(_ context.Context, tenantID, id string) (*domain.Template, error) {
+// readOf wraps a stored write-aggregate into the read model the Repository
+// port now returns (ADR 0065). The Latest ref is derived from the aggregate's
+// scalar version pointer so promoted-field access stays truthful.
+func readOf(t *domain.Template) *domain.TemplateRead {
+	return &domain.TemplateRead{
+		Template: *t,
+		Latest: domain.VersionRef{
+			Number: t.LatestVersion,
+		},
+	}
+}
+
+func (r *fakeRepo) GetTemplate(_ context.Context, tenantID, id string) (*domain.TemplateRead, error) {
 	t, ok := r.templates[id]
 	if !ok {
 		return nil, domain.ErrNotFound
@@ -94,29 +106,29 @@ func (r *fakeRepo) GetTemplate(_ context.Context, tenantID, id string) (*domain.
 	if !r.ignoreTenantOnGetTemplate && t.TenantID != tenantID {
 		return nil, domain.ErrNotFound
 	}
-	return t, nil
+	return readOf(t), nil
 }
 
-func (r *fakeRepo) GetTemplateByKey(_ context.Context, tenantID, key string) (*domain.Template, error) {
+func (r *fakeRepo) GetTemplateByKey(_ context.Context, tenantID, key string) (*domain.TemplateRead, error) {
 	if r.getTemplateByKeyErr != nil {
 		return nil, r.getTemplateByKeyErr
 	}
 	for _, t := range r.templates {
 		if t.TenantID == tenantID && t.Key == key {
-			return t, nil
+			return readOf(t), nil
 		}
 	}
 	return nil, domain.ErrNotFound
 }
 
-func (r *fakeRepo) ListTemplates(_ context.Context, f application.ListFilter) ([]*domain.Template, error) {
+func (r *fakeRepo) ListTemplates(_ context.Context, f application.ListFilter) ([]*domain.TemplateRead, error) {
 	r.receivedFilter = f
-	out := make([]*domain.Template, 0, len(r.templates))
+	out := make([]*domain.TemplateRead, 0, len(r.templates))
 	for _, t := range r.templates {
 		if f.TenantID != "" && t.TenantID != f.TenantID {
 			continue
 		}
-		out = append(out, t)
+		out = append(out, readOf(t))
 	}
 	if len(out) == 0 {
 		return nil, domain.ErrNotFound

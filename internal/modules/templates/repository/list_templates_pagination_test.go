@@ -24,11 +24,13 @@ func TestListTemplates_OrderByHasStableTiebreaker(t *testing.T) {
 
 	rows := sqlmock.NewRows([]string{
 		"id", "tenant_id", "doc_type_code", "key", "name", "description",
-		"latest_version", "latest_revision_number", "published_version_id", "published_version_number", "current_revision_number",
+		"latest_version", "lv_id", "lv_revision_number", "lv_status",
+		"published_version_id", "pv_version_number", "pv_revision_number", "pv_status",
 		"created_by", "system_owned", "created_at", "updated_at", "archived_at",
 	}).AddRow(
 		"tpl-1", "tenant-1", "finance", "k1", "Template One", "",
-		1, nil, nil, nil, nil,
+		1, "ver-1", 0, "draft",
+		nil, nil, nil, nil,
 		"user-1", false, time.Now().UTC(), time.Now().UTC(), nil,
 	)
 
@@ -87,7 +89,8 @@ func TestListTemplates_ClampsLimitAndOffset(t *testing.T) {
 				WithArgs("tenant-1", nil, tc.wantLimit, tc.wantOffset).
 				WillReturnRows(sqlmock.NewRows([]string{
 					"id", "tenant_id", "doc_type_code", "key", "name", "description",
-					"latest_version", "latest_revision_number", "published_version_id", "published_version_number", "current_revision_number",
+					"latest_version", "lv_id", "lv_revision_number", "lv_status",
+					"published_version_id", "pv_version_number", "pv_revision_number", "pv_status",
 					"created_by", "system_owned", "created_at", "updated_at", "archived_at",
 				}))
 

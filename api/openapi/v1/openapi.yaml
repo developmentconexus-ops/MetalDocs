@@ -5772,14 +5772,27 @@ components:
           properties:
             limit: { type: integer }
             offset: { type: integer }
+    TemplateVersionRef:
+      type: object
+      description: >
+        Compact reference to a template version: internal version counter,
+        regulated revision number (REV{nn}, ADR 0013), and lifecycle status.
+        ADR 0065 — version pointers are nested value objects, never parallel
+        scalars.
+      required: [id, number, revision_number, status]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer, minimum: 1 }
+        revision_number: { type: integer, format: int32, minimum: 0 }
+        status: { type: string, enum: [draft, under_review, approved, published, obsolete] }
     TemplateDTO:
       type: object
-      # Nullable governance fields are required (present-and-null, never absent):
-      # consumers gate on published_version_id to decide clonability, and an
-      # absent key defeats `!== null` checks (ADR 0035 optional-vs-null drift).
-      required: [id, tenant_id, doc_type_code, key, name, latest_version, latest_revision_number,
-                 published_version_id, published_version_number, current_revision_number,
-                 created_by, created_at, archived_at]
+      # ADR 0065: version pointers are nested value objects. published_version
+      # is required-and-nullable (present-and-null, never absent) — consumers
+      # gate template clonability on this single object; the 9f86828b
+      # null-serialization guarantee carries forward.
+      required: [id, tenant_id, doc_type_code, key, name, latest_version,
+                 published_version, created_by, created_at, archived_at]
       properties:
         id: { type: string, format: uuid }
         tenant_id: { type: string, format: uuid }
@@ -5787,26 +5800,12 @@ components:
         key: { type: string }
         name: { type: string }
         description: { type: string, nullable: true }
-        latest_version: { type: integer, minimum: 1 }
-        latest_revision_number:
-          type: integer
-          format: int32
-          minimum: 0
-          description: >
-            Regulated revision number of the template's latest (working) version.
-            0-based (REV00, REV01, ...). Always present. Used as the fallback
-            revision label for never-published drafts, mirroring Documents. ADR 0013.
-        published_version_id: { type: string, format: uuid, nullable: true }
-        published_version_number: { type: integer, nullable: true, minimum: 1 }
-        current_revision_number:
-          type: integer
-          format: int32
+        latest_version:
+          $ref: '#/components/schemas/TemplateVersionRef'
+        published_version:
           nullable: true
-          minimum: 0
-          description: >
-            Regulated revision number of the currently published template version.
-            0-based (REV00, REV01, ...). Null when the template has never been
-            published. ADR 0013.
+          allOf:
+            - $ref: '#/components/schemas/TemplateVersionRef'
         created_by: { type: string }
         created_by_display_name:
           type: string

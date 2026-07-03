@@ -2878,6 +2878,16 @@ export interface components {
                 offset: number;
             };
         };
+        /** @description Compact reference to a template version: internal version counter, regulated revision number (REV{nn}, ADR 0013), and lifecycle status. ADR 0065 — version pointers are nested value objects, never parallel scalars. */
+        TemplateVersionRef: {
+            /** Format: uuid */
+            id: string;
+            number: number;
+            /** Format: int32 */
+            revision_number: number;
+            /** @enum {string} */
+            status: "draft" | "under_review" | "approved" | "published" | "obsolete";
+        };
         TemplateDTO: {
             /** Format: uuid */
             id: string;
@@ -2887,20 +2897,8 @@ export interface components {
             key: string;
             name: string;
             description?: string | null;
-            latest_version: number;
-            /**
-             * Format: int32
-             * @description Regulated revision number of the template's latest (working) version. 0-based (REV00, REV01, ...). Always present. Used as the fallback revision label for never-published drafts, mirroring Documents. ADR 0013.
-             */
-            latest_revision_number: number;
-            /** Format: uuid */
-            published_version_id: string | null;
-            published_version_number: number | null;
-            /**
-             * Format: int32
-             * @description Regulated revision number of the currently published template version. 0-based (REV00, REV01, ...). Null when the template has never been published. ADR 0013.
-             */
-            current_revision_number: number | null;
+            latest_version: components["schemas"]["TemplateVersionRef"];
+            published_version: components["schemas"]["TemplateVersionRef"] | null;
             created_by: string;
             /** @description Display name for created_by, resolved via the iam-owned UserDisplayNameReader port (M4/F4.1). Omitted/null when the user has no resolvable display name; callers fall back to created_by (the raw user id). FE-08. */
             created_by_display_name?: string | null;

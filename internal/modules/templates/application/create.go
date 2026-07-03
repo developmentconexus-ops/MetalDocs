@@ -171,7 +171,7 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 			return err
 		}
 		template.LatestVersion = newNum
-		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
+		if err := s.repo.UpdateTemplateTx(ctx, tx, &template.Template); err != nil {
 			return err
 		}
 		if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{

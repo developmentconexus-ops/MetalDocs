@@ -12,24 +12,23 @@ import (
 
 // Template is the aggregate root for a document template: a tenant-scoped,
 // named container identified by a doc-type code and key, tracking its latest
-// and published version/revision pointers and archival state.
+// version counter, published-version FK, and archival state. Join-projection
+// scalars (latest/published revision numbers) are NOT carried here — they live
+// on the TemplateRead read model (ADR 0065).
 type Template struct {
-	ID                     string
-	TenantID               string
-	DocTypeCode            string
-	Key                    string
-	Name                   string
-	Description            string
-	LatestVersion          int
-	LatestRevisionNumber   int
-	PublishedVersionID     *string
-	PublishedVersionNumber *int
-	CurrentRevisionNumber  *int
-	CreatedBy              string
-	SystemOwned            bool
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
-	ArchivedAt             *time.Time
+	ID                 string
+	TenantID           string
+	DocTypeCode        string
+	Key                string
+	Name               string
+	Description        string
+	LatestVersion      int
+	PublishedVersionID *string
+	CreatedBy          string
+	SystemOwned        bool
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	ArchivedAt         *time.Time
 }
 
 // IsArchived reports whether the template has been archived.

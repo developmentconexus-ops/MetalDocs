@@ -363,11 +363,9 @@ func TestApprove_Accept_WithReviewer(t *testing.T) {
 	if oldPublished.ObsoletedAt == nil {
 		t.Fatal("expected previously published version to be obsoleted")
 	}
-	if template.PublishedVersionID == nil || *template.PublishedVersionID != version.ID {
-		t.Fatalf("expected PublishedVersionID %q, got %v", version.ID, template.PublishedVersionID)
-	}
-	if template.PublishedVersionNumber == nil || *template.PublishedVersionNumber != version.VersionNumber {
-		t.Fatalf("expected PublishedVersionNumber %d, got %v", version.VersionNumber, template.PublishedVersionNumber)
+	stored := repo.templates[template.ID]
+	if stored.PublishedVersionID == nil || *stored.PublishedVersionID != version.ID {
+		t.Fatalf("expected PublishedVersionID %q, got %v", version.ID, stored.PublishedVersionID)
 	}
 	// ARC-09: the obsolete side-effect on the previously-published version must
 	// emit its own AuditObsoleted event, in the same tx as the AuditPublished
@@ -441,11 +439,9 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 	if got.Status != domain.VersionStatusPublished {
 		t.Fatalf("expected status %q, got %q", domain.VersionStatusPublished, got.Status)
 	}
-	if template.PublishedVersionID == nil || *template.PublishedVersionID != version.ID {
-		t.Fatalf("expected PublishedVersionID %q, got %v", version.ID, template.PublishedVersionID)
-	}
-	if template.PublishedVersionNumber == nil || *template.PublishedVersionNumber != version.VersionNumber {
-		t.Fatalf("expected PublishedVersionNumber %d, got %v", version.VersionNumber, template.PublishedVersionNumber)
+	stored := repo.templates[template.ID]
+	if stored.PublishedVersionID == nil || *stored.PublishedVersionID != version.ID {
+		t.Fatalf("expected PublishedVersionID %q, got %v", version.ID, stored.PublishedVersionID)
 	}
 	// M1·T2: no auto next-draft. LatestVersion must NOT be bumped by approve
 	// (no new draft was allocated); it stays at the template's prior value —

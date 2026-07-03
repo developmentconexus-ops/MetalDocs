@@ -10,7 +10,7 @@ import (
 // GetTemplate fetches a template by ID, scoped to tenantID. A template
 // belonging to a different tenant is treated as not found (cross-tenant
 // lookups never leak existence).
-func (s *Service) GetTemplate(ctx context.Context, tenantID, id string) (*domain.Template, error) {
+func (s *Service) GetTemplate(ctx context.Context, tenantID, id string) (*domain.TemplateRead, error) {
 	t, err := s.repo.GetTemplate(ctx, tenantID, id)
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func (s *Service) GetVersion(ctx context.Context, tenantID, templateID string, n
 }
 
 // ListTemplates returns templates matching the given filter.
-func (s *Service) ListTemplates(ctx context.Context, f ListFilter) ([]*domain.Template, error) {
+func (s *Service) ListTemplates(ctx context.Context, f ListFilter) ([]*domain.TemplateRead, error) {
 	return s.repo.ListTemplates(ctx, f)
 }
 

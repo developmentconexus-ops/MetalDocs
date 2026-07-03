@@ -116,16 +116,35 @@ func placeholdersToSlice(ps []domain.Placeholder) (*[]map[string]interface{}, er
 	return &out, nil
 }
 
-// toAPITemplateDTO maps a domain.Template to the OpenAPI-generated TemplateDTO type.
-// F1.3 / ADR 0035 — flat typed wire shape. Mirrors the toAPIVersionDTO pattern.
-// SystemOwned is not present in TemplateDTO (not a public API field).
+// toAPIVersionRef maps a domain.VersionRef to the generated wire value object
+// (ADR 0065). Version pointers travel as one nested object, never parallel
+// scalars.
+func toAPIVersionRef(r domain.VersionRef) (templatesapi.TemplateVersionRef, error) {
+	id, err := uuid.Parse(r.ID)
+	if err != nil {
+		return templatesapi.TemplateVersionRef{}, fmt.Errorf("version ref id %q: %w", r.ID, err)
+	}
+	return templatesapi.TemplateVersionRef{
+		Id:             id,
+		Number:         r.Number,
+		RevisionNumber: int32(r.RevisionNumber),
+		Status:         templatesapi.TemplateVersionRefStatus(r.Status),
+	}, nil
+}
+
+// toAPITemplateDTO maps a domain.TemplateRead read model to the
+// OpenAPI-generated TemplateDTO type. ADR 0065 — version pointers are nested
+// value objects: latest_version is a required ref; published_version is a
+// required-and-nullable ref (nil → marshals "published_version": null, the
+// 9f86828b guarantee). SystemOwned is not present in TemplateDTO (not a public
+// API field).
 //
 // displayName is the resolved display name for t.CreatedBy (FE-08). Pass ""
 // when unresolved/unavailable (e.g. iamdomain.NoopUserDisplayNameReader{} or a
 // miss in the batch lookup) — CreatedByDisplayName is left nil and callers
 // fall back to CreatedBy (the raw user id), matching the
 // UserDisplayNameReader port's documented miss behavior.
-func toAPITemplateDTO(t *domain.Template, displayName string) (templatesapi.TemplateDTO, error) {
+func toAPITemplateDTO(t *domain.TemplateRead, displayName string) (templatesapi.TemplateDTO, error) {
 	if t == nil {
 		return templatesapi.TemplateDTO{}, fmt.Errorf("toAPITemplateDTO: nil template")
 	}
@@ -138,16 +157,18 @@ func toAPITemplateDTO(t *domain.Template, displayName string) (templatesapi.Temp
 		return templatesapi.TemplateDTO{}, fmt.Errorf("template tenant_id %q: %w", t.TenantID, err)
 	}
 
-	latestRevNum := int32(t.LatestRevisionNumber)
+	latest, err := toAPIVersionRef(t.Latest)
+	if err != nil {
+		return templatesapi.TemplateDTO{}, fmt.Errorf("template latest_version: %w", err)
+	}
 	dto := templatesapi.TemplateDTO{
-		Id:                   id,
-		TenantId:             tenantID,
-		Key:                  t.Key,
-		Name:                 t.Name,
-		LatestVersion:        t.LatestVersion,
-		LatestRevisionNumber: latestRevNum,
-		CreatedBy:            t.CreatedBy,
-		CreatedAt:            t.CreatedAt.UTC(),
+		Id:            id,
+		TenantId:      tenantID,
+		Key:           t.Key,
+		Name:          t.Name,
+		LatestVersion: latest,
+		CreatedBy:     t.CreatedBy,
+		CreatedAt:     t.CreatedAt.UTC(),
 	}
 	if !t.UpdatedAt.IsZero() {
 		u := t.UpdatedAt.UTC()
@@ -163,18 +184,15 @@ func toAPITemplateDTO(t *domain.Template, displayName string) (templatesapi.Temp
 	if t.DocTypeCode != "" {
 		dto.DocTypeCode = &t.DocTypeCode
 	}
-	if t.PublishedVersionID != nil {
-		pvID, err := uuid.Parse(*t.PublishedVersionID)
+	if t.Published != nil {
+		pub, err := toAPIVersionRef(*t.Published)
 		if err != nil {
-			return templatesapi.TemplateDTO{}, fmt.Errorf("template published_version_id %q: %w", *t.PublishedVersionID, err)
+			return templatesapi.TemplateDTO{}, fmt.Errorf("template published_version: %w", err)
 		}
-		dto.PublishedVersionId = &pvID
+		dto.PublishedVersion = &pub
 	}
-	dto.PublishedVersionNumber = t.PublishedVersionNumber
-	if t.CurrentRevisionNumber != nil {
-		n := int32(*t.CurrentRevisionNumber)
-		dto.CurrentRevisionNumber = &n
-	}
+	// t.Published == nil → dto.PublishedVersion stays nil → marshals
+	// "published_version": null (present-and-null; no omitempty on the field).
 	if t.ArchivedAt != nil {
 		u := t.ArchivedAt.UTC()
 		dto.ArchivedAt = &u

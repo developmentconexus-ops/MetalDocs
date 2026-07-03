@@ -9,6 +9,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
+	"metaldocs/internal/modules/templates/domain"
 )
 
 var _ templatesapi.ServerInterface = (*Handler)(nil)
@@ -81,7 +82,19 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 		return
 	}
 
-	tplDTO, err := toAPITemplateDTO(res.Template, h.resolveCreatedByDisplayName(r.Context(), tenantID, res.Template.CreatedBy))
+	// ADR 0065: assemble the read model at the boundary. A just-created
+	// template is never published (Published: nil); its latest_version ref is
+	// the version the create returned.
+	read := &domain.TemplateRead{
+		Template: *res.Template,
+		Latest: domain.VersionRef{
+			ID:             res.Version.ID,
+			Number:         res.Version.VersionNumber,
+			RevisionNumber: res.Version.RevisionNumber,
+			Status:         res.Version.Status,
+		},
+	}
+	tplDTO, err := toAPITemplateDTO(read, h.resolveCreatedByDisplayName(r.Context(), tenantID, res.Template.CreatedBy))
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, codeTplInternalError, "internal server error")
 		return

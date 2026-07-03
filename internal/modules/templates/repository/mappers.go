@@ -12,35 +12,48 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-func scanTemplate(row rowScanner) (*domain.Template, error) {
+// scanTemplateRead scans a template row plus its projected latest/published
+// version references into the domain.TemplateRead read model (ADR 0065). The
+// aggregate no longer carries revision-number projections; the refs do.
+func scanTemplateRead(row rowScanner) (*domain.TemplateRead, error) {
 	var (
-		t                      domain.Template
+		t                      domain.TemplateRead
+		latestVersionID        sql.NullString
 		latestRevisionNumber   sql.NullInt32
+		latestStatus           sql.NullString
 		publishedVersionID     sql.NullString
 		publishedVersionNumber sql.NullInt32
-		currentRevisionNumber  sql.NullInt32
+		publishedRevisionNum   sql.NullInt32
+		publishedStatus        sql.NullString
 		archivedAt             sql.NullTime
 	)
 	if err := row.Scan(
 		&t.ID, &t.TenantID, &t.DocTypeCode, &t.Key, &t.Name, &t.Description,
-		&t.LatestVersion, &latestRevisionNumber, &publishedVersionID, &publishedVersionNumber, &currentRevisionNumber,
+		&t.LatestVersion, &latestVersionID, &latestRevisionNumber, &latestStatus,
+		&publishedVersionID, &publishedVersionNumber, &publishedRevisionNum, &publishedStatus,
 		&t.CreatedBy, &t.SystemOwned, &t.CreatedAt, &t.UpdatedAt, &archivedAt,
 	); err != nil {
 		return nil, err
 	}
+	// Latest ref: the lv JOIN can only miss on data corruption (latest_version
+	// always points at an existing row); degrade to zero-values rather than
+	// error, matching the previous NullInt32 behavior.
+	t.Latest = domain.VersionRef{
+		ID:     latestVersionID.String,
+		Number: t.LatestVersion,
+		Status: domain.VersionStatus(latestStatus.String),
+	}
 	if latestRevisionNumber.Valid {
-		t.LatestRevisionNumber = int(latestRevisionNumber.Int32)
+		t.Latest.RevisionNumber = int(latestRevisionNumber.Int32)
 	}
 	if publishedVersionID.Valid {
 		t.PublishedVersionID = &publishedVersionID.String
-	}
-	if publishedVersionNumber.Valid {
-		n := int(publishedVersionNumber.Int32)
-		t.PublishedVersionNumber = &n
-	}
-	if currentRevisionNumber.Valid {
-		n := int(currentRevisionNumber.Int32)
-		t.CurrentRevisionNumber = &n
+		t.Published = &domain.VersionRef{
+			ID:             publishedVersionID.String,
+			Number:         int(publishedVersionNumber.Int32),
+			RevisionNumber: int(publishedRevisionNum.Int32),
+			Status:         domain.VersionStatus(publishedStatus.String),
+		}
 	}
 	if archivedAt.Valid {
 		t.ArchivedAt = &archivedAt.Time

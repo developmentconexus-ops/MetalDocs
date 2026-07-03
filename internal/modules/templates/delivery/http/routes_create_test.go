@@ -12,6 +12,7 @@ import (
 	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/uuid"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/application"
@@ -120,28 +121,80 @@ func (r *fakeRepo) CreateTemplate(_ context.Context, t *domain.Template) error {
 	return nil
 }
 
-func (r *fakeRepo) GetTemplate(_ context.Context, tenantID, id string) (*domain.Template, error) {
+// syntheticVersionUUID derives a deterministic, valid UUID for a template's
+// version ref when no real *domain.TemplateVersion row exists in r.versions
+// to source an id from. Deterministic (not random) so assertions across a
+// single test stay stable; namespaced by template id + role so latest and
+// published never collide.
+func syntheticVersionUUID(templateID, role string) string {
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(templateID+"|"+role)).String()
+}
+
+// readOf wraps a write-aggregate *domain.Template into the read model
+// returned by the repository post-ADR-0065. It resolves Latest (and
+// Published, when PublishedVersionID is set) against r.versions when a
+// matching version row exists, so wire fields like latest_version.id carry
+// real, self-consistent data; otherwise it falls back to a deterministic
+// synthesized UUID so toAPIVersionRef's uuid.Parse never fails.
+func (r *fakeRepo) readOf(t *domain.Template) *domain.TemplateRead {
+	out := &domain.TemplateRead{Template: *t}
+
+	out.Latest = domain.VersionRef{
+		ID:     syntheticVersionUUID(t.ID, "latest"),
+		Number: t.LatestVersion,
+	}
+	for _, v := range r.versions {
+		if v.TemplateID == t.ID && v.VersionNumber == t.LatestVersion {
+			out.Latest = domain.VersionRef{
+				ID:             v.ID,
+				Number:         v.VersionNumber,
+				RevisionNumber: v.RevisionNumber,
+				Status:         v.Status,
+			}
+			break
+		}
+	}
+
+	if t.PublishedVersionID != nil {
+		ref := domain.VersionRef{
+			ID: *t.PublishedVersionID,
+		}
+		if v, ok := r.versions[*t.PublishedVersionID]; ok {
+			ref.Number = v.VersionNumber
+			ref.RevisionNumber = v.RevisionNumber
+			ref.Status = v.Status
+		}
+		if ref.ID == "" {
+			ref.ID = syntheticVersionUUID(t.ID, "published")
+		}
+		out.Published = &ref
+	}
+
+	return out
+}
+
+func (r *fakeRepo) GetTemplate(_ context.Context, tenantID, id string) (*domain.TemplateRead, error) {
 	t, ok := r.templates[id]
 	if !ok || t.TenantID != tenantID {
 		return nil, domain.ErrNotFound
 	}
-	return t, nil
+	return r.readOf(t), nil
 }
 
-func (r *fakeRepo) GetTemplateByKey(_ context.Context, tenantID, key string) (*domain.Template, error) {
+func (r *fakeRepo) GetTemplateByKey(_ context.Context, tenantID, key string) (*domain.TemplateRead, error) {
 	for _, t := range r.templates {
 		if t.TenantID == tenantID && t.Key == key {
-			return t, nil
+			return r.readOf(t), nil
 		}
 	}
 	return nil, domain.ErrNotFound
 }
 
-func (r *fakeRepo) ListTemplates(_ context.Context, f application.ListFilter) ([]*domain.Template, error) {
-	out := make([]*domain.Template, 0, len(r.templates))
+func (r *fakeRepo) ListTemplates(_ context.Context, f application.ListFilter) ([]*domain.TemplateRead, error) {
+	out := make([]*domain.TemplateRead, 0, len(r.templates))
 	for _, t := range r.templates {
 		if t.TenantID == f.TenantID {
-			out = append(out, t)
+			out = append(out, r.readOf(t))
 		}
 	}
 	return out, nil

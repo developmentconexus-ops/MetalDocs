@@ -19,9 +19,9 @@ import (
 type Repository interface {
 	CreateTemplate(ctx context.Context, t *domain.Template) error
 	CreateTemplateTx(ctx context.Context, tx db.Tx, t *domain.Template) error
-	GetTemplate(ctx context.Context, tenantID, id string) (*domain.Template, error)
-	GetTemplateByKey(ctx context.Context, tenantID, key string) (*domain.Template, error)
-	ListTemplates(ctx context.Context, f ListFilter) ([]*domain.Template, error)
+	GetTemplate(ctx context.Context, tenantID, id string) (*domain.TemplateRead, error)
+	GetTemplateByKey(ctx context.Context, tenantID, key string) (*domain.TemplateRead, error)
+	ListTemplates(ctx context.Context, f ListFilter) ([]*domain.TemplateRead, error)
 	UpdateTemplate(ctx context.Context, t *domain.Template) error
 	UpdateTemplateTx(ctx context.Context, tx db.Tx, t *domain.Template) error
 

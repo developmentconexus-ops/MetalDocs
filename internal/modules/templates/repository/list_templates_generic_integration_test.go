@@ -64,7 +64,7 @@ func TestListTemplates_ProfileFilterIncludesGeneric(t *testing.T) {
 
 	repo := repository.New(db)
 
-	collectKeys := func(ts []*domain.Template) map[string]bool {
+	collectKeys := func(ts []*domain.TemplateRead) map[string]bool {
 		out := map[string]bool{}
 		for _, tpl := range ts {
 			out[tpl.Key] = true

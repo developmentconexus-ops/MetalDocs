@@ -85,18 +85,19 @@ INSERT INTO templates_template (
 // GetTemplate loads a template by ID, scoped to the tenant, joining in the
 // latest and published version's revision numbers. It returns
 // domain.ErrNotFound when the row is missing or id is not a valid UUID.
-func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*domain.Template, error) {
+func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*domain.TemplateRead, error) {
 	const q = `
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
-	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
+	t.latest_version, lv.id::text, lv.revision_number, lv.status,
+	t.published_version_id::text, pv.version_number, pv.revision_number, pv.status,
 	t.created_by, t.system_owned, t.created_at, t.updated_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
 LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
 WHERE t.id = $1 AND t.tenant_id = $2::uuid`
 
-	tmpl, err := scanTemplate(r.db.QueryRowContext(ctx, q, id, tenantID))
+	tmpl, err := scanTemplateRead(r.db.QueryRowContext(ctx, q, id, tenantID))
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
@@ -109,18 +110,19 @@ WHERE t.id = $1 AND t.tenant_id = $2::uuid`
 // GetTemplateByKey loads a template by its tenant-scoped unique key, joining
 // in the latest and published version's revision numbers. It returns
 // domain.ErrNotFound when no matching row exists.
-func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string) (*domain.Template, error) {
+func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string) (*domain.TemplateRead, error) {
 	const q = `
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
-	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
+	t.latest_version, lv.id::text, lv.revision_number, lv.status,
+	t.published_version_id::text, pv.version_number, pv.revision_number, pv.status,
 	t.created_by, t.system_owned, t.created_at, t.updated_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
 LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
 WHERE t.tenant_id = $1::uuid AND t.key = $2`
 
-	t, err := scanTemplate(r.db.QueryRowContext(ctx, q, tenantID, key))
+	t, err := scanTemplateRead(r.db.QueryRowContext(ctx, q, tenantID, key))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrNotFound
 	}
@@ -162,11 +164,12 @@ func clampTemplatesLimit(limit int) int {
 // filtered by doc type code (a nil filter also always includes generic
 // templates, i.e. those with an empty doc_type_code), newest first, clamped
 // to the /templates contract's pagination bounds via clampTemplatesLimit.
-func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter) ([]*domain.Template, error) {
+func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter) ([]*domain.TemplateRead, error) {
 	const q = `
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
-	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
+	t.latest_version, lv.id::text, lv.revision_number, lv.status,
+	t.published_version_id::text, pv.version_number, pv.revision_number, pv.status,
 	t.created_by, t.system_owned, t.created_at, t.updated_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
@@ -201,9 +204,9 @@ LIMIT $3 OFFSET $4`
 	}
 	defer rows.Close()
 
-	out := make([]*domain.Template, 0)
+	out := make([]*domain.TemplateRead, 0)
 	for rows.Next() {
-		t, scanErr := scanTemplate(rows)
+		t, scanErr := scanTemplateRead(rows)
 		if scanErr != nil {
 			return nil, scanErr
 		}

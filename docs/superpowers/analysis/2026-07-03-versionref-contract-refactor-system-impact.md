@@ -91,7 +91,14 @@ AS-1 not triggered.
   2. Two schemas, one pattern: `TemplateVersionRef` ≠ `DocumentRevisionRef`; no shared cross-context schema or Go package.
   3. `published_version` is required-and-nullable (present-and-null, never absent) — the 9f86828b guarantee carries forward; pin tests enforce.
   4. `TemplateVersionRef` includes `status` (unblocks wizard "why not selectable" UX — StepTemplate.tsx:80 TODO).
-  5. Read model split: list projection gets its own struct(s) inside each module; `domain.Template` aggregate stops carrying join-projection fields.
-  6. No DB migration; SQL projections unchanged.
+  5. Read model split: repository Get/List return `domain.TemplateRead`
+     (embeds the aggregate + two `VersionRef`s); `domain.Template` drops the
+     three projection scalars. lifecycle.go's in-memory projection writes
+     (lines ~286-290, ~471-474) are deleted — post-command responses assemble
+     refs from the version they just wrote.
+  6. No DB migration. List/Get SQL SELECT gains two columns (lv.id, lv.status)
+     — projection extension, no schema change. (Supersedes the earlier
+     "SQL projections unchanged" wording — status/id of the latest version
+     were not previously selected.)
   7. ADR 0065 written; ADR 0035 memory/doc annotated as structurally closed for this class.
   8. FE consumers gate on the single nullable object (`published_version == null`), never on inner fields.

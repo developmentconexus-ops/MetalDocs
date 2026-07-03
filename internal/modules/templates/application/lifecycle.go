@@ -224,8 +224,9 @@ type ApproveResult struct {
 // binding and pass segregation-of-duties against the author and reviewer.
 // On accept, the version's content hash must already be committed
 // (ErrContentHashMismatch otherwise); the version is published, the
-// template's PublishedVersionID/PublishedVersionNumber/CurrentRevisionNumber
-// are updated, the previously published version (if any) is transitioned to
+// template's PublishedVersionID is updated (ADR 0065 — revision/number are
+// projected onto the read model from the version row, not stored on the
+// aggregate), the previously published version (if any) is transitioned to
 // obsolete, and AuditPublished (plus AuditObsoleted when applicable) events
 // are appended — all atomically in one transaction. On reject, the version
 // reverts to draft and an AuditRejected event (stage "approver") is
@@ -281,13 +282,11 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 		// event must reference.
 		obsoletedVersionID := template.PublishedVersionID
 
+		// ADR 0065: the template aggregate carries only the published-version
+		// FK; revision/number projections live on the read model, assembled
+		// from the version row on read. Post-command responses read the version
+		// directly, so no in-memory projection write is needed here.
 		template.PublishedVersionID = &version.ID
-		approvedNum := version.VersionNumber
-		template.PublishedVersionNumber = &approvedNum
-		// ADR 0013: surface the 0-based regulated revision code alongside the
-		// 1-based lifecycle counter. FE renders REV{nn} directly from this field.
-		approvedRev := version.RevisionNumber
-		template.CurrentRevisionNumber = &approvedRev
 
 		audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, nil, s.clock.Now())
 		if err != nil {
@@ -315,7 +314,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 					return wrapAppErr("templates approve: append obsoleted audit", err)
 				}
 			}
-			if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
+			if err := s.repo.UpdateTemplateTx(ctx, tx, &template.Template); err != nil {
 				return err
 			}
 			if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
@@ -395,9 +394,10 @@ type PublishTemplateVersionResult struct {
 // reviewer) and hold the version's pending approver role binding — a role
 // mismatch is audited as AuditPublishForbiddenRole (best-effort, non-fatal)
 // before returning ErrForbiddenRole. On success, the version is published,
-// the template's PublishedVersionID/PublishedVersionNumber/
-// CurrentRevisionNumber are updated, the previously published version (if
-// any) is transitioned to obsolete, and AuditPublished (plus AuditObsoleted
+// the template's PublishedVersionID is updated (ADR 0065 — revision/number
+// projected onto the read model, not stored on the aggregate), the previously
+// published version (if any) is transitioned to obsolete, and AuditPublished
+// (plus AuditObsoleted
 // when applicable) events are appended — all atomically in one transaction.
 // A CAS conflict from a concurrent transition is remapped to
 // ErrConcurrentTransition (409 instead of 412). Publish no longer spawns the
@@ -466,12 +466,9 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	// event must reference.
 	obsoletedVersionID := template.PublishedVersionID
 
+	// ADR 0065: aggregate carries only the published-version FK; the read
+	// model projects revision/number/status from the version row on read.
 	template.PublishedVersionID = &version.ID
-	publishedNum := version.VersionNumber
-	template.PublishedVersionNumber = &publishedNum
-	// ADR 0013: see Approve Accept branch.
-	publishedRev := version.RevisionNumber
-	template.CurrentRevisionNumber = &publishedRev
 
 	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{"schema_key": cmd.SchemaKey}, now)
 	if err != nil {
@@ -499,7 +496,7 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 				return wrapAppErr("templates publish: append obsoleted audit", err)
 			}
 		}
-		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
+		if err := s.repo.UpdateTemplateTx(ctx, tx, &template.Template); err != nil {
 			return err
 		}
 		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
@@ -561,7 +558,7 @@ func (s *Service) spawnNextDraft(ctx context.Context, tenantID, templateID, acto
 // appending an AuditArchived event, atomically in one transaction. The
 // template must not be system-owned. Archiving an already-archived template
 // is a no-op that returns the template unchanged.
-func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.Template, error) {
+func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.TemplateRead, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
 		return nil, err
@@ -588,7 +585,7 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateArchive), "tenant"); err != nil {
 			return fmt.Errorf("templates archive: authz: %w", err)
 		}
-		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
+		if err := s.repo.UpdateTemplateTx(ctx, tx, &template.Template); err != nil {
 			return err
 		}
 		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
