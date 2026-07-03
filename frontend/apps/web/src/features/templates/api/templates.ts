@@ -11,8 +11,6 @@ type CreateTemplateResponse =
 // Query params derived from the generated contract so the snake_case wire keys
 // (limit/offset/doc_type) can never drift from the spec (F-C2).
 type ListTemplatesQuery = NonNullable<operations['listTemplates']['parameters']['query']>;
-type GeneratedTemplateDTO = components['schemas']['TemplateDTO'];
-type GeneratedVersionDTO = components['schemas']['VersionDTO'];
 // ADR 0065: nested version-ref value object (latest_version/published_version).
 // Re-exported so consumers don't reach into the generated api-types directly.
 export type VersionRef = components['schemas']['TemplateVersionRef'];
@@ -33,47 +31,8 @@ type ApproveTemplateVersionResponse =
 type UpdateTemplateSchemaResponse =
   operations['updateTemplateSchema']['responses'][200]['content']['application/json'];
 
-export type TemplateDTO = Omit<
-  GeneratedTemplateDTO,
-  'archived_at' | 'description' | 'doc_type_code'
-> & {
-  archived_at: string | null;
-  description: string | null | undefined;
-  doc_type_code: string | null;
-};
-export type VersionDTO = Omit<
-  GeneratedVersionDTO,
-  | 'approved_at'
-  | 'approver_id'
-  | 'content_hash'
-  | 'docx_storage_key'
-  | 'metadata_schema'
-  | 'obsoleted_at'
-  | 'pending_approver_role'
-  | 'pending_reviewer_role'
-  | 'placeholder_schema'
-  | 'published_at'
-  | 'reviewed_at'
-  | 'reviewer_id'
-  | 'submitted_at'
-> & {
-  approved_at: string | null;
-  approver_id: string | null;
-  content_hash: string | null;
-  docx_storage_key: string | null;
-  metadata_schema: Record<string, unknown> | null;
-  obsoleted_at: string | null;
-  pending_approver_role: string | null;
-  pending_reviewer_role: string | null;
-  // ADR 0035 / F1.2: backend always emits the placeholder schema as an ordered
-  // array. The generated DTO already types it as an array; this override keeps
-  // the precise element shape instead of widening it back to an object.
-  placeholder_schema: WirePlaceholder[] | null;
-  published_at: string | null;
-  reviewed_at: string | null;
-  reviewer_id: string | null;
-  submitted_at: string | null;
-};
+export type TemplateDTO = components['schemas']['TemplateDTO'];
+export type VersionDTO = components['schemas']['VersionDTO'];
 export type VersionStatus = VersionDTO['status'];
 
 export interface TemplateSchemas {
@@ -299,7 +258,11 @@ export class StaleLockVersionError extends Error {
 export function deriveTemplateSchemas(
   version: VersionDTO,
 ): { schemas: TemplateSchemas; lockVersion: number } {
-  const ph = version.placeholder_schema;
+  // The generated DTO types placeholder_schema elements as an untyped JSON
+  // object ({[key: string]: unknown}) because the spec can't statically
+  // declare the placeholder shape; WirePlaceholder is the local wire-format
+  // view type for this call site only (not an Omit<> override of the DTO).
+  const ph = version.placeholder_schema as WirePlaceholder[] | null;
   return {
     schemas: {
       placeholders: Array.isArray(ph) ? ph.map(placeholderFromWire) : [],
