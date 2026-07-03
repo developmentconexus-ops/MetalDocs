@@ -160,18 +160,20 @@ VALUES
   -- It had iam_user_roles but no user_process_areas, so authz.Require (which
   -- reads only UPA) returned 403 FORBIDDEN_CAPABILITY on every approve/publish
   -- even though /auth/me listed the capability.
-  -- TST-03: the row's role is 'qms_admin', not 'approver'. 'template.publish'
-  -- is granted only to role_capabilities rows ('qms_admin' / 'system_admin')
-  -- (db/reference-data/0001_product_reference_data.sql) — the plain 'approver'
-  -- role never carries it, so a reviewer-stage template (hasReviewer=true),
-  -- whose Approve() stops at status 'approved' and requires a SEPARATE
-  -- PublishTemplateVersion call gated on CapTemplatePublish, would 403 on that
-  -- second call. A second 'approver'-role row is impossible: partial unique
-  -- index ux_user_process_areas_one_active allows ONE active row per
+  -- TST-03 (corrected to runtime truth 2026-07-03): the row's role is
+  -- 'qms_admin', not 'approver'. Runtime facts, live-proven: Approve(accept)
+  -- PUBLISHES DIRECTLY, including on reviewer-stage templates (lifecycle.go
+  -- Approve accept branch) — there is no separate publish call in the
+  -- workflow path, and the direct POST /publish route's handler gate reads
+  -- iam_user_roles x role_capabilities (CapabilityService.CanDo), which this
+  -- UPA row cannot influence (only 'admin'/system_admin passes it among
+  -- seeded users). This row's job is tier-2: authz.Require reads only UPA,
+  -- and 'approver' had NO UPA row at all (403 on every approve). A second
+  -- 'approver'-role row is impossible: partial unique index
+  -- ux_user_process_areas_one_active allows ONE active row per
   -- (user, tenant, area). qms_admin's capability set is a superset of
   -- approver's document/template caps (template.approve, template.review,
-  -- document.signoff, ...), so this single row lets the same
-  -- distinct-from-'admin' identity drive approve AND publish end-to-end.
+  -- document.signoff, ...), so the superset role is the safe single choice.
   -- domain.CheckSegregation is untouched (SoD compares user_id, not role);
   -- role='approver' coverage stays exercised by approver-test above.
   (
