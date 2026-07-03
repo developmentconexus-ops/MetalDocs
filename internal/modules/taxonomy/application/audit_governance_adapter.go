@@ -18,10 +18,15 @@ type AuditGovernanceAdapter struct {
 	writer auditdomain.Writer
 }
 
+// NewAuditGovernanceAdapter builds an AuditGovernanceAdapter wrapping w. w
+// must not be nil — taxonomy's module composition root panics rather than
+// falling back to a no-op logger.
 func NewAuditGovernanceAdapter(w auditdomain.Writer) *AuditGovernanceAdapter {
 	return &AuditGovernanceAdapter{writer: w}
 }
 
+// Log records event to the audit sink outside any caller transaction,
+// defaulting a nil PayloadJSON to an empty JSON object.
 func (a *AuditGovernanceAdapter) Log(ctx context.Context, event domain.GovernanceEvent) error {
 	payload := event.PayloadJSON
 	if payload == nil {

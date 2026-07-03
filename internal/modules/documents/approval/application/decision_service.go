@@ -16,15 +16,17 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
-	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/infrastructure/signature"
 	"metaldocs/internal/modules/documents/approval/repository"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
 )
 
+// ErrApprovalBlockedByUnresolvedComments is returned when an approve decision is
+// attempted while the document still has unresolved review comments.
 var ErrApprovalBlockedByUnresolvedComments = errors.New("approval: unresolved comments block approval")
 
 // ErrReauthNotConfigured is returned (fail-closed) when a password_reauth
@@ -107,6 +109,8 @@ func (s *DecisionService) WithSignatureRegistry(registry *signature.Registry) *D
 	return s
 }
 
+// WithLifecycleEnqueuer wires the F3.3 domain-event enqueuer used to publish
+// lifecycle events after a decision completes a stage or instance transition.
 func (s *DecisionService) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *DecisionService {
 	s.lifecycleEnqueuer = e
 	return s

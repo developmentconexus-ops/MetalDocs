@@ -10,6 +10,8 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// NoActor is the sentinel empty actor ID used to detect a missing actor in
+// ctx before seeding the authz GUCs.
 const NoActor = ""
 
 // setAuthzGUC resolves the tenant/actor identity from ctx and seeds the

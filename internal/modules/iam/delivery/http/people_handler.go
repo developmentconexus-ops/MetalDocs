@@ -41,6 +41,9 @@ type PeopleHandler struct {
 	audit   auditdomain.Writer
 }
 
+// NewPeopleHandler constructs the handler. audit is used only by the
+// bulk-action path (recordAudit); Patch/Invite/Reset/Unlock emit audit rows
+// at the application layer instead.
 func NewPeopleHandler(service *iamapp.PeopleService, authSvc UserAdminService, audit auditdomain.Writer) *PeopleHandler {
 	return &PeopleHandler{service: service, authSvc: authSvc, audit: audit}
 }

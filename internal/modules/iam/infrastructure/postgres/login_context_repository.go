@@ -15,6 +15,7 @@ type LoginContextRepository struct {
 	db *sql.DB
 }
 
+// NewLoginContextRepository constructs a pool-backed LoginContextRepository.
 func NewLoginContextRepository(db *sql.DB) *LoginContextRepository {
 	return &LoginContextRepository{db: db}
 }

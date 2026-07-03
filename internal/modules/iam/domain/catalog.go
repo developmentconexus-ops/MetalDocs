@@ -10,8 +10,11 @@ import "sort"
 type RoleCategory string
 
 const (
+	// RoleCategoryTenant marks a role whose authority applies tenant-wide.
 	RoleCategoryTenant RoleCategory = "tenant"
-	RoleCategoryArea   RoleCategory = "area"
+	// RoleCategoryArea marks a role whose authority is scoped to a granted
+	// process area.
+	RoleCategoryArea RoleCategory = "area"
 )
 
 // RoleDescriptor describes a canonical role for the Admin Center catalogue.

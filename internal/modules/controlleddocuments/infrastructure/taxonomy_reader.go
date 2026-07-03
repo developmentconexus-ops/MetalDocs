@@ -29,10 +29,14 @@ type TaxonomyProfileReader struct {
 	profiles taxonomyProfileGetter
 }
 
+// NewTaxonomyProfileReader builds a TaxonomyProfileReader backed by
+// profiles (the canonical taxonomy profile repository).
 func NewTaxonomyProfileReader(profiles taxonomyProfileGetter) *TaxonomyProfileReader {
 	return &TaxonomyProfileReader{profiles: profiles}
 }
 
+// GetByCode satisfies application.ProfileReader by delegating to the
+// wrapped taxonomy profile repository.
 func (r *TaxonomyProfileReader) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error) {
 	return r.profiles.GetByCode(ctx, tenantID, taxonomydomain.ProfileCode(code))
 }
@@ -44,10 +48,14 @@ type TaxonomyAreaReader struct {
 	areas taxonomyAreaGetter
 }
 
+// NewTaxonomyAreaReader builds a TaxonomyAreaReader backed by areas (the
+// canonical taxonomy area repository).
 func NewTaxonomyAreaReader(areas taxonomyAreaGetter) *TaxonomyAreaReader {
 	return &TaxonomyAreaReader{areas: areas}
 }
 
+// GetByCode satisfies application.AreaReader by delegating to the
+// wrapped taxonomy area repository.
 func (r *TaxonomyAreaReader) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.ProcessArea, error) {
 	return r.areas.GetByCode(ctx, tenantID, taxonomydomain.AreaCode(code))
 }

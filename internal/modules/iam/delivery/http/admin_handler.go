@@ -23,6 +23,10 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// UserAdminService is the narrow auth-module surface AdminHandler and
+// PeopleHandler use for user CRUD and presence. Implemented by
+// *authapp.Service; kept as an interface so handlers depend on a capability,
+// not the concrete auth service.
 type UserAdminService interface {
 	ListUsers(ctx context.Context, tenantID string) ([]authdomain.ManagedUser, error)
 	ListOnlineUsers(ctx context.Context, tenantID string, activeSince time.Time) ([]authdomain.OnlineUser, error)
@@ -55,6 +59,9 @@ type PresenceReader interface {
 	Snapshot(ctx context.Context, tenantID string, now time.Time) ([]iampresence.Item, error)
 }
 
+// AdminHandler serves the legacy role-edit endpoints (POST/PUT
+// /iam/users/{user_id}/roles) plus the composed Admin Center overview.
+// User CRUD lives on PeopleHandler; see RegisterRoutes.
 type AdminHandler struct {
 	service     *iamapp.AdminService
 	authService UserAdminService
@@ -63,18 +70,24 @@ type AdminHandler struct {
 	presence    PresenceReader
 }
 
+// UpsertUserRoleRequest is the POST /iam/users/{user_id}/roles request body.
 type UpsertUserRoleRequest struct {
 	DisplayName string `json:"display_name"`
 	Role        string `json:"role"`
 	AssignedBy  string `json:"assigned_by,omitempty"`
 }
 
+// ReplaceUserRolesRequest is the PUT /iam/users/{user_id}/roles request body.
+// Roles must decode to exactly one role (parseExactlyOneRole).
 type ReplaceUserRolesRequest struct {
 	DisplayName string   `json:"display_name"`
 	Roles       []string `json:"roles"`
 	AssignedBy  string   `json:"assigned_by,omitempty"`
 }
 
+// NewAdminHandler constructs the handler. The variadic auditdomain.Writer
+// parameter is accepted for call-site compatibility only and discarded:
+// audit is now emitted in-tx by AdminService (H-3b).
 func NewAdminHandler(service *iamapp.AdminService, authService UserAdminService, _ ...auditdomain.Writer) *AdminHandler {
 	// auditWriter variadic is kept for call-site compatibility during the H-3b
 	// migration; audit is now emitted in-tx by AdminService and is no longer
@@ -394,7 +407,6 @@ func (h *AdminHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
 		slog.Warn("iam: write response failed", "err", werr)
 	}
 }
-
 
 func parseRoles(items []string) ([]iamdomain.Role, bool) {
 	out := make([]iamdomain.Role, 0, len(items))

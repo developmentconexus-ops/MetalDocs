@@ -1,3 +1,8 @@
+// Package postgres implements authdomain.Repository against Postgres:
+// identities, sessions, and login-lock serialization via
+// pg_advisory_xact_lock. It resolves tenant membership through the
+// iam-owned UserTenantReader port rather than reading iam_user_roles
+// directly (module-boundary remediation, ADR 0031).
 package postgres
 
 import (
@@ -17,6 +22,7 @@ import (
 // Compile-time assertion that the postgres adapter satisfies the auth port.
 var _ authdomain.Repository = (*Repository)(nil)
 
+// Repository is the Postgres-backed authdomain.Repository implementation.
 type Repository struct {
 	db *sql.DB
 	// userTenants is the iam-owned read port for a user's tenant memberships.
@@ -36,10 +42,13 @@ func NewRepository(db *sql.DB, userTenants iamdomain.UserTenantReader) *Reposito
 	return &Repository{db: db, userTenants: userTenants}
 }
 
+// BeginTx starts a transaction on the underlying pool; callers own its lifecycle.
 func (r *Repository) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
 	return r.db.BeginTx(ctx, opts)
 }
 
+// FindIdentityByIdentifier implements authdomain.Repository, matching
+// identifier case-insensitively against username first, then email.
 func (r *Repository) FindIdentityByIdentifier(ctx context.Context, identifier string) (authdomain.Identity, error) {
 	needle := strings.ToLower(strings.TrimSpace(identifier))
 	const q = `
@@ -61,6 +70,7 @@ LIMIT 1
 	return r.loadIdentity(ctx, q, needle)
 }
 
+// FindIdentityByUserID implements authdomain.Repository.
 func (r *Repository) FindIdentityByUserID(ctx context.Context, userID string) (authdomain.Identity, error) {
 	const q = `
 SELECT i.user_id, i.username, COALESCE(i.email, ''), i.display_name, i.password_hash, i.password_algo,
@@ -72,6 +82,7 @@ WHERE i.user_id = $1
 	return r.loadIdentity(ctx, q, userID)
 }
 
+// CreateSession implements authdomain.Repository.
 func (r *Repository) CreateSession(ctx context.Context, session authdomain.Session) error {
 	const q = `
 INSERT INTO metaldocs.auth_sessions (session_id, user_id, tenant_id, created_at, expires_at, revoked_at, ip_address, user_agent, last_seen_at)
@@ -84,6 +95,8 @@ VALUES ($1, $2, $3::uuid, $4, $5, NULL, $6, $7, $8)
 	return nil
 }
 
+// FindSession implements authdomain.Repository. Returns ErrSessionNotFound if
+// no row matches sessionID.
 func (r *Repository) FindSession(ctx context.Context, sessionID string) (authdomain.Session, error) {
 	const q = `
 SELECT session_id, user_id, tenant_id::text, created_at, expires_at, revoked_at, COALESCE(ip_address, ''), COALESCE(user_agent, ''), last_seen_at
@@ -118,6 +131,8 @@ func (r *Repository) GetUserTenants(ctx context.Context, userID string) ([]strin
 	return r.userTenants.UserTenantIDs(ctx, userID)
 }
 
+// GetTenantByID implements authdomain.Repository. Returns ErrTenantNotFound
+// if no row matches tenantID.
 func (r *Repository) GetTenantByID(ctx context.Context, tenantID string) (authdomain.Tenant, error) {
 	const q = `
 SELECT id::text, name, slug
@@ -134,6 +149,9 @@ WHERE id = $1::uuid
 	return tenant, nil
 }
 
+// TouchSession implements authdomain.Repository. The write is skipped
+// (no-op) unless at least 30s have elapsed since the session's stored
+// last_seen_at, bounding write amplification on hot sessions.
 func (r *Repository) TouchSession(ctx context.Context, sessionID string, seenAt time.Time) error {
 	// TODO: consider updating only expired/grace-window-stale sessions to reduce write amplification further.
 	const q = `
@@ -162,6 +180,9 @@ WHERE session_id = $1
 	return nil
 }
 
+// RevokeSessionTx is the tx-scoped variant backing RevokeSession; the caller
+// owns the transaction's commit/rollback. Returns ErrSessionNotFound if
+// sessionID does not exist.
 func (r *Repository) RevokeSessionTx(ctx context.Context, tx *sql.Tx, sessionID string, revokedAt time.Time) error {
 	const q = `
 UPDATE metaldocs.auth_sessions
@@ -182,6 +203,8 @@ WHERE session_id = $1
 	return nil
 }
 
+// RevokeSession implements authdomain.Repository by wrapping RevokeSessionTx
+// in its own transaction.
 func (r *Repository) RevokeSession(ctx context.Context, sessionID string, revokedAt time.Time) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -197,6 +220,9 @@ func (r *Repository) RevokeSession(ctx context.Context, sessionID string, revoke
 	return nil
 }
 
+// RevokeSessionsByUserIDTx is the tx-scoped variant backing
+// RevokeSessionsByUserID; already-revoked sessions are left untouched
+// (idempotent). The caller owns the transaction's commit/rollback.
 func (r *Repository) RevokeSessionsByUserIDTx(ctx context.Context, tx *sql.Tx, userID string, revokedAt time.Time) error {
 	const q = `
 UPDATE metaldocs.auth_sessions
@@ -211,6 +237,8 @@ WHERE user_id = $1
 	return nil
 }
 
+// RevokeSessionsByUserID implements authdomain.Repository by wrapping
+// RevokeSessionsByUserIDTx in its own transaction.
 func (r *Repository) RevokeSessionsByUserID(ctx context.Context, userID string, revokedAt time.Time) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -278,6 +306,8 @@ RETURNING failed_login_attempts, locked_until
 	return attempts, &locked, nil
 }
 
+// RecordSuccessfulLogin implements authdomain.Repository: clears failed-attempt
+// count and lockout, and stamps last_login_at.
 func (r *Repository) RecordSuccessfulLogin(ctx context.Context, userID string, loginAt time.Time) error {
 	return recordSuccessfulLogin(ctx, r.db, userID, loginAt)
 }
@@ -359,6 +389,8 @@ func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, maxAt
 	return recordFailedLogin(ctx, r.db, userID, maxAttempts, lockDurationSeconds, ip)
 }
 
+// CreateUser implements authdomain.Repository by wrapping CreateUserTx in its
+// own transaction.
 func (r *Repository) CreateUser(ctx context.Context, params authdomain.CreateUserParams) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -376,6 +408,9 @@ func (r *Repository) CreateUser(ctx context.Context, params authdomain.CreateUse
 	return nil
 }
 
+// CreateUserTx is the tx-scoped variant backing CreateUser; the caller owns
+// the transaction's commit/rollback. Returns ErrUserAlreadyExists on a unique
+// constraint violation (username/email/user_id collision).
 func (r *Repository) CreateUserTx(ctx context.Context, tx *sql.Tx, params authdomain.CreateUserParams) error {
 	const insertIdentity = `
 INSERT INTO metaldocs.auth_identities (user_id, username, email, display_name, is_active, password_hash, password_algo, must_change_password, last_login_at, failed_login_attempts, locked_until, created_at, updated_at)
@@ -390,6 +425,7 @@ VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, NULL, 0, NULL, NOW(), NOW())
 	return nil
 }
 
+// ListUsers implements authdomain.Repository, ordered by creation time descending.
 func (r *Repository) ListUsers(ctx context.Context) ([]authdomain.ManagedUser, error) {
 	const q = `
 SELECT i.user_id, i.username, COALESCE(i.email, ''), i.display_name, i.is_active, i.must_change_password,
@@ -429,6 +465,8 @@ ORDER BY i.created_at DESC
 	return items, nil
 }
 
+// ListOnlineUsers implements authdomain.Repository: active, non-revoked,
+// non-expired sessions in tenantID seen at or after activeSince, one row per user.
 func (r *Repository) ListOnlineUsers(ctx context.Context, tenantID string, activeSince time.Time) ([]authdomain.OnlineUser, error) {
 	// TODO: use monotonic heartbeat or session token expiry instead of wall-clock comparison.
 	const q = `
@@ -468,6 +506,11 @@ ORDER BY MAX(s.last_seen_at) DESC
 	return items, nil
 }
 
+// UpdateUserTx is the tx-scoped variant backing UpdateUser; the caller owns
+// the transaction's commit/rollback. nil fields in params are left
+// unchanged; a no-op params still requires the row to exist. Returns
+// ErrIdentityNotFound if no row matches, or ErrUserAlreadyExists on an email
+// unique-constraint violation.
 func (r *Repository) UpdateUserTx(ctx context.Context, tx *sql.Tx, params authdomain.UpdateUserParams) error {
 	if !hasMutableUserUpdates(params) {
 		// No writes to do; existence is guaranteed by the surrounding service tx.
@@ -522,6 +565,8 @@ WHERE user_id = $1
 	return nil
 }
 
+// UpdateUser implements authdomain.Repository by wrapping UpdateUserTx in its
+// own transaction (profile and credential updates commit atomically together).
 func (r *Repository) UpdateUser(ctx context.Context, params authdomain.UpdateUserParams) error {
 	if !hasMutableUserUpdates(params) {
 		return r.ensureIdentityExists(ctx, params.UserID)
@@ -561,6 +606,9 @@ SELECT EXISTS (
 	return nil
 }
 
+// BootstrapAdmin implements authdomain.Repository. Uses ON CONFLICT DO
+// NOTHING on user_id, so it is idempotent — created=false (no error) when
+// the row already exists.
 func (r *Repository) BootstrapAdmin(ctx context.Context, params authdomain.BootstrapAdminParams) (bool, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

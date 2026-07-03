@@ -30,8 +30,8 @@ import (
 
 	"github.com/google/uuid"
 
-	authapp "metaldocs/internal/modules/auth/application"
 	auditdomain "metaldocs/internal/modules/audit/domain"
+	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -118,6 +118,7 @@ type BulkOutcome struct {
 	Failed    []BulkFailure
 }
 
+// BulkFailure is the per-user error detail for a failed BulkAction item.
 type BulkFailure struct {
 	UserID  string
 	Code    string
@@ -186,14 +187,14 @@ type peopleMembershipService interface {
 
 // PeopleService is the People-tab orchestrator (PR-4).
 type PeopleService struct {
-	auth          peopleAuthService
-	roles         peopleRoleProvider
-	roleAdmin     iamdomain.RoleAdminRepository
-	memberships   peopleMembershipService
-	areaCatalog   AreaCatalogReader
-	invalidator   RoleCacheInvalidator
-	tempPassword  func() (string, error)
-	nowFn         func() time.Time
+	auth         peopleAuthService
+	roles        peopleRoleProvider
+	roleAdmin    iamdomain.RoleAdminRepository
+	memberships  peopleMembershipService
+	areaCatalog  AreaCatalogReader
+	invalidator  RoleCacheInvalidator
+	tempPassword func() (string, error)
+	nowFn        func() time.Time
 	// H-3b: atomic PatchAtomic wiring. nil in tests that use PeopleServiceFromInterfaces
 	// without a DB; the service falls back to the two-step non-tx path.
 	runner        db.TxRunner
@@ -273,6 +274,8 @@ type InviteInput struct {
 	AreaMemberships []InviteAreaInput
 }
 
+// InviteAreaInput is one area-membership grant requested as part of Invite.
+// Role must be an area-scoped role (see isAreaScopedRole).
 type InviteAreaInput struct {
 	AreaCode string
 	Role     iamdomain.Role
@@ -350,10 +353,10 @@ func (s *PeopleService) Invite(ctx context.Context, tenantID, actorID string, in
 	if s.audit != nil {
 		areaCount := len(input.AreaMemberships)
 		auditPayload := map[string]any{
-			"username":   input.Username,
-			"email":      input.Email,
+			"username":    input.Username,
+			"email":       input.Email,
 			"tenant_role": string(input.TenantRole),
-			"areaCount":  areaCount,
+			"areaCount":   areaCount,
 		}
 		auditPayloadJSON, _ := json.Marshal(auditPayload)
 		ev := auditdomain.Event{
@@ -654,6 +657,8 @@ func (s *PeopleService) BulkAction(ctx context.Context, tenantID, actorID, actio
 // Problem so the frontend can show a deferred-feature notice.
 var errForceLogoutDeferred = errors.New("force_logout_not_implemented")
 
+// IsForceLogoutDeferred reports whether err is (or wraps) errForceLogoutDeferred,
+// letting the handler map the deferred force-logout action to a 501 Problem.
 func IsForceLogoutDeferred(err error) bool { return errors.Is(err, errForceLogoutDeferred) }
 
 func (s *PeopleService) applyBulkAction(ctx context.Context, action, userID string) error {

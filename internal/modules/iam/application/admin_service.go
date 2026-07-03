@@ -15,6 +15,11 @@ import (
 	"metaldocs/internal/platform/requesttrace"
 )
 
+// RoleCacheInvalidator is the narrow port for evicting a user's cached role
+// set. Implemented by CachedRoleProvider. Callers MUST invoke
+// InvalidateUserTenant post-commit after any write that changes a user's
+// roles or tenant membership; otherwise the cache serves stale authz
+// decisions until TTL expiry.
 type RoleCacheInvalidator interface {
 	InvalidateUserTenant(userID, tenantID string)
 }
@@ -29,6 +34,10 @@ type roleAdminTxRepository interface {
 	ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, role domain.Role, assignedBy string) error
 }
 
+// AdminService owns the legacy single-tenant-role assignment write paths
+// (upsert-or-assign and replace). When runner and audit are both wired, the
+// mutation and its audit row commit atomically in one tx (H-3b REQ-ASYNC-1);
+// otherwise it falls back to a non-tx repo call for bootstrap/test paths.
 type AdminService struct {
 	repo        domain.RoleAdminRepository
 	invalidator RoleCacheInvalidator
@@ -36,10 +45,19 @@ type AdminService struct {
 	audit       auditdomain.Writer
 }
 
+// NewAdminService constructs the service. invalidator, runner, and audit may
+// be nil; nil runner/audit forces the non-tx repo fallback path on every
+// write, and a nil invalidator skips post-commit cache eviction.
 func NewAdminService(repo domain.RoleAdminRepository, invalidator RoleCacheInvalidator, runner db.TxRunner, audit auditdomain.Writer) *AdminService {
 	return &AdminService{repo: repo, invalidator: invalidator, runner: runner, audit: audit}
 }
 
+// UpsertUserAndAssignRole creates the user (if absent) and assigns role,
+// atomically with an audit row when runner/audit are wired. Returns
+// domain.ErrUserNotFound for an empty userID/tenantID and domain.ErrInvalidRole
+// for a role outside the canonical set. Invalidates the actor's cached roles
+// post-commit (H-3b invariant) — never before, so a rolled-back tx cannot
+// evict a still-valid cache entry.
 func (s *AdminService) UpsertUserAndAssignRole(ctx context.Context, userID, displayName, tenantID string, role domain.Role, assignedBy, actorID string) error {
 	userID = strings.TrimSpace(userID)
 	displayName = strings.TrimSpace(displayName)
@@ -96,6 +114,11 @@ func (s *AdminService) UpsertUserAndAssignRole(ctx context.Context, userID, disp
 	return nil
 }
 
+// ReplaceUserRoles replaces the user's single tenant role with role,
+// atomically with an audit row when runner/audit are wired. Returns
+// domain.ErrUserNotFound for an empty userID/tenantID and domain.ErrInvalidRole
+// for a role outside the canonical set. Invalidates the actor's cached roles
+// post-commit (H-3b invariant).
 func (s *AdminService) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, role domain.Role, assignedBy, actorID string) error {
 	userID = strings.TrimSpace(userID)
 	displayName = strings.TrimSpace(displayName)

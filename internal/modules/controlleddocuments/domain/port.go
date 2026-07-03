@@ -25,6 +25,12 @@ type ActiveDocumentInstance struct {
 	ApprovalInstanceID *string
 }
 
+// ControlledDocumentRepository is the persistence port for the
+// ControlledDocument aggregate. Implementations must seed the authz GUCs
+// and call authz.Require before every write, pairing with the
+// trg_require_cap_asserted DB tripwire; Tx variants participate in a
+// caller-owned transaction (e.g. atomic CD + first-revision create,
+// ADR 0011).
 type ControlledDocumentRepository interface {
 	// Read operations.
 	GetByID(ctx context.Context, tenantID, id string) (*ControlledDocument, error)
@@ -45,6 +51,8 @@ type ControlledDocumentRepository interface {
 	UpdateStatusTx(ctx context.Context, tx db.Tx, tenantID, id string, status CDStatus, updatedAt time.Time) error
 }
 
+// CDFilter narrows a List query: all pointer/slice fields are optional
+// (nil/empty = unfiltered) and are ANDed together.
 type CDFilter struct {
 	ProfileCode     *string
 	ProcessAreaCode *string

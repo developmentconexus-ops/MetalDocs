@@ -12,14 +12,20 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+// ObservabilityRepository backs the Admin Center observability/usage KPIs
+// with tenant-scoped queries over metaldocs.iam_users, iam_user_roles,
+// audit_events, auth_identities, and tenant_plans.
 type ObservabilityRepository struct {
 	db *sql.DB
 }
 
+// NewObservabilityRepository constructs a pool-backed ObservabilityRepository.
 func NewObservabilityRepository(db *sql.DB) *ObservabilityRepository {
 	return &ObservabilityRepository{db: db}
 }
 
+// CountActiveSeats returns the count of iam_users rows with is_active = true
+// for tenantID.
 func (r *ObservabilityRepository) CountActiveSeats(ctx context.Context, tenantID string) (int, error) {
 	const q = `
 SELECT COUNT(*)
@@ -84,6 +90,9 @@ WHERE tenant_id = $1
 	return n, nil
 }
 
+// CountActiveUsersInWindow returns the count of distinct non-system actor_ids
+// in audit_events for tenantID within the trailing withinSeconds window.
+// Returns an error if withinSeconds <= 0.
 func (r *ObservabilityRepository) CountActiveUsersInWindow(ctx context.Context, tenantID string, withinSeconds int) (int64, error) {
 	if withinSeconds <= 0 {
 		return 0, fmt.Errorf("active users: window must be > 0, got %d", withinSeconds)
@@ -103,6 +112,8 @@ WHERE tenant_id = $1
 	return n, nil
 }
 
+// GetTenantPlan returns the tenant_plans row for tenantID, or
+// iamdomain.ErrTenantPlanNotFound if no plan is provisioned.
 func (r *ObservabilityRepository) GetTenantPlan(ctx context.Context, tenantID string) (iamdomain.TenantPlan, error) {
 	const q = `
 SELECT tenant_id::text, plan_tier, seats_allocated, storage_allocated_bytes, api_calls_allocated, created_at, updated_at
@@ -143,6 +154,9 @@ WHERE u.tenant_id = $1::uuid
 	return n, nil
 }
 
+// CountFailedLoginsInWindow returns the count of "auth.login.failed"
+// audit_events for tenantID within the trailing withinSeconds window.
+// Returns an error if withinSeconds <= 0.
 func (r *ObservabilityRepository) CountFailedLoginsInWindow(ctx context.Context, tenantID string, withinSeconds int) (int64, error) {
 	if withinSeconds <= 0 {
 		return 0, fmt.Errorf("failed logins: window must be > 0, got %d", withinSeconds)
@@ -183,6 +197,8 @@ WHERE u.tenant_id = $1::uuid
 	return n, nil
 }
 
+// RoleDistribution returns the count of iam_user_roles rows per role_code for
+// tenantID, ordered by role_code.
 func (r *ObservabilityRepository) RoleDistribution(ctx context.Context, tenantID string) ([]iamdomain.RoleCount, error) {
 	const q = `
 SELECT role_code, COUNT(*)

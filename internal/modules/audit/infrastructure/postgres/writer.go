@@ -13,6 +13,10 @@ import (
 	"metaldocs/internal/platform/sqlescape"
 )
 
+// Writer is the postgres-backed implementation of domain.Writer/Reader/
+// Counter/IntegrityValidator against metaldocs.audit_events. Every insert
+// takes the audit-hash-chain advisory lock so the prev_hash/row_hash chain is
+// computed and appended without a race between concurrent writers.
 type Writer struct {
 	db *sql.DB
 }
@@ -21,10 +25,14 @@ const auditHashChainLockID int64 = 90120260513004
 const auditIntegrityValidationWindow = 10000
 const auditIntegrityIssueLimit = 256
 
+// NewWriter constructs a Writer backed by db.
 func NewWriter(db *sql.DB) *Writer {
 	return &Writer{db: db}
 }
 
+// Record appends event in its own new transaction (begin, RecordTx, commit).
+// Use this for the standard post-commit case, where the caller's regulated
+// mutation has already committed and this is an independent, separate write.
 func (w *Writer) Record(ctx context.Context, event domain.Event) error {
 	tx, err := w.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -42,6 +50,11 @@ func (w *Writer) Record(ctx context.Context, event domain.Event) error {
 	return nil
 }
 
+// RecordTx appends event inside the caller's own transaction tx, so the audit
+// insert commits or rolls back atomically with the caller's regulated
+// mutation. It takes a transaction-scoped advisory lock (pg_advisory_xact_lock)
+// on the hash chain before computing prev_hash/row_hash, serializing
+// concurrent writers for the duration of tx.
 func (w *Writer) RecordTx(ctx context.Context, tx db.Tx, event domain.Event) error {
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, auditHashChainLockID); err != nil {
 		return fmt.Errorf("lock audit hash chain: %w", err)
@@ -75,6 +88,10 @@ FROM prepared
 	return nil
 }
 
+// ValidateIntegrity re-derives prev_hash/row_hash for the most recent
+// auditIntegrityValidationWindow rows and reports any mismatch as an
+// IntegrityIssue, capped at auditIntegrityIssueLimit. Used by the
+// audit-integrity-validator janitor to detect tampering with audit_events.
 func (w *Writer) ValidateIntegrity(ctx context.Context) ([]domain.IntegrityIssue, error) {
 	const q = `
 WITH recent AS (
@@ -140,6 +157,10 @@ ORDER BY audit_sequence
 	return issues, nil
 }
 
+// ListEvents queries metaldocs.audit_events for query's filter, ordered
+// newest-first with keyset pagination on (occurred_at, id). Fetches one extra
+// row past the page (limit+1 probe) to compute hasMore precisely, trimming
+// the probe before returning.
 func (w *Writer) ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, bool, error) {
 	limit := query.Limit
 	if limit <= 0 {

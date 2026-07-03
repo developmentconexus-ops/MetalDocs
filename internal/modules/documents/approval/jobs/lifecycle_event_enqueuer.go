@@ -23,6 +23,8 @@ func NewLifecycleEventEnqueuer(client *river.Client[*sql.Tx]) documentsdomain.Li
 	return &RiverLifecycleEventEnqueuer{Client: client}
 }
 
+// EnqueueLifecycleEventTx enqueues a lifecycle-event job within tx (outbox
+// pattern). tx must be a *sql.Tx.
 func (e *RiverLifecycleEventEnqueuer) EnqueueLifecycleEventTx(ctx context.Context, tx db.Tx, args documentsdomain.LifecycleEventArgs) error {
 	sqlTx, ok := tx.(*sql.Tx)
 	if !ok {

@@ -24,6 +24,8 @@ type postgresApprovalRepository struct {
 	displayName iamdomain.UserDisplayNameReader
 }
 
+// ErrInvalidScheduledSupersedeTarget is returned when a schedule-publish
+// request names a supersede target that does not exist or is not published.
 var ErrInvalidScheduledSupersedeTarget = errors.New("approval: invalid scheduled supersede target")
 
 // NewPostgresApprovalRepository constructs a production Postgres-backed ApprovalRepository.
@@ -885,10 +887,10 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	for signoffRows.Next() {
 		var (
 			id, instID, stageID, actorUserID, actorTenantID string
-			decision, comment, signatureMethod, contentHash  string
-			displayName                                      string
-			signedAt                                         time.Time
-			sigPayload                                        []byte
+			decision, comment, signatureMethod, contentHash string
+			displayName                                     string
+			signedAt                                        time.Time
+			sigPayload                                      []byte
 		)
 		if err := signoffRows.Scan(&id, &instID, &stageID, &actorUserID, &actorTenantID,
 			&decision, &comment, &signedAt, &signatureMethod, &sigPayload,

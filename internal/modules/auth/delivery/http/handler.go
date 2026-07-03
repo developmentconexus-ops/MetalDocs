@@ -1,3 +1,7 @@
+// Package httpdelivery implements the auth module's HTTP surface: the login/
+// logout/me/change-password Handler and the session-resolving Middleware that
+// gates every other route. Auth is pre-codegen (no api.gen.go); per ADR 0012,
+// hand-rolled typed request/response structs are the sanctioned posture here.
 package httpdelivery
 
 import (
@@ -21,6 +25,8 @@ import (
 	"metaldocs/internal/platform/requesttrace"
 )
 
+// Handler implements the auth module's HTTP endpoints: login, logout, me,
+// and change-password.
 type Handler struct {
 	service *authapp.Service
 	audit   auditdomain.Writer
@@ -60,15 +66,19 @@ func (r changePasswordRequest) String() string {
 	return "changePasswordRequest{redacted}"
 }
 
+// NewHandler constructs a Handler backed by the given auth Service.
 func NewHandler(service *authapp.Service) *Handler {
 	return &Handler{service: service, now: time.Now}
 }
 
+// WithAudit wires an audit.Writer so login/logout/change-password events are
+// recorded; without it, audit calls are silently skipped.
 func (h *Handler) WithAudit(w auditdomain.Writer) *Handler {
 	h.audit = w
 	return h
 }
 
+// RegisterRoutes mounts the auth endpoints (login, logout, me, change-password) on mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/login", h.handleLogin)
 	mux.HandleFunc("/api/v1/auth/logout", h.handleLogout)

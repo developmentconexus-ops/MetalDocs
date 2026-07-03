@@ -6,15 +6,21 @@ import (
 )
 
 var (
-	ErrNoActiveStage       = errors.New("no active stage in instance")
+	// ErrNoActiveStage is returned by stage-transition methods when the instance has no stage in StageActive status.
+	ErrNoActiveStage = errors.New("no active stage in instance")
+	// ErrCannotSkipLastStage is returned by SkipStage when the active stage has no pending successor.
 	ErrCannotSkipLastStage = errors.New("cannot skip last stage: no successor exists")
-	ErrRevisionRegression  = errors.New("revision_version cannot decrease")
-	ErrInstanceTerminal    = errors.New("instance is already in a terminal state")
+	// ErrRevisionRegression is returned by BumpRevisionVersion when next is lower than the current RevisionVersion.
+	ErrRevisionRegression = errors.New("revision_version cannot decrease")
+	// ErrInstanceTerminal is returned by Cancel when the instance Status is already approved, rejected, or cancelled.
+	ErrInstanceTerminal = errors.New("instance is already in a terminal state")
 )
 
 // InstanceStatus represents the top-level lifecycle of an approval instance.
 type InstanceStatus string
 
+// InstanceStatus values. InstanceInProgress is the only non-terminal status;
+// the other three are terminal and reject further stage transitions.
 const (
 	InstanceInProgress InstanceStatus = "in_progress"
 	InstanceApproved   InstanceStatus = "approved"
@@ -25,6 +31,7 @@ const (
 // StageStatus represents per-stage lifecycle.
 type StageStatus string
 
+// StageStatus values. Exactly one stage in an instance may be StageActive at a time.
 const (
 	StagePending      StageStatus = "pending"
 	StageActive       StageStatus = "active"

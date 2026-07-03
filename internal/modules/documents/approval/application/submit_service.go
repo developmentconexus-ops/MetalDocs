@@ -238,6 +238,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 
 const defaultInitialRevisionTitle = "Criacao do documento"
 
+// ErrRevisionTitleRequired is returned when a revision title is required but was not supplied.
 var ErrRevisionTitleRequired = errors.New("revisionTitle is required")
 
 // ErrIdempotencyKeyRequired is returned when SubmitRevisionForReview is called

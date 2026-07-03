@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/strictjson"
 )
@@ -28,6 +28,8 @@ var (
 	}
 )
 
+// PublishHandler publishes a document whose active approval instance reached
+// InstanceApproved. Requires a valid If-Match header (OCC precondition).
 func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -70,6 +72,8 @@ func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// SchedulePublishHandler schedules an approved document for publish at a
+// future effective date. Requires a valid If-Match header (OCC precondition).
 func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

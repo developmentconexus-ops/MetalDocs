@@ -1,3 +1,9 @@
+// Package application implements the auth module's Service: login/logout,
+// session resolution, password lifecycle, and user administration. It holds
+// the timing-safe credential checks (constant-time dummy hash, per-identity
+// login lock) and the session-revoke-on-credential-change invariant
+// (CWE-613); all SQL and HTTP concerns are delegated to authdomain.Repository
+// and the delivery/http package respectively.
 package application
 
 import (
@@ -33,12 +39,18 @@ const (
 	bcryptCost         = 12
 )
 
+// Secret holds a config value that must never be logged (session HMAC key,
+// bootstrap admin password); String and MarshalJSON both redact it.
 type Secret string
 
+// Value returns the underlying secret string. Callers must not log the result.
 func (s Secret) Value() string { return string(s) }
 
+// String redacts the secret so Config is safe to pass to %v/%s formatting and loggers.
 func (s Secret) String() string { return "***" }
 
+// Config configures the auth Service: session cookie/TTL/secret, password
+// policy, login lockout, origin protection, and bootstrap admin credentials.
 type Config struct {
 	SessionCookieName string
 	SessionTTL        time.Duration
@@ -71,6 +83,8 @@ type Config struct {
 	TrustedProxyCIDRs []netip.Prefix
 }
 
+// redacted returns a copy of c with SessionSecret and BootstrapAdminPassword
+// replaced by the "***" placeholder.
 func (c Config) redacted() Config {
 	if c.SessionSecret != "" {
 		c.SessionSecret = Secret("***")
@@ -81,18 +95,22 @@ func (c Config) redacted() Config {
 	return c
 }
 
+// String redacts secret fields so Config is safe to pass to %v/%s formatting and loggers.
 func (c Config) String() string {
 	type configAlias Config
 	redacted := configAlias(c.redacted())
 	return fmt.Sprintf("%+v", redacted)
 }
 
+// MarshalJSON redacts secret fields so Config is safe to serialize (e.g. in debug dumps).
 func (c Config) MarshalJSON() ([]byte, error) {
 	type configAlias Config
 	redacted := configAlias(c.redacted())
 	return json.Marshal(redacted)
 }
 
+// Service implements the auth module's application logic: login/logout,
+// session resolution, password lifecycle, and user administration.
 type Service struct {
 	repo         authdomain.Repository
 	roleProvider iamdomain.RoleProvider
@@ -141,6 +159,10 @@ type revokeSessionsByUserIDTxRepository interface {
 	RevokeSessionsByUserIDTx(ctx context.Context, tx *sql.Tx, userID string, revokedAt time.Time) error
 }
 
+// NewService constructs a Service. loginCtxPort is required (panics if nil).
+// cfg.SessionSecret must be at least 32 characters, or construction fails.
+// auditWriter is optional and variadic; when provided, mutations record their
+// audit row in the same transaction where the repository supports it (H-3b, F-07).
 func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, loginCtxPort iamdomain.LoginContextPort, cfg Config, auditWriter ...auditdomain.Writer) (*Service, error) {
 	if loginCtxPort == nil {
 		panic("auth.NewService: loginCtxPort is required")
@@ -170,6 +192,9 @@ func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider,
 	}, nil
 }
 
+// BootstrapLocalAdmin seeds the first system-admin identity for single-tenant
+// dev mode when cfg.BootstrapAdminEnabled is set and no admin role exists yet
+// for the dev tenant; it is a no-op (nil error) once an admin is present.
 func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 	if !s.cfg.BootstrapAdminEnabled || s.cfg.BootstrapAdminPassword == "" {
 		return nil
@@ -228,6 +253,15 @@ const (
 	loginInactive
 )
 
+// Authenticate verifies identifier+password and, on success, creates a new
+// session and returns an AuthenticatedSession. It runs the credential check
+// inside a per-identity login lock so the lockout check and failed-attempt
+// write are atomic (closes a TOCTOU window across concurrent attempts), and
+// spends bcrypt-equivalent time on every failure path — unknown identifier,
+// locked, inactive, or wrong password — so wall-clock latency never discloses
+// account existence or state (OWASP Authentication Cheat Sheet). Returns
+// ErrInvalidCredentials, ErrIdentityLocked, ErrIdentityInactive,
+// ErrTenantNotPermitted, or ErrTenantClaimRequired depending on outcome.
 func (s *Service) Authenticate(ctx context.Context, identifier, password string, r *http.Request) (authdomain.AuthenticatedSession, error) {
 	identifier = strings.TrimSpace(identifier)
 	if identifier == "" || password == "" {
@@ -366,6 +400,11 @@ func (s *Service) resolveLoginTenant(ctx context.Context, userID, claimedTenantI
 	return "", authdomain.ErrTenantClaimRequired
 }
 
+// ResolveSession validates rawToken's HMAC signature, loads the matching
+// session, and returns its CurrentUser. Returns ErrSessionNotFound,
+// ErrSessionRevoked, or ErrSessionExpired (including sliding idle-timeout
+// expiry when cfg.SessionIdleTimeout > 0) on failure. On success it touches
+// the session's LastSeenAt.
 func (s *Service) ResolveSession(ctx context.Context, rawToken string) (authdomain.CurrentUser, error) {
 	token := strings.TrimSpace(rawToken)
 	if token == "" {
@@ -400,6 +439,8 @@ func (s *Service) ResolveSession(ctx context.Context, rawToken string) (authdoma
 	return s.buildCurrentUser(ctx, session.UserID, session.TenantID)
 }
 
+// Logout revokes the session identified by rawToken. Returns
+// ErrSessionNotFound if the token is empty or malformed.
 func (s *Service) Logout(ctx context.Context, rawToken string) error {
 	token := strings.TrimSpace(rawToken)
 	if token == "" {
@@ -412,6 +453,12 @@ func (s *Service) Logout(ctx context.Context, rawToken string) error {
 	return s.repo.RevokeSession(ctx, sessionID, s.now().UTC())
 }
 
+// ChangePasswordForUser changes currentUser's password to newPassword,
+// verifying currentPassword first unless MustChangePassword is set. On
+// success it revokes all of the user's other sessions (CWE-613: a stolen or
+// stale session must not survive a password change) and, where the
+// repository supports transactional variants, does so atomically with an
+// audit row; otherwise the steps run as sequential best-effort autocommits.
 func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdomain.CurrentUser, currentPassword, newPassword string) error {
 	userID := strings.TrimSpace(currentUser.UserID)
 	if userID == "" {
@@ -519,6 +566,10 @@ func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdom
 	return nil
 }
 
+// ListUsers returns all users that hold a role in tenantID, with roles
+// populated from a single batched lookup (REQ-DATA-2 / F-10). Users absent
+// from the tenant's role map are excluded; users present with no roles are
+// included with an empty Roles slice.
 func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.ManagedUser, error) {
 	items, err := s.repo.ListUsers(ctx)
 	if err != nil {
@@ -552,10 +603,13 @@ func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.
 	return filtered, nil
 }
 
+// ListOnlineUsers returns users in tenantID with a session seen at or after activeSince.
 func (s *Service) ListOnlineUsers(ctx context.Context, tenantID string, activeSince time.Time) ([]authdomain.OnlineUser, error) {
 	return s.repo.ListOnlineUsers(ctx, tenantID, activeSince)
 }
 
+// CreateUser is a convenience wrapper over CreateUserWithInput taking loose
+// string/role arguments instead of a CreateUserInput.
 func (s *Service) CreateUser(ctx context.Context, userID, username, email, displayName, password, tenantID string, roles []iamtypes.Role, createdBy string) error {
 	return s.CreateUserWithInput(ctx, authdomain.CreateUserInput{
 		UserID:      authdomain.UserID(userID),
@@ -569,6 +623,11 @@ func (s *Service) CreateUser(ctx context.Context, userID, username, email, displ
 	})
 }
 
+// CreateUserWithInput creates a new identity and assigns exactly one role
+// (input.Roles must contain exactly one valid role). Where the repository and
+// role-admin collaborator both support transactional variants, identity
+// creation and role assignment commit atomically; otherwise they run as two
+// sequential autocommits.
 func (s *Service) CreateUserWithInput(ctx context.Context, input authdomain.CreateUserInput) error {
 	fields, err := s.normalizeCreateUserInput(input)
 	if err != nil {
@@ -616,6 +675,11 @@ func (s *Service) CreateUserWithInput(ctx context.Context, input authdomain.Crea
 	return s.roleAdmin.ReplaceUserRoles(ctx, fields.userID, fields.displayName, fields.tenantID, fields.role, fields.createdBy)
 }
 
+// UpdateUser applies params to a user, optionally setting newPassword (hashed
+// here). When params.IsActive transitions to false, it also revokes all of
+// the user's sessions in the same operation (F8.4, CWE-613: a session must
+// not outlive the account it authenticates) — atomically where the
+// repository supports transactional variants, otherwise as two autocommits.
 func (s *Service) UpdateUser(ctx context.Context, params authdomain.UpdateUserParams, newPassword string) error {
 	newPassword = strings.TrimSpace(newPassword)
 	if newPassword != "" {
@@ -671,6 +735,11 @@ func (s *Service) UpdateUser(ctx context.Context, params authdomain.UpdateUserPa
 	return nil
 }
 
+// AdminResetPassword sets userID's password to newPassword, forces
+// MustChangePassword, clears any lockout, and revokes all of the user's
+// sessions (CWE-613) — atomically with an audit row where the repository
+// supports transactional variants, otherwise as sequential best-effort
+// autocommits. Actor/tenant for the audit row are resolved from ctx.
 func (s *Service) AdminResetPassword(ctx context.Context, userID, newPassword string) error {
 	userID = strings.TrimSpace(userID)
 	newPassword = strings.TrimSpace(newPassword)
@@ -766,6 +835,8 @@ func (s *Service) AdminResetPassword(ctx context.Context, userID, newPassword st
 	return nil
 }
 
+// UnlockUser clears userID's lockout state, recording an audit row where the
+// repository supports transactional variants (atomic), otherwise best-effort.
 func (s *Service) UnlockUser(ctx context.Context, userID string) error {
 	userID = strings.TrimSpace(userID)
 	updateParams := authdomain.UpdateUserParams{
@@ -841,6 +912,8 @@ func (s *Service) UnlockUser(ctx context.Context, userID string) error {
 	return nil
 }
 
+// SessionCookie builds the HttpOnly, SameSite=Strict session cookie carrying
+// rawToken, with MaxAge clamped to 0 if expiresAt is already in the past.
 func (s *Service) SessionCookie(rawToken string, expiresAt time.Time) *http.Cookie {
 	seconds := int(expiresAt.UTC().Sub(s.now().UTC()).Seconds())
 	if seconds < 0 {
@@ -860,10 +933,13 @@ func (s *Service) SessionCookie(rawToken string, expiresAt time.Time) *http.Cook
 	}
 }
 
+// SessionCookieName returns the configured session cookie name.
 func (s *Service) SessionCookieName() string {
 	return s.cfg.SessionCookieName
 }
 
+// ExpiredSessionCookie returns a cookie that instructs the browser to delete
+// the session cookie (empty value, MaxAge -1, Expires in the past).
 func (s *Service) ExpiredSessionCookie() *http.Cookie {
 	return &http.Cookie{
 		Name:     s.cfg.SessionCookieName,
@@ -879,6 +955,10 @@ func (s *Service) ExpiredSessionCookie() *http.Cookie {
 	}
 }
 
+// CurrentUser resolves the CurrentUser projection for userID in tenantID.
+// Returns ErrIdentityInactive if the identity has been deactivated (fail-closed
+// backstop for sessions that predate a deactivation, mirroring the
+// revoke-on-deactivate write path in UpdateUser).
 func (s *Service) CurrentUser(ctx context.Context, userID, tenantID string) (authdomain.CurrentUser, error) {
 	return s.buildCurrentUser(ctx, userID, tenantID)
 }

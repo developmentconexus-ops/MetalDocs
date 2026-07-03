@@ -22,14 +22,24 @@ var writeJSON = httpresponse.WriteJSON
 // as public.
 type Visibility int
 
+// VisibilityPermissionGuarded, VisibilitySessionRequired, and VisibilityPublic
+// are the three route authorization tiers a PermissionResolver may return.
+// VisibilityPermissionGuarded (the zero value) is fail-closed: a resolver rule
+// that omits Visibility demands a capability rather than defaulting to public.
 const (
 	VisibilityPermissionGuarded Visibility = iota
 	VisibilitySessionRequired
 	VisibilityPublic
 )
 
+// PermissionResolver maps an HTTP method+path to the required tier-1
+// capability and its Visibility tier. Implementations back the route table
+// consulted by Middleware.Wrap.
 type PermissionResolver func(method, path string) (iamdomain.Capability, Visibility)
 
+// Middleware is the tier-1 route→capability authorization gate (ADR 0022).
+// It strips trusted identity headers before invoking the resolver and never
+// trusts client-supplied X-User-ID/X-Tenant-ID for authorization decisions.
 type Middleware struct {
 	caps         *iamapp.CapabilityService
 	roleProvider iamdomain.RoleProvider
@@ -37,6 +47,9 @@ type Middleware struct {
 	resolver     PermissionResolver
 }
 
+// NewMiddleware constructs the tier-1 authz middleware. When enabled is
+// false, Wrap becomes a no-op passthrough (used for internal/unauthenticated
+// entry points).
 func NewMiddleware(caps *iamapp.CapabilityService, roleProvider iamdomain.RoleProvider, enabled bool) *Middleware {
 	return &Middleware{
 		caps:         caps,
@@ -45,11 +58,20 @@ func NewMiddleware(caps *iamapp.CapabilityService, roleProvider iamdomain.RolePr
 	}
 }
 
+// WithPermissionResolver wires the route→capability table. Must be called
+// before Wrap serves traffic; a nil resolver at request time is treated as a
+// misconfiguration and fails closed (500), never passes the request through.
 func (m *Middleware) WithPermissionResolver(resolver PermissionResolver) *Middleware {
 	m.resolver = resolver
 	return m
 }
 
+// Wrap enforces tier-1 capability authorization on next. It strips
+// X-User-ID/X-User-Roles from the inbound request (defense against
+// header-spoofing), resolves userID/tenantID from authenticated session
+// context only, and — for VisibilityPermissionGuarded routes — calls
+// CapabilityService.CanDo before invoking next. Returns next unmodified when
+// the middleware is disabled.
 func (m *Middleware) Wrap(next http.Handler) http.Handler {
 	if !m.enabled {
 		return next

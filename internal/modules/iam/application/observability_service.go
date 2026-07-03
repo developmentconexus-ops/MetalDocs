@@ -35,6 +35,8 @@ type ObservabilityService struct {
 	now  func() time.Time
 }
 
+// ErrTenantRequired is returned by GetUsage and GetKpi when tenantID is
+// empty after trimming.
 var ErrTenantRequired = errors.New("iam observability: tenant id required")
 
 // DormantThresholdDays is the cutoff for the "dormant users 30d" KPI. The
@@ -56,6 +58,8 @@ const AuditEventsRateWindowSec = 60 * 60
 // -1 and the FE renders "—".
 const ApiCallActionPrefix = "http.request."
 
+// NewObservabilityService wires the observability composer. mfa may be nil,
+// in which case KpiSnapshot.MfaCoveragePct is left at its zero value.
 func NewObservabilityService(repo iamdomain.ObservabilityRepository, mfa MfaCoveragePctReader) *ObservabilityService {
 	return &ObservabilityService{
 		repo: repo,
@@ -70,6 +74,11 @@ func (s *ObservabilityService) WithClock(now func() time.Time) *ObservabilitySer
 	return s
 }
 
+// GetUsage composes the Admin Center Overview "Usage" card: seat, storage,
+// and windowed API-call/active-user counts for tenantID. Returns
+// ErrTenantRequired for an empty tenant. Tenant plan lookup tolerates
+// iamdomain.ErrTenantPlanNotFound (falls through with zero allocations
+// rather than failing the whole snapshot).
 func (s *ObservabilityService) GetUsage(ctx context.Context, tenantID string) (iamdomain.UsageSnapshot, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
@@ -141,6 +150,10 @@ func (s *ObservabilityService) GetUsage(ctx context.Context, tenantID string) (i
 	return snapshot, nil
 }
 
+// GetKpi composes the Admin Center Overview "KPI" card: locked accounts,
+// failed logins, dormant users, role distribution, audit-event rate, and
+// (when the mfa reader is wired) MFA coverage percentage for tenantID.
+// Returns ErrTenantRequired for an empty tenant.
 func (s *ObservabilityService) GetKpi(ctx context.Context, tenantID string) (iamdomain.KpiSnapshot, error) {
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {

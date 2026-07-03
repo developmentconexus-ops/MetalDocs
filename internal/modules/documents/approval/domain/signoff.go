@@ -13,6 +13,7 @@ var hashRegex = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // Decision represents an approve or reject vote.
 type Decision string
 
+// Decision values a Signoff may carry.
 const (
 	DecisionApprove Decision = "approve"
 	DecisionReject  Decision = "reject"
@@ -35,18 +36,42 @@ type Signoff struct {
 }
 
 // Getters — no setters exist; immutable after construction.
-func (s *Signoff) ID() string                        { return s.id }
-func (s *Signoff) ApprovalInstanceID() string        { return s.approvalInstanceID }
-func (s *Signoff) StageInstanceID() string           { return s.stageInstanceID }
-func (s *Signoff) ActorUserID() string               { return s.actorUserID }
-func (s *Signoff) ActorTenantID() string             { return s.actorTenantID }
-func (s *Signoff) Decision() Decision                { return s.decision }
-func (s *Signoff) Comment() string                   { return s.comment }
-func (s *Signoff) SignedAt() time.Time               { return s.signedAt }
-func (s *Signoff) SignatureMethod() string           { return s.signatureMethod }
+
+// ID returns the signoff's identifier.
+func (s *Signoff) ID() string { return s.id }
+
+// ApprovalInstanceID returns the parent approval instance's identifier.
+func (s *Signoff) ApprovalInstanceID() string { return s.approvalInstanceID }
+
+// StageInstanceID returns the stage instance this signoff was recorded against.
+func (s *Signoff) StageInstanceID() string { return s.stageInstanceID }
+
+// ActorUserID returns the signing user's identifier.
+func (s *Signoff) ActorUserID() string { return s.actorUserID }
+
+// ActorTenantID returns the signing user's tenant identifier.
+func (s *Signoff) ActorTenantID() string { return s.actorTenantID }
+
+// Decision returns the approve/reject vote.
+func (s *Signoff) Decision() Decision { return s.decision }
+
+// Comment returns the signer's optional comment.
+func (s *Signoff) Comment() string { return s.comment }
+
+// SignedAt returns the timestamp the signoff was recorded.
+func (s *Signoff) SignedAt() time.Time { return s.signedAt }
+
+// SignatureMethod returns the signature method used (e.g. password re-auth).
+func (s *Signoff) SignatureMethod() string { return s.signatureMethod }
+
+// SignaturePayload returns the method-specific signature evidence, opaque to callers.
 func (s *Signoff) SignaturePayload() json.RawMessage { return s.signaturePayload }
-func (s *Signoff) ContentHash() string               { return s.contentHash }
-func (s *Signoff) ActorDisplayNameSnapshot() string  { return s.actorDisplayNameSnapshot }
+
+// ContentHash returns the lowercase hex sha-256 of the document content at signing time.
+func (s *Signoff) ContentHash() string { return s.contentHash }
+
+// ActorDisplayNameSnapshot returns the signer's display name as captured at signing time.
+func (s *Signoff) ActorDisplayNameSnapshot() string { return s.actorDisplayNameSnapshot }
 
 // SignoffParams holds constructor inputs.
 type SignoffParams struct {

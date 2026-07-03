@@ -1,3 +1,9 @@
+// Package domain holds the controlled-documents module's aggregate
+// (ControlledDocument), its sentinel errors, and the repository /
+// sequence-allocator / cross-module ports the application layer depends
+// on. It has no database/sql import (CI guard nosqltxindomain) —
+// persistence concerns stay behind db.Tx and the repository interfaces
+// defined here.
 package domain
 
 import (
@@ -7,14 +13,25 @@ import (
 	"time"
 )
 
+// CDStatus is the lifecycle state of a ControlledDocument: active,
+// obsolete, or superseded. Transitions are one-way (active -> obsolete or
+// active -> superseded) and are DB-enforced via UpdateStatus.
 type CDStatus string
 
+// CDStatus enum values. A ControlledDocument starts CDStatusActive and
+// transitions to CDStatusObsolete or CDStatusSuperseded via changeStatus;
+// there is no transition back to active.
 const (
 	CDStatusActive     CDStatus = "active"
 	CDStatusObsolete   CDStatus = "obsolete"
 	CDStatusSuperseded CDStatus = "superseded"
 )
 
+// ControlledDocument is a numbered slot in metaldocs.controlled_documents
+// binding a (ProfileCode, ProcessAreaCode) pair to a chain of documents
+// revisions. It carries no content of its own — Code is the stable,
+// immutable, audit-traceable identity; the chain of documents rows holds
+// the actual content.
 type ControlledDocument struct {
 	ID                        string     `json:"id"`
 	TenantID                  string     `json:"tenant_id"`
@@ -32,6 +49,8 @@ type ControlledDocument struct {
 	UpdatedAt                 time.Time  `json:"updated_at"`
 }
 
+// Sentinel errors returned by the controlled-documents domain and
+// application layers. Callers should compare with errors.Is.
 var (
 	ErrCDNotFound               = errors.New("controlled document not found")
 	ErrNoActiveInstance         = errors.New("no active document instance for this controlled document")
@@ -50,6 +69,10 @@ var (
 	ErrCDOwnerRequired          = errors.New("controlled document owner user id must not be empty")
 )
 
+// NewControlledDocument trims and validates input, returning a sentinel
+// Err*Required error for the first missing mandatory field (tenant,
+// profile, area, code, title, owner). It does not check code uniqueness
+// or sequence allocation — those are repository/application concerns.
 func NewControlledDocument(input ControlledDocument) (*ControlledDocument, error) {
 	doc := ControlledDocument{
 		ID:                        strings.TrimSpace(input.ID),
@@ -99,10 +122,14 @@ func trimOptionalString(v *string) *string {
 	return &trimmed
 }
 
+// IsActive reports whether d.Status is CDStatusActive.
 func (d ControlledDocument) IsActive() bool {
 	return d.Status == CDStatusActive
 }
 
+// AutoCode formats the system-generated code for a controlled document as
+// "{PROFILE}-{AREA}-{NNN}" (profile and area upper-cased, seq zero-padded
+// to 3 digits). Callers that supply a manual code bypass this formatter.
 func AutoCode(profileCode, areaCode string, seq int) string {
 	return fmt.Sprintf("%s-%s-%03d",
 		strings.ToUpper(profileCode),

@@ -1,3 +1,6 @@
+// Package httpdelivery adapts the audit module's application service onto
+// HTTP: listing audit events and driving the export/status/download flow
+// through the generated auditapi.ServerInterface router.
 package httpdelivery
 
 import (
@@ -37,11 +40,15 @@ type AuditExporter interface {
 	BuildSignedURL(job domain.ExportJob) string
 }
 
+// Handler implements auditapi.ServerInterface for the audit module's mounted
+// routes. exporter is optional: when nil, export/status/download routes
+// respond 501 NOT_IMPLEMENTED (see WithExporter).
 type Handler struct {
 	service  AuditQuerier
 	exporter AuditExporter
 }
 
+// NewHandler constructs a Handler backed by service. Panics if service is nil.
 func NewHandler(service AuditQuerier) *Handler {
 	if service == nil {
 		panic("audit: service is required")

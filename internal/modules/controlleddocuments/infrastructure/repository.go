@@ -1,3 +1,12 @@
+// Package infrastructure is the controlled-documents module's
+// Postgres-backed implementation of the domain repository ports
+// (ControlledDocumentRepository, SequenceAllocator) plus the cross-module
+// read adapters (CDFieldReaderPG, TaxonomyProfileReader,
+// TaxonomyAreaReader). Every write path calls authz.Require before
+// mutating a row, pairing with the trg_require_cap_asserted DB tripwire;
+// visibility reads/writes cover the controlled_document_area_grants and
+// controlled_document_user_grants side tables for restricted-scope
+// documents.
 package infrastructure
 
 import (
@@ -20,6 +29,10 @@ import (
 	"metaldocs/internal/platform/sqlescape"
 )
 
+// PostgresControlledDocumentRepository is the Postgres-backed
+// domain.ControlledDocumentRepository implementation, holding the
+// metaldocs.controlled_documents table plus its visibility grant side
+// tables.
 type PostgresControlledDocumentRepository struct {
 	db *sql.DB
 	// activeInstance is the documents-owned read-port for the active-instance
@@ -28,6 +41,9 @@ type PostgresControlledDocumentRepository struct {
 	activeInstance documentsdomain.ActiveInstanceReader
 }
 
+// NewPostgresControlledDocumentRepository builds a
+// PostgresControlledDocumentRepository backed by db. activeInstance
+// defaults to documentsdomain.NoopActiveInstanceReader when nil.
 func NewPostgresControlledDocumentRepository(db *sql.DB, activeInstance documentsdomain.ActiveInstanceReader) *PostgresControlledDocumentRepository {
 	if activeInstance == nil {
 		activeInstance = documentsdomain.NoopActiveInstanceReader{}
@@ -35,6 +51,9 @@ func NewPostgresControlledDocumentRepository(db *sql.DB, activeInstance document
 	return &PostgresControlledDocumentRepository{db: db, activeInstance: activeInstance}
 }
 
+// GetByID returns the controlled document by (tenantID, id), hydrating
+// visibility grants when the document's scope is restricted. Returns
+// ErrCDNotFound when no matching row exists.
 func (r *PostgresControlledDocumentRepository) GetByID(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error) {
 	const q = `
 SELECT id::text, tenant_id::text, profile_code, process_area_code, department_code,
@@ -56,6 +75,9 @@ WHERE tenant_id = $1 AND id = $2`
 	return doc, nil
 }
 
+// GetByCode returns the controlled document by (tenantID, profileCode,
+// code), hydrating visibility grants when the document's scope is
+// restricted. Returns ErrCDNotFound when no matching row exists.
 func (r *PostgresControlledDocumentRepository) GetByCode(ctx context.Context, tenantID, profileCode, code string) (*controlleddocumentsdomain.ControlledDocument, error) {
 	const q = `
 SELECT id::text, tenant_id::text, profile_code, process_area_code, department_code,
@@ -77,6 +99,8 @@ WHERE tenant_id = $1 AND profile_code = $2 AND code = $3`
 	return doc, nil
 }
 
+// CodeExists reports whether a controlled document with (tenantID,
+// profileCode, code) already exists, regardless of status.
 func (r *PostgresControlledDocumentRepository) CodeExists(ctx context.Context, tenantID, profileCode, code string) (bool, error) {
 	const q = `SELECT EXISTS(
 		SELECT 1 FROM controlled_documents WHERE tenant_id = $1 AND profile_code = $2 AND code = $3
@@ -341,6 +365,11 @@ ORDER BY controlled_document_id, user_id`, tenantID, pgtype.FlatArray[string](id
 	return nil
 }
 
+// Create persists doc in its own transaction, running the tier-2 authz
+// check (CapControlledDocumentCreate against doc.ProcessAreaCode) before
+// the insert. On success doc.ID is populated. Returns ErrCDCodeTaken (or
+// ErrCDArchivedCodeReuse when the conflicting row is non-active) on a
+// unique-code violation.
 func (r *PostgresControlledDocumentRepository) Create(ctx context.Context, doc *controlleddocumentsdomain.ControlledDocument) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -361,6 +390,10 @@ func (r *PostgresControlledDocumentRepository) Create(ctx context.Context, doc *
 	return nil
 }
 
+// CreateTx persists doc inside the caller's tx (ADR 0011 atomic
+// CD+first-revision create). It performs no authz check of its own — the
+// service layer is the mandatory gate for CD create (F-CD6); a redundant
+// check here would double the DB round-trip with no correctness benefit.
 func (r *PostgresControlledDocumentRepository) CreateTx(ctx context.Context, tx db.Tx, doc *controlleddocumentsdomain.ControlledDocument) error {
 	if tx == nil {
 		return errors.New("nil transaction")
@@ -438,6 +471,8 @@ ON CONFLICT (tenant_id, controlled_document_id, user_id) DO NOTHING`, doc.Tenant
 	return nil
 }
 
+// UpdateStatus updates the controlled document's status/updated_at
+// off-tx. Returns ErrCDNotFound when no row matches (tenantID, id).
 func (r *PostgresControlledDocumentRepository) UpdateStatus(ctx context.Context, tenantID, id string, status controlleddocumentsdomain.CDStatus, updatedAt time.Time) error {
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE controlled_documents SET status = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4`,
@@ -456,6 +491,10 @@ func (r *PostgresControlledDocumentRepository) UpdateStatus(ctx context.Context,
 	return nil
 }
 
+// UpdateStatusTx updates the controlled document's status/updated_at
+// inside the caller's tx (e.g. paired with a FOR UPDATE lock + authz
+// check in the service's changeStatus). Returns ErrCDNotFound when no
+// row matches (tenantID, id).
 func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Context, tx db.Tx, tenantID, id string, status controlleddocumentsdomain.CDStatus, updatedAt time.Time) error {
 	res, err := tx.ExecContext(ctx,
 		`UPDATE controlled_documents SET status = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4`,
@@ -474,6 +513,12 @@ func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Contex
 	return nil
 }
 
+// CanRead reports whether actorUserID may read the controlled document:
+// true when the document is company-scoped, actorUserID is the owner, or
+// (for restricted scope) actorUserID's active area membership or an
+// explicit user grant covers it. This is the visibility-scope EXISTS
+// check; it is distinct from — and runs before — the tier-2 capability
+// check in callers like GetActiveInstance.
 func (r *PostgresControlledDocumentRepository) CanRead(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (bool, error) {
 	// The area-grant EXISTS subquery reads iam's PUBLISHED active-membership view
 	// metaldocs.v_active_user_areas (M3/F3.2, ADR-0039 D3a) — the view encodes the
@@ -548,10 +593,15 @@ func (r *PostgresControlledDocumentRepository) GetActiveInstance(ctx context.Con
 	}, nil
 }
 
+// PostgresSequenceAllocator is the Postgres-backed
+// domain.SequenceAllocator implementation, backed by the
+// cd_sequence_counters table (one row per tenant/profile/area).
 type PostgresSequenceAllocator struct {
 	db *sql.DB
 }
 
+// NewPostgresSequenceAllocator builds a PostgresSequenceAllocator backed
+// by db.
 func NewPostgresSequenceAllocator(db *sql.DB) *PostgresSequenceAllocator {
 	return &PostgresSequenceAllocator{db: db}
 }

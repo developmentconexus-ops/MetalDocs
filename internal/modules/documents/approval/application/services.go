@@ -1,3 +1,10 @@
+// Package application holds the approval subsystem's application services —
+// submit, decision, publish, scheduler, supersede, obsolete, cancel, read, and
+// route-admin — each a thin orchestration layer over repository.ApprovalRepository
+// and domain. All mutating operations run inside a single caller-owned
+// transaction (state-write + governance-event emit + outbox enqueue never
+// span more than one tx), and callers are expected to seed authz identity and
+// call authz.Require before any write.
 package application
 
 import (
@@ -6,8 +13,8 @@ import (
 	"time"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/platform/db"
 )
 
@@ -19,6 +26,7 @@ type Clock interface {
 // RealClock is the production Clock implementation.
 type RealClock struct{}
 
+// Now returns the current UTC time.
 func (RealClock) Now() time.Time { return time.Now().UTC() }
 
 // Services is the top-level application service container for the approval
@@ -37,6 +45,7 @@ type Services struct {
 	clock      Clock
 }
 
+// ScheduledPublishJobInput carries the parameters needed to enqueue a scheduled-publish job.
 type ScheduledPublishJobInput struct {
 	TenantID                string
 	DocumentID              string
@@ -45,10 +54,14 @@ type ScheduledPublishJobInput struct {
 	ScheduleGeneration      int64
 }
 
+// ScheduledPublishEnqueuer enqueues a scheduled-publish job in the same transaction
+// as the state write that scheduled it (transactional outbox pattern).
 type ScheduledPublishEnqueuer interface {
 	EnqueueScheduledPublishTx(ctx context.Context, tx db.Tx, input ScheduledPublishJobInput) error
 }
 
+// ErrContentHashMismatch is returned when the caller-supplied content hash does not
+// match the document's current content hash, indicating a stale read (OCC guard).
 var ErrContentHashMismatch = errors.New("approval: content hash mismatch")
 
 // NewServices constructs a fully wired Services value. cdRead is the
@@ -69,6 +82,8 @@ func NewServices(repo repository.ApprovalRepository, emitter EventEmitter, clock
 	}
 }
 
+// WithScheduledPublishEnqueuer wires the scheduled-publish job enqueuer into the
+// Publish service. Call after NewServices.
 func (s *Services) WithScheduledPublishEnqueuer(enqueuer ScheduledPublishEnqueuer) *Services {
 	if s != nil && s.Publish != nil {
 		s.Publish = s.Publish.WithScheduledPublishEnqueuer(enqueuer)

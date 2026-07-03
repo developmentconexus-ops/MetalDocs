@@ -16,6 +16,7 @@ type RoleCapabilitiesRepository struct {
 	db *sql.DB
 }
 
+// NewRoleCapabilitiesRepository constructs a pool-backed RoleCapabilitiesRepository.
 func NewRoleCapabilitiesRepository(db *sql.DB) *RoleCapabilitiesRepository {
 	return &RoleCapabilitiesRepository{db: db}
 }

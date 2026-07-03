@@ -45,6 +45,10 @@ type CachedRoleProvider struct {
 	items map[string]cacheEntry
 }
 
+// NewCachedRoleProvider constructs the cache-aside wrapper and starts a
+// background goroutine that sweeps expired entries every ttl, stopping when
+// ctx is done. ttl <= 0 defaults to 30 seconds. See CacheContract above for
+// the invalidation obligations callers must honor.
 func NewCachedRoleProvider(ctx context.Context, base domain.RoleProvider, ttl time.Duration) *CachedRoleProvider {
 	if ttl <= 0 {
 		ttl = 30 * time.Second
@@ -161,6 +165,10 @@ func (c *CachedRoleProvider) UserActiveInTenant(ctx context.Context, tenantID, u
 	return c.base.UserActiveInTenant(ctx, tenantID, userID)
 }
 
+// InvalidateUserTenant evicts the cached role set for (userID, tenantID).
+// MUST be called by any admin write that changes a user's roles or tenant
+// membership (see CacheContract callers list above); otherwise stale roles
+// continue to authorize until the TTL expires.
 func (c *CachedRoleProvider) InvalidateUserTenant(userID, tenantID string) {
 	c.evict(userID, tenantID)
 }

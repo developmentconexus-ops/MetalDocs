@@ -54,6 +54,9 @@ type PostgresRouteAdminIdempStore struct {
 	deactivate *idempotency.Store
 }
 
+// NewPostgresRouteAdminIdempStore constructs a PostgresRouteAdminIdempStore
+// backed by db. Panics if db is nil — this store must always be wired at the
+// composition root, unlike NewPostgresSignoffIdempStore's nil-tolerant path.
 func NewPostgresRouteAdminIdempStore(db *sql.DB) *PostgresRouteAdminIdempStore {
 	if db == nil {
 		panic("postgres_route_admin_idemp_store: db is nil")
@@ -65,14 +68,20 @@ func NewPostgresRouteAdminIdempStore(db *sql.DB) *PostgresRouteAdminIdempStore {
 	}
 }
 
+// BeginCreateReplay claims or replays an idempotency slot for the create-route
+// endpoint. See beginReplayRaw for the (handle, replay, err) return contract.
 func (s *PostgresRouteAdminIdempStore) BeginCreateReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.RouteAdminReplayCommitter, *application.RouteAdminReplay, error) {
 	return s.beginReplay(ctx, s.create, tenantID, actorID, idempKey, payloadHash)
 }
 
+// BeginUpdateReplay claims or replays an idempotency slot for the update-route
+// endpoint. See beginReplayRaw for the (handle, replay, err) return contract.
 func (s *PostgresRouteAdminIdempStore) BeginUpdateReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.RouteAdminReplayCommitter, *application.RouteAdminReplay, error) {
 	return s.beginReplay(ctx, s.update, tenantID, actorID, idempKey, payloadHash)
 }
 
+// BeginDeactivateReplay claims or replays an idempotency slot for the
+// deactivate-route endpoint. See beginReplayRaw for the (handle, replay, err) return contract.
 func (s *PostgresRouteAdminIdempStore) BeginDeactivateReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.RouteAdminReplayCommitter, *application.RouteAdminReplay, error) {
 	return s.beginReplay(ctx, s.deactivate, tenantID, actorID, idempKey, payloadHash)
 }

@@ -1,3 +1,10 @@
+// Package http is the controlled-documents module's HTTP delivery layer:
+// it mounts the oapi-codegen-generated /api/v1/controlled-documents/*
+// routes onto Handler, which dispatches to
+// application.ControlledDocumentService and maps domain errors to the
+// RFC 9457 problem+json envelope. Idempotency-Key handling for the two
+// mutating POST routes (atomic create, create revision) is wired here via
+// injectTenant + idempotency.Require.
 package http
 
 import (
@@ -29,6 +36,9 @@ type controlledDocumentService interface {
 	PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error)
 }
 
+// Handler implements the generated controlled-documents ServerInterface,
+// dispatching each route to svc and translating results/errors to
+// controlleddocumentsapi response types.
 type Handler struct {
 	svc           controlledDocumentService
 	db            *sql.DB
@@ -36,6 +46,9 @@ type Handler struct {
 	idempRevision *idempotency.Store
 }
 
+// NewHandler builds a Handler backed by svc, with dedicated idempotency
+// stores for the atomic-create and create-revision routes (each keyed by
+// its own route string).
 func NewHandler(svc *application.ControlledDocumentService, db *sql.DB) *Handler {
 	return &Handler{
 		svc:           svc,
@@ -67,6 +80,9 @@ func tenantIDFromContext(ctx context.Context) string {
 	return tenant.DevTenantID
 }
 
+// RegisterRoutes mounts the generated controlled-documents API surface
+// onto mux under /api/v1, wrapping the two mutating POST routes with
+// Idempotency-Key enforcement.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	actorOf := func(ctx context.Context) (string, string) {
 		// Idempotency scoping is best-effort here: a missing actor

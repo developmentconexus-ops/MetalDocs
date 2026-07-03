@@ -26,6 +26,11 @@ func NewAreaCatalogReaderPG() *AreaCatalogReaderPG { return &AreaCatalogReaderPG
 
 var _ taxonomydomain.AreaCatalogReader = (*AreaCatalogReaderPG)(nil)
 
+// AreaName reads document_process_areas.name for (tenantID, code) using
+// exec (either a pool or a caller's tx). found is false when no matching
+// row exists in that tenant; it issues no authz check (HS-PRE-1: this must
+// stay a plain, non-recording SELECT so it is safe inside a lock-holding
+// tx).
 func (AreaCatalogReaderPG) AreaName(ctx context.Context, exec db.DB, tenantID, code string) (string, bool, error) {
 	var name sql.NullString
 	err := exec.QueryRowContext(ctx,
@@ -44,6 +49,10 @@ func (AreaCatalogReaderPG) AreaName(ctx context.Context, exec db.DB, tenantID, c
 	return name.String, true, nil
 }
 
+// AreaExists reports whether a document_process_areas row exists for
+// (tenantID, code) using exec (either a pool or a caller's tx). It issues
+// no authz check (HS-PRE-1: this must stay a plain, non-recording SELECT
+// so it is safe inside a lock-holding tx).
 func (AreaCatalogReaderPG) AreaExists(ctx context.Context, exec db.DB, tenantID, code string) (bool, error) {
 	const q = `
 SELECT EXISTS (

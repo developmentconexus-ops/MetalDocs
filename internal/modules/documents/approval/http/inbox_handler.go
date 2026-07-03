@@ -12,6 +12,9 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+// InboxHandler returns the paginated list of approval instances awaiting the
+// requesting actor's signoff, along with the total count computed in the same
+// query/snapshot (T-005) so total never drifts from the returned page.
 func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

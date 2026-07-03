@@ -13,11 +13,16 @@ import (
 )
 
 var (
+	// ErrIdempotencyRequired is returned when a mutating request is missing the Idempotency-Key header.
 	ErrIdempotencyRequired = errors.New("idempotency: Idempotency-Key header required on mutating requests")
 
+	// ErrContentHashMismatch re-exports application.ErrContentHashMismatch for HTTP-layer error mapping.
 	ErrContentHashMismatch = application.ErrContentHashMismatch
 )
 
+// SignoffHandler records an approve/reject decision for the requesting actor on
+// a stage. Requires both an Idempotency-Key header (replay-safe via idempStore)
+// and a valid If-Match header (OCC precondition).
 func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

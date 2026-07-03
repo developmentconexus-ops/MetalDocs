@@ -9,6 +9,8 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+// ErrCapabilityDenied is returned by CanDo when the user does not hold the
+// requested capability in the tenant (and is not system_admin).
 var ErrCapabilityDenied = errors.New("capability denied")
 
 // queryExecutor is the narrow read surface CapabilityService needs. *sql.DB
@@ -18,10 +20,16 @@ type queryExecutor interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
+// CapabilityService is the tier-1 HTTP-edge capability check (CanDo), backed
+// by a DB-level EXISTS query over direct role grants and group-derived
+// grants. Distinct from tier-2 authz.Require, which runs in-tx with
+// area-scoping. Safe for concurrent use; holds no mutable state beyond db.
 type CapabilityService struct {
 	db queryExecutor
 }
 
+// NewCapabilityService constructs the service over the given query executor
+// (typically *sql.DB; tests may substitute a fake satisfying queryExecutor).
 func NewCapabilityService(db queryExecutor) *CapabilityService {
 	return &CapabilityService{db: db}
 }

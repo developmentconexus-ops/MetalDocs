@@ -10,10 +10,14 @@ import (
 	"metaldocs/internal/modules/iam/domain"
 )
 
+// RoleProvider resolves user role assignments from metaldocs.iam_users /
+// iam_user_roles on the connection pool for tier-2-adjacent membership
+// verification and role lookups.
 type RoleProvider struct {
 	db *sql.DB
 }
 
+// NewRoleProvider constructs a pool-backed RoleProvider.
 func NewRoleProvider(db *sql.DB) *RoleProvider {
 	return &RoleProvider{db: db}
 }

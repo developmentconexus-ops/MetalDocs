@@ -1,3 +1,6 @@
+// Package domain declares the audit module's core contracts: the append-only
+// Event record, the Writer/Reader/Counter ports that infrastructure adapters
+// implement, and the export-job types used by the async-export pipeline.
 package domain
 
 import (
@@ -13,6 +16,9 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// Event is a single append-only audit record. Rows are persisted to
+// metaldocs.audit_events with a prev_hash/row_hash chain for tamper-evidence;
+// Event itself carries no hash fields — those are infrastructure-layer concerns.
 type Event struct {
 	ID           string
 	OccurredAt   time.Time
@@ -25,8 +31,14 @@ type Event struct {
 	TenantID     string
 }
 
+// ErrInvalidEvent is returned by NewEvent when a required field (tenant,
+// actor, action, resource type, or resource id) is blank after trimming.
 var ErrInvalidEvent = errors.New("invalid event")
 
+// NewEvent builds an Event with OccurredAt set to now (UTC), marshaling payload
+// to JSON (defaulting to "{}" when nil). Returns ErrInvalidEvent if any of
+// tenantID, actorID, action, resourceType, or resourceID is empty after
+// trimming — callers must supply a fully-scoped event, never a partial one.
 func NewEvent(tenantID, resourceType, resourceID, actorID, action string, payload any) (Event, error) {
 	payloadJSON := "{}"
 	if payload != nil {
@@ -51,13 +63,23 @@ func NewEvent(tenantID, resourceType, resourceID, actorID, action string, payloa
 	return event, nil
 }
 
+// IntegrityIssueKind classifies a single row-hash-chain discrepancy found by
+// IntegrityValidator.ValidateIntegrity.
 type IntegrityIssueKind string
 
 const (
+	// IntegrityIssuePrevHashMismatch marks a row whose stored prev_hash does not
+	// equal the row_hash of its chain predecessor — the chain link is broken.
 	IntegrityIssuePrevHashMismatch IntegrityIssueKind = "prev_hash_mismatch"
-	IntegrityIssueRowHashMismatch  IntegrityIssueKind = "row_hash_mismatch"
+	// IntegrityIssueRowHashMismatch marks a row whose stored row_hash does not
+	// match the hash recomputed from its own column values — the row was altered
+	// after being written.
+	IntegrityIssueRowHashMismatch IntegrityIssueKind = "row_hash_mismatch"
 )
 
+// IntegrityIssue reports one detected break in the audit_events hash chain,
+// identifying the offending row (Sequence/EventID), the Kind of mismatch, and
+// both the expected and actual hash values for diagnosis.
 type IntegrityIssue struct {
 	Sequence         int64
 	EventID          string
@@ -91,13 +113,27 @@ type Cursor struct {
 	ID         string
 }
 
+// IsZero reports whether c carries no anchor (the "first page" cursor).
 func (c Cursor) IsZero() bool { return c.ID == "" && c.OccurredAt.IsZero() }
 
 // Writer stays in the domain package because audit append semantics are part of
 // the cross-module contract today. Move it behind a narrower application port
 // once write flows stop passing raw audit events across module boundaries.
+//
+// Record and RecordTx are fire-and-forget from the caller's perspective: the
+// regulated mutation's own transaction must already have committed (or use
+// RecordTx to bundle the audit insert into that same transaction) — an audit
+// write failure must never roll back or block the regulated action it
+// describes.
 type Writer interface {
+	// Record appends event in its own new transaction. Use for the standard
+	// post-commit case: the caller's regulated mutation has already committed,
+	// and this call is a separate, independent write.
 	Record(ctx context.Context, event Event) error
+	// RecordTx appends event inside the caller's own transaction tx, so the
+	// audit insert and the regulated mutation commit or roll back atomically.
+	// Used by callers (e.g. bypass/documents adapters) that need the audit
+	// record to share fate with the mutation itself.
 	RecordTx(ctx context.Context, tx db.Tx, event Event) error
 }
 
@@ -117,12 +153,16 @@ type Counter interface {
 	CountEvents(ctx context.Context, query ListEventsQuery) (int64, error)
 }
 
+// IntegrityValidator verifies the audit_events row-hash chain is unbroken —
+// used by the audit-integrity-validator janitor to detect tampering.
 type IntegrityValidator interface {
 	ValidateIntegrity(ctx context.Context) ([]IntegrityIssue, error)
 }
 
 // ---- Export job types -----------------------------------------------------
 
+// ExportFormat is the requested serialization for an audit export (csv or
+// jsonl). Use Valid to check a value parsed from an external request.
 type ExportFormat string
 
 const (
@@ -130,17 +170,22 @@ const (
 	ExportFormatJSONL ExportFormat = "jsonl"
 )
 
+// Valid reports whether f is a recognized export format (csv or jsonl).
 func (f ExportFormat) Valid() bool {
 	return f == ExportFormatCSV || f == ExportFormatJSONL
 }
 
+// ExportStatus is the lifecycle state of an ExportJob.
 type ExportStatus string
 
 const (
 	ExportStatusPending ExportStatus = "pending"
 	ExportStatusRunning ExportStatus = "running"
-	ExportStatusReady   ExportStatus = "ready"
-	ExportStatusFailed  ExportStatus = "failed"
+	// ExportStatusReady means the export payload is persisted and downloadable.
+	// Synchronous exports move straight to Ready in the same call that creates
+	// the job.
+	ExportStatusReady  ExportStatus = "ready"
+	ExportStatusFailed ExportStatus = "failed"
 )
 
 // ExportJob is the persisted row for an audit export request. Inline (sync)
@@ -170,4 +215,8 @@ type ExportJobRepository interface {
 	GetByDownloadToken(ctx context.Context, exportID, token string) (ExportJob, error)
 }
 
+// ErrExportJobNotFound is returned when an export job lookup finds no row for
+// the given (tenant, id) or (id, token) pair — including when the caller is
+// not the job's owning actor, so ownership checks fail closed with the same
+// not-found error rather than leaking existence.
 var ErrExportJobNotFound = errors.New("audit: export job not found")

@@ -1,3 +1,9 @@
+// Package authz implements the ADR 0022 tier-2 in-transaction capability
+// authorization check (Require) and its supporting GUC/context plumbing. It
+// is the second half of the two-tier model: tier-1 is the route→capability
+// HTTP-middleware check; tier-2 (this package) re-checks capability×area
+// inside the caller's own transaction, immediately before the DB tripwire
+// (enforce_capability_asserted trigger) that is the last line of defense.
 package authz
 
 import (
@@ -33,12 +39,17 @@ const SystemAdminExistsSQL = `EXISTS (
      AND gr.role = 'system_admin'
 )`
 
+// ErrCapDenied is returned by Require when the actor does not hold capability
+// in areaCode (no active, non-system_admin grant matched). Callers should
+// treat this as the tier-2 authorization-denied case, distinct from the
+// context-missing errors (ErrActorContextMissing / ErrTenantContextMissing).
 type ErrCapDenied struct {
 	Capability string
 	AreaCode   string
 	ActorID    string
 }
 
+// Error implements the error interface for ErrCapDenied.
 func (e ErrCapDenied) Error() string {
 	return fmt.Sprintf("authz: capability %q denied for actor %q in area %q", e.Capability, e.ActorID, e.AreaCode)
 }
@@ -56,6 +67,10 @@ type assertedCache struct {
 	set   map[string]struct{}
 }
 
+// WithCapCache attaches a per-request/per-job capability cache to ctx, so
+// repeated Require calls for the same (tx, actor, tenant, capability, area)
+// within the same ctx tree skip the redundant grant/system_admin queries.
+// Optional: Require works without it, just without the memoization.
 func WithCapCache(ctx context.Context) context.Context {
 	return context.WithValue(ctx, capCacheKey{}, &capCache{
 		granted:         make(map[string]bool),

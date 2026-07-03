@@ -18,6 +18,8 @@ func (h *Handler) cancelInstance(ctx context.Context, runner db.TxRunner, req ap
 	return h.cancelSvc.CancelInstance(ctx, runner, req)
 }
 
+// CancelHandler cancels an in-progress approval instance. Requires a valid
+// If-Match header (OCC precondition against the document's revision_version).
 func (h *Handler) CancelHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

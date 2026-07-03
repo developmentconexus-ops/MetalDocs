@@ -1,3 +1,10 @@
+// Package domain holds the iam module's core identity and authorization
+// contracts: the canonical Role and Capability registries (ADR 0022
+// Principle-1 single source of truth for capabilities), the CapabilityScope
+// classification, and the narrow cross-module read ports (UserDisplayNameReader,
+// TenantUserReader, MfaUserReader, etc.) that let other modules resolve
+// IAM-owned data without reaching across the module boundary into IAM's
+// tables directly.
 package domain
 
 import (
@@ -35,6 +42,8 @@ func IsValidRole(role Role) bool {
 	return iamtypes.IsValidRole(role)
 }
 
+// ParseRole normalizes raw (lowercase, trimmed) and validates it against the
+// eight canonical roles. Returns ErrInvalidRole if raw is empty or unknown.
 func ParseRole(raw string) (Role, error) {
 	role := Role(strings.ToLower(strings.TrimSpace(raw)))
 	if role == "" || !IsValidRole(role) {
@@ -56,6 +65,11 @@ func AreaRoles() []Role {
 	return iamtypes.AreaRoles()
 }
 
+// Capability is the ADR 0022 Principle-1 typed authorization unit — the
+// enforced boundary is always a capability, never a role. Every Capability
+// value MUST be one of the constants below (validCapabilities is the single
+// source of truth); no capability may be referenced as a raw string anywhere
+// else in the codebase.
 type Capability string
 
 const (
@@ -147,6 +161,8 @@ var validCapabilities = map[Capability]struct{}{
 	CapTokenDictionaryManage:       {},
 }
 
+// IsValidCapability reports whether cap is one of the registered constants in
+// validCapabilities.
 func IsValidCapability(cap Capability) bool {
 	_, ok := validCapabilities[cap]
 	return ok
@@ -162,6 +178,9 @@ func AllCapabilities() []Capability {
 	return out
 }
 
+// MustCapability converts raw to a Capability, panicking if it is not one of
+// the registered constants. Intended for compile-time-known literals (test
+// setup, static registrations) — never for values derived from external input.
 func MustCapability(raw string) Capability {
 	capability := Capability(raw)
 	if !IsValidCapability(capability) {

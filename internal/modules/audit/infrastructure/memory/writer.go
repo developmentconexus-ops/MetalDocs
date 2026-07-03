@@ -1,4 +1,7 @@
-// Test fixture only; not wired by bootstrap.
+// Package memory provides in-process, non-persistent implementations of the
+// audit domain ports (Writer/Reader/Counter, ExportJobRepository). These are
+// test fixtures only — not wired by bootstrap — and carry no hash-chain or
+// integrity guarantees; ValidateIntegrity always fails accordingly.
 package memory
 
 import (
@@ -12,15 +15,20 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// Writer is an in-memory implementation of domain.Writer/Reader/Counter/
+// IntegrityValidator, backed by a mutex-guarded slice. Suitable for unit
+// tests only — see the package doc.
 type Writer struct {
 	mu     sync.Mutex
 	events []domain.Event
 }
 
+// NewWriter constructs an empty in-memory Writer.
 func NewWriter() *Writer {
 	return &Writer{events: make([]domain.Event, 0, 16)}
 }
 
+// Record appends event to the in-memory store. Never returns an error.
 func (w *Writer) Record(_ context.Context, event domain.Event) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -28,10 +36,15 @@ func (w *Writer) Record(_ context.Context, event domain.Event) error {
 	return nil
 }
 
+// RecordTx ignores tx (the in-memory store has no transactional semantics)
+// and delegates to Record.
 func (w *Writer) RecordTx(ctx context.Context, tx db.Tx, event domain.Event) error {
 	return w.Record(ctx, event)
 }
 
+// ListEvents filters and sorts the in-memory events to match domain.Reader's
+// contract: newest-first, with a limit+1 probe row used to compute hasMore so
+// an exact-multiple last page does not falsely advertise a next page.
 func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]domain.Event, bool, error) {
 	w.mu.Lock()
 	snapshot := make([]domain.Event, len(w.events))
@@ -79,6 +92,8 @@ func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]
 	return items, false, nil
 }
 
+// CountEvents counts in-memory events matching query's filter (cursor/limit
+// ignored, matching the postgres Counter's semantics).
 func (w *Writer) CountEvents(_ context.Context, query domain.ListEventsQuery) (int64, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -128,6 +143,8 @@ func matches(e domain.Event, q domain.ListEventsQuery) bool {
 	return true
 }
 
+// ValidateIntegrity always fails: the in-memory store keeps no hash chain, so
+// integrity validation is not meaningful here.
 func (w *Writer) ValidateIntegrity(context.Context) ([]domain.IntegrityIssue, error) {
 	return nil, errors.New("integrity validation not supported by memory writer")
 }

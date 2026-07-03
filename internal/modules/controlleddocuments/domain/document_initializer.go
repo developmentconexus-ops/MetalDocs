@@ -46,10 +46,15 @@ func NewCloneTemplateRequest(templateVersionID *string, name string, formData ma
 	}, nil
 }
 
+// TemplateVersionID returns the caller-supplied override template version
+// id, or nil to use the profile's default template.
 func (r CloneTemplateRequest) TemplateVersionID() *string { return r.templateVersionID }
 
+// Name returns the trimmed, non-empty document name.
 func (r CloneTemplateRequest) Name() string { return r.name }
 
+// FormData returns the initial form field values for the cloned
+// document. Never nil (defaults to an empty map).
 func (r CloneTemplateRequest) FormData() map[string]any { return r.formData }
 
 // DictionaryValues returns the resolved {placeholderID -> pinned value} map for
@@ -84,8 +89,17 @@ type DocumentRef struct {
 // part of this contract: storage_key starts empty and the editor renders on
 // demand.
 type DocumentInitializer interface {
+	// CloneTemplate materializes the initial document revision for cd
+	// inside the caller's tx, using the already-resolved template version
+	// and dictionary values carried on req. It performs no authz-recording
+	// taxonomy or dictionary read of its own (see ResolveTemplateVersionID
+	// / ResolveDictionaryValues below).
 	CloneTemplate(ctx context.Context, tx db.Tx, cd *ControlledDocument, req CloneTemplateRequest) (*DocumentRef, error)
+	// ResolveTemplateStorageKey resolves the S3 storage key of the
+	// effective template (override or profile default) for (tenantID,
+	// profileCode).
 	ResolveTemplateStorageKey(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error)
+	// Exists reports whether an object exists at storageKey.
 	Exists(ctx context.Context, storageKey string) (bool, error)
 	// ResolveTemplateVersionID resolves the effective template version id for the
 	// (profile, optional override) OFF-TX, before the caller opens its atomic tx.

@@ -1,3 +1,8 @@
+// Package domain holds the auth bounded-context's pure domain model:
+// identities, sessions, tenants, and the Repository port they are persisted
+// through. Password material (PlainPassword, PasswordHash) and session tokens
+// are handled here with redaction/hashing contracts that callers must respect;
+// this package has no HTTP or SQL dependencies.
 package domain
 
 import (
@@ -32,6 +37,8 @@ type LoginTx interface {
 	RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (attempts int, lockedUntil *time.Time, err error)
 }
 
+// Repository is the persistence port for the auth module: identities,
+// sessions, login-lock serialization, and user administration.
 type Repository interface {
 	FindIdentityByIdentifier(ctx context.Context, identifier string) (Identity, error)
 	FindIdentityByUserID(ctx context.Context, userID string) (Identity, error)

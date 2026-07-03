@@ -46,8 +46,11 @@ const TickInterval = 15 * time.Second
 type Status string
 
 const (
+	// StatusOnline marks a user whose last_seen_at is within IdleAfter of now.
 	StatusOnline Status = "online"
-	StatusIdle   Status = "idle"
+	// StatusIdle marks a user whose last_seen_at is between IdleAfter and
+	// OfflineAfter of now.
+	StatusIdle Status = "idle"
 )
 
 // Item is one entry in a presence snapshot.

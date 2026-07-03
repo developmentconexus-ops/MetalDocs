@@ -27,6 +27,9 @@ import (
 const maxControlledDocumentsJSONBodyBytes int64 = 1 << 20 // 1 MiB
 var errTenantIDInvalid = errors.New("controlled_documents: tenant id invalid")
 
+// ListControlledDocuments handles GET /controlled-documents: lists
+// controlled documents visible to the caller, filtered by params and
+// forward-paginated via the opaque cursor (FD-2).
 func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request, params controlleddocumentsapi.ListControlledDocumentsParams) {
 	filter, err := filterFromListParams(params)
 	if err != nil {
@@ -67,6 +70,10 @@ func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// AtomicCreateControlledDocument handles POST /controlled-documents:
+// creates a controlled document and its first document revision
+// atomically (ADR 0011). Requires an Idempotency-Key header (enforced by
+// the middleware wired in RegisterRoutes).
 func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.Request, params controlleddocumentsapi.AtomicCreateControlledDocumentParams) {
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
@@ -179,6 +186,9 @@ func uuidStringPtr(id *openapi_types.UUID) *string {
 	return &value
 }
 
+// PreviewControlledDocumentCode handles GET
+// /controlled-documents/preview-code: returns the next auto-allocated
+// code for (profile_code, area_code) without consuming the sequence.
 func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.Request, params controlleddocumentsapi.PreviewControlledDocumentCodeParams) {
 	profileCode := strings.TrimSpace(params.ProfileCode)
 	areaCode := strings.TrimSpace(params.AreaCode)
@@ -204,6 +214,11 @@ func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.R
 	})
 }
 
+// CreateControlledDocumentRevision handles POST
+// /controlled-documents/{id}/revisions: creates a new document revision
+// for an existing active controlled document. Requires an
+// Idempotency-Key header (enforced by the middleware wired in
+// RegisterRoutes).
 func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params controlleddocumentsapi.CreateControlledDocumentRevisionParams) {
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
@@ -252,6 +267,8 @@ func missingCreateRevisionField(req controlleddocumentsapi.CreateRevisionRequest
 	return ""
 }
 
+// GetControlledDocument handles GET /controlled-documents/{id}: returns
+// the controlled document by id, after verifying the caller can read it.
 func (h *Handler) GetControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
@@ -273,6 +290,10 @@ func (h *Handler) GetControlledDocument(w http.ResponseWriter, r *http.Request, 
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }
 
+// GetActiveDocument handles GET /controlled-documents/{id}/active-document:
+// returns the active (or, absent that, most recently published) document
+// instance for the controlled document, including approval state and
+// in-progress approval instance id when applicable (SEC-03/T-006).
 func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
@@ -331,6 +352,9 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }
 
+// ObsoleteControlledDocument handles POST
+// /controlled-documents/{id}/obsolete: transitions the controlled
+// document from active to obsolete.
 func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)
@@ -345,6 +369,9 @@ func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// SupersedeControlledDocument handles POST
+// /controlled-documents/{id}/supersede: transitions the controlled
+// document from active to superseded.
 func (h *Handler) SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	r.SetPathValue("id", id.String())
 	tenantID, err := tenantIDFromRequest(r)

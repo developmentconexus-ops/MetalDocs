@@ -13,6 +13,8 @@ import (
 	"metaldocs/internal/platform/strictjson"
 )
 
+// CreateRouteHandler creates a new approval route for a document profile.
+// Requires an Idempotency-Key header; replays return the original result.
 func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -60,6 +62,9 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// UpdateRouteHandler updates an existing approval route. Requires both an
+// Idempotency-Key header and a valid If-Match header (OCC precondition
+// against the route's version).
 func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -115,6 +120,9 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DeactivateRouteHandler deactivates an approval route. Requires both an
+// Idempotency-Key header and a valid If-Match header (OCC precondition
+// against the route's version).
 func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -169,6 +177,7 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// ListRoutesHandler returns all approval routes configured for the tenant.
 func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

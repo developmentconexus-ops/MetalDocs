@@ -11,8 +11,12 @@ import (
 )
 
 var (
+	// ErrMembershipNotFound is returned by Revoke when no active membership
+	// exists for the given (user, tenant, area).
 	ErrMembershipNotFound = errors.New("membership_not_found")
-	ErrUnknownRole        = errors.New("unknown_role")
+	// ErrUnknownRole is returned by Grant when role does not parse as a known
+	// domain.Role.
+	ErrUnknownRole = errors.New("unknown_role")
 	// ErrMembershipExists is returned by Grant when an active membership for
 	// (user, tenant, area) with the same role already exists. The admin
 	// surface treats grant as non-idempotent: callers must explicitly revoke
@@ -21,6 +25,10 @@ var (
 	ErrMembershipExists = errors.New("membership_exists")
 )
 
+// UserAreaWriteRepository is the persistence port for area-membership
+// mutations and directory reads. All Tx-suffixed methods must run inside a
+// transaction opened by BeginTx so the mutation and its governance log entry
+// commit atomically (REQ-ASYNC-1).
 type UserAreaWriteRepository interface {
 	ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error)
 	// ListActiveForUsers loads active memberships for a set of userIDs in a
@@ -50,6 +58,9 @@ type UserAreaWriteRepository interface {
 	GrantAtomicTx(ctx context.Context, tx domain.MembershipTx, oldMembership, newMembership domain.UserProcessArea) error
 }
 
+// MembershipGovernanceLogger records an area-membership grant/revoke event as
+// part of the caller's transaction, so the audit trail can never diverge from
+// the mutation it describes.
 type MembershipGovernanceLogger interface {
 	// LogTx writes the governance event inside an open transaction so the audit
 	// record is atomically committed with the membership mutation (REQ-ASYNC-1,
@@ -57,6 +68,9 @@ type MembershipGovernanceLogger interface {
 	LogTx(ctx context.Context, tx db.Tx, action string, membership domain.UserProcessArea) error
 }
 
+// AreaMembershipService owns grant/revoke of user↔area role memberships,
+// pairing each mutation with an atomic governance-log write and (once wired)
+// a role-cache invalidation so authorization reflects the change immediately.
 type AreaMembershipService struct {
 	repo        UserAreaWriteRepository
 	logger      MembershipGovernanceLogger
@@ -64,6 +78,9 @@ type AreaMembershipService struct {
 	nowFn       func() time.Time
 }
 
+// NewAreaMembershipService constructs an AreaMembershipService. repo and
+// logger are required; it panics if either is nil since that is a wiring
+// bug, not a runtime condition.
 func NewAreaMembershipService(repo UserAreaWriteRepository, logger MembershipGovernanceLogger) *AreaMembershipService {
 	if repo == nil {
 		panic("iam.NewAreaMembershipService: repo is required")
@@ -96,6 +113,7 @@ func (s *AreaMembershipService) invalidate(userID, tenantID string) {
 	}
 }
 
+// ListActive returns the caller's active area memberships as of now.
 func (s *AreaMembershipService) ListActive(ctx context.Context, userID, tenantID string) ([]domain.UserProcessArea, error) {
 	return s.repo.ListActive(ctx, userID, tenantID, s.nowFn())
 }
@@ -127,6 +145,12 @@ func (s *AreaMembershipService) ListByTenantInManagedAreas(ctx context.Context, 
 	return s.repo.ListByTenantInManagedAreas(ctx, tenantID, userID, areaCode, role, actorID, capability, s.nowFn())
 }
 
+// Grant assigns role to userID in areaCode. If an active membership with a
+// different role already exists it is atomically closed and replaced
+// (role-change path); if the same role is already active it returns
+// ErrMembershipExists (grant is non-idempotent — callers must Revoke first).
+// The mutation and its governance-log entry commit in the same transaction,
+// then the actor's cached roles are invalidated (A3).
 func (s *AreaMembershipService) Grant(
 	ctx context.Context,
 	userID, tenantID, areaCode string,
@@ -213,6 +237,10 @@ func buildMembership(userID, tenantID, areaCode string, role domain.Role, effect
 	return membership
 }
 
+// Revoke closes the caller's active membership in areaCode as of now.
+// Returns ErrMembershipNotFound if no active membership exists. The closure
+// and its governance-log entry commit in the same transaction, then the
+// actor's cached roles are invalidated (A3).
 func (s *AreaMembershipService) Revoke(
 	ctx context.Context,
 	userID, tenantID, areaCode string,

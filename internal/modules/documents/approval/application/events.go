@@ -8,8 +8,10 @@ import (
 	"metaldocs/internal/platform/db"
 )
 
+// EventType identifies the kind of governance event recorded via EventEmitter.
 type EventType string
 
+// EventType values written to governance_events by the approval subsystem.
 const (
 	EventTypeApprovalInstanceCancelled EventType = "approval.instance_cancelled"
 	EventTypeDocumentPublished         EventType = "document_published"
@@ -51,6 +53,8 @@ INSERT INTO governance_events
   (tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, now()))`
 
+// Emit inserts ev into governance_events using tx, so the write shares the
+// caller's transaction (outbox pattern — never a separate connection).
 func (e *sqlEmitter) Emit(ctx context.Context, tx db.Tx, ev GovernanceEvent) error {
 	payload := ev.PayloadJSON
 	if payload == nil {
@@ -72,6 +76,7 @@ type MemoryEmitter struct {
 	Events []GovernanceEvent
 }
 
+// Emit appends ev to Events. Test-only implementation; ignores ctx and tx.
 func (m *MemoryEmitter) Emit(_ context.Context, _ db.Tx, ev GovernanceEvent) error {
 	m.Events = append(m.Events, ev)
 	return nil

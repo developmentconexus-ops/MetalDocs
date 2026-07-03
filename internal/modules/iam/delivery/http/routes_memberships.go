@@ -43,6 +43,11 @@ type MembershipUserTenantVerifier interface {
 	VerifyUserInTenant(ctx context.Context, tenantID, userID string) error
 }
 
+// MembershipHandler serves the /iam/area-memberships list/grant/revoke
+// surface. Authorization is tier-1 (route capability) plus tier-2
+// (AreaMembershipService's in-repo authz.Require on the target area); the
+// handler itself enforces only the self-grant lockout and the cross-tenant
+// 404 guard (ADR 0022 Phase 3/4 — no role-string literals here).
 type MembershipHandler struct {
 	svc      *iamapp.AreaMembershipService
 	verifier MembershipUserTenantVerifier
@@ -84,10 +89,15 @@ func toMembershipDTO(m iamdomain.UserProcessArea) membershipDTO {
 	return dto
 }
 
+// NewMembershipHandler constructs the handler. Both svc and verifier should
+// be non-nil in production; a nil svc causes every route to answer 501, and
+// a nil verifier fails the tenant guard closed with 501 (see
+// guardMembershipUserInTenant).
 func NewMembershipHandler(svc *iamapp.AreaMembershipService, verifier MembershipUserTenantVerifier) *MembershipHandler {
 	return &MembershipHandler{svc: svc, verifier: verifier}
 }
 
+// RegisterRoutes mounts the list/grant/revoke area-membership routes on mux.
 func (h *MembershipHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/iam/area-memberships", h.listMemberships)
 	mux.HandleFunc("POST /api/v1/iam/area-memberships", h.grantMembership)

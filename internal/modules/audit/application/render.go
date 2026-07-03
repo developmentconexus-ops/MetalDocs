@@ -1,3 +1,7 @@
+// Package application implements the audit module's use cases: querying,
+// exporting, and rendering the append-only audit event stream. It sits
+// between the domain contracts (Writer/Reader/Counter) and the HTTP delivery
+// layer, and owns no persistence of its own.
 package application
 
 import (
@@ -64,14 +68,14 @@ func renderJSONL(events []domain.Event) ([]byte, error) {
 			}
 		}
 		obj := map[string]any{
-			"id":           e.ID,
+			"id":            e.ID,
 			"occurred_at":   e.OccurredAt.UTC().Format(time.RFC3339Nano),
 			"actor_id":      e.ActorID,
-			"action":       e.Action,
+			"action":        e.Action,
 			"resource_type": e.ResourceType,
 			"resource_id":   e.ResourceID,
 			"trace_id":      e.TraceID,
-			"payload":      payload,
+			"payload":       payload,
 		}
 		encoded, err := json.Marshal(obj)
 		if err != nil {

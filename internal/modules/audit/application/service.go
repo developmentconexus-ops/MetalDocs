@@ -17,15 +17,34 @@ import (
 )
 
 var (
-	ErrTenantRequired      = errors.New("audit: tenant id is required")
-	ErrReaderRequired      = errors.New("audit: reader is required")
-	ErrActorRequired       = errors.New("audit: actor id is required")
-	ErrInvalidFormat       = errors.New("audit: invalid export format")
-	ErrExportTooLarge      = errors.New("audit: export result set too large for synchronous export")
-	ErrExportRepoMissing   = errors.New("audit: export job repository not configured")
-	ErrCounterMissing      = errors.New("audit: counter not configured for export sizing")
+	// ErrTenantRequired is returned when a query or export request carries no
+	// tenant id — the application layer refuses to run an unscoped audit query.
+	ErrTenantRequired = errors.New("audit: tenant id is required")
+	// ErrReaderRequired is returned by NewService (as a panic) and by any method
+	// called on a Service constructed without a domain.Reader.
+	ErrReaderRequired = errors.New("audit: reader is required")
+	// ErrActorRequired is returned when an export or status/download call carries
+	// no actor id — ownership scoping cannot be enforced without one.
+	ErrActorRequired = errors.New("audit: actor id is required")
+	// ErrInvalidFormat is returned when the requested export format is neither
+	// csv nor jsonl.
+	ErrInvalidFormat = errors.New("audit: invalid export format")
+	// ErrExportTooLarge is returned when the estimated row count for an export
+	// filter exceeds SyncExportRowLimit; the synchronous export path refuses
+	// rather than running an unbounded query.
+	ErrExportTooLarge = errors.New("audit: export result set too large for synchronous export")
+	// ErrExportRepoMissing is returned when export operations are invoked on a
+	// Service that has not been wired via WithExports.
+	ErrExportRepoMissing = errors.New("audit: export job repository not configured")
+	// ErrCounterMissing is returned when ExportEvents needs to size a query but
+	// no domain.Counter has been wired via WithExports.
+	ErrCounterMissing = errors.New("audit: counter not configured for export sizing")
+	// ErrExportTokenMismatch is returned when a download request's token does not
+	// match the export job's stored DownloadToken.
 	ErrExportTokenMismatch = errors.New("audit: invalid export download token")
-	ErrExportsDisabled     = errors.New("audit: export pipeline not configured")
+	// ErrExportsDisabled is returned when export operations are invoked on a
+	// Service whose writer dependency has not been wired via WithExports.
+	ErrExportsDisabled = errors.New("audit: export pipeline not configured")
 )
 
 // SyncExportRowLimit is the threshold above which an export request is
@@ -39,6 +58,11 @@ const ExportTTL = 15 * time.Minute
 // download URL.
 type SignedURLBuilder func(job domain.ExportJob) string
 
+// Service implements the audit module's application use cases (list, export,
+// export status/download) against the domain ports. The export pipeline
+// (counter/exportRepo/writer/signedURL) is optional and only becomes active
+// once WithExports has been called; until then export methods fail closed
+// with ErrExportsDisabled / ErrExportRepoMissing / ErrCounterMissing.
 type Service struct {
 	reader     domain.Reader
 	counter    domain.Counter
@@ -48,6 +72,8 @@ type Service struct {
 	now        func() time.Time
 }
 
+// NewService constructs a Service backed by reader. Panics if reader is nil —
+// a Service with no read port cannot serve any of its use cases.
 func NewService(reader domain.Reader) *Service {
 	if reader == nil {
 		panic(ErrReaderRequired.Error())
@@ -68,6 +94,9 @@ func (s *Service) WithExports(counter domain.Counter, repo domain.ExportJobRepos
 	return s
 }
 
+// ListEvents normalizes query (trimming filters, clamping limit to [1,100],
+// defaulting to 50) and delegates to the underlying domain.Reader. Returns
+// ErrTenantRequired when query.TenantID is empty.
 func (s *Service) ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, bool, error) {
 	if s == nil || s.reader == nil {
 		return nil, false, ErrReaderRequired

@@ -13,23 +13,33 @@ const (
 	tplVersionObsolete  = "obsolete"
 )
 
+// TemplateResolutionInput is the input to Resolve: the target profile plus
+// the (already-fetched) override and/or default template version
+// candidates. OverrideTemplate, when non-nil, takes precedence over
+// DefaultTemplate.
 type TemplateResolutionInput struct {
 	ProfileCode      string
 	OverrideTemplate *TemplateVersionCandidate
 	DefaultTemplate  *TemplateVersionCandidate
 }
 
+// TemplateVersionCandidate is the minimal template-version projection
+// Resolve needs to decide eligibility. Status is nil when the version row
+// no longer exists (deleted).
 type TemplateVersionCandidate struct {
 	ID          string
 	ProfileCode string
 	Status      *string
 }
 
+// TemplateResolutionResult is the winning template version and where it
+// came from ("override" or "default").
 type TemplateResolutionResult struct {
 	TemplateVersionID string
 	Source            string
 }
 
+// Sentinel errors returned by Resolve, one per rejected-candidate reason.
 var (
 	ErrProfileHasNoDefaultTemplate = errors.New("profile has no default template")
 	ErrOverrideTemplateDeleted     = errors.New("override template deleted")
@@ -38,6 +48,11 @@ var (
 	ErrTemplateProfileMismatch     = errors.New("template profile mismatch")
 )
 
+// Resolve picks the effective template version for a controlled document:
+// in.OverrideTemplate when set (must be published and belong to
+// in.ProfileCode), otherwise in.DefaultTemplate (must be published; an
+// obsolete default is a distinct error from a missing one). Pure function,
+// no I/O.
 func Resolve(in TemplateResolutionInput) (TemplateResolutionResult, error) {
 	if in.OverrideTemplate != nil {
 		return resolveOverrideTemplate(in.ProfileCode, in.OverrideTemplate)

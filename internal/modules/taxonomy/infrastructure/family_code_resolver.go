@@ -28,6 +28,8 @@ type FamilyCodeResolverRepository struct {
 	db *sql.DB
 }
 
+// NewFamilyCodeResolverRepository builds a FamilyCodeResolverRepository
+// backed by db.
 func NewFamilyCodeResolverRepository(db *sql.DB) *FamilyCodeResolverRepository {
 	return &FamilyCodeResolverRepository{db: db}
 }

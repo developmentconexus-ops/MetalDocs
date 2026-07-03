@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"time"
 
-	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 )
@@ -49,6 +49,10 @@ type scheduledDocumentState struct {
 // RunScheduledPublishJob maps it to a successful no-op.
 var errScheduledPublishNoOp = errors.New("scheduler: scheduled row already published")
 
+// RunScheduledPublishJob performs the deferred publish (and supersede, when
+// applicable) for one scheduled-publish job. It is idempotent: a stale or
+// already-claimed job (OCC UPDATE affects zero rows) is treated as a
+// successful no-op rather than an error, so River-triggered retries are safe.
 func (s *SchedulerService) RunScheduledPublishJob(ctx context.Context, runner db.TxRunner, input ScheduledPublishJobInput) error {
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		if err := authz.BypassSystem(ctx, tx); err != nil {

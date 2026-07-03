@@ -14,6 +14,9 @@ type DevRoleProvider struct {
 	allowedTenantID string
 }
 
+// NewDevRoleProvider constructs the dev-mode provider. A nil rolesByUser map
+// is replaced with an empty one. Only allowedTenantID resolves any user;
+// every other tenant is treated as unknown.
 func NewDevRoleProvider(rolesByUser map[string][]domain.Role, allowedTenantID string) *DevRoleProvider {
 	if rolesByUser == nil {
 		rolesByUser = map[string][]domain.Role{}
@@ -23,6 +26,10 @@ func NewDevRoleProvider(rolesByUser map[string][]domain.Role, allowedTenantID st
 	return &DevRoleProvider{rolesByUser: rolesByUser, allowedTenantID: allowedTenantID}
 }
 
+// RolesByUserID returns a defensive copy of the user's configured roles.
+// Returns domain.ErrUserNotFound when tenantID does not match the allowed
+// tenant or userID is unknown, and domain.ErrNoRolesAssigned when the user
+// is known but has zero roles configured.
 func (p *DevRoleProvider) RolesByUserID(_ context.Context, userID, tenantID string) ([]domain.Role, error) {
 	if strings.TrimSpace(tenantID) != p.allowedTenantID {
 		return nil, domain.ErrUserNotFound

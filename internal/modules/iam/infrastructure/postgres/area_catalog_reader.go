@@ -34,6 +34,9 @@ func NewProcessAreaCatalog(db *sql.DB, areaCatalog taxonomydomain.AreaCatalogRea
 	return &ProcessAreaCatalog{db: db, areaCatalog: areaCatalog}
 }
 
+// AreaCodeExists reports whether areaCode is a known process area for
+// tenantID, delegating to the taxonomy-published AreaCatalogReader port over
+// the iam pool (off-tx, non-recording).
 func (c *ProcessAreaCatalog) AreaCodeExists(ctx context.Context, tenantID, areaCode string) (bool, error) {
 	return c.areaCatalog.AreaExists(ctx, c.db, tenantID, areaCode)
 }

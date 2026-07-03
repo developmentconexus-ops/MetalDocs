@@ -1,3 +1,7 @@
+// Package application holds the taxonomy module's use-case services
+// (AreaService, FamilyService, ProfileService): thin orchestrators that
+// validate input via domain constructors, resolve the acting user, and
+// delegate persistence to the domain repository ports.
 package application
 
 import (
@@ -9,12 +13,16 @@ import (
 	"metaldocs/internal/platform/authn"
 )
 
+// AreaService is the use-case orchestrator for ProcessArea: List, Get,
+// Create, Update, Archive. Every mutating method emits a governance event
+// via govLogger inside the same transaction as the mutation (T-005 closed).
 type AreaService struct {
 	areas     domain.AreaRepository
 	govLogger domain.GovernanceLogger
 	now       func() time.Time
 }
 
+// NewAreaService builds an AreaService with now defaulted to time.Now.
 func NewAreaService(areas domain.AreaRepository, govLogger domain.GovernanceLogger) *AreaService {
 	return &AreaService{
 		areas:     areas,
@@ -23,6 +31,8 @@ func NewAreaService(areas domain.AreaRepository, govLogger domain.GovernanceLogg
 	}
 }
 
+// List returns process areas for tenantID, including archived ones when
+// includeArchived is true.
 func (s *AreaService) List(ctx context.Context, tenantID string, includeArchived bool) ([]domain.ProcessArea, error) {
 	areas, err := s.areas.List(ctx, tenantID, includeArchived)
 	if err != nil {
@@ -31,6 +41,8 @@ func (s *AreaService) List(ctx context.Context, tenantID string, includeArchived
 	return areas, nil
 }
 
+// Get returns the area identified by (tenantID, code), or a wrapped
+// domain.ErrAreaNotFound if no such row exists.
 func (s *AreaService) Get(ctx context.Context, tenantID string, code domain.AreaCode) (*domain.ProcessArea, error) {
 	area, err := s.areas.GetByCode(ctx, tenantID, code)
 	if err != nil {
@@ -39,6 +51,9 @@ func (s *AreaService) Get(ctx context.Context, tenantID string, code domain.Area
 	return area, nil
 }
 
+// Create validates a, inserts it, and logs an area.created governance
+// event, all inside a single transaction (BeginTx...Commit); any failure
+// rolls the transaction back so no partial area/event pair is persisted.
 func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
 	newArea, err := domain.NewProcessArea(*a)
 	if err != nil {
@@ -81,6 +96,13 @@ func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
 	return nil
 }
 
+// Update locks the area row (GetByCodeForUpdate FOR UPDATE), applies the
+// normalized fields from a (Name, Description, ParentCode, OwnerUserID,
+// DefaultApproverRole, ArchivedAt), persists them, and logs an
+// area.updated governance event — all inside one transaction. Code is
+// never mutated (immutability is DB-enforced regardless). Note: this
+// method does not run the ListAncestors cycle check on ParentCode changes
+// (T-016 — the guarded SetParent entrypoint was deleted as dead code).
 func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 	normalized, err := domain.NewProcessArea(*a)
 	if err != nil {
@@ -133,6 +155,10 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 	return nil
 }
 
+// Archive locks the area row (FOR UPDATE), soft-archives it via
+// ProcessArea.Archive, persists the change, and logs an area.archived
+// governance event — all inside one transaction. Returns
+// domain.ErrAreaArchived if the area is already archived.
 func (s *AreaService) Archive(ctx context.Context, tenantID string, areaCode domain.AreaCode, actorID string) error {
 	tx, err := s.areas.BeginTx(ctx)
 	if err != nil {

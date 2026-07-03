@@ -1,3 +1,10 @@
+// Package httpdelivery is the IAM module's HTTP delivery layer: tier-1
+// capability-gated route handlers for admin/roles, People-tab user
+// management, area memberships, roles & capabilities catalogues, sessions,
+// and observability (usage/KPI). Every handler resolves tenant scope from
+// request context (never a client header) and maps cross-tenant lookups to
+// 404, never 403, per the multi-tenant pooled invariant.
+//
 // router.go — CON-07 codegen rollout for IAM (ADR 0012 / target-arch N2).
 //
 // Mounts the oapi-codegen-generated iamapi.ServerInterface via
@@ -103,6 +110,8 @@ func (rt *Router) RegisterGenerated(mux *http.ServeMux) {
 
 // ─── auth/sessions ──────────────────────────────────────────────────────────
 
+// ListSessions delegates to SessionsHandler.handleSessions; answers 501 when
+// sessions is not wired (SQLDB-less boot path).
 func (rt *Router) ListSessions(w http.ResponseWriter, r *http.Request, _ iamapi.ListSessionsParams) {
 	if rt.sessions == nil {
 		writeIAMNotImplemented(w, "Sessions service is not configured")
@@ -111,6 +120,8 @@ func (rt *Router) ListSessions(w http.ResponseWriter, r *http.Request, _ iamapi.
 	rt.sessions.handleSessions(w, r)
 }
 
+// RevokeSession delegates to SessionsHandler.handleSessionByID; answers 501
+// when sessions is not wired.
 func (rt *Router) RevokeSession(w http.ResponseWriter, r *http.Request, _ string) {
 	if rt.sessions == nil {
 		writeIAMNotImplemented(w, "Sessions service is not configured")
@@ -125,20 +136,29 @@ func (rt *Router) RevokeSession(w http.ResponseWriter, r *http.Request, _ string
 
 // ─── iam/admin/overview ─────────────────────────────────────────────────────
 
+// GetIamAdminOverview delegates to AdminHandler.handleAdminOverview, which
+// composes KPI, presence, and recent-activity snapshots concurrently.
 func (rt *Router) GetIamAdminOverview(w http.ResponseWriter, r *http.Request) {
 	rt.admin.handleAdminOverview(w, r)
 }
 
 // ─── iam/area-memberships ───────────────────────────────────────────────────
 
+// ListAreaMemberships delegates to MembershipHandler.listMemberships, which
+// resolves the caller's directory scope (tenant-wide/managed-areas/self-only)
+// before filtering (ADR 0022 Phase 4).
 func (rt *Router) ListAreaMemberships(w http.ResponseWriter, r *http.Request, _ iamapi.ListAreaMembershipsParams) {
 	rt.memberships.listMemberships(w, r)
 }
 
+// GrantAreaMembership delegates to MembershipHandler.grantMembership, which
+// enforces the self-grant lockout and tier-2 area authz before writing.
 func (rt *Router) GrantAreaMembership(w http.ResponseWriter, r *http.Request) {
 	rt.memberships.grantMembership(w, r)
 }
 
+// RevokeAreaMembership delegates to MembershipHandler.revokeMembership.
+// Self-revoke is permitted (self-de-escalation, not escalation).
 func (rt *Router) RevokeAreaMembership(w http.ResponseWriter, r *http.Request, _ string, _ string) {
 	// revokeMembership reads user_id/area_code via r.PathValue, which the
 	// Go 1.22 mux populates identically whether the pattern was registered
@@ -149,20 +169,28 @@ func (rt *Router) RevokeAreaMembership(w http.ResponseWriter, r *http.Request, _
 
 // ─── iam/capabilities, iam/roles, iam/role-capabilities ────────────────────
 
+// ListCapabilities delegates to RolesCapsHandler.listCapabilities, serving
+// the process-lifetime-cached capability catalogue.
 func (rt *Router) ListCapabilities(w http.ResponseWriter, r *http.Request) {
 	rt.rolesCaps.listCapabilities(w, r)
 }
 
+// ListRoles delegates to RolesCapsHandler.listRoles, serving the
+// process-lifetime-cached role catalogue.
 func (rt *Router) ListRoles(w http.ResponseWriter, r *http.Request) {
 	rt.rolesCaps.listRoles(w, r)
 }
 
+// ListRoleCapabilities delegates to RolesCapsHandler.listRoleCapabilities,
+// reading the role→capability matrix from RoleCapabilitiesReader.
 func (rt *Router) ListRoleCapabilities(w http.ResponseWriter, r *http.Request) {
 	rt.rolesCaps.listRoleCapabilities(w, r)
 }
 
 // ─── iam/kpi, iam/usage ─────────────────────────────────────────────────────
 
+// GetKpi delegates to ObservabilityHandler.handleKpi; answers 501 when
+// observability is not wired.
 func (rt *Router) GetKpi(w http.ResponseWriter, r *http.Request) {
 	if rt.observability == nil {
 		writeIAMNotImplemented(w, "Observability service is not configured")
@@ -171,6 +199,8 @@ func (rt *Router) GetKpi(w http.ResponseWriter, r *http.Request) {
 	rt.observability.handleKpi(w, r)
 }
 
+// GetUsage delegates to ObservabilityHandler.handleUsage; answers 501 when
+// observability is not wired.
 func (rt *Router) GetUsage(w http.ResponseWriter, r *http.Request) {
 	if rt.observability == nil {
 		writeIAMNotImplemented(w, "Observability service is not configured")
@@ -181,6 +211,9 @@ func (rt *Router) GetUsage(w http.ResponseWriter, r *http.Request) {
 
 // ─── iam/presence/snapshot ───────────────────────────────────────────────────
 
+// GetPresenceSnapshot delegates to presence.Handler.ServeSnapshot; answers
+// 501 when presence is not wired. The WebSocket stream upgrade is excluded
+// from codegen and stays on presence.Handler.RegisterRoutes (see package doc).
 func (rt *Router) GetPresenceSnapshot(w http.ResponseWriter, r *http.Request) {
 	if rt.presence == nil {
 		writeIAMNotImplemented(w, "Presence service is not configured")
@@ -191,6 +224,7 @@ func (rt *Router) GetPresenceSnapshot(w http.ResponseWriter, r *http.Request) {
 
 // ─── iam/users ───────────────────────────────────────────────────────────────
 
+// ListUsers delegates to PeopleHandler.handleListUsers (filtered, cursor-paginated).
 func (rt *Router) ListUsers(w http.ResponseWriter, r *http.Request, _ iamapi.ListUsersParams) {
 	rt.people.handleListUsers(w, r)
 }
@@ -201,34 +235,46 @@ func (rt *Router) CreateManagedUser(w http.ResponseWriter, r *http.Request) {
 	writeIAMNotImplemented(w, "createManagedUser is deprecated and not implemented; use POST /iam/users/invite")
 }
 
+// BulkUsers delegates to PeopleHandler.handleBulk, applying a per-user
+// mutation with per-item failure isolation.
 func (rt *Router) BulkUsers(w http.ResponseWriter, r *http.Request) {
 	rt.people.handleBulk(w, r)
 }
 
+// InviteUser delegates to PeopleHandler.handleInvite, provisioning a new
+// tenant-managed user with a one-time temp password.
 func (rt *Router) InviteUser(w http.ResponseWriter, r *http.Request) {
 	rt.people.handleInvite(w, r)
 }
 
+// PatchUser delegates to PeopleHandler.handlePatch, applying a partial
+// update to a managed user's metadata and/or tenant role.
 func (rt *Router) PatchUser(w http.ResponseWriter, r *http.Request, _ string) {
 	rt.people.handlePatch(w, r)
 }
 
+// ListMemberships delegates to PeopleHandler.handleListMemberships, returning
+// a single user's active area memberships.
 func (rt *Router) ListMemberships(w http.ResponseWriter, r *http.Request, _ string) {
 	rt.people.handleListMemberships(w, r)
 }
 
+// ResetPassword delegates to PeopleHandler.handleResetPassword.
 func (rt *Router) ResetPassword(w http.ResponseWriter, r *http.Request, _ string) {
 	rt.people.handleResetPassword(w, r)
 }
 
+// UpsertUserRole delegates to AdminHandler.handleUserRoleUpsert.
 func (rt *Router) UpsertUserRole(w http.ResponseWriter, r *http.Request, userId string) {
 	rt.admin.handleUserRoleUpsert(w, r, userId)
 }
 
+// ReplaceUserRoles delegates to AdminHandler.handleReplaceUserRoles.
 func (rt *Router) ReplaceUserRoles(w http.ResponseWriter, r *http.Request, userId string) {
 	rt.admin.handleReplaceUserRoles(w, r, userId)
 }
 
+// UnlockUser delegates to PeopleHandler.handleUnlock.
 func (rt *Router) UnlockUser(w http.ResponseWriter, r *http.Request, _ string) {
 	rt.people.handleUnlock(w, r)
 }

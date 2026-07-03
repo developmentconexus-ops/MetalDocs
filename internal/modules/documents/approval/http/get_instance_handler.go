@@ -12,6 +12,8 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 )
 
+// GetInstanceHandler returns a single approval instance by ID, with an ETag
+// header set to the document's current revision_version for OCC on subsequent writes.
 func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

@@ -25,10 +25,12 @@ type MfaUserReader interface {
 // NoopMfaUserReader satisfies MfaUserReader and always returns zeros / empty slice.
 type NoopMfaUserReader struct{}
 
+// TenantMfaCounts always returns (0, 0, nil).
 func (NoopMfaUserReader) TenantMfaCounts(_ context.Context, _ string) (int, int, error) {
 	return 0, 0, nil
 }
 
+// TenantMfaCountsByRole always returns an empty, non-nil slice and a nil error.
 func (NoopMfaUserReader) TenantMfaCountsByRole(_ context.Context, _ string) ([]RoleMfaCounts, error) {
 	return []RoleMfaCounts{}, nil
 }

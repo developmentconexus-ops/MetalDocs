@@ -1,3 +1,7 @@
+// Package application holds the controlleddocuments module's use-case
+// service: the atomic clone-template-into-document flow that creates a
+// ControlledDocument row plus its initial document revision in one
+// transaction, delegating cross-module work to published ports.
 package application
 
 import (
@@ -24,21 +28,39 @@ import (
 	platformdb "metaldocs/internal/platform/db"
 )
 
+// TemplateVersionChecker is the cross-module read port into the templates
+// module used to validate an override template version's status and
+// profile ownership before it is bound to a controlled document.
 type TemplateVersionChecker interface {
 	GetTemplateVersionState(ctx context.Context, tenantID, templateVersionID string) (*string, string, error)
 }
 
+// ProfileReader is the cross-module read port into taxonomy used to
+// validate a controlled document's profile is active before create.
 type ProfileReader interface {
 	GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error)
 }
 
+// AreaReader is the cross-module read port into taxonomy used to
+// validate a controlled document's process area is active before create.
 type AreaReader interface {
 	GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.ProcessArea, error)
 }
 
+// ControlledDocument aliases the domain aggregate for callers that only
+// import the application package.
 type ControlledDocument = controlleddocumentsdomain.ControlledDocument
+
+// CDFilter aliases the domain list filter for callers that only import
+// the application package.
 type CDFilter = controlleddocumentsdomain.CDFilter
 
+// ControlledDocumentService is the controlled-documents module's
+// application-layer entry point: it orchestrates profile/area validation,
+// code allocation (manual or auto-sequence), the atomic CD+first-revision
+// create (ADR 0011), status transitions, and best-effort governance
+// logging. It is the sole authz boundary for these operations — the
+// repository layer does not re-check (F-CD6).
 type ControlledDocumentService struct {
 	// Core dependencies.
 	runner    platformdb.TxRunner
@@ -54,6 +76,10 @@ type ControlledDocumentService struct {
 	now func() time.Time
 }
 
+// CreateControlledDocumentCmd is the input to Create: either ManualCode
+// (with ManualCodeReason) or an empty ManualCode to auto-allocate via the
+// profile/area sequence. OverrideTemplateVersionID and
+// OverrideTemplateReason are optional and validated together.
 type CreateControlledDocumentCmd struct {
 	TenantID                  string
 	ProfileCode               string
@@ -81,7 +107,14 @@ type CreateResult struct {
 	DocumentRef        *controlleddocumentsdomain.DocumentRef
 }
 
+// ErrTemplateArtifactMissing is returned when the resolved template's S3
+// storage key is empty or does not exist, so Create/PreviewCode cannot
+// proceed.
 var ErrTemplateArtifactMissing = errors.New("template artifact missing")
+
+// ErrTemplateArtifactInvariantUnconfigured is returned when
+// ensureTemplateArtifact runs with no DocumentInitializer wired
+// (s.docInit == nil) — a wiring-order bug, not a user error.
 var ErrTemplateArtifactInvariantUnconfigured = errors.New("controlled_documents: template artifact invariant not configured")
 
 // ErrActorMissing signals the request context lacked an authenticated
@@ -90,6 +123,11 @@ var ErrTemplateArtifactInvariantUnconfigured = errors.New("controlled_documents:
 // wiki/reviews/2026-05-21-go-backend-review/platform-2a-security.md.
 var ErrActorMissing = errors.New("controlled_documents: actor user id missing in context")
 
+// NewControlledDocumentService wires a ControlledDocumentService. It
+// panics if any dependency except docInit is nil (fail-loud by design);
+// docInit may be nil at construction and wired later via
+// WithDocumentInitializer to break the controlled-documents<->documents
+// module init cycle.
 func NewControlledDocumentService(
 	runner platformdb.TxRunner,
 	docs controlleddocumentsdomain.ControlledDocumentRepository,
@@ -147,6 +185,12 @@ func (s *ControlledDocumentService) WithDocumentInitializer(d controlleddocument
 	return s
 }
 
+// Create validates cmd's profile and area are active, resolves the CD
+// code (manual, with uniqueness check, or auto-allocated inside the
+// atomic tx), and — when a DocumentInitializer is wired — clones the
+// effective template into the first document revision in the same tx
+// (ADR 0011). Governance events are logged best-effort after commit
+// (H-PRE-1: logging inside the tx risks an advisory-lock deadlock).
 func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateControlledDocumentCmd) (*CreateResult, error) {
 	ctx, span := otel.Tracer("metaldocs/controlleddocuments").Start(ctx, "cd.create",
 		oteltrace.WithAttributes(attribute.String("document.profile_code", cmd.ProfileCode)),
@@ -174,9 +218,9 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 	}
 
 	var (
-		code     string
-		sequence *int
-		events   []taxonomydomain.GovernanceEvent
+		code       string
+		sequence   *int
+		events     []taxonomydomain.GovernanceEvent
 		overrideID *string
 		doc        *controlleddocumentsdomain.ControlledDocument
 		docRef     *controlleddocumentsdomain.DocumentRef
@@ -572,14 +616,21 @@ func (s *ControlledDocumentService) validateSequenceSeries(ctx context.Context, 
 	return nil
 }
 
+// Obsolete transitions the controlled document to CDStatusObsolete.
+// Requires the document to currently be active; see changeStatus.
 func (s *ControlledDocumentService) Obsolete(ctx context.Context, tenantID, controlledDocumentID string) error {
 	return s.changeStatus(ctx, tenantID, controlledDocumentID, controlleddocumentsdomain.CDStatusObsolete, string(iamdomain.CapControlledDocumentObsolete))
 }
 
+// Supersede transitions the controlled document to CDStatusSuperseded.
+// Requires the document to currently be active; see changeStatus.
 func (s *ControlledDocumentService) Supersede(ctx context.Context, tenantID, controlledDocumentID string) error {
 	return s.changeStatus(ctx, tenantID, controlledDocumentID, controlleddocumentsdomain.CDStatusSuperseded, string(iamdomain.CapControlledDocumentSupersede))
 }
 
+// List returns controlled documents matching filter, scoped to what the
+// caller in ctx is authorized to read (filter.ActorUserID is set from
+// context, overriding any caller-supplied value).
 func (s *ControlledDocumentService) List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, bool, error) {
 	actorUserID, ok := authn.UserIDFromContext(ctx)
 	if !ok {
@@ -593,6 +644,9 @@ func (s *ControlledDocumentService) List(ctx context.Context, tenantID string, f
 	return docs, hasMore, nil
 }
 
+// Get returns the controlled document by id after verifying the caller
+// in ctx can read it (CanRead); returns ErrCDNotFound otherwise, so
+// existence is not leaked to unauthorized callers.
 func (s *ControlledDocumentService) Get(ctx context.Context, tenantID, id string) (*ControlledDocument, error) {
 	actorUserID, ok := authn.UserIDFromContext(ctx)
 	if !ok {
@@ -742,6 +796,8 @@ SELECT status, process_area_code
 	})
 }
 
+// CreateRevisionCmd is the input to CreateRevision: TemplateVersionID is
+// optional (nil resolves to the CD's profile default / existing override).
 type CreateRevisionCmd struct {
 	TenantID          string
 	CDID              string

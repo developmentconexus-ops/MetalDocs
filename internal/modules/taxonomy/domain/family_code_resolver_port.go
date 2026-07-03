@@ -44,10 +44,12 @@ type FamilyCodeResolver interface {
 // NoopTenantUserReader.
 type NoopFamilyCodeResolver struct{}
 
+// ResolveFamilyCodes always returns an empty, non-nil map with a nil error.
 func (NoopFamilyCodeResolver) ResolveFamilyCodes(_ context.Context, _ string, _ []ProfileCode) (map[ProfileCode]FamilyCode, error) {
 	return map[ProfileCode]FamilyCode{}, nil
 }
 
+// ProfileCodesForFamily always returns an empty, non-nil slice with a nil error.
 func (NoopFamilyCodeResolver) ProfileCodesForFamily(_ context.Context, _ string, _ FamilyCode) ([]ProfileCode, error) {
 	return []ProfileCode{}, nil
 }

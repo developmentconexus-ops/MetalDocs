@@ -27,6 +27,9 @@ const PathLogin = "/api/v1/auth/login"
 // maintaining two independent lists that can drift apart.
 type PublicPathChecker func(method, path string) bool
 
+// Middleware resolves the session cookie into a CurrentUser and injects it
+// into the request context, rejecting unauthenticated requests to non-public
+// routes. When enabled is false, Wrap is a no-op passthrough.
 type Middleware struct {
 	service       *authapp.Service
 	cfg           authapp.Config
@@ -34,6 +37,7 @@ type Middleware struct {
 	publicChecker PublicPathChecker // optional; falls back to defaultPublicPaths
 }
 
+// NewMiddleware constructs a Middleware. enabled=false makes Wrap a no-op passthrough.
 func NewMiddleware(service *authapp.Service, cfg authapp.Config, enabled bool) *Middleware {
 	return &Middleware{service: service, cfg: cfg, enabled: enabled}
 }
@@ -53,6 +57,13 @@ func (m *Middleware) isPublic(method, path string) bool {
 	return defaultPublicPaths(method, path)
 }
 
+// Wrap enforces authentication on next: public paths (per isPublic) pass
+// through unauthenticated; everything else requires a valid, non-expired,
+// non-revoked session, resolves to an active identity, and — unless the
+// principal has MustChangePassword and the path is one of the allowed
+// exceptions — is rejected with 403 until the password is changed. On
+// success it injects CurrentUser, the IAM auth context, and the tenant ID
+// into the request context and strips any client-supplied X-Tenant-ID header.
 func (m *Middleware) Wrap(next http.Handler) http.Handler {
 	if !m.enabled {
 		return next

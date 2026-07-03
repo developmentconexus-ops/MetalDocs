@@ -40,10 +40,12 @@ type CDFieldReader interface {
 // Mirrors iam/domain.NoopUserDisplayNameReader.
 type NoopCDFieldReader struct{}
 
+// ProfileCode always returns ("", nil).
 func (NoopCDFieldReader) ProfileCode(_ context.Context, _ db.DB, _, _ string) (string, error) {
 	return "", nil
 }
 
+// ProcessAreaCode always returns ("", false, nil).
 func (NoopCDFieldReader) ProcessAreaCode(_ context.Context, _ db.DB, _, _ string) (string, bool, error) {
 	return "", false, nil
 }

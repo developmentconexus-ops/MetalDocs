@@ -11,20 +11,33 @@ import (
 
 // PasswordHash must only be set via bcrypt.GenerateFromPassword; never assign raw strings.
 type PasswordHash string
+
+// PlainPassword holds an unhashed password in transit; never persisted or logged.
 type PlainPassword string
+
+// UserID identifies an auth identity.
 type UserID string
+
+// SessionID identifies a session.
 type SessionID string
+
+// TenantID identifies a tenant.
 type TenantID string
 
-func (id UserID) String() string   { return string(id) }
+// String returns the underlying user ID string.
+func (id UserID) String() string { return string(id) }
+
+// String returns the underlying tenant ID string.
 func (id TenantID) String() string { return string(id) }
 
+// Tenant is a minimal tenant projection used by the auth module.
 type Tenant struct {
 	ID   string
 	Name string
 	Slug string
 }
 
+// Identity is an authenticatable user record.
 type Identity struct {
 	UserID   string
 	Username string
@@ -44,6 +57,8 @@ type Identity struct {
 	UpdatedAt           time.Time
 }
 
+// NewIdentity constructs an active Identity with trimmed UserID and Username;
+// all other fields are left zero for the caller to populate.
 func NewIdentity(userID UserID, username string) Identity {
 	return Identity{
 		UserID:   strings.TrimSpace(userID.String()),
@@ -52,6 +67,7 @@ func NewIdentity(userID UserID, username string) Identity {
 	}
 }
 
+// Session is a persisted login session.
 type Session struct {
 	SessionID  string
 	UserID     string
@@ -64,6 +80,8 @@ type Session struct {
 	LastSeenAt time.Time
 }
 
+// OnlineUser is a projection of a user with a currently active (non-expired,
+// non-revoked) session.
 type OnlineUser struct {
 	UserID      string
 	Username    string
@@ -71,6 +89,8 @@ type OnlineUser struct {
 	LastSeenAt  time.Time
 }
 
+// ManagedUser is the admin-facing projection of an Identity for user-management
+// listings (no PasswordHash).
 type ManagedUser struct {
 	UserID              string
 	Username            string
@@ -86,6 +106,8 @@ type ManagedUser struct {
 	UpdatedAt           time.Time
 }
 
+// CreateUserParams is the repository-layer input for persisting a new user;
+// PasswordHash must already be hashed by the caller.
 type CreateUserParams struct {
 	UserID             string
 	Username           string
@@ -99,6 +121,8 @@ type CreateUserParams struct {
 	CreatedBy          string
 }
 
+// CreateUserInput is the application-layer input for creating a user; Password
+// is plaintext and must be hashed before persistence, never stored as-is.
 type CreateUserInput struct {
 	UserID      UserID
 	Username    string
@@ -110,6 +134,8 @@ type CreateUserInput struct {
 	CreatedBy   string
 }
 
+// UpdateUserParams carries a partial update for an existing user; nil pointer
+// fields are left unchanged. NewPasswordHash must already be hashed by the caller.
 type UpdateUserParams struct {
 	UserID             string
 	DisplayName        *string
@@ -120,6 +146,8 @@ type UpdateUserParams struct {
 	ResetLockState     bool
 }
 
+// BootstrapAdminParams seeds the first admin identity on system bootstrap;
+// PasswordHash must already be hashed by the caller.
 type BootstrapAdminParams struct {
 	UserID             string
 	Username           string
@@ -147,16 +175,24 @@ type CurrentUser struct {
 	Capabilities []iamdomain.Capability `json:"capabilities"`
 }
 
+// AuthenticatedSession is the post-login result: raw token plus resolved
+// CurrentUser. RawToken is redacted by both String and MarshalJSON — never
+// log or serialize this struct through anything but the caller that issues
+// the session cookie.
 type AuthenticatedSession struct {
 	RawToken    string
 	CurrentUser CurrentUser
 	ExpiresAt   time.Time
 }
 
+// String redacts RawToken so AuthenticatedSession is safe to pass to %v/%s
+// formatting and loggers.
 func (s AuthenticatedSession) String() string {
 	return "***"
 }
 
+// MarshalJSON redacts RawToken so AuthenticatedSession is safe to serialize
+// (e.g. in debug responses); the real token must be delivered via cookie only.
 func (s AuthenticatedSession) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		RawToken    string      `json:"rawToken"`

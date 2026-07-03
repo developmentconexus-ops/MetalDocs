@@ -36,10 +36,12 @@ type AreaCatalogReader interface {
 // satisfies AreaCatalogReader and always reports empty/absent with nil errors.
 type NoopAreaCatalogReader struct{}
 
+// AreaName always reports not-found with a nil error.
 func (NoopAreaCatalogReader) AreaName(_ context.Context, _ db.DB, _, _ string) (string, bool, error) {
 	return "", false, nil
 }
 
+// AreaExists always reports false with a nil error.
 func (NoopAreaCatalogReader) AreaExists(_ context.Context, _ db.DB, _, _ string) (bool, error) {
 	return false, nil
 }

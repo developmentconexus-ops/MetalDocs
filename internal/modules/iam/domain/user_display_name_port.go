@@ -30,10 +30,12 @@ type UserDisplayNameReader interface {
 // instead of wiring the real pool-backed repository.
 type NoopUserDisplayNameReader struct{}
 
+// DisplayName always returns ("", nil).
 func (NoopUserDisplayNameReader) DisplayName(_ context.Context, _, _ string) (string, error) {
 	return "", nil
 }
 
+// DisplayNames always returns an empty, non-nil map and a nil error.
 func (NoopUserDisplayNameReader) DisplayNames(_ context.Context, _ string, _ []string) (map[string]string, error) {
 	return map[string]string{}, nil
 }

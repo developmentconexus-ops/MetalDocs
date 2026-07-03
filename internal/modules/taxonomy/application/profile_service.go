@@ -9,10 +9,18 @@ import (
 	"metaldocs/internal/platform/authn"
 )
 
+// TemplateVersionChecker is the cross-module read port ProfileService uses
+// to validate a template version before binding it as a profile's default
+// (SetDefaultTemplate). It returns whether the version is published and
+// which profile code it belongs to.
 type TemplateVersionChecker interface {
 	IsPublished(ctx context.Context, versionID string) (bool, string, error)
 }
 
+// ProfileService is the use-case orchestrator for DocumentProfile: List,
+// Get, Create, Update, Archive, SetDefaultTemplate. Every mutating method
+// emits a governance event via govLogger inside the same transaction as the
+// mutation (T-005 closed).
 type ProfileService struct {
 	profiles  domain.ProfileRepository
 	tplCheck  TemplateVersionChecker
@@ -20,6 +28,9 @@ type ProfileService struct {
 	now       func() time.Time
 }
 
+// NewProfileService builds a ProfileService with now defaulted to
+// time.Now. It panics if govLogger or tplCheck is nil — taxonomy has no
+// silent-audit-loss or unchecked-template fallback (fail-loud by design).
 func NewProfileService(
 	profiles domain.ProfileRepository,
 	tplCheck TemplateVersionChecker,
@@ -34,6 +45,8 @@ func NewProfileService(
 	return &ProfileService{profiles: profiles, tplCheck: tplCheck, govLogger: govLogger, now: time.Now}
 }
 
+// List returns profiles for tenantID, including archived ones when
+// includeArchived is true.
 func (s *ProfileService) List(ctx context.Context, tenantID string, includeArchived bool) ([]domain.DocumentProfile, error) {
 	profiles, err := s.profiles.List(ctx, tenantID, includeArchived)
 	if err != nil {
@@ -42,6 +55,8 @@ func (s *ProfileService) List(ctx context.Context, tenantID string, includeArchi
 	return profiles, nil
 }
 
+// Get returns the profile identified by (tenantID, code), or a wrapped
+// domain.ErrProfileNotFound if no such row exists.
 func (s *ProfileService) Get(ctx context.Context, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
 	profile, err := s.profiles.GetByCode(ctx, tenantID, code)
 	if err != nil {
@@ -50,6 +65,9 @@ func (s *ProfileService) Get(ctx context.Context, tenantID string, code domain.P
 	return profile, nil
 }
 
+// Create validates p, inserts it, and logs a profile.created governance
+// event, all inside a single transaction (BeginTx...Commit); any failure
+// rolls the transaction back so no partial profile/event pair is persisted.
 func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) error {
 	newProfile, err := domain.NewDocumentProfile(*p)
 	if err != nil {
@@ -93,6 +111,11 @@ func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) 
 	return nil
 }
 
+// Update persists p and logs a profile.updated governance event, both
+// inside a single transaction; any failure rolls the transaction back.
+// Unlike Create, Update does not re-validate p through
+// domain.NewDocumentProfile — callers must pass an already-normalized
+// profile.
 func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) error {
 	tx, err := s.profiles.BeginTx(ctx)
 	if err != nil {
@@ -132,6 +155,13 @@ func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) 
 	return nil
 }
 
+// SetDefaultTemplate locks the profile row (FOR UPDATE), rejects archived
+// profiles with domain.ErrProfileArchived, validates the template version
+// via tplCheck (domain.ErrTemplateNotPublished if unpublished,
+// domain.ErrTemplateProfileMismatch if it belongs to a different profile),
+// then persists DefaultTemplateVersionID and logs a
+// profile.default_template_change governance event — all inside one
+// transaction.
 func (s *ProfileService) SetDefaultTemplate(ctx context.Context, tenantID string, profileCode domain.ProfileCode, templateVersionID, actorID string) error {
 	tx, err := s.profiles.BeginTx(ctx)
 	if err != nil {
@@ -190,6 +220,10 @@ func (s *ProfileService) SetDefaultTemplate(ctx context.Context, tenantID string
 	return nil
 }
 
+// Archive locks the profile row (FOR UPDATE), soft-archives it via
+// DocumentProfile.Archive, persists the change, and logs a
+// profile.archived governance event — all inside one transaction. Returns
+// domain.ErrProfileArchived if the profile is already archived.
 func (s *ProfileService) Archive(ctx context.Context, tenantID string, profileCode domain.ProfileCode, actorID string) error {
 	tx, err := s.profiles.BeginTx(ctx)
 	if err != nil {

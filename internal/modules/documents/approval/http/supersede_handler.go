@@ -18,6 +18,8 @@ func (h *Handler) publishSuperseding(ctx context.Context, runner db.TxRunner, re
 	return h.supersedeSvc.PublishSuperseding(ctx, runner, req)
 }
 
+// SupersedeHandler marks documentID as superseding an earlier published
+// document. Requires a valid If-Match header (OCC precondition).
 func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

@@ -19,6 +19,7 @@ type AdminRoleMemberReader interface {
 // an empty map with a nil error.
 type NoopAdminRoleMemberReader struct{}
 
+// AdminRoleMembers always returns an empty, non-nil map and a nil error.
 func (NoopAdminRoleMemberReader) AdminRoleMembers(_ context.Context, _ string, _ []string) (map[string]string, error) {
 	return map[string]string{}, nil
 }

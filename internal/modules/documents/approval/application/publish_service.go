@@ -12,9 +12,9 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
-	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -191,11 +191,15 @@ type SchedulePublishResult struct {
 	ScheduleGeneration int64
 }
 
+// WithScheduledPublishEnqueuer wires the job enqueuer used to schedule the
+// deferred publish for a future effective date.
 func (s *PublishService) WithScheduledPublishEnqueuer(enqueuer ScheduledPublishEnqueuer) *PublishService {
 	s.scheduledPublishEnqueuer = enqueuer
 	return s
 }
 
+// WithLifecycleEnqueuer wires the F3.3 domain-event enqueuer used to publish
+// a lifecycle event once the document is published.
 func (s *PublishService) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *PublishService {
 	s.lifecycleEnqueuer = e
 	return s

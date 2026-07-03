@@ -1,3 +1,13 @@
+// Package controlleddocuments is the composition root for the
+// controlled-documents bounded context: it owns the numbered
+// ControlledDocument slot (metaldocs.controlled_documents) that binds a
+// (profile, area) pair to a chain of documents-module revisions. New
+// wires the repository, sequence allocator, application service, and
+// HTTP handler together; RegisterRoutes mounts the resulting HTTP
+// surface. The module depends on taxonomy (profile/area validation),
+// documents (revision content via DocumentInitializer /
+// ActiveInstanceReader), and templates (template version state) purely
+// through published ports — never their repositories or SQL.
 package controlleddocuments
 
 import (
@@ -13,6 +23,8 @@ import (
 	platformdb "metaldocs/internal/platform/db"
 )
 
+// Module is the assembled controlled-documents module: its HTTP Handler
+// plus the service and repository closed over it.
 type Module struct {
 	Handler *dhttp.Handler
 	svc     *application.ControlledDocumentService
@@ -56,6 +68,14 @@ type Dependencies struct {
 	TemplateVersionChecker application.TemplateVersionChecker
 }
 
+// New builds a Module: the Postgres repository and sequence allocator
+// over deps.DB, the application service, and the HTTP handler. It panics
+// if ProfileReader, AreaReader, GovernanceLogger, or
+// TemplateVersionChecker is nil (fail-loud by design); ActiveInstanceReader
+// defaults to documentsdomain.NoopActiveInstanceReader when nil. The
+// service is constructed with a nil DocumentInitializer — callers must
+// wire it post-construction via Service().WithDocumentInitializer to
+// break the controlled-documents<->documents module init cycle.
 func New(deps Dependencies) *Module {
 	if deps.ProfileReader == nil {
 		panic("controlled_documents: ProfileReader is required (nil provided)")
@@ -99,10 +119,14 @@ func New(deps Dependencies) *Module {
 	return &Module{Handler: h, svc: svc, repo: repo}
 }
 
+// RegisterRoutes mounts the module's HTTP handler onto mux.
 func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	m.Handler.RegisterRoutes(mux)
 }
 
+// Service returns the module's application service so the composition
+// root can wire a DocumentInitializer post-construction (see New) or
+// call the service directly from another module's wiring code.
 func (m *Module) Service() *application.ControlledDocumentService { return m.svc }
 
 // Repo returns the module's controlled-document repository so the composition

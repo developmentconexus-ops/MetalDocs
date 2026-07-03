@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// ProcessArea is a per-tenant operational area catalog entry, optionally
+// nested under another area via ParentCode (self-FK). Cycle prevention on
+// ParentCode reassignment is application-layer only (ListAncestors walk),
+// not DB-enforced.
 type ProcessArea struct {
 	Code                AreaCode   `json:"code"`
 	TenantID            string     `json:"tenant_id"`
@@ -18,6 +22,9 @@ type ProcessArea struct {
 	CreatedAt           time.Time  `json:"created_at"`
 }
 
+// Sentinel errors returned by ProcessArea construction and mutation. Callers
+// match these with errors.Is; they are stable across the area service and
+// repository layers.
 var (
 	ErrAreaNotFound           = errors.New("process area not found")
 	ErrAreaArchived           = errors.New("process area is archived")
@@ -29,8 +36,15 @@ var (
 	ErrAreaNameRequired       = errors.New("area name must not be empty")
 )
 
+// AreaCode is the immutable primary-key identifier of a ProcessArea.
+// Immutability is DB-enforced post-create by trg_process_areas_code_immutable.
 type AreaCode string
 
+// NewProcessArea validates and normalizes input into a new ProcessArea. It
+// trims Code/TenantID/Name/Description/ParentCode/OwnerUserID/
+// DefaultApproverRole (blank optional fields collapse to nil) and rejects
+// empty Code, TenantID, or Name with the corresponding sentinel error. It
+// does not perform any I/O.
 func NewProcessArea(input ProcessArea) (*ProcessArea, error) {
 	area := ProcessArea{
 		Code:                AreaCode(strings.TrimSpace(string(input.Code))),
@@ -66,10 +80,13 @@ func trimOptionalAreaCode(v *AreaCode) *AreaCode {
 	return &trimmed
 }
 
+// IsActive reports whether the area has not been archived (ArchivedAt is nil).
 func (a *ProcessArea) IsActive() bool {
 	return a.ArchivedAt == nil
 }
 
+// Archive soft-archives the area by stamping ArchivedAt with now (ADR 0010).
+// It returns ErrAreaArchived if the area is already archived.
 func (a *ProcessArea) Archive(now time.Time) error {
 	if !a.IsActive() {
 		return ErrAreaArchived

@@ -31,6 +31,7 @@ type TenantUserReader interface {
 // NoopUserDisplayNameReader.
 type NoopTenantUserReader struct{}
 
+// TenantUserIDs always returns an empty, non-nil slice and a nil error.
 func (NoopTenantUserReader) TenantUserIDs(_ context.Context, _ string) ([]string, error) {
 	return []string{}, nil
 }

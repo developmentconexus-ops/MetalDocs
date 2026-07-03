@@ -10,8 +10,8 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
-	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -26,6 +26,8 @@ type SupersedeService struct {
 	lifecycleEnqueuer docsdomain.LifecycleEventEnqueuer
 }
 
+// WithLifecycleEnqueuer wires the F3.3 domain-event enqueuer used to publish
+// a lifecycle event once the document is superseded.
 func (s *SupersedeService) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *SupersedeService {
 	s.lifecycleEnqueuer = e
 	return s

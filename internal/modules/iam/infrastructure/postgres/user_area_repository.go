@@ -14,14 +14,25 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+// UserAreaRepository reads and writes public.user_process_areas, the
+// area-scoped membership table backing capability grants (ADR 0022). Write
+// methods (Insert/InsertTx, CloseActive/CloseActiveTx, GrantAtomic/GrantAtomicTx)
+// call authz.Require(CapMembershipManage, <realAreaCode>) in-tx — never the
+// "tenant" sentinel, since membership.manage is area-grade. Read methods
+// (ListByTenant, MembershipDirectoryScope, ListByTenantInManagedAreas) filter
+// visibility at the SQL layer per ADR 0022 R3, never by post-fetch filtering.
 type UserAreaRepository struct {
 	db *sql.DB
 }
 
+// NewUserAreaRepository constructs a pool-backed UserAreaRepository.
 func NewUserAreaRepository(db *sql.DB) *UserAreaRepository {
 	return &UserAreaRepository{db: db}
 }
 
+// ListActive returns the user's active-as-of-now memberships across all
+// areas: rows where effective_from <= now and (effective_to IS NULL OR
+// effective_to > now).
 func (r *UserAreaRepository) ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]iamdomain.UserProcessArea, error) {
 	const q = `
 SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
@@ -278,6 +289,10 @@ VALUES
 	return nil
 }
 
+// Insert opens and commits its own transaction, requires CapMembershipManage
+// in-tx against membership.AreaCode (area-grade, never the "tenant"
+// sentinel), then inserts the membership row. Returns an error (and rolls
+// back) if the INSERT affects zero rows.
 func (r *UserAreaRepository) Insert(ctx context.Context, membership iamdomain.UserProcessArea) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -376,6 +391,11 @@ WHERE user_id = $1
 	return nil
 }
 
+// CloseActive opens and commits its own transaction, requires
+// CapMembershipManage in-tx against areaCode, then sets effective_to and
+// revoked_by = actorID on the active row (revoked_by satisfies the DB CHECK
+// constraint revoked_by_required_when_revoked). Returns an error (and rolls
+// back) if no active row matched.
 func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -496,6 +516,13 @@ VALUES
 	return nil
 }
 
+// GrantAtomic opens and commits its own transaction, atomically closing
+// oldMembership and inserting newMembership (the role-change path). It
+// asserts oldMembership.AreaCode == newMembership.AreaCode before touching
+// the database — a defense-in-depth invariant so a caller cannot close a row
+// in an unauthorized area by pairing it with an authorized new area — then
+// requires CapMembershipManage in-tx against the shared area once for both
+// legs. Returns an error (and rolls back) if the close affects zero rows.
 func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, newMembership iamdomain.UserProcessArea) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -586,6 +613,8 @@ VALUES
 	return nil
 }
 
+// GetActiveByUserAndArea returns the user's active-as-of-now membership in
+// areaCode, or (nil, nil) if none exists.
 func (r *UserAreaRepository) GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*iamdomain.UserProcessArea, error) {
 	const q = `
 SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by

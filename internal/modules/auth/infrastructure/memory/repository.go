@@ -16,6 +16,8 @@ import (
 // Compile-time assertion that the in-memory adapter satisfies the auth port.
 var _ authdomain.Repository = (*Repository)(nil)
 
+// Repository is an in-memory authdomain.Repository double for tests: not
+// wired by bootstrap, no persistence, safe for concurrent use via its mutex.
 type Repository struct {
 	mu            sync.Mutex
 	users         map[string]authdomain.Identity
@@ -28,6 +30,7 @@ type Repository struct {
 	loginLocks   map[string]*sync.Mutex
 }
 
+// NewRepository returns an empty in-memory Repository seeded with the system tenant.
 func NewRepository() *Repository {
 	return &Repository{
 		users:      map[string]authdomain.Identity{},
@@ -45,6 +48,7 @@ func NewRepository() *Repository {
 	}
 }
 
+// FindIdentityByIdentifier implements authdomain.Repository.
 func (r *Repository) FindIdentityByIdentifier(_ context.Context, identifier string) (authdomain.Identity, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -60,6 +64,7 @@ func (r *Repository) FindIdentityByIdentifier(_ context.Context, identifier stri
 	return cloneIdentity(identity), nil
 }
 
+// FindIdentityByUserID implements authdomain.Repository.
 func (r *Repository) FindIdentityByUserID(_ context.Context, userID string) (authdomain.Identity, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -71,6 +76,7 @@ func (r *Repository) FindIdentityByUserID(_ context.Context, userID string) (aut
 	return cloneIdentity(identity), nil
 }
 
+// CreateSession implements authdomain.Repository.
 func (r *Repository) CreateSession(_ context.Context, session authdomain.Session) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -78,6 +84,7 @@ func (r *Repository) CreateSession(_ context.Context, session authdomain.Session
 	return nil
 }
 
+// FindSession implements authdomain.Repository.
 func (r *Repository) FindSession(_ context.Context, sessionID string) (authdomain.Session, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -89,6 +96,9 @@ func (r *Repository) FindSession(_ context.Context, sessionID string) (authdomai
 	return session, nil
 }
 
+// TouchSession implements authdomain.Repository. It coalesces writes: LastSeenAt
+// only advances when at least 30s have elapsed since the prior value, to avoid
+// a write on every request.
 func (r *Repository) TouchSession(_ context.Context, sessionID string, seenAt time.Time) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -105,6 +115,7 @@ func (r *Repository) TouchSession(_ context.Context, sessionID string, seenAt ti
 	return nil
 }
 
+// RevokeSession implements authdomain.Repository.
 func (r *Repository) RevokeSession(_ context.Context, sessionID string, revokedAt time.Time) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -118,6 +129,8 @@ func (r *Repository) RevokeSession(_ context.Context, sessionID string, revokedA
 	return nil
 }
 
+// RevokeSessionsByUserID implements authdomain.Repository. Already-revoked
+// sessions are left untouched (idempotent).
 func (r *Repository) RevokeSessionsByUserID(_ context.Context, userID string, revokedAt time.Time) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -132,6 +145,8 @@ func (r *Repository) RevokeSessionsByUserID(_ context.Context, userID string, re
 	return nil
 }
 
+// RecordSuccessfulLogin implements authdomain.Repository: clears failed-attempt
+// count and lockout, and stamps LastLoginAt.
 func (r *Repository) RecordSuccessfulLogin(_ context.Context, userID string, loginAt time.Time) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -215,6 +230,8 @@ func (m memoryLoginTx) RecordFailedLogin(ctx context.Context, userID string, max
 	return m.r.RecordFailedLogin(ctx, userID, maxAttempts, lockDurationSeconds, ip)
 }
 
+// CreateUser implements authdomain.Repository. Returns ErrUserAlreadyExists if
+// UserID, Username, or Email collides with an existing user.
 func (r *Repository) CreateUser(_ context.Context, params authdomain.CreateUserParams) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -253,6 +270,7 @@ func (r *Repository) CreateUser(_ context.Context, params authdomain.CreateUserP
 	return nil
 }
 
+// ListUsers implements authdomain.Repository.
 func (r *Repository) ListUsers(_ context.Context) ([]authdomain.ManagedUser, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -277,6 +295,7 @@ func (r *Repository) ListUsers(_ context.Context) ([]authdomain.ManagedUser, err
 	return out, nil
 }
 
+// ListOnlineUsers implements authdomain.Repository.
 func (r *Repository) ListOnlineUsers(_ context.Context, tenantID string, activeSince time.Time) ([]authdomain.OnlineUser, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -318,6 +337,7 @@ func (r *Repository) ListOnlineUsers(_ context.Context, tenantID string, activeS
 	return out, nil
 }
 
+// UpdateUser implements authdomain.Repository; nil fields in params are left unchanged.
 func (r *Repository) UpdateUser(_ context.Context, params authdomain.UpdateUserParams) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -358,6 +378,9 @@ func (r *Repository) UpdateUser(_ context.Context, params authdomain.UpdateUserP
 	return nil
 }
 
+// BootstrapAdmin implements authdomain.Repository. Returns created=false
+// (no error) if the UserID already exists or any user already holds
+// RoleSystemAdmin — bootstrap is a one-time, idempotent no-op thereafter.
 func (r *Repository) BootstrapAdmin(_ context.Context, params authdomain.BootstrapAdminParams) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -393,6 +416,8 @@ func (r *Repository) BootstrapAdmin(_ context.Context, params authdomain.Bootstr
 	return true, nil
 }
 
+// RolesByUserID implements iamdomain.RoleProvider. Returns ErrUserNotFound,
+// ErrUserInactive, or ErrNoRolesAssigned as appropriate.
 func (r *Repository) RolesByUserID(_ context.Context, userID, _ string) ([]iamtypes.Role, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -453,6 +478,8 @@ func sliceContains(s []string, v string) bool {
 	return false
 }
 
+// UpsertUserAndAssignRole implements iamdomain.RoleAdminRepository: creates
+// the user if absent, adds role if not already held, and activates the user.
 func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, _ string, role iamtypes.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -482,6 +509,7 @@ func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayN
 	return nil
 }
 
+// HasAnyRole implements iamdomain.RoleAdminRepository.
 func (r *Repository) HasAnyRole(_ context.Context, role iamtypes.Role, _ string) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -496,6 +524,8 @@ func (r *Repository) HasAnyRole(_ context.Context, role iamtypes.Role, _ string)
 	return false, nil
 }
 
+// ReplaceUserRoles implements iamdomain.RoleAdminRepository: creates the user
+// if absent, then overwrites its role set with the single given role.
 func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, role iamtypes.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -546,6 +576,8 @@ func (r *Repository) SeedUserTenants(userID string, tenantIDs []string) {
 	}
 }
 
+// GetUserTenants implements authdomain.Repository. Returns an empty slice
+// until SeedUserTenants has populated the user (test-only helper).
 func (r *Repository) GetUserTenants(_ context.Context, userID string) ([]string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -553,6 +585,8 @@ func (r *Repository) GetUserTenants(_ context.Context, userID string) ([]string,
 	return append([]string(nil), tenants...), nil
 }
 
+// GetTenantByID implements authdomain.Repository. Returns ErrTenantNotFound
+// if tenantID is not in the seeded catalog.
 func (r *Repository) GetTenantByID(_ context.Context, tenantID string) (authdomain.Tenant, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

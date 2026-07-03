@@ -18,6 +18,8 @@ func (h *Handler) markObsolete(ctx context.Context, runner db.TxRunner, req appl
 	return h.obsoleteSvc.MarkObsolete(ctx, runner, req)
 }
 
+// ObsoleteHandler marks a published or superseded document obsolete. Requires
+// a valid If-Match header (OCC precondition against the document's revision_version).
 func (h *Handler) ObsoleteHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

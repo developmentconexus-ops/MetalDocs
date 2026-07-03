@@ -16,11 +16,15 @@ const (
 	stageSignoffRouteTemplate    = "POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs"
 )
 
+// SignoffReplayHandle commits or fails an in-flight signoff idempotency slot
+// claimed by PostgresSignoffIdempStore. It implements application.SignoffReplayCommitter.
 type SignoffReplayHandle struct {
 	store  *idempotency.Store
 	handle *idempotency.ReplayHandle
 }
 
+// Complete persists outcome as the replay response for this slot, so a retried
+// request with the same Idempotency-Key returns the same outcome.
 func (h *SignoffReplayHandle) Complete(outcome string) error {
 	if h == nil || h.store == nil || h.handle == nil {
 		return errors.New("idempotency store not configured")
@@ -32,6 +36,8 @@ func (h *SignoffReplayHandle) Complete(outcome string) error {
 	return h.store.CompleteReplay(h.handle, 200, body)
 }
 
+// Fail releases the slot after cause, allowing a subsequent retry with the
+// same Idempotency-Key to attempt the handler again rather than replay a failure.
 func (h *SignoffReplayHandle) Fail(cause error) error {
 	if h == nil || h.store == nil || h.handle == nil {
 		return nil
@@ -39,11 +45,16 @@ func (h *SignoffReplayHandle) Fail(cause error) error {
 	return h.store.FailReplay(h.handle, cause)
 }
 
+// PostgresSignoffIdempStore implements application.SignoffIdempStore for the
+// document-level and stage-level signoff endpoints.
 type PostgresSignoffIdempStore struct {
 	document *idempotency.Store
 	stage    *idempotency.Store
 }
 
+// NewPostgresSignoffIdempStore constructs a PostgresSignoffIdempStore backed by
+// db. A nil db yields a store whose sub-stores are unset; every Begin*Replay
+// call then fails closed with an error instead of panicking.
 func NewPostgresSignoffIdempStore(db *sql.DB) *PostgresSignoffIdempStore {
 	if db == nil {
 		// Return a store with nil sub-stores; beginReplay returns an error for each call.
@@ -55,10 +66,14 @@ func NewPostgresSignoffIdempStore(db *sql.DB) *PostgresSignoffIdempStore {
 	}
 }
 
+// BeginDocumentReplay claims or replays an idempotency slot for the
+// document-level signoff endpoint. See beginReplayRaw for the return contract.
 func (s *PostgresSignoffIdempStore) BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {
 	return s.beginReplay(ctx, s.document, tenantID, actorID, idempKey, payloadHash)
 }
 
+// BeginStageReplay claims or replays an idempotency slot for the stage-level
+// signoff endpoint. See beginReplayRaw for the return contract.
 func (s *PostgresSignoffIdempStore) BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {
 	return s.beginReplay(ctx, s.stage, tenantID, actorID, idempKey, payloadHash)
 }

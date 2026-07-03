@@ -19,10 +19,14 @@ type ObservabilityHandler struct {
 	service *iamapp.ObservabilityService
 }
 
+// NewObservabilityHandler constructs the handler. A nil service causes both
+// endpoints to answer 501 NOT_IMPLEMENTED rather than panic.
 func NewObservabilityHandler(service *iamapp.ObservabilityService) *ObservabilityHandler {
 	return &ObservabilityHandler{service: service}
 }
 
+// RegisterRoutes mounts GET /iam/usage and GET /iam/kpi on mux. Both routes
+// are permission-guarded by CapMetricsView at the tier-1 routing table.
 func (h *ObservabilityHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc(http.MethodGet+" /api/v1/iam/usage", h.handleUsage)
 	mux.HandleFunc(http.MethodGet+" /api/v1/iam/kpi", h.handleKpi)

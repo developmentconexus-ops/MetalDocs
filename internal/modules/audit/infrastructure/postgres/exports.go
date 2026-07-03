@@ -1,3 +1,7 @@
+// Package postgres provides the Postgres-backed implementations of the audit
+// domain ports: Writer (append-only hash-chained event log, ADR tamper
+// evidence via prev_hash/row_hash), Reader/Counter (metaldocs.audit_events
+// queries), and ExportJobRepository (metaldocs.audit_export_jobs).
 package postgres
 
 import (
@@ -16,6 +20,7 @@ type ExportJobRepository struct {
 	db *sql.DB
 }
 
+// NewExportJobRepository constructs an ExportJobRepository backed by db.
 func NewExportJobRepository(db *sql.DB) *ExportJobRepository {
 	return &ExportJobRepository{db: db}
 }
@@ -23,6 +28,8 @@ func NewExportJobRepository(db *sql.DB) *ExportJobRepository {
 const exportJobColumns = `id, tenant_id, actor_id, format, filter_json, status, object_key, download_token,
        expires_at, error_message, estimated_rows, actual_rows, payload, created_at, completed_at`
 
+// Save inserts job into metaldocs.audit_export_jobs. Callers must not reuse
+// an existing job ID — there is no upsert path.
 func (r *ExportJobRepository) Save(ctx context.Context, job domain.ExportJob) error {
 	const q = `
 INSERT INTO metaldocs.audit_export_jobs (
@@ -49,20 +56,30 @@ INSERT INTO metaldocs.audit_export_jobs (
 	return nil
 }
 
+// Get returns the job for exportID scoped to tenantID. Returns
+// domain.ErrExportJobNotFound when no matching row exists.
 func (r *ExportJobRepository) Get(ctx context.Context, tenantID, exportID string) (domain.ExportJob, error) {
 	q := `SELECT ` + exportJobColumns + ` FROM metaldocs.audit_export_jobs WHERE id = $1 AND tenant_id = $2`
 	return scanJob(r.db.QueryRowContext(ctx, q, exportID, tenantID))
 }
 
+// GetByDownloadToken returns the job for exportID iff its stored
+// download_token matches token. Returns domain.ErrExportJobNotFound on any
+// mismatch.
 func (r *ExportJobRepository) GetByDownloadToken(ctx context.Context, exportID, token string) (domain.ExportJob, error) {
 	q := `SELECT ` + exportJobColumns + ` FROM metaldocs.audit_export_jobs WHERE id = $1 AND download_token = $2`
 	return scanJob(r.db.QueryRowContext(ctx, q, exportID, token))
 }
 
+// rowScanner abstracts *sql.Row so scanJob works against a single-row query
+// result regardless of call site.
 type rowScanner interface {
 	Scan(dest ...any) error
 }
 
+// scanJob scans a single audit_export_jobs row (in exportJobColumns order)
+// into a domain.ExportJob, translating sql.ErrNoRows into
+// domain.ErrExportJobNotFound.
 func scanJob(row rowScanner) (domain.ExportJob, error) {
 	var (
 		job          domain.ExportJob

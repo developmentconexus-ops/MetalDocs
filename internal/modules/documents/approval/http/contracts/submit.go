@@ -11,12 +11,14 @@ var (
 	sha256Pattern = regexp.MustCompile(`(?i)^[0-9a-f]{64}$`)
 )
 
+// SubmitRequest is the decoded body plus header-sourced fields for the submit-for-review endpoint.
 type SubmitRequest struct {
 	RouteID        string `json:"route_id"`
 	IdempotencyKey string
 	ContentHash    string `json:"content_hash"`
 }
 
+// Validate enforces RouteID is a valid UUID and ContentHash is 64 hex characters.
 func (r SubmitRequest) Validate() error {
 	if err := validateUUID("route_id", r.RouteID); err != nil {
 		return wrapValidation(err)
@@ -27,6 +29,7 @@ func (r SubmitRequest) Validate() error {
 	return nil
 }
 
+// SubmitResponse is the response body for a successful submit-for-review.
 type SubmitResponse struct {
 	InstanceID string `json:"instance_id"`
 	WasReplay  bool   `json:"was_replay"`

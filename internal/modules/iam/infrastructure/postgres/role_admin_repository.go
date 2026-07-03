@@ -9,18 +9,29 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+// RoleAdminRepository writes user+role assignments against
+// metaldocs.iam_users / iam_user_roles. Tx-owning callers (UpsertUserAndAssignRole,
+// ReplaceUserRoles) open and commit their own transaction; tx-aware variants
+// (UpsertUserAndAssignRoleTx, ReplaceUserRolesTx) run inside a caller-supplied
+// *sql.Tx and require CapUserManage in-tx via authz.Require.
 type RoleAdminRepository struct {
 	db *sql.DB
 }
 
+// NewRoleAdminRepository constructs a pool-backed RoleAdminRepository.
 func NewRoleAdminRepository(db *sql.DB) *RoleAdminRepository {
 	return &RoleAdminRepository{db: db}
 }
 
+// BeginTx opens a database transaction for callers that need to compose
+// RoleAdminRepository's tx-aware methods with other work. The caller owns
+// Commit/Rollback.
 func (r *RoleAdminRepository) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
 	return r.db.BeginTx(ctx, opts)
 }
 
+// HasAnyRole reports whether at least one iam_user_roles row exists for role
+// within tenantID.
 func (r *RoleAdminRepository) HasAnyRole(ctx context.Context, role iamdomain.Role, tenantID string) (bool, error) {
 	var count int
 	if err := r.db.QueryRowContext(ctx, `
@@ -34,6 +45,8 @@ WHERE role_code = $1
 	return count > 0, nil
 }
 
+// UpsertUserAndAssignRole opens and commits its own transaction around
+// UpsertUserAndAssignRoleTx, rolling back on any error.
 func (r *RoleAdminRepository) UpsertUserAndAssignRole(ctx context.Context, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -49,6 +62,11 @@ func (r *RoleAdminRepository) UpsertUserAndAssignRole(ctx context.Context, userI
 	return nil
 }
 
+// UpsertUserAndAssignRoleTx requires CapUserManage in-tx (tenant-grade, area
+// filter off), then upserts the iam_users row and replaces the user's role
+// set with {role} via DELETE-then-INSERT under the (tenant_id, user_id)
+// uniqueness on iam_user_roles — idempotent under retry. The caller owns
+// Commit/Rollback on tx.
 func (r *RoleAdminRepository) UpsertUserAndAssignRoleTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, assignedBy); err != nil {
@@ -101,6 +119,10 @@ func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, disp
 	return tx.Commit()
 }
 
+// ReplaceUserRolesTx requires CapUserManage in-tx (tenant-grade, area filter
+// off), then upserts the iam_users row and replaces the user's role set with
+// {role} via the same DELETE-then-INSERT pattern as UpsertUserAndAssignRoleTx.
+// The caller owns Commit/Rollback on tx.
 func (r *RoleAdminRepository) ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, assignedBy); err != nil {

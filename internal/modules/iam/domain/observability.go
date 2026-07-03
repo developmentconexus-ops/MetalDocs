@@ -7,8 +7,11 @@ import "time"
 type PlanTier string
 
 const (
-	PlanTierFree       PlanTier = "free"
-	PlanTierPro        PlanTier = "pro"
+	// PlanTierFree is the free plan tier.
+	PlanTierFree PlanTier = "free"
+	// PlanTierPro is the paid, self-serve plan tier.
+	PlanTierPro PlanTier = "pro"
+	// PlanTierEnterprise is the negotiated, platform-owner-managed plan tier.
 	PlanTierEnterprise PlanTier = "enterprise"
 )
 

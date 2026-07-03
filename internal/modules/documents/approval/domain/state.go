@@ -8,6 +8,7 @@ var ErrLegacyStateRejected = errors.New("legacy document state is not valid in t
 // DocState represents the 8-state Spec 2 document lifecycle.
 type DocState string
 
+// DocState values forming the Spec 2 lifecycle graph; see legalTransitions for the allowed edges.
 const (
 	StateDraft       DocState = "draft"
 	StateUnderReview DocState = "under_review"

@@ -1,3 +1,7 @@
+// Package repository defines ApprovalRepository, the persistence port for the
+// approval subsystem, plus its Postgres implementation and the pgError→domain-error
+// mapping (MapPgError). All mutating methods take a caller-owned db.Tx; the
+// repository never opens its own transaction or commits.
 package repository
 
 import (
@@ -16,6 +20,9 @@ type SignoffInsertResult struct {
 	WasReplay bool // true if ON CONFLICT detected existing matching signoff
 }
 
+// ErrScheduledSupersedeConflict is returned when a scheduled-publish cutover's
+// recorded supersede target no longer matches the document currently published,
+// meaning another write raced ahead of the schedule; the job should no-op.
 var ErrScheduledSupersedeConflict = errors.New("approval: scheduled supersede target no longer matches the current published head")
 
 // ScheduledPublishRow remains as a persistence-shape helper for tests and

@@ -69,18 +69,26 @@ const (
 	approvalCodeValidationProfileUnknown problem.Code = "validation.profile_unknown"
 )
 
+// ValidationError is a generic request-validation failure mapped to HTTP 400
+// with approvalCodeValidationRequestInvalid by MapErrorToResponse.
 type ValidationError struct {
 	msg string
 }
 
+// NewValidationError constructs a ValidationError with the given message.
 func NewValidationError(msg string) *ValidationError {
 	return &ValidationError{msg: msg}
 }
 
+// Error implements the error interface.
 func (e *ValidationError) Error() string {
 	return e.msg
 }
 
+// MapErrorToResponse translates a domain/repository/contract error into an RFC
+// 9457 problem+json response, choosing the HTTP status and typed problem.Code
+// that best matches err. Unrecognized errors fall back to a generic 500 with
+// approvalCodeInternalUnknown — the client never sees internal error detail.
 func MapErrorToResponse(err error) *problem.Problem {
 	statusCode := http.StatusInternalServerError
 	code := approvalCodeInternalUnknown
@@ -256,6 +264,9 @@ func MapErrorToResponse(err error) *problem.Problem {
 	return problem.New(statusCode, code, responseTitle(err, statusCode))
 }
 
+// WriteError maps err via MapErrorToResponse and writes it as a problem+json
+// response. Any 5xx is also logged server-side, since the client body is
+// intentionally generic and must not leak internal error detail.
 func WriteError(w http.ResponseWriter, err error) {
 	prob := MapErrorToResponse(err)
 	// Never swallow server-side failures: the client gets a generic "internal
@@ -272,6 +283,9 @@ func WriteError(w http.ResponseWriter, err error) {
 	}
 }
 
+// WriteJSON marshals body and writes it with the given status code. If body
+// fails to marshal, it falls back to a generic 500 internal-error payload
+// rather than writing a broken response.
 func WriteJSON(w http.ResponseWriter, status int, body any) {
 	payload, err := json.Marshal(body)
 	if err != nil {

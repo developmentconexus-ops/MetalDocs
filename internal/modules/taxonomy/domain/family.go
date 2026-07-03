@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// DocumentFamily is the top-level, tenant-agnostic catalog grouping (e.g.
+// "Procedimento") that profiles bind to. document_families carries no
+// tenant_id — a family row is visible and mutable from every tenant (T-002).
 type DocumentFamily struct {
 	Code        FamilyCode `json:"code"`
 	TenantID    string     `json:"tenant_id"`
@@ -16,6 +19,9 @@ type DocumentFamily struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// Sentinel errors returned by DocumentFamily construction and mutation.
+// Callers match these with errors.Is; they are stable across the family
+// service and repository layers.
 var (
 	ErrFamilyNotFound        = errors.New("family not found")
 	ErrFamilyAlreadyInactive = errors.New("family is already inactive")
@@ -25,8 +31,14 @@ var (
 	ErrFamilyNameRequired    = errors.New("family name must not be empty")
 )
 
+// FamilyCode is the immutable primary-key identifier of a DocumentFamily.
+// Immutability is DB-enforced post-create by trg_reject_families_code_update.
 type FamilyCode string
 
+// NewDocumentFamily validates and normalizes input into a new, active
+// DocumentFamily. It trims Code/TenantID/Name/Description and rejects empty
+// Code, TenantID, or Name with the corresponding sentinel error. It does not
+// perform any I/O.
 func NewDocumentFamily(input DocumentFamily) (*DocumentFamily, error) {
 	family := DocumentFamily{
 		Code:        FamilyCode(strings.TrimSpace(string(input.Code))),
@@ -48,6 +60,10 @@ func NewDocumentFamily(input DocumentFamily) (*DocumentFamily, error) {
 	return &family, nil
 }
 
+// Deactivate transitions the family to inactive in-memory. It returns
+// ErrFamilyAlreadyInactive if the family is already inactive; it does not
+// check for dependent active profiles — callers must run that check
+// (FamilyRepository.HasActiveProfilesTx) before calling Deactivate.
 func (f *DocumentFamily) Deactivate() error {
 	if !f.IsActive {
 		return ErrFamilyAlreadyInactive

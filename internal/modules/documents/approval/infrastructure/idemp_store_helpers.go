@@ -1,3 +1,6 @@
+// Package infrastructure holds Postgres-backed idempotency stores for the
+// approval subsystem's route-admin and signoff endpoints, wrapping the shared
+// internal/platform/idempotency.Store with endpoint-specific replay envelopes.
 package infrastructure
 
 import (

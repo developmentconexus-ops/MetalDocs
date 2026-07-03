@@ -12,6 +12,10 @@ import (
 	"metaldocs/internal/modules/taxonomy/domain"
 )
 
+// FamilyRepository is the *sql.DB-backed implementation of
+// domain.FamilyRepository. Non-Tx methods each own a single-statement
+// transaction; Tx-suffixed methods run inside a caller-supplied
+// domain.FamilyTx (concretely a familyTx).
 type FamilyRepository struct {
 	db *sql.DB
 }
@@ -34,10 +38,14 @@ func (f familyTx) QueryRowContext(ctx context.Context, query string, args ...any
 	return f.tx.QueryRowContext(ctx, query, args...)
 }
 
+// NewFamilyRepository builds a FamilyRepository backed by db.
 func NewFamilyRepository(db *sql.DB) *FamilyRepository {
 	return &FamilyRepository{db: db}
 }
 
+// GetByCode reads the family for (tenantID, code) inside a short-lived
+// read transaction, seeding the authz GUCs and requiring CapTaxonomyView.
+// Returns domain.ErrFamilyNotFound if no such row exists.
 func (r *FamilyRepository) GetByCode(ctx context.Context, tenantID string, code domain.FamilyCode) (*domain.DocumentFamily, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -70,6 +78,9 @@ WHERE tenant_id = $1 AND code = $2`
 	return &f, nil
 }
 
+// List returns families for tenantID, ordered by code, capped at
+// maxTaxonomyListRows as a safety bound (x-pagination-exempt; T-012).
+// Requires CapTaxonomyView.
 func (r *FamilyRepository) List(ctx context.Context, tenantID string, includeInactive bool) ([]domain.DocumentFamily, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -120,6 +131,8 @@ WHERE tenant_id = $1`
 	return out, nil
 }
 
+// Create inserts f inside its own transaction, requiring CapTaxonomyManage
+// before the INSERT; the transaction commits only on success.
 func (r *FamilyRepository) Create(ctx context.Context, f *domain.DocumentFamily) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -162,6 +175,10 @@ VALUES ($1, $2, $3, $4, $5)`
 	return err
 }
 
+// Update writes f's mutable fields inside its own transaction, requiring
+// CapTaxonomyManage before the UPDATE, and commits only on success.
+// Returns domain.ErrFamilyNotFound if the (tenant_id, code) row does not
+// exist.
 func (r *FamilyRepository) Update(ctx context.Context, f *domain.DocumentFamily) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -193,6 +210,10 @@ WHERE tenant_id = $4 AND code = $5`
 	return tx.Commit()
 }
 
+// HasActiveProfiles reports whether any non-archived profile references
+// familyCode within tenantID, inside its own short-lived transaction.
+// Requires CapTaxonomyView. Prefer HasActiveProfilesTx when the check must
+// be atomic with a subsequent deactivate write (T-007).
 func (r *FamilyRepository) HasActiveProfiles(ctx context.Context, tenantID string, familyCode domain.FamilyCode) (bool, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -217,6 +238,8 @@ SELECT EXISTS(
 	return exists, err
 }
 
+// BeginTx opens a new database transaction and returns it wrapped as a
+// domain.FamilyTx (familyTx). The caller owns Commit/Rollback.
 func (r *FamilyRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -225,6 +248,10 @@ func (r *FamilyRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error)
 	return familyTx{tx: tx}, nil
 }
 
+// GetByCodeForUpdate reads the family for (tenantID, code) with a SELECT
+// ... FOR UPDATE inside tx, requiring CapTaxonomyManage. tx must be the
+// familyTx returned by BeginTx. Returns domain.ErrFamilyNotFound if no
+// such row exists.
 func (r *FamilyRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, tenantID string, code domain.FamilyCode) (*domain.DocumentFamily, error) {
 	sqlTx, ok := tx.(familyTx)
 	if !ok {
@@ -255,6 +282,11 @@ FOR UPDATE`
 	return &f, nil
 }
 
+// HasActiveProfilesTx reports whether any non-archived profile references
+// familyCode within tenantID, inside the caller-owned tx (with a
+// tenant_id predicate — T-007 resolved). Requires CapTaxonomyManage. Used
+// by FamilyService.Deactivate to keep the check and the deactivate write
+// atomic.
 func (r *FamilyRepository) HasActiveProfilesTx(ctx context.Context, tx domain.FamilyTx, tenantID string, familyCode domain.FamilyCode) (bool, error) {
 	sqlTx, ok := tx.(familyTx)
 	if !ok {
@@ -279,6 +311,10 @@ SELECT EXISTS(
 	return exists, nil
 }
 
+// UpdateTx writes f's mutable fields inside the caller-owned tx, requiring
+// CapTaxonomyManage before the UPDATE. The caller is responsible for
+// committing or rolling back. Returns domain.ErrFamilyNotFound if the
+// (tenant_id, code) row does not exist.
 func (r *FamilyRepository) UpdateTx(ctx context.Context, tx domain.FamilyTx, f *domain.DocumentFamily) error {
 	sqlTx, ok := tx.(familyTx)
 	if !ok {

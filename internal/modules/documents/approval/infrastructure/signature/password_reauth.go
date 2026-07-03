@@ -11,9 +11,15 @@ import (
 )
 
 var (
+	// ErrInvalidCredentials is returned for a missing/wrong password or an unknown actor
+	// (same error in both cases — disclosure-safe, never reveals which).
 	ErrInvalidCredentials = errors.New("signature: invalid credentials")
-	ErrRateLimited        = errors.New("signature: too many failed attempts, try again later")
-	ErrRateLimiterConfig  = errors.New("signature: auth-failure rate limiter not configured")
+	// ErrRateLimited is returned when the actor has exceeded maxFailures within windowDur,
+	// or when the limiter itself fails (fail-closed).
+	ErrRateLimited = errors.New("signature: too many failed attempts, try again later")
+	// ErrRateLimiterConfig is returned when Sign is called without an AuthFailureRateLimiter
+	// wired — password_reauth must never run unrate-limited.
+	ErrRateLimiterConfig = errors.New("signature: auth-failure rate limiter not configured")
 )
 
 // IamUserReader abstracts password-hash lookup for testability.
@@ -55,8 +61,16 @@ func NewPasswordReauthProvider(reader IamUserReader, emitter EventEmitterStub, l
 	}
 }
 
+// Method returns "password_reauth", identifying this Provider in the Registry.
 func (p *PasswordReauthProvider) Method() string { return "password_reauth" }
 
+// Sign verifies req.Credentials["password"] against the actor's bcrypt hash in
+// iam_users, subject to the wired AuthFailureRateLimiter. It fails closed:
+// ErrRateLimiterConfig if no limiter is wired, ErrRateLimited if the limiter
+// denies or errors, and ErrInvalidCredentials for any lookup or compare
+// failure (never distinguishing "user not found" from "wrong password").
+// On success it resets the rate limiter and returns an opaque attestation —
+// the raw password is never included in SignatureResult.Payload.
 func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (SignatureResult, error) {
 	password, ok := req.Credentials["password"]
 	if !ok || password == "" {
@@ -113,4 +127,3 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 	})
 	return SignatureResult{Method: "password_reauth", Payload: payload, SignedAt: now}, nil
 }
-

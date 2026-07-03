@@ -12,6 +12,9 @@ import (
 	"metaldocs/internal/platform/strictjson"
 )
 
+// SubmitHandler submits a document revision for approval, opening a new
+// approval instance. Requires both an Idempotency-Key header (persisted as
+// approval_instances.idempotency_key, F-D4) and a valid If-Match header (OCC precondition).
 func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	documentID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)

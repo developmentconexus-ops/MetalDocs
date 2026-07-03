@@ -3,7 +3,9 @@ package domain
 import "errors"
 
 var (
-	ErrAuthorCannotSign  = errors.New("SoD: document author cannot sign their own revision")
+	// ErrAuthorCannotSign is returned by CheckSoD when the signing actor is the document's author.
+	ErrAuthorCannotSign = errors.New("SoD: document author cannot sign their own revision")
+	// ErrActorAlreadySigned is returned by CheckSoD when the actor already signed off in an earlier stage of the same instance.
 	ErrActorAlreadySigned = errors.New("SoD: actor has already signed in a prior stage of this instance")
 )
 

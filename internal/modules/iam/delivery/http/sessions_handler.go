@@ -42,6 +42,10 @@ type SessionAdmin interface {
 	RevokeSessionsByUserID(ctx context.Context, userID string, revokedAt time.Time) error
 }
 
+// SessionsHandler serves the /auth/sessions admin list + revoke surface.
+// Revocation is tenant-guarded: a session belonging to another tenant
+// returns 404, not 403, so cross-tenant probes cannot distinguish "exists
+// elsewhere" from "does not exist".
 type SessionsHandler struct {
 	sessions          SessionAdmin
 	sessionService    *iamapp.SessionService
@@ -49,6 +53,11 @@ type SessionsHandler struct {
 	now               func() time.Time
 }
 
+// NewSessionsHandler constructs the handler with the Noop display-name
+// reader (all names fall back to user_id until WithDisplayNameReader is
+// called). The variadic auditdomain.Writer parameter is accepted for
+// call-site compatibility only and discarded: audit is now emitted in-tx by
+// SessionService (H-3b Site 1).
 func NewSessionsHandler(sessions SessionAdmin, _ ...auditdomain.Writer) *SessionsHandler {
 	// The second variadic arg (legacy auditdomain.Writer) is intentionally
 	// discarded: audit is now emitted in-tx by SessionService (H-3b Site 1).
@@ -81,6 +90,8 @@ func (h *SessionsHandler) WithSessionService(svc *iamapp.SessionService) *Sessio
 	return h
 }
 
+// RegisterRoutes mounts the session list (GET) and revoke (DELETE) routes on
+// mux under /api/v1/auth/sessions.
 func (h *SessionsHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/auth/sessions", h.handleSessions)
 	mux.HandleFunc("/api/v1/auth/sessions/", h.handleSessionByID)

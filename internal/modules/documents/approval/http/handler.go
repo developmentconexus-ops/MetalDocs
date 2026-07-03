@@ -1,3 +1,8 @@
+// Package approvalhttp implements the approval subsystem's HTTP handlers:
+// submit, decision, read, cancel, obsolete, supersede, and route admin. Every
+// mutating handler enforces the If-Match / Idempotency-Key preconditions
+// (OCC + safe-retry) before invoking the application layer, and errors are
+// mapped to RFC 9457 problem+json via MapErrorToResponse.
 package approvalhttp
 
 import (
@@ -53,7 +58,9 @@ type routeAdminService interface {
 }
 
 var (
-	ErrIfMatchRequired  = errors.New("precondition: If-Match header required")
+	// ErrIfMatchRequired is returned when a write endpoint is called without an If-Match header (OCC precondition).
+	ErrIfMatchRequired = errors.New("precondition: If-Match header required")
+	// ErrIfMatchMalformed is returned when the If-Match header is present but not "v<N>" or "*".
 	ErrIfMatchMalformed = errors.New("precondition: If-Match header malformed; expected \"v<N>\" or \"*\"")
 )
 
@@ -65,6 +72,9 @@ type signoffIdempStore interface {
 	BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error)
 }
 
+// Handler implements the approval subsystem's HTTP endpoints (submit, decision,
+// read, cancel, obsolete, supersede, route admin). It wraps *application.Services
+// behind narrow per-endpoint interfaces so handlers can be tested against fakes.
 type Handler struct {
 	services          *application.Services
 	db                *sql.DB

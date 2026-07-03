@@ -5,6 +5,7 @@ import "fmt"
 // QuorumOutcome is the result of evaluating quorum for a stage.
 type QuorumOutcome string
 
+// QuorumOutcome values returned by EvaluateQuorum / EvaluateQuorumResult.
 const (
 	QuorumPending       QuorumOutcome = "pending"
 	QuorumApprovedStage QuorumOutcome = "approved_stage"
@@ -12,6 +13,8 @@ const (
 	QuorumError         QuorumOutcome = "error"
 )
 
+// QuorumResult is the outcome of EvaluateQuorumResult plus an optional
+// human-readable Reason, populated for QuorumError and forced outcomes.
 type QuorumResult struct {
 	Outcome QuorumOutcome
 	Reason  string
@@ -42,6 +45,9 @@ func EvaluateQuorum(stage StageInstance, approvals []Signoff, rejections []Signo
 	return EvaluateQuorumResult(stage, approvals, rejections, effectiveDenominator).Outcome
 }
 
+// EvaluateQuorumResult is the QuorumResult-returning counterpart of EvaluateQuorum,
+// carrying a Reason string for QuorumError and denominator-forced outcomes.
+// Signoffs from actors NOT in EligibleActorIDs are ignored.
 func EvaluateQuorumResult(stage StageInstance, approvals []Signoff, rejections []Signoff, effectiveDenominator int) QuorumResult {
 	if len(stage.EligibleActorIDs) == 0 {
 		return QuorumResult{Outcome: QuorumError, Reason: "empty_eligible_set"}

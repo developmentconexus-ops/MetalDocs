@@ -1,3 +1,7 @@
+// Package http is the taxonomy module's HTTP delivery layer: it mounts the
+// 16 oapi-codegen-generated /api/v1/taxonomy/* routes onto Handler, which
+// dispatches to the profile/area/family application services and maps
+// domain errors to the RFC 9457 problem+json envelope.
 package http
 
 import (
@@ -33,12 +37,17 @@ type familyService interface {
 	Deactivate(ctx context.Context, code domain.FamilyCode) error
 }
 
+// Handler wires the generated taxonomyapi.ServerInterface to the taxonomy
+// application services. It holds no persistence or authz logic of its own.
 type Handler struct {
 	profiles profileService
 	areas    areaService
 	families familyService
 }
 
+// RegisterRoutes mounts the 16 generated taxonomy operations onto mux under
+// the "/api/v1" base, translating unmarshalable request bodies to a 400
+// VALIDATION_ERROR problem+json response.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	taxonomyapi.HandlerWithOptions(h, taxonomyapi.StdHTTPServerOptions{
 		BaseRouter: mux,
@@ -51,6 +60,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	})
 }
 
+// NewHandler builds a Handler wired to the given profile/area/family
+// application services.
 func NewHandler(profiles profileService, areas areaService, families familyService) *Handler {
 	return &Handler{
 		profiles: profiles,

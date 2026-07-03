@@ -10,11 +10,17 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+// FamilyService is the use-case orchestrator for DocumentFamily: List, Get,
+// Create, Update, Deactivate. Every mutating method emits a governance event
+// via govLogger inside the same transaction as the mutation (T-004/T-005
+// closed).
 type FamilyService struct {
 	families  domain.FamilyRepository
 	govLogger domain.GovernanceLogger
 }
 
+// NewFamilyService builds a FamilyService. It panics if govLogger is nil —
+// taxonomy has no silent-audit-loss fallback (fail-loud by design).
 func NewFamilyService(families domain.FamilyRepository, govLogger domain.GovernanceLogger) *FamilyService {
 	if govLogger == nil {
 		panic("taxonomy: FamilyService requires a non-nil GovernanceLogger")
@@ -22,6 +28,8 @@ func NewFamilyService(families domain.FamilyRepository, govLogger domain.Governa
 	return &FamilyService{families: families, govLogger: govLogger}
 }
 
+// List returns families for tenantID, including inactive ones when
+// includeInactive is true.
 func (s *FamilyService) List(ctx context.Context, tenantID string, includeInactive bool) ([]domain.DocumentFamily, error) {
 	families, err := s.families.List(ctx, tenantID, includeInactive)
 	if err != nil {
@@ -30,6 +38,8 @@ func (s *FamilyService) List(ctx context.Context, tenantID string, includeInacti
 	return families, nil
 }
 
+// Get returns the family identified by (tenantID, code), or a wrapped
+// domain.ErrFamilyNotFound if no such row exists.
 func (s *FamilyService) Get(ctx context.Context, tenantID string, code domain.FamilyCode) (*domain.DocumentFamily, error) {
 	family, err := s.families.GetByCode(ctx, tenantID, code)
 	if err != nil {
@@ -38,6 +48,9 @@ func (s *FamilyService) Get(ctx context.Context, tenantID string, code domain.Fa
 	return family, nil
 }
 
+// Create validates f, inserts it, and logs a family.created governance
+// event, all inside a single transaction (BeginTx...Commit); any failure
+// rolls the transaction back so no partial family/event pair is persisted.
 func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) error {
 	newFamily, err := domain.NewDocumentFamily(*f)
 	if err != nil {
@@ -79,6 +92,11 @@ func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) er
 	return nil
 }
 
+// Update locks the family row (GetByCodeForUpdate FOR UPDATE), applies the
+// Name/Description changes from f, persists them, and logs a
+// family.updated governance event — all inside one transaction. Code is
+// never mutated (immutability is DB-enforced regardless). Returns
+// domain.ErrFamilyNameRequired if f.Name is blank.
 func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*domain.DocumentFamily, error) {
 	if strings.TrimSpace(f.Name) == "" {
 		return nil, domain.ErrFamilyNameRequired
@@ -138,6 +156,11 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 	return existing, nil
 }
 
+// Deactivate locks the family row (FOR UPDATE), checks HasActiveProfilesTx
+// (tenant-scoped, same tx) to reject with domain.ErrFamilyHasProfiles if any
+// profile still references the family, then flips is_active and logs a
+// family.deactivated governance event — all inside one transaction
+// (T-007: closes the TOCTOU window between the check and the write).
 func (s *FamilyService) Deactivate(ctx context.Context, code domain.FamilyCode) error {
 	tx, err := s.families.BeginTx(ctx)
 	if err != nil {

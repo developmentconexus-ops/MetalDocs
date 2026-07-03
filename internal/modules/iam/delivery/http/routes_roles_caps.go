@@ -35,6 +35,9 @@ type RolesCapsHandler struct {
 	cachedCaps  []iamapi.CapabilityDescriptor
 }
 
+// NewRolesCapsHandler constructs the handler and eagerly builds the role and
+// capability catalogues from the in-process domain registries (not from
+// roleCaps, which only serves the role→capability link matrix).
 func NewRolesCapsHandler(roleCaps RoleCapabilitiesReader) *RolesCapsHandler {
 	return &RolesCapsHandler{
 		roleCaps:    roleCaps,
@@ -43,6 +46,7 @@ func NewRolesCapsHandler(roleCaps RoleCapabilitiesReader) *RolesCapsHandler {
 	}
 }
 
+// RegisterRoutes mounts the three read-only catalogue routes on mux.
 func (h *RolesCapsHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/iam/roles", h.listRoles)
 	mux.HandleFunc("GET /api/v1/iam/capabilities", h.listCapabilities)

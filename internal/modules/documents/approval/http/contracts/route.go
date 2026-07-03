@@ -8,16 +8,20 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+// QuorumKind is the wire representation of a stage's quorum policy.
 type QuorumKind string
 
+// QuorumKind values.
 const (
 	QuorumKindAny1Of QuorumKind = "any_1_of"
 	QuorumKindAllOf  QuorumKind = "all_of"
 	QuorumKindMOfN   QuorumKind = "m_of_n"
 )
 
+// DriftPolicyKind is the wire representation of a stage's eligibility-drift policy.
 type DriftPolicyKind string
 
+// DriftPolicyKind values.
 const (
 	DriftPolicyKindReduceQuorum DriftPolicyKind = "reduce_quorum"
 	DriftPolicyKindFailStage    DriftPolicyKind = "fail_stage"
@@ -29,6 +33,7 @@ var (
 	requiredCapabilityPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*\.[a-z0-9._]*[a-z0-9]$`)
 )
 
+// StageRequest is the wire representation of one stage in a create/update route request.
 type StageRequest struct {
 	Order              int             `json:"order"`
 	Name               string          `json:"name"`
@@ -40,6 +45,7 @@ type StageRequest struct {
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 }
 
+// CreateRouteRequest is the decoded body for the create-route endpoint.
 type CreateRouteRequest struct {
 	ProfileCode    string         `json:"profile_code"`
 	Name           string         `json:"name"`
@@ -47,6 +53,8 @@ type CreateRouteRequest struct {
 	IdempotencyKey string
 }
 
+// Validate enforces ProfileCode and Name are non-empty, ProfileCode matches the
+// route-code pattern, and Stages passes validateStages.
 func (r CreateRouteRequest) Validate() error {
 	if err := validateRequired("profile_code", r.ProfileCode); err != nil {
 		return wrapValidation(err)
@@ -60,12 +68,14 @@ func (r CreateRouteRequest) Validate() error {
 	return wrapValidation(validateStages(r.Stages))
 }
 
+// UpdateRouteRequest is the decoded body for the update-route endpoint.
 type UpdateRouteRequest struct {
 	Name           string         `json:"name"`
 	Stages         []StageRequest `json:"stages"`
 	IdempotencyKey string
 }
 
+// Validate enforces Name is non-empty and Stages passes validateStages.
 func (r UpdateRouteRequest) Validate() error {
 	if err := validateRequired("name", r.Name); err != nil {
 		return wrapValidation(err)
@@ -186,6 +196,7 @@ func validateRequiredCapability(field, value string) error {
 	return nil
 }
 
+// RouteResponse is the response body for a successful create/update/get route.
 type RouteResponse struct {
 	RouteID     string          `json:"route_id"`
 	ProfileCode string          `json:"profile_code"`
@@ -198,6 +209,7 @@ type RouteResponse struct {
 	CreatedAt   string          `json:"created_at"`
 }
 
+// StageResponse is the wire representation of one stage within a RouteResponse.
 type StageResponse struct {
 	Order              int             `json:"order"`
 	Name               string          `json:"name"`
@@ -209,6 +221,7 @@ type StageResponse struct {
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 }
 
+// ListStageItem is the wire representation of one stage within a ListRouteItem.
 type ListStageItem struct {
 	Order              int             `json:"order"`
 	Name               string          `json:"name"`
@@ -220,6 +233,7 @@ type ListStageItem struct {
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 }
 
+// ListRouteItem is one row of the list-routes response.
 type ListRouteItem struct {
 	ID          string          `json:"id"`
 	Name        string          `json:"name"`
@@ -240,10 +254,12 @@ type ListRoutesResponse struct {
 	Total  int             `json:"total"`
 }
 
+// DeactivateRouteRequest is the decoded body for the deactivate-route endpoint.
 type DeactivateRouteRequest struct {
 	Reason string `json:"reason"`
 }
 
+// Validate enforces Reason is non-empty after trimming whitespace.
 func (r DeactivateRouteRequest) Validate() error {
 	if err := validateRequired("reason", strings.TrimSpace(r.Reason)); err != nil {
 		return wrapValidation(err)

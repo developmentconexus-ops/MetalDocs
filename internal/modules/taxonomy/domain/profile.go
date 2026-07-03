@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// DocumentProfile is a per-tenant document type bound to a DocumentFamily.
+// It carries the optional default template version consumed by the documents
+// wizard (DefaultTemplateVersionID) and is soft-archived via ArchivedAt
+// (ADR 0010).
 type DocumentProfile struct {
 	Code                     ProfileCode `json:"code"`
 	TenantID                 string      `json:"tenant_id"`
@@ -21,6 +25,9 @@ type DocumentProfile struct {
 	CreatedAt                time.Time   `json:"created_at"`
 }
 
+// Sentinel errors returned by DocumentProfile construction and mutation.
+// Callers match these with errors.Is; they are stable across the profile
+// service and repository layers.
 var (
 	ErrProfileNotFound         = errors.New("profile not found")
 	ErrProfileCodeImmutable    = errors.New("profile code is immutable")
@@ -33,8 +40,15 @@ var (
 	ErrProfileNameRequired     = errors.New("profile name must not be empty")
 )
 
+// ProfileCode is the immutable primary-key identifier of a DocumentProfile.
+// Immutability is DB-enforced post-create by trg_document_profiles_code_immutable.
 type ProfileCode string
 
+// NewDocumentProfile validates and normalizes input into a new
+// DocumentProfile. It trims Code/TenantID/FamilyCode/Name/Description/Alias/
+// EditableByRole and rejects empty Code, TenantID, FamilyCode, or Name with
+// the corresponding sentinel error. An empty Alias defaults to Code
+// (truncated to 24 chars). It does not perform any I/O.
 func NewDocumentProfile(input DocumentProfile) (*DocumentProfile, error) {
 	profile := DocumentProfile{
 		Code:                     ProfileCode(strings.TrimSpace(string(input.Code))),
@@ -71,10 +85,14 @@ func NewDocumentProfile(input DocumentProfile) (*DocumentProfile, error) {
 	return &profile, nil
 }
 
+// IsActive reports whether the profile has not been archived (ArchivedAt is nil).
 func (p *DocumentProfile) IsActive() bool {
 	return p.ArchivedAt == nil
 }
 
+// Archive soft-archives the profile by stamping ArchivedAt with now
+// (ADR 0010). It returns ErrProfileArchived if the profile is already
+// archived.
 func (p *DocumentProfile) Archive(now time.Time) error {
 	if !p.IsActive() {
 		return ErrProfileArchived

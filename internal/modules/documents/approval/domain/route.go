@@ -8,6 +8,7 @@ import (
 // QuorumPolicy defines how many signoffs satisfy a stage.
 type QuorumPolicy string
 
+// QuorumPolicy values understood by EvaluateQuorumResult.
 const (
 	QuorumAny1Of QuorumPolicy = "any_1_of"
 	QuorumAllOf  QuorumPolicy = "all_of"
@@ -17,6 +18,7 @@ const (
 // DriftPolicy defines behavior when eligible actors change after stage opens.
 type DriftPolicy string
 
+// DriftPolicy values understood by ApplyEligibilityDrift.
 const (
 	DriftReduceQuorum DriftPolicy = "reduce_quorum"
 	DriftFailStage    DriftPolicy = "fail_stage"

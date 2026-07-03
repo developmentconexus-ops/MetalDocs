@@ -1,3 +1,9 @@
+// Package infrastructure is the taxonomy module's Postgres-backed
+// implementation of the domain repository ports (ProfileRepository,
+// AreaRepository, FamilyRepository) plus the cross-module read adapters
+// (AreaCatalogReaderPG, FamilyCodeResolverRepository). Every write path
+// seeds the authz GUCs (setAuthzGUC) and calls authz.Require before
+// mutating a row, pairing with the trg_require_cap_asserted DB tripwire.
 package infrastructure
 
 import (
@@ -12,6 +18,10 @@ import (
 	"metaldocs/internal/modules/taxonomy/domain"
 )
 
+// ProfileRepository is the *sql.DB-backed implementation of
+// domain.ProfileRepository. Non-Tx methods each own a single-statement
+// transaction; Tx-suffixed methods run inside a caller-supplied
+// domain.FamilyTx (concretely a taxonomyTx).
 type ProfileRepository struct {
 	db *sql.DB
 }
@@ -39,10 +49,13 @@ func (t taxonomyTx) QueryRowContext(ctx context.Context, query string, args ...a
 	return t.tx.QueryRowContext(ctx, query, args...)
 }
 
+// NewProfileRepository builds a ProfileRepository backed by db.
 func NewProfileRepository(db *sql.DB) *ProfileRepository {
 	return &ProfileRepository{db: db}
 }
 
+// BeginTx opens a new database transaction and returns it wrapped as a
+// domain.FamilyTx (taxonomyTx). The caller owns Commit/Rollback.
 func (r *ProfileRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -51,6 +64,9 @@ func (r *ProfileRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error
 	return taxonomyTx{tx: tx}, nil
 }
 
+// GetByCode reads the profile for (tenantID, code) inside a short-lived
+// read transaction, seeding the authz GUCs and requiring CapTaxonomyView.
+// Returns domain.ErrProfileNotFound if no such row exists.
 func (r *ProfileRepository) GetByCode(ctx context.Context, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -99,6 +115,9 @@ WHERE tenant_id = $1 AND code = $2`
 	return &profile, nil
 }
 
+// List returns profiles for tenantID, ordered by code, capped at
+// maxTaxonomyListRows (no real pagination — T-015). Requires
+// CapTaxonomyView.
 func (r *ProfileRepository) List(ctx context.Context, tenantID string, includeArchived bool) ([]domain.DocumentProfile, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -160,6 +179,8 @@ WHERE tenant_id = $1`
 	return out, nil
 }
 
+// Create inserts p inside its own transaction, requiring CapTaxonomyManage
+// before the INSERT; the transaction commits only on success.
 func (r *ProfileRepository) Create(ctx context.Context, p *domain.DocumentProfile) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -226,6 +247,10 @@ VALUES
 	return err
 }
 
+// Update writes p's mutable fields inside its own transaction, requiring
+// CapTaxonomyManage before the UPDATE, and commits only on success.
+// Returns domain.ErrProfileNotFound if the (tenant_id, code) row does not
+// exist.
 func (r *ProfileRepository) Update(ctx context.Context, p *domain.DocumentProfile) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -280,6 +305,10 @@ WHERE tenant_id = $10 AND code = $11`
 	return tx.Commit()
 }
 
+// GetByCodeForUpdate reads the profile for (tenantID, code) with a SELECT
+// ... FOR UPDATE inside tx, requiring CapTaxonomyManage. tx must be the
+// taxonomyTx returned by BeginTx. Returns domain.ErrProfileNotFound if no
+// such row exists.
 func (r *ProfileRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
 	sqlTx, ok := tx.(taxonomyTx)
 	if !ok {
@@ -316,6 +345,10 @@ FOR UPDATE`
 	return &profile, nil
 }
 
+// UpdateTx writes p's mutable fields inside the caller-owned tx, requiring
+// CapTaxonomyManage before the UPDATE. The caller is responsible for
+// committing or rolling back. Returns domain.ErrProfileNotFound if the
+// (tenant_id, code) row does not exist.
 func (r *ProfileRepository) UpdateTx(ctx context.Context, tx domain.FamilyTx, p *domain.DocumentProfile) error {
 	sqlTx, ok := tx.(taxonomyTx)
 	if !ok {
@@ -353,14 +386,21 @@ WHERE tenant_id = $10 AND code = $11`
 	return nil
 }
 
+// AreaRepository is the *sql.DB-backed implementation of
+// domain.AreaRepository. Non-Tx methods each own a single-statement
+// transaction; Tx-suffixed methods run inside a caller-supplied
+// domain.FamilyTx (concretely a taxonomyTx).
 type AreaRepository struct {
 	db *sql.DB
 }
 
+// NewAreaRepository builds an AreaRepository backed by db.
 func NewAreaRepository(db *sql.DB) *AreaRepository {
 	return &AreaRepository{db: db}
 }
 
+// BeginTx opens a new database transaction and returns it wrapped as a
+// domain.FamilyTx (taxonomyTx). The caller owns Commit/Rollback.
 func (r *AreaRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -369,6 +409,9 @@ func (r *AreaRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error) {
 	return taxonomyTx{tx: tx}, nil
 }
 
+// GetByCode reads the area for (tenantID, code) inside a short-lived read
+// transaction, seeding the authz GUCs and requiring CapTaxonomyView.
+// Returns domain.ErrAreaNotFound if no such row exists.
 func (r *AreaRepository) GetByCode(ctx context.Context, tenantID string, code domain.AreaCode) (*domain.ProcessArea, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -415,6 +458,9 @@ WHERE tenant_id = $1 AND code = $2`
 	return &area, nil
 }
 
+// List returns process areas for tenantID, ordered by code, capped at
+// maxTaxonomyListRows (no real pagination — T-015). Requires
+// CapTaxonomyView.
 func (r *AreaRepository) List(ctx context.Context, tenantID string, includeArchived bool) ([]domain.ProcessArea, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -474,6 +520,8 @@ WHERE tenant_id = $1`
 	return out, nil
 }
 
+// Create inserts a inside its own transaction, requiring CapTaxonomyManage
+// before the INSERT; the transaction commits only on success.
 func (r *AreaRepository) Create(ctx context.Context, a *domain.ProcessArea) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -537,6 +585,10 @@ VALUES
 	return err
 }
 
+// Update writes a's mutable fields inside its own transaction, requiring
+// CapTaxonomyManage before the UPDATE, and commits only on success.
+// Returns domain.ErrAreaNotFound if the (tenant_id, code) row does not
+// exist.
 func (r *AreaRepository) Update(ctx context.Context, a *domain.ProcessArea) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -585,6 +637,10 @@ WHERE tenant_id = $7 AND code = $8`
 	return tx.Commit()
 }
 
+// GetByCodeForUpdate reads the area for (tenantID, code) with a SELECT ...
+// FOR UPDATE inside tx, requiring CapTaxonomyManage. tx must be the
+// taxonomyTx returned by BeginTx. Returns domain.ErrAreaNotFound if no such
+// row exists.
 func (r *AreaRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, tenantID string, code domain.AreaCode) (*domain.ProcessArea, error) {
 	sqlTx, ok := tx.(taxonomyTx)
 	if !ok {
@@ -620,6 +676,11 @@ FOR UPDATE`
 	return &area, nil
 }
 
+// ListAncestorsTx walks the parent_code chain for (tenantID, code) up to
+// maxTaxonomyTreeDepth inside the caller-owned tx, returning the ancestor
+// codes. It performs no authz check of its own (read-only recursive CTE);
+// callers that need a capability check must gate the surrounding
+// operation.
 func (r *AreaRepository) ListAncestorsTx(ctx context.Context, tx domain.FamilyTx, tenantID string, code domain.AreaCode) ([]domain.AreaCode, error) {
 	sqlTx, ok := tx.(taxonomyTx)
 	if !ok {
@@ -658,6 +719,10 @@ SELECT code FROM ancestors`
 	return ancestors, rows.Err()
 }
 
+// UpdateTx writes a's mutable fields inside the caller-owned tx, requiring
+// CapTaxonomyManage before the UPDATE. The caller is responsible for
+// committing or rolling back. Returns domain.ErrAreaNotFound if the
+// (tenant_id, code) row does not exist.
 func (r *AreaRepository) UpdateTx(ctx context.Context, tx domain.FamilyTx, a *domain.ProcessArea) error {
 	sqlTx, ok := tx.(taxonomyTx)
 	if !ok {
@@ -692,6 +757,10 @@ WHERE tenant_id = $7 AND code = $8`
 	return nil
 }
 
+// ListAncestors walks the parent_code chain for (tenantID, code) up to
+// maxTaxonomyTreeDepth inside its own short-lived transaction, seeding the
+// authz GUCs and requiring CapTaxonomyView. Used by the (now-deleted)
+// SetParent cycle check; retained as a standalone read.
 func (r *AreaRepository) ListAncestors(ctx context.Context, tenantID string, code domain.AreaCode) ([]domain.AreaCode, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

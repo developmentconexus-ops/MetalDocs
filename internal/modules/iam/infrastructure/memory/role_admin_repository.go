@@ -9,6 +9,10 @@ import (
 	"metaldocs/internal/modules/iam/domain"
 )
 
+// RoleAdminRepository is an in-memory double of the Postgres role-admin
+// repository, guarded by a mutex. Test fixture only — no authz.Require calls,
+// no tx semantics; see UpsertUserAndAssignRoleTx/ReplaceUserRolesTx for the
+// tx-aware method shapes kept parity with the real implementation.
 type RoleAdminRepository struct {
 	mu    sync.Mutex
 	users map[string]userRecord
@@ -19,10 +23,13 @@ type userRecord struct {
 	roles       map[domain.Role]bool
 }
 
+// NewRoleAdminRepository constructs an empty in-memory RoleAdminRepository.
 func NewRoleAdminRepository() *RoleAdminRepository {
 	return &RoleAdminRepository{users: map[string]userRecord{}}
 }
 
+// HasAnyRole reports whether any tracked user currently holds role, ignoring
+// the tenantID argument (the in-memory double does not partition by tenant).
 func (r *RoleAdminRepository) HasAnyRole(_ context.Context, role domain.Role, _ string) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -35,6 +42,9 @@ func (r *RoleAdminRepository) HasAnyRole(_ context.Context, role domain.Role, _ 
 	return false, nil
 }
 
+// UpsertUserAndAssignRole replaces the user's record with displayName and a
+// single active role, mirroring the Postgres implementation's replace
+// semantics (delete-then-insert, not accumulate).
 func (r *RoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, _ string, role domain.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -46,6 +56,8 @@ func (r *RoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, userID,
 	return nil
 }
 
+// ReplaceUserRoles upserts the user's displayName and sets their role set to
+// exactly {role}, creating the record if it does not already exist.
 func (r *RoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, role domain.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

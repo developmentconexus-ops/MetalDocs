@@ -2,13 +2,18 @@ package contracts
 
 import "fmt"
 
+// Decision is the wire representation of an approve/reject vote.
 type Decision string
 
+// Decision values.
 const (
 	DecisionApprove Decision = "approve"
 	DecisionReject  Decision = "reject"
 )
 
+// SignoffRequest is the decoded body plus header-sourced fields for the signoff
+// endpoint. PasswordToken carries the e-signature re-authentication credential
+// (21 CFR Part 11); it is never persisted, only verified.
 type SignoffRequest struct {
 	Decision       Decision `json:"decision"`
 	Reason         string   `json:"reason"`
@@ -17,6 +22,8 @@ type SignoffRequest struct {
 	IdempotencyKey string
 }
 
+// Validate enforces Decision is approve or reject, Reason is required when
+// rejecting, PasswordToken is non-empty, and ContentHash is 64 hex chars.
 func (r SignoffRequest) Validate() error {
 	switch r.Decision {
 	case DecisionApprove:
@@ -38,6 +45,7 @@ func (r SignoffRequest) Validate() error {
 	return nil
 }
 
+// SignoffResponse is the response body for a successful signoff.
 type SignoffResponse struct {
 	SignoffID string `json:"signoff_id"`
 	WasReplay bool   `json:"was_replay"`
