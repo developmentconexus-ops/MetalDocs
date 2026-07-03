@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/approval.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/approval-refactor.md`.
 
-**Last verified:** 2026-07-02 (CON-04 verification pass — T-002 closed as stale drift, see entry below). Prior: 2026-06-12 (Wave 2.12 sync — InMemoryAuthFailureRateLimiter deleted; PostgresAuthFailureRateLimiter unconditional; no debt rows opened or closed). Prior: 2026-06-11 (anchor-correction pass at HEAD `d3f5dc62b` — T-001 `MapErrorToResponse` corrected to `:83`, T-005 `ListInboxItems`/`CountPendingForActor` corrected to `:237`/`:326`, T-006 cancel GUC `set_config` call corrected to `:124-126`; no logic changes). Prior: 2026-06-02 (Approval route admin PR-5 — pure wiki/backlog sync: composite tech-debt row T-015 registered closing FE-1..FE-20 + C-2 + BE-3..BE-12 across PR-1..PR-4; BE-1 marked resolved under T-002 (route-admin OpenAPI coverage shipped PR-1, signoff/cancel doc-scoped routes still pending); BE-9 explicitly carried over to F-001 follow-up (Tier-1 `route.view` split / `CapRouteView`); backlog row `R-RouteAdmin-Rewrite` added; bugs-audit K2 flipped `wont-fix` → `fixed`; approval module summary risks tally recomputed. Prior PR-4 verification preserved below.
+**Last verified:** 2026-07-02 (ARC-07/APP-04 resolution sync — T-011 closed (both GUC helpers deleted), T-006 surface re-anchored to `supersede_service.go` post-rename + new assert-before-write pairing tests recorded; see entries below). Same-day prior: CON-04 verification pass — T-002 closed as stale drift, see entry below. Prior: 2026-06-12 (Wave 2.12 sync — InMemoryAuthFailureRateLimiter deleted; PostgresAuthFailureRateLimiter unconditional; no debt rows opened or closed). Prior: 2026-06-11 (anchor-correction pass at HEAD `d3f5dc62b` — T-001 `MapErrorToResponse` corrected to `:83`, T-005 `ListInboxItems`/`CountPendingForActor` corrected to `:237`/`:326`, T-006 cancel GUC `set_config` call corrected to `:124-126`; no logic changes). Prior: 2026-06-02 (Approval route admin PR-5 — pure wiki/backlog sync: composite tech-debt row T-015 registered closing FE-1..FE-20 + C-2 + BE-3..BE-12 across PR-1..PR-4; BE-1 marked resolved under T-002 (route-admin OpenAPI coverage shipped PR-1, signoff/cancel doc-scoped routes still pending); BE-9 explicitly carried over to F-001 follow-up (Tier-1 `route.view` split / `CapRouteView`); backlog row `R-RouteAdmin-Rewrite` added; bugs-audit K2 flipped `wont-fix` → `fixed`; approval module summary risks tally recomputed. Prior PR-4 verification preserved below.
 
 **Prior verification — 2026-06-02 (PR-4):** Approval route admin PR-4 — FE rewrite of `RouteAdminPage` on canonical patterns closes the legacy FE scan items FE-1..FE-20 + C-2: TanStack Query for reads, optimistic+rollback mutations on writes; thin `routeAdminApi.ts` consumes `components['schemas']` codegen; native `<dialog>` primitive at `components/ui/Dialog.tsx` (no `@radix-ui` dep); stage rows keyed by stable uuid; `useAreasQuery` replaces silent `fetchAreas().catch(()=>{})`; 412/409/422/403 mapped to distinct PT-BR copy via `messageForRouteError`; status badge visually distinct; cause-based edit-disabled tooltip; role select fed by `useIamRolesQuery` (ADR 0018 Option B fallback); legacy `getJSON` + 4 route fns + 9 route-admin DTOs deleted; `ControlledDocumentDetailPanel.tsx` migrated to `routeAdminApi.listRoutes` + `RouteSummary`. FE-side debt rows to be authored in PR-5 will reference this PR. Prior PR-2 verification preserved below.
 
@@ -55,14 +55,15 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Linked backlog row:** `backlog/approval-refactor.md#R-005`
 - **Linked ADR:** missing-ADR
 
-### T-006 · Tripwire pairing audit not extended to cancel & cutover service paths
-- **Severity:** major
-- **Surface:** `internal/modules/documents/approval/application/cancel_service.go:124-126` (`cancelInstance` writes `metaldocs.cancel_in_progress` via `set_config` but pairing with `authz.Require` on the cancel call site not verified by Phase 4 audit); `internal/modules/documents/approval/application/cutover_service.go:39`
+### T-006 · Tripwire pairing audit not extended to cancel & cutover service paths — CLOSED 2026-05-25
+- **Severity:** ~~major~~ closed
+- **Surface (current):** `internal/modules/documents/approval/application/cancel_service.go:108` (`authz.Require` precedes the `metaldocs.cancel_in_progress` `set_config` at `:115`); `internal/modules/documents/approval/application/supersede_service.go:54` (`PublishSuperseding`; formerly `cutover_service.go` — renamed, confirmed via `git log --follow`)
 - **Observation:** Phase 4 statement-local audit (`wiki/modules/approval/_artifacts/04-persistence.md` §6) flagged 3 FAIL rows on `InsertInstance` / `InsertSignoff` / `UpdateInstanceStatus` — these are repository methods called from `submit_service`/`decision_service`/`obsolete_service` where `authz.Require` does precede in the calling function (service-call-graph pairing OK). Not audited: cancel and cutover service call sites. Defense-in-depth gap if either path skips `authz.Require`.
 - **Evidence:** `wiki/modules/approval/_artifacts/04-persistence.md` §6 (statement-local FAILs); cross-deps §1 (cancel_service.go:12 imports `authz`).
 - **Linked backlog row:** `backlog/approval-refactor.md#R-006`
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md` (covers tier-2 model)
 - **Resolution sync 2026-05-25:** CLOSED by 5c High hardening. `cancel_service.go` now sets authz/RLS context before instance load, requires `workflow.instance.cancel` for user cancels, keeps system bypass behind `SystemCancelInstance`, tenant-scopes stage cancellation through `approval_instances`, and checks cancel event `json.Marshal` errors. `cutover_service.go` now counts legacy statuses inside a transaction with `authz.BypassSystem`, so RLS cannot hide rows during preflight. Verified with `go test ./internal/modules/documents/approval/application ./internal/modules/documents/approval/repository -count=1`.
+- **Resolution sync 2026-07-02 (ARC-07/APP-04):** `cutover_service.go` no longer exists — renamed to `supersede_service.go` (confirmed via `git log --follow`); surface line above re-anchored. Pairing re-verified as still correct in both paths: `authz.Require` precedes gated writes in the same tx (`cancel_service.go:108` before `set_config` at `:115`; `supersede_service.go:68`/`:73` inside `PublishSuperseding` at `:54`). Test coverage asymmetry closed: `supersede_service_test.go` already enforced assert-before-write pairing at the fake-driver level, `cancel_service_test.go` did not — new tests `TestCancelInstance_CapabilityAssertPairsBeforeGatedWrite` (`cancel_service_test.go:354`) and `TestPublishSuperseding_CapabilityAssertPairsBeforeGatedWrite` (`supersede_service_test.go:316`) now pin the pairing on both paths.
 
 ### T-007 · `infrastructure/signature/` vs `infrastructure/` package naming inconsistency
 - **Severity:** minor
@@ -96,13 +97,14 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Linked backlog row:** `backlog/approval-refactor.md#R-010`
 - **Linked ADR:** missing-ADR
 
-### T-011 · `WithMembershipContext` and `setAuthzGUC` both write authz GUCs
-- **Severity:** minor
-- **Surface:** `internal/modules/documents/approval/application/membership_tx.go:22` and `internal/modules/documents/approval/application/authz_guc.go:11`
-- **Observation:** Two helpers set `metaldocs.tenant_id` + `metaldocs.actor_id` on the tx. `setAuthzGUC` is the call used by both `submit_service` and `decision_service`; `WithMembershipContext` predates it and is now only referenced internally. Risk: future caller picks the wrong helper.
+### T-011 · `WithMembershipContext` and `setAuthzGUC` both write authz GUCs — CLOSED 2026-07-02 (ARC-07/APP-04)
+- **Severity:** ~~minor~~ closed
+- **Surface (original, both files now deleted):** `internal/modules/documents/approval/application/membership_tx.go:22` and `internal/modules/documents/approval/application/authz_guc.go:11`
+- **Observation (original):** Two helpers set `metaldocs.tenant_id` + `metaldocs.actor_id` on the tx. `setAuthzGUC` is the call used by both `submit_service` and `decision_service`; `WithMembershipContext` predates it and is now only referenced internally. Risk: future caller picks the wrong helper.
 - **Evidence:** surface scan §2; `wiki/modules/approval/_artifacts/02-flow-signoff.md` step 9.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-011`
 - **Linked ADR:** missing-ADR
+- **Resolution sync 2026-07-02 (ARC-07/APP-04):** Both helpers are gone from approval — the wrong-pick risk no longer exists. `authz_guc.go` (`setAuthzGUC`) deleted by commit `96fde7c2`, deduplicated to the canonical `authz.SeedTxIdentity`. `membership_tx.go` + `membership_tx_test.go` deleted as confirmed-dead code: zero call sites, and `WithMembershipContext` targeted a DB role `metaldocs_membership_writer` and GUC `metaldocs.verified_capability` that exist nowhere in `db/migrations/` — the helper could never have worked against the real schema.
 
 ### T-014 · Idempotency store wrapper duplication
 - **Severity:** minor
