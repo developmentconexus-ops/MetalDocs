@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -71,9 +70,14 @@ func TestSweep_EvictsIdleEntries(t *testing.T) {
 
 // TestSweeper_ExitsOnContextCancel proves the sweeper goroutine terminates
 // when the constructor-provided context is canceled (no goroutine leak).
+//
+// Deliberately built on the Middleware WaitGroup join (Wait) rather than
+// runtime.NumGoroutine(): the process-global goroutine count flaked under
+// full-suite parallel load (TST-04) — unrelated tests start/stop goroutines
+// inside the observation windows. Wait() returning IS the leak proof: it
+// joins the sweeper's WaitGroup, which is Done()ed only when sweepLoop
+// returns. External goroutine churn cannot make Wait return early or late.
 func TestSweeper_ExitsOnContextCancel(t *testing.T) {
-	before := runtime.NumGoroutine()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	cfg := mustConfig(t,
 		map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 60},
@@ -82,40 +86,27 @@ func TestSweeper_ExitsOnContextCancel(t *testing.T) {
 	)
 	mw := ratelimit.New(ctx, cfg)
 
-	deadline := time.Now().Add(200 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		if runtime.NumGoroutine() > before {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if runtime.NumGoroutine() <= before {
-		t.Fatalf("expected sweeper goroutine running; before=%d now=%d", before, runtime.NumGoroutine())
-	}
-
-	cancel()
-
 	done := make(chan struct{})
 	go func() {
 		mw.Wait()
 		close(done)
 	}()
 
+	// Pre-cancel the sweeper must still be running: Wait must not have
+	// returned. One-directional check — external load cannot fake either
+	// outcome (only a sweeper that already exited closes done early).
+	select {
+	case <-done:
+		t.Fatal("sweeper exited before context cancel")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	cancel()
+
 	select {
 	case <-done:
 	case <-time.After(time.Second):
-		t.Fatalf("sweeper did not exit within 1s of context cancel")
-	}
-
-	for i := 0; i < 20; i++ {
-		runtime.Gosched()
-		if runtime.NumGoroutine() <= before {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if runtime.NumGoroutine() > before {
-		t.Fatalf("goroutine leak: before=%d after=%d", before, runtime.NumGoroutine())
+		t.Fatal("sweeper did not exit within 1s of context cancel")
 	}
 }
 
