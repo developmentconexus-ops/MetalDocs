@@ -64,6 +64,10 @@ func RunSpecRules(specPath string) ([]Violation, error) {
 	// CASING-DRIFT walks the whole document (schemas + inline path bodies) for
 	// every declared `properties:` key and flags any that is not snake_case.
 	out = append(out, checkCasing(specPath, root)...)
+	// SHAPE-NULLABLE-NOT-REQUIRED walks the whole document (components.schemas
+	// + inline body/response schemas) for every declared nullable property
+	// absent from its schema's own `required:` array (AIP-134 / 9f86828b).
+	out = append(out, checkShapeNullableNotRequired(specPath, root)...)
 	return out, nil
 }
 

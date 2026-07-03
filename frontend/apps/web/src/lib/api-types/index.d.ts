@@ -2146,8 +2146,8 @@ export interface components {
             /** Format: date-time */
             effective_from: string;
             /** Format: date-time */
-            effective_to?: string | null;
-            granted_by?: string | null;
+            effective_to: string | null;
+            granted_by: string | null;
         };
         AreaMembershipListResponse: {
             items: components["schemas"]["AreaMembershipRow"][];
@@ -2231,7 +2231,7 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
-            read_at?: string | null;
+            read_at: string | null;
         };
         NotificationsListResponse: {
             items: components["schemas"]["Notification"][];
@@ -2503,18 +2503,18 @@ export interface components {
             revision_number: number;
             active_session_id: string;
             /** Format: date-time */
-            values_frozen_at?: string | null;
+            values_frozen_at: string | null;
             /** Format: date-time */
-            archived_at?: string | null;
+            archived_at: string | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
             updated_at: string;
             created_by: string;
-            controlled_document_id?: string | null;
-            revision_title?: string | null;
-            profile_code_snapshot?: string | null;
-            process_area_code_snapshot?: string | null;
+            controlled_document_id: string | null;
+            revision_title: string | null;
+            profile_code_snapshot: string | null;
+            process_area_code_snapshot: string | null;
             code: string;
         };
         DocumentDetailResponse: {
@@ -2531,9 +2531,9 @@ export interface components {
             revision_version: number;
             active_session_id: string;
             /** Format: date-time */
-            values_frozen_at?: string | null;
+            values_frozen_at: string | null;
             /** Format: date-time */
-            archived_at?: string | null;
+            archived_at: string | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -2541,16 +2541,16 @@ export interface components {
             created_by: string;
             /** Format: int64 */
             revision_number: number;
-            controlled_document_id?: string | null;
-            revision_title?: string | null;
-            profile_code_snapshot?: string | null;
-            process_area_code_snapshot?: string | null;
+            controlled_document_id: string | null;
+            revision_title: string | null;
+            profile_code_snapshot: string | null;
+            process_area_code_snapshot: string | null;
             code: string;
             /** Format: int64 */
-            current_revision_file_size_bytes?: number | null;
-            current_revision_page_count?: number | null;
+            current_revision_file_size_bytes: number | null;
+            current_revision_page_count: number | null;
             /** @enum {string|null} */
-            current_revision_page_count_source?: "eigenpal_client" | "server_renderer" | null;
+            current_revision_page_count_source: "eigenpal_client" | "server_renderer" | null;
         };
         DocumentCommentContentNode: {
             [key: string]: unknown;
@@ -2559,7 +2559,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             library_comment_id: number;
-            parent_library_id?: number | null;
+            parent_library_id: number | null;
             author: string;
             author_id: string;
             content: components["schemas"]["DocumentCommentContentNode"][];
@@ -2569,7 +2569,7 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             /** Format: date-time */
-            resolved_at?: string | null;
+            resolved_at: string | null;
         };
         DocumentCommentCreateRequest: {
             library_comment_id: number;
@@ -2795,7 +2795,7 @@ export interface components {
              * @description Tenant plan label; null when no plan row exists.
              * @enum {string|null}
              */
-            plan_tier?: "free" | "pro" | "enterprise" | null;
+            plan_tier: "free" | "pro" | "enterprise" | null;
         };
         UpsertUserRoleRequest: {
             display_name?: string;
@@ -2896,19 +2896,19 @@ export interface components {
             doc_type_code: string | null;
             key: string;
             name: string;
-            description?: string | null;
+            description: string | null;
             latest_version: components["schemas"]["TemplateVersionRef"];
             published_version: components["schemas"]["TemplateVersionRef"] | null;
             created_by: string;
             /** @description Display name for created_by, resolved via the iam-owned UserDisplayNameReader port (M4/F4.1). Omitted/null when the user has no resolvable display name; callers fall back to created_by (the raw user id). FE-08. */
-            created_by_display_name?: string | null;
+            created_by_display_name: string | null;
             /** Format: date-time */
             created_at: string;
             /**
              * Format: date-time
              * @description Last-modified timestamp for the template row. Nullable only for wire-compatibility with historical rows created before this field existed (db/migrations/0267_templates_template_updated_at.sql backfills all existing rows to created_at, so in practice this is always present going forward). FE-08.
              */
-            updated_at?: string | null;
+            updated_at: string | null;
             /** Format: date-time */
             archived_at: string | null;
         };
@@ -2925,30 +2925,30 @@ export interface components {
             revision_number?: number;
             /** @enum {string} */
             status: "draft" | "under_review" | "approved" | "published" | "obsolete";
-            docx_storage_key?: string | null;
-            content_hash?: string | null;
-            metadata_schema?: {
+            docx_storage_key: string | null;
+            content_hash: string | null;
+            metadata_schema: {
                 [key: string]: unknown;
             } | null;
             /** @description Ordered placeholder list. Matches `domain.TemplateVersion.PlaceholderSchema` ([]Placeholder). Backend always emits as array; ADR 0035 declared shape corrected from `object` 2026-06-15 (F1.2). */
-            placeholder_schema?: {
+            placeholder_schema: {
                 [key: string]: unknown;
             }[] | null;
             author_id: string;
-            pending_reviewer_role?: string | null;
-            pending_approver_role?: string | null;
-            reviewer_id?: string | null;
-            approver_id?: string | null;
+            pending_reviewer_role: string | null;
+            pending_approver_role: string | null;
+            reviewer_id: string | null;
+            approver_id: string | null;
             /** Format: date-time */
-            submitted_at?: string | null;
+            submitted_at: string | null;
             /** Format: date-time */
-            reviewed_at?: string | null;
+            reviewed_at: string | null;
             /** Format: date-time */
-            approved_at?: string | null;
+            approved_at: string | null;
             /** Format: date-time */
-            published_at?: string | null;
+            published_at: string | null;
             /** Format: date-time */
-            obsoleted_at?: string | null;
+            obsoleted_at: string | null;
             /**
              * Format: int32
              * @description Optimistic-concurrency token. Increments on every successful write to the version row. Clients must echo the last-seen value back via `expected_lock_version` on PUT .../schema. A mismatch yields HTTP 412 with code `stale_lock_version`.
@@ -2996,7 +2996,7 @@ export interface components {
         TemplateApprovalConfig: {
             /** Format: uuid */
             template_id: string;
-            reviewer_role?: string | null;
+            reviewer_role: string | null;
             approver_role: string;
         };
         UpsertTemplateApprovalConfigResponse: {
@@ -3021,11 +3021,11 @@ export interface components {
             /** Format: uuid */
             template_id: string;
             /** Format: uuid */
-            version_id?: string | null;
+            version_id: string | null;
             /** Format: uuid */
             actor_id: string;
             action: string;
-            details?: {
+            details: {
                 [key: string]: unknown;
             } | null;
             /** Format: date-time */
@@ -3055,13 +3055,13 @@ export interface components {
             tenant_id: string;
             profile_code: string;
             process_area_code: string;
-            department_code?: string | null;
+            department_code: string | null;
             code: string;
-            sequence_num?: number | null;
+            sequence_num: number | null;
             title: string;
             owner_user_id: string;
             /** Format: uuid */
-            override_template_version_id?: string | null;
+            override_template_version_id: string | null;
             /** @enum {string} */
             status: "active" | "obsolete" | "superseded";
             visibility: components["schemas"]["ControlledDocumentVisibility"];
@@ -3148,7 +3148,7 @@ export interface components {
             /** Format: date-time */
             submitted_at: string;
             /** Format: date-time */
-            completed_at?: string | null;
+            completed_at: string | null;
             stages: components["schemas"]["ApprovalStageInstanceResponse"][];
             etag: string;
         };
@@ -3168,7 +3168,7 @@ export interface components {
             /** @enum {string} */
             status: "approved" | "rejected" | "active" | "waiting";
             /** @enum {string|null} */
-            decision?: "approve" | "reject" | null;
+            decision: "approve" | "reject" | null;
         };
         ApprovalSignoffRecordResponse: {
             /** Format: uuid */
@@ -3358,7 +3358,7 @@ export interface components {
             required_capability: string;
             area_code: string;
             quorum: components["schemas"]["QuorumKind"];
-            quorum_m?: number | null;
+            quorum_m: number | null;
             drift_policy: components["schemas"]["DriftPolicy"];
         } & {
             [key: string]: unknown;
@@ -3419,7 +3419,7 @@ export interface components {
             name: string;
             value: string;
             label: string;
-            description?: string | null;
+            description: string | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -6324,10 +6324,10 @@ export interface operations {
                         revision_num: number;
                         idempotent_replay?: boolean;
                         /** Format: int64 */
-                        file_size_bytes?: number | null;
-                        page_count?: number | null;
+                        file_size_bytes: number | null;
+                        page_count: number | null;
                         /** @enum {string|null} */
-                        page_count_source?: "eigenpal_client" | "server_renderer" | null;
+                        page_count_source: "eigenpal_client" | "server_renderer" | null;
                     };
                 };
             };

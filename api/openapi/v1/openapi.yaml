@@ -2878,7 +2878,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [revision_id, revision_num]
+                required: [revision_id, revision_num, file_size_bytes, page_count, page_count_source]
                 properties:
                   revision_id: { type: string, format: uuid }
                   revision_num: { type: integer, minimum: 1 }
@@ -4287,7 +4287,6 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
-  parameters:
   schemas:
     AuthLoginRequest:
       type: object
@@ -4406,7 +4405,7 @@ components:
     AreaMembershipRow:
       type: object
       description: Active area membership row returned by the tenant-scoped /iam/area-memberships listing.
-      required: [user_id, tenant_id, area_code, role, effective_from]
+      required: [user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by]
       properties:
         user_id: { type: string }
         tenant_id: { type: string }
@@ -4549,7 +4548,7 @@ components:
           description: Active members of this area obligated via area_grant. The sum across areas need not equal total_targets (user_grant-only and company_scope users belong to no area; multi-area users count once per area). Empty array for company-scope documents.
     Notification:
       type: object
-      required: [id, recipient_user_id, event_type, resource_type, resource_id, title, message, status, created_at]
+      required: [id, recipient_user_id, event_type, resource_type, resource_id, title, message, status, created_at, read_at]
       properties:
         id:
           type: string
@@ -5058,7 +5057,7 @@ components:
           type: string
     DocumentSummary:
       type: object
-      required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, revision_number, active_session_id, created_at, updated_at, created_by, code]
+      required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, revision_number, active_session_id, created_at, updated_at, created_by, code, values_frozen_at, archived_at, controlled_document_id, revision_title, profile_code_snapshot, process_area_code_snapshot]
       properties:
         id:
           type: string
@@ -5116,7 +5115,7 @@ components:
           type: string
     DocumentDetailResponse:
       type: object
-      required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, active_session_id, created_at, updated_at, created_by, revision_number, code]
+      required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, active_session_id, created_at, updated_at, created_by, revision_number, code, values_frozen_at, archived_at, controlled_document_id, revision_title, profile_code_snapshot, process_area_code_snapshot, current_revision_file_size_bytes, current_revision_page_count, current_revision_page_count_source]
       properties:
         id:
           type: string
@@ -5189,7 +5188,7 @@ components:
       additionalProperties: true
     DocumentCommentResponse:
       type: object
-      required: [id, library_comment_id, author, author_id, content, done, created_at, updated_at]
+      required: [id, library_comment_id, author, author_id, content, done, created_at, updated_at, parent_library_id, resolved_at]
       properties:
         id:
           type: string
@@ -5614,7 +5613,7 @@ components:
         last30d: { type: integer, minimum: 0 }
     UsageSnapshot:
       type: object
-      required: [seats, storage, api_calls, active_users]
+      required: [seats, storage, api_calls, active_users, plan_tier]
       properties:
         seats:
           type: object
@@ -5801,7 +5800,8 @@ components:
       # gate template clonability on this single object; the 9f86828b
       # null-serialization guarantee carries forward.
       required: [id, tenant_id, doc_type_code, key, name, latest_version,
-                 published_version, created_by, created_at, archived_at]
+                 published_version, created_by, created_at, archived_at,
+                 description, created_by_display_name, updated_at]
       properties:
         id: { type: string, format: uuid }
         tenant_id: { type: string, format: uuid }
@@ -5838,7 +5838,10 @@ components:
         archived_at: { type: string, format: date-time, nullable: true }
     VersionDTO:
       type: object
-      required: [id, template_id, version_number, status, author_id, created_at]
+      required: [id, template_id, version_number, status, author_id, created_at,
+                 docx_storage_key, content_hash, metadata_schema, placeholder_schema,
+                 pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
+                 submitted_at, reviewed_at, approved_at, published_at, obsoleted_at]
       properties:
         id: { type: string, format: uuid }
         template_id: { type: string, format: uuid }
@@ -5937,7 +5940,7 @@ components:
               $ref: '#/components/schemas/TemplateDTO'
     TemplateApprovalConfig:
       type: object
-      required: [template_id, approver_role]
+      required: [template_id, approver_role, reviewer_role]
       properties:
         template_id: { type: string, format: uuid }
         reviewer_role: { type: string, nullable: true }
@@ -5973,7 +5976,7 @@ components:
             url: { type: string }
     TemplateAuditEvent:
       type: object
-      required: [tenant_id, template_id, actor_id, action, occurred_at]
+      required: [tenant_id, template_id, actor_id, action, occurred_at, version_id, details]
       properties:
         tenant_id: { type: string, format: uuid }
         template_id: { type: string, format: uuid }
@@ -6016,7 +6019,7 @@ components:
             $ref: '#/components/schemas/PlaceholderCatalogEntry'
     ControlledDocument:
       type: object
-      required: [id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status, visibility, created_at, updated_at]
+      required: [id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status, visibility, created_at, updated_at, department_code, sequence_num, override_template_version_id]
       properties:
         id: { type: string, format: uuid }
         tenant_id: { type: string, format: uuid }
@@ -6116,7 +6119,7 @@ components:
         approval_instance_id: { type: string, format: uuid }
     ApprovalInstanceByDocumentResponse:
       type: object
-      required: [id, document_id, route_id, tenant_id, status, submitted_by, submitted_at, stages, etag]
+      required: [id, document_id, route_id, tenant_id, status, submitted_by, submitted_at, stages, etag, completed_at]
       properties:
         id: { type: string, format: uuid }
         document_id: { type: string, format: uuid }
@@ -6156,7 +6159,7 @@ components:
             $ref: '#/components/schemas/ApprovalStageActorResponse'
     ApprovalStageActorResponse:
       type: object
-      required: [user_id, display_name, status]
+      required: [user_id, display_name, status, decision]
       properties:
         user_id: { type: string }
         display_name: { type: string }
@@ -6436,7 +6439,7 @@ components:
     StageSummary:
       type: object
       additionalProperties: true
-      required: [order, name, required_role, required_capability, area_code, quorum, drift_policy]
+      required: [order, name, required_role, required_capability, area_code, quorum, drift_policy, quorum_m]
       properties:
         order: { type: integer, minimum: 1 }
         name: { type: string }
@@ -6519,7 +6522,7 @@ components:
           items: { $ref: '#/components/schemas/RouteSummary' }
     TokenDictionaryEntry:
       type: object
-      required: [id, name, value, label, created_at, updated_at]
+      required: [id, name, value, label, created_at, updated_at, description]
       properties:
         id: { type: string, format: uuid }
         name: { type: string, minLength: 1, maxLength: 64 }

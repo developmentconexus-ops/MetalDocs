@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: good
+  title: shape_optional_not_nullable_good
   version: 1.0.0
 paths:
   /widgets:
@@ -32,23 +32,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-  /widgets/{id}/publish:
-    post:
-      operationId: publishWidget
-      security:
-        - bearerAuth: []
-      x-authz-area:
-        source: path
-        field: id
-      responses:
-        '204':
-          description: done
-        '403':
-          description: forbidden
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
 components:
   securitySchemes:
     bearerAuth:
@@ -73,12 +56,22 @@ components:
           nullable: true
         has_more:
           type: boolean
+    Widget:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
     ListWidgetsResponse:
       type: object
       properties:
         items:
           type: array
           items:
-            type: object
+            $ref: '#/components/schemas/Widget'
         page:
           $ref: '#/components/schemas/Page'

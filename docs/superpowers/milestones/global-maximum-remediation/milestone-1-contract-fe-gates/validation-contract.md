@@ -91,6 +91,41 @@ bug (9f86828b). Requiring nullable fields to be in `required` forces the key to 
   positiving (documented in the rule comment) — a missed exotic case is a bounded defer, a false
   positive on the live spec is not acceptable (must be zero on the clean tree).
 
+### AMENDMENT — response scope (operator-approved 2026-07-03, HS-7 cleared)
+
+**Discovered runtime truth (during F1.2 impl):** the rule as first specified ("every object-schema
+property") fires **60** genuine violations on the live spec — reality worse than the pre-code
+assumption of a clean spec (same pattern as the struct "1 not 133" and F1.3 "all modules drift"
+findings). Classification (runtime handlers read, agent `af455dac`): **50** are response-DTO fields
+(present-and-null server-emitted → the real 9f86828b drift); **10** are request-body fields
+(`createTemplate.reviewer_role`, `commitDocumentAutosave` req `page_count`,
+`DocumentCommentCreateRequest.parent_library_id`, `TaxonomyProfile/AreaUpsertRequest.*` ×5,
+`Create/UpdateTokenDictionaryEntryRequest.description`) — all confirmed full-replace/create with **no
+null-vs-absent distinction** (no genuine PATCH clear-semantics).
+
+**Operator fork #1:** reconcile the 60 → **full burn-down in M1** (not a grandfather allowlist).
+
+**Operator fork #2:** the 10 request fields cannot be fixed non-breakingly — *both* remove-`nullable`
+(`request-property-became-not-nullable`) *and* add-`required` (`request-property-became-required`) are
+oasdiff-**breaking**, and F1.1's own new gate would red the M1 PR. Root cause: the invariant is a
+**response** (generated-consumer-shape) concern; request bodies legitimately use optional+nullable for
+upsert/PATCH. **Resolution (operator-approved): scope the rule to response-reachable schemas.** The
+rule now exempts any schema reachable **only** from `requestBody` (transitive `$ref` closure) and any
+inline schema lexically under a `requestBody:` ancestor; response-reachable schemas (incl. shared) are
+still checked. No protection lost — the 9f86828b bug class is response-side.
+
+**Burn-down applied:** the **50** response fields added to their schemas' `required:` arrays via
+`openapi.yaml` + regen (non-breaking; oasdiff response-required-add = 0 errors). The **10** request
+fields left as-is (nullable+optional), now exempt by scope. Live spec → **0 violations**; oasdiff
+base→head → **exit 0 (no breaking)**.
+
+**New finding surfaced (HS-6, NOT fixed in F1.2 — bounded defer):** `PUT /templates/{id}/approval-config`
+(`upsertTemplateApprovalConfig`) has **no `requestBody` block** in the spec, yet the handler
+(`routes_lifecycle.go:192-239`) decodes `reviewer_role`/`approver_role` from the body — an
+undocumented-request-contract defect. Out of F1.2's nullable boundary (fix = add requestBody + regen →
+changes the generated handler interface = delivery work). Owner: Leandro; trigger: contract-truth
+hygiene micro-feature or fold to M9 governance. Reported at HS-1.
+
 **Unit test:** `scripts/api-lint/spec_rules_test.go` (or a new `shape_rules_test.go`) with:
 - a fixture schema `{nullable: true}` prop absent from `required` → **1 violation** (asserted rule
   name + message substring);
@@ -130,10 +165,15 @@ picked up automatically because it is registered in `RunSpecRules`. The `struct`
 by the existing `openapi-lint` job (`redocly lint`) in the same workflow (reads `redocly.yaml`).
 
 ### Exit criteria
-1. New rule registered + unit-tested (pass-and-fail cases).
-2. Live spec clean under the rule (0 violations) and under `struct: error`.
+1. New rule registered + unit-tested (pass-and-fail cases **incl. the response-scope case**: a
+   nullable-not-required property is 0 violations under `requestBody`, 1 under `responses`).
+2. Live spec clean under the rule (0 violations — via the 50 response add-required burn-down; the 10
+   request fields exempt by response-scope) and clean under `struct: error`.
 3. Both negatives proven red.
-4. Burn-down recorded (struct 1→0; operation-summary/security-defined owner+trigger).
+4. Burn-down recorded (nullable-not-required 60→0 = 50 response add-required + 10 request exempt;
+   struct 1→0; operation-summary/security-defined owner+trigger).
+5. oasdiff base→head over the burn-down = **exit 0, no breaking** (the burn-down must not break the API).
+6. Missing-requestBody defer (upsertTemplateApprovalConfig) recorded with owner+trigger.
 
 ---
 
@@ -275,13 +315,16 @@ workflow. Blocking (the job already fails the build on lint error).
 1. All four gates satisfy the D4 proof shape: POSITIVE (clean → green) **and** NEGATIVE (fixture →
    red), each captured verbatim in the feature's `evidence.md`.
 2. Every gate is **blocking** and wired at the CI point named above; path filters correct.
-3. `go build ./...` clean; `go test ./scripts/api-lint/... -count=1` green; `go generate ./...` +
-   `pnpm run gen:api` produce **no diff** (contract-first, zero hand-edits to generated files).
+3. `go build ./...` clean; `go test ./scripts/api-lint/... -count=1` green. Generated files are in
+   sync with the spec: after the committed regeneration, a fresh `go generate ./...` + `pnpm run
+   gen:api` produce **no further diff** (contract-first, zero hand-edits — the F1.2 burn-down's
+   generated churn is the committed regeneration of the 50 response fields, not a hand-edit).
 4. M0 regression intact: `redocly lint` clean, templates pin tests green, no shipped M0 shape changed.
 5. Recorded bounded defers, each with a written trigger + owner: (a) F1.3 approval carve-out → M9
    F9.5; (b) F1.4 cross-feature allowlist (shrink-only); (c) F1.2 operation-summary/security-defined
-   still off; (d) any local pnpm-tree block on `pnpm run lint`/vitest (gate still demonstrated). No
-   defer beyond these without surfacing (HS-6).
+   still off; (d) any local pnpm-tree block on `pnpm run lint`/vitest (gate still demonstrated);
+   (e) F1.2 `upsertTemplateApprovalConfig` missing-requestBody contract defect → contract-hygiene
+   micro-feature / M9. No defer beyond these without surfacing (HS-6).
 6. All work committed locally (standing auth); **never pushed**; `docs/release/` never committed;
    plans dir never force-added.
 7. `milestone-validator` verdict **PASS** written to `qa/milestone-qa.md`; then HS-1 operator gate —

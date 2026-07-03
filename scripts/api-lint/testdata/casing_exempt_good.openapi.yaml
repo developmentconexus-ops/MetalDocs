@@ -59,6 +59,7 @@ components:
             type: object
     Page:
       type: object
+      required: [next_cursor, has_more]
       properties:
         next_cursor:
           type: string
