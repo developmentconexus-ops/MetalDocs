@@ -341,15 +341,15 @@ The adapter's central job is to be the only place that imports `@eigenpal/docx-e
 Pointer-only. Body in `wiki/modules/editor-ui-eigenpal-tech-debt.md`. Severity rubric (concrete triggers) is in the same file; do not invent local definitions.
 
 - Critical: 1
-- Major: 2
-- Minor: 5
+- Major: 3
+- Minor: 3
 
 Coverage stats (computed at compose time):
 - Public symbols undocumented: 0 / 10
 - Operations missing C4 placement: 0 / 0 (no HTTP)
 - Cross-deps missing in Â§5/Â§8: 0 / 5
 - State transitions missing in Â§6: 0 / 0 (no state machine)
-- Decisions without ADR link: 6
+- Decisions without ADR link: 3
 
 Top 3 (by severity, then by blast-radius):
 1. T-004 â€” `createOutlinePlugin` exported but not registered; public surface advertises a plugin with no current consumer. See tech-debt Â§T-004.

@@ -5,3 +5,16 @@ packages:
 allowBuilds:
   canvas: true
   esbuild: true
+minimumReleaseAgeExclude:
+  - '@opentelemetry/api-logs@0.220.0'
+  - '@opentelemetry/context-async-hooks@2.9.0'
+  - '@opentelemetry/core@2.9.0'
+  - '@opentelemetry/exporter-trace-otlp-http@0.220.0'
+  - '@opentelemetry/otlp-exporter-base@0.220.0'
+  - '@opentelemetry/otlp-transformer@0.220.0'
+  - '@opentelemetry/resources@2.9.0'
+  - '@opentelemetry/sdk-logs@0.220.0'
+  - '@opentelemetry/sdk-metrics@2.9.0'
+  - '@opentelemetry/sdk-trace-base@2.9.0'
+  - '@opentelemetry/sdk-trace-node@2.9.0'
+  - '@opentelemetry/sdk-trace@2.9.0'

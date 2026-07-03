@@ -8,6 +8,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 type FanoutRequest struct {
@@ -75,6 +78,13 @@ func (c *Client) Fanout(ctx context.Context, req FanoutRequest) (FanoutResponse,
 	if c.serviceToken != "" {
 		httpReq.Header.Set("X-Service-Token", c.serviceToken)
 	}
+	// Inject the active span's W3C traceparent (REQ-OBS-3: edge → api → outbox
+	// → worker → docx-renderer). otel.GetTextMapPropagator() is the composite
+	// TraceContext+Baggage propagator installed by SetupOTel when enabled; when
+	// OTel is not installed (unconfigured default), the global propagator is
+	// the OTel no-op and Inject is a harmless no-op — no header is added, no
+	// error, matching SetupOTel's inert-by-default contract.
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(httpReq.Header))
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return FanoutResponse{}, err

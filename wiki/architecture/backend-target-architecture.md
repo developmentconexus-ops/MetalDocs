@@ -260,7 +260,7 @@ sequenceDiagram
 
 - **REQ-OBS-1** Structured logs (slog) only; every line in a request path carries `request_id`, `tenant_id`, `principal_id` (when authenticated). No PII, secrets, or credentials in logs. (MUST)
 - **REQ-OBS-2** RED metrics per route (rate, error count by class, duration histogram); USE metrics for pools (DB conns, worker concurrency, queue depth). Alerts fire on p99/SLO burn, not averages. (MUST)
-- **REQ-OBS-3** One trace context propagates edge → api → outbox → worker → docx-renderer via W3C `traceparent`, carried through the outbox row so async hops join the originating trace. OpenTelemetry is the export standard. (MUST — depth currently unverified; refactor item RF-1.)
+- **REQ-OBS-3** One trace context propagates edge → api → outbox → worker → docx-renderer via W3C `traceparent`, carried through the outbox row so async hops join the originating trace. OpenTelemetry is the export standard. (MUST — edge→api→outbox→worker leg met via Z-1 `SetupOTel`; the worker→docx-renderer leg closed 2026-07-03 (TST-05): `Client.Fanout` injects `traceparent` via `otel.GetTextMapPropagator()`, and `docx-renderer` now runs its own env-gated OTel tracer provider parenting a `docx_renderer.render_fanout` span on the inbound header — see `wiki/modules/editor-ui-eigenpal-tech-debt.md` T-010.)
 - **REQ-OBS-4** Distinct liveness (`process up`) and readiness (`DB + Redis + MinIO reachable`) endpoints; readiness gates traffic during deploys. (MUST)
 - **REQ-OBS-5** Audit events (product/compliance) and ops logs are separate streams with separate retention; audit is append-only with integrity validation (existing `audit_integrity_validator` is the pattern). (MUST)
 

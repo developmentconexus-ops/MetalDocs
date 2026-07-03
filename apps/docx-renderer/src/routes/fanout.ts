@@ -5,6 +5,7 @@ import type { Env } from '../env.js';
 import { getObjectBuffer, putObjectBuffer } from '../s3.js';
 import { fanout } from '../render/fanout.js';
 import { RenderError, type RenderErrorKind } from '@metaldocs/eigenpal-adapter';
+import { extractTraceContext, withRenderSpan } from '../observability/tracing.js';
 
 const BodySchema = z.object({
   body_docx_s3_key: z.string().min(1),
@@ -92,14 +93,18 @@ export function registerFanoutRoute(
       throw err;
     }
 
+    const parentCtx = extractTraceContext(req.headers);
+
     let result;
     try {
-      result = await fanout({
-        bodyDocx: new Uint8Array(bodyBuf),
-        placeholderValues: placeholder_values,
-        compositionConfig: composition_config,
-        resolvedValues: resolved_values,
-      });
+      result = await withRenderSpan(parentCtx, { tenant_id }, () =>
+        fanout({
+          bodyDocx: new Uint8Array(bodyBuf),
+          placeholderValues: placeholder_values,
+          compositionConfig: composition_config,
+          resolvedValues: resolved_values,
+        }),
+      );
     } catch (err) {
       if (err instanceof RenderError) {
         const { status, body } = renderErrorToHttp(err);
