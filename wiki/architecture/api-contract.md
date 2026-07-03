@@ -2,7 +2,14 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-07-02 (approval document-mutation cluster wire-truth repair: 6 operations —
+> **Last verified:** 2026-07-03 (approval instance-route wire-truth repair, same defect class as the 2026-07-02
+> cluster: `recordApprovalStageSignoff` got `SignoffApprovalStageRequest` (wire field `password_token`, unlike the
+> document-route's `password`) + shared `SignoffDocumentResponse`; `cancelApprovalInstance` got the shared
+> `CancelDocumentApprovalRequest`/`Response` + required `If-Match` (handler hard-requires it via `parseIfMatch`);
+> `listApprovalInbox` got `ApprovalInboxResponse` (`items`/`total`) + declared `area_code`/`limit`/`offset` query
+> params, pagination-exempt reason corrected to offset/limit truth; BE (`approval/api`) + FE (`gen:api`) codegen
+> regenerated; FE `InboxItem`/`ListInboxResponse` hand-rolled types replaced by codegen aliases.
+> Prior: 2026-07-02 (approval document-mutation cluster wire-truth repair: 6 operations —
 > `recordDocumentSignoff`, `publishDocument`, `scheduleDocumentPublish`, `obsoleteDocument`,
 > `cancelDocumentApproval`, `supersedeDocument` — got declared `requestBody`/200 schemas matching
 > `approval/http/contracts` (ADR 0035 flat bodies); required `If-Match` header declared on the 5
