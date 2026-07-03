@@ -40,6 +40,8 @@ code text NOT NULL,
 );
 ```
 
+**Post-baseline note (migration `0264`, 2026-07-02, DB-08/T-015):** the PRIMARY KEY was promoted from `code` alone to composite `(tenant_id, code)`. The previously separate `ux_process_areas_tenant_code` unique index on `(tenant_id, code)` was dropped as redundant — the new PK's backing index now serves that role. All 5 inbound FKs referencing this table (`fk_area_parent_tenant`, `cd_sequence_counters_tenant_id_process_area_code_fkey`, `controlled_document_area_grants_tenant_id_area_code_fkey`, `controlled_documents_tenant_id_process_area_code_fkey`, `user_process_areas_tenant_id_area_code_fkey`) were already composite `(tenant_id, *)` before this migration, so none needed re-pointing. RLS (`FORCE ROW LEVEL SECURITY` + `tenant_isolation` policy) is unaffected — the policy keys off the `tenant_id` column value, not the PK shape. Contrast with `document_profiles` (same T-015 finding, but NOT promoted — see `wiki/modules/taxonomy-tech-debt.md` T-015 design note for why the two tables are architecturally different).
+
 ## Runtime Usage
 
 Use `rg -n "document_process_areas" internal apps` and the owning module wiki to verify readers/writers before changing this table.
@@ -50,4 +52,4 @@ Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001
 
 ## Notes and Debt
 
-Curated baseline table in the `metaldocs` schema.
+Curated baseline table in the `metaldocs` schema. See `wiki/modules/taxonomy-tech-debt.md` T-015 for the PK-redundancy finding this table's half resolved (2026-07-02).

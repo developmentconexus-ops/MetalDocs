@@ -1,6 +1,6 @@
 # Database Dictionary Index
 
-> **Last verified:** 2026-07-02 (DB-06: migration 0262 drop — `templates_audit_log` table retired, audit sink unified on `metaldocs.audit_events`) | **Prior:** 2026-06-12 (FE-5: migration 0236 dead-schema drop — `document_subjects` table retired; `templates_template.areas/visibility/specific_areas` + `document_profiles.is_active` columns dropped)
+> **Last verified:** 2026-07-02 (DB-08/status-tighten/DB-09: migration `0264` promotes `document_process_areas` PK to `(tenant_id, code)` — `document_profiles` PK deliberately left as `code` alone, see its table page + `wiki/modules/taxonomy-tech-debt.md` T-015; migration `0265` tightens `documents_status_check` to 9 live values, drops dead `'finalized'`; migration `0266` adds `audit_events_payload_size_cap` (64 KiB) + hardens `metaldocs_app`'s already-INSERT/SELECT-only grant on `audit_events`) | **Prior:** 2026-07-02 (DB-06: migration 0262 drop — `templates_audit_log` table retired, audit sink unified on `metaldocs.audit_events`) | **Prior:** 2026-06-12 (FE-5: migration 0236 dead-schema drop — `document_subjects` table retired; `templates_template.areas/visibility/specific_areas` + `document_profiles.is_active` columns dropped)
 > **Source:** `db/baseline/0001_current_schema.sql`
 
 | Table | Schema | Owner | Page |
