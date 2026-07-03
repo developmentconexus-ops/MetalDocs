@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../store/auth.store';
 import { useDashboardInboxQuery } from '../queries/useDashboardInboxQuery';
-import { useDashboardStatsQuery } from '../queries/useDashboardStatsQuery';
+import { useLibraryStatsQuery } from '../../documents/queries/useLibraryStatsQuery';
 import { useDashboardActivityQuery } from '../queries/useDashboardActivityQuery';
 import { deriveDashboardStats } from '../lib/deriveDashboardStats';
 import { deriveActivityItems } from '../lib/deriveActivity';
@@ -122,7 +122,7 @@ export function Component() {
     data: statsData,
     isLoading: statsLoading,
     isError: statsError,
-  } = useDashboardStatsQuery();
+  } = useLibraryStatsQuery();
 
   const firstName = user ? getFirstName(user.displayName) : 'você';
   const items = data?.items ?? [];

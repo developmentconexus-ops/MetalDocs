@@ -2,12 +2,13 @@ import styles from './LibraryStatCards.module.css';
 
 // Backend currently exposes only statsByStatus on GET /api/v1/documents/stats.
 // "Aprovação pendente / Frozen este mês / Próx. revisão" require dedicated counts
-// that the backend does not yet emit; render them as inert placeholders rather
-// than display fabricated numbers.
+// that the backend does not yet emit. Rather than render permanently-inert
+// placeholder cards (FE-19 N8: no dead interactions in shipped screens), they
+// are hidden until those counts exist server-side.
 type CardConfig = {
   key: string;
   label: string;
-  mod: 'review' | 'pending' | 'frozen' | 'upcoming';
+  mod: 'review';
   value: (s: Record<string, number>) => number | null;
   hint: string;
 };
@@ -20,31 +21,9 @@ const CARDS: CardConfig[] = [
     value: (s) => s['under_review'] ?? 0,
     hint: 'documentos',
   },
-  {
-    key: 'pending',
-    label: 'Aprovação pendente',
-    mod: 'pending',
-    value: () => null,
-    hint: 'sem fonte de dados',
-  },
-  {
-    key: 'frozen',
-    label: 'Frozen este mês',
-    mod: 'frozen',
-    value: () => null,
-    hint: 'sem fonte de dados',
-  },
-  {
-    key: 'upcoming',
-    label: 'Próx. revisão',
-    mod: 'upcoming',
-    value: () => null,
-    hint: 'sem fonte de dados',
-  },
 ];
 
 type Props = {
-  total: number;
   statsByStatus: Record<string, number>;
 };
 

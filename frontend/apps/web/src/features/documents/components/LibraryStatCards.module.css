@@ -1,6 +1,6 @@
 .root {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -65,16 +65,3 @@
 /* ─── Color variants ──────────────────────────────────── */
 .review::before  { background: var(--warning); }
 .trend_review    { color: var(--warning); }
-
-.pending::before { background: var(--accent); }
-.trend_pending   { color: var(--accent); }
-
-.frozen::before  { background: var(--success); }
-.trend_frozen    { color: var(--success); }
-
-.upcoming::before{ background: var(--info); }
-.trend_upcoming  { color: var(--info); }
-
-@media (max-width: 1100px) {
-  .root { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}

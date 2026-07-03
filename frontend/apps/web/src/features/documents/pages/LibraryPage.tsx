@@ -166,7 +166,7 @@ export default function LibraryPage(): JSX.Element {
           </p>
         </header>
 
-        <LibraryStatCards total={total} statsByStatus={statsByStatus} />
+        <LibraryStatCards statsByStatus={statsByStatus} />
 
         <LibraryFilterTabs
           activeTab={activeFilter}

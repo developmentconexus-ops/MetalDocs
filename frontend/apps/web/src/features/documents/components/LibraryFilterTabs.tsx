@@ -46,32 +46,9 @@ export function LibraryFilterTabs({
         );
       })}
       <span className={styles.spacer} aria-hidden="true" />
-      {/* TODO: wire Filtros panel + Exportar action. Disabled until backend
-          endpoints exist (server-side advanced filters + export job). */}
-      <button
-        type="button"
-        className={`${styles.actionBtn} ${styles.actionBtnDisabled}`}
-        disabled
-        aria-disabled="true"
-        title="Em breve"
-      >
-        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M3 5h14M5 10h10M8 15h4" />
-        </svg>
-        Filtros
-      </button>
-      <button
-        type="button"
-        className={`${styles.actionBtn} ${styles.actionBtnDisabled}`}
-        disabled
-        aria-disabled="true"
-        title="Em breve"
-      >
-        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M10 3v10m0 0l-4-4m4 4l4-4M3 17h14" />
-        </svg>
-        Exportar
-      </button>
+      {/* FE-19 N8: Filtros/Exportar removed rather than shipped permanently
+          disabled — no working control until server-side advanced filters and
+          an export job endpoint exist. */}
     </div>
   );
 }

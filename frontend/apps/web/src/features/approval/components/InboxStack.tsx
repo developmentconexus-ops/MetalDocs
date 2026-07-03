@@ -33,7 +33,10 @@ export function InboxStack({
   const todayCount = items.filter((item) => new Date(item.submitted_at).getTime() >= todayStart.getTime()).length;
   const selectedItem = items[selectedIdx];
 
-  // Keyboard navigation: A=approve, D=return, ←/→=prev/next
+  // Keyboard navigation: ←/→=prev/next.
+  // A/D approve-return shortcuts were removed (FE-19 N8) — the handlers were
+  // empty TODOs advertised via keyboardHints below with no working listener.
+  // Approve/reject remain available via the card buttons (onApprove/onReject).
   useEffect(() => {
     if (items.length === 0) return;
 
@@ -42,10 +45,6 @@ export function InboxStack({
         onPrev();
       } else if (e.key === 'ArrowRight') {
         onNext();
-      } else if (e.key === 'a' || e.key === 'A') {
-        // TODO [BACKLOG: caixa-aprovacao.md]: trigger approve flow
-      } else if (e.key === 'd' || e.key === 'D') {
-        // TODO [BACKLOG: caixa-aprovacao.md]: trigger return flow
       }
     }
 
@@ -104,7 +103,7 @@ export function InboxStack({
         </div>
 
         <div className={styles.keyboardHints}>
-          <kbd>A</kbd> Aprovar · <kbd>D</kbd> Devolver · <kbd>←/→</kbd> Navegar
+          <kbd>←/→</kbd> Navegar
         </div>
       </>
     );

@@ -1,5 +1,3 @@
-// @ts-expect-error O pacote existe no workspace, mas este app não expõe typings de uuid.
-import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 
 import { ApiError, dispatchAuthExpired } from '../../../lib/api';
@@ -27,7 +25,7 @@ export async function mutate<TReq, TRes>(
   body?: TReq,
   opts: MutateOptions = {},
 ): Promise<TRes> {
-  const idempotencyKey = opts.idempotencyKey ?? uuidv4();
+  const idempotencyKey = opts.idempotencyKey ?? crypto.randomUUID();
   const ifMatch = opts.ifMatch ?? (opts.resourceId ? etagCache.get(opts.resourceId) : undefined);
 
   const headers: Record<string, string> = {
