@@ -458,22 +458,22 @@ From artifact 03 Â§4. Loaded in `internal/platform/authn/config.go:101-116`.
 
 Pointer-only. Body in [`wiki/modules/auth-tech-debt.md`](auth-tech-debt.md). Severity rubric (concrete triggers) lives in the register, not here.
 
-Summary counts:
-- Critical: 0 (T-001 closed commit 554c4007d; T-002 closed 2026-05-11 Plan 6a)
-- Major: 3 (T-004, T-005, T-014)
-- Minor: 7 (T-007, T-008, T-009, T-010, T-011, T-012, T-013)
+Summary counts (all rows counted by tally including closed):
+- Critical: 2 (T-001 closed commit 554c4007d; T-002 closed 2026-05-11 Plan 6a)
+- Major: 4 (T-003 closed Plan 7; T-004 closed Plan 9r; T-005 open; T-014 closed 2026-05-28)
+- Minor: 8 (T-006 closed Phase 8; T-007 open — Role slice closed ARC-06, remainder open; T-008 closed 2026-07-02 ADR 0027/0055; T-009 open; T-010 closed 2026-07-02 ADR 0058; T-011 open; T-012 closed 2026-07-01 register drift; T-013 open)
 
-Top 3 (by severity, then by blast-radius):
-1. T-004 â€” `CreateUser` two-transaction non-atomicity: orphaned `auth_identities` row when IAM role TX fails. Major.
-2. T-005 â€” Login endpoint missing IP-based rate limit: per-account lockout permits distributed brute-force across identifiers. Major.
-3. T-014 â€” FE 401 interceptor conflated session-expiry with domain-401 (closed 2026-05-28). Major (closed).
+Top 3 open (by severity, then by blast-radius):
+1. T-005 â€” Login endpoint missing IP-based rate limit: per-account lockout permits distributed brute-force across identifiers. Major.
+2. T-007 â€” Auth↔IAM bidirectional dependency (Role slice closed ARC-06; capability/port coupling remainder still open). Minor.
+3. T-009 â€” Logout cannot distinguish "no session" from "tampered cookie". Minor.
 
 Coverage stats (computed at compose):
 - Public symbols undocumented: 98 / 98
 - Operations missing C4 placement: 0 / 4
 - Cross-deps missing in Â§5/Â§8: 0
 - State transitions missing in Â§6: 0
-- Decisions without ADR link: 8
+- Decisions without ADR link: 6
 
 Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md).
 

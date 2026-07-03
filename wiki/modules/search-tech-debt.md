@@ -6,11 +6,11 @@
 
 ## Items
 
-### T-001 · 405 response body is empty (no RFC 9457 Problem+JSON envelope)
-- **Severity:** minor
-- **Surface:** `internal/modules/search/delivery/http/handler.go:54-56`
-- **Observation:** The method guard calls `w.WriteHeader(http.StatusMethodNotAllowed)` and returns without a body. All other error paths in the handler were migrated to `httpresponse.WriteError` (RFC 9457 compliant) in commit c4c4d95d2 (Phase D error-envelope unification). The 405 path was not migrated and emits no body.
-- **Evidence:** `handler.go:54-56` — `w.WriteHeader(http.StatusMethodNotAllowed); return` with no `httpresponse.WriteError` call. `writeAPIError` no longer exists in the handler; previous evidence anchor was stale.
+### ~~T-001 · 405 response body is empty (no RFC 9457 Problem+JSON envelope)~~ **DRIFT-CLOSED 2026-07-02 (no change — handler.go:66-69 calls `httpresponse.WriteMethodNotAllowed`, which emits `WriteError` RFC 9457 problem+json)**
+- **Severity:** ~~minor~~ closed
+- **Surface:** `internal/modules/search/delivery/http/handler.go:66-69`; `internal/platform/httpresponse/response.go:22-25`
+- **Observation (original):** The method guard called `w.WriteHeader(http.StatusMethodNotAllowed)` and returned without a body.
+- **Evidence:** `handler.go:66-69` now calls `httpresponse.WriteMethodNotAllowed(w, http.MethodGet)`; `response.go:22-25` shows `WriteMethodNotAllowed` sets the `Allow` header and delegates to `WriteError(w, http.StatusMethodNotAllowed, problem.CodeMethodNotAllowed, "Method not allowed")` — a full RFC 9457 problem+json body. No code change needed; row was already fixed, register was stale.
 - **Linked backlog row:** `R-001`
 - **Linked ADR:** missing-ADR
 

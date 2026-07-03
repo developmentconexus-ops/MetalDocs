@@ -7,12 +7,12 @@
 > **Key files:**
 > - `internal/modules/audit/domain/port.go:8-31` â€” `Event`, `ListEventsQuery`, `Writer`, `Reader`
 > - `internal/modules/audit/application/service.go:94-99` â€” `Service.ListEvents` (limit clamp [1..100] default 50; MaxLimit=100 from pagination platform package)
-> - `internal/modules/audit/delivery/http/handler.go:67` â€” `RegisterRoutes` (mounts `GET /api/v1/audit/events`, export routes)
-> - `internal/modules/audit/delivery/http/handler.go:73` â€” `handleEvents` (cursor envelope `{items, page:{next_cursor, has_more}}`)
+> - `internal/modules/audit/delivery/http/handler.go:85` â€” `RegisterRoutes` (mounts all 4 routes via generated `auditapi.HandlerWithOptions`, BaseURL `/api/v1`)
+> - `internal/modules/audit/delivery/http/handler.go:130` â€” `handleEvents` (cursor envelope `{items, page:{next_cursor, has_more}}`)
 > - `internal/modules/audit/infrastructure/postgres/writer.go:20,44` â€” `Record` (INSERT) + `ListEvents` (SELECT)
 > - `archive/migrations/0004_init_audit_events.sql:1` — `metaldocs.audit_events` table
 > - `archive/migrations/0005_grant_workflow_audit_privileges.sql:2` — INSERT grant to `metaldocs_app`
-> - `apps/api/cmd/metaldocs-api/main.go:193` â€” route registration site
+> - `apps/api/cmd/metaldocs-api/main.go:342` â€” route registration site (`auditHandler.RegisterRoutes(mux)`)
 > - `apps/api/cmd/metaldocs-api/main.go:773-829` â€” `documentsAuditAdapter`
 
 ---
@@ -52,7 +52,7 @@
 - Language / runtime: Go 1.25
 - Persistence: Postgres, table `metaldocs.audit_events` (schema-qualified, not `public`)
 - API contract: OpenAPI 3.0.3 declares `/audit/events` at `api/openapi/v1/openapi.yaml:741-745` with `operationId: listAuditEvents`
-- HTTP routing: `http.ServeMux.HandleFunc` directly â€” NOT oapi-codegen (`handler.go:68`)
+- HTTP routing: generated `auditapi.HandlerWithOptions` (oapi-codegen dispatch) mounted at `handler.go:85-93`; audit's `Handler` implements `auditapi.ServerInterface` directly via thin adapter methods (`handler.go:107-128`) — migrated off hand-mounted `mux.HandleFunc` 2026-07-02 (T-008, commit `0d0aa9f2`)
 - Error envelope: RFC 9457 Problem Details (`problem.Write`) — T-002 closed Phase D/F
 - Append-only by grant only â€” `INSERT` grant exclusively (`archive/migrations/0005:2`); no application-layer UPDATE/DELETE path
 
@@ -107,7 +107,7 @@ Outbound interfaces:
 - **Domain port + concrete adapters.** `Writer`/`Reader` defined in `domain/port.go`; postgres and in-memory adapters injected via platform bootstrap. Lets consumers depend on `auditdomain` only.
 - **Append-only via grant plus hash-chain evidence.** `metaldocs_app` gets `INSERT` only (`archive/migrations/0005:2`), while `migrations/0193` adds `audit_sequence`, `prev_hash`, `row_hash`, and `metaldocs.audit_event_row_hash(...)`. Simpler than a forbid-update trigger; DBA/superuser changes are detected by the integrity validator job rather than prevented.
 - **Fire-and-forget write contract.** Caller's regulated action commits its own tx FIRST; audit Record is a separate, post-hoc call that returns an error the caller ignores. Driver: audit failure must never roll back a regulated state change. Cost: dropped audit emissions are silent (T-005).
-- **One handler-mounted route, not codegen.** `handler.RegisterRoutes` wires `mux.HandleFunc` directly. Driver: pre-dates the contract-first migration (ADR 0012); audit was never re-mounted under oapi-codegen.
+- **Generated-router mount (as of 2026-07-02).** `handler.RegisterRoutes` (`handler.go:85-93`) mounts all 4 routes via `auditapi.HandlerWithOptions`; `Handler` implements `auditapi.ServerInterface` directly, with thin adapter methods (`ListAuditEvents`, `ExportAuditEvents`, `GetAuditExportStatus`, `DownloadAuditExport`, `handler.go:107-128`) delegating unchanged to the pre-existing `handleEvents`/`handleExport`/`handleExportSubresource` private handlers. Audit was the last hand-mounted module (T-008, CON-03/CON-09 pattern); commit `0d0aa9f2` closed the gap. Tier-1 `CapAuditRead` gating (keys off method+path in `permissions.go`) is unaffected — the generated router preserves paths byte-for-byte (AD-1: BaseURL `/api/v1` + spec's relative paths).
 - **Same `*postgres.Writer` serves both `Writer` and `Reader`.** Bootstrap wires `auditpg.NewWriter(db)` into both interface slots (`bootstrap/api.go:100-101`). Driver: simplicity; cost: nothing today.
 
 ---
@@ -121,7 +121,7 @@ Outbound interfaces:
 ```mermaid
 C4Container
     title Container View — audit (module-internal packages)
-    Container(http, "HTTP Handler", "Go (http.ServeMux)", "GET /api/v1/audit/events")
+    Container(http, "HTTP Handler", "Go (generated auditapi.HandlerWithOptions)", "GET /api/v1/audit/events")
     Container(svc, "Application Service", "Go", "ListEvents â€” normalize + clamp limit")
     Container(port, "Domain Port", "Go interfaces", "Writer.Record Â· Reader.ListEvents Â· Event Â· ListEventsQuery")
     Container(pgw, "Postgres adapter", "Go + database/sql", "Record (INSERT) Â· ListEvents (SELECT)")
@@ -145,34 +145,34 @@ C4Container
 | `internal/modules/audit/application/service.go:10` | `Service` | struct | wraps a `Reader` |
 | `internal/modules/audit/application/service.go:14` | `NewService(reader)` | func | constructor |
 | `internal/modules/audit/application/service.go:94-99` | `Service.ListEvents` | method | normalize + clamp `Limit` to `[1..100]`, default 50; MaxLimit=100 from pagination platform package |
-| `internal/modules/audit/delivery/http/handler.go:37` | `Handler` | struct | HTTP wrapper |
-| `internal/modules/audit/delivery/http/handler.go:42` | `EventResponse` | struct | wire shape: `id`, `occurred_at` (RFC3339 UTC), `actor_id`, `action`, `resource_type`, `resource_id`, `payload` (decoded), `trace_id` |
-| `internal/modules/audit/delivery/http/handler.go:53` | `NewHandler(service)` | func | constructor |
-| `internal/modules/audit/delivery/http/handler.go:67` | `Handler.RegisterRoutes` | method | mounts `GET /api/v1/audit/events` (+ export routes) on a `*http.ServeMux` |
+| `internal/modules/audit/delivery/http/handler.go:46` | `Handler` | struct | HTTP wrapper; implements `auditapi.ServerInterface` |
+| `internal/modules/audit/delivery/http/handler.go:466` | `buildEventResponses` | func | maps stored events onto generated `auditapi.AuditEventItem` (wire shape: `id`, `occurred_at` RFC3339 UTC, `actor_id`, `action`, `resource_type`, `resource_id`, `payload` decoded, `trace_id`) — replaces the former hand-written `EventResponse` struct |
+| `internal/modules/audit/delivery/http/handler.go:52` | `NewHandler(service)` | func | constructor |
+| `internal/modules/audit/delivery/http/handler.go:85` | `Handler.RegisterRoutes` | method | mounts all 4 routes via generated `auditapi.HandlerWithOptions` (BaseURL `/api/v1`) |
 | `internal/modules/audit/infrastructure/postgres/writer.go:12,16,20,44` | `postgres.Writer`, `NewWriter`, `Record`, `ListEvents` | type + methods | Postgres adapter (satisfies both Writer + Reader) |
 | `internal/modules/audit/infrastructure/memory/writer.go:11,16,20,27` | `memory.Writer`, `NewWriter`, `Record`, `ListEvents` | type + methods | in-process adapter for dev/tests |
 
 ### 5.3 HTTP operations
 
-| Method | Path | OperationID | Handler | Authz |
+| Method | Path | OperationID | Generated adapter → delegate | Authz |
 |---|---|---|---|---|
-| GET | `/api/v1/audit/events` | `listAuditEvents` (`api/openapi/v1/openapi.yaml:745`) | `Handler.handleEvents` (`handler.go:75`) | `CapAuditRead` (`permissions.go:232`) |
-| POST | `/api/v1/audit/events/export` | _missing_ | `Handler.handleExport` (`handler.go:132`) | `CapAuditRead` (`permissions.go:233`) |
-| GET | `/api/v1/audit/events/export/{id}` | _missing_ | `Handler.handleExportSubresource` → status branch (`handler.go:223`) | `CapAuditRead` (`permissions.go:234`) |
-| GET | `/api/v1/audit/events/export/{id}/download` | _missing_ | `Handler.handleExportSubresource` → download branch (`handler.go:239`) | `CapAuditRead` tier-1 + download token application-layer gate |
+| GET | `/api/v1/audit/events` | `listAuditEvents` (`api/openapi/v1/openapi.yaml:774`) | `Handler.ListAuditEvents` (`handler.go:107`) → `handleEvents` (`handler.go:130`) | `CapAuditRead` (`permissions.go:257`) |
+| POST | `/api/v1/audit/events/export` | `exportAuditEvents` (`api/openapi/v1/openapi.yaml:577`) | `Handler.ExportAuditEvents` (`handler.go:112`) → `handleExport` (`handler.go:189`) | `CapAuditRead` (`permissions.go:258`) |
+| GET | `/api/v1/audit/events/export/{id}` | `getAuditExportStatus` (`api/openapi/v1/openapi.yaml:603`) | `Handler.GetAuditExportStatus` (`handler.go:119`) → `handleExportSubresource` status branch (`handler.go:281`) | `CapAuditRead` (`permissions.go:259`) |
+| GET | `/api/v1/audit/events/export/{id}/download` | `downloadAuditExport` (`api/openapi/v1/openapi.yaml:628`) | `Handler.DownloadAuditExport` (`handler.go:126`) → `handleExportSubresource` → `handleExportDownload` (`handler.go:342`) | `CapAuditRead` tier-1 + download token application-layer gate |
 
-Route registration: `handler.go:69-73` mounts all four logical routes via three `mux.HandleFunc` calls; sub-resource routing is done inline by path parsing at `handler.go:232-246`.
+Route registration: `handler.go:85-93` mounts all 4 routes in one call via generated `auditapi.HandlerWithOptions`; each `ServerInterface` adapter method is a thin, unchanged delegate to the pre-existing private handler (`handler.go:107-128`). Sub-resource dispatch (status vs. download) is still done inline by path parsing inside `handleExportSubresource` (`handler.go:291-305`).
 
 ## API Route Truth Table (Plan 8 Baseline)
 
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/audit/events` | `internal/modules/audit/delivery/http/handler.go:69` | `handleEvents` | `/audit/events` | `listAuditEvents` | â€” | Aligned | Spec server is `/api/v1`; handler wired directly via `http.ServeMux` (not oapi-codegen). |
-| POST | `/api/v1/audit/events/export` | `internal/modules/audit/delivery/http/handler.go:71` | `handleExport` | _not in spec_ | â€” | â€” | Uncontracted | Export routes wired in code (`permissions.go:233`) but absent from OpenAPI spec. |
-| GET | `/api/v1/audit/events/export/{id}` | `internal/modules/audit/delivery/http/handler.go:73` | `handleExportSubresource` (status branch) | _not in spec_ | â€” | â€” | Uncontracted | |
-| GET | `/api/v1/audit/events/export/{id}/download` | `internal/modules/audit/delivery/http/handler.go:73` | `handleExportSubresource` (download branch) | _not in spec_ | â€” | â€” | Uncontracted | Token-gated download; path parsed inline at `handler.go:232-246`. |
+| GET | `/api/v1/audit/events` | `internal/modules/audit/delivery/http/handler.go:85` (mount) → `:107` (adapter) | `ListAuditEvents` → `handleEvents` | `/audit/events` | `listAuditEvents` | `ListAuditEvents` | Aligned | Spec server is `/api/v1`; mounted via generated `auditapi.HandlerWithOptions`. |
+| POST | `/api/v1/audit/events/export` | `internal/modules/audit/delivery/http/handler.go:85` (mount) → `:112` (adapter) | `ExportAuditEvents` → `handleExport` | `/audit/events/export` | `exportAuditEvents` | `ExportAuditEvents` | Aligned | Mounted by the same generated router; `permissions.go:258` gates tier-1. |
+| GET | `/api/v1/audit/events/export/{id}` | `internal/modules/audit/delivery/http/handler.go:85` (mount) → `:119` (adapter) | `GetAuditExportStatus` → `handleExportSubresource` (status branch) | `/audit/events/export/{export_id}` | `getAuditExportStatus` | `GetAuditExportStatus` | Aligned | |
+| GET | `/api/v1/audit/events/export/{id}/download` | `internal/modules/audit/delivery/http/handler.go:85` (mount) → `:126` (adapter) | `DownloadAuditExport` → `handleExportSubresource` → `handleExportDownload` | `/audit/events/export/{export_id}/download` | `downloadAuditExport` | `DownloadAuditExport` | Aligned | Token-gated download; sub-resource dispatch (status vs. download) still parsed inline at `handler.go:291-305`. |
 
-- Module contract status: Partially contracted (list route only; export routes present in code and permissions.go but absent from OpenAPI spec)
+- Module contract status: Fully contracted — all 4 routes spec'd and mounted via generated `auditapi.HandlerWithOptions` (migrated off hand-mounted `mux.HandleFunc` 2026-07-02, T-008, commit `0d0aa9f2`). Historical note: this table previously described a partially-contracted, hand-mounted state (pre-2026-07-02); superseded.
 - Owner: leandro
 
 ---
@@ -336,8 +336,8 @@ Wiring: `iamdelivery.NewAdminHandler(..., deps.AuditWriter).WithAuditReader(deps
 Pointer-only. Body in `wiki/modules/audit-tech-debt.md`. Severity rubric: see that file.
 
 - Critical: 2
-- Major: 4
-- Minor: 6
+- Major: 5
+- Minor: 7
 
 Top 3 (by severity, then by blast-radius):
 

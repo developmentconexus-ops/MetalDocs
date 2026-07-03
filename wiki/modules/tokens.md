@@ -376,8 +376,8 @@ Go never parses token syntax (this is a binding invariant from `wiki/concepts/to
 Pointer-only. Body in `wiki/modules/tokens-tech-debt.md`. Severity rubric: see that file.
 
 - Critical: 0
-- Major: 0 (TD-1 closed — resolved by SP-2 reserved-name guard + creation-time pinning; see ADR 0049)
-- Minor: 1 (TD-2: strictjson promotion shim in documents module)
+- Major: 1 (TD-1: ~~closed~~ resolved by SP-2 reserved-name guard + creation-time pinning; see ADR 0049 — all rows counted by tally including closed)
+- Minor: 1 (TD-2: ~~closed~~ strictjson promotion shim, resolved ARC-03 2026-07-02)
 
 TD-1 closed: the render-time catalog merge problem is moot because dictionary values are pinned at creation time and the reserved-name guard (D4/D5) prevents naming collisions before any document is created. See `wiki/modules/tokens-tech-debt.md`.
 

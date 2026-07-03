@@ -54,6 +54,23 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# --- Exempt modules ----------------------------------------------------------
+# Modules whose register deliberately does NOT use the T-NNN + `- **Severity:**`
+# row shape this script tallies. Exemption != drift: forcing a fake severity
+# taxonomy onto these would be format-washing, and renumbering would break
+# existing cross-references (e.g. the grade-A register cites "security #7").
+# This list MUST only shrink; additions require operator approval + reason.
+$ExemptModules = @{
+    # security-tech-debt.md is a numbered defer-table (| # | Item | Reason for
+    # defer | Promote when |) and security.md is a narrow single-topic doc with
+    # no section 11 — by design (2026-07-02 Phase-5 reconciliation verdict).
+    'security' = 'defer-table register shape; no section-11 severity taxonomy by design'
+}
+if ($ExemptModules.ContainsKey($Module)) {
+    Write-Host "[tally] SKIP (exempt: $($ExemptModules[$Module]))"
+    exit 0
+}
+
 $doc = Join-Path $RepoRoot "wiki/modules/$Module.md"
 $debt = Join-Path $RepoRoot "wiki/modules/$Module-tech-debt.md"
 

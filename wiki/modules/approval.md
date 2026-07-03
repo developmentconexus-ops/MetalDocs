@@ -487,7 +487,7 @@ Pointer-only. Body lives in `wiki/modules/approval-tech-debt.md`. Severity rubri
 
 - Critical: 3 total — 2 closed (T-001 Plan 7; T-013 2026-06-01); 1 open (T-002, with sub-item BE-1 resolved by PR-1 2026-06-02 — see T-002 sub-item note)
 - Major: 4 total — 2 closed (T-003 Plan 7; T-006 2026-05-25); 2 open (T-004, T-005)
-- Minor: 6 total — 2 closed (T-008 migration 0194; T-012 Plan 4); 4 open (T-007, T-009, T-010, T-011); 1 deferred-by-policy (T-014 idempotency wrapper duplication — revisit at 3rd-store boundary)
+- Minor: 7 total — 3 closed (T-008 migration 0194; T-009 DRIFT-CLOSED 2026-07-02; T-012 Plan 4); 3 open (T-007, T-010, T-011); 1 deferred-by-policy (T-014 idempotency wrapper duplication — revisit at 3rd-store boundary)
 - High (composite): 1 closed — T-015 RouteAdminPage legacy FE/BE drift, closed by PR-1..PR-4 (2026-06-02)
 
 Top 3 open (by severity, then by blast-radius):

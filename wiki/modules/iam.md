@@ -447,16 +447,16 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 
 Pointer-only. Body in [`wiki/modules/iam-tech-debt.md`](iam-tech-debt.md). Severity rubric (concrete triggers) lives in the register, not here.
 
-Summary counts (open + partial only; closed items retained in register with CLOSED markers):
-- Critical: 0
-- Major: 1 (T-004 partial)
-- Minor: 3 (T-008, T-010, T-011)
-- Decisions without ADR link: 11
+Summary counts (all rows counted by tally including closed):
+- Critical: 5 (T-PR7B-1, T-PR7B-2, T-PR7B-3 closed 2026-06-02; T-001 closed Plan 4; T-005 closed Plan 6a)
+- Major: 5 (T-002 closed Plan 4; T-003 closed Plan 4; T-004 partially closed Plan 5; T-006 closed Plan 7; T-007 closed Wave 2.12)
+- Minor: 5 (T-008 open; T-009 closed Plan 4; T-010 closed ARC-06; T-011 closed ADR 0059; T-012 closed Plan 4)
+- Decisions without ADR link: 10
 
-Top 3 (by severity, then by blast-radius):
+Top 3 open/residual (by severity, then by blast-radius):
 1. T-004 â€” `iam_users` INSERT inside `UpsertUserAndAssignRole`/`ReplaceUserRoles` still tier-1 only; no dedicated tripwire on `metaldocs.iam_users`. Residual after Plan 5 closed the `iam_user_roles`/`user_process_areas` halves. Major (partially closed).
-2. T-010 â€” `auth` module imports `iamdomain.Role` while IAM admin handler imports `auth/domain.ManagedUser`; non-circular today but blocks future structural moves of `admin_handler`. Minor.
-3. T-008 â€” `CachedRoleProvider` not invalidated on group membership writes. Minor (latent).
+2. T-008 â€” `CachedRoleProvider` not invalidated on group membership writes. Minor (latent, no live consumer yet).
+3. T-PR8-1/T-PR8-2/T-PR8-3 â€” Tier-A billing/storage/apiCalls surfaces open by design (see PRD gaps, not counted in the 3 severity buckets above — pre-PR7B numbering, out of T-NNN sequence).
 
 **Wave 2.12 closed:** T-007 (`MembershipGovernanceLogger` now wired, best-effort). **Deferred:** in-tx atomic membership governance via `RecordTx` — next-touch trigger for T-007 residual.
 

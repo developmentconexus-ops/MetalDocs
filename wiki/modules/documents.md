@@ -525,9 +525,9 @@ Documents were already manually versioned (publish transitions status only; a ne
 
 Pointer-only. Body in `wiki/modules/documents-tech-debt.md`. Severity rubric in template `tech-debt-register.md`.
 
-Summary counts (T-008 closed Plan 4; all rows counted by tally including closed):
+Summary counts (T-008 closed Plan 4; T-013 DRIFT-CLOSED 2026-07-02; all rows counted by tally including closed):
 - Critical: 1
-- Major: 7
+- Major: 8
 - Minor: 4
 
 Top 3 (by severity, then blast radius):

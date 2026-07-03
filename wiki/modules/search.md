@@ -82,10 +82,10 @@ Only columns present on `public.documents` and `public.controlled_documents` are
 
 ## Risks & Technical Debt
 
-Open tech-debt items by severity (source: [search-tech-debt.md](search-tech-debt.md)):
+Summary counts (source: [search-tech-debt.md](search-tech-debt.md); all rows counted by tally including closed):
 
 - Critical: 0
 - Major: 0
-- Minor: 1 (T-001: ✅ CLOSED Wave 1 — 405 bare responses → `httpresponse.WriteMethodNotAllowed`; T-002: template search path deferred)
+- Minor: 3 (T-001: ~~CLOSED~~ DRIFT-CLOSED 2026-07-02 — 405 bare responses → `httpresponse.WriteMethodNotAllowed`; T-002: open, template search path deferred; T-003: CLOSED 2026-06-05 — dead ABAC path removed)
 
 Refactor backlog: [../backlog/search-refactor.md](../backlog/search-refactor.md)

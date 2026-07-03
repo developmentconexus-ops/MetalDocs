@@ -86,12 +86,12 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Linked backlog row:** `backlog/approval-refactor.md#R-008` (merged 2026-05-15 with 0194 evidence)
 - **Linked ADR:** missing-ADR
 
-### T-009 · `NOT VALID` FKs on tenant-scoped iam_users joins
-- **Severity:** minor
-- **Surface:** `migrations/0135_approval_instances.sql:28-31` (`approval_instances.submitted_by` → `metaldocs.iam_users`); `:95-98` (`approval_signoffs.actor_user_id`)
-- **Observation:** Both FKs declared `NOT VALID` and never validated by a follow-up migration. Latent integrity gap — orphaned `submitted_by` / `actor_user_id` rows would not be caught at write time.
-- **Evidence:** persistence map §1.
-- **Linked backlog row:** `backlog/approval-refactor.md#R-009`
+### ~~T-009 · `NOT VALID` FKs on tenant-scoped iam_users joins~~ **DRIFT-CLOSED 2026-07-02 (no change — db/baseline/0001_current_schema.sql:4145 and :4169 declare both FKs fully validated, no NOT VALID clause)**
+- **Severity:** ~~minor~~ closed (non-actionable — resolved in curated baseline)
+- **Surface:** `archive/migrations/0135_approval_instances.sql:28-31` (`approval_instances.submitted_by` → `metaldocs.iam_users`, archive-only); `:95-98` (`approval_signoffs.actor_user_id`, archive-only)
+- **Observation (original):** Both FKs declared `NOT VALID` in the original migration and never validated by a follow-up migration. Latent integrity gap — orphaned `submitted_by` / `actor_user_id` rows would not be caught at write time.
+- **Evidence:** `db/baseline/0001_current_schema.sql:4141-4145` — `approval_instances_submitted_by_tenant_fkey FOREIGN KEY (tenant_id, submitted_by) REFERENCES metaldocs.iam_users(tenant_id, user_id)`, no `NOT VALID`; `:4165-4169` — `approval_signoffs_actor_tenant_fkey FOREIGN KEY (actor_tenant_id, actor_user_id) REFERENCES metaldocs.iam_users(tenant_id, user_id)`, no `NOT VALID`. Same non-actionable pattern as documents T-009 (fix folded into curated baseline at cut time).
+- **Linked backlog row:** `backlog/approval-refactor.md#R-009` (should be closed — baseline evidence above)
 - **Linked ADR:** missing-ADR
 
 ### T-010 · ~110 exported symbols across domain/application/http undocumented

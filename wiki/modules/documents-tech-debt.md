@@ -115,13 +115,13 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 
 2026-05-19 follow-up: sidebar revision rows were tightened to code/title/date and `REV00` now defaults to `Criacao do documento`; no new debt opened. Rich history search/filtering remains deferred until governed lineages are long enough to need more than collapse/expand.
 
-### T-013 · `freeze_service.go` optional-tx-enlistment pattern (ADR-0015 deferred) — OPEN
-- **Severity:** major (open — deferred by ADR-0015 annotation)
-- **Surface:** `internal/modules/documents/application/freeze_service.go:178`, `:314`, `:379` — three `if tx != nil { //cilint:allow-dualmode }` branches retained; `freeze_service` can enlist in a caller-provided tx or run without one.
-- **Observation:** Wave 2.12 removed all other `db==nil` dual-mode branches in the documents service, but `freeze_service` retains the optional-tx pattern annotated `//cilint:allow-dualmode`. This is explicitly deferred: the path where no tx is provided is the ADR-0015 "optional enlistment" design. Collapse to in-tx-only requires rethinking callers that invoke freeze without an outer tx. CI guard `nodualmode` treats the annotation as an allow-list escape hatch.
-- **Resolution path:** Collapse `freeze_service` to require a non-nil `tx` argument; refactor callers. Next-touch trigger: any change to the freeze execution path.
+### ~~T-013 · `freeze_service.go` optional-tx-enlistment pattern (ADR-0015 deferred)~~ **DRIFT-CLOSED 2026-07-02 (no change — freeze_service.go:183-186 makes tx mandatory, no dual-mode branches remain)**
+- **Severity:** ~~major~~ closed
+- **Surface (resolved):** `internal/modules/documents/application/freeze_service.go:183-186` — `Pin` now returns an error if `tx == nil` (`"freeze_service: tx required (ADR 0015 amended by Wave Z Z-5)"`); no `//cilint:allow-dualmode` annotations remain anywhere in the file or module (`grep -rn cilint:allow-dualmode internal/modules/documents/` — zero hits).
+- **Observation (original):** Wave 2.12 removed all other `db==nil` dual-mode branches in the documents service, but `freeze_service` retained the optional-tx pattern annotated `//cilint:allow-dualmode`, deferred under ADR-0015's "optional enlistment" design.
+- **Evidence:** `freeze_service.go:178-186` doc comment + guard clause; `wiki/decisions/0015-async-freeze-pin-materialize.md:3` — "Status: Accepted (amended 2026-06-13 — optional-tx-enlistment retired by Wave Z Z-5; tx is mandatory)".
 - **Linked backlog row:** none yet
-- **Linked ADR:** ADR-0015 (referenced in annotation; no standalone file verified)
+- **Linked ADR:** `wiki/decisions/0015-async-freeze-pin-materialize.md` (amended 2026-06-13)
 
 ## Coverage stats (computed at compose time)
 

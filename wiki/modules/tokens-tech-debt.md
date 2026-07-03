@@ -8,7 +8,7 @@
 
 ## TD-1: Computed-token / dictionary collision (CLOSED — SP-2)
 
-**Severity:** Major → **CLOSED**
+- **Severity:** ~~major~~ closed
 **Status:** Resolved by ADR 0049 (SP-2 creation-time prevention + pinning)
 **Opened:** 2026-06-28 (SP-1 design, spec §8)
 **Closed:** 2026-06-28 (SP-2 delivery)
@@ -37,7 +37,7 @@ There is no render-time merge map; there is therefore no collision to resolve. T
 
 ## TD-2: strictjson promotion shim in documents/approval module (CLOSED — ARC-03)
 
-**Severity:** Minor → **CLOSED**
+- **Severity:** ~~minor~~ closed
 **Status:** Resolved — both the tokens-handler half and the documents/approval shim removal are done
 **Opened:** 2026-06-28 (SP-1 Task 1 observation)
 **Updated:** 2026-06-28 (SP-1 final review + SP-2 cleanup)
