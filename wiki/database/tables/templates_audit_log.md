@@ -1,11 +1,15 @@
-# public.templates_audit_log
+# public.templates_audit_log — RETIRED 2026-07-02 (DB-06 / T-013)
 
-> **Source:** `db/baseline/0001_current_schema.sql` + `db/migrations/0213_templates_tenant_id_uuid.sql`
+> **Source:** `db/baseline/0001_current_schema.sql` + `db/migrations/0213_templates_tenant_id_uuid.sql` (history) + `db/migrations/0262_drop_templates_audit_log.sql` (retirement)
 > **Schema:** `public`
 > **Owner:** templates
 
-## Purpose
-Current curated-baseline table owned by `templates`. See the owning module wiki and runtime repositories for business behavior.
+## Status: dropped
+
+Dropped by `db/migrations/0262_drop_templates_audit_log.sql`. The templates audit sink is now unified on `metaldocs.audit_events` for both reads and writes — see `wiki/architecture/data-model.md` "Audit sink (templates)" and `wiki/modules/templates-tech-debt.md` T-013 (closed). Any rows this table held before the write-sink migrated (Wave 1.8/F-07-sub-split, well before 0262) were backfilled into `metaldocs.audit_events` by 0262's hash-chain-preserving INSERT-SELECT before the DROP TABLE ran. This page is retained as historical record of the table's prior shape; do not resurrect it for new code.
+
+## Purpose (historical)
+Former curated-baseline table owned by `templates`, superseded by the canonical `metaldocs.audit_events` sink.
 
 ## Columns
 

@@ -1,6 +1,6 @@
 # Architecture: Data Model
 
-> **Last verified:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257) | **Prior:** 2026-06-08 (Phase F F4: ListDocumentsPaginated cursor migration; repository.go line anchors updated)
+> **Last verified:** 2026-07-02 (DB-06: templates audit sink is fully canonical — `public.templates_audit_log` retired via `db/migrations/0262_drop_templates_audit_log.sql`; both `AppendAudit`/`AppendAuditTx` writes and `ListAudit` reads go through `metaldocs.audit_events`) | **Prior:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257) | **Prior-2:** 2026-06-08 (Phase F F4: ListDocumentsPaginated cursor migration; repository.go line anchors updated)
 > **Status:** Stub. Expand with ERD + per-table schema notes when SQL stabilizes.
 > **Scope:** Postgres tables, key relationships, snapshot columns, hash columns.
 > **Out of scope:** Migration archaeology (the legacy DB-research notes were removed at the v1 re-baseline, commit `c7f06f2e`; retained historical `migrations/` evidence remains).
@@ -83,6 +83,10 @@ Populated at document-version creation by `application.SnapshotService`. Trigger
 - `schema_hash` — hash of the placeholder schema snapshot
 
 See [concepts/freeze-and-hashing.md](../concepts/freeze-and-hashing.md).
+
+## Audit sink (templates)
+
+Template audit history has one sink, not two: `metaldocs.audit_events` — a tamper-evident, hash-chained append-only log (`prev_hash`/`row_hash` via `metaldocs.audit_event_row_hash`, ordered by `audit_sequence`). `internal/modules/templates/repository/postgres.go` `AppendAudit`/`AppendAuditTx` (:604-624) write to it through `auditdomain.Writer`; `ListAudit` (:660-706) reads from it filtered to `resource_type = 'template'`. The former module-local `public.templates_audit_log` table (write path closed 2026-05-11 Plan 6a; read path closed earlier in Wave 1.8/F-07-sub-split) was dropped by `db/migrations/0262_drop_templates_audit_log.sql`, which backfilled any pre-cutover rows into the hash chain first. See `wiki/modules/templates-tech-debt.md` T-013 (closed).
 
 ## Runtime DB user permissions (metaldocs_app)
 

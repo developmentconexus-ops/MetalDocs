@@ -1,6 +1,6 @@
 # Database Dictionary Index
 
-> **Last verified:** 2026-06-12 (FE-5: migration 0236 dead-schema drop — `document_subjects` table retired; `templates_template.areas/visibility/specific_areas` + `document_profiles.is_active` columns dropped)
+> **Last verified:** 2026-07-02 (DB-06: migration 0262 drop — `templates_audit_log` table retired, audit sink unified on `metaldocs.audit_events`) | **Prior:** 2026-06-12 (FE-5: migration 0236 dead-schema drop — `document_subjects` table retired; `templates_template.areas/visibility/specific_areas` + `document_profiles.is_active` columns dropped)
 > **Source:** `db/baseline/0001_current_schema.sql`
 
 | Table | Schema | Owner | Page |
@@ -69,7 +69,7 @@
 | `template_versions` | `public` | templates | `wiki/database/tables/template_versions.md` |
 | `templates` | `public` | templates | `wiki/database/tables/templates.md` |
 | `templates_approval_config` | `public` | templates | `wiki/database/tables/templates_approval_config.md` |
-| `templates_audit_log` | `public` | templates | `wiki/database/tables/templates_audit_log.md` |
+| `templates_audit_log` | `public` | templates | `wiki/database/tables/templates_audit_log.md` (RETIRED 2026-07-02, migration 0262 — audit sink is `metaldocs.audit_events`) |
 | `templates_template` | `public` | templates | `wiki/database/tables/templates_template.md` |
 | `templates_template_version` | `public` | templates | `wiki/database/tables/templates_template_version.md` |
 | `user_process_areas` | `public` | iam | `wiki/database/tables/user_process_areas.md` |
