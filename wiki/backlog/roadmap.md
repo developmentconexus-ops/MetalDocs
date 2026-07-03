@@ -36,9 +36,9 @@
 | P3 | 7 | RFC 9457 envelope rollout | 11 commits | done 2026-05-11 |
 | P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | done 2026-05-13 (codegen only — contract incoherence carried forward) → **superseded-by [api-contract-hardening.md](../_archive/backlog/api-contract-hardening.md), CLOSED 2026-06-08** (re-audit 0 CRIT/0 HIGH) |
 | P4 | 9 | Transactional + idempotency hardening + template workflow alignment | ~6 | done 2026-05-13 (Plan 9R) |
-| P4 | 10 | Legacy purge + rename sweep (`templates → templates`, `v2 → v1`) | ~6 | pending |
+| P4 | 10 | Legacy purge + rename sweep (`templates → templates`, `v2 → v1`) | ~6 | done (R-101 `/api/v1` flip residual, open-deferred) |
 | P5 | 12 | Screen finalization × 7 (per `metaldocs-screen-implementation`) | ~7 | pending |
-| P5 | 13 | Doc-comment + ADR sweep | ~3 | pending |
+| P5 | 13 | Doc-comment + ADR sweep | ~3 | done 2026-07-02 (via grade-A DEC-07 + TST-06) |
 
 **Closes by end of P2:** 21 / 21 Critical rows. **Closes by end of P4:** 44 / 44 Major rows.
 
@@ -136,7 +136,7 @@ Status: implemented as a dedicated audit T-004 follow-up after Plan 9R. Added `a
 - **Closes:** templates R-100, R-101, T-012/R-012; documents R-100; registry R-100, T-010/R-010; approval T-007/R-007, T-008/R-008, T-009/R-009, T-011/R-011; auth T-012/R-012; editor-ui-eigenpal T-004/R-004, T-005/R-005, T-006/R-006; taxonomy T-013/R-013, T-015/R-015.
 - **Critical rows closed:** 0.
 - **Blockers:** Plans 4 / 5 / 6 / 7 / 8 done — rename + purge conflict w/ in-flight semantic work.
-- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
+- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`. Roadmap correction (2026-07-02, DOC-05): execution-order table said `pending` — this body stamp was the drifted side for the residue: templates R-101 (`/api/v1` URL flip + module dir rename) remains open-deferred in templates-refactor.md; the other Touches were closed here or by later programs (editable_zones dropped per history/DB-04, NOT VALID FKs validated DB-07, dual GUC helper collapsed ARC-07, OriginProtection wired SEC-07). Table updated to `done (R-101 residual)`.
 
 ## Plan 11 · Editor frontend stabilization
 
@@ -161,7 +161,7 @@ See above (P1, parallel to Plan 4).
 - **Closes:** every remaining `missing-ADR` link across all 10 tech-debt registers (~80 cells) + every doc-comment R-row.
 - **Critical rows closed:** 0.
 - **Blockers:** ratifies decisions Plans 3–10 made — do last.
-- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
+- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`. Roadmap correction (2026-07-02, DOC-05): this stamp reused Plan 10's commit list and was false at the time — neither half was done. Both halves actually closed 2026-07-02 under the grade-A program: missing-ADR cells retired by the DEC-07 ADR batch (ADRs 0058–0064), doc-comment sweep executed as TST-06. Table row updated to `done 2026-07-02 (via grade-A DEC-07 + TST-06)`.
 
 ---
 

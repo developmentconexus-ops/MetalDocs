@@ -487,7 +487,7 @@ Pointer-only. Body lives in `wiki/modules/templates-tech-debt.md`.
 
 - Critical: 4
 - Major: 6
-- Minor: 4
+- Minor: 5
 
 Top 3 (by severity, then blast-radius):
 
