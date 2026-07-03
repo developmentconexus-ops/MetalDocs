@@ -18,6 +18,13 @@
   color: var(--text-muted);
   font-weight: 500;
 }
+/* Callout modifier: tightens line-height so the kicker's uppercase glyphs
+   don't visually crowd a dashed-border callout's top padding (novo-documento
+   Step 4 "Ao confirmar" box). Apply directly via className instead of
+   reaching through a CSS-module :global(.kicker) descendant selector. */
+.kicker--callout {
+  line-height: 1;
+}
 .display-1 { font-size: 36px; line-height: 1.1; letter-spacing: -0.025em; font-weight: 600; margin: 0; }
 .h2 { font-size: 22px; line-height: 1.25; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
 .h3 { font-size: 16px; line-height: 1.35; font-weight: 600; letter-spacing: -0.02em; margin: 0; }

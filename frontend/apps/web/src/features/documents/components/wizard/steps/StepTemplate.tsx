@@ -1,5 +1,6 @@
 import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { Icon } from '../../../../../components/ui/Icon';
+import { InlineAlert } from '../../../../../components/ui/InlineAlert';
 import { resolveQueryError } from '../../../../../lib/api';
 import { formatRevisionCode } from '../../../../../lib/labels/revisionCode';
 import type { TemplateDTO } from '../../../../templates';
@@ -61,14 +62,14 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
           </div>
         </div>
       ) : isError ? (
-        <div role="alert" aria-live="assertive" aria-atomic="true" className="card">
-          {resolveQueryError(error, 'Falha ao carregar templates.')}
-          <div>
+        <InlineAlert
+          message={resolveQueryError(error, 'Falha ao carregar templates.')}
+          action={
             <button type="button" className="btn btn-sm" onClick={onRetry}>
               Tentar novamente
             </button>
-          </div>
-        </div>
+          }
+        />
       ) : (
         <div className={styles.templateStack}>
           {templates.length === 0 ? (

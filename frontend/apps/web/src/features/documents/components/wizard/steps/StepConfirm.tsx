@@ -1,5 +1,6 @@
 import { CodeChip } from '../../../../../components/ui/CodeChip';
 import { StatusPill } from '../../../../../components/ui/StatusPill';
+import { InlineAlert } from '../../../../../components/ui/InlineAlert';
 import type { DocumentProfile, ProcessArea } from '../../../../taxonomy/types';
 import type { TemplateDTO } from '../../../../templates';
 import { VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
@@ -122,7 +123,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
       </div>
 
       <div className={styles.nextStepsCallout}>
-        <div className={`${styles.nextStepsKicker} kicker`}>Ao confirmar</div>
+        <div className={`${styles.nextStepsKicker} kicker kicker--callout`}>Ao confirmar</div>
         <ol className={styles.nextStepsList}>
           <li>
             O slot <span className="mono">{codePreview}</span> será reservado permanentemente — códigos
@@ -153,11 +154,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
         </span>
       </label>
 
-      {error ? (
-        <div role="alert" aria-live="assertive" aria-atomic="true" className={`card ${styles.errorAlert}`}>
-          {error}
-        </div>
-      ) : null}
+      {error ? <InlineAlert message={error} className={styles.errorAlert} /> : null}
 
       <WizardFooter
         stepLabel={

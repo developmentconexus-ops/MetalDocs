@@ -22,23 +22,19 @@
 }
 
 /* Doc title (see design-source HTML reference): fontSize:16, fontWeight:500, marginBottom:14 */
-/* TODO(novo-documento:typography-tokens): raw 16px/500 — no font-size scale
-   in tokens.css today. See wiki/backlog/novo-documento.md#typography-tokens. */
 .docTitle {
-  font-size: 16px;
+  font-size: var(--font-size-md-3);
   font-weight: 500;
   margin-bottom: 14px;
 }
 
 /* Step 4 2-col field grid (see design-source HTML reference):
    gridTemplateColumns:1fr 1fr, gap:8, fontSize:12 */
-/* TODO(novo-documento:typography-tokens): raw 12px — no font-size scale.
-   See wiki/backlog/novo-documento.md#typography-tokens. */
 .fieldGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-2);
-  font-size: 12px;
+  font-size: var(--font-size-xs-2);
 }
 
 /* Responsive collapse for narrow viewports. */
@@ -85,11 +81,9 @@
 }
 
 /* Kicker sits flush at top of padding area; uppercase glyphs visually
-   crowd the dashed border. Tighten line-height so 16px padding-top
-   gives a clean gap above the text. */
-.nextStepsCallout :global(.kicker) {
-  line-height: 1;
-}
+   crowd the dashed border. Line-height tightened via the shared
+   .kicker--callout modifier in src/styles.css (applied at the JSX call
+   site) instead of a :global(.kicker) descendant-selector reach here. */
 
 /* Kicker inside the callout: marginBottom:8, color:var(--brand) */
 .nextStepsKicker {
@@ -102,7 +96,7 @@
 .nextStepsList {
   margin: 0;
   padding-left: 18px;
-  font-size: 12.5px;
+  font-size: var(--font-size-sm);
   line-height: 1.7;
   color: var(--text-soft);
 }
@@ -115,7 +109,7 @@
   align-items: flex-start;
   gap: 10px;
   margin-bottom: var(--sp-2);
-  font-size: 12.5px;
+  font-size: var(--font-size-sm);
   color: var(--text-soft);
   width: 100%;
 }

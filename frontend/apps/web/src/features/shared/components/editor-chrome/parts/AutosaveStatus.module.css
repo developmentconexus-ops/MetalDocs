@@ -1,12 +1,19 @@
+/* Component-local tokens — single-use values not part of the shared --sp-* /
+   --font-size-* scales. Scoped here (not tokens.css) to avoid polluting the
+   global design-token surface with one-off names (FE-06 T-005). */
 .status {
+  --autosave-status-min-w: 60px;
+  --autosave-dot-size: 8px;
+  --autosave-pulse-duration: 1.2s;
+
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs-2);
   font-family: var(--font-sans);
   white-space: nowrap;
-  min-width: 60px;
+  min-width: var(--autosave-status-min-w);
   flex-shrink: 0;
 }
 
@@ -15,8 +22,8 @@
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: var(--autosave-dot-size);
+  height: var(--autosave-dot-size);
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -27,7 +34,7 @@
 
 .dotSaving {
   background: var(--info);
-  animation: pulse 1.2s ease-in-out infinite;
+  animation: pulse var(--autosave-pulse-duration) ease-in-out infinite;
 }
 
 .dotError {

@@ -42,7 +42,7 @@
   z-index: 60;
   pointer-events: none;
   white-space: nowrap;
-  font-size: 13px; /* TODO:token — between --font-size-sm (12.5px) and --font-size-md (14px) */
+  font-size: var(--font-size-sm-2);
   font-family: var(--font-sans);
 }
 
@@ -66,7 +66,7 @@
   left: 0;
   right: 0;
   z-index: 100;
-  padding: 6px var(--sp-5); /* TODO:token — 6px has no --sp token (--sp-1=4px, --sp-2=8px) */
+  padding: var(--sp-1-5) var(--sp-5);
   font-size: var(--font-size-sm); /* 12.5px */
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -75,7 +75,7 @@
 /* ---------- Title text inside overlayCenter ---------- */
 
 .docTitle {
-  font-size: 15px; /* TODO:token — no exact token (--font-size-md=14px, --font-size-lg=22px) */
+  font-size: var(--font-size-md-2);
   font-weight: 600;
   color: var(--text);
   overflow: hidden;
@@ -92,7 +92,7 @@
 .docMeta {
   color: var(--text-muted);
   font-weight: 400;
-  font-size: 12px; /* TODO:token — no exact token (--font-size-xs=11px, --font-size-sm=12.5px) */
+  font-size: var(--font-size-xs-2);
 }
 
 /* ---------- Button primitives ---------- */
@@ -101,8 +101,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px; /* TODO:token — no icon-size token yet */
-  height: 26px; /* TODO:token — no icon-size token yet */
+  width: var(--ctl-h-sm);
+  height: var(--ctl-h-sm);
   padding: 0;
   background: transparent;
   border: 1px solid var(--border);
@@ -118,13 +118,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  height: 26px; /* TODO:token — no button-height token (--avatar-sm=22px, --avatar-md=28px near-miss) */
+  height: var(--ctl-h-sm);
   padding: 0 var(--sp-3);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--r-2);
   color: var(--text-soft);
-  font-size: 12px; /* TODO:token — no exact token (--font-size-xs=11px, --font-size-sm=12.5px) */
+  font-size: var(--font-size-xs-2);
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -138,13 +138,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  height: 26px; /* TODO:token — no button-height token */
+  height: var(--ctl-h-sm);
   padding: 0 var(--sp-3);
   background: var(--brand);
   border: 0;
   border-radius: var(--r-2);
   color: #fff;
-  font-size: 12px; /* TODO:token — no exact token (--font-size-xs=11px, --font-size-sm=12.5px) */
+  font-size: var(--font-size-xs-2);
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -157,13 +157,20 @@
 /* --- Eigenpal coupling pin ---------------------------------------------
    The :global(.ep-root ...) overrides below target eigenpal data-testid
    attributes and SVG fills as shipped by
-     third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz
+     @eigenpal/docx-editor-core@1.9.0 + @eigenpal/docx-editor-react@1.9.0
+     (see packages/eigenpal-adapter/package.json, packages/editor-ui/package.json)
+   FE-06 T-003: this comment previously pinned a stale vendored-tarball path
+   (third_party/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz) that no longer
+   matches the resolved npm dependency version — corrected 2026-07-02.
+   scripts/check-eigenpal-selector-pin.sh enforces the selector count and
+   forced-priority-declaration count below so an eigenpal bump fails CI
+   loudly instead of silently no-op'ing an override.
    On any eigenpal version bump:
      1. Re-run the manual smoke checklist in
         wiki/references/eigenpal-controlled-package.md
      2. Re-verify every selector matches at least one node in the
         rendered DOM of TemplateEditorPage + DocumentEditorPage.
-     3. Update this pin comment to the new version.
+     3. Update this pin comment and the guard script's EXPECTED_VERSION.
    --------------------------------------------------------------------- */
 
 /* ===== Eigenpal overrides — scoped to .wrapper :global(.ep-root) ===== */

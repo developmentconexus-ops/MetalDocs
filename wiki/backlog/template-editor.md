@@ -72,9 +72,9 @@ The replacement is a single negative-assertion test under `QueryClientProvider`:
 
 ---
 
-## VersionActionPanel inline styles
+## ~~VersionActionPanel inline styles~~ (stale, closed 2026-07-02 — FE-07 verification)
 
-`VersionActionPanel.tsx` uses inline styles for the review/approve/publish footer panel. Restyle to CSS Module + tokens to match the rest of the screen. Low risk — no data-shape change.
+`VersionActionPanel.tsx` no longer exists in the tree (0 matches for `VersionActionPanel` across `frontend/apps/web/src` as of 2026-07-02). It was dropped by `316aed29 refactor(templates): drop dead VersionActionPanel, add editor metadata sidebar`, which replaced the inline-styled footer panel with the editor metadata sidebar. This backlog row predates that refactor and is stale — no restyle work remains.
 
 ---
 

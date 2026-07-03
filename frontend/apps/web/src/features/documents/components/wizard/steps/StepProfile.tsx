@@ -1,5 +1,6 @@
 import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { Icon } from '../../../../../components/ui/Icon';
+import { InlineAlert } from '../../../../../components/ui/InlineAlert';
 import { resolveQueryError } from '../../../../../lib/api';
 import type { DocumentProfile } from '../../../../taxonomy/types';
 import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
@@ -48,14 +49,14 @@ export function StepProfile({
           </div>
         </div>
       ) : isError ? (
-        <div role="alert" aria-live="assertive" aria-atomic="true" className="card">
-          {resolveQueryError(error, 'Falha ao carregar perfis.')}
-          <div>
+        <InlineAlert
+          message={resolveQueryError(error, 'Falha ao carregar perfis.')}
+          action={
             <button type="button" className="btn btn-sm" onClick={onRetry}>
               Tentar novamente
             </button>
-          </div>
-        </div>
+          }
+        />
       ) : profiles.length === 0 ? (
         <div className="card">
           <div className="caption">Nenhum perfil cadastrado.</div>

@@ -1,4 +1,6 @@
 export { Icon } from './Icon';
+export { InlineAlert } from './InlineAlert';
+export type { InlineAlertTone } from './InlineAlert';
 export { Avatar } from './Avatar';
 export { CodeChip } from './CodeChip';
 export { StatusPill } from './StatusPill';
