@@ -1,6 +1,6 @@
 # MetalDocs Backend Atlas
 
-> **Last verified:** 2026-06-12 (Wave F coherence pass)
+> **Last verified:** 2026-07-02 (StagingOutboxWorker consolidation: outbox relay references updated — `PDFOutboxWorker`/`MaterializeOutboxWorker` are now two instances of generic `fanout.StagingOutboxWorker`) | **Prior:** 2026-06-12 (Wave F coherence pass)
 > **Scope:** Atlas entrypoint for the MetalDocs backend Stage-1 truth map. Covers every binary, domain module, platform package, contract surface, and cross-cutting concern. Every behavioral claim carries a `file:line` anchor derived from Stage-1 audit artifacts. Runtime-only behavior tagged `[runtime-unverified]`.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (all wiring)
@@ -346,8 +346,8 @@ graph LR
         direction TB
         HTTP_SRV["http.Server\n:8080 (APP_PORT=8081 in dev)"]
         SCHED["Scheduler goroutines\nstuck-instance-watchdog 5m\nidempotency-janitor 15m\naudit-integrity-validator 1h\nlease-reaper 10m"]
-        PDF_RELAY["PDFOutboxWorker\n5s poll\nmetaldocs.pdf_dispatch_outbox"]
-        MAT_RELAY["MaterializeOutboxWorker\n5s poll\nmetaldocs.materialize_dispatch_outbox"]
+        PDF_RELAY["StagingOutboxWorker (PDF)\n5s poll\nmetaldocs.pdf_dispatch_outbox"]
+        MAT_RELAY["StagingOutboxWorker (materialize)\n5s poll\nmetaldocs.materialize_dispatch_outbox"]
         SESS_SW["SessionSweeper\n60s"]
         ORPHAN_SW["OrphanPendingSweeper\n1h"]
         HUB["Presence Hub\n15s room tick\n30s heartbeat"]
@@ -422,11 +422,11 @@ graph LR
 
 **Runtime topology notes:**
 
-- `metaldocs-api` is the only process that serves HTTP traffic. It also hosts 7 in-process async goroutines: `PDFOutboxWorker`, `MaterializeOutboxWorker`, `SessionSweeper`, `OrphanPendingSweeper`, 3 scheduler goroutines (watchdog, janitor, validator/lease-reaper), and the Presence Hub.
+- `metaldocs-api` is the only process that serves HTTP traffic. It also hosts 7 in-process async goroutines: two `StagingOutboxWorker` instances (PDF + materialize relay), `SessionSweeper`, `OrphanPendingSweeper`, 3 scheduler goroutines (watchdog, janitor, validator/lease-reaper), and the Presence Hub.
 - `metaldocs-worker` is stateless between ticks; it has no HTTP server. It interacts only with Postgres (`outbox_events`) and external services (Gotenberg, docx-renderer, MinIO).
 - `metaldocs-jobs` is a River worker host. It has no HTTP server. Its deployment status is a high-severity open gap: no Dockerfile, no compose service (`async-runtime.md §10`; `repo-topology.md §10`).
 - `docx-renderer` is a separate Node.js process. The worker calls it over HTTP; no direct DB access from docx-renderer.
-- Two outbox staging tables (`pdf_dispatch_outbox`, `materialize_dispatch_outbox`) exist inside the API process. The API `PDFOutboxWorker`/`MaterializeOutboxWorker` relay rows into `metaldocs.outbox_events`, which `metaldocs-worker` then consumes. This is a two-stage outbox chain (`async-runtime.md §10`).
+- Two outbox staging tables (`pdf_dispatch_outbox`, `materialize_dispatch_outbox`) exist inside the API process. The API's two `StagingOutboxWorker` instances relay rows into `metaldocs.outbox_events`, which `metaldocs-worker` then consumes. This is a two-stage outbox chain (`async-runtime.md §10`).
 
 ---
 
@@ -496,10 +496,10 @@ Remaining open item: `FreezeService` optional-tx enlistment branches at `freeze_
 The PDF and DOCX materialization pipeline crosses three outbox tables and two processes:
 
 1. API process: domain write enqueues into `pdf_dispatch_outbox` or `materialize_dispatch_outbox` (staging tables)
-2. API process: `PDFOutboxWorker`/`MaterializeOutboxWorker` relay staging rows into `metaldocs.outbox_events`
+2. API process: two `StagingOutboxWorker` instances (PDF + materialize) relay staging rows into `metaldocs.outbox_events`
 3. `metaldocs-worker` process: `worker.Service.RunOnce` claims from `outbox_events` and dispatches to Gotenberg/docx-renderer
 
-`pdf_outbox_repository.go` and `materialize_outbox_repository.go` are near-identical clones (~160 lines each); same for their corresponding worker files. This is four files of structural duplication (`async-runtime.md §10`; `render-pipeline.md §10`). Full classification: F-04 in [legacy-register.md](legacy-register.md).
+The former four-file clone duplication (`pdf_outbox_repository.go`/`materialize_outbox_repository.go` + worker files) is resolved: consolidated into generic `StagingOutboxRepository` (`internal/modules/render/fanout/staging_outbox.go:33`) + `StagingOutboxWorker` (`staging_outbox_worker.go:23`). Full classification: F-04 (resolved) in [legacy-register.md](legacy-register.md).
 
 ### 7.6 No OpenTelemetry or distributed tracing
 

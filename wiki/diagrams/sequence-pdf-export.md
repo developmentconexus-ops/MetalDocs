@@ -1,10 +1,10 @@
 # Sequence — PDF Generation (post-freeze)
 
-> **Last verified:** 2026-06-01 (docgen-v2 → docx-renderer rename)
+> **Last verified:** 2026-07-02 (StagingOutboxWorker consolidation: relay is now the PDF instance of generic `fanout.StagingOutboxWorker`, hosted in metaldocs-api) | **Prior:** 2026-06-01 (docgen-v2 → docx-renderer rename)
 > **Flow:** Final approval enqueues a row in the **transactional PDF outbox** inside the same DB transaction. After the tx commits, a worker claims the row, reads the frozen docx from MinIO, converts it via Gotenberg, and writes the PDF back to MinIO. **Failure here never rolls back the approval** — ADR 0009.
 > **Code anchors:**
-> - [`internal/modules/render/fanout/pdf_outbox_repository.go:33`](../../internal/modules/render/fanout/pdf_outbox_repository.go) — `pdf_dispatch_outbox` INSERT (in-tx)
-> - [`internal/modules/render/fanout/pdf_outbox_worker.go`](../../internal/modules/render/fanout/pdf_outbox_worker.go) — relay: outbox row → published event
+> - [`internal/modules/render/fanout/staging_outbox.go:52`](../../internal/modules/render/fanout/staging_outbox.go) — `StagingOutboxRepository.Enqueue`: `pdf_dispatch_outbox` INSERT (in-tx)
+> - [`internal/modules/render/fanout/staging_outbox_worker.go:23`](../../internal/modules/render/fanout/staging_outbox_worker.go) — generic relay worker (PDF instance): outbox row → published event
 > - [`internal/platform/worker/pdf_job_runner.go:82`](../../internal/platform/worker/pdf_job_runner.go) — `ConvertPDF` call
 > - [`internal/platform/servicebus/gotenberg_pdf.go`](../../internal/platform/servicebus/gotenberg_pdf.go) — direct Gotenberg adapter (replaces the old docx-renderer PDF proxy; on the qa/approval-inbox branch)
 > - [ADR 0009](../decisions/0009-pdf-dispatch-outbox.md) — transactional outbox pattern
@@ -15,7 +15,7 @@ sequenceDiagram
     actor Approver
     participant API as metaldocs-api
     participant PG as Postgres
-    participant Outbox as PDFOutboxWorker (in metaldocs-worker)
+    participant Outbox as StagingOutboxWorker — PDF instance (in metaldocs-api)
     participant Pub as Outbox publisher
     participant Runner as PDFJobRunner (in metaldocs-worker)
     participant Minio as MinIO

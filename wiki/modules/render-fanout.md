@@ -1,6 +1,6 @@
 # Module: render-fanout
 
-> **Last verified:** 2026-06-29 (ADR 0050 — new `render/domain` package with `ComputedCatalog()` single source of truth; bidirectional parity guard; `approval_date` resolver now returns sentinel pre-approval; prior: 2026-06-12 Wave F — `Enqueue` now fails loud on nil tx; prior: 2026-06-01 P2 consolidation)
+> **Last verified:** 2026-07-02 (StagingOutboxWorker consolidation: per-table outbox worker/repo files replaced by generic `staging_outbox_worker.go`/`staging_outbox.go`; APP-01 `pdf_dispatcher.go`/`pdf_dispatch_adapter.go` deleted — key files + failure matrix updated) | **Prior:** 2026-06-29 (ADR 0050 — new `render/domain` package with `ComputedCatalog()` single source of truth; bidirectional parity guard; `approval_date` resolver now returns sentinel pre-approval; prior: 2026-06-12 Wave F — `Enqueue` now fails loud on nil tx; prior: 2026-06-01 P2 consolidation)
 > **Status:** active (pipeline module)
 > **Maturity:** L2
 > **Scope:** DOCX → PDF rendering pipeline, token substitution engine, outbox-driven dispatch.
@@ -13,10 +13,8 @@
 > - `internal/platform/messaging/events.go` - typed event envelope and `PDFConvertPayload`
 > - `internal/modules/render/fanout/client.go` — HTTP client to docx-renderer
 > - `apps/docx-renderer/src/routes/fanout.ts` — docx-renderer fanout route
-> - `internal/modules/render/fanout/pdf_dispatcher.go` — outbox publisher
-> - `internal/modules/render/fanout/pdf_dispatch_adapter.go` — invoker bridge
-> - `internal/modules/render/fanout/pdf_outbox_repository.go:97` — `ReadState(ctx, tenantID, revisionID)` — returns latest outbox status; used by `view_service.go` to report `pdf_status=failed`
-> - `internal/modules/render/fanout/pdf_outbox_worker.go` — background worker polls + dispatches
+> - `internal/modules/render/fanout/staging_outbox.go:33` — generic `StagingOutboxRepository` (allowlisted table binding; `ReadState` at `:179` returns latest outbox status, used by `view_service.go` to report `pdf_status=failed`)
+> - `internal/modules/render/fanout/staging_outbox_worker.go:23` — generic `StagingOutboxWorker`: background worker polls + dispatches (PDF + materialize instances)
 > - `internal/platform/worker/pdf_job_runner.go` — outbox consumer
 > - `apps/docx-renderer/src/render/fanout.ts` — eigenpal headless substitution
 
@@ -77,10 +75,10 @@ a template without the resolver erroring on unpublished documents.
 
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
-| Gotenberg / LibreOffice down | PDF outbox rows accumulate in `pdf_dispatch_outbox` with `pending`; published doc shows `pdf_status=pending` for >SLA | `pdf_outbox_worker` logs HTTP error; `pdf_outbox_repository.ReadState` returns `pending`/`failed` | Restart Gotenberg container; failed rows retried by worker until `max_attempts`, then marked `failed` (see [`render-fanout-tech-debt.md`](render-fanout-tech-debt.md)) |
+| Gotenberg / LibreOffice down | PDF outbox rows accumulate in `pdf_dispatch_outbox` with `pending`; published doc shows `pdf_status=pending` for >SLA | `StagingOutboxWorker` logs HTTP error; `StagingOutboxRepository.ReadState` returns `pending`/`failed` | Restart Gotenberg container; failed rows retried by worker until `max_attempts`, then marked `failed` (see [`render-fanout-tech-debt.md`](render-fanout-tech-debt.md)) |
 | docx-renderer fanout substitution error | Freeze emits `docgen.substitution_failed`; outbox row may be `failed` | `apps/docx-renderer/src/routes/fanout.ts` returns 5xx; `internal/modules/render/fanout/client.go` surfaces error | Inspect docx-renderer logs for token/resolver mismatch; check `concepts/placeholders.md` 8-token catalog drift |
 | Resolver returns empty value for required token | Frozen DOCX renders blank placeholder | `internal/modules/render/resolvers/builtins.go` returns `""`; tracked by `concepts/placeholders.md` | Confirm upstream data populated (e.g. controlled-document fields); add resolver coverage |
-| Nil tx passed to `Enqueue` | `Enqueue` returns an error immediately (`"pdf outbox enqueue: tx must not be nil"` / `"materialize outbox enqueue: tx must not be nil"`) — `pdf_outbox_repository.go:31` / `materialize_outbox_repository.go:31` | Error propagates to caller; no outbox row written | Fix caller to pass the business transaction; a nil tx would break the transactional-outbox guarantee (Wave F, commit `f698d1fd2`) |
+| Nil tx passed to `Enqueue` | `Enqueue` returns an error immediately (`"metaldocs.pdf_dispatch_outbox enqueue: tx must not be nil"` / `"metaldocs.materialize_dispatch_outbox enqueue: tx must not be nil"`) — `staging_outbox.go:52-55` | Error propagates to caller; no outbox row written | Fix caller to pass the business transaction; a nil tx would break the transactional-outbox guarantee (Wave F, commit `f698d1fd2`) |
 | Outbox replay (worker restart mid-dispatch) | Same `(tenant_id, revision_id)` processed twice | `ON CONFLICT (tenant_id, revision_id) DO NOTHING` on outbox INSERT dedupes; consumer is idempotent | Expected; no operator action |
 | MinIO upload fails for frozen PDF | Worker logs S3 PUT error; outbox row marked `failed` | Worker error log + outbox status | MinIO healthcheck; retry by clearing `failed` status or reissuing freeze |
 

@@ -1,6 +1,6 @@
 # Legacy & Duplication Register
 
-> **Last verified:** 2026-06-13
+> **Last verified:** 2026-07-02 (F-04 resolution note updated: `StagingOutboxWorker`/`StagingOutboxRepository` consolidation complete; clone files deleted) | **Prior:** 2026-06-13
 > **CLOSED (Wave Z, 2026-06-13):** every F-\*/D-\* entry is resolved, KEEP, or at-release. Pre-existing deferred items that were never Wave Z scope live in [post-v1-backlog.md](post-v1-backlog.md).
 > **Scope:** Consolidated cross-area register of every legacy pattern, structural duplication, and correctness gap found during the Stage-1 audit of the MetalDocs backend. Entries are grouped by root-cause family, ordered by worst severity, and mapped to normative requirements from [../architecture/backend-target-architecture.md](../architecture/backend-target-architecture.md). Each family states the Stage-2 question it must answer before closure.
 > **Key files:**
@@ -177,6 +177,8 @@ A secondary defect: `startOutboxWorker` has a restart loop that is dead code —
 **Deferred (Wave F sweep, 2026-06-12):** Stage-2 verdict SIMPLIFY, P2 (DRY / Go generics; RF-7). No correctness defect — the duplication is structural debt, not a bug; the two-stage relay was runtime-verified working in Wave F F.3 (worker claimed a `pdf_dispatch_outbox` row and relayed it to `outbox_events`). The `F-04-dead-loop` sub-item (dead restart loop in `startOutboxWorker`, DELETE/P3) rides the same trigger. **Trigger:** next time `render/fanout` is touched — extract `StagingOutboxWorker[R]`/`StagingOutboxRepository[R]` generics and delete the dead loop then.
 
 **Resolved (Wave Z): Z-10 `3367570c6` / allowlist tail `029003c2d`** — generic staging outbox repo/worker extracted; dead restart loop deleted; idempotency-store dedup applied (F-04, RF-7).
+
+**Current state (verified 2026-07-02):** the clone and dead-loop rows above are all CLOSED. `PDFOutboxWorker`/`MaterializeOutboxWorker` and their per-table repo/worker files no longer exist — the evidence paths in the table are historical. Current implementation: generic `StagingOutboxWorker` (`internal/modules/render/fanout/staging_outbox_worker.go:23`) + `StagingOutboxRepository` (`internal/modules/render/fanout/staging_outbox.go:33`, constructors `NewPDFOutboxRepository`/`NewMaterializeOutboxRepository` at `:215`/`:220`); both instances started without a restart loop by `startOutboxWorkers` (`apps/api/cmd/metaldocs-api/main.go:945`); shared config `config.StagingOutboxWorkerConfig` (`METALDOCS_STAGING_OUTBOX_*`).
 
 ---
 

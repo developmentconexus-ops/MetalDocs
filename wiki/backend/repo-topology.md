@@ -1,6 +1,6 @@
 # Repository Topology
 
-> **Last verified:** 2026-07-01 (TST-13 — deleted `start-api-no-build.ps1`, `start-api-planc.ps1`, `start-api.sh`, `check-governance.sh`, `run_metaldocs.ps1`, `dev-api-web.ps1`; prior: 2026-06-15 M4c F4c.5)
+> **Last verified:** 2026-07-02 (outbox-worker goroutine rows updated for StagingOutboxWorker consolidation) | **Prior:** 2026-07-01 (TST-13 — deleted `start-api-no-build.ps1`, `start-api-planc.ps1`, `start-api.sh`, `check-governance.sh`, `run_metaldocs.ps1`, `dev-api-web.ps1`; prior: 2026-06-15 M4c F4c.5)
 > **Scope:** Top-level directory layout, all binaries built and run, Go module configuration, CI pipeline shape, script entry points, and orphan/legacy classification for every top-level directory. Does not descend into `frontend/`, `node_modules/`, `vendor/`, `.worktrees/`, `.clone/`, or `non_git/` beyond identification.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (binary 1)
@@ -449,8 +449,7 @@ sequenceDiagram
 4. `migrate.Apply(ctx, deps.SQLDB, "db/migrations", slog.Default())` runs all pending migrations forward (`main.go:191-194`). Failure is fatal.
 5. All module services instantiated in order: auth → audit → search → IAM → taxonomy → controlled-documents → documents → templates → approval → jobs scheduler (`main.go:196-560`).
 6. Background goroutines started:
-   - PDF outbox worker (`main.go:488-489`) — exponential backoff restart
-   - Materialize outbox worker (`main.go:491-492`) — same
+   - PDF + materialize staging outbox workers (`startOutboxWorkers`, `main.go:543/945`) — no restart loop; `Run` returns only on ctx cancel
    - Scheduler goroutine (`main.go:563-566`) — `stuck-instance-watchdog`, `idempotency-janitor`, `audit-integrity-validator`, `lease-reaper` on ticker intervals
    - Session sweeper (`main.go:568`) — 60-second interval
    - Orphan pending sweeper (`main.go:569`) — hourly
@@ -553,8 +552,8 @@ Goroutines started by the composition root (`main.go`):
 
 | Goroutine | Location | Lifecycle |
 |---|---|---|
-| PDF outbox worker | `main.go:488-489` | Runs until ctx cancels; exponential backoff restart (base 1s, cap 60s) |
-| Materialize outbox worker | `main.go:491-492` | Same as above |
+| PDF staging outbox worker | `main.go:960-974` | Runs until ctx cancels (`StagingOutboxWorker.Run` returns only nil); no restart wrapper |
+| Materialize staging outbox worker | `main.go:976-989` | Same as above |
 | Scheduler | `main.go:563-566` | `s.Start(ctx)` — tick-based job runner; exits on ctx cancel |
 | Session sweeper | `main.go:568` | 60-second interval |
 | Orphan pending sweeper | `main.go:569` | Hourly, sweeps orphaned pending uploads older than 24h |

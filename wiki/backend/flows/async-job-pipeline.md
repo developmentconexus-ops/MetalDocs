@@ -9,7 +9,7 @@
 > - `internal/platform/messaging/outbox/postgres/consumer.go`
 > - `internal/modules/documents/approval/jobs/scheduled_publish_job.go`
 > - `internal/modules/jobs/scheduler/scheduler.go`
-> - `internal/modules/render/fanout/pdf_outbox_worker.go`
+> - `internal/modules/render/fanout/staging_outbox_worker.go`
 
 ---
 
@@ -41,7 +41,7 @@ Three stages across two binaries and the API process.
 When an approval decision triggers PDF dispatch:
 
 1. `DecisionService` calls `s.pdfOutbox.Enqueue` (`fanout.StagingOutboxRepository`, `decision_service.go:535`) inside the approvals transaction, inserting a row into `metaldocs.pdf_dispatch_outbox` with `status='pending'` (APP-01 2026-07-01: the former `PDFDispatchAdapter` post-commit path is deleted — outbox is the only dispatch path).
-2. A `fanout.StagingOutboxWorker` goroutine (PDF instance wired at `apps/api/cmd/metaldocs-api/main.go:930`; poll interval/batch from `config.StagingOutboxWorkerConfig`) polls `pdf_dispatch_outbox`. It claims rows with `FOR UPDATE SKIP LOCKED`, then calls `messaging.Publisher.Publish` for each row, inserting into `metaldocs.outbox_events` with `idempotency_key = "docgen_v2_pdf:{tenantID}:{revisionID}"` (ON CONFLICT DO NOTHING).
+2. A `fanout.StagingOutboxWorker` goroutine (PDF instance wired at `apps/api/cmd/metaldocs-api/main.go:960` via `startOutboxWorkers`, `main.go:945`; poll interval/batch from `config.StagingOutboxWorkerConfig`) polls `pdf_dispatch_outbox`. It claims rows with `FOR UPDATE SKIP LOCKED`, then calls `messaging.Publisher.Publish` for each row, inserting into `metaldocs.outbox_events` with `idempotency_key = "docgen_v2_pdf:{tenantID}:{revisionID}"` (ON CONFLICT DO NOTHING).
 
 ### Stage B — Outbox claim and PDF execution (in worker binary)
 
@@ -59,7 +59,7 @@ sequenceDiagram
     participant MinIO
 
     API->>PG_PDF: Enqueue(pending) [inside approval tx]
-    loop PDFOutboxWorker every 5s
+    loop StagingOutboxWorker (PDF) every 5s
         API->>PG_PDF: ClaimPending (SKIP LOCKED, limit 10)
         API->>PG_OB: Publisher.Publish (ON CONFLICT DO NOTHING)
         API->>PG_PDF: MarkDispatched
@@ -83,7 +83,7 @@ Three stages; the materialize worker re-enters the PDF pipeline at the end.
 ### Stage A — Freeze to materialize staging outbox (in API process)
 
 1. When `FreezeService.Pin` is called (approval decision), the freeze service writes the snapshot and then calls `materializeOutboxRepo.Enqueue` inside the freeze transaction, inserting into `metaldocs.materialize_dispatch_outbox` (migration `db/migrations/0215_materialize_dispatch_outbox.sql`).
-2. `MaterializeOutboxWorker` (started at `apps/api/main.go:491`) polls `materialize_dispatch_outbox` every 5 s, claims pending rows, calls `Publisher.Publish` with `EventTypeMaterializeFanout`, inserting into `outbox_events`.
+2. The materialize `StagingOutboxWorker` instance (wired at `apps/api/cmd/metaldocs-api/main.go:976` via `startOutboxWorkers`, `main.go:945`) polls `materialize_dispatch_outbox` every 5 s (default), claims pending rows, calls `Publisher.Publish` with `EventTypeMaterializeFanout`, inserting into `outbox_events`.
 
 ### Stage B — Materialize execution (in worker binary)
 
@@ -102,7 +102,7 @@ sequenceDiagram
     participant PG_PDF as pdf_dispatch_outbox
 
     API->>PG_MAT: Enqueue(pending) [inside freeze tx]
-    loop MaterializeOutboxWorker every 5s
+    loop StagingOutboxWorker (materialize) every 5s
         API->>PG_MAT: ClaimPending
         API->>PG_OB: Publisher.Publish (docx_materialize)
         API->>PG_MAT: MarkDispatched
@@ -223,7 +223,7 @@ Both use `authz.WithBackgroundBypass`. No restart logic — if the goroutine exi
 
 **Permanent-failure fast path** (`service.go` `markFailure`, added commit `9aab29c5`): before computing backoff, `markFailure` does a structural match — `errors.As(handleErr, &interface{ Retryable() bool })` — unwrapping through any `fmt.Errorf("...: %w", err)` chain. If the matched error reports `Retryable() == false` (e.g. `*fanout.RenderError` for a `template_parse` defect: a permanent, non-retriable template/composition bug from the docx-renderer, as opposed to a transient 5xx/network failure), `markFailure` forces `attempt = MaxAttempts` so the event dead-letters on the very first observed failure instead of burning the full retry budget on a defect that can never succeed. The match is structural rather than a direct import of `fanout.RenderError` so `internal/platform/worker` stays decoupled from the `render` module (no platform→module import inversion). This only applies to the `docx_materialize` (`EventTypeMaterializeFanout`) path, which is the only worker-routed consumer of `fanout.Client.Fanout`; `render/fanout/reconstruction.go`'s `ReconstructService.Reconstruct` (manual/forensic re-render) is not driven by the outbox retry loop and does not need this classification. Covered by `internal/platform/worker/service_test.go` (`TestWorkerService_NonRetryableRenderError_DeadLettersOnFirstAttempt`, `TestWorkerService_RetryableRenderError_SchedulesBackoffLikeBefore`).
 
-**PDF outbox worker backoff** (`pdf_outbox_worker.go:89`): uses a separate formula — `min(30min, 30s * 2^attempts)` — where `attempts` is the current `r.Attempts` value (0-based, capped at 30). This is an entirely distinct implementation from the worker-service backoff above.
+**Staging outbox worker backoff** (`staging_outbox_worker.go:102-104`, shared by both instances): uses a separate formula — `min(30min, 30s * 2^attempts)` — where `attempts` is the current `r.Attempts` value (0-based, capped at 30). This is an entirely distinct implementation from the worker-service backoff above.
 
 ### River scheduled jobs (`apps/jobs`)
 
@@ -272,10 +272,11 @@ Test coverage: `internal/modules/render/fanout/pdf_outbox_repository_test.go` (r
 | `lease_reaper` governance writes silently fail for all scheduler jobs (wrong JOIN) | High | [../binaries/worker.md](../binaries/worker.md) |
 | Two-stage outbox chaining with duplicate claim/retry logic across three tables | Medium | [../platform/async-messaging.md](../platform/async-messaging.md) |
 | `METALDOCS_WORKER_REVIEW_REMINDER_DAYS` loaded but never consumed | Medium | [../binaries/worker.md](../binaries/worker.md) |
-| `startOutboxWorker` restart loop is dead code | Low | [../binaries/worker.md](../binaries/worker.md) |
 | Outbox claim lease vs. materialization duration: 5-min claimLease may allow duplicate materialization execution for slow docx-renderer calls [runtime-unverified] | Low | Flow 2, Stage B |
 
-Closed flags: tenant-unscoped `pdf_dispatch_outbox`/`materialize_dispatch_outbox` claim is no longer an open flag as of ADR 0054 (2026-07-02) — the cross-tenant `ClaimPending` shape is sanctioned by design; see §7 "Staging outbox tables" above.
+Closed flags:
+- Tenant-unscoped `pdf_dispatch_outbox`/`materialize_dispatch_outbox` claim is no longer an open flag as of ADR 0054 (2026-07-02) — the cross-tenant `ClaimPending` shape is sanctioned by design; see §7 "Staging outbox tables" above.
+- `startOutboxWorker` restart-loop dead code: closed — the restart loop was deleted with the `StagingOutboxWorker` consolidation; `startOutboxWorkers` (`apps/api/cmd/metaldocs-api/main.go:945`) starts each instance's `Run` in a WaitGroup-tracked goroutine.
 
 Full flag registry: [../legacy-register.md](../legacy-register.md).
 

@@ -1,6 +1,6 @@
 # Binary: metaldocs-worker
 
-> **Last verified:** 2026-06-16
+> **Last verified:** 2026-07-02 (StagingOutboxWorker consolidation: `PDFOutboxWorker`/`MaterializeOutboxWorker` replaced by two instances of the generic `fanout.StagingOutboxWorker`; restart loop removed) | **Prior:** 2026-06-16
 > **Scope:** The `apps/worker` binary — its purpose, what it consumes from Postgres, what external services it calls, how it is configured, and its full lifecycle from startup to shutdown. This document also covers the three in-API async goroutine subsystems that are architecturally part of the same worker concern (outbox relay, maintenance jobs, sweepers) even though they run inside the API process.
 > **Key files:**
 > - `apps/worker/cmd/metaldocs-worker/main.go` — binary entrypoint
@@ -11,8 +11,8 @@
 > - `internal/platform/bootstrap/worker.go` — dependency wiring
 > - `internal/platform/config/worker.go` — configuration schema
 > - `internal/modules/jobs/scheduler/scheduler.go` — in-API maintenance scheduler
-> - `internal/modules/render/fanout/pdf_outbox_worker.go` — in-API PDF relay
-> - `internal/modules/render/fanout/materialize_outbox_worker.go` — in-API materialize relay
+> - `internal/modules/render/fanout/staging_outbox_worker.go:23` — generic in-API staging outbox relay worker (PDF + materialize instances)
+> - `internal/modules/render/fanout/staging_outbox.go:33` — generic staging outbox repository (allowlist-validated table binding)
 > - `internal/modules/documents/jobs/session_sweeper.go` — in-API session sweeper
 > - `internal/modules/documents/jobs/orphan_pending_sweeper.go` — in-API orphan sweeper
 
@@ -33,7 +33,7 @@ The worker binary processes exactly two event types from `metaldocs.outbox_event
 | `EventTypePDFConvert` | `docgen_v2_pdf` | `PDFJobRunner` | Gotenberg (HTTP), MinIO |
 | `EventTypeMaterializeFanout` | `docx_materialize` | `MaterializeJobRunner` | docx-renderer (HTTP), MinIO, Postgres |
 
-Events are placed into `outbox_events` by the in-API relay workers (`PDFOutboxWorker`, `MaterializeOutboxWorker`) — not by the API handlers directly. See [../platform/async-messaging.md](../platform/async-messaging.md) for the staging outbox layer.
+Events are placed into `outbox_events` by the in-API relay workers (two instances of the generic `fanout.StagingOutboxWorker` — PDF and materialize) — not by the API handlers directly. See [../platform/async-messaging.md](../platform/async-messaging.md) for the staging outbox layer.
 
 ### PDF event (`docgen_v2_pdf`)
 
@@ -50,7 +50,7 @@ Events are placed into `outbox_events` by the in-API relay workers (`PDFOutboxWo
 
 1. Extracts `MaterializeFanoutPayload`.
 2. Calls `MaterializeInvoker.Materialize` — HTTP POST to the docx-renderer fanout service. This call is made **outside any transaction**.
-3. Opens a new Postgres transaction to call `WriteFinalDocxInTx` (persists the final DOCX S3 key) and `pdfOutbox.Enqueue` atomically (inserts a `pdf_dispatch_outbox` row). This enqueue re-enters the PDF pipeline: the API's `PDFOutboxWorker` will relay it into `outbox_events` and the worker will process it as a `docgen_v2_pdf` event.
+3. Opens a new Postgres transaction to call `WriteFinalDocxInTx` (persists the final DOCX S3 key) and `pdfOutbox.Enqueue` atomically (inserts a `pdf_dispatch_outbox` row). This enqueue re-enters the PDF pipeline: the API's PDF `StagingOutboxWorker` instance will relay it into `outbox_events` and the worker will process it as a `docgen_v2_pdf` event.
 
 ---
 
@@ -111,16 +111,16 @@ Three async subsystems run as goroutines inside `apps/api` rather than in `apps/
 
 ### 5.1 Outbox relay workers
 
-Started by `apps/api/main.go:489,492` via `startOutboxWorker` (created at lines 488 and 491 respectively):
+Both relays are instances of the generic `fanout.StagingOutboxWorker` (`internal/modules/render/fanout/staging_outbox_worker.go:23`), started by `startOutboxWorkers` (`apps/api/cmd/metaldocs-api/main.go:945`, called at `main.go:543`). The per-instance difference is only the repository table binding (`NewPDFOutboxRepository`/`NewMaterializeOutboxRepository`, `staging_outbox.go:215/220`) and the `buildEvent` callback:
 
-| Worker | Source table | Event type | Poll | Batch |
+| Instance (wired at) | Source table | Event type | Poll | Batch |
 |--------|-------------|-----------|------|-------|
-| `PDFOutboxWorker` | `metaldocs.pdf_dispatch_outbox` | `docgen_v2_pdf` | 5 s | 10 |
-| `MaterializeOutboxWorker` | `metaldocs.materialize_dispatch_outbox` | `docx_materialize` | 5 s | 10 |
+| PDF (`main.go:960`) | `metaldocs.pdf_dispatch_outbox` | `docgen_v2_pdf` | 5 s | 10 |
+| Materialize (`main.go:976`) | `metaldocs.materialize_dispatch_outbox` | `docx_materialize` | 5 s | 10 |
 
-Each relay worker: claims rows with `FOR UPDATE SKIP LOCKED`, calls `Publisher.Publish` (inserts into `outbox_events`), marks rows dispatched. `ResetStaleClaims` recovers rows stuck in `processing` status.
+Each relay instance: claims rows with `FOR UPDATE SKIP LOCKED`, calls `Publisher.Publish` (inserts into `outbox_events`), marks rows dispatched. `ResetStaleClaims` recovers rows stuck in `processing` status.
 
-The `startOutboxWorker` wrapper at `apps/api/main.go:462–486` contains a restart loop with exponential backoff. In practice the workers swallow all errors internally (`Run` only returns `nil`), so the restart path is dead code.
+Poll/batch/retry knobs come from the shared `config.StagingOutboxWorkerConfig` (`internal/platform/config/staging_outbox_worker.go`; env `METALDOCS_STAGING_OUTBOX_POLL_INTERVAL_SECONDS` / `_BATCH_SIZE` / `_MAX_ATTEMPTS` / `_STALE_AFTER_SECONDS`; defaults 5 s / 10 / 5 / 300 s). There is no restart wrapper: `Run` returns only `nil` on context cancellation, and the goroutines are joined via `workerWG` (`main.go:542`) at shutdown.
 
 ### 5.2 In-API maintenance scheduler
 
@@ -167,7 +167,7 @@ The worker binary is containerised via `deploy/docker/worker.Dockerfile` and def
 | `METALDOCS_WORKER_REVIEW_REMINDER_DAYS` loaded and logged but never consumed anywhere in service or runner code | Medium | — |
 | Sequential batch processing — no per-event goroutine parallelism | Info | — |
 | No graceful drain in `apps/worker/main.go`: SIGTERM cancels context (`main.go:52–53`) but in-flight HTTP calls are abandoned immediately [runtime-unverified] | Info | — |
-| `startOutboxWorker` restart loop is dead code | Low | — |
+| ~~`startOutboxWorker` restart loop is dead code~~ **CLOSED:** restart loop deleted with the `StagingOutboxWorker` consolidation — `startOutboxWorkers` (`main.go:945`) starts each instance directly | ~~Low~~ | — |
 | `lease_reaper` governance events are never written for scheduler jobs: the subquery `SELECT tenant_id FROM public.documents WHERE id::text = job_name` (`lease_reaper.go:38`) always returns NULL because `job_name` is a string like `'stuck-instance-watchdog'`, never a document UUID. The `tenant attribution unavailable` error is logged (`lease_reaper.go:79–84`) and propagated via `errors.Join` (`lease_reaper.go:122`), but every reaped lease row is skipped. | High | — |
 | Backpressure uses hard-coded pg_stat_activity ratio thresholds with no configuration surface | Low | — |
 

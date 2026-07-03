@@ -29,7 +29,7 @@ MetalDocs separates async concerns across four platform packages and one module-
 | `internal/platform/worker` | Poll-and-dispatch service: claims events, routes by `EventType`, calls handlers, manages retry/DLQ | `apps/worker/cmd/metaldocs-worker/main.go` |
 | `internal/platform/jobs/river` | River client factory (`ClientBundle`) wrapping `github.com/riverqueue/river` | `apps/jobs/cmd/metaldocs-jobs/main.go`, `apps/api/cmd/metaldocs-api/main.go`, `bootstrap/jobs.go` |
 | `internal/platform/servicebus` | External I/O adapters: `GotenbergPDFClient` (reads DOCX from MinIO, calls Gotenberg, writes PDF back to MinIO) | `platform/worker/pdf_job_runner.go`, `bootstrap/worker.go`, `bootstrap/api.go` |
-| `internal/modules/render/fanout` | Domain-level staging outbox: generic `StagingOutboxRepository` + generic `StagingOutboxWorker` (one type, two instances — PDF and materialize) | `apps/api/cmd/metaldocs-api/main.go` (started as goroutines via `startOutboxWorkers`, `main.go:932`), `apps/worker/cmd/metaldocs-worker/main.go` (`NewPDFOutboxRepository`, `main.go:111`) |
+| `internal/modules/render/fanout` | Domain-level staging outbox: generic `StagingOutboxRepository` + generic `StagingOutboxWorker` (one type, two instances — PDF and materialize) | `apps/api/cmd/metaldocs-api/main.go` (started as goroutines via `startOutboxWorkers`, `main.go:945`), `apps/worker/cmd/metaldocs-worker/main.go` (`NewPDFOutboxRepository`, `main.go:111`) |
 
 ---
 
@@ -85,7 +85,7 @@ No MetalDocs imports — depends only on stdlib, crypto, and the MinIO/Gotenberg
 
 This layer sits between domain writes and `outbox_events`. It is technically a module package, not a platform package, but it is architecturally part of the async substrate.
 
-A single generic worker type, `StagingOutboxWorker` (`internal/modules/render/fanout/staging_outbox_worker.go:23`), runs as **two instances** inside the API process — one per staging table. The only per-instance difference is the `buildEvent` closure (event type, idempotency-key prefix, payload shape) supplied at construction in `startOutboxWorkers` (`apps/api/cmd/metaldocs-api/main.go:932`). Both instances share a generic repository, `StagingOutboxRepository` (`internal/modules/render/fanout/staging_outbox.go:33`), bound to its table via the allowlist-validated constructors `NewPDFOutboxRepository` / `NewMaterializeOutboxRepository`:
+A single generic worker type, `StagingOutboxWorker` (`internal/modules/render/fanout/staging_outbox_worker.go:23`), runs as **two instances** inside the API process — one per staging table. The only per-instance difference is the `buildEvent` closure (event type, idempotency-key prefix, payload shape) supplied at construction in `startOutboxWorkers` (`apps/api/cmd/metaldocs-api/main.go:945`). Both instances share a generic repository, `StagingOutboxRepository` (`internal/modules/render/fanout/staging_outbox.go:33`), bound to its table via the allowlist-validated constructors `NewPDFOutboxRepository` / `NewMaterializeOutboxRepository`:
 
 | Instance (repo constructor) | Source table | Event type published |
 |-----------------------------|-------------|---------------------|
@@ -179,7 +179,7 @@ graph TD
 
 Closed flags:
 - Tenant-unscoped `pdf_dispatch_outbox`/`materialize_dispatch_outbox` claim is no longer an open flag as of [ADR 0054](../../decisions/0054-cross-tenant-outbox-claim.md) (2026-07-02) — the cross-tenant `ClaimPending` shape is sanctioned by design (closed as SEC-13, commit b4302dbf); see §2.6 above.
-- `startOutboxWorker` dead-code restart loop: closed. The restart loop was removed when the workers were consolidated into the generic `StagingOutboxWorker`; the current `startOutboxWorkers` (`apps/api/cmd/metaldocs-api/main.go:932`) just starts each instance's `Run` in a WaitGroup-tracked goroutine — `Run` returns only nil on context cancellation, and shutdown joins the goroutines cleanly.
+- `startOutboxWorker` dead-code restart loop: closed. The restart loop was removed when the workers were consolidated into the generic `StagingOutboxWorker`; the current `startOutboxWorkers` (`apps/api/cmd/metaldocs-api/main.go:945`) just starts each instance's `Run` in a WaitGroup-tracked goroutine — `Run` returns only nil on context cancellation, and shutdown joins the goroutines cleanly.
 
 Full flag registry: [../legacy-register.md](../legacy-register.md).
 

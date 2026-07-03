@@ -1,6 +1,6 @@
 # Backend Blueprint — Composition, Standards, Maturity
 
-> **Last verified:** 2026-06-13 (Wave Z all-green re-score — see §7)
+> **Last verified:** 2026-07-02 (D6 retry-owner reference updated for StagingOutboxWorker consolidation) | **Prior:** 2026-06-13 (Wave Z all-green re-score — see §7)
 > **Scope:** The canonical answer to "what is the MetalDocs backend composed of". Defines every backend concern, maps it to our implementation, names the industry standard it must satisfy, and grades maturity. This is the reference for the industry-grade refactoring program.
 > **Out of scope:** Runtime topology ([system-overview.md](system-overview.md)), route truth ([backend-api-structure.md](backend-api-structure.md)), per-module deep dives (`wiki/modules/*`).
 > **Definition layer:** The implementation-independent canon this blueprint maps against is [../standards/backend-canon.md](../standards/backend-canon.md) — read it first if you want the universal model before our specifics.
@@ -230,7 +230,7 @@ flowchart LR
 
 #### D6. Internal service-to-service calls — ✅
 - **Definition:** Tuned HTTP clients for intra-cluster fanout; retries owned by callers with outbox semantics, not buried in the client.
-- **We have:** `platform/httpclient.NewInternalClient` (timeouts, HTTP/2, no embedded retry — retry owned by `PDFOutboxWorker`, ADR 0009).
+- **We have:** `platform/httpclient.NewInternalClient` (timeouts, HTTP/2, no embedded retry — retry owned by the PDF `StagingOutboxWorker` instance, ADR 0009).
 
 #### D7. Feature flags — ✅
 - **We have:** `platform/featureflags` (2 files).

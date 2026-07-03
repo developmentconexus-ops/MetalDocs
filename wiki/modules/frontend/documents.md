@@ -1,6 +1,6 @@
 # Frontend module: documents
 
-> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section)
+> **Last verified:** 2026-07-02 (anchor refresh: PDF-status detection anchor now `StagingOutboxRepository.ReadState` after StagingOutboxWorker consolidation) | **Prior:** 2026-06-01 (P2 consolidation: added Failure modes section)
 > **Scope:** Library, document detail, eigenpal-based editor, distribution, new-document wizard. Frontend slice of the backend [`documents`](../documents.md) module.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/documents.md`](../documents.md)
 
@@ -88,7 +88,7 @@ Owns the document lifecycle UI: discoverability (Library), authored revision (Ed
 | Backend 5xx on `useLibraryQuery` | Library shell shows error state | `useLibraryQuery.error` | Retry; check `metaldocs-api` |
 | 401 during editor session | `authBus` redirect; in-flight commit lost | Editor mutation rejects with 401 → authBus | Re-login; returnTo brings user back to `/documents/:id/edit` |
 | Approval-instance cache stale after submit | Editor sidebar shows `draft` while backend already opened `under_review` | `useApprovalInstanceQuery` not invalidated | `DocumentEditorPage.tsx:288–300` invalidates `QK.approval.instance(id)` + `QK.documents.detail(id)` on submit success |
-| Export PDF outbox still pending | Distribution / published view shows `pdf_status=pending` longer than expected | Backend `pdf_outbox_repository.ReadState` surfaces status | Worker drains async; if `failed`, check worker logs (`render-fanout` module) |
+| Export PDF outbox still pending | Distribution / published view shows `pdf_status=pending` longer than expected | Backend `StagingOutboxRepository.ReadState` (`render/fanout/staging_outbox.go:179`) surfaces status | Worker drains async; if `failed`, check worker logs (`render-fanout` module) |
 
 ## 10. Cross-links
 

@@ -1,6 +1,6 @@
 # HTTP Kernel — Composition Root, Middleware Chain, and Startup
 
-> **Last verified:** 2026-06-11 (Wave 1)
+> **Last verified:** 2026-07-02 (§8 outbox relay rows updated for the StagingOutboxWorker consolidation; other §8 anchors verified 2026-06-11) | **Prior:** 2026-06-11 (Wave 1)
 > **Scope:** The `apps/api` composition root: startup sequence, dependency injection, middleware chain, routing, server lifecycle, graceful shutdown, and tier-1 authorization truth table. Does not cover per-module business logic or persistence owned by domain modules.
 > **Key files:**
 > - `apps/api/cmd/metaldocs-api/main.go` — composition root (config → DI → routes → lifecycle)
@@ -94,7 +94,7 @@ flowchart TD
     MIG --> AUTH[auth service + bootstrap admin<br/>main.go:196-202]
     AUTH --> AUTHZ[capability svc + cached roles +<br/>permResolver + middlewares<br/>main.go:224-246]
     AUTHZ --> MOUNT[module DI + RegisterRoutes on one mux<br/>main.go:279-521]
-    MOUNT --> BG[scheduler + outbox workers +<br/>sweepers + retention<br/>main.go:461-593]
+    MOUNT --> BG[scheduler + outbox workers +<br/>sweepers + retention<br/>main.go:542-639]
     BG --> CHAIN[middleware chain composition<br/>chain.go + main.go:623-643]
     CHAIN --> SRV[http.Server :8080/APP_PORT<br/>Read/Write/Idle timeouts<br/>main.go:654-663]
     SRV --> SHUT[shutdownServer blocks<br/>main.go:627]
@@ -222,15 +222,15 @@ All goroutines launched by the kernel:
 | Presence hub `RunHeartbeat` | `main.go:307` | 30s (`presence/model.go:33`, `presence/hub.go:237-238`) | root ctx |
 | Presence bump cleanup | `main.go:310` → `presence/middleware.go:108-129` | every 5min, TTL 10min | root ctx |
 | Per-request presence bump | `presence/middleware.go:92-98` | fire-and-forget per debounced user | 2s timeout ctx |
-| PDF outbox worker | `main.go:488-489` | `fanout.NewPDFOutboxWorker.Run`; restart wrapper 1s→1min exponential backoff (`main.go:461-486`) | root ctx; `workerWG` |
-| Materialize outbox worker | `main.go:491-492` | same harness | root ctx; `workerWG` |
+| PDF staging outbox worker | `main.go:960-974` | `fanout.StagingOutboxWorker.Run` (generic worker, PDF instance; wired via `startOutboxWorkers`, `main.go:945`); no restart wrapper — `Run` returns nil only on ctx cancel | root ctx; `workerWG` |
+| Materialize staging outbox worker | `main.go:976-989` | same generic worker, materialize instance | root ctx; `workerWG` |
 | Job scheduler | `main.go:561-566` | stuck-instance-watchdog 5min, idempotency-janitor 15min, audit-integrity-validator 1h, lease-reaper 10min; all `SkipOnPressure`; leader ID = `hostname:pid` (`main.go:839-845`) | root ctx; `schedulerWG` |
 | Documents session sweeper | `main.go:568` | 60s | returned stop func (deferred `main.go:570`) |
 | Orphan pending sweeper | `main.go:569` | 1h interval, 24h max age | stop func (deferred `main.go:571`) |
 | Audit retention purge | `main.go:576-592` | 24h ticker | root ctx |
 | `server.ListenAndServe` | `main.go:622-625` | — | `server.Shutdown` via `serverErr` channel |
 
-Synchronization: `workerWG` (`main.go:461`), `schedulerWG` (`main.go:561`), buffered `serverErr` channel (`main.go:622`). Shutdown join order in §7 above. Outbox **writes** happen in module transactions; the kernel only hosts the relay workers.
+Synchronization: `workerWG` (`main.go:542`), `schedulerWG` (`main.go:561`), buffered `serverErr` channel (`main.go:622`). Shutdown join order in §7 above. Outbox **writes** happen in module transactions; the kernel only hosts the relay workers.
 
 ---
 
@@ -287,7 +287,7 @@ See also: [./legacy-register.md](./legacy-register.md) (full cross-area legacy r
 ## 12. Open questions
 
 - `[runtime-unverified]` Readiness probe depth: actual payload/status codes from `observability.NewPostgresRuntimeStatusProvider` under Gotenberg failure were not exercised (Docker down during audit).
-- `[runtime-unverified]` Outbox worker restart behavior under sustained DB failure — backoff loop at `main.go:466-484` was code-read only; 1s→1min cap not observed live.
+- Outbox worker restart wrapper: no longer exists — removed with the `StagingOutboxWorker` consolidation. `Run` returns only nil on ctx cancellation; there is no restart path to verify.
 - `[runtime-unverified]` `server.Shutdown` 15s budget vs. open WebSocket presence streams (see §7).
 - **Genuine unknown:** `metaldocs-jobs` binary (`apps/jobs`) also registers scheduler jobs. Which leased jobs are intended to run in the API process vs. the jobs process is not declared anywhere in `apps/api`; API registers watchdog/janitor/validator/reaper (`main.go:528-559`) gated only by env defaults that are ON. Cross-binary lease contention is resolved at the `metaldocs.job_leases` table, but the intended ownership split is undocumented.
 - **Genuine unknown:** whether any deployment sets `METALDOCS_RATE_LIMIT_ENABLED=true` or `METALDOCS_CORS_ENABLED=true` — both default off, making the outermost two layers and the innermost layer of the chain effective no-ops in the default environment.

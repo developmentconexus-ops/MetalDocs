@@ -1,11 +1,11 @@
 # Sequence — Signoff + Freeze
 
-> **Last verified:** 2026-06-01 (async freeze refactor — ADR 0015)
+> **Last verified:** 2026-07-02 (StagingOutboxWorker consolidation: outbox relay is now the materialize instance of generic `fanout.StagingOutboxWorker`) | **Prior:** 2026-06-01 (async freeze refactor — ADR 0015)
 > **Flow:** Approver clicks "approve" → API pins the document (fast, no network) → commits → worker materializes the frozen DOCX asynchronously.
 > **Code anchors:**
 > - [`internal/modules/documents/approval/application/decision_service.go`](../../internal/modules/documents/approval/application/decision_service.go) — signoff calls `pinInvoker.Pin` in-tx
 > - [`internal/modules/documents/application/freeze_service.go`](../../internal/modules/documents/application/freeze_service.go) — `Pin` + `Materialize`
-> - [`internal/modules/render/fanout/materialize_outbox_worker.go`](../../internal/modules/render/fanout/materialize_outbox_worker.go) — outbox relay (API process)
+> - [`internal/modules/render/fanout/staging_outbox_worker.go`](../../internal/modules/render/fanout/staging_outbox_worker.go) — generic outbox relay worker, materialize instance (API process)
 > - [`internal/platform/worker/materialize_job_runner.go`](../../internal/platform/worker/materialize_job_runner.go) — job handler (worker process)
 
 ## Current design (as of 2026-06-01 — async freeze, ADR 0015)
@@ -47,7 +47,7 @@ sequenceDiagram
     API-->>Web: 200 {result, next_state}
     Web-->>Approver: "Approved" (+ "Finalizando artefato…" badge)
 
-    Note over API: Async — MaterializeOutboxWorker polls the outbox
+    Note over API: Async — materialize StagingOutboxWorker instance polls the outbox
     API->>PG: claim materialize_dispatch_outbox row
     API->>PG: publish docx_materialize event
 

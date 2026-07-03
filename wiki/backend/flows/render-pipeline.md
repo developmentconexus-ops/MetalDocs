@@ -1,11 +1,11 @@
 # Document Render Pipeline — End-to-End Flow
 
-> **Last verified:** 2026-07-01 (ARC-01: §7 template reader fallback flipped canonical-first; legacy `TemplateReader` is now fallback-only with a residual-hit counter + WARN log. APP-01: §4 legacy synchronous freeze + `PDFDispatcher`/`PDFDispatchAdapter` removed — PDF dispatch outbox-only) | **Prior:** 2026-06-11
+> **Last verified:** 2026-07-02 (StagingOutboxWorker consolidation: `PDFOutboxWorker`/`MaterializeOutboxWorker` and their per-table repos replaced by generic `fanout.StagingOutboxWorker` + `StagingOutboxRepository` — §12 clone flags resolved) | **Prior:** 2026-07-01 (ARC-01: §7 template reader fallback flipped canonical-first; legacy `TemplateReader` is now fallback-only with a residual-hit counter + WARN log. APP-01: §4 legacy synchronous freeze + `PDFDispatcher`/`PDFDispatchAdapter` removed — PDF dispatch outbox-only), 2026-06-11
 > **Scope:** The complete render pipeline: from approval trigger through placeholder resolution (Pin), async DOCX materialization (Materialize), PDF conversion, to frozen artifact storage. Covers all five flows: primary async freeze, legacy synchronous freeze, PDF conversion, forensic reconstruction, and template reader fallback. Includes all actors: Go API binary, Go worker binary, docx-renderer sidecar, Gotenberg, and MinIO.
 > **Key files:**
 > - `internal/modules/documents/application/freeze_service.go`
-> - `internal/modules/render/fanout/materialize_outbox_worker.go`
-> - `internal/modules/render/fanout/pdf_outbox_worker.go`
+> - `internal/modules/render/fanout/staging_outbox_worker.go:23` — generic staging outbox relay worker (PDF + materialize instances)
+> - `internal/modules/render/fanout/staging_outbox.go:33` — generic staging outbox repository
 > - `internal/platform/worker/materialize_job_runner.go`
 > - `internal/platform/worker/pdf_job_runner.go`
 > - `internal/modules/render/fanout/client.go`
@@ -35,9 +35,9 @@ This design means no external HTTP calls are made from within the approval datab
 | Actor | Binary | Language | Responsibility |
 |---|---|---|---|
 | `FreezeService` | `metaldocs-api` | Go | Pin (resolve + hash + enqueue) and Materialize (call docx-renderer, write DB) |
-| `MaterializeOutboxWorker` | `metaldocs-api` | Go | Polls `materialize_dispatch_outbox`; publishes `docx_materialize` events |
+| `StagingOutboxWorker` (materialize instance) | `metaldocs-api` | Go | Polls `materialize_dispatch_outbox`; publishes `docx_materialize` events |
 | `MaterializeJobRunner` | `metaldocs-worker` | Go | Handles `docx_materialize` events; calls `FreezeService.Materialize`; commits DOCX key + enqueues PDF |
-| `PDFOutboxWorker` | `metaldocs-api` | Go | Polls `pdf_dispatch_outbox`; publishes `docgen_v2_pdf` events |
+| `StagingOutboxWorker` (PDF instance) | `metaldocs-api` | Go | Polls `pdf_dispatch_outbox`; publishes `docgen_v2_pdf` events |
 | `PDFJobRunner` | `metaldocs-worker` | Go | Handles `docgen_v2_pdf` events; calls Gotenberg; writes PDF to MinIO |
 | `fanout.Client` | `metaldocs-api` / `metaldocs-worker` | Go | HTTP client — `POST /render/fanout` to docx-renderer |
 | `docx-renderer` | standalone sidecar | TypeScript/Node | DOCX token substitution + sub-block injection; reads/writes MinIO directly |
@@ -57,7 +57,7 @@ sequenceDiagram
     participant ApprovalSvc as DecisionService<br/>(approval/application)
     participant FreezePin as FreezeService.Pin<br/>(documents/application)
     participant MatOutbox as materialize_dispatch_outbox<br/>(Postgres)
-    participant MatWorker as MaterializeOutboxWorker<br/>(metaldocs-api goroutine)
+    participant MatWorker as StagingOutboxWorker (materialize)<br/>(metaldocs-api goroutine)
     participant Messaging as messaging.Publisher
     participant MatRunner as MaterializeJobRunner<br/>(metaldocs-worker)
     participant FreezeMAT as FreezeService.Materialize<br/>(documents/application)
@@ -65,7 +65,7 @@ sequenceDiagram
     participant DocxRend as docx-renderer<br/>POST /render/fanout
     participant MinIO
     participant PdfOutbox as pdf_dispatch_outbox<br/>(Postgres)
-    participant PdfWorker as PDFOutboxWorker<br/>(metaldocs-api goroutine)
+    participant PdfWorker as StagingOutboxWorker (PDF)<br/>(metaldocs-api goroutine)
     participant PdfRunner as PDFJobRunner<br/>(metaldocs-worker)
     participant Gotenberg
 
@@ -120,15 +120,15 @@ sequenceDiagram
 | `pinValidateAndHash` — resolver loop | `freeze_service.go:144` |
 | Values hash computation | `freeze_service.go:166-174` |
 | Materialize outbox enqueue | `freeze_service.go:218` |
-| `MaterializeOutboxWorker.Run` goroutine start | `apps/api/cmd/metaldocs-api/main.go:491-492` |
-| Worker poll interval | `materialize_outbox_worker.go:34` / `pdf_outbox_worker.go:34` (5 s ticker, set in constructors) |
+| Materialize `StagingOutboxWorker` instance wired + started | `apps/api/cmd/metaldocs-api/main.go:976-989` (via `startOutboxWorkers`, `main.go:945`) |
+| Worker poll interval | `config/staging_outbox_worker.go` default 5 s (`METALDOCS_STAGING_OUTBOX_POLL_INTERVAL_SECONDS`); ticker at `staging_outbox_worker.go:59` |
 | `MaterializeJobRunner.Handle` | `internal/platform/worker/materialize_job_runner.go:59` |
 | `FreezeService.Materialize` entry | `freeze_service.go:225` |
 | `fanout.Client.Fanout` HTTP call | `freeze_service.go:278` |
 | docx-renderer MinIO read | `apps/docx-renderer/src/routes/fanout.ts:52-56` |
 | docx-renderer MinIO write (frozen.docx) | `apps/docx-renderer/src/routes/fanout.ts:65-70` |
 | Atomic WriteFinalDocx + PDF outbox enqueue | `materialize_job_runner.go:74-87` |
-| `PDFOutboxWorker.Run` goroutine start | `apps/api/cmd/metaldocs-api/main.go:488-489` |
+| PDF `StagingOutboxWorker` instance wired + started | `apps/api/cmd/metaldocs-api/main.go:960-974` (via `startOutboxWorkers`, `main.go:945`) |
 | `PDFJobRunner.Handle` | `internal/platform/worker/pdf_job_runner.go:68` |
 | Gotenberg DOCX-to-PDF call | `servicebus/gotenberg_pdf.go:70` |
 | PDF MinIO write + persist | `pdf_job_runner.go` → `PDFPersister.WritePDF` |
@@ -227,22 +227,22 @@ This fallback exists because the codebase is mid-migration between two template 
 
 ## 8. Outbox pattern — concurrency and reliability
 
-Both outbox workers follow the same pattern (ADR 0009, ADR 0015):
+Both outbox worker instances share the same generic implementation (ADR 0009, ADR 0015):
 
 | Property | Value | Source |
 |---|---|---|
-| Poll interval | 5 s | `pdf_outbox_worker.go` / `materialize_outbox_worker.go` |
+| Poll interval | 5 s (default, `METALDOCS_STAGING_OUTBOX_POLL_INTERVAL_SECONDS`) | `config/staging_outbox_worker.go`; ticker `staging_outbox_worker.go:59` |
 | Batch size | 10 rows | same |
 | Max attempts | 5 | same |
-| Stale-claim reset threshold | 5 minutes in `processing` | `pdf_outbox_repository.go:147` |
+| Stale-claim reset threshold | 5 minutes in `processing` (default, `METALDOCS_STAGING_OUTBOX_STALE_AFTER_SECONDS`) | `config/staging_outbox_worker.go`; `staging_outbox.go:197` (`ResetStaleClaims`) |
 | Backoff base | 30 s | outbox worker |
 | Backoff cap | 30 m | outbox worker |
-| Claim query | `FOR UPDATE SKIP LOCKED` | `pdf_outbox_repository.go:48-57` |
-| Deduplication | `ON CONFLICT (tenant_id, revision_id) DO NOTHING` | both outbox repos |
+| Claim query | `FOR UPDATE SKIP LOCKED` | `staging_outbox.go:73-102` (`ClaimPending`) |
+| Deduplication | `ON CONFLICT (tenant_id, revision_id) DO NOTHING` | `staging_outbox.go:57-60` (`Enqueue`, both table bindings) |
 
 The `FOR UPDATE SKIP LOCKED` claim pattern makes the outbox workers safe to run as multiple concurrent instances without coordination.
 
-**Cross-tenant claim:** the `pdf_dispatch_outbox` claim query is currently cross-tenant (drains across all tenants). The TODO at `pdf_outbox_repository.go:43` documents this as a known future multi-tenant concern.
+**Cross-tenant claim:** the staging outbox claim query is cross-tenant by design (drains across all tenants) — sanctioned by ADR 0054; tenancy is enforced at processing time per row. Doc comment at `staging_outbox.go:68-72`.
 
 **Idempotency on retry:** the frozen DOCX is written to a deterministic MinIO key (`tenants/{t}/revisions/{r}/frozen.docx`). If the worker is killed after the docx-renderer HTTP call succeeds but before the DB transaction commits, the outbox row remains in `processing` until `ResetStaleClaims` resets it after 5 minutes, and the next retry writes to the same MinIO key. Whether this produces an idempotent re-run depends on MinIO PUT semantics (unconditional overwrite at the same key) — [runtime-unverified: confirm that MinIO PUT at the same key is unconditionally overwriting; no MetalDocs code or config verifies this property].
 
@@ -294,7 +294,7 @@ All observability in this pipeline is log-based. No metrics or traces instrument
 
 | Component | Log approach |
 |---|---|
-| `PDFOutboxWorker` / `MaterializeOutboxWorker` | `slog.Warn` / `slog.Error` with `id`, `revision_id`, `tenant_id` fields |
+| `StagingOutboxWorker` (both instances) | `slog.Warn` / `slog.Error` with `id`, `revision_id`, `tenant_id` fields |
 | `MaterializeJobRunner` | `slog.InfoContext` on success |
 | `DocumentContextBuilder` approval lookup | `slog.WarnContext` on failure (best-effort, non-fatal) |
 | docx-renderer | Fastify built-in logger at `LOG_LEVEL`; request/response logged automatically |
@@ -306,12 +306,11 @@ All observability in this pipeline is log-based. No metrics or traces instrument
 
 | Flag | Location | Description | RF ref |
 |---|---|---|---|
-| `PDFOutboxWorker` and `MaterializeOutboxWorker` are near-identical clones | `fanout/pdf_outbox_worker.go`, `fanout/materialize_outbox_worker.go` | Same tick/claim/dispatch/backoff algorithm with identical constants; bug fixes and tuning changes must be applied twice | — |
-| `PDFOutboxRepository` and `MaterializeOutboxRepository` are near-identical clones | `fanout/pdf_outbox_repository.go`, `fanout/materialize_outbox_repository.go` | All six methods identical except table name and row type; classic copy-paste duplication | — |
+| ~~Worker + repository near-identical clones (`PDFOutboxWorker`/`MaterializeOutboxWorker`, `PDFOutboxRepository`/`MaterializeOutboxRepository`)~~ | was `fanout/pdf_outbox_worker.go` etc. (deleted) | **RESOLVED (F-04):** consolidated into generic `StagingOutboxWorker` (`fanout/staging_outbox_worker.go:23`) + `StagingOutboxRepository` (`fanout/staging_outbox.go:33`); per-table difference is only the allowlisted table binding and `buildEvent` callback | — |
 | `FreezeService.Freeze` is a legacy synchronous path | `freeze_service.go:302` | Comment-marked "use Pin+Materialize instead"; remains exported; blocks calling goroutine on docx-renderer HTTP | — |
 | `EngineVersions` hardcoded to `"local"` | `main.go:424` | Reconstruction records always carry `eigenpal_ver="local"` and `docxtemplater_ver="local"`; cross-version forensics is currently meaningless | — |
 | `GetFinalApprovalDate` not deterministic for multiple approval cycles | `resolver.go:70-72`, `resolver_readers.go:93-101` | Returns `MAX(signed_at)` across all approval instances for a revision; rework cycles produce non-deterministic approval date | — |
-| `pdf_dispatch_outbox` claim is cross-tenant | `pdf_outbox_repository.go:43` | Intentional today; documented as a future multi-tenant concern; no tenant predicate in claim query | — |
+| `pdf_dispatch_outbox` claim is cross-tenant | `fanout/staging_outbox.go:73` (`ClaimPending`) | Intentional by design — sanctioned by ADR 0054; tenancy enforced at processing time per row | — |
 | Hardcoded Portuguese fallback in `approvers` resolver | `approvers.go:34` | `"[aguardando aprovação]"` baked into resolver; no i18n mechanism | — |
 | `controlled_by_area` is resolver version 2 while all others are version 1 | `controlled_by_area.go:14` | No resolver versioning/migration policy; registry silently takes last-registered version per key | — |
 

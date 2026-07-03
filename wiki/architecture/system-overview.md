@@ -1,6 +1,6 @@
 ﻿# System Overview
 
-> **Last verified:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257) | **Prior:** 2026-06-07 (Phase C dead-path prune: taxonomy module description updated — departments/subjects paths removed from spec; prior: 2026-06-01)
+> **Last verified:** 2026-07-02 (StagingOutboxWorker consolidation: retry-owner reference updated) | **Prior:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257), 2026-06-07 (Phase C dead-path prune: taxonomy module description updated — departments/subjects paths removed from spec; prior: 2026-06-01)
 > **Scope:** Services, ports, data flow, infra at a glance.
 > **Out of scope:** Per-module deep dives (see `modules/*`), DB schema details (see `data-model.md`).
 > **Key files:**
@@ -113,7 +113,7 @@ Modules:
 - `render/fanout` + `render/resolvers` - substitution + DOCX/PDF generation
 - `controlled-documents` - controlled-document codes, sequence counters (module path remains `internal/modules/controlleddocuments`)
 - `jobs/*` - background jobs (effective-date publisher, idempotency janitor, scheduler, watchdog)
-- `platform/httpclient` - `NewInternalClient()`     tuned `*http.Client` for intra-cluster service fanout; `Timeout: 60s`, `ResponseHeaderTimeout: 10s`, `MaxIdleConnsPerHost: 20`, `ForceAttemptHTTP2: true`. No retry logic embedded; retry is owned by `PDFOutboxWorker`. See `internal/platform/httpclient/internal_client.go:12-30` and `wiki/decisions/0009-pdf-dispatch-outbox.md`.
+- `platform/httpclient` - `NewInternalClient()`     tuned `*http.Client` for intra-cluster service fanout; `Timeout: 60s`, `ResponseHeaderTimeout: 10s`, `MaxIdleConnsPerHost: 20`, `ForceAttemptHTTP2: true`. No retry logic embedded; retry is owned by the PDF `StagingOutboxWorker` instance (`internal/modules/render/fanout/staging_outbox_worker.go:23`). See `internal/platform/httpclient/internal_client.go:12-30` and `wiki/decisions/0009-pdf-dispatch-outbox.md`.
 - `search` - cross-module document search index; `infrastructure/v2documents/reader.go` queries `public.documents LEFT JOIN controlled_documents` to populate `DocumentCode`/`DocumentSequence` (fixed 2026-04-27: was reading `d.code` which is always empty for v2 docs; now reads `COALESCE(cd.code, '')` from the join)
 
 ## Frontend topology
