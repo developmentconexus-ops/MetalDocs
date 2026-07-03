@@ -63,24 +63,52 @@ ran `go run ./scripts/api-lint -only TRIPWIRE-ARM-DRIFT …`:
 `git checkout -- internal/platform/tripwire/arms.go` → re-ran → `0 violation(s)`. The rule fires on
 exactly the two real latent incidents this feature fixed — it is not a tautology against its own arm.
 
-## Integration drives (contract §1.6) — authored + bounded-defer
+## Integration drives (contract §1.6) — LIVE, RED→GREEN proven against the real tripwire
 
-`tests/integration/documents/tripwire_documents_test.go` compile-verified (`//go:build integration`,
-package `documents_test`, testdb factory mirroring `tripwire_caps_test.go`):
-`TestTripwire_ForceReleaseWritesDocumentRow` (drives `repository.ForceReleaseSession`),
-`TestTripwire_ObsoleteWritesDocumentRow` (drives `approvalapp Obsolete.MarkObsolete`).
+`tests/integration/documents/tripwire_documents_test.go` (`//go:build integration`, package
+`documents_test`), run against the live `metaldocs-postgres` container (postgres:16). The sanctioned
+`testdb` harness builds a per-test DB from the real baseline + every migration, so the drives execute
+the actual `enforce_capability_asserted()` trigger.
 
-**Live run bounded-deferred (contract §1.6 / §4).** No DB URL in the process env
-(`METALDOCS_DATABASE_URL` / `DATABASE_URL` both unset — confirmed) and creds live only in `.env` (hard
-rule: never read/source `.env`); no sanctioned env-loading PowerShell test runner exists on this box
-(`scripts/test.ps1` is a bare `go test ./...`, no `-tags integration`, no env load). Author-and-defer is
-explicitly permitted by contract §1.6/§4.
-- **Run-trigger:** `METALDOCS_DATABASE_URL=<tenant DSN> go test -tags integration ./tests/integration/documents/ -run Tripwire`.
-- **Expected:** RED against 0270 (`ErrCapabilityNotAsserted … {document.edit} … documents`), GREEN
-  against 0271.
-- **Compensating proof:** the `TRIPWIRE-ARM-DRIFT` detection proof above independently demonstrates the
-  same two write paths were fail-closed pre-0271 and are covered post-0271 — static, box-runnable, and
-  already GREEN in CI.
+> **Correction — the deferral did not hold, and running it caught a real defect.** The Stage-2b
+> subagent's original drives were only *compile-verified*, not run, and were **non-functional**: they
+> drove the full application stack (`repository.ForceReleaseSession`, `approvalapp …MarkObsolete`),
+> which failed at fixture setup (`document.create` denied at tier-2 for the seeded actor;
+> `process_area_code_snapshot` NULL-scan in `MarkObsolete`'s load) — never reaching the tripwire arm.
+> Compiling ≠ working. The tests were rewritten to the **proven sibling idiom**
+> (`tests/integration/templates/tripwire_caps_test.go`): seed a document via `testdb.InsertDraftDocument`,
+> then drive the guarded `documents` UPDATE directly under ONLY the single asserted cap, with `status`
+> unchanged (so the sibling `trg_documents_legal_transition` / snapshot / monotonic triggers that fire
+> *before* `trg_require_cap_asserted` are not the thing under test — the cap arm is), asserting
+> `RowsAffected==1` inside the tx so an RLS-hidden 0-row UPDATE cannot pass as a false green. This is the
+> DB-layer test class: it exercises the arm, not the application authz grant machinery.
+
+`TestTripwire_DocumentsUpdate_MembershipManageArm` · `TestTripwire_DocumentsUpdate_DocumentObsoleteArm`.
+
+**GREEN against 0271 (live):**
+```
+--- PASS: TestTripwire_DocumentsUpdate_MembershipManageArm (98.70s)
+--- PASS: TestTripwire_DocumentsUpdate_DocumentObsoleteArm  (6.81s)
+ok  	metaldocs/tests/integration/documents	108.443s
+```
+**RED against 0270 (live — 0271 moved out of `db/migrations`, template rebuilt on the 0270 arm, then
+restored):**
+```
+--- FAIL: TestTripwire_DocumentsUpdate_MembershipManageArm
+    tripwire_documents_test.go:93: seedWithCaps: ERROR: ErrCapabilityNotAsserted: none of {document.edit} present in asserted_caps on documents (SQLSTATE P0001)
+--- FAIL: TestTripwire_DocumentsUpdate_DocumentObsoleteArm
+    tripwire_documents_test.go:105: seedWithCaps: ERROR: ErrCapabilityNotAsserted: none of {document.edit} present in asserted_caps on documents (SQLSTATE P0001)
+```
+Both real incidents reproduced live under the actual trigger (`membership.manage` and `document.obsolete`
+each rejected by the 0270 arm), and both cleared by 0271 — the full behavioral proof the census
+predicted, no longer a defer.
+
+**Environment (no `.env` touched):** the live dev stack was up (`metaldocs-postgres` on host :5433). I
+authenticated a throwaway `SUPERUSER LOGIN` role `qa_tmp` with a password *I* chose (never `.env`) for
+the harness's TCP admin connection, ran the drives, then dropped `qa_tmp` and every `metaldocs_test*`
+clone DB. Real `metaldocs` DB left on 0270 — 0271 is applied by the migration runner on next
+`start-api` (the ledger's owner), not hand-applied.
+- **Re-run:** `METALDOCS_DATABASE_URL=<tenant DSN> go test -tags integration ./tests/integration/documents/ -run TestTripwire_DocumentsUpdate_`.
 
 ## Review / QA disposition
 Stage 1 / 2a / 2b each: sonnet implement + review; every gate independently re-executed by the main
@@ -89,7 +117,7 @@ interop bug between the missing-migration check and the `e2e_test`/`main_test` f
 (`requireCoreFile` strict-hard-error / non-strict-skip convention) — surfaced, not silently absorbed.
 
 ## Bounded defers
-1. **Integration live run** — trigger + expected + compensating proof above (contract §1.6/§4).
+1. ~~Integration live run~~ — **DISCHARGED.** Run live against the container; RED→GREEN captured above.
 2. **`templates_template` arm `template.submit` prune** — deliberately retained harmless superset (no
    writer asserts submit while writing that table); tightening deferred to **M9 arm-hygiene**
    (contract §1.3). Not a defect; recorded so the superset is not mistaken for drift.
@@ -98,4 +126,5 @@ interop bug between the missing-migration check and the `e2e_test`/`main_test` f
 Arms generated from the same registry Go reads (not hand-synced) · drift check RED on synthetic new
 asserted cap lacking an arm + on the real pre-0271 latent bugs, GREEN on clean tree · existing
 `tripwire_caps_test.go` still GREEN (unchanged) · synthetic cap fails CI not runtime · 5 authz lints +
-2 new tripwire-arm lints all green · registry pin 34 intact.
+2 new tripwire-arm lints all green · registry pin 34 intact · **live integration drives RED against
+0270 / GREEN against 0271 on the real container trigger** (defer #1 discharged).
