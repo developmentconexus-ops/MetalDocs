@@ -2,19 +2,25 @@
 # §2.3). This is the checked-in, non-hardcoded data file the lint reads to
 # decide whether a worker/jobs DB write targets a tenant-scoped (FORCE RLS)
 # table. Derived from `grep -n "FORCE ROW LEVEL SECURITY" db/baseline/0001_current_schema.sql`
-# (32 tables, all carrying `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL
+# (33 tables, all carrying `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL
 # SECURITY` and the identical NULL-permissive `tenant_isolation` policy).
 # Bare table names only (schema prefix stripped), one per line, `#`-comments
 # and blank lines ignored — mirrors parseMutatingTable's bareTableName
 # normalization in tripwire_arm_rules.go so entries match write-site parsing.
 #
-# NOTE: idempotency_keys and job_leases are intentionally NOT listed here even
-# though idempotency_keys carries FORCE ROW LEVEL SECURITY — both are system
-# tables with no tenant_id column (RLS is structurally N/A for them) and are
-# separately allowlisted by category in async-tenant-seed-allowlist.txt
-# (contract §2.4), not by omission from this file being silently correct: a
-# write against them would never match this table set regardless, so no
-# ASYNC-TENANT-SEED violation is even possible for them.
+# This file is the honest mirror of the 33 FORCE-RLS tenant tables, INCLUDING
+# idempotency_keys (it carries tenant_id uuid NOT NULL + FORCE ROW LEVEL
+# SECURITY — 0001_current_schema.sql:1330,1347). A corrected reading (F3.4):
+#   - idempotency_keys IS tenant-scoped; its idempotency-janitor TTL sweep
+#     (DELETE ... WHERE expires_at < now(), internal/modules/jobs/
+#     idempotency_janitor/job.go:34) is a SANCTIONED cross-tenant system-
+#     maintenance DELETE run GUC-unset under the NULL-permissive hatch — same
+#     class as the audit-integrity scan. The janitor package is OUTSIDE the
+#     ASYNC-TENANT-SEED scanned handler roots, so listing idempotency_keys here
+#     does not trip the lint on the janitor (nor is an allowlist entry needed);
+#     it does correctly guard any future worker/jobs write to the table.
+#   - job_leases is the ONLY genuinely tenant-global system table (no tenant_id
+#     column, no RLS) and is correctly ABSENT from this set.
 audit_events
 audit_export_jobs
 auth_sessions
@@ -24,6 +30,7 @@ iam_group_members
 iam_groups
 iam_user_roles
 iam_users
+idempotency_keys
 materialize_dispatch_outbox
 notifications
 pdf_dispatch_outbox

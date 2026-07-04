@@ -118,6 +118,10 @@ Application-layer predicates in Go repositories (and the tripwire for write path
 > body above (Wave Z execution record, 2026-06-13) — it documents a **coverage** change layered on top of it.
 > Source: `docs/superpowers/milestones/global-maximum-remediation/milestone-3-tenancy-chokepoint/validation-contract.md`
 > §3.1/§4, and the F3.1/F3.2 evidence files in the same milestone folder.
+> **Erratum (F3.4, 2026-07-03):** §4 and the per-binary table below originally miscited `idempotency_keys`
+> as a system table "with no `tenant_id` column." It **is** a `tenant_id`-bearing FORCE-RLS table; its
+> janitor sweep is a sanctioned cross-tenant NULL-permissive maintenance `DELETE` (same class as the audit
+> scan). Corrected in place; `job_leases` (no `tenant_id`) was already correct.
 
 The RLS **policy** shipped by Wave Z is unchanged: NULL-permissive (`GUC unset → all rows visible`), FORCE
 RLS, on all 33 tenant-scoped tables (the 27+2 base tables from Amendment-era migrations, since grown to 33
@@ -180,8 +184,14 @@ not gaps:
   across tenants before a single row is bound to a tenant for processing.
 - **Cross-tenant scans** — the stuck-instance-watchdog list query and the audit-integrity scan; these are
   read-only maintenance scans over all tenants by design.
-- **System tables with no `tenant_id` column** — `idempotency_keys` and `job_leases`; RLS cannot apply a
-  tenant predicate where no tenant column exists.
+- **`job_leases`** (lease-reaper) — genuinely has **no `tenant_id` column**; RLS cannot apply a tenant
+  predicate where no tenant column exists.
+- **`idempotency_keys`** (idempotency-janitor) — **is** a `tenant_id`-bearing FORCE-RLS table (1 of the 33,
+  see this ADR's body §2 Tier-3). Its TTL sweep (`DELETE … WHERE expires_at < now()`,
+  `internal/modules/jobs/idempotency_janitor/job.go:34`) is a **sanctioned cross-tenant system-maintenance
+  sweep** run GUC-unset, relying on the NULL-permissive hatch — the same category as the audit-integrity
+  scan, **not** a table where RLS "cannot apply." (The janitor package sits outside the `ASYNC-TENANT-SEED`
+  scanned handler roots, so it needs no lint allowlist entry.)
 
 ### 5. Cross-references
 
@@ -199,7 +209,7 @@ not gaps:
 | **metaldocs-api** (sync) | `TxRunner` chokepoint, auto from the platform identity carrier set by the auth middleware | Seeded to the authenticated tenant on every request `Do`/`DoReadOnly` | Active backstop — cross-tenant SELECT/UPDATE/DELETE return 0 rows; wrong-tenant INSERT fails `42501` | Allowlisted cross-tenant platform-admin paths; any pre-auth/system `Do` with no ctx identity (no-op seed) |
 | **metaldocs-worker** (materialize, pdf, staging-outbox, platform outbox) | Per-message `authz.SeedTxTenant` in the processing tx, from the claimed row's tenant | Seeded to the claimed row's tenant in each single-tenant processing tx | Active backstop on processing writes — same 0-rows/`42501` semantics | Claim steps (ADR 0054 rule 1) run GUC-unset by design |
 | **metaldocs-jobs** (scheduled-publish, notifications-fanout, River) | Per-job `authz.SeedTxTenant` in the work tx, from the job's tenant | Seeded to the job's tenant | Active backstop on job writes | Nothing tenant-scoped runs unseeded outside the sanctioned allowlist |
-| **Janitors** (hosted in metaldocs-api: stuck-instance-watchdog, idempotency-janitor, audit-integrity-validator, lease-reaper) | Not seeded — system, no tenant | Unseeded — NULL-permissive by design | Intentionally inert for cross-tenant maintenance scans | Entire janitor scan/maintenance surface; `idempotency_keys`/`job_leases` have no `tenant_id` column |
+| **Janitors** (hosted in metaldocs-api: stuck-instance-watchdog, idempotency-janitor, audit-integrity-validator, lease-reaper) | Not seeded — system, no tenant | Unseeded — NULL-permissive by design | Intentionally inert for cross-tenant maintenance scans | Entire janitor scan/maintenance surface — cross-tenant TTL/maintenance sweeps run GUC-unset by design (e.g. the idempotency-janitor `DELETE` on the `tenant_id`-bearing FORCE-RLS `idempotency_keys`, same class as the audit scan); `job_leases` genuinely has no `tenant_id` column |
 
 **Invariant restated:** the RLS policy is byte-identical before and after M3. What changed is **GUC-seeding
 coverage** — from "API only, via ~62 hand-placed calls" to "API via a structural chokepoint + async via a

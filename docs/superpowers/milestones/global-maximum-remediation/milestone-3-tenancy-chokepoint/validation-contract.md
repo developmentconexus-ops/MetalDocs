@@ -7,6 +7,16 @@
 > contract, or re-open this contract **with operator approval** — never silently edit the contract to
 > match the code (mission §9 HS-7). The **§4 per-binary RLS-behavior table**, the **§1 chokepoint seeding
 > contract**, the **§1.4 allowlist**, and the **§2.5 negative-proof shape** are the load-bearing clauses.
+>
+> **Erratum 2026-07-03 (HS-7 re-open, operator-approved — feature F3.4).** The milestone-validator (M3 QA)
+> found a false runtime-truth premise in §0.3/§2.4/§4: `idempotency_keys` was described as a system table
+> "with no `tenant_id` column / RLS structurally N/A." Source (`db/baseline/0001_current_schema.sql:1330,1347`)
+> shows it **has** `tenant_id uuid NOT NULL` + FORCE RLS + the `tenant_isolation` policy (it is 1 of the 33
+> FORCE tables). Its idempotency-janitor TTL `DELETE` is a **sanctioned cross-tenant system-maintenance
+> sweep** run GUC-unset under the NULL-permissive hatch (same class as the audit scan), not a table where
+> RLS cannot apply. `job_leases` genuinely has no `tenant_id` (that claim was correct). §0.3, §2.4, §4 were
+> corrected in place under this operator-approved re-open; no acceptance bar changed. See
+> `f3.4-idempotency-keys-rls-truth/`.
 
 ---
 
@@ -64,7 +74,7 @@ All claims below are traced to source at authoring time (2026-07-03), not to pri
 | scheduled-publish (`internal/modules/documents/approval/jobs/scheduled_publish_job.go`) | yes (`runner.Do`) | yes (River args) | yes | **seed tenant GUC** |
 | notifications-fanout (`internal/modules/notifications/infrastructure/fanout_worker.go`) | **no** (raw `ExecContext`) | yes (event args) | yes | **wrap in tx + seed** |
 | staging-outbox **processing** (`internal/modules/render/fanout/staging_outbox_worker.go`, per claimed row) | per-row | yes (claimed `OutboxRow.TenantID`) | yes (1 row) | **seed tenant GUC in processing tx** |
-| **Sanctioned cross-tenant / system (stay GUC-unset — allowlisted):** platform outbox **claim** (`internal/platform/messaging/outbox/postgres/consumer.go`), staging-outbox **claim** (`internal/modules/render/fanout/staging_outbox.go`, ADR 0054 rule 1), stuck-watchdog cross-tenant **list**, `idempotency_keys` janitor (**no `tenant_id` column**), `job_leases` lease-reaper (**no `tenant_id` column**), audit-integrity scan | — | — (cross-tenant by design) | — | **no seed; on the §2.4 allowlist** |
+| **Sanctioned cross-tenant / system (stay GUC-unset — allowlisted):** platform outbox **claim** (`internal/platform/messaging/outbox/postgres/consumer.go`), staging-outbox **claim** (`internal/modules/render/fanout/staging_outbox.go`, ADR 0054 rule 1), stuck-watchdog cross-tenant **list**, `idempotency_keys` janitor (**`tenant_id`-bearing FORCE-RLS table; cross-tenant TTL sweep under the NULL-permissive hatch, same class as the audit scan**), `job_leases` lease-reaper (**genuinely no `tenant_id` column**), audit-integrity scan | — | — (cross-tenant by design) | — | **no seed; on the §2.4 allowlist** |
 
 **ADR 0054 already mandates the F3.2 seam** (rule 2: "everything the consumer does *with* a claimed row
 … MUST be scoped to that row's `tenant_id`; tx-local GUCs per item; never mix rows from different tenants
@@ -213,8 +223,13 @@ Explicit, reasoned allowlist (file/const). Only these categories:
   `FOR UPDATE SKIP LOCKED`; tenancy enforced one row later at processing time (§2.2).
 - **Cross-tenant scans** with no per-row mutation — stuck-instance-watchdog list step (its per-instance
   **action** goes through `runner.Do` and is seeded/allowlisted per its tenant).
-- **System tables with no `tenant_id` column** — `idempotency_keys` (janitor), `job_leases` (lease-reaper).
-  RLS is structurally N/A (no `tenant_id` to scope); recorded as such.
+- **`job_leases` (lease-reaper)** — genuinely has **no `tenant_id` column**; RLS is structurally N/A
+  (nothing to scope); recorded as such.
+- **`idempotency_keys` (idempotency-janitor)** — **is** a `tenant_id`-bearing FORCE-RLS table (1 of the 33);
+  its TTL `DELETE … WHERE expires_at < now()` (`internal/modules/jobs/idempotency_janitor/job.go:34`) is a
+  **sanctioned cross-tenant system-maintenance sweep** run GUC-unset under the NULL-permissive hatch — same
+  category as the audit-integrity scan, **not** a table where RLS "cannot apply." Its janitor package is
+  outside the `ASYNC-TENANT-SEED` scanned handler roots, so no lint allowlist entry is required.
 - **Audit-integrity scan** — read-only, system-wide by design.
 
 ### 2.5 The negative RLS proof (integration — the load-bearing acceptance)
@@ -292,7 +307,7 @@ ADR 0027 carries the dated amendment with all five points · wiki tenancy docs m
 | **metaldocs-api** (sync) | `TxRunner` chokepoint, auto from platform identity carrier (authn middleware) | **Seeded** to the authenticated tenant on every request `Do`/`DoReadOnly` | **Active backstop** — cross-tenant SELECT/UPDATE/DELETE → 0 rows; wrong-tenant INSERT → `42501` | Allowlisted cross-tenant platform-admin paths (§1.4-B) + any pre-auth/system `Do` with no ctx identity (no-op seed, NULL-permissive) |
 | **metaldocs-worker** (async: materialize, pdf, staging-outbox, platform outbox) | Per-message `SeedTxTenant` in the processing tx (claimed row's tenant) | **Seeded** to the claimed row's tenant in each single-tenant processing tx | **Active backstop** on processing writes — same 0-rows / `42501` semantics | **Claim** steps (ADR 0054 rule 1) run GUC-unset by design (allowlisted §2.4) |
 | **metaldocs-jobs** (async: scheduled-publish, notifications-fanout, River) | Per-job `SeedTxTenant` in the work tx (River-args / event tenant) | **Seeded** to the job's tenant | **Active backstop** on job writes | Nothing tenant-scoped runs unseeded except the §2.4 allowlist |
-| **(janitors, hosted in metaldocs-api)** | Not seeded (system, no tenant) | **Unseeded** — NULL-permissive by design | Intentionally inert (cross-tenant maintenance); guarded by §2.4 allowlist + `idempotency_keys`/`job_leases` having no `tenant_id` | Entire janitor scan/maintenance surface (sanctioned) |
+| **(janitors, hosted in metaldocs-api)** | Not seeded (system, no tenant) | **Unseeded** — NULL-permissive by design | Intentionally inert (cross-tenant maintenance); guarded by the §2.4 allowlist. Cross-tenant TTL/maintenance sweeps run GUC-unset by design — e.g. the idempotency-janitor `DELETE` on the `tenant_id`-bearing FORCE-RLS `idempotency_keys` (same class as the audit scan); `job_leases` genuinely has no `tenant_id` | Entire janitor scan/maintenance surface (sanctioned) |
 
 **Invariant restated:** the RLS **policy** is byte-identical before and after M3 (NULL-permissive, FORCE,
 33 tables). What changes is **GUC seeding coverage**: from "API only, by 62 manual acts" to "API by
