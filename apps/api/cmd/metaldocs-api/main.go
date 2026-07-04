@@ -49,6 +49,7 @@ import (
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/fanout/dispatchjobs"
+	"metaldocs/internal/modules/render/fanout/retention"
 	"metaldocs/internal/modules/render/resolvers"
 	searchapp "metaldocs/internal/modules/search/application"
 	searchdelivery "metaldocs/internal/modules/search/delivery/http"
@@ -507,8 +508,11 @@ func main() {
 			// Config.PeriodicJobs; metaldocs-api joins the same leader election but
 			// does NOT subscribe the "maintenance" queue and has nil Workers here,
 			// so it enqueues-when-leader but never executes these jobs (ADR 0067
-			// dual-define, jobs-only execute topology).
-			PeriodicJobs:        maintenance.PeriodicJobs(),
+			// dual-define, jobs-only execute topology). The staging-outbox purge
+			// job (M5 F5.4 T2) follows the exact same pattern: its periodic-job
+			// definition is appended here for leader-election parity, but api
+			// never subscribes "maintenance" and never registers the PurgeWorker.
+			PeriodicJobs:        append(maintenance.PeriodicJobs(), retention.PeriodicJob()),
 			Schema:              jobsCfg.RiverSchema,
 			SkipUnknownJobCheck: true,
 		}, nil)

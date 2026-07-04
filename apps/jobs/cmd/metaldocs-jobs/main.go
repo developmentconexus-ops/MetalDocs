@@ -26,6 +26,7 @@ import (
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/fanout/dispatchjobs"
+	"metaldocs/internal/modules/render/fanout/retention"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
 	outboxpg "metaldocs/internal/platform/messaging/outbox/postgres"
@@ -72,7 +73,12 @@ func run(ctx context.Context) error {
 		river.AddWorker(workers, dispatchjobs.NewPDFDispatchWorker(publisher, pdfRepo))
 		river.AddWorker(workers, dispatchjobs.NewMaterializeDispatchWorker(publisher, matRepo))
 
-		return workers, maintenance.PeriodicJobs(), nil
+		// Staging outbox retention purge (M5 F5.4 T2): reuses the same pdfRepo/
+		// matRepo instances built above for the dispatch workers.
+		river.AddWorker(workers, retention.NewPurgeWorker(pdfRepo, matRepo))
+
+		periodicJobs := append(maintenance.PeriodicJobs(), retention.PeriodicJob())
+		return workers, periodicJobs, nil
 	})
 	if err != nil {
 		return fmt.Errorf("build jobs dependencies: %w", err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
@@ -53,6 +54,17 @@ func BuildJobsDependencies(ctx context.Context, cfg config.JobsConfig, workerFac
 		Queues:       cfg.Queues,
 		Schema:       cfg.RiverSchema,
 		PeriodicJobs: periodicJobs,
+		// M5 F5.4 T2: explicit retention values (binding per contract §4.1),
+		// matching River's own documented defaults — set explicitly so a
+		// future River default change can't silently drift the policy.
+		// metaldocs-jobs is the designated host binary for the purge worker
+		// (contract §1); metaldocs-api's enqueue-only Config intentionally
+		// leaves these at zero (inherits River's own defaults, harmless
+		// since api never runs the cleaner as the primary contract-pinned
+		// host).
+		CompletedJobRetentionPeriod: 24 * time.Hour,
+		CancelledJobRetentionPeriod: 24 * time.Hour,
+		DiscardedJobRetentionPeriod: 7 * 24 * time.Hour,
 	}, workers)
 	if err != nil {
 		_ = closeDB(db)
