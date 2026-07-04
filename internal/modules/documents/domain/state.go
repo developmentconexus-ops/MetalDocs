@@ -9,13 +9,15 @@ package domain
 // flag (ADR 0010, documents.archived_at) set by MarkArchived without changing
 // status, so every arc into or out of "archived" is illegal here.
 //
-// "rejected" still exists as a DocumentStatus constant but has no arcs in
-// this function: the app runtime never writes it (reject collapses
-// under_review back to "draft"), matching the trigger's app-reachable
-// subset. The under_review→draft arc mirrors both the reject rollback and
-// the cancel rollback; the DB trigger additionally gates that specific arc
-// on the metaldocs.cancel_in_progress GUC — this function only reports the
-// arc as legal, it does not enforce the GUC (that remains a DB-only concern).
+// "rejected" was removed as a DocumentStatus entirely (migration 0272 +
+// model.go), because the app runtime never wrote it: reject collapses
+// under_review back to "draft". This function and the DB trigger dropped the
+// under_review→rejected and rejected→draft arcs together (parity, see
+// state_parity_test.go). The surviving under_review→draft arc mirrors both the
+// reject rollback and the cancel rollback; the DB trigger additionally gates
+// that specific arc on the metaldocs.cancel_in_progress GUC — this function
+// only reports the arc as legal, it does not enforce the GUC (that remains a
+// DB-only concern).
 func CanTransitionDocumentStatus(cur, next DocumentStatus) error {
 	switch cur {
 	case DocStatusDraft:
