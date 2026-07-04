@@ -94,11 +94,11 @@ func softTenantID(ctx context.Context, tx *sql.Tx) string {
 }
 
 func softGUC(ctx context.Context, tx *sql.Tx, query, def string) string {
-	var v string
-	if err := tx.QueryRowContext(ctx, query).Scan(&v); err != nil {
-		return def
-	}
-	if v == "" {
+	// readSoftGUC collapses a never-seeded placeholder GUC (SQL NULL) to "" instead
+	// of erroring; the soft path additionally treats any read error as "unset" and
+	// returns the caller's default (background sweeps fail soft, by design).
+	v, err := readSoftGUC(ctx, tx, query)
+	if err != nil || v == "" {
 		return def
 	}
 	return v

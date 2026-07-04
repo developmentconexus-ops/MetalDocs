@@ -17,11 +17,38 @@ var ErrActorContextMissing = errors.New("authz: metaldocs.actor_id GUC not set o
 // the current transaction.
 var ErrTenantContextMissing = errors.New("authz: metaldocs.tenant_id GUC not set on transaction")
 
+// readSoftGUC reads a transaction-local custom GUC via current_setting(name, true)
+// and normalizes the "not seeded" case to an empty string.
+//
+// PostgreSQL subtlety this exists to absorb: a *placeholder* custom GUC
+// (metaldocs.*) that was never introduced on the connection makes
+// current_setting(..., true) return SQL **NULL**, not ''. Scanning that NULL into
+// a plain Go string fails at the driver ("converting NULL to string is
+// unsupported") — which on a cold, never-seeded pooled connection turns a clean
+// "identity missing" into an opaque driver error. Scanning into sql.NullString and
+// collapsing NULL to "" gives every caller one unambiguous unset signal (NULL and
+// '' both mean "not seeded"). This is the same idiom loadAssertedCaps already uses;
+// centralizing it here removes the three-way split across the GUC readers.
+//
+// query is always a compile-time constant literal at the call site (no injection
+// surface); it is passed through verbatim so the emitted SQL stays byte-identical
+// to the historical statements the sqlmock tests match on.
+func readSoftGUC(ctx context.Context, tx *sql.Tx, query string) (string, error) {
+	var v sql.NullString
+	if err := tx.QueryRowContext(ctx, query).Scan(&v); err != nil {
+		return "", err
+	}
+	if !v.Valid {
+		return "", nil
+	}
+	return v.String, nil
+}
+
 // MustActorID returns the metaldocs.actor_id GUC value for the given transaction.
-// Returns ErrActorContextMissing if the GUC is unset or empty.
+// Returns ErrActorContextMissing if the GUC is unset (SQL NULL) or empty.
 func MustActorID(ctx context.Context, tx *sql.Tx) (string, error) {
-	var v string
-	if err := tx.QueryRowContext(ctx, "SELECT current_setting('metaldocs.actor_id', true)").Scan(&v); err != nil {
+	v, err := readSoftGUC(ctx, tx, "SELECT current_setting('metaldocs.actor_id', true)")
+	if err != nil {
 		return "", fmt.Errorf("read actor_id GUC: %w", err)
 	}
 	if v == "" {
@@ -31,10 +58,10 @@ func MustActorID(ctx context.Context, tx *sql.Tx) (string, error) {
 }
 
 // MustTenantID returns the metaldocs.tenant_id GUC value for the given transaction.
-// Returns ErrTenantContextMissing if the GUC is unset or empty.
+// Returns ErrTenantContextMissing if the GUC is unset (SQL NULL) or empty.
 func MustTenantID(ctx context.Context, tx *sql.Tx) (string, error) {
-	var v string
-	if err := tx.QueryRowContext(ctx, "SELECT current_setting('metaldocs.tenant_id', true)").Scan(&v); err != nil {
+	v, err := readSoftGUC(ctx, tx, "SELECT current_setting('metaldocs.tenant_id', true)")
+	if err != nil {
 		return "", fmt.Errorf("read tenant_id GUC: %w", err)
 	}
 	if v == "" {

@@ -43,8 +43,10 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
+	platformtenant "metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -101,7 +103,12 @@ func runPublishRaceInterleaving(t *testing.T, seed seedState, manualFirst bool) 
 	// scheduler no-op there — but the job input still references this timestamp
 	// so the scheduler genuinely attempts (loads state under FOR UPDATE) before
 	// diverging.
-	effectiveAt := time.Now().UTC().Add(-1 * time.Hour)
+	// Truncated to microseconds: Postgres timestamptz has microsecond resolution,
+	// so a nanosecond-precision time.Now() would not survive the seed round-trip
+	// byte-for-byte and scheduledJobMatchesState's effective_from equality
+	// (state.EffectiveFrom.Equal(input.ScheduledEffectiveAt)) would spuriously fail,
+	// making the scheduler no-op on a row it should publish.
+	effectiveAt := time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Microsecond)
 
 	tnt := testdb.NewTenant(t, database)
 	user := testdb.NewUser(t, database, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
@@ -152,6 +159,27 @@ func runPublishRaceInterleaving(t *testing.T, seed seedState, manualFirst bool) 
 	svcs := NewServices(repo, emitter, clock, cdRead)
 	runner := db.NewTxRunner(database)
 
+	// Production-faithful identity: in the real request lifecycle the authn
+	// middleware plants tenant+actor into the context and TxRunner auto-seeds the
+	// tx-local GUCs (metaldocs.tenant_id / metaldocs.actor_id) from it before fn
+	// runs — the same GUCs authz.Require reads. context.Background() carries no
+	// identity, so the runner would no-op the seed and the in-tx authz guard would
+	// (correctly) fail closed with ErrActorContextMissing. Seed the context exactly
+	// as middleware does so the race exercises the real authorized publish path.
+	idCtx := platformtenant.WithActorID(
+		platformtenant.WithTenantID(ctx, tnt.ID),
+		user.ID,
+	)
+
+	// Scheduler is the async/background lifecycle, NOT a human request: in
+	// production scheduled_publish_job.go marks its root with
+	// authz.WithBackgroundBypass so RunScheduledPublishJob may bypass the tier-2
+	// capability tripwire, and the service seeds its own tenant GUC in-tx via
+	// SeedTxTenant(input.TenantID) (no human actor). Mirror exactly that root here;
+	// using idCtx would be wrong (the scheduler has no human actor and needs the
+	// background-bypass marker).
+	schedCtx := authz.WithBackgroundBypass(ctx)
+
 	// -----------------------------------------------------------------------
 	// Real concurrent barrier: both goroutines block on `start` until it is
 	// closed once. Launch order (manualFirst) only nudges Go's runtime; the
@@ -166,7 +194,7 @@ func runPublishRaceInterleaving(t *testing.T, seed seedState, manualFirst bool) 
 	manualGoroutine := func() {
 		defer wg.Done()
 		<-start
-		_, manualErr = svcs.Publish.PublishApproved(ctx, runner, PublishRequest{
+		_, manualErr = svcs.Publish.PublishApproved(idCtx, runner, PublishRequest{
 			TenantID:    tnt.ID,
 			InstanceID:  inst.ID,
 			PublishedBy: user.ID,
@@ -175,7 +203,7 @@ func runPublishRaceInterleaving(t *testing.T, seed seedState, manualFirst bool) 
 	schedGoroutine := func() {
 		defer wg.Done()
 		<-start
-		schedErr = svcs.Scheduler.RunScheduledPublishJob(ctx, runner, schedInput)
+		schedErr = svcs.Scheduler.RunScheduledPublishJob(schedCtx, runner, schedInput)
 	}
 
 	if manualFirst {
@@ -251,8 +279,10 @@ func runPublishRaceInterleaving(t *testing.T, seed seedState, manualFirst bool) 
 	// -----------------------------------------------------------------------
 	var publishedEventCount int
 	if err := database.QueryRowContext(ctx,
+		// governance_events.tenant_id is uuid but resource_id is TEXT (it holds any
+		// resource's id, not only uuids) — compare resource_id as text, not ::uuid.
 		`SELECT COUNT(*) FROM public.governance_events
-		  WHERE tenant_id = $1::uuid AND resource_id = $2::uuid AND event_type = 'document_published'`,
+		  WHERE tenant_id = $1::uuid AND resource_id = $2 AND event_type = 'document_published'`,
 		tnt.ID, doc.ID,
 	).Scan(&publishedEventCount); err != nil {
 		t.Fatalf("%s: query governance_events count: %v", label, err)

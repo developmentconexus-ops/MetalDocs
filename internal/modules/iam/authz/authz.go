@@ -294,14 +294,14 @@ func appendAssertedCap(ctx context.Context, tx *sql.Tx, capability, areaCode str
 }
 
 func loadAssertedCaps(ctx context.Context, tx *sql.Tx) (*assertedCache, error) {
-	var raw sql.NullString
-	if err := tx.QueryRowContext(ctx, "SELECT current_setting('metaldocs.asserted_caps', true)").Scan(&raw); err != nil {
+	raw, err := readSoftGUC(ctx, tx, "SELECT current_setting('metaldocs.asserted_caps', true)")
+	if err != nil {
 		return nil, err
 	}
 
 	items := make([]map[string]string, 0, 4)
-	if raw.Valid && raw.String != "" {
-		if err := json.Unmarshal([]byte(raw.String), &items); err != nil {
+	if raw != "" {
+		if err := json.Unmarshal([]byte(raw), &items); err != nil {
 			return nil, err
 		}
 	}

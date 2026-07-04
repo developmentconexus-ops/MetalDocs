@@ -37,6 +37,66 @@ func TestMustActorID_ReturnsErrWhenGUCMissing(t *testing.T) {
 	}
 }
 
+// TestMustActorID_ReturnsErrWhenGUCNull pins the F4.2/F4.5 root-cause fix: a
+// placeholder GUC that was never set on the connection makes
+// current_setting('metaldocs.actor_id', true) return SQL NULL (not ''). Before the
+// fix, scanning that NULL into a plain string failed with a driver error
+// ("converting NULL to string is unsupported") instead of the documented sentinel.
+// AddRow(nil) reproduces the NULL; the guard must fail closed with
+// ErrActorContextMissing, exactly as the empty-string case does.
+func TestMustActorID_ReturnsErrWhenGUCNull(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock new: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(nil))
+
+	_, err = authz.MustActorID(context.Background(), tx)
+	if !errors.Is(err, authz.ErrActorContextMissing) {
+		t.Fatalf("expected ErrActorContextMissing on NULL GUC, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+// TestMustTenantID_ReturnsErrWhenGUCNull — tenant twin of the NULL-GUC pin above.
+func TestMustTenantID_ReturnsErrWhenGUCNull(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock new: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(nil))
+
+	_, err = authz.MustTenantID(context.Background(), tx)
+	if !errors.Is(err, authz.ErrTenantContextMissing) {
+		t.Fatalf("expected ErrTenantContextMissing on NULL GUC, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestMustActorID_ReturnsValueWhenSet(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

@@ -72,6 +72,54 @@ smuggled into a correctness milestone. When it happens it supersedes this ADR's 
   hand-edits), keep the `lock_version` column and its CAS; then retire this ADR.
 - No runtime behavior changes as a result of this ADR (documentation/decision only).
 
+## Target design (global maximum) — the concrete unification
+
+The professional, Go-idiomatic end state (what a fresh implementation would build, and the charter for
+the future unifier). It is **one transport, parsed and enforced in exactly one place**, consumed by
+every OCC write endpoint — the same "single chokepoint, generated/shared not hand-synced" principle the
+rest of this program applies:
+
+1. **A small platform kernel package** — `internal/platform/occ` (no module imports; platform rule) —
+   owns the entire idiom:
+   ```go
+   // FormatETag renders a resource version as a strong validator: FormatETag(42) == `"v42"`.
+   func FormatETag(version int64) string
+
+   // ParseIfMatch extracts the expected version from an If-Match header value.
+   // Fail-closed and RFC-7232/6585 exact:
+   //   - header absent/empty      -> ErrPreconditionRequired  (HTTP 428, problem+json)
+   //   - malformed / not "vN"     -> ErrMalformedIfMatch      (HTTP 400)
+   //   - "*"                      -> ErrPreconditionWildcard  (unsupported for CAS writes)
+   // A successful parse returns the int64 version to feed the CAS UPDATE.
+   func ParseIfMatch(headerValue string) (int64, error)
+   ```
+   This subsumes documents' current `parseIfMatch` (`handler.go:145-164`) verbatim — that function
+   *is* the seed; it moves to the kernel and both modules call it.
+
+2. **Every OCC write endpoint requires `If-Match: "vN"`** and every resource read/write response emits
+   `ETag: "vN"`, so a client always has a fresh validator to echo back. No version field ever appears
+   in a **request body** schema again.
+
+3. **`428 Precondition Required`** when the header is absent (RFC 6585 — forbids the silent
+   lost-update that an optional precondition invites; Zalando/AIP guidance), **`412 Precondition
+   Failed`** when the CAS finds a stale version. Uniform problem+json mapping in one middleware/helper,
+   not per handler.
+
+4. **templates migration is contract-first:** remove `expected_lock_version` from
+   `routes_schema.go` request schema (OpenAPI + `oapi-codegen` regen, **zero hand-edits**), map the
+   `If-Match` version onto the existing `lock_version` CAS. **The `lock_version` column and its CAS
+   stay** — only the *transport* changes; the DB remains the last-line monotonicity enforcer in both
+   modules.
+
+Why this is the global maximum (not a local tweak): OCC state (the version) lives in an HTTP
+**validator header**, which is cache-/proxy-/tooling-native and keeps concurrency out of every request
+schema; the parse + error-mapping exists **once** (kill the divergent-idiom class at its root, exactly
+like F4.5 did for the GUC readers and M2 did for tripwire arms); and each handler stays thin. It is the
+convergent industry pattern (RFC 7232 `ETag`/`If-Match`, RFC 6585 `428`, Google AIP-154, Zalando,
+Stripe/Microsoft). Executing it is a first-class cross-module wire change (candidate M9 / standalone
+milestone), **not** milestone-smuggled; on completion it **supersedes this ADR** with uniform
+`If-Match`.
+
 ## References
 
 - M4 validation contract: `docs/superpowers/milestones/global-maximum-remediation/milestone-4-versioning-kernel/validation-contract.md` §3 (with the 2026-07-04 erratum recording the false-premise correction)

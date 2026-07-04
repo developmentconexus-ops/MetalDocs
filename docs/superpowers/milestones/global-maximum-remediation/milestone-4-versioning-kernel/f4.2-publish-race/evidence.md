@@ -36,26 +36,54 @@ Safe by construction: the two OCC UPDATEs have **mutually-exclusive `status` pre
 `scheduled`) plus a `revision_version` CAS — a single row satisfies at most one, so no interleaving yields
 two winners. **No `PublishRevision` choke point warranted; none added. No production code changed.**
 
-## Commands (real output)
+## Commands (real output) — LIVE GREEN on real Postgres
+
+Ran against a disposable `postgres:16` container (`METALDOCS_DATABASE_URL` set for the run only; `.env`
+never touched). The harness (`testdb.Open`) built the template DB from prerequisites + baseline +
+reference-data + **all migrations including `0272`**, then cloned per test.
 
 ```
 $ go vet -tags integration ./internal/modules/documents/approval/application/   → clean, VET_EXIT=0
+
+$ METALDOCS_DATABASE_URL=postgres://…@localhost:55432/postgres?sslmode=disable \
+    go test ./internal/modules/documents/approval/application/ -tags integration -run TestPublishRace -count=1 -v
+=== RUN   TestPublishRace
+--- PASS: TestPublishRace (130.42s)
+    --- PASS: TestPublishRace/ScheduledSeed_ManualFirst (103.93s)   # first run builds the template DB
+    --- PASS: TestPublishRace/ScheduledSeed_SchedulerFirst (7.04s)
+    --- PASS: TestPublishRace/ApprovedSeed_ManualFirst (9.21s)
+    --- PASS: TestPublishRace/ApprovedSeed_SchedulerFirst (10.24s)
+PASS
+ok  metaldocs/internal/modules/documents/approval/application  134.096s
 ```
 
-## Bounded defer — live green run (honest disclosure)
+All four subtests green: single winner per seed, terminal `status='published'`, `revision_version==4`
+(exactly one bump), exactly one `document_published` governance event. The safe-by-construction verdict
+is now **empirically confirmed under real concurrency**, not only argued.
 
-A live green run is **not** observed. Root cause is a **pre-existing** platform gap, NOT a defect in this
-deliverable: `authz.MustActorID` / `MustTenantID` (`internal/modules/iam/authz/context.go`) `Scan` a
-`SELECT current_setting('metaldocs.actor_id', true)` result into a plain `string`; on a cold pooled
-connection never touched by `set_config`, Postgres returns SQL NULL and the `Scan` fails with
-`converting NULL to string is unsupported` instead of the intended `ErrActorContextMissing` sentinel.
+## Bounded defer — live green run — **CLOSED (2026-07-04)**
 
-Verified this is environmental, not test-quality: the **reference** integration test
-(`TestPublishApproved_DoesNotAutoCreateNextVersion`, the file this one mirrors) fails **byte-identically**
-on the same disposable `postgres:16` container. The project's real CI/test-DB image seeds GUCs (M3 TxRunner
-auto-seed) and masks this on cold connections; the disposable container bypassed that path.
+The live green run the original evidence deferred is now **observed** (above). Getting there corrected two
+distinct root causes; the original "masked by CI GUC-seeding" hypothesis was imprecise and is superseded:
 
-| Defer | Rationale | Trigger / owner |
-|---|---|---|
-| Live `-tags integration` green run | 20-min box (contract §5/§6) + pre-existing authz NULL-GUC scan gap blocks cold-connection runs | Run on project CI/real test-DB image before program close-out; drive authored + committed (M1–M3 precedent) |
-| Fix authz NULL-GUC scan → `ErrActorContextMissing` on cold connection | Out of M4 boundary (iam/authz platform robustness, not the publish race); flagged as `task_e03a4383` | M8 ops-readiness or a platform-hardening pass |
+1. **Test-harness identity gap (the real blocker, PRIMARY).** The harness drove the services with
+   `context.Background()` — no tenant/actor — so the M3 `TxRunner` auto-seed
+   (`seedTxIdentityFromContext`) no-op'd and the in-tx `authz.Require` correctly failed closed. Fixed by
+   seeding the context **exactly as production middleware does**: manual path gets
+   `platformtenant.WithTenantID`+`WithActorID` (human lifecycle); scheduler path gets
+   `authz.WithBackgroundBypass` and self-seeds its tenant in-tx via `SeedTxTenant` (async lifecycle) —
+   mirroring `scheduled_publish_job.go`. Plus two fixture-precision fixes: `effectiveAt` truncated to
+   µs (Postgres `timestamptz` resolution, or `scheduledJobMatchesState` spuriously no-ops), and the
+   `governance_events` count query compares `resource_id` as **TEXT** (the column is text, not uuid).
+   These are test-only changes — **no production publish-path code was touched.**
+
+2. **authz NULL-GUC scan gap (secondary, now fixed as F4.5).** On a cold connection the missing identity
+   surfaced as an opaque driver error (`converting NULL to string is unsupported`) instead of the
+   documented `ErrActorContextMissing` sentinel, because `MustActorID`/`MustTenantID` scanned
+   `current_setting(...,true)` (which returns SQL **NULL** for a never-set placeholder GUC) into a plain
+   `string`. Fixed in **[F4.5](../f4.5-authz-guc-null-hardening/evidence.md)** — one shared
+   `readSoftGUC` helper (`sql.NullString`, NULL⇒missing) now backs all four GUC readers. Fail-closed
+   behavior is unchanged (stricter-or-equal); it only replaces a driver crash with the correct sentinel.
+   `task_e03a4383` is thereby resolved inside M4, not deferred.
+
+**No defers remain open for F4.2.**
