@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
@@ -189,6 +190,40 @@ SELECT status FROM %s
 		return "", fmt.Errorf("%s read state: %w", r.name, err)
 	}
 	return status, nil
+}
+
+// PurgeDispatched deletes dispatched rows older than cutoff in bounded
+// batches, stopping early once a batch affects 0 rows (nothing left to
+// delete) or maxIterations is reached — mirrors the bounded-batch-delete
+// idiom in internal/modules/jobs/idempotency_janitor/job.go:56-78 (ctid
+// subquery with LIMIT, looped, break on n==0). The status='dispatched'
+// filter alone excludes dead-lettered rows (their status is 'failed', never
+// 'dispatched'), so no extra guard is needed to protect the DLQ.
+func (r *StagingOutboxRepository) PurgeDispatched(ctx context.Context, cutoff time.Time, batchSize, maxIterations int) (int, error) {
+	totalDeleted := 0
+	for i := 0; i < maxIterations; i++ {
+		//nolint:gosec // table name is allowlist-validated at construction
+		result, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+DELETE FROM %s
+WHERE ctid IN (
+	SELECT ctid FROM %s
+	WHERE status = 'dispatched' AND dispatched_at < $1
+	LIMIT $2
+)`, r.table, r.table), cutoff, batchSize)
+		if err != nil {
+			return totalDeleted, fmt.Errorf("%s purge dispatched: %w", r.name, err)
+		}
+
+		n, err := result.RowsAffected()
+		if err != nil {
+			return totalDeleted, fmt.Errorf("%s purge dispatched: rows affected: %w", r.name, err)
+		}
+		totalDeleted += int(n)
+		if n == 0 {
+			break
+		}
+	}
+	return totalDeleted, nil
 }
 
 // NewPDFOutboxRepository returns a StagingOutboxRepository bound to the PDF dispatch table.
