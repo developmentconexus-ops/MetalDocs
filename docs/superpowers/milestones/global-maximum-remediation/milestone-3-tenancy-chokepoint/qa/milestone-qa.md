@@ -1,184 +1,139 @@
 # Milestone 3 — Validation Verdict (C1–C7)
 
 > **Written by:** the `milestone-validator` subagent — *not* the main session (separation of powers).
-> **Validates against:** `../milestone.md` + `../validation-contract.md` (D4, binding, re-opened once
-> under HS-7 for F3.4) + each feature's `spec.md`.
+> **Validates against:** `../milestone.md` + `../validation-contract.md` (D4) + each feature's `spec.md`.
 > **Binding procedure:** `.claude/skills/milestone/references/milestone-end-validation.md`.
-> **Run:** 2026-07-03 (HS-4 re-dispatch after F3.4)  ·  **HEAD:** `118e0196`  ·  **Baseline:** `e80c1800`
-> (pre-impl contract commit)  ·  **Verdict:** see C7 → **PASS**.
-> The validator judges and writes this file only; it edited no source, fixed no finding, flipped no status.
-> (Synthetic RED-probe files inserted for lint negative-proof were removed; final tree clean.)
+> **Run:** 2026-07-03 (RE-VALIDATION) · **Verdict:** see C7.
+>
+> **Why re-validated:** The prior PASS (`5f7169b5`) treated the F3.2 negative-RLS integration proof as a
+> *deferred* live run. The operator required the real run; it was **RED** on first execution (the proof
+> targeted `public.documents`, whose M2 capability write-tripwire `trg_require_cap_asserted` raises `P0001`
+> *before* RLS is the deciding control, masking the outcome). Fix-feature **F3.5** retargeted the proof to
+> `metaldocs.notifications` (FORCE-RLS `tenant_isolation`, a real F3.2 async seed site, NOT tripwired) and
+> ran it GREEN for real. The prior PASS is VOID; this verdict re-runs the full C1–C7 from clean state and
+> does not assume any prior feature is still green.
 
-## Context — this is a re-validation
+## Inputs loaded
 
-Prior run (@ `a6c874a3`) returned **FAIL** on finding **F-1**: three durable records falsely claimed
-`idempotency_keys` has "no `tenant_id` column / RLS structurally N/A" (a split-brain contradicting the
-schema and ADR 0027's own body). The main session opened + closed fix-feature **F3.4
-(idempotency-keys-rls-truth)** — a docs + lint-data-only truth reconciliation, no behavior/policy change.
-This run re-executes the full C1–C7 gate from clean state (all four features re-verified, not assumed).
-
-## Inputs loaded (none missing — did not judge blind)
-
-`milestone.md` · `validation-contract.md` (§0–§6 + the HS-7 F3.4 erratum head) · program `README.md` ·
-governing `mission.md` (§7 M3) · all **four** features' `spec.md`/`plan.md`/`evidence.md`
-(F3.1/F3.2/F3.3/F3.4) · aggregate diff `git diff e80c1800..118e0196` (79 files) across five commits
-`de94758a` (F3.1) · `bad74d86` (F3.2) · `a6c874a3` (F3.3) · `118e0196` (F3.4).
-
----
+milestone.md · validation-contract.md (incl. F3.4 §0.3/§2.4/§4 erratum + §6 F3.5 defer-CLOSED note) ·
+f3.1/f3.2/f3.3/f3.4/f3.5 spec+plan+evidence · program README.md · aggregate diff `da7ae95c..HEAD`
+(commits `de94758a`, `bad74d86`, `a6c874a3`, `118e0196`, `5f7169b5`, `66af8f04`). All present and readable.
 
 ## C1 — Spec & plan conformance (per feature)
 
-| Feature | spec approved before code | interview populated | consumer contract honored | acceptance met | non-goals respected | Evidence |
-|---------|---------------------------|---------------------|---------------------------|----------------|---------------------|----------|
-| F3.1 | ✅ 2026-07-03 | ✅ Q&A | ✅ FORCE-RLS + `SEED-CHOKEPOINT` | ✅ | ✅ | C2/C3 |
-| F3.2 | ✅ 2026-07-03 | ✅ Q&A | ✅ FORCE-RLS + `ASYNC-TENANT-SEED` + neg-proof | ✅ | ✅ | C2/C3 |
-| F3.3 | ✅ 2026-07-03 | ✅ Q&A | ✅ **durable record now matches runtime truth** (F-1 closed) | ✅ | ✅ (docs-only) | C2/C3 |
-| F3.4 | ✅ 2026-07-03 (operator, incl. HS-7 re-open) | ✅ 4-row Q&A | ✅ PG-1..4 (below) | ✅ | ✅ (no behavior/policy change) | this run |
+| Feature | Consumer contract honored? | Acceptance met? | Non-goals respected? | Evidence |
+|---------|----------------------------|-----------------|----------------------|----------|
+| F3.1 | ✅ platform carrier reads only `internal/platform/tenant` (no iam import); chokepoint seeds both `Do`/`DoReadOnly`, present→seed / absent→no-op | ✅ 21 `SeedTxIdentity` sites = 21 allowlist entries, 0 outside; SEED-CHOKEPOINT blocking | ✅ no RLS policy change | spec/plan/evidence + allowlist |
+| F3.2 | ✅ `SeedTxTenant` tenant-only (no actor), 5 processing txs seeded; ASYNC-TENANT-SEED handler-scoped per §2.3 | ✅ lint 0 live violations, RED-on-synthetic captured; `emitStuckAlert` gap closed | ✅ policy unchanged; tx-local GUCs | spec/plan/evidence |
+| F3.3 | ✅ ADR 0027 dated amendment (all 5 §3.1 points + per-binary §4 table); wiki tenancy pages updated | ✅ no stale "async no backstop"/"85 sites" claim; wiki-curator clean | ✅ docs-only, verified 0 code diff | spec/plan/evidence |
+| F3.4 | ✅ `async-tenant-tables.txt` set-equal to the 33 FORCE tables; `idempotency_keys` a real entry, `job_leases` noted no-`tenant_id` | ✅ contract §0.3/§2.4/§4 corrected under operator-approved HS-7 re-open + dated erratum | ✅ docs+list only, RLS byte-identical | spec/plan/evidence |
+| F3.5 | ✅ proof retargeted to `metaldocs.notifications` (non-tripwired FORCE-RLS, real async seed site) so RLS is the sole control | ✅ real green run; PG-1/2/3/4 all pass (see C2) | ✅ test-construction only; SeedTxTenant/policy/migration byte-identical | spec/plan/evidence |
 
-All twelve artifacts (`spec.md`/`plan.md`/`evidence.md` × 4) exist and are execution-shaped (task lists,
-files-touched, test strategy). Each `evidence.md` acceptance table maps to its `spec.md` Validation Gate.
-Every approval line is filled (dated 2026-07-03). F3.4's spec/plan/evidence are consistent and scoped to
-truth reconciliation.
+- All five features have spec.md (approval recorded: F3.1–F3.4 dated `2026-07-03`; F3.5 opened by
+  operator-mandated HS-4 real run, recorded in the README HS table + spec header), populated interview
+  records (F3.4/F3.5 explicit Q&A tables), execution-shaped plan.md, and evidence.md whose acceptance
+  tables match each spec's validation gate row-for-row.
+- Minor doc note (not a fail): F3.5's spec records approval via its operator-mandated opener rather than a
+  standalone dated "Approved" line as F3.1–F3.4 use. Intent of C1.1 (contract authored before the fix, not
+  guessed) is met — F3.5 has a full consumer-contract + interview record and an operator-mandated opener.
 
-**C1 result: PASS.** The single prior C1 miss (F3.3 acceptance §3.3/PG-2 "durable record matches runtime
-truth") is now met — see F3.4 verification below.
+**C1: PASS.**
 
-### F-1 closure — verified (the fix under test)
+## C2 — Gates re-run, isolated (validator ran these, not trusted from transcript)
 
-F3.4's four gates re-verified independently by the validator, from source:
+| Feature / gate | Command re-run | Real output | Pass? |
+|---------|----------------|-------------|-------|
+| F3.5 negative-RLS proof (**load-bearing, real DB**) | `run-rls-proof.ps1` → `go test -tags integration -count=1 -v -run 'SeedTxTenant_RLSBackstop' ./internal/modules/iam/authz/...` (live Postgres `metaldocs-postgres`, port 5433, NOBYPASSRLS role) | `--- PASS: ...LeakBeforeBlockedAfter (105.05s)` + all 4 subtests PASS: `leak_before_no_seed`, `.../select_update_delete_see_zero_rows`, `.../insert_or_update_producing_b_row_is_42501`; `ok metaldocs/internal/modules/iam/authz 107.899s`; `EXITCODE=0` | ✅ |
+| F3.1/F3.2 api-lint (both new rules, live, blocking) | `go run ./scripts/api-lint -strict api/openapi/v1/openapi.yaml .` | `0 violation(s)` (exit 0) | ✅ |
+| F3.1/F3.2 lint unit tests | `go test ./scripts/api-lint/ -run 'SeedChokepoint|AsyncTenantSeed'` | `ok metaldocs/scripts/api-lint 2.489s` | ✅ |
+| F3.1 census | grep non-test `SeedTxIdentity(` outside chokepoint | 21 sites, all 21 in `seed-chokepoint-allowlist.txt`; 0 outside | ✅ |
+| F3.4 table-set equality | `diff <lint-tables> <FORCE-RLS tables>` from `0001_current_schema.sql` | `SET_EQUAL` (33 == 33; `idempotency_keys`, `notifications` present) | ✅ |
+| Build | `go build ./...` | exit 0, no output | ✅ |
+| M2 regression lints | `go test ./scripts/api-lint/ -run 'Tripwire|CapName|Divergence|Arm'` | `ok metaldocs/scripts/api-lint 1.740s` | ✅ |
 
-- **PG-1 — no residual false claim; `job_leases` intact.** Grepped `idempotency_keys` across all three
-  durable records. Every occurrence now classifies it as a **`tenant_id`-bearing FORCE-RLS table** whose
-  janitor TTL `DELETE` is a **sanctioned cross-tenant NULL-permissive maintenance sweep (audit-scan class)**:
-  `validation-contract.md` §0.3 (line 77), §2.4 (line 228), §4 (line 310); ADR 0027 §4 residual list
-  (line 189) + per-binary janitor row (line 212). No "no `tenant_id` / RLS N/A / cannot apply" is attributed
-  to `idempotency_keys` anywhere. The `job_leases`-genuinely-no-`tenant_id` claim is intact and correctly
-  distinct (contract §2.4 line 77 + §4; ADR 0027 line 187). ✅
-- **PG-2 — set-equality (33 == 33).** Extracted FORCE tables from `db/baseline/0001_current_schema.sql`
-  (schema-qualified, both `metaldocs.`/`public.`, normalized to bare name, sorted-unique) → **33**;
-  non-comment entries of `scripts/api-lint/async-tenant-tables.txt` → **33**; `diff` **empty** (set-equal).
-  `idempotency_keys` present in both. Ground truth confirmed at `0001_current_schema.sql:1330`
-  (`tenant_id uuid NOT NULL`) + `:1347` (`FORCE ROW LEVEL SECURITY`). ✅
-- **PG-3 — lint green + no false trip.** `go run ./scripts/api-lint -strict …` → **0 violation(s), exit 0**;
-  `go test ./scripts/api-lint/ -run 'SeedChokepoint|AsyncTenantSeed'` → **14/14 PASS** (no hardcoded-32
-  broke). Confirmed at source that `asyncHandlerRoots` (`async_tenant_seed_rule.go:45-52`) does **not**
-  include `internal/modules/jobs/idempotency_janitor` nor `internal/platform/idempotency`, so listing
-  `idempotency_keys` in the table set cannot false-trip the lint on the janitor's `DELETE`. ✅
-- **PG-4 — no behavior diff.** `git show --name-only 118e0196` → only the two docs (contract + ADR 0027),
-  the `.txt` lint data, the f3.4 folder, and the prior `qa/milestone-qa.md`. **No `.go`/`.sql`/migration
-  file.** RLS byte-identical. ✅
-- **HS-7 discipline.** The committed contract was re-opened **with operator approval** and the re-open
-  recorded as a **dated erratum** at the contract head (`validation-contract.md:11-19`) and in the ADR
-  amendment (`0027-…md:121-124`) — auditable, not a silent edit. The acceptance bar (§3.3/PG-2) was **not**
-  weakened; only a false premise was corrected. ✅
+- **The load-bearing question is answered: the negative-RLS proof RAN GREEN for real** — my own live-DB
+  execution, not the evidence transcript. It is not deferred, not skipped, not a mock/sqlmock: the
+  `leak_before_no_seed` subtest reproduces the 1-row cross-tenant leak (proving RLS, not some other gate,
+  is the sole control), and the seeded subtests give 0/0 rows + SQLSTATE `42501` on retenant.
 
----
-
-## C2 — Gates re-run, isolated (validator ran these @ `118e0196`; not trusted from evidence)
-
-| Gate | Command re-run | Real output | Pass? |
-|------|----------------|-------------|-------|
-| build | `go build ./...` | exit 0 | ✅ |
-| build (integration tag) | `go vet -tags integration ./internal/modules/iam/authz/` | exit 0 (compiles + vets) | ✅ |
-| core F3.1/F3.2/M2 pkgs | `go test ./internal/platform/db/... ./internal/platform/tenant/... ./internal/modules/iam/authz/... ./scripts/api-lint/... ./internal/modules/iam/domain/...` | all `ok` (api-lint 9.0s) | ✅ |
-| live api-lint (both new lints blocking) | `go run ./scripts/api-lint -strict api/openapi/v1/openapi.yaml .` | **0 violation(s)**, exit 0 | ✅ |
-| lint unit tests | `go test ./scripts/api-lint/ -run 'SeedChokepoint\|AsyncTenantSeed' -v` | **14/14 PASS** (clean-green, stray-fires-named, after-removal-green, allowlist, stale-allowlist, sync-path-never-flagged, non-tenant-never-flagged) | ✅ |
-| **F3.2 ASYNC-TENANT-SEED live RED→GREEN** | inserted throwaway unseeded `UPDATE documents` in `internal/platform/worker/zz_validator_probe.go` | `ASYNC-TENANT-SEED … zz_validator_probe.go:5 (op UPDATE, table documents)`, **1 violation, exit 1**; removed → **0, exit 0** | ✅ |
-| **PG-2 set-equality (F3.4)** | `diff <(FORCE tables normalized sort -u) <(txt non-comment sort -u)` | **IDENTICAL, 33 == 33**; `idempotency_keys` in both | ✅ |
-| **PG-4 no-behavior (F3.4)** | `git show --name-only 118e0196 \| grep -E '\.(go\|sql)$\|migration'` | **NONE** | ✅ |
-| F3.2 negative-RLS proof | `ls` + `head` + `go vet -tags integration …` on `internal/modules/iam/authz/seed_tx_tenant_rls_integration_test.go` | **exists**, `//go:build integration`, `testdb` factory, §2.5 shape (2 tenants, NOBYPASSRLS role, leak-before → row visible + UPDATE affects 1, blocked-after `SeedTxTenant(A)` → 0 rows / `42501`); compiles + vets; **run deferred** (no DB env — accepted bounded defer §2.5/§6) | ✅ (authored) |
-| M2 regression | `go test ./internal/modules/iam/domain/ -run CapabilityRegistrySize` (within core run) | `ok`; live api-lint 0 violations ⇒ 5 authz lints + M2 tripwire drift/parity lints still green | ✅ |
-
-Throwaway probe file deleted; final `git status` shows no probe residue (only untracked `docs/release/`).
-No gate regressed. All C2 commands passed.
-
----
+**C2: PASS.**
 
 ## C3 — Senior review of the aggregate milestone diff
 
-Reviewed `git diff e80c1800..118e0196` as one unit.
+Reviewed `da7ae95c..HEAD` as one unit.
 
-- **No schema/RLS change (whole milestone):** `git diff --name-only e80c1800..118e0196` yields **no**
-  `.sql`, migration, or `db/**` schema file (the only `db/`-path hits are `internal/platform/db/runner.go`
-  + its test — Go chokepoint code, not schema). The RLS policy is **byte-identical** before/after M3
-  (NULL-permissive, FORCE, 33 tables). §0.1/§4 invariant held.
-- **F3.1 chokepoint / collapse / F3.2 primitive / 5 seed sites / negative-RLS proof:** unchanged from the
-  prior run's senior review — all senior-clean (module boundary honored, H-PRE-1 preserved, single-tenant
-  per tx, no HS-2 tenant-mix). No regression introduced by F3.4 (docs/data only).
-- **F-1 split-brain — RESOLVED.** The sole prior split-brain (the `idempotency_keys` exemption fact stated
-  two contradictory ways) is closed: reality (`has tenant_id` + FORCE-RLS, sweeps cross-tenant via
-  NULL-permissive) and the durable records (contract §0.3/§2.4/§4 + ADR 0027 §4/per-binary + `.txt`) now
-  state **one** fact. The ADR no longer contradicts its own body (`0027-…md:91` lists `idempotency_keys`
-  among `tenant_id`-carrying tables; the amendment now agrees). `async-tenant-tables.txt` is the honest
-  33-table FORCE mirror.
-- **Staff-engineer bar:** **met** on both mechanism (F3.1/F3.2 code) and durable-record truth (F3.3 as
-  corrected by F3.4). No duplication, no dead code, no feature broke another.
+- **No split-brain:** F3.4 made `async-tenant-tables.txt` set-equal to the 33 FORCE tables and reconciled
+  the three prior records that falsely claimed `idempotency_keys` has no `tenant_id`; the D4 contract
+  §0.3/§2.4/§4 carry a dated erratum. One fact (which tables are tenant-scoped), one source of truth.
+- **No production diff from F3.5:** `git show 66af8f04 --name-only` = the test file + M3 docs only; no
+  `.go` (non-test) / `.sql` / migration. `SeedTxTenant` last touched in F3.2 (`bad74d86`) — byte-identical.
+  The fix corrected the *proof*, not the thing under proof (correct separation).
+- **No dead code / no feature breaking another:** the ASYNC-TENANT-SEED lint is handler-scoped (documented,
+  mirrors M2 TRIPWIRE-ARM-DRIFT scoping); the F3.2 main-session audit closed the real `emitStuckAlert`
+  unseeded-write gap the AST lint could not see — an honest coverage boundary, recorded.
+- **Honest residual (not a defect):** the F3.1 allowlist retains 21 manual seeds — genuine distinct-actor
+  (category A) and raw-`BeginTx` repository/taxonomy sites the TxRunner chokepoint structurally does not
+  cover (they open their own `*sql.Tx`). Each is enumerated with a reason; the SEED-CHOKEPOINT lint blocks
+  *new* drift. This is a bounded coverage limit, transparently recorded — not split-brain or symptom-patch.
 
-**C3 result: PASS.** No blocking finding; the prior split-brain is closed.
+Staff-engineer bar met? ✅
 
----
+**C3: PASS.**
 
 ## C4 — Workflow-class QA + regression
 
 | Check | Outcome | Notes |
 |-------|---------|-------|
-| Canonical checklist (backend-api multi-tenant) | pass-with-defers | both new lints blocking + 0 live violations; RED→GREEN captured; core tenant/db/authz pkgs green; full 20-min suite intentionally not run (mission §10) |
-| RLS policy byte-identity | pass | aggregate diff touches **no** `db/**`/migration/`*.sql`; no `CREATE/DROP POLICY`/`ENABLE`/`FORCE` change (§0.1/§4 invariant held) |
-| Regression vs M0/M1/M2 | all still pass | `TestCapabilityRegistrySize` `ok`; 5 authz lints + M2 tripwire drift/parity lints green (live api-lint 0); no route/contract shape regressed; F3.4 added no code path to regress |
+| Canonical checklist (backend-api multi-tenant) | pass | Both new lints blocking + 0 live violations; targeted RLS integration proof green (real DB); `go build ./...` green. Full 20-min suite deliberately NOT run (mission §10). |
+| Regression vs prior milestones | all still pass | M2 tripwire/cap-name lints: `go test ./scripts/api-lint/ -run 'Tripwire\|CapName\|Divergence\|Arm'` → `ok`. `go build ./...` green. RLS policy byte-identical (no migration in scope) → M0/M1 contract gates unaffected. |
 
----
+**C4: PASS.**
 
 ## C5 — Quality-bar re-measure + retrospective
 
 | Bar / class | Before | After | Root-cause-fixed evidence |
 |-------------|--------|-------|---------------------------|
-| Manual-seed discipline (Dim-4 cross-cutting #2) | ~62 hand `SeedTxIdentity` acts; forget-one silently absorbed | chokepoint auto-seed + reasoned allowlist + `SEED-CHOKEPOINT` blocking lint | census 0 outside chokepoint+allowlist; lint RED on synthetic; structurally closed for sync |
-| Async RLS backstop (Dim-4 DEBT→) | worker/jobs seeded nothing; one bad join = silent leak, no gate | 5 processing txs seed `SeedTxTenant`; `ASYNC-TENANT-SEED` blocking lint; negative RLS proof authored | lint RED on synthetic (verified live); §2.5-shaped proof compiles/vets; backstop engaged in code (live run = bounded defer) |
-| Durable-record truth (F-1, the fix under test) | 3 records falsely claimed `idempotency_keys` has no `tenant_id`/RLS N/A (split-brain vs schema + ADR body) | all 3 records reclassify it honestly as FORCE-RLS `tenant_id`-bearing, janitor sweep = sanctioned audit-scan-class NULL-permissive DELETE | PG-1 grep clean; PG-2 33==33 set-equal; ADR no longer self-contradicts; HS-7 erratum dated + auditable |
-| RLS policy not weakened | NULL-permissive/FORCE/33 tables | identical | no SQL/migration/policy diff (C3/C4); PG-4 confirms F3.4 added none |
+| Manual-seed discipline (finding #2) | ~62 hand-seed acts, forgetting one silently absorbed by NULL-permissive RLS | Structural: chokepoint auto-seed (api) + `SeedTxTenant` per-message (async), guarded by 2 blocking lints | api-lint `0 violation(s)`; 21 residual sites all allowlisted-with-reason + drift-locked |
+| Async RLS backstop (Dimension 4) | worker/jobs seeded nothing; zero RLS backstop | FORCE RLS engaged on async processing txs; **proven live** | My own real run: unseeded cross-tenant UPDATE leaks 1 row; `SeedTxTenant(A)` → 0/0 rows + `42501`. Not asserted — executed. |
+| RLS policy integrity | NULL-permissive, FORCE, 33 tables | **byte-identical** | No policy/migration diff anywhere in `da7ae95c..HEAD`; bar moved by adding seeding, not weakening RLS |
 
-- **Root-cause vs symptom:** seeding closed at chokepoint + per-message primitive (root, sync + async);
-  F-1 closed by correcting the false schema premise at every durable source of truth (not masked). The
-  `.txt` is now derived from the actual 33-table FORCE set, so future drift is a set-equality failure, not
-  a silent lie.
-- **Could it be built better?** The one remaining standing item is the **live run of the negative RLS
-  integration proof** — authored + shape-verified, execution deferred (no DB env; `.env` read forbidden),
-  a correctly-recorded bounded defer (§2.5/§6), not counted against this verdict. Trigger: run on CI/a
-  capable box before program close-out.
+- Root cause fixed, not symptom-patched: F3.5 did **not** weaken any assertion to force green — it moved the
+  proof to a table where RLS is the sole control and kept the leak-before / 0-row / 42501 shape intact.
+- Could it be built better? The 21-entry raw-`BeginTx` allowlist is the residual: those repository writes
+  bypass the TxRunner chokepoint. A future consolidation onto the chokepoint (or a repo-tx wrapper that
+  seeds) would shrink the allowlist toward 0. Recorded as next-milestone input; the current construction is
+  sound (drift-locked), so it does not FAIL M3.
 
----
+**C5: PASS.**
 
-## C6 — Forbidden-list
+## C6 — Forbidden-list (any hit = FAIL)
 
-- [ ] Suite-green reported as a pass without per-feature acceptance mapped to evidence — *clean* (each feature's acceptance mapped in C1/C2; per-gate commands + outputs recorded)
-- [ ] Fixture/mock passed off as real-provider proof — *clean* (F3.2 negative proof explicitly labeled real-DB/testdb, run-deferred, **not** claimed as run; lint tests labeled AST-static)
-- [ ] Consumer contract guessed — *clean* (F3.4 consumer = maintainer/validator reading the enforcement record; contract read from schema source, not guessed)
-- [ ] Split-brain (one fact, two sources of truth) — **clean (prior HIT F-1 now RESOLVED)** — `idempotency_keys` stated one consistent way across schema, contract, ADR, and `.txt`
-- [ ] Self-judged close / validator edited code — *clean* (validator only judged; wrote this file only; probe files removed)
-- [ ] Scope drift — *clean* (F3.4 diff = docs + `.txt` only, matches its spec; PG-4 no code/SQL)
-- [ ] Symptom-patch — *clean* (F-1 fixed at every durable source of truth + the `.txt` now derived from the real FORCE set; not masked)
+- [ ] Suite-green reported as a pass without per-feature acceptance mapped to evidence — *clean; each
+  feature's acceptance mapped to a validator-run command (C2).*
+- [ ] Fixture/mock passed off as real-provider proof — *clean; the load-bearing proof is a real live-DB run
+  the validator executed; F3.1's sqlmock PG-1 is explicitly labeled fixture and the real backstop proof is
+  F3.2/F3.5's integration drive.*
+- [ ] Consumer contract guessed rather than read — *clean; contracts read from source/consumer.*
+- [ ] Split-brain — *clean; F3.4 reconciled the `idempotency_keys` fact to one source of truth.*
+- [ ] Self-judged close / validator edited or fixed code — *clean; validator only judged + wrote this file.*
+- [ ] Scope drift — *clean; the `emitStuckAlert` fix and the allowlist are recorded with rationale.*
+- [ ] Symptom-patch — *clean; F3.5 retargeted the proof without weakening assertions; RLS byte-identical.*
 
-**C6 result: all clean — no hit.**
+(All unchecked = clean.)
 
----
+**C6: PASS.**
 
 ## C7 — Verdict
 
 - **VERDICT: PASS**
-- **All checks C1–C6 pass.** The prior FAIL finding **F-1** (false `idempotency_keys` no-`tenant_id`
-  claim / split-brain, an HS-7 contract-accuracy defect) is **closed** by fix-feature **F3.4**, verified
-  independently against source: PG-1 (no residual false claim; `job_leases` intact), PG-2 (`.txt` == the
-  33 FORCE-RLS tables, set-equal), PG-3 (api-lint 0 + 14/14 lint unit tests; janitor outside scanned roots
-  → no false trip), PG-4 (no `.go`/`.sql`/migration diff; RLS byte-identical). HS-7 discipline honored
-  (operator-approved re-open, dated auditable erratum, acceptance bar unchanged).
-- **All four M3 acceptance themes met:** F3.1 (census 0 outside chokepoint+allowlist; `SEED-CHOKEPOINT`
-  lint blocking/RED-on-synthetic) · F3.2 (5 `SeedTxTenant` sites; `ASYNC-TENANT-SEED` lint verified
-  RED→GREEN live; negative-RLS integration proof exists + §2.5-shaped, live run a labeled bounded defer) ·
-  F3.3 (ADR 0027 dated amendment + live tenancy wiki, now truth-accurate) · F3.4 (F-1 closed per PG-1..4).
-- **Standing bounded defer (not a failure):** live execution of the F3.2 negative-RLS integration proof
-  (no DB env) — authored + shape-verified; trigger = CI/capable box before program close-out.
+- The load-bearing question — *did the negative-RLS proof actually run green for real (not deferred, not
+  mocked)?* — is answered **YES** by the validator's own live-Postgres execution: all subtests PASS,
+  leak-before reproduced (1 row), retenant `42501`, `EXITCODE=0`. F3.5 is a test-construction-only fix with
+  no production/policy/migration diff. All other M3 themes (F3.1 chokepoint + census, F3.2 async seed +
+  lint, F3.3 ADR/wiki, F3.4 table-set truth) re-verified green from clean state; M0/M1/M2 gates
+  un-regressed; `go build ./...` green.
 - Handed back to the main session to flip status and present the HS-1 operator gate.
 
 > **Main-session actions (post-verdict, NOT the validator's):**
-> - Operator gate (HS-1): pending (main session to present)
-> - Status flipped in `README.md`: main session's action, only now that the verdict is PASS
+> - Operator gate (HS-1): pending
+> - Status flipped in `README.md`: no — only on PASS + operator HS-1 approval
