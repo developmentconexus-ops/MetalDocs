@@ -1,100 +1,116 @@
 # Milestone 4 — Validation Verdict (C1–C7)
 
 > **Written by:** the `milestone-validator` subagent — *not* the main session (separation of powers).
-> **Validates against:** `../milestone.md` (the up-front spec) + `../validation-contract.md` (D4 binding) + each feature's `spec.md`.
+> **Validates against:** `../milestone.md` (the up-front spec) + each feature's `spec.md` + `../validation-contract.md`.
 > **Binding procedure:** `.claude/skills/milestone/references/milestone-end-validation.md`.
-> **Run:** 2026-07-04 (re-dispatch after F4.4 fix)  ·  **Verdict:** see C7 — **PASS**.
-> This is the re-validation following the prior FAIL, whose single blocker (F-1: stray tracked `docs/release/v2-name-inventory.md`) is now resolved by fix-feature `f4.4-drop-stray-release-file` (commit `c7aebfe3`). Run only after every feature is closed. The validator judges and writes this file; the main session flips status only on a PASS. The validator never edits code, fixes findings, or flips status.
+> **Run:** 2026-07-04  ·  **Verdict:** see C7.
+> **Re-validation:** this is the re-validation after fix-feature **F4.5** (authz soft-GUC NULL
+> hardening, commit `4ce4d308`) closed the F4.2 live-run defer (HS-2, operator-directed). Prior PASS
+> was after F4.4 (HEAD `e5d0d91a`); current HEAD `cd1f3d64`. The two new commits since prior PASS are
+> `4ce4d308` (F4.5) and `cd1f3d64` (README). Aggregate M4 diff measured from M3 close `2e4411ca`.
 
 ## Inputs loaded
 
-All present and readable: milestone spec, `validation-contract.md` (incl. the §3.7 HS-7 erratum that supersedes §3.4/§3.5/§3.6), program README + `mission.md`, all four features' (`f4.1`, `f4.2`, `f4.3`, `f4.4`) `spec.md`/`plan.md`/`evidence.md`, and the aggregate M4 diff (commits `a83a560e` … `c7aebfe3`). No blind-judge FAIL.
-
-## Prior verdict & delta
-
-The 2026-07-04 verdict was **FAIL** on a **single** blocker: commit `51950c26` accidentally tracked `docs/release/v2-name-inventory.md` (316 lines), breaching validation-contract §5 / CLAUDE.md ("never commit `docs/release/`"), no rationale recorded (finding F-1, C3/C6). All of C1/C2/C4/C5 passed on independent re-run. This re-validation re-runs the binding gate and confirms F-1 is cleared with nothing new surfaced.
+- `milestone.md`, `validation-contract.md`, program `README.md`, mission spec (§7 M4 via README).
+- Every feature `spec.md`/`plan.md`/`evidence.md`: F4.1, F4.2, F4.3, F4.4, F4.5.
+- Aggregate diff `git diff 2e4411ca..HEAD` (56 files, +2397/−212).
+- No input missing or unreadable.
 
 ## C1 — Spec & plan conformance (per feature)
 
 | Feature | Consumer contract honored? | Acceptance met? | Non-goals respected? | Evidence |
 |---------|----------------------------|-----------------|----------------------|----------|
-| F4.1 | ✅ — approval services (consumer) route through `domain.CanTransitionDocumentStatus`; DB trigger (consumer) is exact mirror, parity pinned; wire/FE no longer list `rejected` | ✅ — all §1.6 exit criteria met (see C2) | ✅ — no route added for DB-legal-unused arcs; `archived` retained; enforcement stayed in DB; approval-INSTANCE FSM untouched | spec/plan/evidence present, `Approved for code: 2026-07-04`, interview record populated |
-| F4.2 | ✅ — real concurrent testdb integration test proving exactly-one-winner + terminal state + single side-effect, matching §2.2 cell-for-cell | ✅ (test authored + compiles + vets under `-tags integration`; live-green is a contract-§6-permitted bounded defer, see C4) | ✅ — targeted `-run` only; no publish business logic changed (safe-by-construction proven, no choke point needed) | spec/plan/evidence present, approved 2026-07-04, interview record populated |
-| F4.3 | ✅ — decision recorded (ADR 0066) + contract §3 re-opened with loud dated non-silent erratum; the binding F4.3 decision is the §3.7 HS-7 erratum, not the struck §3.4/§3.5 | ✅ — §3.7 corrected exit criteria met: ADR 0066 landed, erratum dated, spec/plan/evidence updated, zero templates/documents wire change, HS-7 headlined for HS-1 gate | ✅ — no templates migration, no `lock_version` rename, no documents change | spec/plan/evidence present, approved 2026-07-04, interview record populated |
-| F4.4 | ✅ — consumer = repo history + M4 gate; required outcome (`docs/release/` untracked, kept on disk, dedicated commit) delivered | ✅ — `git ls-files docs/release/` empty; file `??` on disk; `go build ./...` green; fix commit touches no other functional path (see C2/C3) | ✅ — not deleted from disk, no `.gitignore` add, no source/test/contract change, no history rewrite | spec/plan/evidence present, `Approved for code: 2026-07-04`, interview record populated (1 row) |
+| F4.1 state-machine-unification | ✅ (openapi enum = domain `CanTransitionDocumentStatus` = DB-trigger parity) | ✅ 9-status exhaustive fn; 0 scattered `if status !=` guards (census below) | ✅ | `state.go`, `state_parity_test.go`, `state_test.go` |
+| F4.2 publish-race | ✅ scheduler no-op sentinel + repo `ErrStaleRevision` read, not guessed | ✅ real concurrent test, single winner, correct terminal state — **now live-green** | ✅ no prod code changed | `f4.2/evidence.md`, my C2 re-run |
+| F4.3 concurrency-idiom | ✅ contract §3.5 fallback (ADR-split); premise-false surfaced honestly | ✅ ADR 0066 records intentional split, If-Match target; HS-7 operator-ratified | ✅ no wire change | `f4.3/evidence.md`, ADR 0066 |
+| F4.4 drop-stray-release-file | ✅ | ✅ `docs/release/` net-zero in M4 diff (verified) | ✅ | `f4.4/evidence.md` |
+| F4.5 authz-guc-null-hardening | ✅ consumer = all `MustActorID`/`MustTenantID` callers; contract read, not guessed | ✅ TDD pins green; unit+integration green; downstream F4.2 live-green | ✅ stricter-or-equal, no `authz.Require`/RLS change | `f4.5/evidence.md`, my C2 re-runs |
 
-All four features have complete spec/plan/evidence with filled approval lines and non-empty interview records. C1 conformance: **PASS**.
+All five features carry `spec.md` (approval line filled), `plan.md` (execution-shaped), `evidence.md`
+(acceptance table matching gate). F4.5 interview record populated (3 rows). No missing artifacts.
 
-## C2 — Gates re-run, isolated (validator re-ran from clean state, not trusted from transcript)
+## C2 — Gates re-run, isolated (by the validator, from clean state)
 
 | Feature | Command re-run | Real output | Pass? |
 |---------|----------------|-------------|-------|
-| all | `go build ./...` | `BUILD_EXIT=0` | ✅ |
-| F4.1 | `go test ./internal/modules/documents/domain/ -run 'CanTransitionDocumentStatus\|DBTriggerParity' -count=1` | `ok metaldocs/internal/modules/documents/domain 1.227s` | ✅ |
-| F4.1 | `grep -rn DocStatusRejected internal/ \| grep -v _test.go` | none remain | ✅ |
-| F4.2 | `go vet -tags integration ./internal/modules/documents/approval/application/` | `VET_EXIT=0` | ✅ |
-| F4.4 | `git ls-files docs/release/` | empty (no tracked file) | ✅ |
-| F4.4 | `test -f docs/release/v2-name-inventory.md` | `YES on disk` (untracked `??`) | ✅ |
-| F4.4 | `git show --stat c7aebfe3` | touches exactly: `docs/release/v2-name-inventory.md` (316 del, index removal) + the 3 f4.4 records (spec/plan/evidence) — no other path | ✅ |
-| M2 regression | `go test ./internal/modules/iam/authz/... -count=1` | `ok metaldocs/internal/modules/iam/authz 1.284s` | ✅ |
+| build | `go build ./...` | BUILD_EXIT=0 | ✅ |
+| F4.5 unit | `go test ./internal/modules/iam/authz/ -count=1` | `ok … 1.369s` | ✅ |
+| F4.5 NULL pins | `go test ./internal/modules/iam/authz/ -run Null -count=1 -v` | `PASS: TestMustActorID_ReturnsErrWhenGUCNull`, `PASS: TestMustTenantID_ReturnsErrWhenGUCNull` | ✅ |
+| F4.5 integration | `go test ./internal/modules/iam/authz/ -tags integration -count=1` (real Postgres) | `ok … 205.735s` | ✅ |
+| F4.1 state+parity | `go test ./internal/modules/documents/domain/ -run 'State|Transition|Parity' -v` | `PASS: TestCanTransitionDocumentStatus_DBTriggerParity`, `PASS: TestCanTransitionDocumentStatus` | ✅ |
+| F4.1 guard census | grep for scattered lifecycle status-equality guards in approval services | 0 matches | ✅ |
+| F4.2 live race | `go test …/approval/application/ -tags integration -run TestPublishRace -count=1 -v` (real Postgres) | `--- PASS: TestPublishRace (239.65s)` + all 4 subtests PASS; `ok … exit 0` | ✅ |
 
-C2 re-run: **PASS** — every named gate re-run green from clean state.
-
-**F4.4 fix cross-checks (independently verified, not trusted from evidence):**
-- `docs/release/` touches across the full M4 commit set: only `51950c26` (+1, the accidental add) and `c7aebfe3` (+1, the index removal); the other eight commits = 0. No M4 commit *going forward* touches a `docs/release/` path.
-- **Net aggregate M4 diff** (`git diff --stat a83a560e^..c7aebfe3 -- docs/release/`) = **empty**: the stray file is net-zero over the milestone — as if never added. The F-1 breach is fully undone in the tracked history.
-- `c7aebfe3` is `HEAD`; it is the milestone tip. The fix is a dedicated commit; no source/test/contract/generated change rode along.
+F4.2 note: one `db.go:101` line ("drop isolated test database … timeout") is a **teardown-only**
+cleanup message (DB drop after the assertions), not a test assertion — the enclosing test and all 4
+subtests reported PASS and the package returned `ok` (exit 0). Genuinely live-green on real Postgres,
+re-run by me, not trusted from the transcript.
 
 ## C3 — Senior review of the aggregate milestone diff
 
-- **F-1 (prior blocker) — RESOLVED.** The stray `docs/release/v2-name-inventory.md` is untracked again (`git ls-files docs/release/` empty), removed via `git rm --cached` in a dedicated, rationale-carrying commit (`c7aebfe3`). Net M4 diff no longer adds any `docs/release/` path. The contract §5 / CLAUDE.md "never commit `docs/release/`" constraint is honored across the aggregate.
-- **Split-brain:** none — F4.1 closed the app-vs-DB transition split-brain; the friendly-first-line function is the single app authority, pinned to the DB trigger by the parity test.
-- **Dead code:** dead `CanTransitionDocument` FSM removed; no second document-status FSM remains.
-- **Duplication / one feature breaking another:** F4.1 refactor left the approval unit suite green; F4.2 changed no production code; F4.3 changed no product code; F4.4 changed only the git index + its own records.
-- Staff-engineer bar on the deliverable code **and** on the committed change set as a whole: now met.
+Whole M4 diff (`2e4411ca..HEAD`) reviewed as one unit.
+
+- **F4.5 authz change** — one shared `readSoftGUC` (`sql.NullString`) now backs all four soft-GUC
+  readers (`MustActorID`, `MustTenantID`, `softGUC`, `loadAssertedCaps`); this **collapses** a prior
+  three-way behavior split into one idiom (anti-split-brain, positive). Accept path byte-identical;
+  emitted SQL unchanged (constant literals). Reject path swaps a driver crash for the documented
+  sentinel — **stricter-or-equal**, fail-closed preserved. `softActorID`/`softTenantID` still fail-soft
+  to their defaults (`"system"`/`""`). No dead code.
+- **F4.2 harness change** — test-only: seeds identity exactly as production middleware does (manual
+  path `platformtenant.WithTenantID/WithActorID`; scheduler path `authz.WithBackgroundBypass` +
+  in-tx `SeedTxTenant`), µs-truncated timestamp, text `resource_id` compare. **No production
+  publish-path code changed** (confirmed: publish/scheduler service diffs are F4.1 routing only).
+- **F4.1 `rejected` removal** is consistent across openapi enum, `api.gen.go`, FE parsers, and
+  `DocumentStatus` domain — NOT split-brain. The surviving `"rejected"` literals live in the distinct
+  **approval-instance / signoff** types (`InstanceStatus`, `DocState`, `ApprovalInstance…Status`),
+  which are a different concept from document lifecycle status and out of F4.1 scope.
+- **Module boundary** — `internal/platform/db` still does not import `internal/modules/iam`
+  (grep = only the guard comment, no import). Boundary intact.
+- **`docs/release/`** — net-zero in the M4 diff (F4.4 fix holds; `git ls-files docs/release/` empty).
+
+- Findings: none.
+- Staff-engineer bar met? ✅
 
 ## C4 — Workflow-class QA + regression
 
 | Check | Outcome | Notes |
 |-------|---------|-------|
-| backend-api / contract-first (`api/openapi` + regen, zero hand-edits) | pass | document-status enum tightened; regen pure; approval-DECISION enums correctly retain `rejected` |
-| test-discipline (testdb factory for the race integration; targeted `-run`; no full suite) | pass | F4.2 uses `tests/integration/testdb`; full 20-min integration suite correctly not run |
-| F4.2 live-green run | pass-with-defer | contract §6-permitted bounded defer (20-min box + pre-existing authz NULL-GUC cold-connection scan gap reproducing byte-identically on a reference integration test); honestly disclosed, fixture-vs-real distinguished, flagged `task_e03a4383` for M8. Legitimately bounded, not a masked failure. |
-| Regression vs M0–M3 | all still pass | `go build ./...` green; `DocStatusRejected` fully gone; `iam/authz` tests green (M2 tripwire/M3 seed not regressed); no `.env`/`node_modules`/`docs/release` leaks in the aggregate diff |
-
-C4: **pass**. The F4.2 defer is contract-legitimate.
+| Canonical checklist (backend-api + test-discipline) | pass | Contract-first: openapi edit + regen only, zero hand-edits to gen; testdb factory used for F4.2/authz integration (not sqlmock); targeted `-run` only, full suite not run (per box constraint). |
+| Regression vs prior milestones | all still pass | F4.1 state-machine + DB-trigger parity re-run green; F4.5 did not weaken authz (fail-closed preserved, tenancy/RLS untouched — M3 chokepoint intact; authz integration green on real DB exercising RLS backstop + bypass). M0 VersionRef wire shape unaffected (F4.3 = no wire change). `go build ./...` green. |
 
 ## C5 — Quality-bar re-measure + retrospective
 
 | Bar / class | Before | After | Root-cause-fixed evidence |
 |-------------|--------|-------|---------------------------|
-| One exhaustive transition function; zero scattered lifecycle guards | dead 3-of-9 FSM called 0×; real legality scattered as `if status != X` | single `CanTransitionDocumentStatus`, routed by all 9 services, census = 0 | root cause fixed (parity test pins fn == DB trigger); not symptom-patched |
-| Publish race proven safe (real concurrent test) | asserted-but-unverified | real testdb barrier test, exactly-one-winner + terminal + single side-effect | proven by construction; no production change needed |
-| One OCC idiom or ADR-recorded exception | undocumented accidental split | ADR 0066 records intentional split + If-Match target + deferred-unification charter | undocumented drift closed by a decision record; HS-7 handled by loud dated erratum, ratification headlined for HS-1 |
-| Change-set hygiene (no stray `docs/release/`) | F-1: stray file tracked in `51950c26` | untracked via `c7aebfe3`; net M4 diff = 0 for `docs/release/` | root cause (accidental `git add` sweep) undone at the index; kept on disk per non-goal |
+| M4.1 one exhaustive 9-status transition fn, 0 scattered guards | scattered `if status != X` across services | one `CanTransitionDocumentStatus` + 0 census hits | census grep = 0; parity test green |
+| M4.2 publish race proven safe by a real concurrent test | argued safe-by-construction; live run deferred | **live-green on real Postgres** (my re-run, 4/4 subtests) | `TestPublishRace` PASS exit 0 |
+| F4.5 authz NULL-GUC gap (HS-2) | driver crash on cold-connection identity read | correct `ErrActorContextMissing`/`ErrTenantContextMissing` sentinel | 2 NULL pins green; class collapsed to one reader (root cause, not symptom-patch) |
 
-- Could it be built better? Deliverables are sound. Optional hardening surfaced by F4.4 (add `docs/release/` to `.gitignore` to prevent a future re-stage) is correctly left to the operator at HS-1, out of the minimal fix scope. Non-blocking.
+- Could it be built better? The OCC transport unification (F4.3) remains a real defer — ADR 0066
+  records the concrete `platform/occ` kernel target design and names M9 as the candidate change. Not a
+  soundness defect for M4 (intentional, operator-ratified split). No other retrospective item.
 
 ## C6 — Forbidden-list (any hit = FAIL)
 
-- [ ] Suite-green reported as a pass without per-feature acceptance mapped to evidence
-- [ ] Fixture/mock passed off as real-provider proof — *(F4.2 distinguishes fixture from real and discloses the live-green defer honestly)*
-- [ ] Consumer contract guessed rather than read from the consumer
-- [ ] Split-brain (one fact, two sources of truth) — *(the milestone closes one; parity test pins it)*
-- [ ] Self-judged close / validator edited or fixed code
-- [ ] Scope drift (work beyond the spec, no rationale) — *(prior F-1 breach RESOLVED by f4.4; net M4 diff no longer touches `docs/release/`; f4.4 itself is a validator-named fix feature with recorded rationale)*
-- [ ] Symptom-patch (bar "moved" by masking, root cause intact)
+- [ ] Suite-green reported as a pass without per-feature acceptance mapped to evidence — clean (per-feature C2 rows)
+- [ ] Fixture/mock passed off as real-provider proof — clean (F4.2 + authz integration re-run on **real Postgres** by me)
+- [ ] Consumer contract guessed rather than read from the consumer — clean (F4.5 sentinel + F4.2 no-op read from source)
+- [ ] Split-brain (one fact, two sources of truth) — clean (F4.5 collapses the reader split; `rejected` refs are a distinct type)
+- [ ] Self-judged close / validator edited or fixed code — clean (validator only judged + wrote this file)
+- [ ] Scope drift (work beyond the spec, no rationale) — clean (F4.5 recorded with HS-2 operator-direction rationale)
+- [ ] Symptom-patch (bar moved by masking, root cause intact) — clean (F4.5 fixes the reader class; F4.2 live-proven)
 
-No box checked → C6 clean → no forbidden-list hit.
+(All unchecked = clean.)
 
 ## C7 — Verdict
 
 - **VERDICT: PASS**
-- The sole prior blocker (F-1 / C3 / C6 — stray tracked `docs/release/v2-name-inventory.md` in `51950c26`) is **resolved** by fix-feature `f4.4-drop-stray-release-file` (commit `c7aebfe3`): `git ls-files docs/release/` empty, file kept on disk (`??`), dedicated commit touching only the index removal + its own f4.4 records, net aggregate M4 diff for `docs/release/` = zero. No M4 commit going forward touches a `docs/release/` path.
-- All feature deliverables re-verified green from clean state: F4.1 unified `CanTransitionDocumentStatus` + DB-trigger parity (`ok` on `CanTransitionDocumentStatus|DBTriggerParity`), `rejected` fully removed (no `DocStatusRejected` refs); F4.2 real concurrent race harness (`go vet -tags integration` clean, single-winner contract per §2.2, bounded live defer legitimate); F4.3 ADR 0066 intentional-split decision (the §3.7 HS-7 erratum is the binding decision). `go build ./...` green; M0–M3 not regressed (`iam/authz` tests green).
-- Nothing new surfaced. Both dimensions (code-wise + function-wise/QA) pass.
-- The milestone may advance. The main session may now flip status and present the **HS-1 operator gate** (including the F4.3 §3.7 HS-7 ratification and the F4.2 live-green defer for acknowledgement).
+- Both dimensions pass. Code-wise: senior-level, contract-clean, no split-brain, no dead code,
+  fail-closed preserved, module boundary intact, `docs/release/` net-zero. Function-wise: F4.1 coverage
+  + parity green, F4.2 publish race **live-green on real Postgres** (my isolated re-run), F4.3 ADR-split
+  recorded + operator-ratified, F4.5 NULL-GUC class fixed at root and TDD-pinned. No fix feature needed.
+- Handed back to the main session to flip status and present the HS-1 operator gate.
 
 > **Main-session actions (post-verdict, NOT the validator's):**
-> - Operator gate (HS-1): now reachable — present for approval
-> - Status flip in `README.md` / roadmap: main session's action on this PASS (the validator does not flip status; a `README.md` modification is currently pending in the worktree — that is the main session's to commit, not the validator's)
+> - Operator gate (HS-1): pending — includes F4.3 HS-7 ADR-split ratification (README notes "HS-7 okay").
+> - Status flipped in `README.md`: main session only, on this PASS.
