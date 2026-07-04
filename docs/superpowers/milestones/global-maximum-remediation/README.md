@@ -15,7 +15,7 @@ Convert every finding of the 2026-07-03 final architecture review (commit 778f49
 | 2 | `milestone-2-authz-enforcement-generation` | Tripwire arms generated from capability registry + CI drift check; cap-name divergences closed | passed (2026-07-03) | [PASS](milestone-2-authz-enforcement-generation/qa/milestone-qa.md) |
 | 3 | `milestone-3-tenancy-chokepoint` | TxRunner auto-seed GUCs; RLS backstop covers worker/jobs; ADR 0027 amended | validator PASS — HS-1 pending (2026-07-03) | [PASS](milestone-3-tenancy-chokepoint/qa/milestone-qa.md) |
 | 4 | `milestone-4-versioning-kernel` | Unified 9-status state machine; publish race proven safe + **live-green** (F4.5 closed the defer); concurrency idiom decided (ADR-split, operator-ratified) | **passed** (2026-07-04) | [PASS](milestone-4-versioning-kernel/qa/milestone-qa.md) |
-| 5 | `milestone-5-async-river-consolidation` | Janitors + staging outbox onto River; lease scheduler retired; outbox retention; fanout ordering | planned | — |
+| 5 | `milestone-5-async-river-consolidation` | Janitors + staging outbox onto River; lease scheduler retired; outbox retention; fanout ordering | in-progress — gate 🟡 Yellow + ADR 0067 accepted; validation-contract committed (D4) | — |
 | 6 | `milestone-6-eqms-review-reason` | Periodic review/expiry + structured reason-for-change (ISO 9001 §7.5.3 / Part 11) | planned | — |
 | 7 | `milestone-7-tenant-lifecycle` | Tenant onboarding, export, erasure design (crypto-shredding ADR) | planned | — |
 | 8 | `milestone-8-ops-readiness` | Dockerfiles, distributed rate limiter, metrics/trace-correlation/backup posture | planned | — |
