@@ -5069,7 +5069,7 @@ components:
           type: string
         status:
           type: string
-          enum: [draft, under_review, approved, rejected, scheduled, published, superseded, obsolete]
+          enum: [draft, under_review, approved, scheduled, published, superseded, obsolete]
         form_data_json:
           type: object
           additionalProperties: true

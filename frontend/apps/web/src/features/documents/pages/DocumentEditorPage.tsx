@@ -349,7 +349,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     enabled: documentID.length > 0 && docStatus === 'under_review',
   });
   const canEditContent = session.state.phase === 'writer' && docStatus === 'draft';
-  const canComment = Boolean(doc) && (docStatus === 'draft' || docStatus === 'under_review' || docStatus === 'rejected');
+  const canComment = Boolean(doc) && (docStatus === 'draft' || docStatus === 'under_review');
   const docCode = doc?.code ?? '';
   const revisionBadge = doc?.revision_number != null ? formatRevisionCode(doc.revision_number) : null;
   const displayName = documentName.replace(/\.docx$/i, '');

@@ -1555,7 +1555,6 @@ func isKnownDocumentStatus(status string) bool {
 		documentsapi.Draft,
 		documentsapi.Obsolete,
 		documentsapi.Published,
-		documentsapi.Rejected,
 		documentsapi.Scheduled,
 		documentsapi.Superseded,
 		documentsapi.UnderReview:

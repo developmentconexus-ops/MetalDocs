@@ -23,7 +23,6 @@ const STATUS_DOT: Record<string, string> = {
   under_review: 'dotReview',
   approved:     'dotApproved',
   published:    'dotPublished',
-  rejected:     'dotRejected',
   obsolete:     'dotObsolete',
 };
 

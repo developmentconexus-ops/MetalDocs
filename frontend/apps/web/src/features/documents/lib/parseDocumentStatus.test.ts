@@ -8,7 +8,6 @@ describe('parseDocumentStatus', () => {
       'under_review',
       'approved',
       'frozen',
-      'rejected',
       'archived',
       'scheduled',
       'published',
@@ -28,6 +27,14 @@ describe('parseDocumentStatus', () => {
     // silently-aliased canonical values.
     expect(parseDocumentStatus('review')).toBeNull();
     expect(parseDocumentStatus('finalized')).toBeNull(); // cilint:allow-legacy (parse-boundary rejection)
+  });
+
+  it('rejects the removed document-status "rejected" (M4 F4.1) — not the live approval-decision "rejected"', () => {
+    // documents.status 'rejected' is dead (no producer, backend Task A/B
+    // already removed the Go domain const + DB CHECK/trigger arcs). It must
+    // not resurface as a canonical document status. This is unrelated to the
+    // LIVE approval-decision 'rejected' under features/approval/*.
+    expect(parseDocumentStatus('rejected')).toBeNull();
   });
 
   it('rejects unrecognized and empty values', () => {

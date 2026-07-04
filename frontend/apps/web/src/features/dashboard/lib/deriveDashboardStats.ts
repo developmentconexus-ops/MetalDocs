@@ -23,9 +23,11 @@ export function deriveDashboardStats(stats: DocumentStatsResponse): StatItem[] {
       color: 'var(--success)',
     },
     {
-      // under_review + rejected — `rejected` is the returned-to-author (devolvido) state.
+      // M4 F4.1: document-status 'rejected' removed (dead, no producer — the
+      // live returned-to-author signal is the approval-decision 'rejected'
+      // under features/approval/*, not a documents.status value here).
       label: 'Em revisão',
-      value: String(count('under_review') + count('rejected')),
+      value: String(count('under_review')),
       sub: 'aguardam ajuste',
       color: 'var(--warning)',
     },

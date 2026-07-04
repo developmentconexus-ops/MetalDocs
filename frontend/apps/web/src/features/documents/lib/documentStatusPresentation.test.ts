@@ -60,9 +60,20 @@ describe('getDocumentStatusPresentation', () => {
   it.each([
     ['draft', 'rascunho', 'Rascunho — ainda não publicado', 'rascunho'],
     ['under_review', 'em revisão', 'Aguardando decisão de aprovação', 'em revisão'],
-    ['rejected', 'rejeitado', 'Revisão rejeitada', 'rejeitado'],
   ])('%s renders fixed pre-publication copy', (status, badgeLabel, subtitle, ownerMeta) => {
     expect(getDocumentStatusPresentation(status, EM_DASH)).toEqual({ badgeLabel, subtitle, ownerMeta });
+  });
+
+  it('rejected (M4 F4.1: removed document-status) falls through to the unknown-status branch', () => {
+    // documents.status 'rejected' is dead (no producer). It is no longer a
+    // recognized document status and must echo the raw value like any other
+    // unknown status, rather than keep bespoke governed copy. Unrelated to the
+    // LIVE approval-decision 'rejected' under features/approval/*.
+    expect(getDocumentStatusPresentation('rejected', EM_DASH)).toEqual({
+      badgeLabel: 'rejected',
+      subtitle: null,
+      ownerMeta: 'rejected',
+    });
   });
 
   it('unknown status with publish date echoes a publish subtitle', () => {

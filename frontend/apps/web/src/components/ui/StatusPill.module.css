@@ -34,11 +34,6 @@
   background: var(--success-bg);
 }
 
-:global(.pill-rejected) {
-  color: var(--danger);
-  background: var(--danger-bg);
-}
-
 :global(.pill-scheduled) {
   color: var(--info);
   background: var(--info-bg);

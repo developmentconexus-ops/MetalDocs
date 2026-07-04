@@ -2492,7 +2492,7 @@ export interface components {
             template_version_id: string;
             name: string;
             /** @enum {string} */
-            status: "draft" | "under_review" | "approved" | "rejected" | "scheduled" | "published" | "superseded" | "obsolete";
+            status: "draft" | "under_review" | "approved" | "scheduled" | "published" | "superseded" | "obsolete";
             form_data_json: {
                 [key: string]: unknown;
             };

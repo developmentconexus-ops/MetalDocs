@@ -181,7 +181,6 @@
 .dotReview   { background: var(--warning); }
 .dotApproved { background: var(--success); }
 .dotPublished{ background: var(--brand); }
-.dotRejected { background: var(--danger); }
 .dotObsolete { background: var(--text-faint); }
 
 /* ─── Footer ──────────────────────────────────────────── */

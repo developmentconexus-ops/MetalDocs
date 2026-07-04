@@ -12,6 +12,11 @@
 // rejected (mapped to null) rather than silently aliased to a canonical value,
 // so any resurfacing shows up as a gap instead of being masked.
 //
+// M4 F4.1: 'rejected' was removed as a document-status value (dead, no
+// producer — not to be confused with the LIVE approval-decision 'rejected'
+// under features/approval/*). It is now unrecognized/legacy like 'review'
+// and 'finalized' above and maps to null.
+//
 // Anywhere that narrows a raw `doc.status` string into `DocumentStatus` should
 // route through this function instead of hand-maintaining its own allow-list.
 
@@ -22,7 +27,6 @@ const CANONICAL_STATUSES: readonly DocumentStatus[] = [
   'under_review',
   'approved',
   'frozen',
-  'rejected',
   'archived',
   'scheduled',
   'published',

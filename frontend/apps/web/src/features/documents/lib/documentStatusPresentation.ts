@@ -52,8 +52,6 @@ export function getDocumentStatusPresentation(status: string, publishedAt: strin
       return { badgeLabel: 'rascunho', subtitle: 'Rascunho — ainda não publicado', ownerMeta: 'rascunho' };
     case 'under_review':
       return { badgeLabel: 'em revisão', subtitle: 'Aguardando decisão de aprovação', ownerMeta: 'em revisão' };
-    case 'rejected':
-      return { badgeLabel: 'rejeitado', subtitle: 'Revisão rejeitada', ownerMeta: 'rejeitado' };
     default:
       return {
         badgeLabel: status || 'sem status',

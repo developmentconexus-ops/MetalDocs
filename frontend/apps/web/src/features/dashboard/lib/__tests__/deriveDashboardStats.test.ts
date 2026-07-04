@@ -9,7 +9,7 @@ function statsWith(byStatus: Record<string, number>): DocumentStatsResponse {
 describe('deriveDashboardStats', () => {
   it('maps by_status counts to the three re-scoped cards', () => {
     const items = deriveDashboardStats(
-      statsWith({ approved: 12, under_review: 3, rejected: 2, published: 40, draft: 7 }),
+      statsWith({ approved: 12, under_review: 3, published: 40, draft: 7 }),
     );
     expect(items).toHaveLength(3);
 
@@ -17,9 +17,8 @@ describe('deriveDashboardStats', () => {
     expect(aprovados.label).toBe('Aprovados');
     expect(aprovados.value).toBe('12');
 
-    // Em revisão = under_review (3) + rejected/devolvidos (2) = 5
     expect(revisao.label).toBe('Em revisão');
-    expect(revisao.value).toBe('5');
+    expect(revisao.value).toBe('3');
 
     expect(publicados.label).toBe('Publicados');
     expect(publicados.value).toBe('40');
@@ -30,8 +29,8 @@ describe('deriveDashboardStats', () => {
     expect(items.map((i) => i.value)).toEqual(['0', '0', '0']);
   });
 
-  it('sums only under_review and rejected into the review card', () => {
-    const items = deriveDashboardStats(statsWith({ under_review: 4 }));
+  it('ignores a stray document-status "rejected" count (M4 F4.1: dead, no producer)', () => {
+    const items = deriveDashboardStats(statsWith({ under_review: 4, rejected: 2 }));
     expect(items[1].value).toBe('4');
   });
 });

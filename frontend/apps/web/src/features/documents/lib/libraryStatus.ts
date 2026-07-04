@@ -16,7 +16,6 @@ export type LibraryFilter =
   | 'agendados'
   | 'publicados'
   | 'substituidos'
-  | 'rejeitados'
   | 'obsoletos';
 
 type StatusEntry = {
@@ -35,7 +34,6 @@ export const LIBRARY_STATUSES: readonly StatusEntry[] = [
   { status: 'scheduled',     filter: 'agendados',    label: 'Agendados'   },
   { status: 'published',     filter: 'publicados',   label: 'Publicados'  },
   { status: 'superseded',    filter: 'substituidos', label: 'Substituídos' },
-  { status: 'rejected',      filter: 'rejeitados',   label: 'Rejeitados'  },
   { status: 'obsolete',      filter: 'obsoletos',    label: 'Obsoletos'   },
 ] as const;
 
