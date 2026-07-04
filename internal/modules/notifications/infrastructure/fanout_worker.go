@@ -99,17 +99,31 @@ func (w *NotificationsFanoutWorker) fanoutToReaders(ctx context.Context, tx *sql
 	}
 	defer rows.Close()
 
-	msgs := ptBRMessages[args.EventType]
+	// Buffer all reader IDs before issuing any Exec on the same tx: a
+	// *sql.Tx has a single underlying connection, and interleaving
+	// ExecContext with an open Query result set on that connection
+	// surfaces as "driver: bad connection" (confirmed live, River job
+	// kind=notification_fanout). Collect first, insert after rows is
+	// drained.
+	var userIDs []string
 	for rows.Next() {
 		var userID string
 		if err := rows.Scan(&userID); err != nil {
 			return fmt.Errorf("fanout_worker: scan user_id: %w", err)
 		}
+		userIDs = append(userIDs, userID)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("fanout_worker: iterate obligated readers: %w", err)
+	}
+
+	msgs := ptBRMessages[args.EventType]
+	for _, userID := range userIDs {
 		if err := w.insertRow(ctx, tx, args, userID, msgs[0], msgs[1]); err != nil {
 			return err
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 func (w *NotificationsFanoutWorker) fanoutToAuthor(ctx context.Context, tx *sql.Tx, args documentsdomain.LifecycleEventArgs) error {

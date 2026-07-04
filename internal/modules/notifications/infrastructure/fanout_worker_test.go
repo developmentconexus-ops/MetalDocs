@@ -91,6 +91,66 @@ func TestNotificationsFanoutWorker_Work_SeedsTenantBeforeAuthorInsert(t *testing
 	}
 }
 
+// TestNotificationsFanoutWorker_Work_MultipleReaders_AllInserted is a
+// regression test for the live bug (River job kind=notification_fanout,
+// error "insert notification for admin: driver: bad connection"): issuing
+// tx.ExecContext for each reader while the obligated-readers rows cursor
+// from tx.QueryContext was still open on the same *sql.Tx broke the single
+// underlying connection. The fix buffers all reader IDs, closes/drains the
+// query, then inserts. This asserts every buffered reader still gets its
+// own INSERT once the cursor is fully drained first.
+func TestNotificationsFanoutWorker_Work_MultipleReaders_AllInserted(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	worker := NewNotificationsFanoutWorker(db)
+
+	mock.MatchExpectationsInOrder(true)
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
+		WithArgs("tenant-fanout-4").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`SELECT user_id FROM metaldocs\.v_cd_obligated_readers`).
+		WithArgs("tenant-fanout-4", "cd-4").
+		WillReturnRows(sqlmock.NewRows([]string{"user_id"}).
+			AddRow("user-1").
+			AddRow("user-2").
+			AddRow("admin"))
+	mock.ExpectExec(`INSERT INTO metaldocs\.notifications`).
+		WithArgs("tenant-fanout-4", "user-1", documentsdomain.EventTypeDocumentPublished, "document", "doc-4",
+			sqlmock.AnyArg(), sqlmock.AnyArg(), "evt-4").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`INSERT INTO metaldocs\.notifications`).
+		WithArgs("tenant-fanout-4", "user-2", documentsdomain.EventTypeDocumentPublished, "document", "doc-4",
+			sqlmock.AnyArg(), sqlmock.AnyArg(), "evt-4").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`INSERT INTO metaldocs\.notifications`).
+		WithArgs("tenant-fanout-4", "admin", documentsdomain.EventTypeDocumentPublished, "document", "doc-4",
+			sqlmock.AnyArg(), sqlmock.AnyArg(), "evt-4").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	job := &river.Job[documentsdomain.LifecycleEventArgs]{Args: documentsdomain.LifecycleEventArgs{
+		EventID:              "evt-4",
+		TenantID:             "tenant-fanout-4",
+		EventType:            documentsdomain.EventTypeDocumentPublished,
+		ResourceType:         "document",
+		ResourceID:           "doc-4",
+		ControlledDocumentID: "cd-4",
+		OccurredAt:           time.Now(),
+	}}
+
+	if err := worker.Work(context.Background(), job); err != nil {
+		t.Fatalf("Work: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations (multi-reader fanout regression): %v", err)
+	}
+}
+
 // TestNotificationsFanoutWorker_Work_UnhandledEventType_NoTxOpened proves the
 // default no-op path does not open a tx at all (no seed needed for an event
 // type the worker does not act on).
