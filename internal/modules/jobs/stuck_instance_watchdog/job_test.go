@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,36 +15,6 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	platformdb "metaldocs/internal/platform/db"
 )
-
-type mockCancelService struct {
-	mu      sync.Mutex
-	calls   []application.CancelInput
-	results []error
-}
-
-func (m *mockCancelService) CancelInstance(_ context.Context, _ platformdb.TxRunner, in application.CancelInput) (application.CancelResult, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.calls = append(m.calls, in)
-	if len(m.results) > 0 {
-		err := m.results[0]
-		m.results = m.results[1:]
-		if err != nil {
-			return application.CancelResult{}, err
-		}
-	}
-	return application.CancelResult{DocumentID: "doc"}, nil
-}
-
-func (m *mockCancelService) SystemCancelInstance(_ context.Context, _ platformdb.TxRunner, in application.CancelInput) (application.CancelResult, error) {
-	return m.CancelInstance(context.Background(), nil, in)
-}
-
-func (m *mockCancelService) callCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return len(m.calls)
-}
 
 type recordingEmitter struct {
 	mu     sync.Mutex
@@ -190,22 +159,22 @@ func TestWatchdog_NoStuck(t *testing.T) {
 
 	state := &watchdogDBState{}
 	db := newWatchdogDB(t, state)
-	cancelSvc := &mockCancelService{}
 	emitter := &recordingEmitter{}
 
-	runner := platformdb.NewTxRunner(db)
-	if err := run(authz.WithBackgroundBypass(context.Background()), db, runner, cancelSvc, emitter); err != nil {
+	if err := run(authz.WithBackgroundBypass(context.Background()), db, emitter); err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
 
-	if got := cancelSvc.callCount(); got != 0 {
-		t.Fatalf("cancel calls = %d, want 0", got)
-	}
 	if got := emitter.count(); got != 0 {
 		t.Fatalf("alerts emitted = %d, want 0", got)
 	}
 }
 
+// TestListStuckInstances_UsesStageSnapshotDriftPolicy guards the read source
+// for drift_policy: the watchdog still reads (and reports, in the alert
+// payload) the active stage snapshot's on_eligibility_drift_snapshot column —
+// this is unrelated to the removed auto_cancel branch (ADR 0068), it is the
+// informational field surfaced in every stuck_alert event.
 func TestListStuckInstances_UsesStageSnapshotDriftPolicy(t *testing.T) {
 	src, err := os.ReadFile("job.go")
 	if err != nil {
@@ -221,45 +190,6 @@ func TestListStuckInstances_UsesStageSnapshotDriftPolicy(t *testing.T) {
 	}
 }
 
-func TestWatchdog_AutoCancel(t *testing.T) {
-	t.Parallel()
-
-	state := &watchdogDBState{
-		stuckRows: []StuckInstance{
-			{ID: "inst-1", TenantID: "tenant-1", DocumentID: "doc-1", SubmittedBy: "u1", DriftPolicy: "auto_cancel"},
-			{ID: "inst-2", TenantID: "tenant-1", DocumentID: "doc-2", SubmittedBy: "u2", DriftPolicy: "auto_cancel"},
-			{ID: "inst-3", TenantID: "tenant-2", DocumentID: "doc-3", SubmittedBy: "u3", DriftPolicy: "auto_cancel"},
-		},
-	}
-	db := newWatchdogDB(t, state)
-	cancelSvc := &mockCancelService{}
-	emitter := &recordingEmitter{}
-
-	runner := platformdb.NewTxRunner(db)
-	if err := run(authz.WithBackgroundBypass(context.Background()), db, runner, cancelSvc, emitter); err != nil {
-		t.Fatalf("job returned error: %v", err)
-	}
-
-	if got := cancelSvc.callCount(); got != 3 {
-		t.Fatalf("cancel calls = %d, want 3", got)
-	}
-	if got := emitter.count(); got != 0 {
-		t.Fatalf("alerts emitted = %d, want 0", got)
-	}
-
-	for i, call := range cancelSvc.calls {
-		if call.ExpectedRevisionVersion != 0 {
-			t.Fatalf("call[%d] ExpectedRevisionVersion = %d, want 0", i, call.ExpectedRevisionVersion)
-		}
-		if call.ActorUserID != SystemActor {
-			t.Fatalf("call[%d] ActorUserID = %q, want %q", i, call.ActorUserID, SystemActor)
-		}
-		if call.Reason != "stuck_watchdog_auto_cancel" {
-			t.Fatalf("call[%d] Reason = %q", i, call.Reason)
-		}
-	}
-}
-
 func TestWatchdog_AlertOnly(t *testing.T) {
 	t.Parallel()
 
@@ -269,17 +199,12 @@ func TestWatchdog_AlertOnly(t *testing.T) {
 		},
 	}
 	db := newWatchdogDB(t, state)
-	cancelSvc := &mockCancelService{}
 	emitter := &recordingEmitter{}
 
-	runner := platformdb.NewTxRunner(db)
-	if err := run(authz.WithBackgroundBypass(context.Background()), db, runner, cancelSvc, emitter); err != nil {
+	if err := run(authz.WithBackgroundBypass(context.Background()), db, emitter); err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
 
-	if got := cancelSvc.callCount(); got != 0 {
-		t.Fatalf("cancel calls = %d, want 0", got)
-	}
 	if got := emitter.count(); got != 1 {
 		t.Fatalf("alerts emitted = %d, want 1", got)
 	}
@@ -295,30 +220,35 @@ func TestWatchdog_AlertOnly(t *testing.T) {
 	}
 }
 
-func TestWatchdog_CancelError(t *testing.T) {
+// TestWatchdog_AlertOnly_MultipleInstances proves every stuck instance gets
+// exactly one alert regardless of its drift_policy value — there is no branch
+// in run() that special-cases any policy string anymore (ADR 0068).
+func TestWatchdog_AlertOnly_MultipleInstances(t *testing.T) {
 	t.Parallel()
 
 	state := &watchdogDBState{
 		stuckRows: []StuckInstance{
-			{ID: "inst-1", TenantID: "tenant-1", DocumentID: "doc-1", SubmittedBy: "u1", DriftPolicy: "auto_cancel"},
-			{ID: "inst-2", TenantID: "tenant-1", DocumentID: "doc-2", SubmittedBy: "u2", DriftPolicy: "auto_cancel"},
+			{ID: "inst-1", TenantID: "tenant-1", DocumentID: "doc-1", SubmittedBy: "u1", DriftPolicy: "reduce_quorum"},
+			{ID: "inst-2", TenantID: "tenant-1", DocumentID: "doc-2", SubmittedBy: "u2", DriftPolicy: "keep_snapshot"},
+			{ID: "inst-3", TenantID: "tenant-2", DocumentID: "doc-3", SubmittedBy: "u3", DriftPolicy: "fail_stage"},
 		},
 	}
 	db := newWatchdogDB(t, state)
-	cancelSvc := &mockCancelService{
-		results: []error{errors.New("boom"), nil},
-	}
 	emitter := &recordingEmitter{}
 
-	runner := platformdb.NewTxRunner(db)
-	if err := run(authz.WithBackgroundBypass(context.Background()), db, runner, cancelSvc, emitter); err == nil {
-		t.Fatal("expected job to return error when cancel path fails")
+	if err := run(authz.WithBackgroundBypass(context.Background()), db, emitter); err != nil {
+		t.Fatalf("job returned error: %v", err)
 	}
 
-	if got := cancelSvc.callCount(); got != 2 {
-		t.Fatalf("cancel calls = %d, want 2", got)
+	if got := emitter.count(); got != 3 {
+		t.Fatalf("alerts emitted = %d, want 3", got)
 	}
-	if got := emitter.count(); got != 0 {
-		t.Fatalf("alerts emitted = %d, want 0", got)
+	for _, ev := range []application.GovernanceEvent{emitter.events[0], emitter.events[1], emitter.events[2]} {
+		if ev.EventType != "approval.instance.stuck_alert" {
+			t.Fatalf("event type = %q, want approval.instance.stuck_alert", ev.EventType)
+		}
+		if ev.ActorUserID != SystemActor {
+			t.Fatalf("actor_user_id = %q, want %q", ev.ActorUserID, SystemActor)
+		}
 	}
 }

@@ -3,11 +3,11 @@
 
 package stuck_instance_watchdog
 
-// M5 F5.2 T6 — P1 proof. After the River job-consolidation migration removed
-// the custom lease scheduler + its advisory lock (ADR 0067), this test proves
-// the extracted run(...) body still auto-cancels a genuinely stuck approval
-// instance identically to the pre-migration behavior, against real Postgres
-// via the canonical testdb factory (ADR 0034) — no sqlmock.
+// M5 F5.8 T2 — honest alert-only proof (ADR 0068). The auto_cancel branch was
+// removed in T1: the watchdog is alert-only for every stuck (in_progress,
+// submitted_at < now()-7d) approval instance, regardless of drift policy.
+// These tests prove that against real Postgres via the canonical testdb
+// factory (ADR 0034) — no sqlmock, no schema-impossible fixture values.
 
 import (
 	"context"
@@ -15,23 +15,25 @@ import (
 	"testing"
 	"time"
 
-	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/approval/application"
-	"metaldocs/internal/modules/documents/approval/repository"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/iam/authz"
-	platformdb "metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
-func TestIntegration_Watchdog_P1_AutoCancelEquivalence(t *testing.T) {
+// TestIntegration_Watchdog_P1_AlertOnly proves a genuinely stuck approval
+// instance (in_progress, submitted 8 days ago) gets exactly one
+// approval.instance.stuck_alert governance event emitted and is otherwise
+// left completely untouched — instance stays in_progress, document stays
+// under_review. A fresh (<7d) instance with the same drift policy is proven
+// untouched, confirming the 7-day threshold is honored.
+func TestIntegration_Watchdog_P1_AlertOnly(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
 	tenant := testdb.NewTenant(t, db)
 
-	// Stuck instance: in_progress, submitted 8 days ago, active stage snapshot
-	// says auto_cancel — the watchdog must cancel it.
+	// Stuck instance: in_progress, submitted 8 days ago — the watchdog must
+	// alert on it, not touch its status.
 	stuckDoc := testdb.NewDocument(t, db, testdb.WithTenant(tenant.ID), testdb.WithStatus("under_review"))
 	stuckRoute := testdb.NewApprovalRoute(t, db, testdb.WithTenant(tenant.ID))
 	stuckInstance := testdb.NewApprovalInstance(t, db,
@@ -40,10 +42,10 @@ func TestIntegration_Watchdog_P1_AutoCancelEquivalence(t *testing.T) {
 		testdb.WithStatus("in_progress"),
 	)
 	backdateSubmittedAt(t, db, stuckInstance.ID, 8*24*time.Hour)
-	seedActiveStageSnapshot(t, db, stuckInstance.ID, "auto_cancel")
+	seedActiveStageSnapshot(t, db, stuckInstance.ID, "reduce_quorum")
 
-	// Non-stuck instance: submitted just now, same drift policy — must survive
-	// completely untouched (proves the 7-day threshold is honored).
+	// Non-stuck instance: submitted just now, same drift policy — must
+	// survive completely untouched (proves the 7-day threshold is honored).
 	freshDoc := testdb.NewDocument(t, db, testdb.WithTenant(tenant.ID), testdb.WithStatus("under_review"))
 	freshRoute := testdb.NewApprovalRoute(t, db, testdb.WithTenant(tenant.ID))
 	freshInstance := testdb.NewApprovalInstance(t, db,
@@ -51,29 +53,48 @@ func TestIntegration_Watchdog_P1_AutoCancelEquivalence(t *testing.T) {
 		testdb.WithRoute(freshRoute),
 		testdb.WithStatus("in_progress"),
 	)
-	seedActiveStageSnapshot(t, db, freshInstance.ID, "auto_cancel")
+	seedActiveStageSnapshot(t, db, freshInstance.ID, "reduce_quorum")
 
-	repo := repository.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
 	emitter := application.NewSQLEmitter()
-	services := application.NewServices(repo, emitter, application.RealClock{}, controlleddocumentsdomain.NoopCDFieldReader{})
 
-	runner := platformdb.NewTxRunner(db)
-
-	if err := run(ctx, db, runner, services.Cancel, emitter); err != nil {
+	if err := run(ctx, db, emitter); err != nil {
 		t.Fatalf("watchdog run: %v", err)
 	}
 
-	assertInstanceStatus(t, db, stuckInstance.ID, "cancelled")
-	assertDocumentStatus(t, db, stuckDoc.ID, "draft")
+	assertInstanceStatus(t, db, stuckInstance.ID, "in_progress")
+	assertDocumentStatus(t, db, stuckDoc.ID, "under_review")
 
 	assertInstanceStatus(t, db, freshInstance.ID, "in_progress")
 	assertDocumentStatus(t, db, freshDoc.ID, "under_review")
+
+	var stuckAlertCount int
+	if err := db.QueryRowContext(context.Background(),
+		`SELECT count(*) FROM governance_events WHERE resource_id = $1 AND event_type = 'approval.instance.stuck_alert'`,
+		stuckInstance.ID,
+	).Scan(&stuckAlertCount); err != nil {
+		t.Fatalf("count stuck alerts (stuck instance): %v", err)
+	}
+	if stuckAlertCount != 1 {
+		t.Fatalf("stuck alert count for stuck instance = %d, want 1", stuckAlertCount)
+	}
+
+	var freshAlertCount int
+	if err := db.QueryRowContext(context.Background(),
+		`SELECT count(*) FROM governance_events WHERE resource_id = $1 AND event_type = 'approval.instance.stuck_alert'`,
+		freshInstance.ID,
+	).Scan(&freshAlertCount); err != nil {
+		t.Fatalf("count stuck alerts (fresh instance): %v", err)
+	}
+	if freshAlertCount != 0 {
+		t.Fatalf("stuck alert count for fresh instance = %d, want 0", freshAlertCount)
+	}
 }
 
-// TestIntegration_Watchdog_P1_AlertOnlyEquivalence proves the alert-only
-// (non auto_cancel) drift policy path emits a governance event and leaves the
-// instance untouched — the companion branch of the same run(...) body.
-func TestIntegration_Watchdog_P1_AlertOnlyEquivalence(t *testing.T) {
+// TestIntegration_Watchdog_P1_AlertOnly_AnyDriftPolicy proves the alert-only
+// behavior holds for a different valid drift policy value (keep_snapshot) —
+// there is no branch in run() that special-cases any drift_policy string
+// (ADR 0068 removed the last such branch, auto_cancel).
+func TestIntegration_Watchdog_P1_AlertOnly_AnyDriftPolicy(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := authz.WithBackgroundBypass(context.Background())
 
@@ -86,15 +107,11 @@ func TestIntegration_Watchdog_P1_AlertOnlyEquivalence(t *testing.T) {
 		testdb.WithStatus("in_progress"),
 	)
 	backdateSubmittedAt(t, db, instance.ID, 8*24*time.Hour)
-	seedActiveStageSnapshot(t, db, instance.ID, "reduce_quorum")
+	seedActiveStageSnapshot(t, db, instance.ID, "keep_snapshot")
 
-	repo := repository.NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
 	emitter := application.NewSQLEmitter()
-	services := application.NewServices(repo, emitter, application.RealClock{}, controlleddocumentsdomain.NoopCDFieldReader{})
 
-	runner := platformdb.NewTxRunner(db)
-
-	if err := run(ctx, db, runner, services.Cancel, emitter); err != nil {
+	if err := run(ctx, db, emitter); err != nil {
 		t.Fatalf("watchdog run: %v", err)
 	}
 
@@ -130,7 +147,9 @@ func backdateSubmittedAt(t *testing.T, db *sql.DB, instanceID string, age time.D
 
 // seedActiveStageSnapshot inserts an active approval_stage_instances row for
 // instanceID carrying the given on_eligibility_drift_snapshot policy — the
-// column listStuckInstances joins on to decide auto_cancel vs alert-only.
+// column listStuckInstances joins on and surfaces in the stuck-alert payload.
+// Valid values per the CHECK constraint: reduce_quorum, fail_stage,
+// keep_snapshot.
 func seedActiveStageSnapshot(t *testing.T, db *sql.DB, instanceID, driftPolicy string) {
 	t.Helper()
 	if _, err := db.ExecContext(context.Background(), `
