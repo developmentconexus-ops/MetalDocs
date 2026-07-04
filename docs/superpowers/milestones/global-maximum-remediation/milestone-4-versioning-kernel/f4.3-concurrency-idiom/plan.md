@@ -1,29 +1,37 @@
-# F4.3 plan
+# F4.3 plan (corrected — decision-only)
 
-Executed via subagent; main reviews + commits. Contract-first.
+> Original plan ("migrate templates to If-Match") superseded 2026-07-04 by the contract §3.7 HS-7 erratum.
+> Corrected decision: **ADR-record the two-idiom split** (ADR 0066). No product code changes.
 
 ## Task
-Migrate templates optimistic-concurrency transport from body `expected_lock_version` to the `If-Match`
-header, matching documents' idiom. Land an ADR.
+
+Record the OCC-transport decision. No BE/FE/openapi/regen work.
 
 Files:
-- `api/openapi/**` — templates mutating write endpoint(s) that today declare a body `expected_lock_version`
-  gain an `If-Match` header precondition; drop the body field. Then regenerate BE (`api.gen.go`) + FE
-  (`api-types`) — ZERO hand-edits to generated files.
-- `internal/modules/templates/delivery/http/routes_schema.go` (~32-57) + handlers — parse `If-Match`
-  (reuse the documents `parseIfMatch` shape from `documents/approval/http/handler.go:145-164`, or extract
-  a shared helper) → map to `lock_version`. CAS `WHERE lock_version=$N` UNCHANGED.
-- FE template-edit consumers — send `If-Match` header instead of the body field.
-- `wiki/decisions/NNNN-optimistic-concurrency-if-match.md` — ADR: decision, RFC 7232 / AIP-154 / Zalando
-  basis, templates cutover, pre-v1 atomic-cutover exception. Cite it in the commit.
+- `wiki/decisions/0066-optimistic-concurrency-transport-split.md` — ADR: intentional split
+  (documents=`If-Match`, templates=body `expected_lock_version`), `If-Match` named as target, full
+  unification deferred to its own cross-module change. RFC 7232 / AIP-154 / Zalando basis. **DONE.**
+- `../validation-contract.md` §3 — re-opened with the dated §3.7 erratum documenting the false premise
+  and switching to the ADR-split decision (HS-7). **DONE.**
+- `spec.md` (this feature) — updated to the corrected decision. **DONE.**
+- `evidence.md` — records verification commands (zero templates If-Match; endpoint tags), the
+  false-premise correction, and the HS-7 disposition.
 
-Header value grammar: documents use `If-Match: "vN"`. Apply the same grammar uniformly; the shared helper
-handles it. ADR records the exact on-the-wire value format so both modules match.
+## Verification evidence (the analysis that flipped the decision)
+
+- `grep -rln "If-Match\|IfMatch\|parseIfMatch" internal/modules/templates/ frontend/apps/web/src/features/templates/` → **empty** (zero templates If-Match).
+- The 3 If-Match OpenAPI operations are tagged `[documents]` / `[approval]` — none `[templates]`.
+- templates `expected_lock_version` is its only OCC write (`routes_schema.go`), self-consistent with
+  `lock_version` + `stale_lock_version`.
+- "DEC-01" = CON-01 (`wiki/modules/documents.md`), a documents-internal decision, not a system-wide ADR.
 
 ## Gate
-`oapi-codegen` + FE typegen clean, zero hand-edits · openapi lint green · templates handler parses header,
-`lock_version` CAS intact · `tsc --noEmit` + targeted vitest (templates) green · `go build ./...` green.
 
-## Fallback (HS-7-gated)
-If a hard blocker makes the header cutover unsafe within M4, ADR-record the split as intentional instead,
-and re-open contract §3 with operator approval. Not expected.
+ADR 0066 present + cited · contract §3.7 erratum present + dated · spec/plan/evidence consistent · no
+templates/documents wire change · HS-7 re-open headlined at the HS-1 gate. (No build/test steps — this
+feature ships documentation only.)
+
+## HS-7 disposition
+
+Contract re-open done via loud dated erratum (not silent edit), per the contract §0 HS-7 rule and the
+§3.5 fallback clause. Operator ratification deferred to the M4 HS-1 gate (nothing pushed/merged before).

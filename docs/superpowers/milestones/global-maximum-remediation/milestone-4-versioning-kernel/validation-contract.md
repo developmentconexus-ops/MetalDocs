@@ -14,9 +14,12 @@
 >    enum + FE + reader + tests). It is a dead status: no app service ever enters it (reject writes `draft`).
 > 2. **`scheduled`** — keep it, one-way (`scheduled → published` is its cutover exit; `scheduled → draft`
 >    stays a DB-legal arc for parity but no app path exercises it — see §1.3). No feature rework.
-> 3. **`concurrency idiom`** — operator delegated the choice to a full engineering analysis (§3): the
->    decision is **unify on the `If-Match` header idiom, migrate templates (the minority), contract-first,
->    with an ADR**.
+> 3. **`concurrency idiom`** — operator delegated the choice to a full engineering analysis (§3). Original
+>    decision was "unify on `If-Match`, migrate templates." **SUPERSEDED 2026-07-04 (HS-7 erratum §3.7):**
+>    verification proved the "templates is the minority straggler" premise false — templates has zero
+>    If-Match and its body idiom is self-consistent. Corrected binding decision: **ADR-record the split as
+>    intentional (ADR 0066)**, name `If-Match` as the target, defer full unification to its own change (not
+>    M4). Re-open headlined for ratification at the HS-1 gate.
 
 ---
 
@@ -325,14 +328,20 @@ on mutating requests. The body-field approach (`expected_lock_version`) is a wor
 RPC-ism: it couples the precondition into every request schema, is invisible to HTTP caches/proxies, and
 duplicates what a standard header already expresses. Documents already sit on the idiomatic side.
 
-### 3.4 Decision (binding)
+### 3.4 Decision (binding) — ⚠ SUPERSEDED 2026-07-04 by the §3.7 erratum (HS-7)
 
-**Unify on the `If-Match` header idiom; migrate templates (the minority) to it; contract-first; record an
-ADR.** Rationale: it moves both modules to the HTTP-native, standards-endorsed mechanism (global maximum,
-not the local maximum of "document whichever split we happen to have"); documents need no change; the
-migration is bounded to templates' mutating write endpoints; pre-v1 cutover cost is low and there are no
-external consumers yet. This **kills** the DEBT (mission intent: "unify … migrate the minority"), rather
-than merely annotating it.
+> **HS-7 erratum, 2026-07-04:** the decision below rested on a premise that F4.3 verification proved
+> **false**. It is superseded by **§3.7**. Kept verbatim for audit. **Do not implement §3.4/§3.5 as
+> written** — the binding F4.3 decision is now §3.7 (ADR-record the split; ADR 0066).
+
+~~**Unify on the `If-Match` header idiom; migrate templates (the minority) to it; contract-first; record an
+ADR.**~~ Rationale (as originally written): it moves both modules to the HTTP-native, standards-endorsed
+mechanism (global maximum, not the local maximum of "document whichever split we happen to have");
+documents need no change; the migration is bounded to templates' mutating write endpoints; pre-v1 cutover
+cost is low and there are no external consumers yet. This **kills** the DEBT (mission intent: "unify …
+migrate the minority"), rather than merely annotating it.
+
+**Why superseded:** see §3.7. The "templates is the minority straggler" framing was false runtime truth.
 
 ### 3.5 Scope of the templates migration (binding)
 
@@ -357,12 +366,52 @@ version guards), F4.3 falls back to the acceptance-permitted **"ADR-record the s
 justifying two idioms as intentional — and the migration becomes a tracked follow-on. This fallback is
 **HS-7-gated**: taking it requires updating this §3 decision with operator approval, not silently.
 
-### 3.6 F4.3 exit criteria
+### 3.6 F4.3 exit criteria — ⚠ SUPERSEDED 2026-07-04 by §3.7
 
-One optimistic-concurrency wire idiom (`If-Match`) across documents + templates — templates migrated
+> Superseded together with §3.4/§3.5. The binding F4.3 exit criteria are now **§3.7**. Kept for audit.
+
+~~One optimistic-concurrency wire idiom (`If-Match`) across documents + templates~~ — templates migrated
 contract-first (openapi + regen, zero hand-edits), handler + FE consumers updated, `lock_version` CAS
 semantics preserved · ADR landed + cited · `tsc --noEmit` + targeted vitest green · openapi lint green ·
 `go build ./...` green · **OR** the §3.5 fallback ADR-split with operator-approved §3 update.
+
+---
+
+### 3.7 ★ CORRECTED DECISION (binding, 2026-07-04 — HS-7 erratum) — ADR-record the split
+
+**What changed.** §3.4/§3.5 above decided "unify on `If-Match`, migrate templates the minority." F4.3
+verification (2026-07-04) proved the premise **false**, so per HS-7 (§0 header: "fix the code to the
+contract, or re-open this contract with operator approval — never silently edit the contract to match the
+code") this §3 is **re-opened with a loud, dated, auditable erratum** and the decision is switched to the
+§3.5-permitted fallback. The re-open is surfaced as a **headline HS-7 item at the M4 HS-1 operator gate**
+for ratification (nothing is pushed or merged before that gate).
+
+**The false premise (corrected runtime truth):**
+
+| Original claim (§3.4/§3.5, §0.5) | Verified truth (F4.3, 2026-07-04) |
+|---|---|
+| templates is "the minority" already near the If-Match convention | templates has **zero** If-Match usage anywhere (BE + FE); its `expected_lock_version` body field is its **only** OCC write (`UpdateSchemas`), self-consistent with its own `lock_version` column + `stale_lock_version` error |
+| an existing system-wide If-Match standard makes templates non-conformant ("DEC-01") | the cited decision is **CON-01** in `wiki/modules/documents.md` — a **documents-module-internal** decision (submit-canonical-over-finalize), **not** a system-wide OCC ADR. No cross-module If-Match standard exists |
+| migrating templates "finishes convergence" (bounded cleanup) | migrating templates **creates a new cross-module OCC standard** and imports a documents-local decision into templates — a first-class architectural change, not a cleanup |
+
+**What still holds:** §3.3's analysis — that `If-Match` is the idiomatic HTTP OCC transport (RFC 7232 /
+AIP-154 / Zalando) and the right **long-term target** — is unchanged. Only the "templates is a straggler
+to migrate now, inside M4" framing was wrong.
+
+**Corrected decision (binding):** **ADR-record the two-idiom split as intentional** (ADR 0066), naming
+`If-Match` as the target transport and deferring full unification to its own deliberate cross-module
+change (candidate M9 governance-hygiene or standalone), **not** M4. Rationale: M4's objective is
+**versioning kernel correctness**; a cosmetic cross-module transport refactor of a correct, self-consistent
+module (templates BE + FE + contract + tests) is scope creep + regression risk M4 has no reason to take.
+This is the global-maximum call — record the target and unify deliberately — over the local maximum of
+smuggling a risky refactor into a correctness milestone.
+
+**Corrected F4.3 exit criteria (binding, replaces §3.6):** ADR 0066 landed under `wiki/decisions/`
+recording the intentional split + If-Match target + deferred-unification charter · contract §3 re-opened
+with this dated erratum (not silent) · f4.3 `spec.md`/`plan.md` updated to the corrected decision ·
+`evidence.md` records the false-premise correction and the HS-7 disposition · **no templates code/contract
+change in M4** (documents + templates both unchanged at the wire) · HS-7 re-open headlined at the HS-1
+operator gate. No BE/FE/openapi build steps apply (documentation/decision-only feature).
 
 ---
 
