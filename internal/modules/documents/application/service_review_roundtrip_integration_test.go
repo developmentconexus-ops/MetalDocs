@@ -207,58 +207,39 @@ func TestReviewWriteRoundTrip(t *testing.T) {
 	}
 
 	// -----------------------------------------------------------------------
-	// Scenario 4: After rejection (under_review→rejected→draft), the document
-	// owner (author) can PresignAutosave again.
-	//
-	// The transition is performed via direct SQL rather than wiring the full
-	// DecisionService + approval sub-module. Both hops are trigger-legal without
-	// a GUC (see baseline: under_review→rejected and rejected→draft are in the
-	// allowed-transition graph). This exercises the domain gate only: that the
-	// service re-opens write access to the owner once the document is draft again.
+	// Scenario 4: 'rejected' is a removed DB status (migration
+	// 0272_documents_remove_rejected.sql). The reject path collapses
+	// under_review straight back to 'draft' (no intermediate 'rejected' hop),
+	// matching documents/domain.CanTransitionDocumentStatus (state.go), which
+	// has no rejected arcs. This asserts the DB trigger now REJECTS
+	// under_review→rejected with a check_violation, proving app<->DB parity
+	// at the schema boundary (not just the Go domain layer).
 	// -----------------------------------------------------------------------
 
-	// Step A: under_review → rejected (allowed by trigger graph, no GUC required).
-	if _, err := db.ExecContext(ctx,
+	_, err = db.ExecContext(ctx,
 		`UPDATE public.documents SET status='rejected' WHERE id=$1::uuid AND status='under_review'`,
 		doc.ID,
-	); err != nil {
-		t.Fatalf("scenario 4: set status=rejected: %v", err)
+	)
+	if err == nil {
+		t.Fatal("scenario 4: under_review→rejected succeeded; want check_violation (rejected status removed by migration 0272)")
+	}
+	var pqErr interface{ SQLState() string }
+	if errors.As(err, &pqErr) {
+		if pqErr.SQLState() != "23514" && pqErr.SQLState() != "P0001" {
+			t.Fatalf("scenario 4: under_review→rejected failed with unexpected SQLSTATE %q, want check_violation (23514) or raised exception (P0001): %v", pqErr.SQLState(), err)
+		}
 	}
 
-	// Step B: rejected → draft (also allowed by trigger graph, no GUC required).
-	if _, err := db.ExecContext(ctx,
-		`UPDATE public.documents SET status='draft' WHERE id=$1::uuid AND status='rejected'`,
-		doc.ID,
-	); err != nil {
-		t.Fatalf("scenario 4: set status=draft: %v", err)
-	}
-
-	// Verify the status change landed.
-	var postRejectStatus string
+	// Confirm the document is unaffected (still under_review) since the
+	// UPDATE was rejected by the trigger/CHECK constraint.
+	var statusAfter string
 	if err := db.QueryRowContext(ctx,
 		`SELECT status FROM public.documents WHERE id=$1::uuid`, doc.ID,
-	).Scan(&postRejectStatus); err != nil {
-		t.Fatalf("scenario 4: query post-reject status: %v", err)
+	).Scan(&statusAfter); err != nil {
+		t.Fatalf("scenario 4: query status after rejected UPDATE attempt: %v", err)
 	}
-	if postRejectStatus != "draft" {
-		t.Fatalf("scenario 4: expected status=draft after reject path, got %q", postRejectStatus)
-	}
-
-	// After CommitAutosave the session's last_acknowledged_revision_id was
-	// advanced to newRevID. Use newRevID as BaseRevisionID for the next presign.
-	presignRes4, err := svc.PresignAutosave(ctx, application.PresignAutosaveCmd{
-		TenantID:       tnt.ID,
-		ActorUserID:    approver.ID, // document owner acting as author post-reject
-		DocumentID:     doc.ID,
-		SessionID:      sessID,
-		BaseRevisionID: newRevID,
-		ContentHash:    "roundtrip-hash-post-reject",
-	})
-	if err != nil {
-		t.Fatalf("scenario 4: PresignAutosave(owner, draft) = %v; want success", err)
-	}
-	if presignRes4 == nil || presignRes4.PendingUploadID == "" {
-		t.Fatal("scenario 4: PresignAutosave(owner, draft): empty pending upload ID")
+	if statusAfter != "under_review" {
+		t.Fatalf("scenario 4: expected status still under_review after blocked transition, got %q", statusAfter)
 	}
 }
 

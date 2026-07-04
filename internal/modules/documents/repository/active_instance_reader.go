@@ -31,12 +31,11 @@ func NewActiveInstanceReaderPG(db *sql.DB) *ActiveInstanceReaderPG {
 var _ documentsdomain.ActiveInstanceReader = (*ActiveInstanceReaderPG)(nil)
 
 // activeInstanceStatuses is the active (non-published) status set, expressed in
-// the owner's vocabulary (documents/domain.DocStatus*). Passed as $3..$7.
+// the owner's vocabulary (documents/domain.DocStatus*). Passed as $3..$6.
 var activeInstanceStatuses = []any{
 	string(documentsdomain.DocStatusDraft),
 	string(documentsdomain.DocStatusUnderReview),
 	string(documentsdomain.DocStatusApproved),
-	string(documentsdomain.DocStatusRejected),
 	string(documentsdomain.DocStatusScheduled),
 }
 
@@ -63,13 +62,13 @@ SELECT active.id,
           FROM documents
          WHERE tenant_id = $1::uuid
            AND controlled_document_id = $2::uuid
-           AND status IN ($3, $4, $5, $6, $7)
+           AND status IN ($3, $4, $5, $6)
          LIMIT 1) active
   FULL OUTER JOIN
        (SELECT id FROM documents
          WHERE tenant_id = $1::uuid
            AND controlled_document_id = $2::uuid
-           AND status = $8
+           AND status = $7
          ORDER BY revision_number DESC
          LIMIT 1) pub ON TRUE`,
 		args...,
