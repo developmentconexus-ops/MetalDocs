@@ -88,6 +88,16 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	}
 	out = append(out, drift...)
 
+	// M3 F3.1 (validation-contract.md §1.5) — SEED-CHOKEPOINT: the TxRunner
+	// chokepoint auto-seeds tenant+actor from ctx; any remaining manual
+	// authz.SeedTxIdentity call outside the chokepoint/definition files and
+	// outside the declared allowlist is census drift.
+	seedChokepoint, err := checkSeedChokepoint(modulesRoot, strict)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, seedChokepoint...)
+
 	return out, nil
 }
 

@@ -459,9 +459,6 @@ func (s *Service) RequireDocumentView(ctx context.Context, tenantID, actorID, do
 	_ = docID // tenant-grade cap: no per-document filtering today (see doc comment).
 	ctx = authz.WithCapCache(ctx)
 	return s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return err
-		}
 		return authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant")
 	})
 }
@@ -813,9 +810,6 @@ func (s *Service) ListCheckpoints(ctx context.Context, tenantID, actorID, docID 
 	// RW tx: F8 bypass audit may INSERT.
 	ctx = authz.WithCapCache(ctx)
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return err
-		}
 		return authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant")
 	}); err != nil {
 		return nil, err

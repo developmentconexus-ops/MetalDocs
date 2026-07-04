@@ -50,11 +50,6 @@ func newReadService(repo repository.ApprovalRepository, cdRead controlleddocumen
 func (s *ReadService) LoadInstance(ctx context.Context, runner db.TxRunner, tenantID, instanceID string) (*domain.Instance, error) {
 	var inst *domain.Instance
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
-		actorID := iamdomain.UserIDFromContext(ctx)
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return fmt.Errorf("read load instance: %w", err)
-		}
-
 		_, found, err := loadInstanceAreaCode(ctx, tx, s.cdRead, tenantID, instanceID)
 		if err != nil {
 			return fmt.Errorf("read load instance: load area: %w", err)
@@ -95,11 +90,6 @@ func (s *ReadService) LoadInstance(ctx context.Context, runner db.TxRunner, tena
 func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, error) {
 	var inst *domain.Instance
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
-		actorID := iamdomain.UserIDFromContext(ctx)
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return fmt.Errorf("read load instance by document: %w", err)
-		}
-
 		ctx := authz.WithCapCache(ctx)
 		// CapDocumentView is tenant-grade (iam/domain/capability_scope.go:51); pass the
 		// "tenant" sentinel so the area filter is intentionally OFF — mirrors the
@@ -135,11 +125,6 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, runner d
 func (s *ReadService) LoadActiveInstanceByDocumentForMutation(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, error) {
 	var inst *domain.Instance
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
-		actorID := iamdomain.UserIDFromContext(ctx)
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return fmt.Errorf("mutation load instance by document: %w", err)
-		}
-
 		loaded, err := s.repo.LoadActiveInstanceByDocument(ctx, tx, tenantID, documentID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -259,10 +244,6 @@ func (s *ReadService) listInboxItems(ctx context.Context, runner db.TxRunner, te
 	var items []InboxView
 	var total int
 	err = runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return fmt.Errorf("list inbox: %w", err)
-		}
-
 		// COUNT(*) OVER() piggybacks the total-matching-rows count onto the same
 		// result set as the page, so the page and the total are always read from
 		// the same MVCC snapshot inside this transaction — no second round-trip
@@ -366,10 +347,6 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, runner db.TxRunn
 
 	var total int
 	err = runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return fmt.Errorf("count pending: %w", err)
-		}
-
 		err := tx.QueryRowContext(ctx, `
 			SELECT COUNT(DISTINCT ai.id)
 			FROM approval_instances ai

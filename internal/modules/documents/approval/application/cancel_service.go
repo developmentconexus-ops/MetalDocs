@@ -66,9 +66,15 @@ func (s *CancelService) cancelInstance(ctx context.Context, runner db.TxRunner, 
 			if err := authz.BypassSystem(ctx, tx); err != nil {
 				return fmt.Errorf("cancel: system authz bypass: %w", err)
 			}
-		} else {
+			// System path (stuck-instance-watchdog auto-cancel) runs on a
+			// carrier-less background ctx, so the TxRunner chokepoint auto-seed
+			// (F3.1) is a no-op here. Seed the claimed instance's tenant
+			// explicitly so FORCE RLS still backstops this per-instance action
+			// (validation-contract §2.4 stuck-watchdog: "per-instance action …
+			// seeded per its tenant"). The sync CancelInstance path is seeded by
+			// the chokepoint from its request identity and needs no manual seed.
 			if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
-				return fmt.Errorf("cancel: %w", err)
+				return fmt.Errorf("cancel: seed system identity: %w", err)
 			}
 		}
 

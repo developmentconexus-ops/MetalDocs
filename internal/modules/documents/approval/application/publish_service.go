@@ -57,10 +57,6 @@ func (s *PublishService) PublishApproved(ctx context.Context, runner db.TxRunner
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
-		if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.PublishedBy); err != nil {
-			return fmt.Errorf("publishApproved: %w", err)
-		}
-
 		// Step 2: load the approval instance.
 		instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)
 		if err != nil {
@@ -219,9 +215,6 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
-		if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.ScheduledBy); err != nil {
-			return fmt.Errorf("schedulePublish: %w", err)
-		}
 
 		// Step 3: load the approval instance.
 		instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)

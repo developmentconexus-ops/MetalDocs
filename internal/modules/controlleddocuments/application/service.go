@@ -339,9 +339,6 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			return nil, fmt.Errorf("controlled_documents: build controlled document: %w", err)
 		}
 		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-			if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-				return fmt.Errorf("controlled_documents: set authz context: %w", err)
-			}
 			// ADR 0022 Phase 7: area-scoped tier-2 — symmetric with the auto branch.
 			// Closes B2 (F0.2): manual-code creation used to bypass tier-2 because the
 			// branch had no tx/identity, so the repo's authz.Require failed-closed on
@@ -397,9 +394,6 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		}
 		// Auto path: sequence allocation, authz, and persistence run atomically.
 		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-			if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-				return fmt.Errorf("controlled_documents: set authz context: %w", err)
-			}
 			// ADR 0022 Phase 7: area-scoped tier-2 — a CD is created INTO a process
 			// area, so authorize against that area (least-privilege; system_admin
 			// still bypasses). cmd.ProcessAreaCode validated active above.
@@ -570,16 +564,12 @@ func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profi
 	if err := s.validateSequenceSeries(ctx, tenantID, profileCode, areaCode); err != nil {
 		return 0, fmt.Errorf("controlled_documents: validate sequence series: %w", err)
 	}
-	actorUserID, ok := authn.UserIDFromContext(ctx)
-	if !ok {
+	if _, ok := authn.UserIDFromContext(ctx); !ok {
 		return 0, ErrActorMissing
 	}
 
 	var n int
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
-			return fmt.Errorf("controlled_documents: set authz context preview code: %w", err)
-		}
 		// ADR 0022 Phase 7: preview-code allocation is part of CD create — authorize
 		// against the target area, not tenant-wide.
 		if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), areaCode); err != nil {
@@ -698,9 +688,6 @@ func (s *ControlledDocumentService) GetActiveInstance(ctx context.Context, tenan
 
 	ctx = authz.WithCapCache(ctx)
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
-			return fmt.Errorf("controlled_documents: set authz context get active instance: %w", err)
-		}
 		// document.view is tenant-grade (iam/domain/capability_scope.go) — pass the
 		// "tenant" sentinel so the area filter is intentionally OFF, mirroring
 		// documents/approval/application/read_service.go LoadInstance and
@@ -734,10 +721,6 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 	}
 
 	return s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorUserID); err != nil {
-			return fmt.Errorf("controlled_documents: set authz context changeStatus: %w", err)
-		}
-
 		// ADR 0022 Phase 7: load the CD's process area (FOR UPDATE — read, not a
 		// mutation) BEFORE the tier-2 check so obsolete/supersede are authorized
 		// against the CD's real area, not tenant-wide. authz.Require still precedes
@@ -847,9 +830,6 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 
 	var ref *controlleddocumentsdomain.DocumentRef
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, actorUserID); err != nil {
-			return fmt.Errorf("controlled_documents: set authz guc for create revision: %w", err)
-		}
 		// ADR 0022 Phase 7: a revision is created within the CD's own process area —
 		// authorize against cd.ProcessAreaCode (loaded above), not tenant-wide.
 		if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), cd.ProcessAreaCode); err != nil {

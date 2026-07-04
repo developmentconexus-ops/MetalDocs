@@ -88,9 +88,6 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 	}
 
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return fmt.Errorf("templates update schemas: setAuthzGUC: %w", err)
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
 			return fmt.Errorf("templates update schemas: authz: %w", err)
 		}

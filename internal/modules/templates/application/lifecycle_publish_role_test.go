@@ -1,7 +1,6 @@
 package application_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -116,7 +115,7 @@ func TestPublishTemplateVersion_RoleBinding(t *testing.T) {
 				mock.ExpectCommit()
 			}
 
-			_, gotErr := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+			_, gotErr := svc.PublishTemplateVersion(authzCtx("tenant-a", "approver-1"), application.PublishTemplateVersionCmd{
 				TenantID:      "tenant-a",
 				ActorUserID:   "approver-1",
 				ActorRoles:    tc.setup.actorRoles,

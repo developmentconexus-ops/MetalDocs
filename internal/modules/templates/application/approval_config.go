@@ -74,9 +74,6 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 	}
 
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return fmt.Errorf("templates approval config: setAuthzGUC: %w", err)
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
 			return fmt.Errorf("templates approval config: authz: %w", err)
 		}

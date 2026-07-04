@@ -71,9 +71,6 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 	version.PendingReviewerRole = cmd.ReviewerRole
 
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return fmt.Errorf("templates create: set authz context: %w", err)
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateCreate), "tenant"); err != nil {
 			return fmt.Errorf("templates create: authz: %w", err)
 		}
@@ -161,9 +158,6 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 	}
 
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return fmt.Errorf("templates create next version: setAuthzGUC: %w", err)
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
 			return fmt.Errorf("templates create next version: authz: %w", err)
 		}

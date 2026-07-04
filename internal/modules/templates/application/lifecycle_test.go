@@ -682,7 +682,7 @@ func TestReview_UsesTemplateReviewCapability(t *testing.T) {
 	expectTemplateAuthz(mock, "reviewer-1", "tenant-a", "template.review")
 	mock.ExpectCommit()
 
-	_, err = svc.Review(context.Background(), application.ReviewCmd{
+	_, err = svc.Review(authzCtx("tenant-a", "reviewer-1"), application.ReviewCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "reviewer-1",
 		ActorRoles:    []string{"reviewer"},
@@ -715,7 +715,7 @@ func TestArchiveTemplate_UsesTemplateArchiveCapability(t *testing.T) {
 	expectTemplateAuthz(mock, "user-1", "tenant-a", "template.archive")
 	mock.ExpectCommit()
 
-	_, err = svc.ArchiveTemplate(context.Background(), application.ArchiveCmd{
+	_, err = svc.ArchiveTemplate(authzCtx("tenant-a", "user-1"), application.ArchiveCmd{
 		TenantID:    "tenant-a",
 		ActorUserID: "user-1",
 		TemplateID:  template.ID,
@@ -1107,7 +1107,7 @@ func TestApprove_Accept_ObsoletesInSameTxCommitEnvelope(t *testing.T) {
 	expectTemplateAuthz(mock, "approver-1", "tenant-a", "template.approve")
 	mock.ExpectCommit()
 
-	_, err = svc.Approve(context.Background(), application.ApproveCmd{
+	_, err = svc.Approve(authzCtx("tenant-a", "approver-1"), application.ApproveCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "approver-1",
 		ActorRoles:    []string{"approver"},

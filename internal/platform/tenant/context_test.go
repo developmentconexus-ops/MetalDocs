@@ -42,3 +42,32 @@ func TestWithTenantID_EmptyPanics(t *testing.T) {
 
 	_ = WithTenantID(context.Background(), "")
 }
+
+func TestActorFromContext_RoundTrip(t *testing.T) {
+	ctx := WithActorID(context.Background(), "actor-a")
+	got, err := ActorFromContext(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "actor-a" {
+		t.Fatalf("got %q, want actor-a", got)
+	}
+}
+
+func TestActorFromContext_MissingReturnsSentinel(t *testing.T) {
+	_, err := ActorFromContext(context.Background())
+	if !errors.Is(err, ErrActorMissing) {
+		t.Fatalf("got %v, want ErrActorMissing", err)
+	}
+}
+
+func TestActorFromContext_EmptyReturnsSentinel(t *testing.T) {
+	// WithActorID does not panic on empty (unlike WithTenantID) — the
+	// chokepoint treats "present but empty" the same as "absent" (no-op
+	// seed), so ActorFromContext must surface the sentinel either way.
+	ctx := context.WithValue(context.Background(), actorCtxKey{}, "   ")
+	_, err := ActorFromContext(ctx)
+	if !errors.Is(err, ErrActorMissing) {
+		t.Fatalf("got %v, want ErrActorMissing", err)
+	}
+}

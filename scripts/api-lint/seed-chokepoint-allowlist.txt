@@ -1,0 +1,35 @@
+# M3 F3.1 SEED-CHOKEPOINT allowlist (validation-contract.md §1.4).
+# Format: path:LINE  # category A|B — reason
+# Category A: seeded actor is a genuine distinct identity (not the ctx actor).
+# Category B: cross-tenant / platform-admin path, tx not flowing through the
+#             normal per-tenant ctx-actor chokepoint.
+# Raw-BeginTx entries: the tx here is NOT produced by TxRunner.Do/DoReadOnly
+# (repo opens its own *sql.Tx via db.BeginTx or a module-local tx wrapper), so
+# the chokepoint auto-seed never runs for these call sites; the manual seed
+# is the only seed and must stay.
+
+internal/modules/documents/repository/repository.go:127  # category A — d.CreatedBy (document owner) is distinct from the ctx actor creating it (CreateDocumentTx)
+internal/modules/documents/repository/repository.go:336  # raw BeginTx — UpdateDocumentNameTx-adjacent path opens its own tx, not chokepoint-covered
+internal/modules/documents/repository/repository.go:628  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/repository/repository.go:663  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/repository/repository.go:746  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/repository/repository.go:779  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/repository/repository.go:1015  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/repository/repository.go:1156  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/repository/repository.go:1282  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/repository/repository.go:1624  # raw BeginTx — not chokepoint-covered
+internal/modules/documents/repository/repository.go:1662  # raw BeginTx — not chokepoint-covered
+
+internal/modules/iam/infrastructure/postgres/role_admin_repository.go:72  # category A — assignedBy (role-grantor) distinct from ctx actor (UpsertUserAndAssignRoleTx)
+internal/modules/iam/infrastructure/postgres/role_admin_repository.go:128  # category A — assignedBy distinct from ctx actor (ReplaceUserRolesTx)
+
+internal/modules/iam/infrastructure/postgres/user_area_repository.go:249  # category A — grantedByActor(membership.GrantedBy) distinct from ctx actor; raw tx (rawTx), not chokepoint-covered
+internal/modules/iam/infrastructure/postgres/user_area_repository.go:304  # category A — grantedByActor(membership.GrantedBy) distinct from ctx actor
+internal/modules/iam/infrastructure/postgres/user_area_repository.go:359  # raw BeginTx (rawTx) — not chokepoint-covered
+internal/modules/iam/infrastructure/postgres/user_area_repository.go:407  # raw BeginTx — not chokepoint-covered
+internal/modules/iam/infrastructure/postgres/user_area_repository.go:456  # category A — grantedByActor(newMembership.GrantedBy) distinct from ctx actor; raw tx (rawTx)
+internal/modules/iam/infrastructure/postgres/user_area_repository.go:543  # category A — grantedByActor(newMembership.GrantedBy) distinct from ctx actor
+
+internal/modules/taxonomy/infrastructure/authz_guc.go:31  # raw BeginTx — shared setAuthzGUC() helper called from 24 taxonomy repository sites that open their own tx (module-local tx wrapper), none flow through TxRunner
+
+internal/modules/documents/approval/application/cancel_service.go:76  # category B — system path only (stuck-instance-watchdog auto-cancel); carrier-less background ctx, chokepoint no-ops, manual seed is the RLS backstop per its tenant (validation-contract §2.4)

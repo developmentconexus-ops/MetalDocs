@@ -198,10 +198,6 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 	err = runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
-		if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.ActorUserID); err != nil {
-			return fmt.Errorf("recordSignoff: %w", err)
-		}
-
 		// Step 4: load approval instance; child stage rows locked FOR UPDATE inside LoadInstance (J1).
 		instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)
 		if err != nil {
@@ -568,9 +564,6 @@ func (s *DecisionService) emitEligibilityRejection(ctx context.Context, runner d
 	return runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return err
-		}
 		if err := s.emitter.Emit(ctx, tx, event); err != nil {
 			return fmt.Errorf("emit event: %w", err)
 		}

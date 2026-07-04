@@ -86,7 +86,7 @@ func TestUpsertApprovalConfig_NonHolder_PublishedTemplate(t *testing.T) {
 	mock.ExpectQuery("").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 	mock.ExpectRollback()
 
-	_, gotErr := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
+	_, gotErr := svc.UpsertApprovalConfig(authzCtx(tenantID, actorID), application.UpsertApprovalConfigCmd{
 		TenantID:     tenantID,
 		ActorUserID:  actorID,
 		TemplateID:   tpl.ID,
@@ -166,7 +166,7 @@ func TestUpsertApprovalConfig_NonCreatorNonHolder_UnpublishedTemplate(t *testing
 	mock.ExpectQuery("").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false)) // not granted
 	mock.ExpectRollback()
 
-	_, gotErr := svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
+	_, gotErr := svc.UpsertApprovalConfig(authzCtx(tenantID, actorID), application.UpsertApprovalConfigCmd{
 		TenantID:     tenantID,
 		ActorUserID:  actorID,
 		TemplateID:   tpl.ID,
@@ -281,7 +281,7 @@ func TestUpsertApprovalConfig_WithDB_CreatorPath_UsesTxAndSingleAuthzCheck(t *te
 	expectTemplateEditAuthzConfig(mock, "author-1", "tenant-a")
 	mock.ExpectCommit()
 
-	_, err = svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
+	_, err = svc.UpsertApprovalConfig(authzCtx("tenant-a", "author-1"), application.UpsertApprovalConfigCmd{
 		TenantID:     "tenant-a",
 		ActorUserID:  "author-1",
 		TemplateID:   tpl.ID,
@@ -340,7 +340,7 @@ func TestUpsertApprovalConfig_WithDB_ManageHolderPath_AssertsBothRequires(t *tes
 	mock.ExpectExec("").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	_, err = svc.UpsertApprovalConfig(context.Background(), application.UpsertApprovalConfigCmd{
+	_, err = svc.UpsertApprovalConfig(authzCtx(tenantID, actorID), application.UpsertApprovalConfigCmd{
 		TenantID:     tenantID,
 		ActorUserID:  actorID,
 		TemplateID:   tpl.ID,

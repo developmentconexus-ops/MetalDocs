@@ -85,10 +85,6 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 	err = runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
-		if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.SubmittedBy); err != nil {
-			return fmt.Errorf("submit: %w", err)
-		}
-
 		// document.submit is area-grade: pass the resolved area as-is ("" fail-closes,
 		// denying non-system actors). ADR 0022 Phase 11 (F7): shared LoadDocumentAreaCode.
 		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, req.DocumentID)

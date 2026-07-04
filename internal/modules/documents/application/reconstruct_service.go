@@ -35,10 +35,6 @@ func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID,
 	// Read-write tx: authz.Require may audit a system_admin bypass (ADR 0022 F8),
 	// which INSERTs — see the Require INVARIANT note in iam/authz/authz.go.
 	if err := s.txRunner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return err
-		}
-
 		// document.edit is area-grade: pass the resolved area as-is ("" fail-closes).
 		areaCode, _, err := LoadDocumentAreaCode(ctx, tx, s.cdRead, tenantID, docID)
 		if err != nil {

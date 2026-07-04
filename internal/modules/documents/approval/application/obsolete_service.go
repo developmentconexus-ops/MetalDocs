@@ -82,9 +82,6 @@ func (s *ObsoleteService) MarkObsolete(ctx context.Context, runner db.TxRunner, 
 			return ErrInvalidObsoleteSource
 		}
 
-		if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.MarkedBy); err != nil {
-			return fmt.Errorf("markObsolete: %w", err)
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentObsolete), areaCode); err != nil {
 			return err
 		}

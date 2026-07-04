@@ -24,9 +24,6 @@ func requireDocEditDraft(ctx context.Context, runner db.TxRunner, cdRead control
 	// here — see the Require INVARIANT note in iam/authz/authz.go.
 	ctx = authz.WithCapCache(ctx)
 	return runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return err
-		}
 		// document.edit is area-grade: pass the resolved area as-is. A missing document
 		// or null area yields "" which fail-closes (authz.Require denies non-system
 		// actors). ADR 0022 Phase 11 (F7): the per-file loadDocumentAreaCode was merged

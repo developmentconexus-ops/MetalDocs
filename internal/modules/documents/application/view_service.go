@@ -52,10 +52,6 @@ func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID s
 	// Read-write tx: authz.Require may audit a system_admin bypass (ADR 0022 F8),
 	// which INSERTs — see the Require INVARIANT note in iam/authz/authz.go.
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return err
-		}
-
 		var status string
 		var pdfKey sql.NullString
 		err := tx.QueryRowContext(ctx, `

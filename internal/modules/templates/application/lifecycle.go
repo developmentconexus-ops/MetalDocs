@@ -81,9 +81,6 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 	// Validation reads above still happen before the write transaction; this tx
 	// only serializes the state update itself in the current implementation.
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return fmt.Errorf("templates submit: setAuthzGUC: %w", err)
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateSubmit), "tenant"); err != nil {
 			return fmt.Errorf("templates submit: authz: %w", err)
 		}
@@ -300,9 +297,6 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, 
 			}
 		}
 		if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-			if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-				return fmt.Errorf("templates approve: setAuthzGUC: %w", err)
-			}
 			if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateApprove), "tenant"); err != nil {
 				return fmt.Errorf("templates approve: authz: %w", err)
 			}
@@ -482,9 +476,6 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 		}
 	}
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return fmt.Errorf("templates publish: setAuthzGUC: %w", err)
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplatePublish), "tenant"); err != nil {
 			return fmt.Errorf("templates publish: authz: %w", err)
 		}
@@ -579,9 +570,6 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 	}
 
 	if err := s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
-			return fmt.Errorf("templates archive: setAuthzGUC: %w", err)
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateArchive), "tenant"); err != nil {
 			return fmt.Errorf("templates archive: authz: %w", err)
 		}
@@ -605,9 +593,6 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 // so that status-transition callers surface a 409 rather than a 412.
 func (s *Service) updateVersionWithAuthzAndAudit(ctx context.Context, tenantID, actorID string, version *domain.TemplateVersion, cap string, audit *domain.AuditEvent) error {
 	return s.runner.Do(ctx, func(tx *sql.Tx) error {
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return fmt.Errorf("templates update version: setAuthzGUC: %w", err)
-		}
 		if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
 			return fmt.Errorf("templates update version: authz: %w", err)
 		}

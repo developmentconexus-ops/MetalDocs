@@ -836,7 +836,7 @@ func TestRouteAdminList_RunsUnderTenantGUC(t *testing.T) {
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	out, err := svc.List(context.Background(), newTxRunner(db), "tenant-list", "actor-list")
+	out, err := svc.List(authzCtx("tenant-list", "actor-list"), newTxRunner(db), "tenant-list", "actor-list")
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -1064,7 +1064,7 @@ func TestRouteAdminList_PassesThroughTotalFromRepo(t *testing.T) {
 		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
 	}
 
-	out, err := svc.List(context.Background(), newTxRunner(db), "tenant-list", "actor-list")
+	out, err := svc.List(authzCtx("tenant-list", "actor-list"), newTxRunner(db), "tenant-list", "actor-list")
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}

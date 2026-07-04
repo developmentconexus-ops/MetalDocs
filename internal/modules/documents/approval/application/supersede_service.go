@@ -58,10 +58,6 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, runner db.TxR
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
-		if err := authz.SeedTxIdentity(ctx, tx, req.TenantID, req.SupersededBy); err != nil {
-			return fmt.Errorf("publishSuperseding: %w", err)
-		}
-
 		// document.supersede is area-grade: pass the resolved area as-is ("" fail-closes).
 		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, req.NewDocumentID)
 		if err != nil {

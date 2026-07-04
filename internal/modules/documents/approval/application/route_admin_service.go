@@ -159,9 +159,6 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
-		if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
-			return err
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
 			return err
 		}
@@ -284,9 +281,6 @@ func (s *RouteAdminService) updateTx(ctx context.Context, runner db.TxRunner, in
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
-		if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
-			return err
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
 			return err
 		}
@@ -439,9 +433,6 @@ func (s *RouteAdminService) deactivateTx(ctx context.Context, runner db.TxRunner
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
-		if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
-			return err
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
 			return err
 		}
@@ -521,9 +512,6 @@ func (s *RouteAdminService) List(ctx context.Context, runner db.TxRunner, tenant
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
-		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
-			return err
-		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
 			return err
 		}

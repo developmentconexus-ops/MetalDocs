@@ -83,7 +83,7 @@ func TestListInboxItems_PopulatesTitleAndQuorumProgress(t *testing.T) {
 	mock.ExpectCommit()
 
 	svc := &ReadService{}
-	items, err := svc.ListInboxItems(context.Background(), newTxRunner(db), "tenant-1", "actor-1", "finance", 25, 0)
+	items, err := svc.ListInboxItems(authzCtx("tenant-1", "actor-1"), newTxRunner(db), "tenant-1", "actor-1", "finance", 25, 0)
 	if err != nil {
 		t.Fatalf("ListInboxItems: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestListInboxItems_FiltersByActor(t *testing.T) {
 	mock.ExpectCommit()
 
 	svc := &ReadService{}
-	if _, err := svc.ListInboxItems(context.Background(), newTxRunner(db), "tenant-1", "actor-xyz", "", 0, 0); err != nil {
+	if _, err := svc.ListInboxItems(authzCtx("tenant-1", "actor-xyz"), newTxRunner(db), "tenant-1", "actor-xyz", "", 0, 0); err != nil {
 		t.Fatalf("ListInboxItems: %v", err)
 	}
 
@@ -179,7 +179,7 @@ func TestListInboxItemsWithTotal_SingleQueryCarriesTotal(t *testing.T) {
 	mock.ExpectCommit()
 
 	svc := &ReadService{}
-	items, total, err := svc.ListInboxItemsWithTotal(context.Background(), newTxRunner(db), "tenant-1", "actor-1", "finance", 25, 0)
+	items, total, err := svc.ListInboxItemsWithTotal(authzCtx("tenant-1", "actor-1"), newTxRunner(db), "tenant-1", "actor-1", "finance", 25, 0)
 	if err != nil {
 		t.Fatalf("ListInboxItemsWithTotal: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestListInboxItemsWithTotal_EmptyPageFallsBackToCount(t *testing.T) {
 	mock.ExpectCommit()
 
 	svc := &ReadService{}
-	items, total, err := svc.ListInboxItemsWithTotal(context.Background(), newTxRunner(db), "tenant-1", "actor-1", "finance", 25, 1000)
+	items, total, err := svc.ListInboxItemsWithTotal(authzCtx("tenant-1", "actor-1"), newTxRunner(db), "tenant-1", "actor-1", "finance", 25, 1000)
 	if err != nil {
 		t.Fatalf("ListInboxItemsWithTotal: %v", err)
 	}
@@ -284,7 +284,7 @@ func TestListInboxItemsWithTotal_ClampsLimit(t *testing.T) {
 			mock.ExpectCommit()
 
 			svc := &ReadService{}
-			_, _, err = svc.ListInboxItemsWithTotal(context.Background(), newTxRunner(db), "tenant-1", "actor-1", "", tc.inLimit, tc.inOffset)
+			_, _, err = svc.ListInboxItemsWithTotal(authzCtx("tenant-1", "actor-1"), newTxRunner(db), "tenant-1", "actor-1", "", tc.inLimit, tc.inOffset)
 			if err != nil {
 				t.Fatalf("ListInboxItemsWithTotal: %v", err)
 			}
@@ -312,7 +312,7 @@ func TestCountPendingForActor_ReturnsTotal(t *testing.T) {
 	mock.ExpectCommit()
 
 	svc := &ReadService{}
-	total, err := svc.CountPendingForActor(context.Background(), newTxRunner(db), "tenant-1", "actor-1", "")
+	total, err := svc.CountPendingForActor(authzCtx("tenant-1", "actor-1"), newTxRunner(db), "tenant-1", "actor-1", "")
 	if err != nil {
 		t.Fatalf("CountPendingForActor: %v", err)
 	}
@@ -349,6 +349,7 @@ func TestLoadActiveInstanceByDocument_RequiresDocumentViewBeforeRepoLoad(t *test
 	mock.ExpectRollback()
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	ctx = tenant.WithActorID(ctx, "actor-1")
 	ctx = iamdomain.WithAuthContext(ctx, "actor-1", nil)
 	_, err = svc.LoadActiveInstanceByDocument(ctx, newTxRunner(db), "tenant-1", "doc-1")
 	if err == nil {
@@ -388,6 +389,7 @@ func TestLoadActiveInstanceByDocumentForMutation_DoesNotRequireDocumentView(t *t
 	mock.ExpectCommit()
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	ctx = tenant.WithActorID(ctx, "actor-1")
 	ctx = iamdomain.WithAuthContext(ctx, "actor-1", nil)
 	inst, err := svc.LoadActiveInstanceByDocumentForMutation(ctx, newTxRunner(db), "tenant-1", "doc-1")
 	if err != nil {

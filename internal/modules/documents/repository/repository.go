@@ -358,9 +358,6 @@ func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, actorID, 
 }
 
 func (r *Repository) UpdateDocumentNameTx(ctx context.Context, tx db.Tx, tenantID, actorID, docID, name string) error {
-	if err := authz.SeedTxIdentity(ctx, mustSQLTx(tx), tenantID, actorID); err != nil {
-		return err
-	}
 	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
 	if err != nil {
 		return err
@@ -818,9 +815,6 @@ func (r *Repository) ForceReleaseSession(ctx context.Context, tenantID, adminID,
 // The caller is responsible for authz GUC setup, commit, and rollback.
 func (r *Repository) ForceReleaseSessionTx(ctx context.Context, tx db.Tx, tenantID, adminID, sessionID string) error {
 	ctx = authz.WithCapCache(ctx)
-	if err := authz.SeedTxIdentity(ctx, mustSQLTx(tx), tenantID, adminID); err != nil {
-		return err
-	}
 	docArea, err := loadDocumentAreaBySession(ctx, tx, tenantID, sessionID)
 	if err != nil {
 		return err
@@ -846,9 +840,6 @@ func (r *Repository) ForceReleaseSessionTx(ctx context.Context, tx db.Tx, tenant
 // The caller is responsible for authz GUC setup, commit, and rollback.
 func (r *Repository) MarkArchivedTx(ctx context.Context, tx db.Tx, tenantID, docID, actorID string) error {
 	ctx = authz.WithCapCache(ctx)
-	if err := authz.SeedTxIdentity(ctx, mustSQLTx(tx), tenantID, actorID); err != nil {
-		return err
-	}
 	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
 	if err != nil {
 		return err

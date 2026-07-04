@@ -71,7 +71,7 @@ func TestCreate_AutoCode(t *testing.T) {
 	svc := NewControlledDocumentService(newTxRunner(mockDB), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
 	svc.now = func() time.Time { return time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC) }
 
-	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+	res, err := svc.Create(authzCtx("tenant-a", "actor-1"), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "po",
 		ProcessAreaCode: "quality",
@@ -180,7 +180,7 @@ func TestCreate_UsesControlledDocumentConstructorValidation(t *testing.T) {
 	mock.ExpectRollback()
 
 	svc := NewControlledDocumentService(newTxRunner(mockDB), newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
-	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
+	_, err = svc.Create(authzCtx("tenant-a", "actor-1"), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "po",
 		ProcessAreaCode: "quality",
@@ -231,7 +231,7 @@ func TestCreate_OverrideTemplate_GovernanceEvent(t *testing.T) {
 	}}
 	svc := NewControlledDocumentService(newTxRunner(mockDB), repo, &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
 
-	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
+	_, err = svc.Create(authzCtx("tenant-a", "actor-1"), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
 		ProfileCode:               "po",
 		ProcessAreaCode:           "quality",
@@ -560,7 +560,7 @@ func TestControlledDocumentService_Create_AtomicWithDocument(t *testing.T) {
 
 	svc := NewControlledDocumentService(newTxRunner(db), repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
 
-	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+	res, err := svc.Create(authzCtx("tenant-a", "actor-1"), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "dc",
 		ProcessAreaCode: "rh",
@@ -603,7 +603,7 @@ func TestControlledDocumentService_Create_InitializerError_RollsBack(t *testing.
 	docInit := &fakeDocumentInitializer{err: errors.New("clone failed"), exists: true}
 	svc := NewControlledDocumentService(newTxRunner(db), repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
-	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
+	_, err = svc.Create(authzCtx("tenant-a", "actor-1"), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "dc",
 		ProcessAreaCode: "rh",
@@ -998,7 +998,7 @@ func TestCreateRevision_SetsAuthzContextBeforeClone(t *testing.T) {
 	}
 	svc := NewControlledDocumentService(newTxRunner(db), repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
-	ctx := iamdomain.WithAuthContext(context.Background(), "actor-1", []iamdomain.Role{"system_admin"})
+	ctx := iamdomain.WithAuthContext(authzCtx("tenant-a", "actor-1"), "actor-1", []iamdomain.Role{"system_admin"})
 	ref, err := svc.CreateRevision(ctx, CreateRevisionCmd{
 		TenantID:          "tenant-a",
 		CDID:              "cd-1",
@@ -1046,7 +1046,7 @@ func TestCreateRevision_MapsActiveSiblingUniqueViolationToDomainConflict(t *test
 	}
 	svc := NewControlledDocumentService(newTxRunner(db), repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
-	ctx := iamdomain.WithAuthContext(context.Background(), "actor-1", []iamdomain.Role{"system_admin"})
+	ctx := iamdomain.WithAuthContext(authzCtx("tenant-a", "actor-1"), "actor-1", []iamdomain.Role{"system_admin"})
 	_, err = svc.CreateRevision(ctx, CreateRevisionCmd{
 		TenantID: "tenant-a",
 		CDID:     "cd-1",

@@ -133,7 +133,7 @@ func TestCreateTemplate_WithDBSetsAuthzContext(t *testing.T) {
 	expectTemplateCreateAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")
 	mock.ExpectCommit()
 
-	_, err = svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
+	_, err = svc.CreateTemplate(authzCtx("11111111-1111-1111-1111-111111111111", "user-a"), application.CreateTemplateCmd{
 		TenantID:     "11111111-1111-1111-1111-111111111111",
 		ActorUserID:  "user-a",
 		DocTypeCode:  "CONTRACT",
@@ -271,7 +271,7 @@ func TestCreateNextVersion_WithDB_UsesTransaction(t *testing.T) {
 	expectTemplateAuthz(mock, "user-b", "tenant-a", "template.edit")
 	mock.ExpectCommit()
 
-	if _, err := svc.CreateNextVersion(context.Background(), application.CreateVersionCmd{
+	if _, err := svc.CreateNextVersion(authzCtx("tenant-a", "user-b"), application.CreateVersionCmd{
 		TenantID:    "tenant-a",
 		ActorUserID: "user-b",
 		TemplateID:  template.ID,

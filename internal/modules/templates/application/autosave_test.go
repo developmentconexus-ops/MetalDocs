@@ -186,7 +186,7 @@ func TestCommitAutosave_WithDBSetsTemplateEditAuthz(t *testing.T) {
 	expectTemplateEditAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")
 	mock.ExpectCommit()
 
-	_, err = svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
+	_, err = svc.CommitAutosave(authzCtx("11111111-1111-1111-1111-111111111111", "user-a"), application.CommitAutosaveCmd{
 		TenantID:            "11111111-1111-1111-1111-111111111111",
 		ActorUserID:         "user-a",
 		TemplateID:          "tpl-1",
@@ -327,7 +327,7 @@ func TestCommitAutosave_WithDB_LoserCommitEnvelopeRollsBack(t *testing.T) {
 	expectTemplateEditAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")
 	mock.ExpectRollback()
 
-	_, err = svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
+	_, err = svc.CommitAutosave(authzCtx("11111111-1111-1111-1111-111111111111", "user-a"), application.CommitAutosaveCmd{
 		TenantID:            "11111111-1111-1111-1111-111111111111",
 		ActorUserID:         "user-a",
 		TemplateID:          "tpl-1",
