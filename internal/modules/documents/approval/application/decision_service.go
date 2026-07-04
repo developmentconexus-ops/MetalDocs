@@ -399,7 +399,12 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 				}); err != nil {
 					return fmt.Errorf("recordSignoff: pin: %w", err)
 				}
-				// Transition document under_review → approved.
+				// Transition document under_review → approved. Friendly first-line
+				// legality check (M4/F4.1) mirrors the DB trigger; the OCC WHERE
+				// below remains the atomic CAS + optimistic-lock enforcement.
+				if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusApproved); err != nil {
+					return err
+				}
 				res, err := tx.ExecContext(ctx, `
 					UPDATE documents
 					   SET status           = 'approved',
@@ -455,7 +460,14 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 				return err
 			}
 
-			// Transition document under_review -> draft so the author can edit and resubmit.
+			// Transition document under_review -> draft so the author can edit and
+			// resubmit. Friendly first-line legality check (M4/F4.1) mirrors the DB
+			// trigger; the OCC WHERE below remains the atomic CAS + optimistic-lock
+			// enforcement (the DB trigger additionally gates this specific arc on the
+			// metaldocs.cancel_in_progress GUC set above).
+			if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusDraft); err != nil {
+				return err
+			}
 			res, err := tx.ExecContext(ctx, `
         UPDATE documents
            SET status           = 'draft',

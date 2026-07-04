@@ -15,6 +15,7 @@ import (
 	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -175,7 +176,12 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return fmt.Errorf("submit: %w", err)
 		}
 
-		// Step 8b: transition document draft → under_review.
+		// Step 8b: transition document draft → under_review. Friendly first-line
+		// legality check (M4/F4.1) mirrors the DB trigger; the OCC WHERE below
+		// remains the atomic CAS + optimistic-lock enforcement.
+		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusDraft, docsdomain.DocStatusUnderReview); err != nil {
+			return err
+		}
 		res, err := tx.ExecContext(ctx, `
 			UPDATE documents
 			   SET status           = 'under_review',

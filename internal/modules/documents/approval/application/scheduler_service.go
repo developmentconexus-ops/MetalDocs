@@ -203,7 +203,11 @@ func (s *SchedulerService) loadScheduledDocumentState(ctx context.Context, tx *s
 }
 
 func scheduledJobMatchesState(state scheduledDocumentState, input ScheduledPublishJobInput) bool {
-	if state.Status != string(docsdomain.DocStatusScheduled) {
+	// Friendly first-line legality check (M4/F4.1) mirrors the DB trigger; the
+	// OCC UPDATE in publishScheduledDocumentTx remains the atomic CAS +
+	// optimistic-lock enforcement. state.Status is loaded fresh under FOR
+	// UPDATE, so this is the authoritative current status for this job run.
+	if docsdomain.CanTransitionDocumentStatus(docsdomain.DocumentStatus(state.Status), docsdomain.DocStatusPublished) != nil {
 		return false
 	}
 	if !state.EffectiveFrom.Valid {

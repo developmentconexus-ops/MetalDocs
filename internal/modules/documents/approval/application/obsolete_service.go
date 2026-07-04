@@ -78,7 +78,10 @@ func (s *ObsoleteService) MarkObsolete(ctx context.Context, runner db.TxRunner, 
 		}
 
 		// Step 3: guard — only published or superseded may transition to obsolete.
-		if priorStatus != string(docsdomain.DocStatusPublished) && priorStatus != string(docsdomain.DocStatusSuperseded) {
+		// Friendly first-line legality check (M4/F4.1) mirrors the DB trigger and
+		// replaces the prior ad-hoc "!= X && != Y" lifecycle guard; the OCC WHERE
+		// below remains the atomic CAS + optimistic-lock enforcement.
+		if docsdomain.CanTransitionDocumentStatus(docsdomain.DocumentStatus(priorStatus), docsdomain.DocStatusObsolete) != nil {
 			return ErrInvalidObsoleteSource
 		}
 

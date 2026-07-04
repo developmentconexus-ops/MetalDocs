@@ -9,6 +9,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -145,7 +146,13 @@ func (s *CancelService) cancelInstance(ctx context.Context, runner db.TxRunner, 
 			return fmt.Errorf("cancel: cancel stages: %w", err)
 		}
 
-		// Revert document to draft (trigger enforces under_review→draft only with GUC set).
+		// Revert document to draft (trigger enforces under_review→draft only with
+		// GUC set — set above). Friendly first-line legality check (M4/F4.1)
+		// mirrors the DB trigger; the OCC WHERE below remains the atomic CAS +
+		// optimistic-lock enforcement.
+		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusDraft); err != nil {
+			return err
+		}
 		res, err := tx.ExecContext(ctx, `
 			UPDATE documents
 			   SET status           = 'draft',

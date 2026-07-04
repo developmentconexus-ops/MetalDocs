@@ -91,8 +91,12 @@ func (s *PublishService) PublishApproved(ctx context.Context, runner db.TxRunner
 			return err
 		}
 
-		// Step 3: transition the document from "approved" to "published".
-		// Status check is the concurrency guard — atomic UPDATE catches any racing transition.
+		// Step 3: transition the document from "approved" to "published". Friendly
+		// first-line legality check (M4/F4.1) mirrors the DB trigger; the OCC
+		// WHERE below remains the atomic CAS + optimistic-lock enforcement.
+		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusApproved, docsdomain.DocStatusPublished); err != nil {
+			return err
+		}
 		res, err := tx.ExecContext(ctx, `
 			UPDATE documents
 			   SET status           = 'published',
@@ -266,6 +270,11 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 		}
 
 		// Step 4: OCC transition the document from "approved" to "scheduled".
+		// Friendly first-line legality check (M4/F4.1) mirrors the DB trigger; the
+		// OCC WHERE below remains the atomic CAS + optimistic-lock enforcement.
+		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusApproved, docsdomain.DocStatusScheduled); err != nil {
+			return err
+		}
 		var scheduleGeneration int64
 		err = tx.QueryRowContext(ctx, `
 			UPDATE documents

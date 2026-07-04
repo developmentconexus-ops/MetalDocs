@@ -72,7 +72,12 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, runner db.TxR
 			return err
 		}
 
-		// Step 2: OCC UPDATE for new document (approved → published).
+		// Step 2: OCC UPDATE for new document (approved → published). Friendly
+		// first-line legality check (M4/F4.1) mirrors the DB trigger; the OCC
+		// WHERE below remains the atomic CAS + optimistic-lock enforcement.
+		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusApproved, docsdomain.DocStatusPublished); err != nil {
+			return err
+		}
 		priorRevisionVersion := req.PriorRevisionVersion
 		if s.repo != nil {
 			priorRevisionVersion, err = s.repo.GetDocumentRevisionVersion(ctx, tx, req.PriorDocumentID, req.TenantID)
@@ -102,7 +107,12 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, runner db.TxR
 			return repository.ErrStaleRevision
 		}
 
-		// Step 3: OCC UPDATE for prior document (published → superseded).
+		// Step 3: OCC UPDATE for prior document (published → superseded). Friendly
+		// first-line legality check (M4/F4.1) mirrors the DB trigger; the OCC
+		// WHERE below remains the atomic CAS + optimistic-lock enforcement.
+		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusPublished, docsdomain.DocStatusSuperseded); err != nil {
+			return err
+		}
 		priorResult, err := tx.ExecContext(ctx, `
 			UPDATE documents
 			   SET status           = 'superseded',
