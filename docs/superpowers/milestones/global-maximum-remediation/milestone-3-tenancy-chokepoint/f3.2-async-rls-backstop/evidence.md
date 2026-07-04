@@ -2,7 +2,7 @@
 
 > Contract: `../validation-contract.md` §2 + §4. Executed via subagent (TDD); main session reviewed the
 > aggregate diff, ran an independent carrier-less-write audit, fixed one real gap the lint could not see,
-> and commits. Real-DB proof labeled; run deferred (no DB env), drive authored + compiling.
+> and commits. Real-DB proof authored; RUN GREEN for real in F3.5 (retargeted to `metaldocs.notifications`).
 
 ## What shipped
 
@@ -53,19 +53,26 @@ forbid outside the §2.4 allowlist, and which the lint **cannot** see (write goe
 not a literal `Exec`). **Fix:** added `authz.SeedTxTenant(ctx, tx, inst.TenantID)` after `BypassSystem` in
 `emitStuckAlert`. The audit confirmed this was the only such gap.
 
-## Negative RLS proof (T5) — authored, run deferred
+## Negative RLS proof (T5) — authored; retargeted + RUN GREEN for real in F3.5
+
+> **Update 2026-07-03 (F3.5):** the operator required a REAL run (no defer). First real run was RED — the
+> proof targeted `documents`, whose M2 capability write-tripwire (`P0001`) fires before the RLS tenant
+> policy and masked it. Fix-feature **F3.5** retargeted the proof to `metaldocs.notifications` (a FORCE-RLS
+> `tenant_isolation` table, a real F3.2 async seed site, NOT tripwired), then ran it **GREEN** against live
+> Postgres — all subtests pass, leak-before reproduced (1 row), no assertion weakened. See
+> `../f3.5-rls-proof-real-green/evidence.md`. The bounded run-defer below is **CLOSED**.
 
 `internal/modules/iam/authz/seed_tx_tenant_rls_integration_test.go` (`//go:build integration`, testdb
 factory). Creates a **NOBYPASSRLS** role (the dev/test connection role is a BYPASSRLS superuser for which
-RLS never applies), two tenants A/B each with a `documents` row, then:
+RLS never applies), two tenants A/B each with a `metaldocs.notifications` row (F3.5; was `documents`), then:
 - **leak_before_no_seed:** unseeded tx → B's row visible + a cross-tenant UPDATE affects 1 row (the
   pre-fix "async has zero backstop" evidence).
 - **blocked_after_seed_tenant_a:** `SeedTxTenant(A)` → B invisible (SELECT), UPDATE/DELETE of B = 0 rows,
   A's own row still visible (scoped, not a blanket lockout); a re-tenant UPDATE producing a B-row → error
   **SQLSTATE 42501**.
-Labeled **real-DB (testdb), not sqlmock**. Compiles + `go vet -tags integration` clean.
-**Run deferred** (bounded): no `DATABASE_URL`/`METALDOCS_DATABASE_URL` in this shell and constructing one
-requires reading `.env` secrets (forbidden). The test **SKIPs cleanly** today (confirmed live).
+Labeled **real-DB (testdb), not sqlmock**. Compiles + `go vet -tags integration` clean. **RUN GREEN for
+real** in F3.5 (`ok metaldocs/internal/modules/iam/authz`, all subtests PASS) via a `.env`-loading
+PowerShell wrapper that redacts the DB password from all output (no `.env` secret exposed).
 
 ## Gates (captured)
 
@@ -75,7 +82,7 @@ requires reading `.env` secrets (forbidden). The test **SKIPs cleanly** today (c
 | `go test` iam/authz, platform/worker, approval/*, notifications/infrastructure, render/fanout, jobs/stuck_instance_watchdog, scripts/api-lint | ok |
 | `go run ./scripts/api-lint -strict …` (live) | **0 violations** |
 | PG-3 negative | stray unseeded `documents` UPDATE in a worker root → `ASYNC-TENANT-SEED` **RED** (names `zz_pg3_throwaway.go:12`, op UPDATE, table documents); removed → **GREEN** 0 |
-| PG-4 negative RLS proof | authored + compiling; **run deferred** (no DB env) |
+| PG-4 negative RLS proof | authored + compiling; **RUN GREEN for real** (F3.5, on `metaldocs.notifications`) — all subtests PASS, leak-before=1 row, blocked-after=0/0, retenant=42501 |
 
 ## Behavior-change risks reviewed
 - **pdf** + **notifications-fanout** moved from untransacted writes to tx-wrapped writes (required by
@@ -86,14 +93,15 @@ requires reading `.env` secrets (forbidden). The test **SKIPs cleanly** today (c
   callers + the `fakeOutboxRepo` test double updated; no other callers.
 
 ## Bounded defers
-- PG-4 live run — trigger: run `go test -tags integration -run 'RLS|Tenant|Isolation' ./internal/modules/iam/authz/...`
-  once a `DATABASE_URL` is available without reading `.env`. (Also the program-wide integration-run defer.)
+- ~~PG-4 live run~~ — **CLOSED in F3.5**: run GREEN for real against live Postgres (proof retargeted to
+  `metaldocs.notifications`; the `documents` capability write-tripwire had masked RLS). See
+  `../f3.5-rls-proof-real-green/evidence.md`.
 - Cross-file claim→process call-graph coverage — both async/sync lints are handler-local (contract §6);
   covered meanwhile by the allowlist + the negative proof + the main-session BypassSystem audit.
 
 ## Contract conformance (§2.6 exit criteria)
 `SeedTxTenant` tenant-only ✓ · 5 processing txs seeded (pdf + fanout wrapped) ✓ · no tenant-mixing (no
 HS-2) ✓ · `ASYNC-TENANT-SEED` registered/blocking, GREEN clean / RED synthetic ✓ · sanctioned allowlist
-enumerated ✓ · negative RLS proof authored (leak→blocked, 42501), run deferred ✓ · scheduled-publish +
+enumerated ✓ · negative RLS proof (leak→blocked, 42501) RUN GREEN for real (F3.5, notifications) ✓ · scheduled-publish +
 fanout still function (targeted drives green) ✓ · `go build` green ✓ · H-PRE-1 preserved ✓ · **plus** the
 `emitStuckAlert` gap closed so no tenant-scoped async write runs unseeded outside §2.4 (§4 posture met).

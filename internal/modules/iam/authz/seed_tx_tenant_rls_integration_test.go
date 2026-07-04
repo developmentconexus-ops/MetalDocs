@@ -17,8 +17,18 @@ import (
 // test class that can pin the async RLS backstop end-to-end (application
 // tests are sqlmock and cannot exercise a real Postgres RLS policy).
 //
+// Table: metaldocs.notifications (NOT public.documents). documents carries the
+// M2 capability write-tripwire (trg_require_cap_asserted -> P0001 when
+// metaldocs.asserted_caps is unset), which fires BEFORE the RLS tenant_isolation
+// policy is the deciding control — so a documents-based proof conflates two
+// controls and the leak-before / retenant assertions observe P0001 instead of
+// the RLS outcome (see F3.5). metaldocs.notifications is a FORCE-RLS
+// tenant_isolation table (0001_current_schema.sql:1437,1453,4632) that carries
+// no capability tripwire and is a real F3.2 async seed site (notifications
+// fanout worker), so RLS is the sole deciding control end-to-end.
+//
 // Shape (binding, contract §2.5):
-//   - Setup: two tenants A and B, each with a public.documents row.
+//   - Setup: two tenants A and B, each with a metaldocs.notifications row.
 //   - NEGATIVE-before / leak demonstration: in a tx with NO tenant GUC seeded
 //     (today's pre-F3.2 worker behavior), a cross-tenant SELECT/UPDATE against
 //     tenant B's row succeeds/sees the row.
@@ -41,8 +51,8 @@ func TestSeedTxTenant_RLSBackstop_LeakBeforeBlockedAfter(t *testing.T) {
 	tntA := testdb.NewTenant(t, db)
 	tntB := testdb.NewTenant(t, db)
 
-	docA := testdb.NewDocument(t, db, testdb.WithTenant(tntA.ID))
-	docB := testdb.NewDocument(t, db, testdb.WithTenant(tntB.ID))
+	notifA := testdb.NewNotification(t, db, testdb.WithTenant(tntA.ID))
+	notifB := testdb.NewNotification(t, db, testdb.WithTenant(tntB.ID))
 
 	// A NOBYPASSRLS role is required to faithfully exercise FORCE RLS — the
 	// pooled dev/test connection role is a BYPASSRLS superuser.
@@ -57,7 +67,10 @@ func TestSeedTxTenant_RLSBackstop_LeakBeforeBlockedAfter(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `GRANT USAGE ON SCHEMA public TO `+rlsRole); err != nil {
 		t.Fatalf("grant schema usage: %v", err)
 	}
-	if _, err := db.ExecContext(ctx, `GRANT SELECT, UPDATE, INSERT, DELETE ON public.documents TO `+rlsRole); err != nil {
+	if _, err := db.ExecContext(ctx, `GRANT USAGE ON SCHEMA metaldocs TO `+rlsRole); err != nil {
+		t.Fatalf("grant schema usage: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `GRANT SELECT, UPDATE, INSERT, DELETE ON metaldocs.notifications TO `+rlsRole); err != nil {
 		t.Fatalf("grant dml: %v", err)
 	}
 
@@ -85,8 +98,8 @@ func TestSeedTxTenant_RLSBackstop_LeakBeforeBlockedAfter(t *testing.T) {
 		// an unset metaldocs.tenant_id GUC lets a cross-tenant row through.
 		var visibleB bool
 		if err := tx.QueryRowContext(ctx,
-			`SELECT EXISTS (SELECT 1 FROM public.documents WHERE id = $1::uuid)`,
-			docB.ID,
+			`SELECT EXISTS (SELECT 1 FROM metaldocs.notifications WHERE id = $1::uuid)`,
+			notifB.ID,
 		).Scan(&visibleB); err != nil {
 			t.Fatalf("query tenant B visibility (unseeded): %v", err)
 		}
@@ -95,8 +108,8 @@ func TestSeedTxTenant_RLSBackstop_LeakBeforeBlockedAfter(t *testing.T) {
 		}
 
 		res, err := tx.ExecContext(ctx,
-			`UPDATE public.documents SET name = 'leaked-touch' WHERE id = $1::uuid`,
-			docB.ID,
+			`UPDATE metaldocs.notifications SET status = 'SENT' WHERE id = $1::uuid`,
+			notifB.ID,
 		)
 		if err != nil {
 			t.Fatalf("cross-tenant update (unseeded) should succeed pre-fix, got error: %v", err)
@@ -138,19 +151,19 @@ func TestSeedTxTenant_RLSBackstop_LeakBeforeBlockedAfter(t *testing.T) {
 			// predicate — isolation comes entirely from the RLS policy.
 			var visibleB bool
 			if err := tx.QueryRowContext(ctx,
-				`SELECT EXISTS (SELECT 1 FROM public.documents WHERE id = $1::uuid)`,
-				docB.ID,
+				`SELECT EXISTS (SELECT 1 FROM metaldocs.notifications WHERE id = $1::uuid)`,
+				notifB.ID,
 			).Scan(&visibleB); err != nil {
 				t.Fatalf("query tenant B visibility (seeded A): %v", err)
 			}
 			if visibleB {
-				t.Fatal("RLS breach: tenant B's document is visible via SELECT while metaldocs.tenant_id = A")
+				t.Fatal("RLS breach: tenant B's notification is visible via SELECT while metaldocs.tenant_id = A")
 			}
 
 			// UPDATE of B's row -> 0 rows affected (row invisible to the tx).
 			res, err := tx.ExecContext(ctx,
-				`UPDATE public.documents SET name = 'should-not-apply' WHERE id = $1::uuid`,
-				docB.ID,
+				`UPDATE metaldocs.notifications SET status = 'READ' WHERE id = $1::uuid`,
+				notifB.ID,
 			)
 			if err != nil {
 				t.Fatalf("cross-tenant update (seeded A) errored instead of affecting 0 rows: %v", err)
@@ -164,7 +177,7 @@ func TestSeedTxTenant_RLSBackstop_LeakBeforeBlockedAfter(t *testing.T) {
 			}
 
 			// DELETE of B's row -> 0 rows affected.
-			res, err = tx.ExecContext(ctx, `DELETE FROM public.documents WHERE id = $1::uuid`, docB.ID)
+			res, err = tx.ExecContext(ctx, `DELETE FROM metaldocs.notifications WHERE id = $1::uuid`, notifB.ID)
 			if err != nil {
 				t.Fatalf("cross-tenant delete (seeded A) errored instead of affecting 0 rows: %v", err)
 			}
@@ -180,13 +193,13 @@ func TestSeedTxTenant_RLSBackstop_LeakBeforeBlockedAfter(t *testing.T) {
 			// block above is tenant-scoped, not a blanket RLS lockout.
 			var visibleA bool
 			if err := tx.QueryRowContext(ctx,
-				`SELECT EXISTS (SELECT 1 FROM public.documents WHERE id = $1::uuid)`,
-				docA.ID,
+				`SELECT EXISTS (SELECT 1 FROM metaldocs.notifications WHERE id = $1::uuid)`,
+				notifA.ID,
 			).Scan(&visibleA); err != nil {
 				t.Fatalf("query tenant A visibility (seeded A): %v", err)
 			}
 			if !visibleA {
-				t.Fatal("tenant A's own document must remain visible under metaldocs.tenant_id = A")
+				t.Fatal("tenant A's own notification must remain visible under metaldocs.tenant_id = A")
 			}
 		})
 
@@ -201,13 +214,13 @@ func TestSeedTxTenant_RLSBackstop_LeakBeforeBlockedAfter(t *testing.T) {
 				t.Fatalf("SeedTxTenant: %v", err)
 			}
 
-			// An UPDATE that would retarget tenant A's own document row to
+			// An UPDATE that would retarget tenant A's own notification row to
 			// tenant B violates the WITH CHECK half of tenant_isolation (the
 			// USING clause doubles as WITH CHECK per the policy shape) ->
 			// 42501, not a silent 0-row no-op.
 			_, err = tx.ExecContext(ctx,
-				`UPDATE public.documents SET tenant_id = $2::uuid WHERE id = $1::uuid`,
-				docA.ID, tntB.ID,
+				`UPDATE metaldocs.notifications SET tenant_id = $2::uuid WHERE id = $1::uuid`,
+				notifA.ID, tntB.ID,
 			)
 			if err == nil {
 				t.Fatal("RLS breach: UPDATE re-tenanting tenant A's row to tenant B must be rejected by the WITH CHECK policy while metaldocs.tenant_id = A")
