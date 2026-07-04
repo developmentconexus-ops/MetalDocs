@@ -9,7 +9,6 @@ import (
 	"github.com/riverqueue/river"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
-	"metaldocs/internal/modules/jobs/scheduler"
 )
 
 const JobName = "audit_integrity_validator"
@@ -41,15 +40,7 @@ func (w *AuditIntegrityValidatorWorker) Work(ctx context.Context, job *river.Job
 	return run(ctx, w.validator)
 }
 
-func New(validator auditdomain.IntegrityValidator) scheduler.JobFunc {
-	return func(ctx context.Context, epoch int64) error {
-		return run(ctx, validator)
-	}
-}
-
-// run executes one audit-integrity-validation tick. Extracted so both the
-// legacy lease-scheduler New closure and the River Worker delegate to the
-// same behavior.
+// run executes one audit-integrity-validation tick.
 func run(ctx context.Context, validator auditdomain.IntegrityValidator) error {
 	issues, err := validator.ValidateIntegrity(ctx)
 	if err != nil {

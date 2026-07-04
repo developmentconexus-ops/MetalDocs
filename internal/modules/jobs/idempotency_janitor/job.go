@@ -6,8 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/riverqueue/river"
-
-	"metaldocs/internal/modules/jobs/scheduler"
 )
 
 const (
@@ -44,7 +42,7 @@ func (w *IdempotencyJanitorWorker) Work(ctx context.Context, job *river.Job[Idem
 	return run(ctx, w.db)
 }
 
-// New returns a janitor job that sweeps the idempotency_keys table.
+// run executes one idempotency-sweep tick.
 //
 // Two passes per tick:
 //  1. Delete any row past expires_at regardless of status. Pre-fix the sweep
@@ -53,15 +51,6 @@ func (w *IdempotencyJanitorWorker) Work(ctx context.Context, job *river.Job[Idem
 //  2. Warn on `in_flight` rows past expires_at + OrphanGraceMinutes. These
 //     are crashed-handler orphans; surfacing them lets ops correlate with
 //     panic logs.
-func New(db *sql.DB) scheduler.JobFunc {
-	return func(ctx context.Context, epoch int64) error {
-		return run(ctx, db)
-	}
-}
-
-// run executes one idempotency-sweep tick. Extracted so both the legacy
-// lease-scheduler New closure and the River Worker delegate to the same
-// behavior.
 func run(ctx context.Context, db *sql.DB) error {
 	totalDeleted := 0
 	for i := 0; i < MaxIterations; i++ {

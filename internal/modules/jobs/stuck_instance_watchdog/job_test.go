@@ -13,7 +13,8 @@ import (
 	"testing"
 
 	"metaldocs/internal/modules/documents/approval/application"
-	"metaldocs/internal/platform/db"
+	"metaldocs/internal/modules/iam/authz"
+	platformdb "metaldocs/internal/platform/db"
 )
 
 type mockCancelService struct {
@@ -22,7 +23,7 @@ type mockCancelService struct {
 	results []error
 }
 
-func (m *mockCancelService) CancelInstance(_ context.Context, _ db.TxRunner, in application.CancelInput) (application.CancelResult, error) {
+func (m *mockCancelService) CancelInstance(_ context.Context, _ platformdb.TxRunner, in application.CancelInput) (application.CancelResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls = append(m.calls, in)
@@ -36,7 +37,7 @@ func (m *mockCancelService) CancelInstance(_ context.Context, _ db.TxRunner, in 
 	return application.CancelResult{DocumentID: "doc"}, nil
 }
 
-func (m *mockCancelService) SystemCancelInstance(_ context.Context, _ db.TxRunner, in application.CancelInput) (application.CancelResult, error) {
+func (m *mockCancelService) SystemCancelInstance(_ context.Context, _ platformdb.TxRunner, in application.CancelInput) (application.CancelResult, error) {
 	return m.CancelInstance(context.Background(), nil, in)
 }
 
@@ -51,7 +52,7 @@ type recordingEmitter struct {
 	events []application.GovernanceEvent
 }
 
-func (r *recordingEmitter) Emit(_ context.Context, _ db.Tx, e application.GovernanceEvent) error {
+func (r *recordingEmitter) Emit(_ context.Context, _ platformdb.Tx, e application.GovernanceEvent) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.events = append(r.events, e)
@@ -127,12 +128,6 @@ func (s *watchdogStmt) Exec(_ []driver.Value) (driver.Result, error) {
 
 func (s *watchdogStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
-	if strings.Contains(q, "pg_try_advisory_lock") {
-		return &watchdogRows{
-			cols: []string{"pg_try_advisory_lock"},
-			rows: [][]driver.Value{{true}},
-		}, nil
-	}
 	if strings.Contains(q, "from approval_instances") {
 		s.state.mu.Lock()
 		rows := append([]StuckInstance(nil), s.state.stuckRows...)
@@ -198,8 +193,8 @@ func TestWatchdog_NoStuck(t *testing.T) {
 	cancelSvc := &mockCancelService{}
 	emitter := &recordingEmitter{}
 
-	fn := New(db, cancelSvc, emitter)
-	if err := fn(context.Background(), 1); err != nil {
+	runner := platformdb.NewTxRunner(db)
+	if err := run(authz.WithBackgroundBypass(context.Background()), db, runner, cancelSvc, emitter); err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
 
@@ -240,8 +235,8 @@ func TestWatchdog_AutoCancel(t *testing.T) {
 	cancelSvc := &mockCancelService{}
 	emitter := &recordingEmitter{}
 
-	fn := New(db, cancelSvc, emitter)
-	if err := fn(context.Background(), 2); err != nil {
+	runner := platformdb.NewTxRunner(db)
+	if err := run(authz.WithBackgroundBypass(context.Background()), db, runner, cancelSvc, emitter); err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
 
@@ -277,8 +272,8 @@ func TestWatchdog_AlertOnly(t *testing.T) {
 	cancelSvc := &mockCancelService{}
 	emitter := &recordingEmitter{}
 
-	fn := New(db, cancelSvc, emitter)
-	if err := fn(context.Background(), 3); err != nil {
+	runner := platformdb.NewTxRunner(db)
+	if err := run(authz.WithBackgroundBypass(context.Background()), db, runner, cancelSvc, emitter); err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
 
@@ -315,8 +310,8 @@ func TestWatchdog_CancelError(t *testing.T) {
 	}
 	emitter := &recordingEmitter{}
 
-	fn := New(db, cancelSvc, emitter)
-	if err := fn(context.Background(), 4); err == nil {
+	runner := platformdb.NewTxRunner(db)
+	if err := run(authz.WithBackgroundBypass(context.Background()), db, runner, cancelSvc, emitter); err == nil {
 		t.Fatal("expected job to return error when cancel path fails")
 	}
 

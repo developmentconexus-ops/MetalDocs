@@ -12,7 +12,6 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/iam/authz"
-	"metaldocs/internal/modules/jobs/scheduler"
 	"metaldocs/internal/platform/db"
 )
 
@@ -81,21 +80,9 @@ func (w *StuckInstanceWatchdogWorker) Work(ctx context.Context, job *river.Job[S
 	return run(ctx, w.database, w.runner, w.cancelSvc, w.emitter)
 }
 
-func New(database *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) scheduler.JobFunc {
-	runner := db.NewTxRunner(database)
-	return func(ctx context.Context, epoch int64) error {
-		// Background root: permit SystemCancelInstance's authz.BypassSystem
-		// (fail-closed off any HTTP path — ADR 0022 Phase 7, CWE-269).
-		ctx = authz.WithBackgroundBypass(ctx)
-		return run(ctx, database, runner, cancelSvc, emitter)
-	}
-}
-
-// run executes one watchdog tick. Extracted so both the legacy lease-scheduler
-// New closure and the River Worker delegate to the same behavior. The
-// lease-scheduler-era advisory lock is not part of this body — cluster-wide
-// single-runner is provided by the caller's own mutual-exclusion mechanism
-// (lease scheduler, or River leader-election + queue dequeue).
+// run executes one watchdog tick. Cluster-wide single-runner is provided by
+// River leader-election + queue dequeue semantics; the lease-scheduler-era
+// advisory lock is not part of this body (ADR 0067 §H-PRE-1).
 func run(ctx context.Context, database *sql.DB, runner db.TxRunner, cancelSvc cancelSvcInterface, emitter governanceEmitter) error {
 	stuck, err := listStuckInstances(ctx, database)
 	if err != nil {

@@ -112,8 +112,7 @@ func TestJanitor_NoExpired(t *testing.T) {
 	state := &janitorDBState{rowsAffected: []int64{0}}
 	db := newJanitorDB(t, state)
 
-	fn := New(db)
-	if err := fn(context.Background(), 1); err != nil {
+	if err := run(context.Background(), db); err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
 
@@ -128,8 +127,7 @@ func TestJanitor_SomeExpired(t *testing.T) {
 	state := &janitorDBState{rowsAffected: []int64{100, 0}}
 	db := newJanitorDB(t, state)
 
-	fn := New(db)
-	if err := fn(context.Background(), 2); err != nil {
+	if err := run(context.Background(), db); err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
 
@@ -145,8 +143,7 @@ func TestJanitor_ExecError(t *testing.T) {
 	state := &janitorDBState{execErr: expectedErr}
 	db := newJanitorDB(t, state)
 
-	fn := New(db)
-	err := fn(context.Background(), 3)
+	err := run(context.Background(), db)
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("err = %v, want %v", err, expectedErr)
 	}

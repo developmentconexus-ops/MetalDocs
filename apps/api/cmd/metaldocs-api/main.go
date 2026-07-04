@@ -26,11 +26,7 @@ import (
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/documents/jobs"
 	docrepo "metaldocs/internal/modules/documents/repository"
-	"metaldocs/internal/modules/jobs/audit_integrity_validator"
-	"metaldocs/internal/modules/jobs/idempotency_janitor"
 	"metaldocs/internal/modules/jobs/maintenance"
-	jobscheduler "metaldocs/internal/modules/jobs/scheduler"
-	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
 	templatesapp "metaldocs/internal/modules/templates/application"
 	templateshttp "metaldocs/internal/modules/templates/delivery/http"
 	templatejobs "metaldocs/internal/modules/templates/jobs"
@@ -604,25 +600,9 @@ func main() {
 		})
 	})
 
-	leaderID := schedulerLeaderID()
-	s, err := jobscheduler.New(deps.SQLDB, leaderID, slog.Default())
-	if err != nil {
-		slog.Error("jobs scheduler configuration failed", "err", err)
-		deps.Cleanup()
-		os.Exit(1)
-	}
-	registerScheduledJobs(s, deps, approvalServices.Cancel, approvalEmitter)
-	httpObs.SetSchedulerMetrics(s)
 	if deps.SQLDB != nil {
 		httpObs.SetDBPool(postgres.NewPoolStatsAdapter(deps.SQLDB))
 	}
-
-	var schedulerWG sync.WaitGroup
-	schedulerWG.Add(1)
-	go func() {
-		defer schedulerWG.Done()
-		s.Start(ctx)
-	}()
 
 	stopSessions := jobs.StartSessionSweeper(ctx, docMod.Repo(), 60*time.Second)
 	stopOrphans := jobs.StartOrphanPendingSweeper(ctx, docMod.Repo(), time.Hour, 24*time.Hour)
@@ -718,7 +698,7 @@ func main() {
 		serverErr <- server.ListenAndServe()
 	}()
 
-	exitCode := shutdownServer(ctx, stop, server, serverErr, &schedulerWG, &workerWG)
+	exitCode := shutdownServer(ctx, stop, server, serverErr, &workerWG)
 	if exitCode != 0 {
 		// os.Exit skips deferred functions, including deps.Cleanup. Invoke
 		// cleanup explicitly so DB / object-store handles are released on
@@ -731,15 +711,15 @@ func main() {
 
 // shutdownServer waits for either a server-listen error or ctx cancellation,
 // then runs the same graceful-teardown sequence on both paths: server.Shutdown,
-// stop signal handler, scheduler join, worker join. Returns a non-zero exit
-// code only if a real failure occurred (genuine ListenAndServe error or a
-// Shutdown that didn't drain cleanly).
+// stop signal handler, worker join. Returns a non-zero exit code only if a
+// real failure occurred (genuine ListenAndServe error or a Shutdown that
+// didn't drain cleanly).
 func shutdownServer(
 	ctx context.Context,
 	stop context.CancelFunc,
 	server *http.Server,
 	serverErr <-chan error,
-	schedulerWG, workerWG *sync.WaitGroup,
+	workerWG *sync.WaitGroup,
 ) int {
 	exitCode := 0
 	select {
@@ -762,9 +742,8 @@ func shutdownServer(
 		slog.Info("graceful shutdown complete")
 	}
 	stop()
-	schedulerWG.Wait()
 	workerWG.Wait()
-	slog.Info("scheduler stopped")
+	slog.Info("workers stopped")
 	return exitCode
 }
 
@@ -863,18 +842,6 @@ func requireApprovalRuntimeSupport(fanoutURL string) error {
 		return errors.New("approval runtime requires METALDOCS_FANOUT_URL; startup without freeze support is not allowed")
 	}
 	return nil
-}
-
-func jobEnabled(envName string) bool {
-	return !strings.EqualFold(strings.TrimSpace(os.Getenv(envName)), "false")
-}
-
-func schedulerLeaderID() string {
-	hostname, err := os.Hostname()
-	if err != nil || strings.TrimSpace(hostname) == "" {
-		hostname = "unknown"
-	}
-	return fmt.Sprintf("%s:%d", hostname, os.Getpid())
 }
 
 // startPresence initialises the PR-9 presence subsystem: hub goroutines, WebSocket
@@ -998,50 +965,6 @@ func startOutboxWorkers(
 		}
 	}, workerCfg, slog.Default())
 	start(materializeOutboxWorker)
-}
-
-// registerScheduledJobs registers the four optional background jobs with the
-// scheduler. Each job is gated on its ENABLE_JOB_* env var (default enabled).
-// The audit-integrity job additionally requires deps.AuditValidator to be non-nil.
-// Scheduler startup and the schedulerWG goroutine remain in main.
-func registerScheduledJobs(
-	s *jobscheduler.Scheduler,
-	deps bootstrap.APIDependencies,
-	cancelSvc *approvalapp.CancelService,
-	emitter approvalapp.EventEmitter,
-) {
-	if jobEnabled("ENABLE_JOB_STUCK_INSTANCE_WATCHDOG") {
-		s.Register(jobscheduler.JobConfig{
-			Name:     "stuck-instance-watchdog",
-			Interval: 5 * time.Minute,
-			Fn:       stuck_instance_watchdog.New(deps.SQLDB, cancelSvc, emitter),
-			Policy:   jobscheduler.SkipOnPressure,
-		})
-	}
-	if jobEnabled("ENABLE_JOB_IDEMPOTENCY_JANITOR") {
-		s.Register(jobscheduler.JobConfig{
-			Name:     "idempotency-janitor",
-			Interval: 15 * time.Minute,
-			Fn:       idempotency_janitor.New(deps.SQLDB),
-			Policy:   jobscheduler.SkipOnPressure,
-		})
-	}
-	if jobEnabled("ENABLE_JOB_AUDIT_INTEGRITY_VALIDATOR") && deps.AuditValidator != nil {
-		s.Register(jobscheduler.JobConfig{
-			Name:     "audit-integrity-validator",
-			Interval: time.Hour,
-			Fn:       audit_integrity_validator.New(deps.AuditValidator),
-			Policy:   jobscheduler.SkipOnPressure,
-		})
-	}
-	if jobEnabled("ENABLE_JOB_LEASE_REAPER") {
-		s.Register(jobscheduler.JobConfig{
-			Name:     "lease-reaper",
-			Interval: 10 * time.Minute,
-			Fn:       jobscheduler.RunLeaseReaper(deps.SQLDB),
-			Policy:   jobscheduler.SkipOnPressure,
-		})
-	}
 }
 
 // startAuditRetention launches a background goroutine that purges audit_events

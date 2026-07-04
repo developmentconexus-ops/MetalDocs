@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'internal/modules/documents/approval/application/**'
-      - 'internal/modules/jobs/scheduler/**'
       - 'api/handlers/approval/**'
   push:
     branches: [main]

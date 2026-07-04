@@ -24,7 +24,7 @@ func TestJobReturnsNilWhenChainIsValid(t *testing.T) {
 
 	validator := &fakeValidator{}
 
-	err := New(validator)(context.Background(), 7)
+	err := run(context.Background(), validator)
 	if err != nil {
 		t.Fatalf("job returned error: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestJobReturnsIntegrityViolationWhenIssuesExist(t *testing.T) {
 		},
 	}
 
-	err := New(validator)(context.Background(), 8)
+	err := run(context.Background(), validator)
 	if !errors.Is(err, ErrIntegrityViolation) {
 		t.Fatalf("err = %v, want ErrIntegrityViolation", err)
 	}
@@ -58,7 +58,7 @@ func TestJobPropagatesValidatorError(t *testing.T) {
 	expectedErr := errors.New("scan failed")
 	validator := &fakeValidator{err: expectedErr}
 
-	err := New(validator)(context.Background(), 9)
+	err := run(context.Background(), validator)
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("err = %v, want %v", err, expectedErr)
 	}
