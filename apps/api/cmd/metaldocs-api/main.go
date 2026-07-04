@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,11 +9,8 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
-
-	"github.com/google/uuid"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	documents "metaldocs/internal/modules/documents"
@@ -75,7 +71,6 @@ import (
 	"metaldocs/internal/platform/formval"
 	"metaldocs/internal/platform/httpclient"
 	riverjobs "metaldocs/internal/platform/jobs/river"
-	"metaldocs/internal/platform/messaging"
 	platformmw "metaldocs/internal/platform/middleware"
 	"metaldocs/internal/platform/migrate"
 	"metaldocs/internal/platform/objectstore"
@@ -550,12 +545,6 @@ func main() {
 	// Wire materialize outbox into the freeze service so Pin can enqueue async jobs.
 	fanoutCfg.freezeService.WithMaterializeOutbox(pdfDispatchEnqueuer)
 
-	// StagingOutboxWorker.Run() only returns nil (context cancellation); no restart loop needed.
-	// Retained during the expand phase (T4 removes it): the poller and the new
-	// River dispatch path may both run harmlessly against the same outbox rows.
-	var workerWG sync.WaitGroup
-	startOutboxWorkers(ctx, &workerWG, deps.Publisher, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg)
-
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{},
 	).WithPDFOutbox(pdfDispatchEnqueuer).WithPinInvoker(fanoutCfg.freezeService).
@@ -709,7 +698,7 @@ func main() {
 		serverErr <- server.ListenAndServe()
 	}()
 
-	exitCode := shutdownServer(ctx, stop, server, serverErr, &workerWG)
+	exitCode := shutdownServer(ctx, stop, server, serverErr)
 	if exitCode != 0 {
 		// os.Exit skips deferred functions, including deps.Cleanup. Invoke
 		// cleanup explicitly so DB / object-store handles are released on
@@ -730,7 +719,6 @@ func shutdownServer(
 	stop context.CancelFunc,
 	server *http.Server,
 	serverErr <-chan error,
-	workerWG *sync.WaitGroup,
 ) int {
 	exitCode := 0
 	select {
@@ -753,7 +741,6 @@ func shutdownServer(
 		slog.Info("graceful shutdown complete")
 	}
 	stop()
-	workerWG.Wait()
 	slog.Info("workers stopped")
 	return exitCode
 }
@@ -924,58 +911,6 @@ func buildFanoutComponents(
 		snapRepo, client,
 	)
 	return fanoutComponents{client: client, freezeService: freezeService}
-}
-
-// startOutboxWorkers builds and starts the PDF and materialize staging outbox
-// workers. Each worker polls its outbox table and publishes events via publisher;
-// goroutine lifetimes are tracked in wg so shutdownServer can join them cleanly.
-// StagingOutboxWorker.Run() returns only on ctx cancellation (nil error);
-// no restart loop is needed.
-func startOutboxWorkers(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	publisher messaging.Publisher,
-	pdfOutboxRepo, materializeOutboxRepo *fanout.StagingOutboxRepository,
-	workerCfg config.StagingOutboxWorkerConfig,
-) {
-	start := func(w *fanout.StagingOutboxWorker) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_ = w.Run(ctx)
-		}()
-	}
-
-	pdfOutboxWorker := fanout.NewStagingOutboxWorker(pdfOutboxRepo, publisher, func(r fanout.OutboxRow) messaging.Event {
-		return messaging.Event{
-			EventID:        messaging.EventID(uuid.NewString()),
-			EventType:      messaging.EventTypePDFConvert,
-			AggregateType:  messaging.AggregateType("document_revision"),
-			AggregateID:    messaging.AggregateID(r.RevisionID),
-			IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + r.TenantID + ":" + r.RevisionID),
-			Payload: messaging.PDFConvertPayload{
-				TenantID:    r.TenantID,
-				RevisionID:  r.RevisionID,
-				ContentHash: hex.EncodeToString(r.ContentHash),
-			},
-		}
-	}, workerCfg, slog.Default())
-	start(pdfOutboxWorker)
-
-	materializeOutboxWorker := fanout.NewStagingOutboxWorker(materializeOutboxRepo, publisher, func(r fanout.OutboxRow) messaging.Event {
-		return messaging.Event{
-			EventID:        messaging.EventID(uuid.NewString()),
-			EventType:      messaging.EventTypeMaterializeFanout,
-			AggregateType:  messaging.AggregateType("document_revision"),
-			AggregateID:    messaging.AggregateID(r.RevisionID),
-			IdempotencyKey: messaging.IdempotencyKey("materialize_fanout:" + r.TenantID + ":" + r.RevisionID),
-			Payload: messaging.MaterializeFanoutPayload{
-				TenantID:   r.TenantID,
-				RevisionID: r.RevisionID,
-			},
-		}
-	}, workerCfg, slog.Default())
-	start(materializeOutboxWorker)
 }
 
 // startAuditRetention launches a background goroutine that purges audit_events

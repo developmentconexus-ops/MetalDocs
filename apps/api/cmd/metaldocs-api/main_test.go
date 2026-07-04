@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,27 +12,18 @@ import (
 	"metaldocs/internal/platform/objectstore"
 )
 
-// TestShutdownServer_ServerErrorJoinsWorker reproduces the C3 regression:
+// TestShutdownServer_ServerErrorReturnsExitOne reproduces the C3 regression:
 // when ListenAndServe returns a non-ErrServerClosed error, the teardown path
-// must still drain the worker goroutine instead of os.Exit-ing and leaking
-// the WaitGroup. The scheduler WaitGroup this test originally covered was
-// retired with the lease scheduler (M5 F5.2 T4, ADR 0067); River periodic
-// jobs need no goroutine join here.
-func TestShutdownServer_ServerErrorJoinsWorker(t *testing.T) {
+// must report a non-zero exit code instead of os.Exit-ing straight through.
+// shutdownServer no longer joins a worker WaitGroup — the staging outbox
+// poll workers it used to join were retired (M5 F5.3 T4; River now owns
+// dispatch retry) and the scheduler WaitGroup was retired earlier still
+// (M5 F5.2 T4, ADR 0067).
+func TestShutdownServer_ServerErrorReturnsExitOne(t *testing.T) {
 	t.Parallel()
 
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
-
-	var workerWG sync.WaitGroup
-	var workerJoined atomic.Bool
-
-	workerWG.Add(1)
-	go func() {
-		defer workerWG.Done()
-		<-ctx.Done()
-		workerJoined.Store(true)
-	}()
 
 	server := &http.Server{Addr: "127.0.0.1:0"}
 	serverErr := make(chan error, 1)
@@ -42,7 +31,7 @@ func TestShutdownServer_ServerErrorJoinsWorker(t *testing.T) {
 
 	done := make(chan int, 1)
 	go func() {
-		done <- shutdownServer(ctx, stop, server, serverErr, &workerWG)
+		done <- shutdownServer(ctx, stop, server, serverErr)
 	}()
 
 	select {
@@ -51,11 +40,7 @@ func TestShutdownServer_ServerErrorJoinsWorker(t *testing.T) {
 			t.Fatalf("expected exit code 1 on server error, got %d", exitCode)
 		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("shutdownServer did not return within 5s — worker likely leaked")
-	}
-
-	if !workerJoined.Load() {
-		t.Fatal("worker goroutine was not joined before shutdownServer returned")
+		t.Fatal("shutdownServer did not return within 5s")
 	}
 }
 
@@ -68,46 +53,32 @@ func TestShutdownServer_ErrServerClosedReturnsZero(t *testing.T) {
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 
-	var workerWG sync.WaitGroup
 	server := &http.Server{Addr: "127.0.0.1:0"}
 	serverErr := make(chan error, 1)
 	serverErr <- http.ErrServerClosed
 
-	exitCode := shutdownServer(ctx, stop, server, serverErr, &workerWG)
+	exitCode := shutdownServer(ctx, stop, server, serverErr)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0 for ErrServerClosed, got %d", exitCode)
 	}
 }
 
 // TestShutdownServer_ContextCancellation confirms the Ctrl-C path returns
-// exit code 0 and drains the worker WaitGroup.
+// exit code 0.
 func TestShutdownServer_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 
-	var workerWG sync.WaitGroup
-	var workerJoined atomic.Bool
-
-	workerWG.Add(1)
-	go func() {
-		defer workerWG.Done()
-		<-ctx.Done()
-		workerJoined.Store(true)
-	}()
-
 	server := &http.Server{Addr: "127.0.0.1:0"}
 	serverErr := make(chan error, 1) // intentionally empty
 
 	stop() // simulate SIGTERM arriving before any listen error
 
-	exitCode := shutdownServer(ctx, stop, server, serverErr, &workerWG)
+	exitCode := shutdownServer(ctx, stop, server, serverErr)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0 on context cancel, got %d", exitCode)
-	}
-	if !workerJoined.Load() {
-		t.Fatal("worker goroutine was not joined before shutdownServer returned")
 	}
 }
 

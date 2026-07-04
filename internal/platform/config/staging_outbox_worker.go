@@ -7,16 +7,18 @@ import (
 	"strings"
 )
 
-// StagingOutboxWorkerConfig controls the poll/retry behaviour of
-// StagingOutboxWorker (render/fanout). The defaults are the literal values that
-// were previously hardcoded in NewStagingOutboxWorker so that existing
-// deployments without any METALDOCS_STAGING_OUTBOX_* env-vars are unaffected.
+// StagingOutboxWorkerConfig controls the staging pdf/materialize dispatch
+// outbox (render/fanout). MaxAttempts is still read by the
+// dispatchjobs.Enqueuer wiring; PollIntervalSeconds/StaleAfterSeconds were
+// used by the poll-based dispatch worker retired in favor of River-driven
+// dispatch (M5 F5.3 T4) — they are kept here unread pending a follow-up
+// cleanup rather than risk a config-loader edit alongside that removal.
 type StagingOutboxWorkerConfig struct {
 	PollIntervalSeconds int
 	BatchSize           int
 	MaxAttempts         int
-	// StaleAfterSeconds is how long a claimed row may remain in 'processing'
-	// before ResetStaleClaims reclaims it.
+	// StaleAfterSeconds is how long a claimed row could remain in
+	// 'processing' before being reclaimed under the retired poll worker.
 	StaleAfterSeconds int
 }
 

@@ -10,7 +10,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
@@ -34,7 +33,7 @@ var ErrMaterializeDispatchJobNil = errors.New("materialize dispatch job is nil")
 // concrete, not behind an interface, at the repo's own package boundary).
 type outboxMarker interface {
 	MarkDispatched(ctx context.Context, tenantID, id string) error
-	MarkFailed(ctx context.Context, tenantID, id, errStr string, nextRetryAt time.Time, finalize bool) error
+	MarkFailed(ctx context.Context, tenantID, id, errStr string) error
 }
 
 // buildPDFEvent reproduces, verbatim, the pdf outbox buildEvent closure
@@ -100,7 +99,7 @@ func terminalDeadLetter(ctx context.Context, repo outboxMarker, fields dispatchF
 	if attempt < maxAttempts {
 		return
 	}
-	_ = repo.MarkFailed(ctx, fields.TenantID, fields.OutboxID, cause.Error(), time.Now(), true)
+	_ = repo.MarkFailed(ctx, fields.TenantID, fields.OutboxID, cause.Error())
 }
 
 // PDFDispatchWorker is the River worker that dispatches one pdf staging

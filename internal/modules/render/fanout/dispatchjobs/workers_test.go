@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"testing"
-	"time"
 
 	"metaldocs/internal/platform/messaging"
 )
@@ -32,7 +31,6 @@ type fakeOutboxMarker struct {
 	dispatchCalls                    int
 
 	failedTenantID, failedID, failedErrStr string
-	failedFinalize                         bool
 	failCalls                              int
 
 	markDispatchedErr error
@@ -46,12 +44,11 @@ func (f *fakeOutboxMarker) MarkDispatched(_ context.Context, tenantID, id string
 	return f.markDispatchedErr
 }
 
-func (f *fakeOutboxMarker) MarkFailed(_ context.Context, tenantID, id, errStr string, _ time.Time, finalize bool) error {
+func (f *fakeOutboxMarker) MarkFailed(_ context.Context, tenantID, id, errStr string) error {
 	f.failCalls++
 	f.failedTenantID = tenantID
 	f.failedID = id
 	f.failedErrStr = errStr
-	f.failedFinalize = finalize
 	return f.markFailedErr
 }
 
@@ -153,9 +150,6 @@ func TestRun_PublishFails_TerminalAttempt_DeadLetters(t *testing.T) {
 	if repo.failCalls != 1 {
 		t.Fatalf("MarkFailed calls = %d, want 1", repo.failCalls)
 	}
-	if !repo.failedFinalize {
-		t.Error("MarkFailed finalize = false, want true on terminal attempt")
-	}
 	if repo.failedTenantID != fields.TenantID || repo.failedID != fields.OutboxID {
 		t.Errorf("MarkFailed(%q, %q), want (%q, %q)", repo.failedTenantID, repo.failedID, fields.TenantID, fields.OutboxID)
 	}
@@ -176,9 +170,6 @@ func TestRun_MarkDispatchedFails_TerminalAttempt_DeadLetters(t *testing.T) {
 	}
 	if repo.failCalls != 1 {
 		t.Fatalf("MarkFailed calls = %d, want 1", repo.failCalls)
-	}
-	if !repo.failedFinalize {
-		t.Error("MarkFailed finalize = false, want true on terminal attempt")
 	}
 }
 
