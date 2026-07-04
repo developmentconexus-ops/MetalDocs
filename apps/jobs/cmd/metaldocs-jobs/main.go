@@ -13,11 +13,16 @@ import (
 
 	"github.com/riverqueue/river"
 
+	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	approvaljobs "metaldocs/internal/modules/documents/approval/jobs"
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	"metaldocs/internal/modules/jobs/audit_integrity_validator"
+	"metaldocs/internal/modules/jobs/idempotency_janitor"
+	"metaldocs/internal/modules/jobs/maintenance"
+	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
@@ -33,16 +38,27 @@ func run(ctx context.Context) error {
 		slog.Info("MetalDocs Jobs disabled by configuration")
 		return nil
 	}
+	if jobsCfg.Queues == nil {
+		jobsCfg.Queues = map[string]river.QueueConfig{}
+	}
+	// metaldocs-jobs is the only binary that subscribes the maintenance queue
+	// and registers the janitor Workers below (ADR 0067 dual-define,
+	// jobs-only execute topology); metaldocs-api only enqueues-when-leader.
+	jobsCfg.Queues["maintenance"] = river.QueueConfig{MaxWorkers: 2}
 
 	deps, err := bootstrap.BuildJobsDependencies(ctx, jobsCfg, func(db *sql.DB) (*river.Workers, []*river.PeriodicJob, error) {
 		// The scheduled-publish job never calls LoadActorDisplayName, but we pass
 		// the real reader so the binary is correct if the code path ever is reached.
 		displayNameRepo := iampg.NewUserDisplayNameRepository(db)
 		repo := approvalrepo.NewPostgresApprovalRepository(db, displayNameRepo)
-		services := approvalapp.NewServices(repo, approvalapp.NewSQLEmitter(), approvalapp.RealClock{}, cdinfra.NewCDFieldReaderPG())
+		approvalEmitter := approvalapp.NewSQLEmitter()
+		services := approvalapp.NewServices(repo, approvalEmitter, approvalapp.RealClock{}, cdinfra.NewCDFieldReaderPG())
 		workers := approvaljobs.NewWorkers(services.Scheduler, db)
 		river.AddWorker(workers, notificationsinfra.NewNotificationsFanoutWorker(db))
-		return workers, nil, nil
+		river.AddWorker(workers, stuck_instance_watchdog.NewWorker(db, services.Cancel, approvalEmitter))
+		river.AddWorker(workers, idempotency_janitor.NewWorker(db))
+		river.AddWorker(workers, audit_integrity_validator.NewWorker(auditpg.NewWriter(db)))
+		return workers, maintenance.PeriodicJobs(), nil
 	})
 	if err != nil {
 		return fmt.Errorf("build jobs dependencies: %w", err)

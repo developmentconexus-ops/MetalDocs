@@ -28,6 +28,7 @@ import (
 	docrepo "metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/modules/jobs/audit_integrity_validator"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
+	"metaldocs/internal/modules/jobs/maintenance"
 	jobscheduler "metaldocs/internal/modules/jobs/scheduler"
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
 	templatesapp "metaldocs/internal/modules/templates/application"
@@ -507,7 +508,14 @@ func main() {
 			os.Exit(1)
 		}
 		riverBundle, err := riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
-			Queues:              jobsCfg.Queues,
+			Queues: jobsCfg.Queues,
+			// PeriodicJobs is defined here too (not just in metaldocs-jobs) because
+			// River only enqueues periodic jobs from the elected leader's own
+			// Config.PeriodicJobs; metaldocs-api joins the same leader election but
+			// does NOT subscribe the "maintenance" queue and has nil Workers here,
+			// so it enqueues-when-leader but never executes these jobs (ADR 0067
+			// dual-define, jobs-only execute topology).
+			PeriodicJobs:        maintenance.PeriodicJobs(),
 			Schema:              jobsCfg.RiverSchema,
 			SkipUnknownJobCheck: true,
 		}, nil)
