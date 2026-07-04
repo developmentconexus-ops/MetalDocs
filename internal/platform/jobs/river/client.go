@@ -12,6 +12,7 @@ type Config struct {
 	Queues              map[string]river.QueueConfig
 	Schema              string
 	SkipUnknownJobCheck bool
+	PeriodicJobs        []*river.PeriodicJob
 }
 
 type ClientBundle struct {
@@ -34,6 +35,7 @@ func NewClientBundle(db *sql.DB, cfg Config, workers *river.Workers) (*ClientBun
 		Schema:              cfg.Schema,
 		SkipUnknownJobCheck: cfg.SkipUnknownJobCheck,
 		Workers:             workers,
+		PeriodicJobs:        cfg.PeriodicJobs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("river jobs: new client: %w", err)

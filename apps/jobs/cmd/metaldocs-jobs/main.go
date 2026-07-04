@@ -34,7 +34,7 @@ func run(ctx context.Context) error {
 		return nil
 	}
 
-	deps, err := bootstrap.BuildJobsDependencies(ctx, jobsCfg, func(db *sql.DB) (*river.Workers, error) {
+	deps, err := bootstrap.BuildJobsDependencies(ctx, jobsCfg, func(db *sql.DB) (*river.Workers, []*river.PeriodicJob, error) {
 		// The scheduled-publish job never calls LoadActorDisplayName, but we pass
 		// the real reader so the binary is correct if the code path ever is reached.
 		displayNameRepo := iampg.NewUserDisplayNameRepository(db)
@@ -42,7 +42,7 @@ func run(ctx context.Context) error {
 		services := approvalapp.NewServices(repo, approvalapp.NewSQLEmitter(), approvalapp.RealClock{}, cdinfra.NewCDFieldReaderPG())
 		workers := approvaljobs.NewWorkers(services.Scheduler, db)
 		river.AddWorker(workers, notificationsinfra.NewNotificationsFanoutWorker(db))
-		return workers, nil
+		return workers, nil, nil
 	})
 	if err != nil {
 		return fmt.Errorf("build jobs dependencies: %w", err)

@@ -14,7 +14,7 @@ import (
 	riverjobs "metaldocs/internal/platform/jobs/river"
 )
 
-type JobsWorkerFactory func(db *sql.DB) (*river.Workers, error)
+type JobsWorkerFactory func(db *sql.DB) (*river.Workers, []*river.PeriodicJob, error)
 
 type JobsDependencies struct {
 	River   *riverjobs.ClientBundle
@@ -40,8 +40,9 @@ func BuildJobsDependencies(ctx context.Context, cfg config.JobsConfig, workerFac
 	// two owners with no declared order.
 
 	var workers *river.Workers
+	var periodicJobs []*river.PeriodicJob
 	if workerFactory != nil {
-		workers, err = workerFactory(db)
+		workers, periodicJobs, err = workerFactory(db)
 		if err != nil {
 			_ = closeDB(db)
 			return JobsDependencies{}, fmt.Errorf("build jobs workers: %w", err)
@@ -49,8 +50,9 @@ func BuildJobsDependencies(ctx context.Context, cfg config.JobsConfig, workerFac
 	}
 
 	riverBundle, err := riverjobs.NewClientBundle(db, riverjobs.Config{
-		Queues: cfg.Queues,
-		Schema: cfg.RiverSchema,
+		Queues:       cfg.Queues,
+		Schema:       cfg.RiverSchema,
+		PeriodicJobs: periodicJobs,
 	}, workers)
 	if err != nil {
 		_ = closeDB(db)
