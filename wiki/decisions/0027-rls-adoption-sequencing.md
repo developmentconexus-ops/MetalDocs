@@ -111,3 +111,97 @@ Application-layer predicates in Go repositories (and the tripwire for write path
 - OWASP ASVS V4.1.3: defense-in-depth tenant isolation
 - ADR [`0007-two-tier-authz.md`](0007-two-tier-authz.md) — two-tier model; trigger tripwire background
 - ADR [`0022-authz-capability-coherence.md`](0022-authz-capability-coherence.md) Phase 5 §Item 7 — native RLS vs. trigger-tripwire finding; `NOSUPERUSER` deployment constraint
+
+## Amendment 2026-07-03 (M3 tenancy chokepoint)
+
+> **Last verified (amendment):** 2026-07-03. This amendment does not alter the Context/Decision/Consequences
+> body above (Wave Z execution record, 2026-06-13) — it documents a **coverage** change layered on top of it.
+> Source: `docs/superpowers/milestones/global-maximum-remediation/milestone-3-tenancy-chokepoint/validation-contract.md`
+> §3.1/§4, and the F3.1/F3.2 evidence files in the same milestone folder.
+
+The RLS **policy** shipped by Wave Z is unchanged: NULL-permissive (`GUC unset → all rows visible`), FORCE
+RLS, on all 33 tenant-scoped tables (the 27+2 base tables from Amendment-era migrations, since grown to 33
+as new tenant-scoped tables were added). Milestone 3 ("tenancy chokepoint," global-maximum-remediation
+program) did not touch the policy — it closed a gap in **who seeds the GUC that the policy reads**.
+
+### 1. The NULL-permissive design is deliberate and load-bearing
+
+`current_setting('metaldocs.tenant_id', true)` returning unset means the `tenant_isolation` policy admits
+all rows. This is **not a bug** and **must not be "fixed"** by making the policy fail-closed on an unset
+GUC: system paths — janitors, cross-tenant scans, the outbox claim step (ADR 0054 rule 1), and bootstrap —
+run with no tenant context by design and depend on this permissive behavior to function at all. Any change
+that makes RLS deny-by-default on an unset GUC would break those paths.
+
+### 2. The pre-M3 sync/async asymmetry
+
+Before M3, `metaldocs-api` seeded `metaldocs.tenant_id`/`metaldocs.actor_id` on (almost) every request
+transaction via hand-placed `authz.SeedTxIdentity` calls (this ADR's original GUC pattern, `context.go:48`),
+so FORCE RLS was a real backstop on the sync path. `metaldocs-worker` and `metaldocs-jobs` seeded **nothing**
+— async tenant isolation rested solely on hand-written query/write predicates, with no RLS gate behind
+them. A single bad join or missed predicate in a worker or job handler was a silent cross-tenant leak with
+no backstop to catch it.
+
+### 3. How M3 closes it
+
+- **(a) Sync chokepoint autoseed (F3.1).** The auth middleware
+  (`internal/modules/auth/delivery/http/middleware.go:106-107`) now injects both tenant and actor into the
+  platform identity carrier (`platformtenant.WithTenantID` + `platformtenant.WithActorID`). The shared
+  `TxRunner` internals (`internal/platform/db/runner.go:63`, `seedTxIdentityFromContext` at :94) read that
+  carrier at the start of **every** `Do`/`DoReadOnly` transaction and seed the tx-local GUCs when both
+  tenant and actor are present; when either is absent (system/janitor/background paths with no request
+  carrier) it is a no-op, preserving NULL-permissive behavior for those paths. This collapsed 61 hand-placed
+  `SeedTxIdentity` call sites to 0 outside the chokepoint plus a 21-entry reviewed allowlist (raw-`BeginTx`
+  paths the chokepoint cannot reach, and distinct-actor cases where the seeded actor differs from the
+  request's authenticated user).
+- **(b) Async per-message tenant seed (F3.2).** A new tenant-only primitive, `authz.SeedTxTenant(ctx, tx,
+  tenantID)` (`internal/modules/iam/authz/context.go`), seeds `metaldocs.tenant_id` (no actor — async work
+  has no human actor) at the start of each of the five single-tenant processing transactions: the
+  materialize job runner, the PDF job runner, scheduled-publish (`RunScheduledPublishJob`), the
+  notifications fanout worker, and the render staging-outbox dispatch-mark step. This engages FORCE RLS as
+  a real backstop on `metaldocs-worker` and `metaldocs-jobs` for the first time, **completing ADR 0054 rule
+  2** (async single-tenant processing transactions must be tenant-scoped).
+- **(c) Two blocking api-lint rules make the seeding structural, not a discipline convention:**
+  `SEED-CHOKEPOINT` (flags any `SeedTxIdentity` call outside the chokepoint/definition files and the
+  reviewed allowlist) and `ASYNC-TENANT-SEED` (flags any tenant-scoped table write in the async handler
+  roots not wrapped by `SeedTxTenant`/`SeedTxIdentity` or allowlisted). Both are registered blocking in
+  `RunCodeRules` and were proven RED-on-violation/GREEN-on-clean live, not just by unit test. A negative
+  real-DB RLS integration proof (`internal/modules/iam/authz/seed_tx_tenant_rls_integration_test.go`,
+  `//go:build integration`) demonstrates the mechanism end-to-end: an unseeded tx leaks a cross-tenant row
+  (read + a 1-row cross-tenant UPDATE) pre-fix; after `SeedTxTenant`, the same row is invisible, UPDATE/DELETE
+  affect 0 rows, and a re-tenant write attempt fails with `SQLSTATE 42501`. This proof is authored and
+  compiles clean but its live run is deferred (no `DATABASE_URL` available without reading `.env`, which is
+  forbidden) — a bounded defer, not a gap in the mechanism itself.
+
+### 4. Residual sanctioned GUC-unset surface
+
+The following remain intentionally unseeded (NULL-permissive) after M3 and are enumerated as **sanctioned**,
+not gaps:
+- **Outbox claim steps** (`FOR UPDATE SKIP LOCKED` claim queries) — ADR 0054 rule 1; claiming must scan
+  across tenants before a single row is bound to a tenant for processing.
+- **Cross-tenant scans** — the stuck-instance-watchdog list query and the audit-integrity scan; these are
+  read-only maintenance scans over all tenants by design.
+- **System tables with no `tenant_id` column** — `idempotency_keys` and `job_leases`; RLS cannot apply a
+  tenant predicate where no tenant column exists.
+
+### 5. Cross-references
+
+- ADR [`0054`](0054-cross-tenant-outbox-claim.md) — rule 1 (outbox claim GUC-unset) was already
+  sanctioned; rule 2 (async processing tx must be tenant-seeded) is now **enforced**, closed by F3.2.
+- Milestone folder:
+  `docs/superpowers/milestones/global-maximum-remediation/milestone-3-tenancy-chokepoint/` — spec,
+  validation-contract.md (§1 F3.1, §2 F3.2, §3.1/§4 this amendment's source), and per-feature `evidence.md`
+  files (`f3.1-txrunner-autoseed/evidence.md`, `f3.2-async-rls-backstop/evidence.md`).
+
+### Per-binary RLS posture (post-M3)
+
+| Binary | Who seeds the GUC | Tenant GUC state on a business tx | FORCE-RLS effect | Sanctioned GUC-unset surface |
+|---|---|---|---|---|
+| **metaldocs-api** (sync) | `TxRunner` chokepoint, auto from the platform identity carrier set by the auth middleware | Seeded to the authenticated tenant on every request `Do`/`DoReadOnly` | Active backstop — cross-tenant SELECT/UPDATE/DELETE return 0 rows; wrong-tenant INSERT fails `42501` | Allowlisted cross-tenant platform-admin paths; any pre-auth/system `Do` with no ctx identity (no-op seed) |
+| **metaldocs-worker** (materialize, pdf, staging-outbox, platform outbox) | Per-message `authz.SeedTxTenant` in the processing tx, from the claimed row's tenant | Seeded to the claimed row's tenant in each single-tenant processing tx | Active backstop on processing writes — same 0-rows/`42501` semantics | Claim steps (ADR 0054 rule 1) run GUC-unset by design |
+| **metaldocs-jobs** (scheduled-publish, notifications-fanout, River) | Per-job `authz.SeedTxTenant` in the work tx, from the job's tenant | Seeded to the job's tenant | Active backstop on job writes | Nothing tenant-scoped runs unseeded outside the sanctioned allowlist |
+| **Janitors** (hosted in metaldocs-api: stuck-instance-watchdog, idempotency-janitor, audit-integrity-validator, lease-reaper) | Not seeded — system, no tenant | Unseeded — NULL-permissive by design | Intentionally inert for cross-tenant maintenance scans | Entire janitor scan/maintenance surface; `idempotency_keys`/`job_leases` have no `tenant_id` column |
+
+**Invariant restated:** the RLS policy is byte-identical before and after M3. What changed is **GUC-seeding
+coverage** — from "API only, via ~62 hand-placed calls" to "API via a structural chokepoint + async via a
+per-message primitive, both guarded by blocking lints and a negative integration proof." Cross-tenant
+URL access still resolves 404, and the pre-existing cross-tenant isolation test suites remain green.

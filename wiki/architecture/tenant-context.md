@@ -1,9 +1,12 @@
 ﻿# Architecture: Session-Bound Tenant Context
 
-> **Last verified:** 2026-06-08 (Phase F: controlled-documents injectTenant anchor :50 → :49)
+> **Last verified:** 2026-07-03 (M3 tenancy chokepoint: §4 middleware block now covers the F3.1 actor-carrier
+> injection; added §9 RLS backstop & GUC seeding summary; corrected the stale "RLS tracked as tech debt"
+> out-of-scope line below — row-level Postgres isolation is live, not deferred)
+> **Prior:** 2026-06-08 (Phase F: controlled-documents injectTenant anchor :50 → :49)
 > **Freeze verification note (2026-05-21):** Terminology and ownership framing were re-checked during spec-review cleanup; runtime/source-of-truth claims in this doc were not expanded in this pass.
 > **Scope:** `internal/platform/tenant` package; how tenant identity flows from login through every request handler; `AllowDevTenantFallback` flag; IAM legacy fallback pattern.
-> **Out of scope:** per-tenant IAM role assignment (see `wiki/modules/iam.md   8.2`); row-level Postgres isolation via GUC/RLS (tracked per-module as tech debt).
+> **Out of scope:** per-tenant IAM role assignment (see `wiki/modules/iam.md   8.2`); the RLS policy shape and rollout history itself — see ADR [`0027`](../decisions/0027-rls-adoption-sequencing.md) (amended 2026-07-03) for the policy and the GUC-seeding coverage posture; this doc covers request-path tenant *context propagation*, not the DB enforcement layer.
 > **Key files:**
 > - `internal/platform/tenant/context.go:18`     `WithTenantID` (auth middleware injects here)
 > - `internal/platform/tenant/context.go:24`     `FromContext` (all handlers read from here)
@@ -99,7 +102,7 @@ Config flag on `authapp.Config` (`service.go:37`). When `true`, login succeeds f
 
 ---
 
-## 4. Middleware injection (`auth/delivery/http/middleware.go:83-88`)
+## 4. Middleware injection (`auth/delivery/http/middleware.go:83-88, 106-107`)
 
 After `ResolveSession` returns a `CurrentUser`:
 
@@ -107,6 +110,7 @@ After `ResolveSession` returns a `CurrentUser`:
 ctx := authdomain.WithCurrentUser(r.Context(), currentUser)
 ctx = iamdomain.WithAuthContext(ctx, currentUser.UserID, currentUser.Roles)
 ctx = platformtenant.WithTenantID(ctx, currentUser.TenantID)
+ctx = platformtenant.WithActorID(ctx, currentUser.UserID)
 r2 := r.WithContext(ctx)
 r2.Header = r2.Header.Clone()
 r2.Header.Del("X-Tenant-ID")
@@ -115,8 +119,14 @@ next.ServeHTTP(w, r2)
 
 Key points:
 - `WithTenantID` writes the session's tenant into the request context.
+- `WithActorID` (`middleware.go:107`, added by M3 feature F3.1) writes the authenticated user into the same
+  platform identity carrier, alongside tenant. This is the **only** production caller for request paths.
 - `r2.Header.Del("X-Tenant-ID")` strips the header so no downstream code can read it     even if it was present on the inbound request.
-- All three context writes happen in one block; if `ResolveSession` fails, none of them run.
+- All context writes happen in one block; if `ResolveSession` fails, none of them run.
+- Handlers and repositories no longer need to hand-seed DB identity: the shared `TxRunner` chokepoint
+  (`internal/platform/db/runner.go`, `seedTxIdentityFromContext`) reads this carrier at the start of every
+  `Do`/`DoReadOnly` transaction and auto-seeds the tx-local `metaldocs.tenant_id`/`metaldocs.actor_id` GUCs
+  when both values are present. See §9 for the full RLS-backstop picture.
 
 ---
 
@@ -171,7 +181,32 @@ All of the following now call `tenant.FromContext` (or a thin wrapper over it) i
 
 ---
 
-## 8. Cross-links
+## 9. RLS backstop & GUC seeding (M3)
+
+The tenant context this doc describes (`tenant.FromContext`, request-scoped) is the source the DB-level
+enforcement layer reads from — but the enforcement mechanics live in ADR
+[`0027`](../decisions/0027-rls-adoption-sequencing.md) (amended 2026-07-03), not here. Summary:
+
+- **API (sync):** the `TxRunner` chokepoint (`internal/platform/db/runner.go`) auto-seeds
+  `metaldocs.tenant_id`/`metaldocs.actor_id` from the platform carrier this doc's §4 populates, at the start
+  of every request transaction. FORCE RLS (NULL-permissive policy, 33 tables) is then a real backstop on
+  every request write/read.
+- **Worker/Jobs (async):** `authz.SeedTxTenant` seeds `metaldocs.tenant_id` (tenant-only, no actor) per
+  message/job in each single-tenant processing transaction, engaging the same FORCE RLS backstop for
+  `metaldocs-worker`/`metaldocs-jobs` — this closed ADR 0054 rule 2.
+- **Two blocking api-lint rules** keep both structural: `SEED-CHOKEPOINT` (sync) and `ASYNC-TENANT-SEED`
+  (async).
+- **NULL-permissive escape hatch (deliberate):** an unset GUC means "all rows visible," not "deny." System
+  paths — janitors, cross-tenant scans, the outbox claim step (ADR 0054 rule 1), and system tables with no
+  `tenant_id` column (`idempotency_keys`, `job_leases`) — rely on this and run GUC-unset by design.
+
+For the full per-binary posture table, the five points of the M3 amendment, and the negative RLS
+integration proof, see ADR 0027's `## Amendment 2026-07-03` section and
+`docs/superpowers/milestones/global-maximum-remediation/milestone-3-tenancy-chokepoint/`.
+
+---
+
+## 10. Cross-links
 
 - `wiki/modules/auth.md`     full auth module doc;   6.1 login sequence,   6.2 resolve-session sequence,   8.7 config
 - `wiki/modules/iam.md   8.2`     tenant scoping in IAM tables
