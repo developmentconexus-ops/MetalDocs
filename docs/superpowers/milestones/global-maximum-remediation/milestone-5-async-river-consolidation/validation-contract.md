@@ -8,7 +8,8 @@
 > contract, or re-open this contract **with operator approval** — never silently edit the contract to
 > match the code (mission §9 HS-7). The load-bearing clauses are the **§2 per-job migration table**
 > (every janitor: schedule + idempotency key + failure behavior + post-migration equivalence), the
-> **§2.5 lease-scheduler retirement census**, the **§2.6 H-PRE-1 retirement proof**, the **§3 staging
+> **§2.5 lease-scheduler retirement census**, the **§2.6 watchdog single-runner-lock removal + River
+> singleton proof** (see the §2.6 HS-7 erratum — does NOT retire H-PRE-1), the **§3 staging
 > dispatch idempotency + backoff-deletion**, the **§4 retention policy + bounded-purge proof**, and the
 > **§5 fanout commutativity proof**.
 >
@@ -132,21 +133,35 @@ reason) for:
 
 Migration ordering per §1 (drop lease objects only after the writing code is gone).
 
-### 2.6 ★ H-PRE-1 retirement (binding proof)
+### 2.6 ★ Watchdog single-runner advisory-lock removal + River singleton proof (binding)
 
-**H-PRE-1** ("never call an authz-recording read inside a lock-holding atomic tx") existed because the
-watchdog took `pg_try_advisory_lock` (`job.go:114`) for single-runner mutual exclusion. Under River the
-periodic job is inserted once (leader) and dequeued once (queue) → the advisory lock is redundant and is
-**removed**. With no application-held advisory lock, the H-PRE-1 hazard no longer exists ⇒ **retired**.
+> **⚠ ERRATUM 2026-07-04 (HS-7 — false premise corrected in place, ratification carried to M5 HS-1).**
+> This section as originally written claimed removing the watchdog's advisory lock **retires H-PRE-1**.
+> That premise is **FALSE** and is withdrawn. Runtime-truth verification (during F5.2 T6/T7) established:
+> **H-PRE-1** ("never call an authz-recording read inside a lock-holding atomic tx") is motivated by the
+> **audit hash-chain writer's `pg_advisory_xact_lock`** (`internal/modules/audit/infrastructure/postgres/writer.go:59`)
+> combined with `authz.Require` recording a system_admin bypass audit **in the caller's tx**
+> (`internal/modules/iam/authz/authz.go:119`) — it governs authz-recording reads nested in ANY lock-holding
+> tx (audit-writer, auth-repo, documents-repo, migrate). The **stuck-instance-watchdog's
+> `pg_try_advisory_lock(hashtext(JobName))`** was pure **single-runner mutual exclusion** with **no**
+> authz-recording read — a *different, unrelated* advisory lock. Removing it therefore **neither triggers
+> nor retires H-PRE-1**. H-PRE-1 stays **LIVE**. `[[advisory-lock-deadlock-constraint]]`.
 
-**Required evidence (retirement is contingent on it being green):** an integration test that starts
-**two** River clients against one database and asserts the watchdog periodic job **executes exactly once
-per tick** (elector singleton), with the advisory lock removed. If this fails, the advisory lock stays,
-H-PRE-1 is **not** retired, and the divergence is recorded (HS-2 boundary call) — the contract is not
-silently satisfied.
+**What M5 actually does (corrected, binding):** the watchdog's redundant single-runner advisory lock is
+**removed** because River's leader elector (single periodic insert) + queue dequeue (`FOR UPDATE SKIP
+LOCKED`, single claim) subsume cluster-wide single-runner. The watchdog body is additionally idempotent
+(a second run finds no new stuck instances), so even a hypothetical double-run is harmless.
 
-**Post-retirement doc updates (in this milestone):** `invariant-checklist.md:58` H-PRE-1 line and the
-memory note `advisory-lock-deadlock-constraint` are updated to "retired M5 (ADR 0067 §H-PRE-1)".
+**Required evidence (binding — proves the single-runner guarantee that justifies removing the lock):** an
+integration test that starts **two** River clients against one database and asserts the watchdog job body
+**executes exactly once** (elector single-insert + queue single-claim), with the advisory lock removed
+(`internal/platform/jobs/river/singleton_integration_test.go`, P4). This validates River's single-runner
+guarantee. It is **not** an H-PRE-1 retirement proof (H-PRE-1 is unaffected). If it fails, the watchdog lock
+removal is unsafe and must be reverted (HS-2 boundary call) — recorded, never silently satisfied.
+
+**Doc updates (in this milestone):** `invariant-checklist.md` H-PRE-1 line reaffirmed **LIVE** with a
+clarifying M5 note (watchdog lock removal is unrelated); the memory `advisory-lock-deadlock-constraint` is
+**kept** (not retired) with the same clarifier. No "retired" claim anywhere.
 
 ---
 

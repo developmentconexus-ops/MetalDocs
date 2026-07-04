@@ -1,9 +1,15 @@
-# ADR 0067 — Async job infrastructure consolidated onto River (lease scheduler + staging poller retired; H-PRE-1 retired)
+# ADR 0067 — Async job infrastructure consolidated onto River (lease scheduler + staging poller retired)
+
+> **⚠ ERRATUM 2026-07-04 (HS-7):** an earlier revision of this ADR asserted "H-PRE-1 retired" in the
+> title, supersedes line, §H-PRE-1, and consequences. That was a **false premise** — H-PRE-1 governs
+> authz-recording reads inside lock-holding txs (audit hash-chain writer), NOT the watchdog's unrelated
+> single-runner lock. Corrected in place throughout; **H-PRE-1 stays LIVE**. See §H-PRE-1. Ratification
+> carried to M5 HS-1.
 
 > **Status:** Accepted
 > **Date:** 2026-07-04
 > **Program:** global-maximum-remediation · **Milestone:** M5 (async consolidation onto River), feature F5.1
-> **Supersedes/retires:** the custom Postgres-lease scheduler (`metaldocs.job_leases` + `acquire_lease`/`heartbeat_lease`/`release_lease`); **H-PRE-1** advisory-lock constraint (retired, §H-PRE-1).
+> **Supersedes/retires:** the custom Postgres-lease scheduler (`metaldocs.job_leases` + `acquire_lease`/`heartbeat_lease`/`release_lease`) and the StagingOutboxWorker poller. **Does NOT retire H-PRE-1** (see §H-PRE-1 erratum) — it removes the watchdog's *unrelated* single-runner advisory lock.
 
 ## Context
 
@@ -113,22 +119,35 @@ Consequence: **`metaldocs-api` becomes a truly stateless sync + authz service** 
 scheduler or async workers. (This corrects the CLAUDE.md "api also hosts the 4 leader-elected janitors"
 wording; the correction is already scoped to M9 F9.4 doc-truth and is applied there, not silently here.)
 
-### H-PRE-1 — **RETIRED** (formal disposition)
-**H-PRE-1** ("never call an authz-recording read inside a lock-holding atomic tx; hoist it off-tx")
-existed because the stuck-instance-watchdog took a **`pg_try_advisory_lock`** (`job.go:114`) to prevent
-concurrent runs across replicas, creating a lock-holding window that must not enclose an authz-recording
-read. Under River:
+### H-PRE-1 — watchdog single-runner lock removed; **H-PRE-1 stays LIVE (retirement withdrawn)**
 
-- The periodic job is **inserted once cluster-wide by the elected leader** and **dequeued once** by a
-  single worker (River's queue guarantees single execution). The advisory lock's sole purpose —
-  single-runner mutual exclusion — is **subsumed by River's elector + queue**.
-- The `pg_try_advisory_lock` is therefore **removed**. With no application-held advisory lock in the
-  janitor, **the H-PRE-1 hazard no longer exists** — the constraint is **retired**, not merely satisfied.
+> **⚠ ERRATUM 2026-07-04 (HS-7 — this ADR's original H-PRE-1 disposition was wrong; corrected in place,
+> ratification carried to M5 HS-1).** The original text claimed H-PRE-1 "existed because the watchdog took
+> `pg_try_advisory_lock`" and is therefore **retired**. Runtime-truth verification during F5.2 falsified
+> both halves:
+> 1. **H-PRE-1 is not about the watchdog.** It ("never call an authz-recording read inside a lock-holding
+>    atomic tx") is motivated by the **audit hash-chain writer's `pg_advisory_xact_lock`**
+>    (`internal/modules/audit/infrastructure/postgres/writer.go:59`) combined with `authz.Require`
+>    recording a system_admin bypass audit **in the caller's tx** (`internal/modules/iam/authz/authz.go:119`).
+>    Its canonical instance was the CD-create path (a taxonomy read nested inside that audit-lock-holding
+>    tx). It also governs the auth-repo, documents-repo, and migrate advisory locks. `[[advisory-lock-deadlock-constraint]]`.
+> 2. **The watchdog lock never even instantiated H-PRE-1.** `acquireRunLock` took `pg_try_advisory_lock`
+>    on its **own dedicated connection** (`db.Conn(ctx)`) purely for single-runner mutual exclusion; it did
+>    **not** enclose the cancel tx or any authz-recording read. It is a *different, unrelated* lock.
+>
+> **Correct disposition: H-PRE-1 remains LIVE and is NOT retired by M5.** No doc marks it retired.
 
-**Evidence required (F5.2):** an integration test that runs two River clients against one database and
-asserts the watchdog periodic job **executes exactly once** per tick (singleton via elector), with the
-advisory lock removed. Retirement is contingent on that proof; until it is green, the constraint is not
-declared retired.
+**What M5 actually does here (binding):** the stuck-instance-watchdog's `pg_try_advisory_lock` is
+**removed** because its sole purpose — single-runner mutual exclusion across replicas — is **subsumed by
+River's elector (single cluster-wide periodic insert) + queue (single `FOR UPDATE SKIP LOCKED` claim)**.
+The watchdog body is additionally idempotent, so a hypothetical double-run is harmless. This removal is a
+local cleanup of a redundant lock; it is **orthogonal to H-PRE-1**.
+
+**Evidence required (F5.2, binding):** an integration test that runs two River clients against one database
+and asserts the watchdog job body **executes exactly once** (singleton via elector + single queue claim),
+with the advisory lock removed (`internal/platform/jobs/river/singleton_integration_test.go`, P4). This
+proves River's single-runner guarantee **justifies removing the watchdog lock** — it is **not** an H-PRE-1
+retirement proof. If it fails, the lock removal is unsafe and reverts (HS-2 boundary call).
 
 ## Consequences
 
@@ -139,8 +158,10 @@ declared retired.
   on the business tx; consumers stay idempotent; retention is added.
 - **RLS backstop preserved** — migrated tenant-scoped jobs seed `SeedTxTenant`/`SeedTxIdentity` per
   message/run (M3 F3.2).
-- **H-PRE-1 retired with evidence** — the memory note and `invariant-checklist.md:58` are updated to
-  reflect retirement (M5 disposition); the advisory-lock class is gone.
+- **Watchdog single-runner advisory lock removed (NOT an H-PRE-1 retirement)** — the memory note and
+  `invariant-checklist.md:58` are updated to keep **H-PRE-1 LIVE** and record that M5 removed the watchdog's
+  *unrelated* `pg_try_advisory_lock` (River elector+queue subsume single-runner mutual exclusion). The
+  audit-writer advisory-lock class that motivates H-PRE-1 is untouched. See §H-PRE-1 erratum.
 - **Migration ordering (destructive, expand/contract):** (a) add River periodic jobs + staging River
   jobs + purge job, verify both run; (b) delete the lease scheduler code + watchdog advisory lock;
   (c) drop `job_leases` + the 3 lease functions in a forward-only migration ordered **after** the code
@@ -153,7 +174,7 @@ declared retired.
 
 - **Keep three infrastructures, patch the two debts in place** (add a lease-scheduler purge job + a
   hand-rolled ordering key). Rejected: optimizes *inside* the patch (locks in the local maximum), leaves
-  three election/retry code paths and the H-PRE-1 class standing. Fails the Global-Maximum rule.
+  three election/retry code paths and the redundant watchdog advisory lock standing. Fails the Global-Maximum rule.
 - **Migrate janitors onto River but leave staging on the poller.** Rejected: still two dispatch/backoff
   implementations; the staging duplicated-backoff debt survives. Half-consolidation.
 - **Host the janitors in `metaldocs-api`** (a River client with periodic jobs inside api). Rejected:

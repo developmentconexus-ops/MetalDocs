@@ -55,4 +55,11 @@ module's application service or published Go interface.
   `internal/platform/problem/problem.go:77` (`Write`); codes `internal/platform/problem/codes.go:9`.
 - **Fixed request lifecycle**: panic→trace→obs→cors→rate-limit→authn→tier-1 authz→idempotency→handler
   is inherited; new routes don't re-wire it. `apps/api/cmd/metaldocs-api/chain.go:25`.
-- **H-PRE-1**: never call an authz-recording read inside a lock-holding atomic tx; hoist it off-tx.
+- **H-PRE-1** (LIVE — never retired): never call an authz-recording read inside a lock-holding atomic tx;
+  hoist it off-tx. Motivating lock = the audit hash-chain writer's `pg_advisory_xact_lock`
+  (`internal/modules/audit/infrastructure/postgres/writer.go:59`) + `authz.Require` recording a
+  system_admin bypass audit in the caller's tx (`internal/modules/iam/authz/authz.go:119`). Also governs the
+  auth-repo / documents-repo / migrate advisory locks. **M5 note:** M5 removed the stuck-instance-watchdog's
+  `pg_try_advisory_lock` — that was single-runner mutual exclusion (River's elector+queue now subsume it),
+  **unrelated** to H-PRE-1's authz-read-in-locked-tx hazard. Removing it neither triggers nor retires H-PRE-1.
+  ([[advisory-lock-deadlock-constraint]].)
