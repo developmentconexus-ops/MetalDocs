@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"time"
+
+	"github.com/riverqueue/river"
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/iam/authz"
@@ -39,91 +40,110 @@ type governanceEmitter interface {
 	Emit(ctx context.Context, tx db.Tx, e application.GovernanceEvent) error
 }
 
+// StuckInstanceWatchdogArgs is the (empty) River job payload for the
+// stuck-instance watchdog tick. The job carries no per-run parameters — all
+// tick behavior is derived from the database at run time.
+type StuckInstanceWatchdogArgs struct{}
+
+// Kind implements river.JobArgs, identifying this job type to River.
+func (StuckInstanceWatchdogArgs) Kind() string { return JobName }
+
+// StuckInstanceWatchdogWorker is the River worker that runs the watchdog tick.
+// Cluster-wide single-runner is provided by River's leader-elected periodic
+// insert plus its queue dequeue semantics; no advisory lock is taken here
+// (ADR 0067 §H-PRE-1 retires the lease-scheduler-era advisory lock as
+// redundant under River).
+type StuckInstanceWatchdogWorker struct {
+	river.WorkerDefaults[StuckInstanceWatchdogArgs]
+
+	database  *sql.DB
+	cancelSvc cancelSvcInterface
+	emitter   governanceEmitter
+	runner    db.TxRunner
+}
+
+// NewWorker constructs a StuckInstanceWatchdogWorker.
+func NewWorker(database *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) *StuckInstanceWatchdogWorker {
+	return &StuckInstanceWatchdogWorker{
+		database:  database,
+		cancelSvc: cancelSvc,
+		emitter:   emitter,
+		runner:    db.NewTxRunner(database),
+	}
+}
+
+// Work runs one watchdog tick under a background-bypass authz context (no
+// HTTP-request identity exists here).
+func (w *StuckInstanceWatchdogWorker) Work(ctx context.Context, job *river.Job[StuckInstanceWatchdogArgs]) error {
+	// Background root: permit SystemCancelInstance's authz.BypassSystem
+	// (fail-closed off any HTTP path — ADR 0022 Phase 7, CWE-269).
+	ctx = authz.WithBackgroundBypass(ctx)
+	return run(ctx, w.database, w.runner, w.cancelSvc, w.emitter)
+}
+
 func New(database *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) scheduler.JobFunc {
 	runner := db.NewTxRunner(database)
 	return func(ctx context.Context, epoch int64) error {
 		// Background root: permit SystemCancelInstance's authz.BypassSystem
 		// (fail-closed off any HTTP path — ADR 0022 Phase 7, CWE-269).
 		ctx = authz.WithBackgroundBypass(ctx)
-		unlock, err := acquireRunLock(ctx, database)
-		if err != nil {
-			slog.ErrorContext(ctx, "stuck_instance_watchdog: acquire run lock failed",
-				"job", JobName, "epoch", epoch, "error", err)
-			return err
-		}
-		defer unlock()
-
-		stuck, err := listStuckInstances(ctx, database)
-		if err != nil {
-			slog.ErrorContext(ctx, "stuck_instance_watchdog: list stuck instances failed",
-				"job", JobName, "epoch", epoch, "error", err)
-			return err
-		}
-
-		stuckDetected := len(stuck)
-		autoCancelled := 0
-		alertsEmitted := 0
-		var runErr error
-
-		for _, inst := range stuck {
-			if inst.DriftPolicy == "auto_cancel" {
-				_, err := cancelSvc.SystemCancelInstance(ctx, runner, application.CancelInput{
-					TenantID:                inst.TenantID,
-					InstanceID:              inst.ID,
-					ExpectedRevisionVersion: 0,
-					ActorUserID:             SystemActor,
-					Reason:                  "stuck_watchdog_auto_cancel",
-				})
-				if err != nil {
-					slog.ErrorContext(ctx, "stuck_instance_watchdog: auto-cancel failed",
-						"job", JobName, "epoch", epoch, "instance_id", inst.ID, "tenant_id", inst.TenantID, "error", err)
-					runErr = errors.Join(runErr, err)
-					continue
-				}
-				autoCancelled++
-				continue
-			}
-
-			if err := emitStuckAlert(ctx, database, emitter, inst); err != nil {
-				slog.ErrorContext(ctx, "stuck_instance_watchdog: emit stuck alert failed",
-					"job", JobName, "epoch", epoch, "instance_id", inst.ID, "tenant_id", inst.TenantID, "error", err)
-				runErr = errors.Join(runErr, err)
-				continue
-			}
-			alertsEmitted++
-		}
-
-		slog.InfoContext(ctx, "stuck_instance_watchdog: tick complete",
-			"job", JobName,
-			"epoch", epoch,
-			"stuck_detected", stuckDetected,
-			"auto_cancelled", autoCancelled,
-			"alerts_emitted", alertsEmitted)
-
-		return runErr
+		return run(ctx, database, runner, cancelSvc, emitter)
 	}
 }
 
-func acquireRunLock(ctx context.Context, db *sql.DB) (func(), error) {
-	conn, err := db.Conn(ctx)
+// run executes one watchdog tick. Extracted so both the legacy lease-scheduler
+// New closure and the River Worker delegate to the same behavior. The
+// lease-scheduler-era advisory lock is not part of this body — cluster-wide
+// single-runner is provided by the caller's own mutual-exclusion mechanism
+// (lease scheduler, or River leader-election + queue dequeue).
+func run(ctx context.Context, database *sql.DB, runner db.TxRunner, cancelSvc cancelSvcInterface, emitter governanceEmitter) error {
+	stuck, err := listStuckInstances(ctx, database)
 	if err != nil {
-		return nil, err
+		slog.ErrorContext(ctx, "stuck_instance_watchdog: list stuck instances failed",
+			"job", JobName, "error", err)
+		return err
 	}
 
-	var locked bool
-	if err := conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock(hashtext($1))`, JobName).Scan(&locked); err != nil {
-		_ = conn.Close()
-		return nil, err
-	}
-	if !locked {
-		_ = conn.Close()
-		return nil, fmt.Errorf("watchdog run lock not acquired")
+	stuckDetected := len(stuck)
+	autoCancelled := 0
+	alertsEmitted := 0
+	var runErr error
+
+	for _, inst := range stuck {
+		if inst.DriftPolicy == "auto_cancel" {
+			_, err := cancelSvc.SystemCancelInstance(ctx, runner, application.CancelInput{
+				TenantID:                inst.TenantID,
+				InstanceID:              inst.ID,
+				ExpectedRevisionVersion: 0,
+				ActorUserID:             SystemActor,
+				Reason:                  "stuck_watchdog_auto_cancel",
+			})
+			if err != nil {
+				slog.ErrorContext(ctx, "stuck_instance_watchdog: auto-cancel failed",
+					"job", JobName, "instance_id", inst.ID, "tenant_id", inst.TenantID, "error", err)
+				runErr = errors.Join(runErr, err)
+				continue
+			}
+			autoCancelled++
+			continue
+		}
+
+		if err := emitStuckAlert(ctx, database, emitter, inst); err != nil {
+			slog.ErrorContext(ctx, "stuck_instance_watchdog: emit stuck alert failed",
+				"job", JobName, "instance_id", inst.ID, "tenant_id", inst.TenantID, "error", err)
+			runErr = errors.Join(runErr, err)
+			continue
+		}
+		alertsEmitted++
 	}
 
-	return func() {
-		_, _ = conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock(hashtext($1))`, JobName)
-		_ = conn.Close()
-	}, nil
+	slog.InfoContext(ctx, "stuck_instance_watchdog: tick complete",
+		"job", JobName,
+		"stuck_detected", stuckDetected,
+		"auto_cancelled", autoCancelled,
+		"alerts_emitted", alertsEmitted)
+
+	return runErr
 }
 
 func listStuckInstances(ctx context.Context, db *sql.DB) ([]StuckInstance, error) {
