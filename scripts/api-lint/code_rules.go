@@ -98,6 +98,15 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	}
 	out = append(out, seedChokepoint...)
 
+	// M3 F3.2 (validation-contract.md §2.3) — ASYNC-TENANT-SEED: a worker/jobs
+	// write against a tenant-scoped (FORCE RLS) table must sit in a function
+	// that also calls SeedTxTenant/SeedTxIdentity, unless allowlisted.
+	asyncTenantSeed, err := checkAsyncTenantSeed(modulesRoot, strict)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, asyncTenantSeed...)
+
 	return out, nil
 }
 

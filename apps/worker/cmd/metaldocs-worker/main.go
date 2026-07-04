@@ -49,6 +49,41 @@ func (a snapshotFinalDocxAdapter) WriteFinalDocxInTx(ctx context.Context, tx db.
 	return a.repo.WriteFinalDocx(ctx, tenantID, revisionID, s3Key, contentHash, tx)
 }
 
+// snapshotPDFTxAdapter bridges SnapshotRepository to workerapp.PDFPersisterInTx
+// (M3 F3.2 — validation-contract.md §2.2 site 2: the pdf job runner's write
+// must run inside a SeedTxTenant-seeded tx).
+type snapshotPDFTxAdapter struct {
+	repo *docrepo.SnapshotRepository
+}
+
+func (a snapshotPDFTxAdapter) WritePDFInTx(ctx context.Context, tx db.Tx, req workerapp.PDFWriteRequest) error {
+	return a.repo.WritePDF(
+		ctx,
+		string(req.TenantID),
+		string(req.DocumentID),
+		string(req.StorageKey),
+		req.PDFHash,
+		req.GeneratedAt,
+		tx,
+	)
+}
+
+// WritePDF satisfies workerapp.PDFPersister so snapshotPDFTxAdapter can be
+// passed directly to NewPDFJobRunnerWithDB (which requires both interfaces);
+// the runner always prefers WritePDFInTx when db != nil, so this untransacted
+// path is dead code in production wiring but keeps the adapter a complete
+// PDFPersister for type-safety.
+func (a snapshotPDFTxAdapter) WritePDF(ctx context.Context, req workerapp.PDFWriteRequest) error {
+	return a.repo.WritePDF(
+		ctx,
+		string(req.TenantID),
+		string(req.DocumentID),
+		string(req.StorageKey),
+		req.PDFHash,
+		req.GeneratedAt,
+	)
+}
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
@@ -89,7 +124,9 @@ func main() {
 
 	if deps.PDFConverter != nil && deps.SQLDB != nil {
 		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
-		pdfRunner := workerapp.NewPDFJobRunner(deps.PDFConverter, workerapp.NewSnapshotPDFPersister(snapRepo))
+		// M3 F3.2 (validation-contract.md §2.2 site 2): wrap the PDF write in a
+		// SeedTxTenant-seeded tx so the FORCE RLS backstop engages.
+		pdfRunner := workerapp.NewPDFJobRunnerWithDB(deps.PDFConverter, snapshotPDFTxAdapter{repo: snapRepo}, deps.SQLDB)
 		workerSvc = workerSvc.WithPDFRunner(pdfRunner)
 	}
 

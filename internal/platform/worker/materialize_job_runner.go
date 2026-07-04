@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/messaging"
 )
@@ -75,6 +76,12 @@ func (r *MaterializeJobRunner) Handle(ctx context.Context, event messaging.Event
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("materialize job runner: begin tx: %w", err)
+	}
+	// M3 F3.2 (validation-contract.md §2.2 site 1) — seed the tenant-only RLS
+	// backstop GUC before any write/lock in this single-tenant processing tx.
+	if err := authz.SeedTxTenant(ctx, tx, payload.TenantID); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("materialize job runner: seed tenant: %w", err)
 	}
 	if err := r.finalDocx.WriteFinalDocxInTx(ctx, tx, payload.TenantID, payload.RevisionID, result.FinalDocxS3Key, result.ContentHash); err != nil {
 		_ = tx.Rollback()

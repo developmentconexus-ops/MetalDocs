@@ -64,3 +64,28 @@ SELECT
 	}
 	return nil
 }
+
+// SeedTxTenant sets ONLY the transaction-local metaldocs.tenant_id GUC — the
+// minimum seed that engages the FORCE ROW LEVEL SECURITY backstop (M3 F3.2 /
+// validation-contract.md §2.1). It sets and requires NO actor: RLS reads
+// only metaldocs.tenant_id, and async system work (worker/jobs processing
+// txs) has no human actor to seed — SeedTxIdentity's actor-required
+// contract is the wrong primitive for that seam. SeedTxTenant is additive
+// and orthogonal to authz.BypassSystem: the RLS backstop (this) and the
+// write-tripwire bypass (BypassSystem) are separate gates and both must
+// still be called where each is needed.
+//
+// tenantID must be non-empty (trimmed); the GUC is seeded tx-local via
+// set_config(..., true) — never session-level, so a pooled connection never
+// leaks a tenant identity to the next borrower.
+func SeedTxTenant(ctx context.Context, tx *sql.Tx, tenantID string) error {
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" {
+		return ErrTenantContextMissing
+	}
+
+	if _, err := tx.ExecContext(ctx, `SELECT set_config('metaldocs.tenant_id', $1, true)`, tenantID); err != nil {
+		return fmt.Errorf("seed authz tx tenant: %w", err)
+	}
+	return nil
+}

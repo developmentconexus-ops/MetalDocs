@@ -26,14 +26,14 @@ type fakeOutboxRepo struct {
 func (f *fakeOutboxRepo) ClaimPending(_ context.Context, _, _ int) ([]OutboxRow, error) {
 	return f.rows, nil
 }
-func (f *fakeOutboxRepo) MarkDispatched(_ context.Context, id string) error {
+func (f *fakeOutboxRepo) MarkDispatched(_ context.Context, _, id string) error {
 	if f.markDispatchedErr != nil {
 		return f.markDispatchedErr
 	}
 	f.dispatchedIDs = append(f.dispatchedIDs, id)
 	return nil
 }
-func (f *fakeOutboxRepo) MarkFailed(_ context.Context, id, _ string, _ time.Time, finalize bool) error {
+func (f *fakeOutboxRepo) MarkFailed(_ context.Context, _, id, _ string, _ time.Time, finalize bool) error {
 	f.failedIDs = append(f.failedIDs, id)
 	if finalize {
 		f.finalizedIDs = append(f.finalizedIDs, id)

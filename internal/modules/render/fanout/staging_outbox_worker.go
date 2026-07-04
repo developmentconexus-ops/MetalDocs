@@ -10,10 +10,15 @@ import (
 	"metaldocs/internal/platform/messaging"
 )
 
+// stagingOutboxRepoAPI's MarkDispatched/MarkFailed take tenantID so the
+// implementation can seed authz.SeedTxTenant(ctx, tx, tenantID) in its own
+// processing tx before the write (M3 F3.2 — validation-contract.md §2.2 site
+// 5: the claim step stays GUC-unset per ADR 0054 rule 1, but every per-row
+// processing write must be scoped to that row's tenant).
 type stagingOutboxRepoAPI interface {
 	ClaimPending(ctx context.Context, limit, maxAttempts int) ([]OutboxRow, error)
-	MarkDispatched(ctx context.Context, id string) error
-	MarkFailed(ctx context.Context, id, errStr string, nextRetryAt time.Time, finalize bool) error
+	MarkDispatched(ctx context.Context, tenantID, id string) error
+	MarkFailed(ctx context.Context, tenantID, id, errStr string, nextRetryAt time.Time, finalize bool) error
 	ResetStaleClaims(ctx context.Context, olderThan time.Duration) (int, error)
 }
 
@@ -87,13 +92,13 @@ func (w *StagingOutboxWorker) dispatchOne(ctx context.Context, r OutboxRow) {
 	if err == nil {
 		// F-R4: if MarkDispatched fails, fall through to MarkFailed so the row
 		// is retried rather than silently abandoned in 'processing' state.
-		if mErr := w.repo.MarkDispatched(ctx, r.ID); mErr != nil {
+		if mErr := w.repo.MarkDispatched(ctx, r.TenantID, r.ID); mErr != nil {
 			w.log.Error("staging outbox mark dispatched", "id", r.ID, "err", mErr)
 			finalize := r.Attempts+1 >= w.maxAttempt
 			cappedAttempts := min(max(r.Attempts, 0), 30)
 			backoff := time.Duration(math.Min(float64(30*time.Minute), float64(time.Duration(1<<cappedAttempts)*30*time.Second)))
 			nextRetry := time.Now().Add(backoff)
-			if fErr := w.repo.MarkFailed(ctx, r.ID, mErr.Error(), nextRetry, finalize); fErr != nil {
+			if fErr := w.repo.MarkFailed(ctx, r.TenantID, r.ID, mErr.Error(), nextRetry, finalize); fErr != nil {
 				w.log.Error("staging outbox mark failed after dispatch error", "id", r.ID, "err", fErr)
 			}
 		}
@@ -103,7 +108,7 @@ func (w *StagingOutboxWorker) dispatchOne(ctx context.Context, r OutboxRow) {
 	cappedAttempts := min(max(r.Attempts, 0), 30)
 	backoff := time.Duration(math.Min(float64(30*time.Minute), float64(time.Duration(1<<cappedAttempts)*30*time.Second)))
 	nextRetry := time.Now().Add(backoff)
-	if mErr := w.repo.MarkFailed(ctx, r.ID, err.Error(), nextRetry, finalize); mErr != nil {
+	if mErr := w.repo.MarkFailed(ctx, r.TenantID, r.ID, err.Error(), nextRetry, finalize); mErr != nil {
 		w.log.Error("staging outbox mark failed", "id", r.ID, "err", mErr)
 	}
 	if finalize {

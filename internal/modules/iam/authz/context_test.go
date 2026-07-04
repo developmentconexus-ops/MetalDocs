@@ -121,3 +121,59 @@ func TestSeedTxIdentity_UsesTransactionLocalGUCs(t *testing.T) {
 		t.Fatalf("unmet expectations: %v", err)
 	}
 }
+
+// TestSeedTxTenant_SetsOnlyTenantGUC — M3 F3.2 PG-1 (validation-contract.md
+// §2.1). SeedTxTenant is the tenant-ONLY primitive for the async RLS
+// backstop: it must set metaldocs.tenant_id tx-local (set_config(...,true))
+// and must NOT touch metaldocs.actor_id at all (async has no human actor;
+// the write-tripwire bypass is handled separately by authz.BypassSystem).
+func TestSeedTxTenant_SetsOnlyTenantGUC(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock new: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+
+	// Statement must set tenant_id tx-local and must NOT reference actor_id.
+	mock.ExpectExec(`^SELECT set_config\('metaldocs\.tenant_id', \$1, true\)$`).
+		WithArgs("tenant-42").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := authz.SeedTxTenant(context.Background(), tx, "tenant-42"); err != nil {
+		t.Fatalf("SeedTxTenant: %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+// TestSeedTxTenant_EmptyTenantErrors — empty tenantID must error rather than
+// silently seeding an empty GUC (mirrors SeedTxIdentity's tenant validation).
+func TestSeedTxTenant_EmptyTenantErrors(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock new: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+
+	if err := authz.SeedTxTenant(context.Background(), tx, "   "); !errors.Is(err, authz.ErrTenantContextMissing) {
+		t.Fatalf("SeedTxTenant empty tenant: got %v, want ErrTenantContextMissing", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}

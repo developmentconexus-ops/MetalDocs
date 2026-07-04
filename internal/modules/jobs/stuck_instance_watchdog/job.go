@@ -184,6 +184,14 @@ func emitStuckAlert(ctx context.Context, db *sql.DB, emitter governanceEmitter, 
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return err
 	}
+	// Carrier-less watchdog ctx → the F3.1 TxRunner chokepoint never runs here
+	// (this is a raw db.BeginTx). Seed the stuck instance's tenant so FORCE RLS
+	// backstops the governance_events write (a tenant-scoped table); the alert
+	// concerns exactly one tenant's instance (validation-contract §2.6/§4: no
+	// tenant-scoped async write runs unseeded outside the §2.4 allowlist).
+	if err := authz.SeedTxTenant(ctx, tx, inst.TenantID); err != nil {
+		return err
+	}
 
 	payload, err := json.Marshal(map[string]any{
 		"instance_id":   inst.ID,

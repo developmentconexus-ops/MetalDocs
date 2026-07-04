@@ -1,0 +1,49 @@
+# ASYNC-TENANT-SEED tenant-scoped table set (M3 F3.2 — validation-contract.md
+# §2.3). This is the checked-in, non-hardcoded data file the lint reads to
+# decide whether a worker/jobs DB write targets a tenant-scoped (FORCE RLS)
+# table. Derived from `grep -n "FORCE ROW LEVEL SECURITY" db/baseline/0001_current_schema.sql`
+# (32 tables, all carrying `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL
+# SECURITY` and the identical NULL-permissive `tenant_isolation` policy).
+# Bare table names only (schema prefix stripped), one per line, `#`-comments
+# and blank lines ignored — mirrors parseMutatingTable's bareTableName
+# normalization in tripwire_arm_rules.go so entries match write-site parsing.
+#
+# NOTE: idempotency_keys and job_leases are intentionally NOT listed here even
+# though idempotency_keys carries FORCE ROW LEVEL SECURITY — both are system
+# tables with no tenant_id column (RLS is structurally N/A for them) and are
+# separately allowlisted by category in async-tenant-seed-allowlist.txt
+# (contract §2.4), not by omission from this file being silently correct: a
+# write against them would never match this table set regardless, so no
+# ASYNC-TENANT-SEED violation is even possible for them.
+audit_events
+audit_export_jobs
+auth_sessions
+document_process_areas
+document_profiles
+iam_group_members
+iam_groups
+iam_user_roles
+iam_users
+materialize_dispatch_outbox
+notifications
+pdf_dispatch_outbox
+tenant_plans
+token_dictionary_entries
+user_process_areas
+controlled_document_area_grants
+controlled_document_user_grants
+controlled_documents
+documents
+approval_instances
+approval_routes
+cd_sequence_counters
+document_comments
+document_exports
+document_placeholder_values
+editor_sessions
+governance_events
+template_audit_log
+templates
+templates_audit_log
+templates_template
+templates_template_version

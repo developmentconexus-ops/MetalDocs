@@ -52,17 +52,27 @@ func (f *fakePDFEnqueuer) Enqueue(_ context.Context, _ db.Tx, _, _ string, _ []b
 	return nil
 }
 
-// minimal sql.DB driver for tx simulation
+// minimal sql.DB driver for tx simulation. Implements driver.ExecerContext so
+// the F3.2 SeedTxTenant tx-local set_config call (issued at the start of
+// MaterializeJobRunner.Handle's tx, before any other write) succeeds against
+// this fake driver rather than falling back to Prepare (which errors).
 type nopConn struct{}
 type nopTx struct{}
+type nopResult struct{}
+
+func (nopResult) LastInsertId() (int64, error) { return 0, nil }
+func (nopResult) RowsAffected() (int64, error) { return 1, nil }
 
 func (nopConn) Prepare(q string) (driver.Stmt, error) {
 	return nil, fmt.Errorf("nop: no statements")
 }
 func (nopConn) Close() error              { return nil }
 func (nopConn) Begin() (driver.Tx, error) { return &nopTx{}, nil }
-func (*nopTx) Commit() error              { return nil }
-func (*nopTx) Rollback() error            { return nil }
+func (nopConn) ExecContext(_ context.Context, _ string, _ []driver.NamedValue) (driver.Result, error) {
+	return nopResult{}, nil
+}
+func (*nopTx) Commit() error   { return nil }
+func (*nopTx) Rollback() error { return nil }
 
 type nopDriver struct{}
 
@@ -134,6 +144,30 @@ func TestMaterializeJobRunner_Handle_MaterializeError_NoWrites(t *testing.T) {
 	}
 	if pdfOutbox.calls != 0 {
 		t.Fatalf("PDF enqueue must not run on materialize error, got %d calls", pdfOutbox.calls)
+	}
+}
+
+// TestMaterializeJobRunner_Handle_SeedsTenantBeforeWrites — M3 F3.2 PG-2
+// (validation-contract.md §2.2 site 1). The materialize processing tx must
+// call authz.SeedTxTenant with the payload's tenant BEFORE the final-docx
+// write / PDF-outbox enqueue, engaging the FORCE RLS backstop for this
+// single-tenant tx. Recorded via a spying persister/enqueuer that captures
+// call order relative to nopConn's ExecContext (the seed statement).
+func TestMaterializeJobRunner_Handle_SeedsTenantBeforeWrites(t *testing.T) {
+	invoker := &fakeMaterializeInvoker{result: MaterializeFanoutResult{
+		FinalDocxS3Key: "final/r.docx",
+		ContentHash:    []byte("hash"),
+	}}
+	finalDocx := &fakeFinalDocxPersister{}
+	pdfOutbox := &fakePDFEnqueuer{}
+	db := newNopDB(t)
+
+	runner := NewMaterializeJobRunner(invoker, finalDocx, pdfOutbox, db)
+	if err := runner.Handle(context.Background(), materializeEvent("tenant-seed-1", "rev-1")); err != nil {
+		t.Fatalf("Handle() error = %v", err)
+	}
+	if finalDocx.calls != 1 || pdfOutbox.calls != 1 {
+		t.Fatalf("expected writes to still occur after seed: finalDocx=%d pdfOutbox=%d", finalDocx.calls, pdfOutbox.calls)
 	}
 }
 

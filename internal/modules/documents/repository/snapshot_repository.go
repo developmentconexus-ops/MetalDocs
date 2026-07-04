@@ -152,8 +152,15 @@ func (r *SnapshotRepository) ReadFinalDocxS3Key(ctx context.Context, tenantID, d
 }
 
 // WritePDF persists the rendered PDF pointer, hash, and generation timestamp.
-func (r *SnapshotRepository) WritePDF(ctx context.Context, tenantID, docID, s3Key string, pdfHash []byte, generatedAt time.Time) error {
-	result, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+// An optional DBTX (q) lets the caller run this inside its own transaction
+// (M3 F3.2 — the pdf job runner wraps this write in a SeedTxTenant-seeded tx);
+// omitted, it runs directly against the pool as before.
+func (r *SnapshotRepository) WritePDF(ctx context.Context, tenantID, docID, s3Key string, pdfHash []byte, generatedAt time.Time, q ...DBTX) error {
+	exec := DBTX(r.db)
+	if len(q) > 0 && q[0] != nil {
+		exec = q[0]
+	}
+	result, err := exec.ExecContext(ctx, fmt.Sprintf(`
         UPDATE %s
            SET final_pdf_s3_key=$1, pdf_hash=$2, pdf_generated_at=$3
          WHERE tenant_id=$4::uuid AND id=$5::uuid`, r.table("documents")),

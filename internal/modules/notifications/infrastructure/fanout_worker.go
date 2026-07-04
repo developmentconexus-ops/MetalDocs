@@ -8,6 +8,7 @@ import (
 	"github.com/riverqueue/river"
 
 	documentsdomain "metaldocs/internal/modules/documents/domain"
+	"metaldocs/internal/modules/iam/authz"
 )
 
 var ptBRMessages = map[string][2]string{
@@ -20,7 +21,9 @@ var ptBRMessages = map[string][2]string{
 
 // NotificationsFanoutWorker is a River worker that consumes LifecycleEventArgs
 // jobs and inserts per-recipient rows into metaldocs.notifications.
-// Runs after commit (H-PRE-1 compliant — no authz reads inside this worker).
+// Runs after commit (H-PRE-1 compliant — no authz.Require/lock inside this
+// worker; authz.SeedTxTenant is a SET LOCAL config write, not an
+// authz-recording read, per M3 F3.2 validation-contract.md §2.2 site 4).
 // Idempotent via partial unique index on (recipient_user_id, source_event_id).
 type NotificationsFanoutWorker struct {
 	river.WorkerDefaults[documentsdomain.LifecycleEventArgs]
@@ -35,26 +38,58 @@ func NewNotificationsFanoutWorker(db *sql.DB) *NotificationsFanoutWorker {
 	return &NotificationsFanoutWorker{db: db}
 }
 
+// Work runs the whole fanout for one delivered event inside a single
+// transaction seeded with the event's tenant (M3 F3.2 — validation-
+// contract.md §2.2 site 4: "wrap the insert loop in a tx"). The event is
+// single-tenant by construction (args.TenantID), so one seeded tx covers the
+// obligated-readers read + every per-recipient insert without mixing tenants
+// (ADR 0054 rule 2).
 func (w *NotificationsFanoutWorker) Work(ctx context.Context, job *river.Job[documentsdomain.LifecycleEventArgs]) error {
 	args := job.Args
 	switch args.EventType {
 	case documentsdomain.EventTypeDocumentPublished,
 		documentsdomain.EventTypeDocumentSuperseded,
-		documentsdomain.EventTypeDocumentObsoleted:
-		return w.fanoutToReaders(ctx, args)
-	case documentsdomain.EventTypeDocumentApproved,
+		documentsdomain.EventTypeDocumentObsoleted,
+		documentsdomain.EventTypeDocumentApproved,
 		documentsdomain.EventTypeDocumentRejected:
-		return w.fanoutToAuthor(ctx, args)
+		// fall through to the seeded-tx path below.
 	default:
 		return nil
 	}
+
+	tx, err := w.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("fanout_worker: begin tx: %w", err)
+	}
+	if err := authz.SeedTxTenant(ctx, tx, args.TenantID); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("fanout_worker: seed tenant: %w", err)
+	}
+
+	switch args.EventType {
+	case documentsdomain.EventTypeDocumentPublished,
+		documentsdomain.EventTypeDocumentSuperseded,
+		documentsdomain.EventTypeDocumentObsoleted:
+		err = w.fanoutToReaders(ctx, tx, args)
+	case documentsdomain.EventTypeDocumentApproved,
+		documentsdomain.EventTypeDocumentRejected:
+		err = w.fanoutToAuthor(ctx, tx, args)
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("fanout_worker: commit: %w", err)
+	}
+	return nil
 }
 
-func (w *NotificationsFanoutWorker) fanoutToReaders(ctx context.Context, args documentsdomain.LifecycleEventArgs) error {
+func (w *NotificationsFanoutWorker) fanoutToReaders(ctx context.Context, tx *sql.Tx, args documentsdomain.LifecycleEventArgs) error {
 	if args.ControlledDocumentID == "" {
 		return nil
 	}
-	rows, err := w.db.QueryContext(ctx,
+	rows, err := tx.QueryContext(ctx,
 		`SELECT user_id FROM metaldocs.v_cd_obligated_readers
 		  WHERE tenant_id = $1::uuid AND controlled_document_id = $2::uuid`,
 		args.TenantID, args.ControlledDocumentID,
@@ -70,23 +105,23 @@ func (w *NotificationsFanoutWorker) fanoutToReaders(ctx context.Context, args do
 		if err := rows.Scan(&userID); err != nil {
 			return fmt.Errorf("fanout_worker: scan user_id: %w", err)
 		}
-		if err := w.insertRow(ctx, args, userID, msgs[0], msgs[1]); err != nil {
+		if err := w.insertRow(ctx, tx, args, userID, msgs[0], msgs[1]); err != nil {
 			return err
 		}
 	}
 	return rows.Err()
 }
 
-func (w *NotificationsFanoutWorker) fanoutToAuthor(ctx context.Context, args documentsdomain.LifecycleEventArgs) error {
+func (w *NotificationsFanoutWorker) fanoutToAuthor(ctx context.Context, tx *sql.Tx, args documentsdomain.LifecycleEventArgs) error {
 	if args.SubmittedBy == "" {
 		return nil
 	}
 	msgs := ptBRMessages[args.EventType]
-	return w.insertRow(ctx, args, args.SubmittedBy, msgs[0], msgs[1])
+	return w.insertRow(ctx, tx, args, args.SubmittedBy, msgs[0], msgs[1])
 }
 
-func (w *NotificationsFanoutWorker) insertRow(ctx context.Context, args documentsdomain.LifecycleEventArgs, recipientUserID, title, message string) error {
-	_, err := w.db.ExecContext(ctx,
+func (w *NotificationsFanoutWorker) insertRow(ctx context.Context, tx *sql.Tx, args documentsdomain.LifecycleEventArgs, recipientUserID, title, message string) error {
+	_, err := tx.ExecContext(ctx,
 		`INSERT INTO metaldocs.notifications
 		   (tenant_id, recipient_user_id, event_type, resource_type, resource_id, title, message, source_event_id)
 		 VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8::uuid)

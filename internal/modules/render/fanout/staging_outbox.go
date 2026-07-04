@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 )
 
@@ -101,34 +102,20 @@ RETURNING o.id, o.tenant_id, o.revision_id, o.content_hash, o.attempts`, r.table
 	return out, rows.Err()
 }
 
-func (r *StagingOutboxRepository) MarkDispatched(ctx context.Context, id string) error {
-	//nolint:gosec // table name is allowlist-validated at construction
-	res, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+// MarkDispatched records successful dispatch of one claimed row. tenantID
+// (the row's own OutboxRow.TenantID, captured at claim time) is seeded via
+// authz.SeedTxTenant in a dedicated per-row tx BEFORE the write, engaging the
+// FORCE RLS backstop for this single-tenant processing step (M3 F3.2 —
+// validation-contract.md §2.2 site 5; ADR 0054 rule 2). The cross-tenant
+// ClaimPending step above is intentionally exempt (ADR 0054 rule 1) and stays
+// GUC-unset.
+func (r *StagingOutboxRepository) MarkDispatched(ctx context.Context, tenantID, id string) error {
+	return r.inSeededTx(ctx, tenantID, func(tx *sql.Tx) error {
+		//nolint:gosec // table name is allowlist-validated at construction
+		res, err := tx.ExecContext(ctx, fmt.Sprintf(`
 UPDATE %s
    SET status='dispatched', dispatched_at=NOW()
  WHERE id=$1::uuid`, r.table), id)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return fmt.Errorf("%s mark dispatched: row not found: id=%s", r.name, id)
-	}
-	return nil
-}
-
-func (r *StagingOutboxRepository) MarkFailed(ctx context.Context, id string, errStr string, nextRetryAt time.Time, finalize bool) error {
-	if finalize {
-		// F-R3: set dead_lettered_at when permanently failing a row, mirroring
-		// internal/platform/messaging/outbox/postgres/consumer.go:152-177.
-		//nolint:gosec // table name is allowlist-validated at construction
-		res, err := r.db.ExecContext(ctx, fmt.Sprintf(`
-UPDATE %s
-   SET status='failed', last_error=$2, attempts=attempts+1, dead_lettered_at=NOW()
- WHERE id=$1::uuid`, r.table), id, errStr)
 		if err != nil {
 			return err
 		}
@@ -137,24 +124,74 @@ UPDATE %s
 			return err
 		}
 		if n == 0 {
-			return fmt.Errorf("%s mark failed finalize: row not found: id=%s", r.name, id)
+			return fmt.Errorf("%s mark dispatched: row not found: id=%s", r.name, id)
 		}
 		return nil
-	}
-	//nolint:gosec // table name is allowlist-validated at construction
-	res, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+	})
+}
+
+// MarkFailed records a dispatch failure (retry or permanent) for one claimed
+// row, seeded the same way as MarkDispatched (see its doc comment).
+func (r *StagingOutboxRepository) MarkFailed(ctx context.Context, tenantID, id string, errStr string, nextRetryAt time.Time, finalize bool) error {
+	return r.inSeededTx(ctx, tenantID, func(tx *sql.Tx) error {
+		if finalize {
+			// F-R3: set dead_lettered_at when permanently failing a row, mirroring
+			// internal/platform/messaging/outbox/postgres/consumer.go:152-177.
+			//nolint:gosec // table name is allowlist-validated at construction
+			res, err := tx.ExecContext(ctx, fmt.Sprintf(`
+UPDATE %s
+   SET status='failed', last_error=$2, attempts=attempts+1, dead_lettered_at=NOW()
+ WHERE id=$1::uuid`, r.table), id, errStr)
+			if err != nil {
+				return err
+			}
+			n, err := res.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if n == 0 {
+				return fmt.Errorf("%s mark failed finalize: row not found: id=%s", r.name, id)
+			}
+			return nil
+		}
+		//nolint:gosec // table name is allowlist-validated at construction
+		res, err := tx.ExecContext(ctx, fmt.Sprintf(`
 UPDATE %s
    SET status='pending', last_error=$2, attempts=attempts+1, next_retry_at=$3, claimed_at=NULL
  WHERE id=$1::uuid`, r.table), id, errStr, nextRetryAt)
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return fmt.Errorf("%s mark failed retry: row not found: id=%s", r.name, id)
+		}
+		return nil
+	})
+}
+
+// inSeededTx opens a tx, seeds it with tenantID via authz.SeedTxTenant BEFORE
+// running fn, then commits/rolls back. This is the shared tx-wrap for the
+// per-row processing writes (MarkDispatched/MarkFailed); the cross-tenant
+// ClaimPending claim step does not use this helper (ADR 0054 rule 1).
+func (r *StagingOutboxRepository) inSeededTx(ctx context.Context, tenantID string, fn func(tx *sql.Tx) error) error {
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
+		return fmt.Errorf("%s: begin tx: %w", r.name, err)
+	}
+	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("%s: seed tenant: %w", r.name, err)
+	}
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback()
 		return err
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return fmt.Errorf("%s mark failed retry: row not found: id=%s", r.name, id)
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("%s: commit: %w", r.name, err)
 	}
 	return nil
 }

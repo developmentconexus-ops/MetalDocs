@@ -75,15 +75,26 @@ func TestMaterializeOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {
 	}
 }
 
+// M3 F3.2 (validation-contract.md §2.2 site 5) — MarkDispatched/MarkFailed
+// now open their own tx and seed authz.SeedTxTenant with the row's tenant
+// BEFORE the write, so every mark-write case below expects Begin → seed →
+// UPDATE → Commit in that order.
+
 func TestPDFOutboxRepository_MarkDispatched(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
 	defer db.Close()
+	mock.MatchExpectationsInOrder(true)
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
+		WithArgs("t1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("UPDATE metaldocs.pdf_dispatch_outbox").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 	repo := NewPDFOutboxRepository(db)
-	if err := repo.MarkDispatched(context.Background(), "id-1"); err != nil {
+	if err := repo.MarkDispatched(context.Background(), "t1", "id-1"); err != nil {
 		t.Fatalf("MarkDispatched: %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -97,9 +108,15 @@ func TestPDFOutboxRepository_MarkFailed_AppliesBackoff(t *testing.T) {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
 	defer db.Close()
+	mock.MatchExpectationsInOrder(true)
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
+		WithArgs("t1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("UPDATE metaldocs.pdf_dispatch_outbox").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 	repo := NewPDFOutboxRepository(db)
-	if err := repo.MarkFailed(context.Background(), "id-1", "bus error", time.Now().Add(30*time.Second), false); err != nil {
+	if err := repo.MarkFailed(context.Background(), "t1", "id-1", "bus error", time.Now().Add(30*time.Second), false); err != nil {
 		t.Fatalf("MarkFailed: %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -142,11 +159,17 @@ func TestPDFOutboxRepository_MarkFailed_RetryPath_ResetsClaimAndBumpsAttempts(t 
 	}
 	defer db.Close()
 	nextRetry := time.Now().Add(30 * time.Second)
+	mock.MatchExpectationsInOrder(true)
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
+		WithArgs("t-retry").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`UPDATE metaldocs\.pdf_dispatch_outbox\s+SET status='pending', last_error=\$2, attempts=attempts\+1, next_retry_at=\$3, claimed_at=NULL\s+WHERE id=\$1::uuid`).
 		WithArgs("id-retry", "transient error", nextRetry).
 		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 	repo := NewPDFOutboxRepository(db)
-	if err := repo.MarkFailed(context.Background(), "id-retry", "transient error", nextRetry, false); err != nil {
+	if err := repo.MarkFailed(context.Background(), "t-retry", "id-retry", "transient error", nextRetry, false); err != nil {
 		t.Fatalf("MarkFailed: %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -165,11 +188,17 @@ func TestPDFOutboxRepository_MarkFailed_FinalizePath_SetsDeadLetteredAndFailedSt
 		t.Fatalf("sqlmock.New: %v", err)
 	}
 	defer db.Close()
+	mock.MatchExpectationsInOrder(true)
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
+		WithArgs("t-final").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(`UPDATE metaldocs\.pdf_dispatch_outbox\s+SET status='failed', last_error=\$2, attempts=attempts\+1, dead_lettered_at=NOW\(\)\s+WHERE id=\$1::uuid`).
 		WithArgs("id-final", "permanent defect").
 		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 	repo := NewPDFOutboxRepository(db)
-	if err := repo.MarkFailed(context.Background(), "id-final", "permanent defect", time.Time{}, true); err != nil {
+	if err := repo.MarkFailed(context.Background(), "t-final", "id-final", "permanent defect", time.Time{}, true); err != nil {
 		t.Fatalf("MarkFailed: %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -187,9 +216,15 @@ func TestPDFOutboxRepository_MarkFailed_RowNotFound(t *testing.T) {
 			t.Fatalf("sqlmock.New: %v", err)
 		}
 		defer db.Close()
+		mock.MatchExpectationsInOrder(true)
+		mock.ExpectBegin()
+		mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
+			WithArgs("t-missing").
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec("UPDATE metaldocs.pdf_dispatch_outbox").WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectRollback()
 		repo := NewPDFOutboxRepository(db)
-		if err := repo.MarkFailed(context.Background(), "missing", "err", time.Now(), false); err == nil {
+		if err := repo.MarkFailed(context.Background(), "t-missing", "missing", "err", time.Now(), false); err == nil {
 			t.Fatal("expected row-not-found error, got nil")
 		}
 	})
@@ -199,9 +234,15 @@ func TestPDFOutboxRepository_MarkFailed_RowNotFound(t *testing.T) {
 			t.Fatalf("sqlmock.New: %v", err)
 		}
 		defer db.Close()
+		mock.MatchExpectationsInOrder(true)
+		mock.ExpectBegin()
+		mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
+			WithArgs("t-missing").
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec("UPDATE metaldocs.pdf_dispatch_outbox").WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectRollback()
 		repo := NewPDFOutboxRepository(db)
-		if err := repo.MarkFailed(context.Background(), "missing", "err", time.Time{}, true); err == nil {
+		if err := repo.MarkFailed(context.Background(), "t-missing", "missing", "err", time.Time{}, true); err == nil {
 			t.Fatal("expected row-not-found error, got nil")
 		}
 	})

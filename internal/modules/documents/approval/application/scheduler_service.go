@@ -55,6 +55,13 @@ var errScheduledPublishNoOp = errors.New("scheduler: scheduled row already publi
 // successful no-op rather than an error, so River-triggered retries are safe.
 func (s *SchedulerService) RunScheduledPublishJob(ctx context.Context, runner db.TxRunner, input ScheduledPublishJobInput) error {
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		// M3 F3.2 (validation-contract.md §2.2 site 3) — seed the tenant-only
+		// RLS backstop GUC before the FOR UPDATE lock below (H-PRE-1: no
+		// authz.Require is added to this locked path; BypassSystem remains
+		// the separate write-tripwire gate).
+		if err := authz.SeedTxTenant(ctx, tx, input.TenantID); err != nil {
+			return fmt.Errorf("scheduler: seed tenant for doc %s: %w", input.DocumentID, err)
+		}
 		if err := authz.BypassSystem(ctx, tx); err != nil {
 			return fmt.Errorf("scheduler: bypass authz for doc %s: %w", input.DocumentID, err)
 		}
