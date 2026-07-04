@@ -150,7 +150,7 @@ import (
 )
 
 func sweepLeases(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, "DELETE FROM job_leases WHERE expires_at < now()")
+	_, err := db.ExecContext(ctx, "DELETE FROM river_leader WHERE expires_at < now()")
 	return err
 }
 `)

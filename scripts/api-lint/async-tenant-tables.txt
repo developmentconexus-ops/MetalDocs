@@ -19,8 +19,6 @@
 #     ASYNC-TENANT-SEED scanned handler roots, so listing idempotency_keys here
 #     does not trip the lint on the janitor (nor is an allowlist entry needed);
 #     it does correctly guard any future worker/jobs write to the table.
-#   - job_leases is the ONLY genuinely tenant-global system table (no tenant_id
-#     column, no RLS) and is correctly ABSENT from this set.
 audit_events
 audit_export_jobs
 auth_sessions

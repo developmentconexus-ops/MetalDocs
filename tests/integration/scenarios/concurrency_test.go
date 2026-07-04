@@ -32,9 +32,6 @@ func TestConcurrencyScenarios(t *testing.T) {
 	t.Run("SkipLocked_NoDuplicateProcessing", func(t *testing.T) {
 		testSkipLockedNoDuplicateProcessing(t)
 	})
-	t.Run("LeaseEpoch_Fencing", func(t *testing.T) {
-		testLeaseEpochFencing(t)
-	})
 	t.Run("SignoffUnique_DuplicateBlocked", func(t *testing.T) {
 		testSignoffUniqueDuplicateBlocked(t)
 	})
@@ -288,37 +285,6 @@ func testSkipLockedNoDuplicateProcessing(t *testing.T) {
 		if cnt != 1 {
 			t.Fatalf("key %s processed %d times (expected 1)", k, cnt)
 		}
-	}
-}
-
-func testLeaseEpochFencing(t *testing.T) {
-	db := openDirectDB(t)
-	ctx := context.Background()
-	jobName := "test-fencing-job"
-
-	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.job_leases WHERE job_name = $1`, jobName)
-	})
-
-	_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.job_leases WHERE job_name = $1`, jobName)
-	if _, err := db.ExecContext(ctx, `
-		INSERT INTO metaldocs.job_leases (job_name, leader_id, lease_epoch, acquired_at, heartbeat_at, expires_at)
-		VALUES ($1, 'A', 5, now(), now(), now() + interval '5 minutes')`,
-		jobName,
-	); err != nil {
-		t.Fatalf("seed lease row: %v", err)
-	}
-
-	_, err := db.ExecContext(ctx, `SELECT metaldocs.assert_lease_epoch($1, $2)`, jobName, 6)
-	if err == nil {
-		t.Fatal("expected stale lease epoch error for epoch=6")
-	}
-	if !hasSQLState(err, "P0001") || !strings.Contains(err.Error(), "ErrLeaseEpochStale") {
-		t.Fatalf("expected P0001 ErrLeaseEpochStale, got: %v", err)
-	}
-
-	if _, err := db.ExecContext(ctx, `SELECT metaldocs.assert_lease_epoch($1, $2)`, jobName, 5); err != nil {
-		t.Fatalf("assert_lease_epoch with current epoch should succeed: %v", err)
 	}
 }
 

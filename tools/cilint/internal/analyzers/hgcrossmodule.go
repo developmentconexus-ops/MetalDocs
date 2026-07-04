@@ -62,7 +62,6 @@ var hgOwnerByTable = map[string]string{
 	"templates_approval_config":  "templates",
 	// jobs
 	"idempotency_keys": "jobs",
-	"job_leases":       "jobs",
 	// notifications
 	"notifications": "notifications",
 }

@@ -5,7 +5,7 @@
 #   (A) outbox claim steps (ADR 0054 rule 1) — cross-tenant FOR UPDATE SKIP
 #       LOCKED; tenancy enforced one row later at processing time.
 #   (B) cross-tenant scans with no per-row mutation.
-#   (C) system tables with no tenant_id column (idempotency_keys, job_leases).
+#   (C) system tables with no tenant_id column (idempotency_keys).
 #   (D) audit-integrity scan — read-only, system-wide by design.
 #   (E) same-file handler-local helper called only from a seeded caller in
 #       the same file — a genuine instance of the lint's documented
@@ -38,7 +38,5 @@ internal/modules/notifications/infrastructure/fanout_worker.go:124  # (E) insert
 #       cross-tenant read-only scan (QueryContext SELECT, no write).
 #   (C) internal/modules/jobs/idempotency_janitor/job.go — idempotency_keys has
 #       no tenant_id column; RLS structurally N/A.
-#   (C) internal/modules/jobs/scheduler/lease_reaper.go — job_leases has no
-#       tenant_id column; RLS structurally N/A.
 #   (D) internal/modules/jobs/audit_integrity_validator/job.go — read-only,
 #       system-wide integrity scan by design.

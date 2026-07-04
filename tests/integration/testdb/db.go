@@ -218,7 +218,6 @@ func repoRoot() string {
 }
 
 var metaldocsOwnedObjects = map[string]struct{}{
-	"acquire_lease":          {},
 	"document_families":      {},
 	"document_process_areas": {},
 	"document_profiles":      {},
@@ -230,7 +229,6 @@ var metaldocsOwnedObjects = map[string]struct{}{
 	"iam_user_roles":         {},
 	"iam_users":              {},
 	"idempotency_keys":       {},
-	"job_leases":             {},
 	"role_capabilities":      {},
 }
 
