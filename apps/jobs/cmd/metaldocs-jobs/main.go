@@ -59,7 +59,7 @@ func run(ctx context.Context) error {
 		services := approvalapp.NewServices(repo, approvalEmitter, approvalapp.RealClock{}, cdinfra.NewCDFieldReaderPG())
 		workers := approvaljobs.NewWorkers(services.Scheduler, db)
 		river.AddWorker(workers, notificationsinfra.NewNotificationsFanoutWorker(db))
-		river.AddWorker(workers, stuck_instance_watchdog.NewWorker(db, services.Cancel, approvalEmitter))
+		river.AddWorker(workers, stuck_instance_watchdog.NewWorker(db, approvalEmitter))
 		river.AddWorker(workers, idempotency_janitor.NewWorker(db))
 		river.AddWorker(workers, audit_integrity_validator.NewWorker(auditpg.NewWriter(db)))
 

@@ -30,11 +30,6 @@ type StuckInstance struct {
 	DriftPolicy string
 }
 
-type cancelSvcInterface interface {
-	CancelInstance(ctx context.Context, runner db.TxRunner, in application.CancelInput) (application.CancelResult, error)
-	SystemCancelInstance(ctx context.Context, runner db.TxRunner, in application.CancelInput) (application.CancelResult, error)
-}
-
 type governanceEmitter interface {
 	Emit(ctx context.Context, tx db.Tx, e application.GovernanceEvent) error
 }
@@ -55,35 +50,35 @@ func (StuckInstanceWatchdogArgs) Kind() string { return JobName }
 type StuckInstanceWatchdogWorker struct {
 	river.WorkerDefaults[StuckInstanceWatchdogArgs]
 
-	database  *sql.DB
-	cancelSvc cancelSvcInterface
-	emitter   governanceEmitter
-	runner    db.TxRunner
+	database *sql.DB
+	emitter  governanceEmitter
 }
 
 // NewWorker constructs a StuckInstanceWatchdogWorker.
-func NewWorker(database *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) *StuckInstanceWatchdogWorker {
+func NewWorker(database *sql.DB, emitter governanceEmitter) *StuckInstanceWatchdogWorker {
 	return &StuckInstanceWatchdogWorker{
-		database:  database,
-		cancelSvc: cancelSvc,
-		emitter:   emitter,
-		runner:    db.NewTxRunner(database),
+		database: database,
+		emitter:  emitter,
 	}
 }
 
 // Work runs one watchdog tick under a background-bypass authz context (no
 // HTTP-request identity exists here).
 func (w *StuckInstanceWatchdogWorker) Work(ctx context.Context, job *river.Job[StuckInstanceWatchdogArgs]) error {
-	// Background root: permit SystemCancelInstance's authz.BypassSystem
-	// (fail-closed off any HTTP path — ADR 0022 Phase 7, CWE-269).
+	// Background root: permits listStuckInstances/emitStuckAlert's own
+	// authz.BypassSystem reads (fail-closed off any HTTP path — ADR 0022
+	// Phase 7, CWE-269). The watchdog is alert-only (ADR 0068) — no cancel
+	// path roots here.
 	ctx = authz.WithBackgroundBypass(ctx)
-	return run(ctx, w.database, w.runner, w.cancelSvc, w.emitter)
+	return run(ctx, w.database, w.emitter)
 }
 
 // run executes one watchdog tick. Cluster-wide single-runner is provided by
 // River leader-election + queue dequeue semantics; the lease-scheduler-era
-// advisory lock is not part of this body (ADR 0067 §H-PRE-1).
-func run(ctx context.Context, database *sql.DB, runner db.TxRunner, cancelSvc cancelSvcInterface, emitter governanceEmitter) error {
+// advisory lock is not part of this body (ADR 0067 §H-PRE-1). The watchdog is
+// alert-only (ADR 0068): every stuck instance emits exactly one
+// approval.instance.stuck_alert governance event — no cancel side effect.
+func run(ctx context.Context, database *sql.DB, emitter governanceEmitter) error {
 	stuck, err := listStuckInstances(ctx, database)
 	if err != nil {
 		slog.ErrorContext(ctx, "stuck_instance_watchdog: list stuck instances failed",
@@ -92,29 +87,10 @@ func run(ctx context.Context, database *sql.DB, runner db.TxRunner, cancelSvc ca
 	}
 
 	stuckDetected := len(stuck)
-	autoCancelled := 0
 	alertsEmitted := 0
 	var runErr error
 
 	for _, inst := range stuck {
-		if inst.DriftPolicy == "auto_cancel" {
-			_, err := cancelSvc.SystemCancelInstance(ctx, runner, application.CancelInput{
-				TenantID:                inst.TenantID,
-				InstanceID:              inst.ID,
-				ExpectedRevisionVersion: 0,
-				ActorUserID:             SystemActor,
-				Reason:                  "stuck_watchdog_auto_cancel",
-			})
-			if err != nil {
-				slog.ErrorContext(ctx, "stuck_instance_watchdog: auto-cancel failed",
-					"job", JobName, "instance_id", inst.ID, "tenant_id", inst.TenantID, "error", err)
-				runErr = errors.Join(runErr, err)
-				continue
-			}
-			autoCancelled++
-			continue
-		}
-
 		if err := emitStuckAlert(ctx, database, emitter, inst); err != nil {
 			slog.ErrorContext(ctx, "stuck_instance_watchdog: emit stuck alert failed",
 				"job", JobName, "instance_id", inst.ID, "tenant_id", inst.TenantID, "error", err)
@@ -127,7 +103,6 @@ func run(ctx context.Context, database *sql.DB, runner db.TxRunner, cancelSvc ca
 	slog.InfoContext(ctx, "stuck_instance_watchdog: tick complete",
 		"job", JobName,
 		"stuck_detected", stuckDetected,
-		"auto_cancelled", autoCancelled,
 		"alerts_emitted", alertsEmitted)
 
 	return runErr

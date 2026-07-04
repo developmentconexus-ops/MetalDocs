@@ -311,36 +311,6 @@ func TestCancelInstance_CapDenied(t *testing.T) {
 	}
 }
 
-func TestSystemCancelInstance_BypassesUserCapability(t *testing.T) {
-	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
-	emitter := &MemoryEmitter{}
-	conn := &cancelTestConn{
-		authzGranted:  false,
-		docUpdateRows: 1,
-	}
-	db := newCancelTestDB(t, conn)
-
-	repo := &cancelFakeRepo{instance: buildCancelInstance()}
-	svc := &CancelService{repo: repo, emitter: emitter, clock: fixedClock{t: now}}
-
-	result, err := svc.SystemCancelInstance(authz.WithBackgroundBypass(context.Background()), newTxRunner(db), CancelInput{
-		TenantID:                "tenant-1",
-		InstanceID:              "inst-1",
-		ExpectedRevisionVersion: 2,
-		ActorUserID:             "system",
-		Reason:                  "watchdog timeout",
-	})
-	if err != nil {
-		t.Fatalf("SystemCancelInstance: unexpected error: %v", err)
-	}
-	if result.DocumentID != "doc-1" {
-		t.Errorf("DocumentID = %q; want %q", result.DocumentID, "doc-1")
-	}
-	if len(emitter.Events) != 1 {
-		t.Fatalf("events = %d; want 1", len(emitter.Events))
-	}
-}
-
 // TestCancelInstance_CapabilityAssertPairsBeforeGatedWrite pins the tripwire
 // pairing invariant (APP-04 / T-006): the fake driver's UPDATE documents and
 // UPDATE approval_stage_instances handlers reject the write unless

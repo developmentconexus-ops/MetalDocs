@@ -44,16 +44,6 @@ type CancelResult struct {
 // active/pending stages to cancelled, and reverts the document to draft.
 // Requires the document.edit capability for the document's area (ADR 0022 P10).
 func (s *CancelService) CancelInstance(ctx context.Context, runner db.TxRunner, in CancelInput) (CancelResult, error) {
-	return s.cancelInstance(ctx, runner, in, false)
-}
-
-// SystemCancelInstance cancels an in-progress approval instance for internal
-// scheduler/watchdog callers using system authz bypass.
-func (s *CancelService) SystemCancelInstance(ctx context.Context, runner db.TxRunner, in CancelInput) (CancelResult, error) {
-	return s.cancelInstance(ctx, runner, in, true)
-}
-
-func (s *CancelService) cancelInstance(ctx context.Context, runner db.TxRunner, in CancelInput, system bool) (CancelResult, error) {
 	// Guard: reason required.
 	if in.Reason == "" {
 		return CancelResult{}, ErrReasonRequired
@@ -62,22 +52,6 @@ func (s *CancelService) cancelInstance(ctx context.Context, runner db.TxRunner, 
 	var docID string
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
-
-		if system {
-			if err := authz.BypassSystem(ctx, tx); err != nil {
-				return fmt.Errorf("cancel: system authz bypass: %w", err)
-			}
-			// System path (stuck-instance-watchdog auto-cancel) runs on a
-			// carrier-less background ctx, so the TxRunner chokepoint auto-seed
-			// (F3.1) is a no-op here. Seed the claimed instance's tenant
-			// explicitly so FORCE RLS still backstops this per-instance action
-			// (validation-contract §2.4 stuck-watchdog: "per-instance action …
-			// seeded per its tenant"). The sync CancelInstance path is seeded by
-			// the chokepoint from its request identity and needs no manual seed.
-			if err := authz.SeedTxIdentity(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
-				return fmt.Errorf("cancel: seed system identity: %w", err)
-			}
-		}
 
 		// Load instance to get document ID and verify not already terminal.
 		inst, err := s.repo.LoadInstance(ctx, tx, in.TenantID, in.InstanceID)
@@ -111,10 +85,8 @@ func (s *CancelService) cancelInstance(ctx context.Context, runner db.TxRunner, 
 		// intentionally fail-closed: authz.Require denies non-system actors for an
 		// area-grade cap (ADR 0022 Phase 8, matches docapp.LoadDocumentAreaCode). Do NOT
 		// COALESCE(..., 'tenant') here — that would silently re-open the area filter.
-		if !system {
-			if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode.String); err != nil {
-				return err
-			}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode.String); err != nil {
+			return err
 		}
 
 		// SET LOCAL cancel GUC — authorises under_review→draft transition in trigger.
