@@ -83,5 +83,7 @@ an interview.
 
 ## ADR
 
-No new ADR — F5.2 executes ADR 0067's already-accepted decisions. The H-PRE-1 retirement it enacts is
-ADR 0067 §H-PRE-1; its doc/memory updates land in this feature.
+No new ADR — F5.2 executes ADR 0067's already-accepted decisions. The **watchdog advisory-lock removal**
+it enacts is ADR 0067 §H-PRE-1 (which — per its HS-7 erratum — keeps **H-PRE-1 LIVE**; the lock removed
+is the watchdog's *unrelated* `pg_try_advisory_lock`, not H-PRE-1's audit-writer lock); its doc/memory
+updates land in this feature.

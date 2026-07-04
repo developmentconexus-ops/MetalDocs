@@ -12,15 +12,17 @@
   committed, and be **cited by** the later F5.x commits, as the rails it judges conformance against.
 - **Consumer 3 — every F5.2–F5.5 implementer subagent:** consumes ADR 0067's decisions (River as single
   primitive; janitors→periodic jobs in `metaldocs-jobs`; staging→transactional job; retention; fanout
-  commutative; H-PRE-1 retired; migration ordering) as locked constraints.
+  commutative; **watchdog advisory-lock removal — H-PRE-1 stays LIVE**, not retired, per ADR 0067
+  §H-PRE-1 erratum; migration ordering) as locked constraints.
 
 ## What to implement
 
 1. Run the `developing-new-work` skill → a written system-impact analysis (10 sections) with a
    Green/Yellow/Red verdict, committed under `docs/superpowers/analysis/`.
 2. Author **ADR 0067** "Async job infrastructure consolidated onto River" recording: River as the single
-   primitive; deployment topology; the **H-PRE-1 re-verification/retirement decision under River
-   semantics**; outbox retention policy; fanout ordering vs idempotent-commutative proof. Accepted, indexed.
+   primitive; deployment topology; the **H-PRE-1 re-verification decision under River semantics** (outcome:
+   H-PRE-1 stays LIVE; only the watchdog's unrelated advisory lock is removed — ADR 0067 §H-PRE-1 erratum);
+   outbox retention policy; fanout ordering vs idempotent-commutative proof. Accepted, indexed.
 
 ## Non-goals
 
@@ -49,7 +51,7 @@ captured in the gate artifact §0.
 | Can River subsume the other two? | Yes — River v0.37.1 ships periodic jobs + `river_leader` elector + retention + `InsertTx` (gate §0, Context7-verified). |
 | Is the foundation sound or a patch? | Local maximum — hand-rolled scheduler/backoff beside a River deployment (gate §2). Moving to global max ⇒ no AS-2 stop. |
 | Any invariant violated? | No — transactional outbox preserved/strengthened; no AS-1 (gate §3). |
-| H-PRE-1 disposition? | Retire — River elector+queue subsume the advisory lock; contingent on a singleton proof (ADR 0067 §H-PRE-1). |
+| H-PRE-1 disposition? | *(originally answered "Retire"; **corrected 2026-07-04, ADR 0067 §H-PRE-1 HS-7 erratum**)* — H-PRE-1 stays **LIVE**. The false premise was that H-PRE-1 existed for the watchdog lock; runtime-truth verification (F5.2) showed H-PRE-1 is motivated by the audit-writer's `pg_advisory_xact_lock` (untouched by M5). M5 removes only the watchdog's *unrelated* `pg_try_advisory_lock`, contingent on the singleton proof (River elector+queue subsume that single-runner guard). |
 | Verdict? | 🟡 Yellow — ADR mandated (D7) + H-PRE-1 + topology are real design choices; not Red, HS-8 does not fire. |
 
 ## ADR

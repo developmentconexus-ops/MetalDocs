@@ -29,10 +29,15 @@
 
 1. **Topology** — janitors + staging dispatch hosted in `metaldocs-jobs` (already a required binary;
    no new binary). `metaldocs-api` becomes stateless sync + authz (drops the 4 hosted janitors).
-2. **H-PRE-1 (advisory-lock deadlock constraint) — RETIRED** under River semantics: River's elector +
-   queue subsume the watchdog's `pg_try_advisory_lock` singleton guard. Contingent on a
-   **singleton integration-proof** (only one instance runs a periodic job per tick) — carried as an
-   F5.2 acceptance obligation.
+2. **H-PRE-1 (advisory-lock deadlock constraint) — stays LIVE** *(corrected 2026-07-04 per ADR 0067
+   §H-PRE-1 HS-7 erratum; this feature's original wording claimed "RETIRED" on a false premise)*. What
+   M5 removes is the stuck-instance-watchdog's **unrelated** `pg_try_advisory_lock` single-runner guard
+   (River's elector + single-queue claim subsume it) — **not** H-PRE-1. H-PRE-1 ("never call an
+   authz-recording read inside a lock-holding atomic tx") is motivated by the **audit hash-chain
+   writer's** `pg_advisory_xact_lock`, which M5 does not touch; it remains a live invariant. The
+   watchdog-lock removal is contingent on a **singleton integration-proof** (only one instance runs a
+   periodic job per tick) — carried as an F5.2 acceptance obligation — but that proof justifies the lock
+   removal; it is **not** an H-PRE-1 retirement proof.
 3. **Retention** — native River cleaner for River's own job rows + a River **periodic purge job** for
    the app-owned `staging_outbox` dispatched rows (F5.4). Values locked in `validation-contract.md` §4.
 4. **Fanout ordering (F5.5)** — proven **idempotent-commutative**, not order-dependent: fanout writes
