@@ -15,22 +15,22 @@ import (
 )
 
 type fakeMaterializeOutboxEnqueuer struct {
-	calls      int
-	tenantIDs  []string
-	revIDs     []string
-	hashes     [][]byte
-	err        error
+	calls     int
+	tenantIDs []string
+	revIDs    []string
+	hashes    [][]byte
+	err       error
 }
 
-func (f *fakeMaterializeOutboxEnqueuer) Enqueue(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte) error {
+func (f *fakeMaterializeOutboxEnqueuer) Enqueue(_ context.Context, _ db.Tx, tenantID, revisionID string, contentHash []byte) (string, error) {
 	if f.err != nil {
-		return f.err
+		return "", f.err
 	}
 	f.calls++
 	f.tenantIDs = append(f.tenantIDs, tenantID)
 	f.revIDs = append(f.revIDs, revisionID)
 	f.hashes = append(f.hashes, append([]byte(nil), contentHash...))
-	return nil
+	return "outbox-id", nil
 }
 
 func TestFreezeService_Pin_NoNetworkCall(t *testing.T) {

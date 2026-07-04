@@ -23,8 +23,8 @@ type OutboxRow struct {
 // stagingOutboxAllowlist restricts which tables the generic repo may address,
 // preventing accidental or malicious fmt.Sprintf injection.
 var stagingOutboxAllowlist = map[string]struct{}{
-	"metaldocs.pdf_dispatch_outbox":          {},
-	"metaldocs.materialize_dispatch_outbox":  {},
+	"metaldocs.pdf_dispatch_outbox":         {},
+	"metaldocs.materialize_dispatch_outbox": {},
 }
 
 // StagingOutboxRepository is a generic transactional-outbox repo for any
@@ -46,24 +46,39 @@ func NewStagingOutboxRepository(db *sql.DB, table string) *StagingOutboxReposito
 	return &StagingOutboxRepository{db: db, table: table, name: table}
 }
 
-// Enqueue inserts a pending outbox row inside the caller's business transaction.
-// The outbox INSERT MUST share the caller's business transaction (atomic dispatch).
-// A nil tx would silently autocommit the outbox row outside that transaction, breaking
-// the transactional-outbox guarantee — fail loud (db.Tx contract: a nil Tx is never valid).
-func (r *StagingOutboxRepository) Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error {
+// Enqueue inserts a pending outbox row inside the caller's business transaction
+// and returns the newly-inserted row's id. The outbox INSERT MUST share the
+// caller's business transaction (atomic dispatch). A nil tx would silently
+// autocommit the outbox row outside that transaction, breaking the
+// transactional-outbox guarantee — fail loud (db.Tx contract: a nil Tx is
+// never valid).
+//
+// The (tenant_id, revision_id) ON CONFLICT is the single dedup point for
+// staging dispatch: a duplicate enqueue for the same tenant+revision hits
+// DO NOTHING, so RETURNING yields zero rows. That is not an error — it is a
+// successful dedup skip — and is reported to the caller as an empty id with a
+// nil error, letting the caller (the dispatchjobs.Enqueuer) decide to skip
+// the paired River insert.
+func (r *StagingOutboxRepository) Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) (string, error) {
 	if tx == nil {
-		return fmt.Errorf("%s enqueue: tx must not be nil", r.name)
+		return "", fmt.Errorf("%s enqueue: tx must not be nil", r.name)
 	}
+	var id string
 	//nolint:gosec // table name is allowlist-validated at construction
-	_, err := tx.ExecContext(ctx, fmt.Sprintf(`
+	err := tx.QueryRowContext(ctx, fmt.Sprintf(`
 INSERT INTO %s (tenant_id, revision_id, content_hash)
 VALUES ($1::uuid, $2::uuid, $3)
-ON CONFLICT (tenant_id, revision_id) DO NOTHING`, r.table),
-		tenantID, revisionID, contentHash)
+ON CONFLICT (tenant_id, revision_id) DO NOTHING
+RETURNING id`, r.table),
+		tenantID, revisionID, contentHash).Scan(&id)
 	if err != nil {
-		return fmt.Errorf("%s enqueue: %w", r.name, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			// ON CONFLICT DO NOTHING skipped the insert: dedup, not a failure.
+			return "", nil
+		}
+		return "", fmt.Errorf("%s enqueue: %w", r.name, err)
 	}
-	return nil
+	return id, nil
 }
 
 // ClaimPending intentionally claims across ALL tenants — sanctioned by ADR 0054

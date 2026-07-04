@@ -30,7 +30,7 @@ type MaterializeFinalDocxPersister interface {
 
 // MaterializePDFEnqueuer enqueues a pdf_dispatch_outbox row inside a transaction.
 type MaterializePDFEnqueuer interface {
-	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
+	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) (string, error)
 }
 
 // MaterializeJobRunner handles EventTypeMaterializeFanout events.
@@ -87,7 +87,7 @@ func (r *MaterializeJobRunner) Handle(ctx context.Context, event messaging.Event
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: write final docx: %w", err)
 	}
-	if err := r.pdfOutbox.Enqueue(ctx, tx, payload.TenantID, payload.RevisionID, result.ContentHash); err != nil {
+	if _, err := r.pdfOutbox.Enqueue(ctx, tx, payload.TenantID, payload.RevisionID, result.ContentHash); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("materialize job runner: enqueue pdf outbox: %w", err)
 	}

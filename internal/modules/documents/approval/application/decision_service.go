@@ -49,7 +49,7 @@ type PinInvoker interface {
 
 // PDFOutboxEnqueuer enqueues a PDF dispatch inside the approval transaction.
 type PDFOutboxEnqueuer interface {
-	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
+	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) (string, error)
 }
 
 // DecisionService handles approver approve/reject decisions.
@@ -544,7 +544,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		// Skipped when pinInvoker is active: PDF dispatch is enqueued by MaterializeJobRunner
 		// after the fanout call succeeds (ADR 0015).
 		if shouldDispatchPDF && s.pdfOutbox != nil && s.pinInvoker == nil {
-			if err := s.pdfOutbox.Enqueue(ctx, tx, pdfTenantID, pdfRevisionID, []byte(contentHash)); err != nil {
+			if _, err := s.pdfOutbox.Enqueue(ctx, tx, pdfTenantID, pdfRevisionID, []byte(contentHash)); err != nil {
 				return fmt.Errorf("recordSignoff: enqueue pdf outbox: %w", err)
 			}
 		}

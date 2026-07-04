@@ -15,12 +15,17 @@ func TestPDFOutboxRepository_Enqueue_UsesTx(t *testing.T) {
 	}
 	defer db.Close()
 	mock.ExpectBegin()
-	mock.ExpectExec("INSERT INTO metaldocs.pdf_dispatch_outbox").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery("INSERT INTO metaldocs.pdf_dispatch_outbox").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("row-1"))
 	mock.ExpectCommit()
 	tx, _ := db.BeginTx(context.Background(), nil)
 	repo := NewPDFOutboxRepository(db)
-	if err := repo.Enqueue(context.Background(), tx, "t1", "r1", []byte("hash")); err != nil {
+	id, err := repo.Enqueue(context.Background(), tx, "t1", "r1", []byte("hash"))
+	if err != nil {
 		t.Fatalf("Enqueue: %v", err)
+	}
+	if id != "row-1" {
+		t.Fatalf("id = %q, want %q", id, "row-1")
 	}
 	_ = tx.Commit()
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -37,11 +42,21 @@ func TestPDFOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {
 	// A nil tx must fail loud, not silently autocommit the outbox row outside the
 	// caller's business transaction (db.Tx contract / transactional-outbox atomicity).
 	repo := NewPDFOutboxRepository(db)
-	if err := repo.Enqueue(context.Background(), nil, "t1", "r1", []byte("hash")); err == nil {
+	id, err := repo.Enqueue(context.Background(), nil, "t1", "r1", []byte("hash"))
+	if err == nil {
 		t.Fatal("expected error on nil tx, got nil")
+	}
+	if id != "" {
+		t.Fatalf("id = %q, want empty on error", id)
 	}
 }
 
+// TestPDFOutboxRepository_Enqueue_Idempotent pins the ON CONFLICT DO NOTHING
+// dedup-skip contract: a duplicate enqueue for the same (tenant_id,
+// revision_id) yields zero RETURNING rows (sql.ErrNoRows), which Enqueue must
+// translate to an empty id and a nil error — not an error — since dedup is a
+// successful outcome for the caller (dispatchjobs.Enqueuer uses the empty id
+// to skip the paired River insert).
 func TestPDFOutboxRepository_Enqueue_Idempotent(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -49,13 +64,18 @@ func TestPDFOutboxRepository_Enqueue_Idempotent(t *testing.T) {
 	}
 	defer db.Close()
 	mock.ExpectBegin()
-	// ON CONFLICT DO NOTHING → 0 rows affected on a duplicate; Enqueue must not error.
-	mock.ExpectExec("INSERT INTO metaldocs.pdf_dispatch_outbox").WillReturnResult(sqlmock.NewResult(0, 0))
+	// ON CONFLICT DO NOTHING → 0 rows returned on a duplicate; Enqueue must not error.
+	mock.ExpectQuery("INSERT INTO metaldocs.pdf_dispatch_outbox").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectCommit()
 	tx, _ := db.BeginTx(context.Background(), nil)
 	repo := NewPDFOutboxRepository(db)
-	if err := repo.Enqueue(context.Background(), tx, "t1", "r1", []byte("hash")); err != nil {
+	id, err := repo.Enqueue(context.Background(), tx, "t1", "r1", []byte("hash"))
+	if err != nil {
 		t.Fatalf("Enqueue: %v", err)
+	}
+	if id != "" {
+		t.Fatalf("id = %q, want empty on dedup skip", id)
 	}
 	_ = tx.Commit()
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -70,8 +90,12 @@ func TestMaterializeOutboxRepository_Enqueue_NilTxRejected(t *testing.T) {
 	}
 	defer db.Close()
 	repo := NewMaterializeOutboxRepository(db)
-	if err := repo.Enqueue(context.Background(), nil, "t1", "r1", []byte("hash")); err == nil {
+	id, err := repo.Enqueue(context.Background(), nil, "t1", "r1", []byte("hash"))
+	if err == nil {
 		t.Fatal("expected error on nil tx, got nil")
+	}
+	if id != "" {
+		t.Fatalf("id = %q, want empty on error", id)
 	}
 }
 

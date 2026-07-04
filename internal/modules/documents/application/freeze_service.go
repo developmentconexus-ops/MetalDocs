@@ -30,7 +30,7 @@ type FanoutClient interface {
 
 // MaterializeOutboxEnqueuer enqueues an async materialize job inside the Pin transaction.
 type MaterializeOutboxEnqueuer interface {
-	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
+	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) (string, error)
 }
 
 // MaterializeResult is returned by Materialize after a successful fanout call.
@@ -209,7 +209,8 @@ func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID 
 	if s.materializeOutbox == nil {
 		return fmt.Errorf("pin: materialize outbox enqueuer not configured")
 	}
-	return s.materializeOutbox.Enqueue(ctx, tx, tenantID, revisionID, hashBytes)
+	_, err = s.materializeOutbox.Enqueue(ctx, tx, tenantID, revisionID, hashBytes)
+	return err
 }
 
 // Materialize is the async half of the freeze split (ADR 0015).
