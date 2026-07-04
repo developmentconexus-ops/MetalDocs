@@ -30,10 +30,9 @@ func TestNotificationsFanoutWorker_Work_SeedsTenantBeforeReaderInsert(t *testing
 	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
 		WithArgs("tenant-fanout-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectQuery(`SELECT user_id FROM metaldocs\.v_cd_obligated_readers`).
-		WithArgs("tenant-fanout-1", "cd-1").
-		WillReturnRows(sqlmock.NewRows([]string{"user_id"}).AddRow("user-1"))
-	mock.ExpectExec(`INSERT INTO metaldocs\.notifications`).
+	mock.ExpectExec(`INSERT INTO metaldocs\.notifications[\s\S]*SELECT[\s\S]*FROM metaldocs\.v_cd_obligated_readers`).
+		WithArgs("tenant-fanout-1", "cd-1", documentsdomain.EventTypeDocumentPublished, "document", "doc-1",
+			sqlmock.AnyArg(), sqlmock.AnyArg(), "evt-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -91,14 +90,13 @@ func TestNotificationsFanoutWorker_Work_SeedsTenantBeforeAuthorInsert(t *testing
 	}
 }
 
-// TestNotificationsFanoutWorker_Work_MultipleReaders_AllInserted is a
-// regression test for the live bug (River job kind=notification_fanout,
-// error "insert notification for admin: driver: bad connection"): issuing
-// tx.ExecContext for each reader while the obligated-readers rows cursor
-// from tx.QueryContext was still open on the same *sql.Tx broke the single
-// underlying connection. The fix buffers all reader IDs, closes/drains the
-// query, then inserts. This asserts every buffered reader still gets its
-// own INSERT once the cursor is fully drained first.
+// TestNotificationsFanoutWorker_Work_MultipleReaders_AllInserted — formerly a
+// regression test for the "driver: bad connection" cursor/exec interleave bug.
+// The fanout is now a single set-based INSERT...SELECT targeting the
+// v_cd_obligated_readers view, so multi-reader cardinality is enforced by
+// Postgres, not a Go loop: one exec, RowsAffected = number of readers. Real
+// multi-row coverage lives in the integration race test
+// (fanout_worker_race_integration_test.go).
 func TestNotificationsFanoutWorker_Work_MultipleReaders_AllInserted(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -113,24 +111,10 @@ func TestNotificationsFanoutWorker_Work_MultipleReaders_AllInserted(t *testing.T
 	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id', \$1, true\)`).
 		WithArgs("tenant-fanout-4").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectQuery(`SELECT user_id FROM metaldocs\.v_cd_obligated_readers`).
-		WithArgs("tenant-fanout-4", "cd-4").
-		WillReturnRows(sqlmock.NewRows([]string{"user_id"}).
-			AddRow("user-1").
-			AddRow("user-2").
-			AddRow("admin"))
-	mock.ExpectExec(`INSERT INTO metaldocs\.notifications`).
-		WithArgs("tenant-fanout-4", "user-1", documentsdomain.EventTypeDocumentPublished, "document", "doc-4",
+	mock.ExpectExec(`INSERT INTO metaldocs\.notifications[\s\S]*SELECT[\s\S]*FROM metaldocs\.v_cd_obligated_readers`).
+		WithArgs("tenant-fanout-4", "cd-4", documentsdomain.EventTypeDocumentPublished, "document", "doc-4",
 			sqlmock.AnyArg(), sqlmock.AnyArg(), "evt-4").
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(`INSERT INTO metaldocs\.notifications`).
-		WithArgs("tenant-fanout-4", "user-2", documentsdomain.EventTypeDocumentPublished, "document", "doc-4",
-			sqlmock.AnyArg(), sqlmock.AnyArg(), "evt-4").
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(`INSERT INTO metaldocs\.notifications`).
-		WithArgs("tenant-fanout-4", "admin", documentsdomain.EventTypeDocumentPublished, "document", "doc-4",
-			sqlmock.AnyArg(), sqlmock.AnyArg(), "evt-4").
-		WillReturnResult(sqlmock.NewResult(0, 1))
+		WillReturnResult(sqlmock.NewResult(0, 3))
 	mock.ExpectCommit()
 
 	job := &river.Job[documentsdomain.LifecycleEventArgs]{Args: documentsdomain.LifecycleEventArgs{

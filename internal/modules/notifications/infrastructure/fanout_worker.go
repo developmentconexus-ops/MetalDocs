@@ -85,43 +85,29 @@ func (w *NotificationsFanoutWorker) Work(ctx context.Context, job *river.Job[doc
 	return nil
 }
 
+// fanoutToReaders inserts one notification per obligated reader with a single
+// set-based INSERT...SELECT — the fanout is computed in Postgres (view
+// v_cd_obligated_readers), so there are no per-recipient round-trips and no
+// Go-side cursor/exec interleaving on the tx. Idempotent via the same partial
+// unique ON CONFLICT (recipient_user_id, source_event_id) DO NOTHING.
 func (w *NotificationsFanoutWorker) fanoutToReaders(ctx context.Context, tx *sql.Tx, args documentsdomain.LifecycleEventArgs) error {
 	if args.ControlledDocumentID == "" {
 		return nil
 	}
-	rows, err := tx.QueryContext(ctx,
-		`SELECT user_id FROM metaldocs.v_cd_obligated_readers
-		  WHERE tenant_id = $1::uuid AND controlled_document_id = $2::uuid`,
-		args.TenantID, args.ControlledDocumentID,
+	msgs := ptBRMessages[args.EventType]
+	_, err := tx.ExecContext(ctx,
+		`INSERT INTO metaldocs.notifications
+		   (tenant_id, recipient_user_id, event_type, resource_type, resource_id, title, message, source_event_id)
+		 SELECT $1::uuid, r.user_id, $3, $4, $5, $6, $7, $8::uuid
+		   FROM metaldocs.v_cd_obligated_readers r
+		  WHERE r.tenant_id = $1::uuid AND r.controlled_document_id = $2::uuid
+		 ON CONFLICT (recipient_user_id, source_event_id) WHERE source_event_id IS NOT NULL
+		 DO NOTHING`,
+		args.TenantID, args.ControlledDocumentID, args.EventType, args.ResourceType, args.ResourceID,
+		msgs[0], msgs[1], args.EventID,
 	)
 	if err != nil {
-		return fmt.Errorf("fanout_worker: query obligated readers: %w", err)
-	}
-	defer rows.Close()
-
-	// Buffer all reader IDs before issuing any Exec on the same tx: a
-	// *sql.Tx has a single underlying connection, and interleaving
-	// ExecContext with an open Query result set on that connection
-	// surfaces as "driver: bad connection" (confirmed live, River job
-	// kind=notification_fanout). Collect first, insert after rows is
-	// drained.
-	var userIDs []string
-	for rows.Next() {
-		var userID string
-		if err := rows.Scan(&userID); err != nil {
-			return fmt.Errorf("fanout_worker: scan user_id: %w", err)
-		}
-		userIDs = append(userIDs, userID)
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("fanout_worker: iterate obligated readers: %w", err)
-	}
-
-	msgs := ptBRMessages[args.EventType]
-	for _, userID := range userIDs {
-		if err := w.insertRow(ctx, tx, args, userID, msgs[0], msgs[1]); err != nil {
-			return err
-		}
+		return fmt.Errorf("fanout_worker: fanout insert for cd %s: %w", args.ControlledDocumentID, err)
 	}
 	return nil
 }
