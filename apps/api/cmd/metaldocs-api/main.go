@@ -52,6 +52,7 @@ import (
 	notificationshttp "metaldocs/internal/modules/notifications/delivery/http"
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
 	"metaldocs/internal/modules/render/fanout"
+	"metaldocs/internal/modules/render/fanout/dispatchjobs"
 	"metaldocs/internal/modules/render/resolvers"
 	searchapp "metaldocs/internal/modules/search/application"
 	searchdelivery "metaldocs/internal/modules/search/delivery/http"
@@ -497,13 +498,14 @@ func main() {
 		deps.Cleanup()
 		os.Exit(1)
 	}
+	var riverBundle *riverjobs.ClientBundle
 	if deps.SQLDB != nil {
 		if err := bootstrap.MigrateRiverSchema(ctx, deps.SQLDB, jobsCfg.RiverSchema); err != nil {
 			slog.Error("migrate river schema", "err", err)
 			deps.Cleanup()
 			os.Exit(1)
 		}
-		riverBundle, err := riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
+		riverBundle, err = riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
 			Queues: jobsCfg.Queues,
 			// PeriodicJobs is defined here too (not just in metaldocs-jobs) because
 			// River only enqueues periodic jobs from the elected leader's own
@@ -531,9 +533,6 @@ func main() {
 	pdfOutboxRepo := fanout.NewPDFOutboxRepository(deps.SQLDB)
 	materializeOutboxRepo := fanout.NewMaterializeOutboxRepository(deps.SQLDB)
 
-	// Wire materialize outbox into the freeze service so Pin can enqueue async jobs.
-	fanoutCfg.freezeService.WithMaterializeOutbox(materializeOutboxRepo)
-
 	stagingOutboxWorkerCfg, err := config.LoadStagingOutboxWorkerConfig()
 	if err != nil {
 		slog.Error("invalid staging outbox worker config", "err", err)
@@ -541,13 +540,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	// pdfDispatchEnqueuer produces the paired (outbox row, River job) write for
+	// both staging dispatch kinds inside the caller's business tx (M5 F5.3 T3).
+	// riverBundle.Client is enqueue-only here (never Started in this binary);
+	// the temporal-queue dispatch workers that consume these jobs run in
+	// metaldocs-jobs.
+	pdfDispatchEnqueuer := dispatchjobs.NewEnqueuer(riverBundle.Client, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg.MaxAttempts)
+
+	// Wire materialize outbox into the freeze service so Pin can enqueue async jobs.
+	fanoutCfg.freezeService.WithMaterializeOutbox(pdfDispatchEnqueuer)
+
 	// StagingOutboxWorker.Run() only returns nil (context cancellation); no restart loop needed.
+	// Retained during the expand phase (T4 removes it): the poller and the new
+	// River dispatch path may both run harmlessly against the same outbox rows.
 	var workerWG sync.WaitGroup
 	startOutboxWorkers(ctx, &workerWG, deps.Publisher, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg)
 
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{},
-	).WithPDFOutbox(pdfOutboxRepo).WithPinInvoker(fanoutCfg.freezeService).
+	).WithPDFOutbox(pdfDispatchEnqueuer).WithPinInvoker(fanoutCfg.freezeService).
 		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB)).
 		WithCDFieldReader(cdReader)
 	docDeps.SubmitSvc = approvalServices.Submit

@@ -34,14 +34,11 @@ type fakePDFOutboxEnqueuer struct {
 	revisionIDs []string
 }
 
-func (f *fakePDFOutboxEnqueuer) Enqueue(_ context.Context, _ db.Tx, tenantID, revisionID string, _ []byte) (string, error) {
+func (f *fakePDFOutboxEnqueuer) EnqueuePDFTx(_ context.Context, _ db.Tx, tenantID, revisionID string, _ []byte) error {
 	f.calls++
 	f.tenantIDs = append(f.tenantIDs, tenantID)
 	f.revisionIDs = append(f.revisionIDs, revisionID)
-	if f.err != nil {
-		return "", f.err
-	}
-	return "outbox-id", nil
+	return f.err
 }
 
 type freezeDecisionConn struct {

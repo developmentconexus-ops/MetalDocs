@@ -47,9 +47,12 @@ type PinInvoker interface {
 	Pin(ctx context.Context, tx db.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
 }
 
-// PDFOutboxEnqueuer enqueues a PDF dispatch inside the approval transaction.
-type PDFOutboxEnqueuer interface {
-	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) (string, error)
+// pdfDispatchEnqueuer is the minimal published interface for the staging
+// pdf dispatch Enqueuer (render/fanout/dispatchjobs), owned here (the
+// consumer) and satisfied by *dispatchjobs.Enqueuer. It inserts the paired
+// (outbox row, River job) atomically inside tx (M5 F5.3 T3).
+type pdfDispatchEnqueuer interface {
+	EnqueuePDFTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
 }
 
 // DecisionService handles approver approve/reject decisions.
@@ -57,8 +60,8 @@ type DecisionService struct {
 	repo       repository.ApprovalRepository
 	emitter    EventEmitter
 	clock      Clock
-	pinInvoker PinInvoker
-	pdfOutbox  PDFOutboxEnqueuer
+	pinInvoker  PinInvoker
+	pdfDispatch pdfDispatchEnqueuer
 	// sigRegistry verifies the e-signature credential before a sign-off is
 	// recorded. nil only in tests that exercise non-reauth methods.
 	sigRegistry       *signature.Registry
@@ -81,9 +84,11 @@ func NewDecisionService(
 	}
 }
 
-// WithPDFOutbox sets the transactional outbox enqueuer, replacing the post-commit dispatcher.
-func (s *DecisionService) WithPDFOutbox(enqueuer PDFOutboxEnqueuer) *DecisionService {
-	s.pdfOutbox = enqueuer
+// WithPDFOutbox sets the transactional staging dispatch Enqueuer, replacing
+// the post-commit dispatcher. Takes the narrow pdfDispatchEnqueuer interface,
+// satisfied by *dispatchjobs.Enqueuer (M5 F5.3 T3).
+func (s *DecisionService) WithPDFOutbox(enqueuer pdfDispatchEnqueuer) *DecisionService {
+	s.pdfDispatch = enqueuer
 	return s
 }
 
@@ -543,8 +548,8 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		// Step 13: enqueue PDF dispatch inside tx (transactional outbox).
 		// Skipped when pinInvoker is active: PDF dispatch is enqueued by MaterializeJobRunner
 		// after the fanout call succeeds (ADR 0015).
-		if shouldDispatchPDF && s.pdfOutbox != nil && s.pinInvoker == nil {
-			if _, err := s.pdfOutbox.Enqueue(ctx, tx, pdfTenantID, pdfRevisionID, []byte(contentHash)); err != nil {
+		if shouldDispatchPDF && s.pdfDispatch != nil && s.pinInvoker == nil {
+			if err := s.pdfDispatch.EnqueuePDFTx(ctx, tx, pdfTenantID, pdfRevisionID, []byte(contentHash)); err != nil {
 				return fmt.Errorf("recordSignoff: enqueue pdf outbox: %w", err)
 			}
 		}

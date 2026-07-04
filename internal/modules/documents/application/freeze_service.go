@@ -28,9 +28,12 @@ type FanoutClient interface {
 	Fanout(ctx context.Context, req fanout.FanoutRequest) (fanout.FanoutResponse, error)
 }
 
-// MaterializeOutboxEnqueuer enqueues an async materialize job inside the Pin transaction.
-type MaterializeOutboxEnqueuer interface {
-	Enqueue(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) (string, error)
+// materializeDispatchEnqueuer is the minimal published interface for the
+// staging materialize dispatch Enqueuer (render/fanout/dispatchjobs), owned
+// here (the consumer) and satisfied by *dispatchjobs.Enqueuer. It inserts
+// the paired (outbox row, River job) atomically inside tx (M5 F5.3 T3).
+type materializeDispatchEnqueuer interface {
+	EnqueueMaterializeTx(ctx context.Context, tx db.Tx, tenantID, revisionID string, contentHash []byte) error
 }
 
 // MaterializeResult is returned by Materialize after a successful fanout call.
@@ -50,7 +53,7 @@ type FreezeService struct {
 	resolveCtx        ResolverContextBuilder
 	snapshots         SnapshotReader
 	fanout            FanoutClient
-	materializeOutbox MaterializeOutboxEnqueuer
+	materializeOutbox materializeDispatchEnqueuer
 }
 
 type ApproverContext struct {
@@ -82,8 +85,10 @@ func NewFreezeService(
 	}
 }
 
-// WithMaterializeOutbox sets the transactional outbox enqueuer used by Pin.
-func (s *FreezeService) WithMaterializeOutbox(enqueuer MaterializeOutboxEnqueuer) *FreezeService {
+// WithMaterializeOutbox sets the transactional staging dispatch Enqueuer used
+// by Pin. Takes the narrow materializeDispatchEnqueuer interface, satisfied
+// by *dispatchjobs.Enqueuer (M5 F5.3 T3).
+func (s *FreezeService) WithMaterializeOutbox(enqueuer materializeDispatchEnqueuer) *FreezeService {
 	s.materializeOutbox = enqueuer
 	return s
 }
@@ -209,8 +214,7 @@ func (s *FreezeService) Pin(ctx context.Context, tx db.Tx, tenantID, revisionID 
 	if s.materializeOutbox == nil {
 		return fmt.Errorf("pin: materialize outbox enqueuer not configured")
 	}
-	_, err = s.materializeOutbox.Enqueue(ctx, tx, tenantID, revisionID, hashBytes)
-	return err
+	return s.materializeOutbox.EnqueueMaterializeTx(ctx, tx, tenantID, revisionID, hashBytes)
 }
 
 // Materialize is the async half of the freeze split (ADR 0015).

@@ -44,12 +44,12 @@ type fakePDFEnqueuer struct {
 	err   error
 }
 
-func (f *fakePDFEnqueuer) Enqueue(_ context.Context, _ db.Tx, _, _ string, _ []byte) (string, error) {
+func (f *fakePDFEnqueuer) EnqueuePDFTx(_ context.Context, _ db.Tx, _, _ string, _ []byte) error {
 	if f.err != nil {
-		return "", f.err
+		return f.err
 	}
 	f.calls++
-	return "outbox-id", nil
+	return nil
 }
 
 // minimal sql.DB driver for tx simulation. Implements driver.ExecerContext so

@@ -11,11 +11,13 @@ import (
 	docapp "metaldocs/internal/modules/documents/application"
 	docrepo "metaldocs/internal/modules/documents/repository"
 	fanoutpkg "metaldocs/internal/modules/render/fanout"
+	"metaldocs/internal/modules/render/fanout/dispatchjobs"
 	"metaldocs/internal/modules/render/resolvers"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/httpclient"
+	riverjobs "metaldocs/internal/platform/jobs/river"
 	"metaldocs/internal/platform/observability"
 	workerapp "metaldocs/internal/platform/worker"
 )
@@ -146,10 +148,43 @@ func main() {
 		)
 
 		pdfOutboxRepo := fanoutpkg.NewPDFOutboxRepository(deps.SQLDB)
+		// The Enqueuer constructor needs both staging outbox repos even though
+		// this binary only ever enqueues pdf dispatch (M5 F5.3 T3).
+		materializeOutboxRepo := fanoutpkg.NewMaterializeOutboxRepository(deps.SQLDB)
+
+		jobsCfg, err := config.LoadJobsConfig()
+		if err != nil {
+			slog.Error("invalid jobs config", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
+		}
+		stagingOutboxWorkerCfg, err := config.LoadStagingOutboxWorkerConfig()
+		if err != nil {
+			slog.Error("invalid staging outbox worker config", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
+		}
+
+		// Enqueue-only River client bundle: no Queues, no Workers, no
+		// PeriodicJobs — this binary only calls InsertTx via the Enqueuer, it
+		// never subscribes a queue or executes jobs, mirroring how
+		// metaldocs-api builds its own enqueue-only bundle (which it also
+		// never Starts).
+		riverBundle, err := riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
+			Schema:              jobsCfg.RiverSchema,
+			SkipUnknownJobCheck: true,
+		}, nil)
+		if err != nil {
+			slog.Error("build staging dispatch enqueuer client", "err", err)
+			deps.Cleanup()
+			os.Exit(1)
+		}
+		pdfDispatchEnqueuer := dispatchjobs.NewEnqueuer(riverBundle.Client, pdfOutboxRepo, materializeOutboxRepo, stagingOutboxWorkerCfg.MaxAttempts)
+
 		materializeRunner := workerapp.NewMaterializeJobRunner(
 			materializeInvokerAdapter{svc: freezeSvc},
 			snapshotFinalDocxAdapter{repo: snapRepo},
-			pdfOutboxRepo,
+			pdfDispatchEnqueuer,
 			deps.SQLDB,
 		)
 		workerSvc = workerSvc.WithMaterializeRunner(materializeRunner)

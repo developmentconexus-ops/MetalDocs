@@ -24,8 +24,11 @@ import (
 	"metaldocs/internal/modules/jobs/maintenance"
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
+	"metaldocs/internal/modules/render/fanout"
+	"metaldocs/internal/modules/render/fanout/dispatchjobs"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
+	outboxpg "metaldocs/internal/platform/messaging/outbox/postgres"
 	"metaldocs/internal/platform/observability"
 )
 
@@ -58,6 +61,17 @@ func run(ctx context.Context) error {
 		river.AddWorker(workers, stuck_instance_watchdog.NewWorker(db, services.Cancel, approvalEmitter))
 		river.AddWorker(workers, idempotency_janitor.NewWorker(db))
 		river.AddWorker(workers, audit_integrity_validator.NewWorker(auditpg.NewWriter(db)))
+
+		// Staging pdf/materialize dispatch workers (M5 F5.3 T3): consume the
+		// River jobs the api/worker Enqueuers insert and run on the already-
+		// subscribed "temporal" queue, publishing the corresponding domain
+		// event and marking the paired staging outbox row dispatched.
+		publisher := outboxpg.NewPublisher(db)
+		pdfRepo := fanout.NewPDFOutboxRepository(db)
+		matRepo := fanout.NewMaterializeOutboxRepository(db)
+		river.AddWorker(workers, dispatchjobs.NewPDFDispatchWorker(publisher, pdfRepo))
+		river.AddWorker(workers, dispatchjobs.NewMaterializeDispatchWorker(publisher, matRepo))
+
 		return workers, maintenance.PeriodicJobs(), nil
 	})
 	if err != nil {
