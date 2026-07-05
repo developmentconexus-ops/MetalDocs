@@ -111,6 +111,17 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	var effectiveTo *time.Time
+	if body.EffectiveTo != nil {
+		t := body.EffectiveTo.UTC()
+		effectiveTo = &t
+	}
+	var reviewDueAt *time.Time
+	if body.ReviewDueAt != nil {
+		t := body.ReviewDueAt.UTC()
+		reviewDueAt = &t
+	}
+
 	result, err := schedulePublish(h, r.Context(), h.runner, application.SchedulePublishRequest{
 		TenantID:             tenantID,
 		InstanceID:           inst.ID,
@@ -118,6 +129,8 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 		EffectiveDate:        effectiveFrom,
 		ScheduledBy:          actorID,
 		SupersededDocumentID: body.SupersededDocumentID,
+		EffectiveTo:          effectiveTo,
+		ReviewDueAt:          reviewDueAt,
 	})
 	if err != nil {
 		WriteError(w, err)

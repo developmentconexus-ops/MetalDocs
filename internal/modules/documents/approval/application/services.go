@@ -33,16 +33,17 @@ func (RealClock) Now() time.Time { return time.Now().UTC() }
 // subsystem. Each field is a focused service; all share the same repo,
 // emitter, and clock.
 type Services struct {
-	Submit     *SubmitService
-	Decision   *DecisionService
-	Publish    *PublishService
-	Scheduler  *SchedulerService
-	Supersede  *SupersedeService
-	Obsolete   *ObsoleteService
-	Cancel     *CancelService
-	Read       *ReadService
-	RouteAdmin *RouteAdminService
-	clock      Clock
+	Submit       *SubmitService
+	Decision     *DecisionService
+	Publish      *PublishService
+	Scheduler    *SchedulerService
+	Supersede    *SupersedeService
+	Obsolete     *ObsoleteService
+	Cancel       *CancelService
+	Read         *ReadService
+	RouteAdmin   *RouteAdminService
+	MarkReviewed *MarkReviewedService
+	clock        Clock
 }
 
 // ScheduledPublishJobInput carries the parameters needed to enqueue a scheduled-publish job.
@@ -78,6 +79,7 @@ func NewServices(repo repository.ApprovalRepository, emitter EventEmitter, clock
 		Cancel:     newCancelService(repo, emitter, clock),
 		Read:       newReadService(repo, cdRead),
 		RouteAdmin: &RouteAdminService{repo: repo, emitter: emitter, clock: clock},
+		MarkReviewed: NewMarkReviewedService(emitter, clock),
 		clock:      clock,
 	}
 }

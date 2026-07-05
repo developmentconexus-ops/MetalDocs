@@ -182,6 +182,13 @@ type SchedulePublishRequest struct {
 	EffectiveDate        time.Time // must be strictly after clock.Now()
 	ScheduledBy          string
 	SupersededDocumentID string
+	// EffectiveTo is the optional expiry date (M6 F6.2 contract §0.1/§2):
+	// nil leaves the column unwritten (NULL).
+	EffectiveTo *time.Time
+	// ReviewDueAt is the optional initial periodic-review due date set at
+	// schedule/publish time (M6 F6.2 contract §0.1/§2): nil leaves the
+	// column unwritten (NULL).
+	ReviewDueAt *time.Time
 }
 
 // SchedulePublishResult is returned on successful scheduling.
@@ -281,6 +288,8 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 			   SET status           = 'scheduled',
 			       effective_from   = $1,
 			       superseded_document_id = NULLIF($2, '')::uuid,
+			       effective_to     = $6,
+			       review_due_at    = $7,
 			       revision_version = revision_version + 1,
 			       schedule_generation = schedule_generation + 1
 			 WHERE id               = $3
@@ -289,6 +298,7 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 			   AND revision_version = $5
 			RETURNING schedule_generation`,
 			req.EffectiveDate.UTC(), supersededDocumentID, instance.DocumentID, req.TenantID, instance.RevisionVersion,
+			nullableTime(req.EffectiveTo), nullableTime(req.ReviewDueAt),
 		).Scan(&scheduleGeneration)
 		if errors.Is(err, sql.ErrNoRows) {
 			return repository.ErrStaleRevision

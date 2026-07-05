@@ -503,8 +503,11 @@ func TestSchedulePublish_PersistsSupersededDocumentID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SchedulePublish: unexpected error: %v", err)
 	}
-	if len(conn.lastUpdateArgs) != 5 {
-		t.Fatalf("update args = %d, want 5", len(conn.lastUpdateArgs))
+	// F6.2: the UPDATE now carries 7 args ($1-$5 as before, plus $6
+	// effective_to and $7 review_due_at, both nil here since the request
+	// does not supply them.
+	if len(conn.lastUpdateArgs) != 7 {
+		t.Fatalf("update args = %d, want 7", len(conn.lastUpdateArgs))
 	}
 	if got := conn.lastUpdateArgs[1]; got != "doc-published-1" {
 		t.Fatalf("superseded document arg = %v, want doc-published-1", got)

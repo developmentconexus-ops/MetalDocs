@@ -69,6 +69,11 @@ const (
 	approvalCodeValidationProfileUnknown          problem.Code = "validation.profile_unknown"
 	approvalCodeValidationReasonForChangeRequired problem.Code = "validation.reason_for_change_required"
 	approvalCodeValidationReasonCategoryInvalid   problem.Code = "validation.reason_category_invalid"
+	approvalCodeNotFoundDocument                  problem.Code = "not_found.document"
+	approvalCodeStateDocumentNotPublished          problem.Code = "state.document_not_published"
+	approvalCodeConflictMarkReviewedStaleRevision  problem.Code = "conflict.mark_reviewed_stale_revision"
+	approvalCodeValidationReviewDueBeforeEffective problem.Code = "validation.review_due_before_effective"
+	approvalCodeValidationEffectiveToNotAfterFrom  problem.Code = "validation.effective_to_not_after_effective_from"
 )
 
 // ValidationError is a generic request-validation failure mapped to HTTP 400
@@ -182,6 +187,27 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, domain.ErrNoActiveStage):
 		statusCode = http.StatusConflict
 		code = approvalCodeStateInstanceCompleted
+	case errors.Is(err, application.ErrDocumentNotFound):
+		statusCode = http.StatusNotFound
+		code = approvalCodeNotFoundDocument
+	case errors.Is(err, application.ErrDocumentNotPublished):
+		// Friendly first-line precondition (mark-reviewed requires published);
+		// 409 mirrors the other illegal-state-for-write cases above (stale
+		// revision / instance completed), not a validation 4xx.
+		statusCode = http.StatusConflict
+		code = approvalCodeStateDocumentNotPublished
+	case errors.Is(err, application.ErrMarkReviewedStaleRevision):
+		// 409, mirroring repository.ErrStaleRevision above: the mark-reviewed
+		// route's openapi response set is {400,401,403,404,409,428,500} — no
+		// 412 — so the OCC conflict is a 409 Conflict, not 412.
+		statusCode = http.StatusConflict
+		code = approvalCodeConflictMarkReviewedStaleRevision
+	case errors.Is(err, application.ErrReviewDueBeforeEffective):
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationReviewDueBeforeEffective
+	case errors.Is(err, application.ErrEffectiveToNotAfterEffectiveFrom):
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationEffectiveToNotAfterFrom
 	default:
 		var capabilityDenied authz.ErrCapDenied
 		var syntaxErr *json.SyntaxError
