@@ -20,6 +20,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
+
+	"metaldocs/internal/platform/bootstrap"
 )
 
 // testNamespace is a fixed UUID v5 namespace for deterministic fixture IDs.
@@ -279,6 +281,16 @@ func ApplyCuratedBootstrap(ctx context.Context, db *sql.DB) error {
 		if _, err := db.ExecContext(ctx, string(sqlBytes)); err != nil {
 			return fmt.Errorf("apply sql bundle %s: %w", filepath.Base(bundle.path), err)
 		}
+	}
+
+	// F5.7 T1: production provisions River's own schema (river_job,
+	// river_leader, river_queue, etc.) via bootstrap.MigrateRiverSchema at
+	// metaldocs-api startup (see internal/platform/bootstrap/jobs.go). The
+	// curated bundles above never create those tables, so any integration
+	// test asserting on river_job rows would fail with 42P01 without this.
+	// Locally River lives in the default/empty schema ("").
+	if err := bootstrap.MigrateRiverSchema(ctx, db, ""); err != nil {
+		return fmt.Errorf("migrate river schema: %w", err)
 	}
 	return nil
 }
