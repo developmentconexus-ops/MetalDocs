@@ -26,4 +26,12 @@ var (
 	// ErrTenantAdminUserConflict is returned when the requested admin_user_id
 	// already exists (auth_identities unique violation). Maps to 409.
 	ErrTenantAdminUserConflict = errors.New("iam: tenant admin user already exists")
+	// ErrTenantNotFound is returned by TenantLifecycleService.RequestExport /
+	// RequestErase when the target tenantId does not exist in
+	// metaldocs.tenants. Maps to 404 (M7 F7.3).
+	ErrTenantNotFound = errors.New("iam: tenant not found")
+	// ErrTenantAlreadyErased is returned when the target tenant's erased_at is
+	// already set — export of an erased tenant and any second erase request
+	// both hit this. Maps to 409 (M7 F7.3).
+	ErrTenantAlreadyErased = errors.New("iam: tenant already erased")
 )

@@ -28,16 +28,34 @@ type TenantOnboarder interface {
 	OnboardTenant(ctx context.Context, in iamapp.OnboardTenantInput, actorID, actorTenantID string) (iamapp.OnboardTenantResult, error)
 }
 
-// TenantHandler serves POST /tenants (tenant onboarding, M7 F7.2).
+// TenantLifecycler is the narrow application-layer surface for M7 F7.3
+// export/erase. Implemented by *iamapp.TenantLifecycleService.
+type TenantLifecycler interface {
+	RequestExport(ctx context.Context, tenantID, actorID, actorTenantID string) (jobID string, err error)
+	RequestErase(ctx context.Context, tenantID, actorID, actorTenantID string) (jobID string, err error)
+}
+
+// TenantHandler serves POST /tenants (tenant onboarding, M7 F7.2) plus
+// POST /tenants/{tenantId}/export and /erase (M7 F7.3).
 type TenantHandler struct {
-	service TenantOnboarder
+	service   TenantOnboarder
+	lifecycle TenantLifecycler
 }
 
 // NewTenantHandler constructs the handler. service may be nil, in which case
 // handleOnboardTenant answers 501 (matching the pre-Task-C stub behavior for
-// boot paths without a configured SQLDB).
+// boot paths without a configured SQLDB). lifecycle may also be nil (export/
+// erase then answer 501) — wire via WithLifecycle.
 func NewTenantHandler(service TenantOnboarder) *TenantHandler {
 	return &TenantHandler{service: service}
+}
+
+// WithLifecycle wires the M7 F7.3 export/erase service onto an existing
+// TenantHandler, mirroring Router.WithTenantHandler's post-construction
+// wiring convention.
+func (h *TenantHandler) WithLifecycle(lifecycle TenantLifecycler) *TenantHandler {
+	h.lifecycle = lifecycle
+	return h
 }
 
 func (h *TenantHandler) handleOnboardTenant(w http.ResponseWriter, r *http.Request) {
@@ -120,4 +138,69 @@ func (h *TenantHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) 
 func isCapabilityDenied(err error) bool {
 	var denied authz.ErrCapDenied
 	return errors.As(err, &denied)
+}
+
+// handleExportTenant serves POST /tenants/{tenantId}/export (M7 F7.3,
+// operationId exportTenant). 202 + job_id on success.
+func (h *TenantHandler) handleExportTenant(w http.ResponseWriter, r *http.Request, tenantID string) {
+	if h.lifecycle == nil {
+		writeIAMNotImplemented(w, "Tenant lifecycle service is not configured")
+		return
+	}
+	h.handleLifecycleRequest(w, r, tenantID, h.lifecycle.RequestExport)
+}
+
+// handleEraseTenant serves POST /tenants/{tenantId}/erase (M7 F7.3,
+// operationId eraseTenant). 202 + job_id on success.
+func (h *TenantHandler) handleEraseTenant(w http.ResponseWriter, r *http.Request, tenantID string) {
+	if h.lifecycle == nil {
+		writeIAMNotImplemented(w, "Tenant lifecycle service is not configured")
+		return
+	}
+	h.handleLifecycleRequest(w, r, tenantID, h.lifecycle.RequestErase)
+}
+
+// handleLifecycleRequest assumes h.lifecycle is non-nil (callers must guard
+// before taking a method value off it — a nil-interface method value panics
+// at creation, not at call time, so the guard cannot live in here).
+func (h *TenantHandler) handleLifecycleRequest(w http.ResponseWriter, r *http.Request, tenantID string, requestFn func(ctx context.Context, tenantID, actorID, actorTenantID string) (string, error)) {
+	actorID := authenticatedActor(r)
+	actorTenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
+		return
+	}
+
+	jobID, err := requestFn(r.Context(), tenantID, actorID, actorTenantID)
+	if err != nil {
+		h.writeLifecycleError(w, err)
+		return
+	}
+
+	jobUUID, err := uuid.Parse(jobID)
+	if err != nil {
+		slog.Error("iam: tenant lifecycle service returned a non-UUID job id", "err", err)
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "internal server error"))
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, iamapi.TenantLifecycleJobResponse{
+		JobId: jobUUID,
+	})
+}
+
+func (h *TenantHandler) writeLifecycleError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, iamdomain.ErrTenantNotFound):
+		h.writeProblem(w, problem.New(http.StatusNotFound, problem.CodeNotFound, "Tenant not found"))
+	case errors.Is(err, iamdomain.ErrTenantAlreadyErased):
+		h.writeProblem(w, problem.New(http.StatusConflict, problem.CodeConflict, "Tenant already erased"))
+	case errors.Is(err, iamdomain.ErrTenantOnboardValidation):
+		h.writeProblem(w, problem.New(http.StatusBadRequest, problem.CodeValidationError, err.Error()))
+	case isCapabilityDenied(err):
+		h.writeProblem(w, problem.New(http.StatusForbidden, problem.CodeForbiddenCapability, "tenant.export or tenant.erase capability required"))
+	default:
+		slog.Error("iam: tenant lifecycle request failed", "err", err)
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, problem.CodeInternalError, "Failed to request tenant lifecycle action"))
+	}
 }

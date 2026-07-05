@@ -84,7 +84,7 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 		var pdfConverter *servicebus.GotenbergPDFClient
 		if attachmentsCfg.Provider == config.StorageProviderMinIO {
 			var err error
-			minioClient, minioPublicClient, minioBucket, err = buildMinioClients(attachmentsCfg)
+			minioClient, minioPublicClient, minioBucket, err = BuildMinioClients(attachmentsCfg)
 			if err != nil {
 				_ = closeDB(db)
 				return APIDependencies{}, err
@@ -120,7 +120,13 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 	}
 }
 
-func buildMinioClients(attachmentsCfg config.AttachmentsConfig) (*miniogo.Client, *miniogo.Client, string, error) {
+// BuildMinioClients constructs the internal (server-to-server) and public
+// (browser-facing presign) minio clients plus the configured bucket name.
+// Exported (M7 F7.3 Task E) so apps/jobs/cmd/metaldocs-jobs can build its own
+// VerifiedStore for the tenant-export artifact write, reusing the exact same
+// construction BuildAPIDependencies uses — no duplicated minio wiring logic
+// between the two composition roots.
+func BuildMinioClients(attachmentsCfg config.AttachmentsConfig) (*miniogo.Client, *miniogo.Client, string, error) {
 	internalClient, err := miniogo.New(attachmentsCfg.MinIOEndpoint, &miniogo.Options{
 		Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
 		Secure: attachmentsCfg.MinIOUseSSL,

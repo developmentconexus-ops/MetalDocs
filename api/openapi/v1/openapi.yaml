@@ -271,6 +271,64 @@ paths:
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /tenants/{tenantId}/export:
+    post:
+      summary: Solicita exportacao completa dos dados de um tenant (assincrono)
+      tags: [iam]
+      operationId: exportTenant
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Exportacao enfileirada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantLifecycleJobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /tenants/{tenantId}/erase:
+    post:
+      summary: Solicita apagamento (crypto-shred) irreversivel dos dados de um tenant (assincrono)
+      tags: [iam]
+      operationId: eraseTenant
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Apagamento enfileirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantLifecycleJobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/users/{user_id}:
     patch:
       summary: Atomic metadata + tenant role update (single tx)
@@ -4953,6 +5011,14 @@ components:
           format: uuid
         admin_user_id:
           type: string
+    TenantLifecycleJobResponse:
+      type: object
+      required: [job_id]
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          description: Identificador do job assincrono de export/erase enfileirado
     UpdateManagedUserRequest:
       type: object
       description: |

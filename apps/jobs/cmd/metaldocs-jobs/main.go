@@ -19,7 +19,9 @@ import (
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
 	documentsrepo "metaldocs/internal/modules/documents/repository"
+	iamapp "metaldocs/internal/modules/iam/application"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	iamjobs "metaldocs/internal/modules/iam/jobs"
 	"metaldocs/internal/modules/jobs/audit_integrity_validator"
 	"metaldocs/internal/modules/jobs/document_review_surfacer"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
@@ -29,11 +31,40 @@ import (
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/fanout/dispatchjobs"
 	"metaldocs/internal/modules/render/fanout/retention"
+	securityapp "metaldocs/internal/modules/security/application"
+	securitydomain "metaldocs/internal/modules/security/domain"
+	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
 	outboxpg "metaldocs/internal/platform/messaging/outbox/postgres"
+	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
+	"metaldocs/internal/platform/tenantdata/registry"
 )
+
+// auditPayloadCryptoAdapter adapts security's published TenantCrypto port to
+// the audit module's narrow auditpg.PayloadCrypto port — same composition-root
+// adapter as apps/api (audit never imports security): ErrKeyNotFound /
+// ErrKeyDestroyed map to the (_, encrypted=false, nil) fall-through-to-
+// plaintext contract; any other error propagates unchanged.
+type auditPayloadCryptoAdapter struct {
+	crypto securitydomain.TenantCrypto
+}
+
+func (a auditPayloadCryptoAdapter) EncryptForTenant(ctx context.Context, tenantID string, plaintext []byte) (string, bool, error) {
+	envelope, err := a.crypto.EncryptForTenant(ctx, tenantID, plaintext)
+	if err != nil {
+		if errors.Is(err, securitydomain.ErrKeyNotFound) || errors.Is(err, securitydomain.ErrKeyDestroyed) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return envelope, true, nil
+}
+
+func (a auditPayloadCryptoAdapter) DecryptForTenant(ctx context.Context, tenantID, envelope string) ([]byte, error) {
+	return a.crypto.DecryptForTenant(ctx, tenantID, envelope)
+}
 
 func run(ctx context.Context) error {
 	jobsCfg, err := config.LoadJobsConfig()
@@ -82,6 +113,19 @@ func run(ctx context.Context) error {
 		// matRepo instances built above for the dispatch workers.
 		river.AddWorker(workers, retention.NewPurgeWorker(pdfRepo, matRepo))
 
+		// M7 F7.3 Task E: tenant lifecycle (export/erase) worker. Consumes
+		// iamdomain.TenantLifecycleJobArgs jobs the api binary's
+		// TenantLifecycleService.RequestExport/RequestErase enqueue (paired
+		// with the tenant_lifecycle_jobs row insert, same tx — see
+		// internal/modules/iam/jobs/tenant_lifecycle_enqueuer.go). Runs on the
+		// already-subscribed "temporal" queue, same as the staging dispatch
+		// workers above.
+		tenantLifecycleWorker, err := buildTenantLifecycleWorker(db)
+		if err != nil {
+			return nil, nil, fmt.Errorf("build tenant lifecycle worker: %w", err)
+		}
+		river.AddWorker(workers, tenantLifecycleWorker)
+
 		periodicJobs := append(maintenance.PeriodicJobs(), retention.PeriodicJob())
 		return workers, periodicJobs, nil
 	})
@@ -105,6 +149,71 @@ func run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// buildTenantLifecycleWorker composes the M7 F7.3 tenant lifecycle worker:
+// VerifiedStore (for the export artifact write / blob deletion during
+// erasure) + TenantCrypto (crypto-shred, nil-safe when METALDOCS_TENANT_KEK
+// is unset — same F7.2/F7.3 established pattern as apps/api's tenantCrypto
+// wiring) + registry.AllTenantDataPorts(db) (every module's erase/export
+// fan-out port). The worker's run-side service needs no TxRunner/tenant
+// lookup/River-enqueuer dependencies (those are enqueue-side-only, wired in
+// apps/api) — nil is passed for those four constructor args since RunJob
+// never calls RequestExport/RequestErase.
+func buildTenantLifecycleWorker(db *sql.DB) (*iamjobs.TenantLifecycleWorker, error) {
+	var tenantCrypto securitydomain.TenantCrypto
+	kek, kekConfigured, err := config.LoadTenantKEK()
+	if err != nil {
+		return nil, fmt.Errorf("invalid tenant crypto KEK: %w", err)
+	}
+	if kekConfigured {
+		svc, err := securityapp.NewTenantCryptoService(securitypg.NewTenantKeyRepository(db), kek)
+		if err != nil {
+			return nil, fmt.Errorf("construct tenant crypto service: %w", err)
+		}
+		tenantCrypto = svc
+	} else {
+		slog.Info("tenant crypto disabled: METALDOCS_TENANT_KEK not set (tenant erasure will not crypto-shred)")
+	}
+
+	// Same audit payload-envelope wiring as apps/api: without it any
+	// worker-side audit event for an active tenant would silently skip
+	// sealing while the api binary seals. tenant.erased itself is written
+	// after key destruction, so the adapter's ErrKeyDestroyed fall-through
+	// keeps that tombstone plaintext-survivable either way.
+	auditWriter := auditpg.NewWriter(db)
+	if tenantCrypto != nil {
+		auditWriter.WithPayloadCrypto(auditPayloadCryptoAdapter{crypto: tenantCrypto})
+	}
+
+	var blobs *objectstore.VerifiedStore
+	attachmentsCfg, err := config.LoadAttachmentsConfig()
+	if err != nil {
+		return nil, fmt.Errorf("invalid attachments config: %w", err)
+	}
+	if attachmentsCfg.Provider == config.StorageProviderMinIO {
+		minioClient, minioPublicClient, minioBucket, err := bootstrap.BuildMinioClients(attachmentsCfg)
+		if err != nil {
+			return nil, fmt.Errorf("build minio clients: %w", err)
+		}
+		blobs = objectstore.NewVerifiedStore(minioClient, minioPublicClient, minioBucket, 25*1024*1024)
+	} else {
+		slog.Info("tenant lifecycle export disabled: attachments provider is not minio")
+	}
+
+	svc := iamapp.NewTenantLifecycleService(
+		nil, // tenantLookupTx: enqueue-side only, wired in apps/api
+		nil, // lifecycleJobInserter: enqueue-side only, wired in apps/api
+		iampg.NewTenantLifecycleRepository(db),
+		nil, // iamdomain.TenantLifecycleEnqueuer: enqueue-side only, wired in apps/api
+		nil, // db.TxRunner: enqueue-side only, wired in apps/api
+		auditWriter,
+		db,
+		registry.AllTenantDataPorts(db),
+		blobs,
+		tenantCrypto,
+	)
+	return iamjobs.NewTenantLifecycleWorker(svc), nil
 }
 
 func main() {

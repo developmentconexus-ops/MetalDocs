@@ -46,6 +46,7 @@ import (
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	iamjobs "metaldocs/internal/modules/iam/jobs"
 	iampresence "metaldocs/internal/modules/iam/presence"
 	notificationshttp "metaldocs/internal/modules/notifications/delivery/http"
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
@@ -81,6 +82,7 @@ import (
 	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/ratelimit"
 	"metaldocs/internal/platform/security"
+	"metaldocs/internal/platform/tenantdata/registry"
 	e2etest "metaldocs/internal/test"
 )
 
@@ -624,6 +626,32 @@ func main() {
 		}
 		approvalServices.WithScheduledPublishEnqueuer(approvaljobs.NewScheduledPublishEnqueuer(riverBundle.Client))
 		approvalServices.WithLifecycleEnqueuer(approvaljobs.NewLifecycleEventEnqueuer(riverBundle.Client))
+
+		// M7 F7.3 Task E: tenant export/erase orchestrator. Constructed here
+		// (not alongside tenantHandler/onboardTenantService above) because it
+		// needs riverBundle.Client for the paired same-tx River enqueue —
+		// riverBundle does not exist yet at the point tenantHandler is built.
+		// WithLifecycle mutates the already-constructed tenantHandler in
+		// place; iamRouter (built later, but referencing the SAME
+		// tenantHandler pointer via WithTenantHandler) sees the wiring once
+		// RegisterGenerated's wrapped handlers are invoked at request time —
+		// route mounting only captures the Router struct, not a snapshot of
+		// tenantHandler's fields.
+		if tenantHandler != nil {
+			tenantLifecycleService := iamapp.NewTenantLifecycleService(
+				iampg.NewTenantRepository(deps.SQLDB),
+				iampg.NewTenantLifecycleRepository(deps.SQLDB),
+				iampg.NewTenantLifecycleRepository(deps.SQLDB),
+				iamjobs.NewTenantLifecycleEnqueuer(riverBundle.Client),
+				iamTxRunner,
+				deps.AuditWriter,
+				deps.SQLDB,
+				registry.AllTenantDataPorts(deps.SQLDB),
+				sharedPresigner,
+				tenantCrypto,
+			)
+			tenantHandler.WithLifecycle(tenantLifecycleService)
+		}
 	}
 	if fanoutCfg.freezeService == nil {
 		slog.Error("approval runtime requires configured freeze service")

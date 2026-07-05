@@ -51,6 +51,8 @@ package httpdelivery
 import (
 	"net/http"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
+
 	iamapi "metaldocs/internal/modules/iam/api"
 	iampresence "metaldocs/internal/modules/iam/presence"
 	"metaldocs/internal/platform/problem"
@@ -298,6 +300,26 @@ func (rt *Router) OnboardTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rt.tenants.handleOnboardTenant(w, r)
+}
+
+// ExportTenant delegates to TenantHandler.handleExportTenant (M7 F7.3).
+// Answers 501 when tenants is not wired (SQLDB-less boot path).
+func (rt *Router) ExportTenant(w http.ResponseWriter, r *http.Request, tenantId openapi_types.UUID) {
+	if rt.tenants == nil {
+		writeIAMNotImplemented(w, "Tenant lifecycle service is not configured")
+		return
+	}
+	rt.tenants.handleExportTenant(w, r, tenantId.String())
+}
+
+// EraseTenant delegates to TenantHandler.handleEraseTenant (M7 F7.3).
+// Answers 501 when tenants is not wired (SQLDB-less boot path).
+func (rt *Router) EraseTenant(w http.ResponseWriter, r *http.Request, tenantId openapi_types.UUID) {
+	if rt.tenants == nil {
+		writeIAMNotImplemented(w, "Tenant lifecycle service is not configured")
+		return
+	}
+	rt.tenants.handleEraseTenant(w, r, tenantId.String())
 }
 
 func writeIAMNotImplemented(w http.ResponseWriter, detail string) {

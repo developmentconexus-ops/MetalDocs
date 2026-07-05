@@ -44,6 +44,25 @@ VALUES ($1::uuid, $2, $3)
 	return nil
 }
 
+// TenantLookupTx returns whether tenantID exists in metaldocs.tenants and, if
+// so, whether it has already been erased (erased_at IS NOT NULL). found=false
+// means no row exists at all. Runs inside the caller's tx (M7 F7.3
+// TenantLifecycleService enqueue path: the existence/erased check happens in
+// the same tx as the tenant_lifecycle_jobs INSERT, before any GUC/authz work
+// so a 404/409 short-circuits without seeding capability GUCs for a
+// nonexistent or already-erased target).
+func (r *TenantRepository) TenantLookupTx(ctx context.Context, tx *sql.Tx, tenantID string) (found, erased bool, err error) {
+	var erasedAt sql.NullTime
+	err = tx.QueryRowContext(ctx, `SELECT erased_at FROM metaldocs.tenants WHERE id = $1::uuid`, tenantID).Scan(&erasedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, false, nil
+	}
+	if err != nil {
+		return false, false, fmt.Errorf("lookup tenant: %w", err)
+	}
+	return true, erasedAt.Valid, nil
+}
+
 func isTenantUniqueViolation(err error) bool {
 	var pgxErr *pgconn.PgError
 	if errors.As(err, &pgxErr) && pgxErr.Code == "23505" {
