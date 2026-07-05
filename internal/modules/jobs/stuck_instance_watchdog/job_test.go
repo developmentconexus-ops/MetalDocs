@@ -173,8 +173,8 @@ func TestWatchdog_NoStuck(t *testing.T) {
 // TestListStuckInstances_UsesStageSnapshotDriftPolicy guards the read source
 // for drift_policy: the watchdog still reads (and reports, in the alert
 // payload) the active stage snapshot's on_eligibility_drift_snapshot column —
-// this is unrelated to the removed auto_cancel branch (ADR 0068), it is the
-// informational field surfaced in every stuck_alert event.
+// this is unrelated to the removed orphaned timeout-action branch (ADR 0068),
+// it is the informational field surfaced in every stuck_alert event.
 func TestListStuckInstances_UsesStageSnapshotDriftPolicy(t *testing.T) {
 	src, err := os.ReadFile("job.go")
 	if err != nil {

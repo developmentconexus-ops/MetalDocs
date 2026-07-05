@@ -3,8 +3,8 @@
 
 package stuck_instance_watchdog
 
-// M5 F5.8 T2 — honest alert-only proof (ADR 0068). The auto_cancel branch was
-// removed in T1: the watchdog is alert-only for every stuck (in_progress,
+// M5 F5.8 T2 — honest alert-only proof (ADR 0068). The orphaned timeout-action
+// branch was removed in T1: the watchdog is alert-only for every stuck (in_progress,
 // submitted_at < now()-7d) approval instance, regardless of drift policy.
 // These tests prove that against real Postgres via the canonical testdb
 // factory (ADR 0034) — no sqlmock, no schema-impossible fixture values.
@@ -93,7 +93,7 @@ func TestIntegration_Watchdog_P1_AlertOnly(t *testing.T) {
 // TestIntegration_Watchdog_P1_AlertOnly_AnyDriftPolicy proves the alert-only
 // behavior holds for a different valid drift policy value (keep_snapshot) —
 // there is no branch in run() that special-cases any drift_policy string
-// (ADR 0068 removed the last such branch, auto_cancel).
+// (ADR 0068 removed the last such orphaned timeout-action branch).
 func TestIntegration_Watchdog_P1_AlertOnly_AnyDriftPolicy(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := authz.WithBackgroundBypass(context.Background())

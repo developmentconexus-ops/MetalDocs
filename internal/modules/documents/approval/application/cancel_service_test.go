@@ -96,8 +96,8 @@ func (s *cancelTestStmt) Exec(args []driver.Value) (driver.Result, error) {
 	// see it recorded first — mirrors supersedeTestStmt.Exec's enforcement.
 	// metaldocs.bypass_authz mirrors the DB tripwire's own bypass short-circuit
 	// (db/migrations/0259_iam_documents_tripwire.sql:171-201: v_bypass checked
-	// before v_asserted_raw) so SystemCancelInstance's authz.BypassSystem path
-	// legitimately skips the asserted_caps requirement.
+	// before v_asserted_raw) so a background authz.BypassSystem path (e.g. the
+	// scheduled-publish job) legitimately skips the asserted_caps requirement.
 	if strings.Contains(lower, "set_config('metaldocs.asserted_caps'") {
 		if len(args) > 0 {
 			if raw, ok := args[0].(string); ok {
