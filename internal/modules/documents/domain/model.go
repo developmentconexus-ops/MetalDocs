@@ -28,30 +28,30 @@ const (
 )
 
 type Document struct {
-	ID                             string                `json:"id"`
-	TenantID                       string                `json:"tenant_id"`
-	TemplateVersionID              string                `json:"template_version_id"`
-	Name                           string                `json:"name"`
-	Status                         DocumentStatus        `json:"status"`
-	FormDataJSON                   []byte                `json:"form_data_json"`
-	CurrentRevisionID              string                `json:"current_revision_id"`
-	RevisionVersion                int64                 `json:"revision_version"`
-	ActiveSessionID                string                `json:"active_session_id"`
-	ValuesFrozenAt                 *time.Time            `json:"values_frozen_at,omitempty"`
-	ArchivedAt                     *time.Time            `json:"archived_at,omitempty"`
-	CreatedAt                      time.Time             `json:"created_at"`
-	UpdatedAt                      time.Time             `json:"updated_at"`
-	CreatedBy                      string                `json:"created_by"`
-	RevisionNumber                 int64                 `json:"revision_number"`
-	RevisionTitle                  *string               `json:"revision_title,omitempty"`
+	ID                string         `json:"id"`
+	TenantID          string         `json:"tenant_id"`
+	TemplateVersionID string         `json:"template_version_id"`
+	Name              string         `json:"name"`
+	Status            DocumentStatus `json:"status"`
+	FormDataJSON      []byte         `json:"form_data_json"`
+	CurrentRevisionID string         `json:"current_revision_id"`
+	RevisionVersion   int64          `json:"revision_version"`
+	ActiveSessionID   string         `json:"active_session_id"`
+	ValuesFrozenAt    *time.Time     `json:"values_frozen_at,omitempty"`
+	ArchivedAt        *time.Time     `json:"archived_at,omitempty"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	CreatedBy         string         `json:"created_by"`
+	RevisionNumber    int64          `json:"revision_number"`
+	RevisionTitle     *string        `json:"revision_title,omitempty"`
 	// Bridge fields (Spec 1 — added as nullable for Phase A; NOT NULL enforced in migration 0129)
-	ControlledDocumentID           *string               `json:"controlled_document_id,omitempty"`
-	ProfileCodeSnapshot            *string               `json:"profile_code_snapshot,omitempty"`
-	ProcessAreaCodeSnapshot        *string               `json:"process_area_code_snapshot,omitempty"`
-	Code                           string                `json:"code"`
-	CurrentRevisionFileSizeBytes   *int64                `json:"current_revision_file_size_bytes,omitempty"`
-	CurrentRevisionPageCount       *int                  `json:"current_revision_page_count,omitempty"`
-	CurrentRevisionPageCountSource *string               `json:"current_revision_page_count_source,omitempty"`
+	ControlledDocumentID           *string `json:"controlled_document_id,omitempty"`
+	ProfileCodeSnapshot            *string `json:"profile_code_snapshot,omitempty"`
+	ProcessAreaCodeSnapshot        *string `json:"process_area_code_snapshot,omitempty"`
+	Code                           string  `json:"code"`
+	CurrentRevisionFileSizeBytes   *int64  `json:"current_revision_file_size_bytes,omitempty"`
+	CurrentRevisionPageCount       *int    `json:"current_revision_page_count,omitempty"`
+	CurrentRevisionPageCountSource *string `json:"current_revision_page_count_source,omitempty"`
 	// Review/expiry model (M6 F6.2, migrations 0274/0276). effective_from/
 	// effective_to already existed on the row; review_due_at/last_reviewed_at
 	// are new. All four nullable — legacy rows keep NULL (no review cycle set).
@@ -59,6 +59,11 @@ type Document struct {
 	EffectiveTo    *time.Time `json:"effective_to,omitempty"`
 	ReviewDueAt    *time.Time `json:"review_due_at,omitempty"`
 	LastReviewedAt *time.Time `json:"last_reviewed_at,omitempty"`
+	// ReviewSurfacedAt (migration 0276, M6 F6.2 T4) records when the River
+	// periodic surfacer flagged this document for its current review_due_at
+	// cycle. F6.4 D2 makes this the worklist marker the review-due filter
+	// reads (see buildDocumentFilter's ReviewDue branch in repository.go).
+	ReviewSurfacedAt *time.Time `json:"review_surfaced_at,omitempty"`
 	// TemplateVersionID is already present above — now semantically write-once after this migration
 
 	// TemplateSnapshot is the frozen template payload. Populated by Service.Create

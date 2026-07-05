@@ -294,7 +294,7 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		        d.controlled_document_id, d.profile_code_snapshot, d.process_area_code_snapshot,
 		        coalesce(d.code,''), d.revision_version, d.revision_number,
 		        cr.file_size_bytes, cr.page_count, cr.page_count_source,
-		        d.effective_from, d.effective_to, d.review_due_at, d.last_reviewed_at
+		        d.effective_from, d.effective_to, d.review_due_at, d.last_reviewed_at, d.review_surfaced_at
 		 FROM documents d
 		 LEFT JOIN document_revisions cr
 		   ON cr.id = d.current_revision_id
@@ -305,7 +305,7 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.RevisionTitle, &d.ControlledDocumentID, &d.ProfileCodeSnapshot,
 		&d.ProcessAreaCodeSnapshot, &d.Code,
 		&d.RevisionVersion, &d.RevisionNumber, &currentFileSize, &currentPageCount, &currentPageCountSource,
-		&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt)
+		&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt, &d.ReviewSurfacedAt)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
@@ -483,16 +483,34 @@ func buildDocumentFilter(tenantID string, opts ListOptions) (whereClause string,
 		conds = append(conds, fmt.Sprintf("name ILIKE $%d ESCAPE '\\'", len(args)))
 	}
 	if opts.ReviewDue {
-		// Mirrors the "due for review" semantics used by the review-due
-		// read-port (repository/review_due_reader.go ListDueForReview, M6
-		// F6.2 §4.1): published, currently-effective (effective_from <= now
-		// and not yet expired), and review_due_at <= now. No arg needed —
-		// now() is evaluated server-side so it matches the same statement
-		// snapshot as the rest of the query.
+		// F6.4 D2 (worklist model, superseding the F6.2 recompute filter):
+		// this returns the surfacer's worklist, not a live recompute of
+		// "due right now". A document only appears once the River periodic
+		// surfacer (jobs/document_review_surfacer) has flagged it for its
+		// CURRENT review_due_at cycle — review_surfaced_at IS NOT NULL AND
+		// review_surfaced_at >= review_due_at (the same idempotency
+		// invariant ReviewSurfaceWriterPG.MarkSurfaced maintains: it only
+		// (re)stamps review_surfaced_at when the prior mark is stale for the
+		// current cycle, repository/review_surface_writer.go). This is a
+		// derived/materialized read of the shared due-core eligibility
+		// (repository/review_due_reader.go's `dueCorePredicate` — same
+		// published + effective-window definition, restated here with the
+		// filter builder's own dynamic status/effective-window fragment
+		// because dueCorePredicate is a fixed-$1 SQL string and cannot be
+		// spliced into this arg-numbered WHERE clause). D3 single-source is
+		// honored at the reader/writer layer; this is the derived worklist
+		// state, not a second definition of "due".
+		//
+		// mark-reviewed advances review_due_at (repository's mark-reviewed
+		// path), which makes review_surfaced_at < review_due_at true again
+		// and auto-expels the document from this filter until the surfacer
+		// re-flags it on its next due cycle — no separate "un-surface" step
+		// needed.
 		conds = append(conds, `status = 'published'
-		   AND review_due_at IS NOT NULL AND review_due_at <= now()
 		   AND effective_from IS NOT NULL AND effective_from <= now()
-		   AND (effective_to IS NULL OR effective_to > now())`)
+		   AND (effective_to IS NULL OR effective_to > now())
+		   AND review_surfaced_at IS NOT NULL
+		   AND review_surfaced_at >= review_due_at`)
 	}
 
 	return strings.Join(conds, " AND "), args
@@ -532,7 +550,7 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 				controlled_document_id, coalesce(code,'') AS code,
 				profile_code_snapshot, process_area_code_snapshot,
 				revision_version, revision_number,
-				effective_from, effective_to, review_due_at, last_reviewed_at,
+				effective_from, effective_to, review_due_at, last_reviewed_at, review_surfaced_at,
 				COUNT(*) OVER() AS total_count
 			FROM documents
 			WHERE %s
@@ -542,7 +560,7 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 			created_by, controlled_document_id, code,
 			profile_code_snapshot, process_area_code_snapshot,
 			revision_version, revision_number,
-			effective_from, effective_to, review_due_at, last_reviewed_at, total_count
+			effective_from, effective_to, review_due_at, last_reviewed_at, review_surfaced_at, total_count
 		FROM filtered%s
 		ORDER BY updated_at DESC, id DESC
 		LIMIT $%d`, where, cursorClause, len(args))
@@ -562,7 +580,7 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code,
 			&d.ProfileCodeSnapshot, &d.ProcessAreaCodeSnapshot,
 			&d.RevisionVersion, &d.RevisionNumber,
-			&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt, &rowTotal); err != nil {
+			&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt, &d.ReviewSurfacedAt, &rowTotal); err != nil {
 			return nil, 0, false, err
 		}
 		total = rowTotal // identical on every row (window over the full filtered set)

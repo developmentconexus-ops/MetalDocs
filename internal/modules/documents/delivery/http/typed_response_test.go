@@ -198,16 +198,17 @@ func TestPDFCompleteResponse_WireContract(t *testing.T) {
 	}
 }
 
-// TestDocumentSummaryAndDetail_ReviewFieldsWireContract pins M6 F6.2 T6: the
-// generated DocumentSummary/DocumentDetailResponse types carry
-// effective_from/effective_to/review_due_at/last_reviewed_at as
-// required+nullable (ADR 0035 flat-body discipline — present-and-null, never
-// omitted) and toDocumentSummary/toDocumentDetailResponse populate them
-// nil-safe from the domain.Document.
+// TestDocumentSummaryAndDetail_ReviewFieldsWireContract pins M6 F6.2 T6 +
+// F6.4 D2: the generated DocumentSummary/DocumentDetailResponse types carry
+// effective_from/effective_to/review_due_at/last_reviewed_at/
+// review_surfaced_at as required+nullable (ADR 0035 flat-body discipline —
+// present-and-null, never omitted) and toDocumentSummary/
+// toDocumentDetailResponse populate them nil-safe from the domain.Document.
 func TestDocumentSummaryAndDetail_ReviewFieldsWireContract(t *testing.T) {
 	reviewDueAt := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	reviewSurfacedAt := time.Date(2026, 6, 2, 0, 0, 0, 0, time.UTC)
 
-	// All four unset (nil) on the domain document -> all four keys still
+	// All five unset (nil) on the domain document -> all five keys still
 	// present in the JSON body, serialized as null (never omitted).
 	empty, err := toDocumentSummary(domain.Document{FormDataJSON: []byte(`{}`)})
 	if err != nil {
@@ -218,7 +219,7 @@ func TestDocumentSummaryAndDetail_ReviewFieldsWireContract(t *testing.T) {
 	if err := json.Unmarshal(raw, &m); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	for _, key := range []string{"effective_from", "effective_to", "review_due_at", "last_reviewed_at"} {
+	for _, key := range []string{"effective_from", "effective_to", "review_due_at", "last_reviewed_at", "review_surfaced_at"} {
 		got, ok := m[key]
 		if !ok {
 			t.Fatalf("DocumentSummary missing required+nullable key %q in wire body %s", key, raw)
@@ -228,9 +229,9 @@ func TestDocumentSummaryAndDetail_ReviewFieldsWireContract(t *testing.T) {
 		}
 	}
 
-	// review_due_at set on the domain document flows through to the wire
-	// value (nil-safe passthrough, not a fixed null).
-	withReview, err := toDocumentSummary(domain.Document{FormDataJSON: []byte(`{}`), ReviewDueAt: &reviewDueAt})
+	// review_due_at / review_surfaced_at set on the domain document flow
+	// through to the wire value (nil-safe passthrough, not a fixed null).
+	withReview, err := toDocumentSummary(domain.Document{FormDataJSON: []byte(`{}`), ReviewDueAt: &reviewDueAt, ReviewSurfacedAt: &reviewSurfacedAt})
 	if err != nil {
 		t.Fatalf("toDocumentSummary: %v", err)
 	}
@@ -243,6 +244,10 @@ func TestDocumentSummaryAndDetail_ReviewFieldsWireContract(t *testing.T) {
 	if string(mWith["review_due_at"]) != string(wantReviewDue) {
 		t.Fatalf("DocumentSummary[review_due_at] = %s, want %s", mWith["review_due_at"], wantReviewDue)
 	}
+	wantReviewSurfaced, _ := json.Marshal(reviewSurfacedAt)
+	if string(mWith["review_surfaced_at"]) != string(wantReviewSurfaced) {
+		t.Fatalf("DocumentSummary[review_surfaced_at] = %s, want %s", mWith["review_surfaced_at"], wantReviewSurfaced)
+	}
 
 	// Same required+nullable contract on DocumentDetailResponse.
 	detail, err := toDocumentDetailResponse(domain.Document{FormDataJSON: []byte(`{}`)})
@@ -254,7 +259,7 @@ func TestDocumentSummaryAndDetail_ReviewFieldsWireContract(t *testing.T) {
 	if err := json.Unmarshal(rawDetail, &mDetail); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	for _, key := range []string{"effective_from", "effective_to", "review_due_at", "last_reviewed_at"} {
+	for _, key := range []string{"effective_from", "effective_to", "review_due_at", "last_reviewed_at", "review_surfaced_at"} {
 		got, ok := mDetail[key]
 		if !ok {
 			t.Fatalf("DocumentDetailResponse missing required+nullable key %q in wire body %s", key, rawDetail)

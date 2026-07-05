@@ -2556,6 +2556,11 @@ export interface components {
              * @description Timestamp of the last mark-reviewed action.
              */
             last_reviewed_at: string | null;
+            /**
+             * Format: date-time
+             * @description Timestamp the periodic review-due surfacer flagged this document for its current review_due_at cycle; NULL means not (yet) surfaced.
+             */
+            review_surfaced_at: string | null;
         };
         DocumentDetailResponse: {
             id: string;
@@ -2611,6 +2616,11 @@ export interface components {
              * @description Timestamp of the last mark-reviewed action.
              */
             last_reviewed_at: string | null;
+            /**
+             * Format: date-time
+             * @description Timestamp the periodic review-due surfacer flagged this document for its current review_due_at cycle; NULL means not (yet) surfaced.
+             */
+            review_surfaced_at: string | null;
         };
         DocumentCommentContentNode: {
             [key: string]: unknown;

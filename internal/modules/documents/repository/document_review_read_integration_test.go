@@ -3,8 +3,8 @@
 
 package repository_test
 
-// M6 F6.2 T6 — read-side integration proof for the review/expiry fields on
-// the document detail + list endpoints (contract-first: api/openapi/v1/
+// M6 F6.2 T6 + F6.4 D2 — read-side integration proof for the review/expiry
+// fields on the document detail + list endpoints (contract-first: api/openapi/v1/
 // openapi.yaml DocumentSummary/DocumentDetailResponse + the review_due list
 // filter on GET /documents, both required+nullable per ADR 0035).
 //
@@ -12,10 +12,13 @@ package repository_test
 //   1. GetDocument (detail read) returns effective_from/effective_to/
 //      review_due_at/last_reviewed_at when set on the row (nil-safe scan,
 //      values flow through unchanged).
-//   2. ListDocumentsPaginated with ListOptions.ReviewDue=true returns only
-//      documents currently due for periodic review (published, effective,
-//      review_due_at <= now) — seeding one due doc and one not-due doc,
-//      asserting exactly the due one comes back.
+//   2. ListDocumentsPaginated with ListOptions.ReviewDue=true returns the
+//      SURFACED worklist (F6.4 D2, superseding the F6.2 recompute predicate):
+//      published, effective, and review_surfaced_at >= review_due_at — i.e.
+//      the River surfacer has flagged the doc for its current cycle. A doc
+//      that is merely "due" (review_due_at <= now) but not yet surfaced is
+//      EXCLUDED; see TestIntegration_ReviewDueFilter_ReadsSurfaced for the
+//      full surface -> include -> mark-reviewed -> auto-expel round trip.
 
 import (
 	"context"
@@ -37,10 +40,18 @@ import (
 // Opt surface has no direct setter for review_due_at/last_reviewed_at).
 func setReviewColumns(t *testing.T, db *sql.DB, docID string, effectiveFrom, effectiveTo, reviewDueAt, lastReviewedAt *time.Time) {
 	t.Helper()
+	setReviewColumnsWithSurfaced(t, db, docID, effectiveFrom, effectiveTo, reviewDueAt, lastReviewedAt, nil)
+}
+
+// setReviewColumnsWithSurfaced is setReviewColumns plus review_surfaced_at
+// (F6.4 D2 worklist marker — nil leaves the column NULL, i.e. "not yet
+// surfaced").
+func setReviewColumnsWithSurfaced(t *testing.T, db *sql.DB, docID string, effectiveFrom, effectiveTo, reviewDueAt, lastReviewedAt, reviewSurfacedAt *time.Time) {
+	t.Helper()
 	ctx := context.Background()
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		t.Fatalf("setReviewColumns: begin tx: %v", err)
+		t.Fatalf("setReviewColumnsWithSurfaced: begin tx: %v", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -48,14 +59,15 @@ func setReviewColumns(t *testing.T, db *sql.DB, docID string, effectiveFrom, eff
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE public.documents
 		    SET effective_from = $1, effective_to = $2,
-		        review_due_at = $3, last_reviewed_at = $4
-		  WHERE id = $5::uuid`,
-		effectiveFrom, effectiveTo, reviewDueAt, lastReviewedAt, docID,
+		        review_due_at = $3, last_reviewed_at = $4,
+		        review_surfaced_at = $5
+		  WHERE id = $6::uuid`,
+		effectiveFrom, effectiveTo, reviewDueAt, lastReviewedAt, reviewSurfacedAt, docID,
 	); err != nil {
-		t.Fatalf("setReviewColumns: update: %v", err)
+		t.Fatalf("setReviewColumnsWithSurfaced: update: %v", err)
 	}
 	if err := tx.Commit(); err != nil {
-		t.Fatalf("setReviewColumns: commit: %v", err)
+		t.Fatalf("setReviewColumnsWithSurfaced: commit: %v", err)
 	}
 }
 
@@ -76,9 +88,10 @@ func TestGetDocument_ReturnsReviewAndExpiryFields(t *testing.T) {
 	effectiveTo := now.Add(300 * 24 * time.Hour)
 	reviewDueAt := now.Add(30 * 24 * time.Hour)
 	lastReviewedAt := now.Add(-10 * 24 * time.Hour)
+	reviewSurfacedAt := now.Add(-5 * 24 * time.Hour)
 
 	docWithReview := testdb.NewDocument(t, db, testdb.WithTenant(tnt.ID), testdb.WithStatus("published"))
-	setReviewColumns(t, db, docWithReview.ID, &effectiveFrom, &effectiveTo, &reviewDueAt, &lastReviewedAt)
+	setReviewColumnsWithSurfaced(t, db, docWithReview.ID, &effectiveFrom, &effectiveTo, &reviewDueAt, &lastReviewedAt, &reviewSurfacedAt)
 
 	got, err := repo.GetDocument(ctx, tnt.ID, docWithReview.ID)
 	if err != nil {
@@ -96,25 +109,31 @@ func TestGetDocument_ReturnsReviewAndExpiryFields(t *testing.T) {
 	if got.LastReviewedAt == nil || !got.LastReviewedAt.Equal(lastReviewedAt) {
 		t.Errorf("LastReviewedAt = %v, want %v", got.LastReviewedAt, lastReviewedAt)
 	}
+	if got.ReviewSurfacedAt == nil || !got.ReviewSurfacedAt.Equal(reviewSurfacedAt) {
+		t.Errorf("ReviewSurfacedAt = %v, want %v", got.ReviewSurfacedAt, reviewSurfacedAt)
+	}
 
-	// Legacy doc: all four columns left NULL at create time -> nil-safe scan,
-	// no panic, all four fields nil on the returned domain.Document.
+	// Legacy doc: all five columns left NULL at create time -> nil-safe scan,
+	// no panic, all five fields nil on the returned domain.Document.
 	docNoReview := testdb.NewDocument(t, db, testdb.WithTenant(tnt.ID), testdb.WithStatus("draft"))
 	gotLegacy, err := repo.GetDocument(ctx, tnt.ID, docNoReview.ID)
 	if err != nil {
 		t.Fatalf("GetDocument (legacy): %v", err)
 	}
-	if gotLegacy.EffectiveFrom != nil || gotLegacy.EffectiveTo != nil || gotLegacy.ReviewDueAt != nil || gotLegacy.LastReviewedAt != nil {
-		t.Errorf("legacy doc review/expiry fields = (%v,%v,%v,%v), want all nil",
-			gotLegacy.EffectiveFrom, gotLegacy.EffectiveTo, gotLegacy.ReviewDueAt, gotLegacy.LastReviewedAt)
+	if gotLegacy.EffectiveFrom != nil || gotLegacy.EffectiveTo != nil || gotLegacy.ReviewDueAt != nil || gotLegacy.LastReviewedAt != nil || gotLegacy.ReviewSurfacedAt != nil {
+		t.Errorf("legacy doc review/expiry fields = (%v,%v,%v,%v,%v), want all nil",
+			gotLegacy.EffectiveFrom, gotLegacy.EffectiveTo, gotLegacy.ReviewDueAt, gotLegacy.LastReviewedAt, gotLegacy.ReviewSurfacedAt)
 	}
 }
 
 // TestListDocumentsPaginated_ReviewDueFilter proves ListOptions.ReviewDue=true
-// (wired from the GET /documents review_due=true query filter) returns only
-// documents currently due for periodic review: published, effective, and
-// review_due_at <= now. Seeds one due doc and one not-due (future review_due_at)
-// doc; asserts exactly the due one is returned.
+// (wired from the GET /documents review_due=true query filter) returns the
+// SURFACED worklist (F6.4 D2): published, effective, and review_surfaced_at
+// >= review_due_at — i.e. the River periodic surfacer has flagged the doc for
+// its current cycle. Seeds one surfaced+due doc, one due-but-NOT-yet-surfaced
+// doc (must be excluded — worklist is surfacer-driven, not a live recompute),
+// one surfaced+not-due doc (future review_due_at; must be excluded), and one
+// surfaced-but-draft doc (non-published; must be excluded).
 func TestListDocumentsPaginated_ReviewDueFilter(t *testing.T) {
 	ctx := context.Background()
 	db, _ := testdb.Open(t)
@@ -127,16 +146,22 @@ func TestListDocumentsPaginated_ReviewDueFilter(t *testing.T) {
 	effectiveFrom := now.Add(-60 * 24 * time.Hour)
 	due := now.Add(-1 * time.Hour)
 	future := now.Add(30 * 24 * time.Hour)
+	surfacedAt := now.Add(-30 * time.Minute) // >= due, i.e. surfaced for this cycle
 
-	dueDoc := testdb.NewDocument(t, db, testdb.WithTenant(tnt.ID), testdb.WithStatus("published"))
-	setReviewColumns(t, db, dueDoc.ID, &effectiveFrom, nil, &due, nil)
+	surfacedDoc := testdb.NewDocument(t, db, testdb.WithTenant(tnt.ID), testdb.WithStatus("published"))
+	setReviewColumnsWithSurfaced(t, db, surfacedDoc.ID, &effectiveFrom, nil, &due, nil, &surfacedAt)
 
+	// Due but never surfaced: review_surfaced_at stays NULL -> excluded.
+	dueNotSurfacedDoc := testdb.NewDocument(t, db, testdb.WithTenant(tnt.ID), testdb.WithStatus("published"))
+	setReviewColumns(t, db, dueNotSurfacedDoc.ID, &effectiveFrom, nil, &due, nil)
+
+	// Surfaced, but not due yet (future review_due_at) -> excluded.
 	notDueDoc := testdb.NewDocument(t, db, testdb.WithTenant(tnt.ID), testdb.WithStatus("published"))
-	setReviewColumns(t, db, notDueDoc.ID, &effectiveFrom, nil, &future, nil)
+	setReviewColumnsWithSurfaced(t, db, notDueDoc.ID, &effectiveFrom, nil, &future, nil, &surfacedAt)
 
-	// Also seed a due-but-draft doc (non-published) to prove the filter excludes it.
+	// Surfaced + due, but draft (non-published) -> excluded.
 	draftDueDoc := testdb.NewDocument(t, db, testdb.WithTenant(tnt.ID), testdb.WithStatus("draft"))
-	setReviewColumns(t, db, draftDueDoc.ID, &effectiveFrom, nil, &due, nil)
+	setReviewColumnsWithSurfaced(t, db, draftDueDoc.ID, &effectiveFrom, nil, &due, nil, &surfacedAt)
 
 	items, total, _, err := repo.ListDocumentsPaginated(ctx, tnt.ID, repository.ListOptions{
 		PageSize:  20,
@@ -146,10 +171,10 @@ func TestListDocumentsPaginated_ReviewDueFilter(t *testing.T) {
 		t.Fatalf("ListDocumentsPaginated: %v", err)
 	}
 	if len(items) != 1 {
-		t.Fatalf("got %d items, want 1 (only the due+published doc): %+v", len(items), items)
+		t.Fatalf("got %d items, want 1 (only the surfaced+due+published doc): %+v", len(items), items)
 	}
-	if items[0].ID != dueDoc.ID {
-		t.Fatalf("got doc id %q, want the due doc %q", items[0].ID, dueDoc.ID)
+	if items[0].ID != surfacedDoc.ID {
+		t.Fatalf("got doc id %q, want the surfaced doc %q", items[0].ID, surfacedDoc.ID)
 	}
 	if total != 1 {
 		t.Fatalf("got total %d, want 1", total)

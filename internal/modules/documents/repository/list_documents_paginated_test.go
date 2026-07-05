@@ -33,7 +33,7 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 		"created_at", "updated_at", "created_by", "controlled_document_id", "code",
 		"profile_code_snapshot", "process_area_code_snapshot",
 		"revision_version", "revision_number",
-		"effective_from", "effective_to", "review_due_at", "last_reviewed_at",
+		"effective_from", "effective_to", "review_due_at", "last_reviewed_at", "review_surfaced_at",
 		"total_count",
 	}
 
@@ -43,7 +43,7 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 
 	rows := sqlmock.NewRows(cols).
 		// Row 1: snapshots populated, governed revision 1, review_due_at set
-		// (M6 F6.2 T6 — the other three review/expiry columns left NULL to
+		// (M6 F6.2 T6 — the other four review/expiry columns left NULL to
 		// also prove nil-safe scan for the still-unset fields).
 		AddRow(
 			"doc-1", "tenant-1", "tpl-1", "Doc One", "draft", []byte("{}"),
@@ -51,18 +51,18 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 			time.Unix(0, 0), time.Unix(0, 0), "user-1", nil, "PO-RH-001",
 			profileCode, areaCode,
 			int64(1), int64(1),
-			nil, nil, reviewDueAt, nil,
+			nil, nil, reviewDueAt, nil, nil,
 			int64(2),
 		).
 		// Row 2: snapshots NULL (must scan into *string without panicking) and rev 0.
-		// All four review/expiry columns NULL (legacy row, no cycle set).
+		// All five review/expiry columns NULL (legacy row, no cycle set).
 		AddRow(
 			"doc-2", "tenant-1", "tpl-1", "Doc Two", "draft", []byte("{}"),
 			"", "", nil,
 			time.Unix(0, 0), time.Unix(0, 0), "user-1", nil, "PO-RH-002",
 			nil, nil,
 			int64(0), int64(0),
-			nil, nil, nil, nil,
+			nil, nil, nil, nil, nil,
 			int64(2),
 		)
 
@@ -104,6 +104,9 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 	if d1.LastReviewedAt != nil {
 		t.Errorf("row 1 LastReviewedAt = %v, want nil", *d1.LastReviewedAt)
 	}
+	if d1.ReviewSurfacedAt != nil {
+		t.Errorf("row 1 ReviewSurfacedAt = %v, want nil", *d1.ReviewSurfacedAt)
+	}
 
 	d2 := got[1]
 	if d2.ProfileCodeSnapshot != nil {
@@ -118,9 +121,9 @@ func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
 	if d2.RevisionNumber != 0 {
 		t.Errorf("row 2 RevisionNumber = %d, want 0", d2.RevisionNumber)
 	}
-	if d2.EffectiveFrom != nil || d2.EffectiveTo != nil || d2.ReviewDueAt != nil || d2.LastReviewedAt != nil {
-		t.Errorf("row 2 review/expiry fields = (%v,%v,%v,%v), want all nil (legacy row, no cycle set)",
-			d2.EffectiveFrom, d2.EffectiveTo, d2.ReviewDueAt, d2.LastReviewedAt)
+	if d2.EffectiveFrom != nil || d2.EffectiveTo != nil || d2.ReviewDueAt != nil || d2.LastReviewedAt != nil || d2.ReviewSurfacedAt != nil {
+		t.Errorf("row 2 review/expiry fields = (%v,%v,%v,%v,%v), want all nil (legacy row, no cycle set)",
+			d2.EffectiveFrom, d2.EffectiveTo, d2.ReviewDueAt, d2.LastReviewedAt, d2.ReviewSurfacedAt)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
