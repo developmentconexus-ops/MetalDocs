@@ -33,6 +33,7 @@ import (
 	"testing"
 
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/modules/render/fanout"
@@ -163,7 +164,8 @@ func TestPDFDispatchWorker_Integration_PublishesAndMarksDispatched(t *testing.T)
 	}
 
 	if err := worker.Work(ctx, &river.Job[PDFDispatchArgs]{
-		Args: PDFDispatchArgs{dispatchFields: fields},
+		JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 25},
+		Args:   PDFDispatchArgs{dispatchFields: fields},
 	}); err != nil {
 		t.Fatalf("PDFDispatchWorker.Work: %v", err)
 	}
@@ -238,7 +240,8 @@ func TestMaterializeDispatchWorker_Integration_PublishesAndMarksDispatched(t *te
 	}
 
 	if err := worker.Work(ctx, &river.Job[MaterializeDispatchArgs]{
-		Args: MaterializeDispatchArgs{dispatchFields: fields},
+		JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 25},
+		Args:   MaterializeDispatchArgs{dispatchFields: fields},
 	}); err != nil {
 		t.Fatalf("MaterializeDispatchWorker.Work: %v", err)
 	}
