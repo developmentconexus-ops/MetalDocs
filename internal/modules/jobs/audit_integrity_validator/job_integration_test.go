@@ -55,7 +55,7 @@ func TestIntegration_AuditValidator_P3_DetectsTamperedChain(t *testing.T) {
 	// Tamper the middle row's row_hash directly — an out-of-band write no
 	// production code path performs, simulating DB-level corruption/tampering.
 	if _, err := db.ExecContext(context.Background(),
-		`UPDATE metaldocs.audit_events SET row_hash = 'tampered0000000000000000000000000000000000000000000000000000' WHERE id = $1`,
+		`UPDATE metaldocs.audit_events SET row_hash = '0000000000000000000000000000000000000000000000000000000000000000' WHERE id = $1`,
 		eventIDs[1],
 	); err != nil {
 		t.Fatalf("tamper row: %v", err)
