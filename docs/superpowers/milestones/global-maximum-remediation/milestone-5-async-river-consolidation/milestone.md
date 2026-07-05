@@ -1,7 +1,7 @@
 # Milestone 5 — Async consolidation onto River
 
 > **Program:** global-maximum-remediation  ·  **Governing spec:** `../mission.md` (§7 M5)
-> **Status:** Spec (drafting)
+> **Status:** milestone-validator **PASS** (Run-2, 2026-07-04) — HS-1 operator gate pending (carries HS-7 H-PRE-1-stays-LIVE ratification). Features F5.1–F5.8 closed (F5.6/F5.7/F5.8 unplanned: HS-6 queue-wiring fix, HS-4 proof-gap closure, HS-2/HS-6 watchdog alert-only per ADR 0068). Not pushed. M6 only after operator HS-1 approval, fresh session.
 > **Authored:** 2026-07-04 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** this milestone is,
