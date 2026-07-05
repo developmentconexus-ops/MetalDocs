@@ -1,0 +1,58 @@
+package domain
+
+import (
+	"context"
+	"database/sql"
+	"time"
+)
+
+// ReviewDueView is the documents-owned projection of a document due for
+// periodic review (M6 F6.2 §4.1). Minimal by design — only what the jobs
+// module's River surfacer (T4) and its evidence need: enough to identify the
+// document and report why it surfaced.
+type ReviewDueView struct {
+	// ID is the document id.
+	ID string
+	// TenantID is the owning tenant. Present for evidence/logging even though
+	// the read itself is tenant-scoped by the caller's tx GUC (RLS), not by an
+	// explicit predicate in the query.
+	TenantID string
+	// Code is the document's business code (public.documents.code).
+	Code string
+	// Name is the document's display name.
+	Name string
+	// Status is the document's status at read time (owner vocabulary,
+	// DocumentStatus values). Always "published" for rows this port returns.
+	Status string
+	// ReviewDueAt is the instant the document became (or will become) due for
+	// review. Never nil for rows this port returns (the query requires
+	// review_due_at IS NOT NULL).
+	ReviewDueAt *time.Time
+}
+
+// ReviewDueReader is the documents-owned published read-port for periodic
+// review surfacing (M6 F6.2 §4.1, the cross-module boundary). The `jobs`
+// module's River periodic surfacer calls THIS port — never raw SQL against
+// public.documents — to find documents due for review. The interface lives in
+// the owner's domain package; the Postgres adapter lives in the documents
+// repository and is wired at the composition root (mirrors ActiveInstanceReader,
+// active_instance_port.go).
+type ReviewDueReader interface {
+	// ListDueForReview returns published, currently-effective documents whose
+	// review_due_at <= now, ordered by review_due_at ascending, capped at
+	// limit. Runs in the caller-provided tx: tenant scoping is enforced by the
+	// tx's metaldocs.tenant_id GUC via the public.documents RLS FORCE policy
+	// (the query itself carries no explicit tenant_id predicate) — the caller
+	// is responsible for seeding tenant identity (SeedTxIdentity/SeedTxTenant,
+	// M3 backstop) before calling this port.
+	ListDueForReview(ctx context.Context, tx *sql.Tx, now time.Time, limit int) ([]ReviewDueView, error)
+}
+
+// NoopReviewDueReader is the fail-closed default: it reports no due documents.
+// Used as the nil-guard default at wiring and in unit tests that do not
+// exercise the review-due surfacer.
+type NoopReviewDueReader struct{}
+
+func (NoopReviewDueReader) ListDueForReview(context.Context, *sql.Tx, time.Time, int) ([]ReviewDueView, error) {
+	return nil, nil
+}
