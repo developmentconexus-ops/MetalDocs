@@ -5,6 +5,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	approvalapi "metaldocs/internal/modules/documents/approval/api"
+	"metaldocs/internal/platform/problem"
 )
 
 func (h *Handler) SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.SubmitDocumentForApprovalParams) {
@@ -25,6 +26,16 @@ func (h *Handler) ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request
 
 func (h *Handler) SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.SupersedeDocumentParams) {
 	h.SupersedeHandler(w, r)
+}
+
+// MarkDocumentReviewed is the spec-generated adapter for the F6.2 mark-reviewed
+// operation. T0 lands the contract + regen only; the real review workflow
+// handler (last_reviewed_at + next review_due_at under CapDocumentReview + M4
+// transition) is implemented in a later M6 task. Until then this returns a
+// 501 problem+json so the strict-server ServerInterface is satisfied and the
+// route is honestly "not yet implemented" rather than silently 404ing.
+func (h *Handler) MarkDocumentReviewed(w http.ResponseWriter, r *http.Request, documentId openapi_types.UUID, params approvalapi.MarkDocumentReviewedParams) {
+	_ = problem.Write(w, problem.New(http.StatusNotImplemented, "not_implemented", "mark-reviewed is not yet implemented"))
 }
 
 func (h *Handler) ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.ObsoleteDocumentParams) {

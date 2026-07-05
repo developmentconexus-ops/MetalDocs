@@ -1724,6 +1724,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/documents/{documentId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark document reviewed
+         * @description Records a periodic-review completion on a live published revision. Sets last_reviewed_at and the next review_due_at (and optionally effective_to) under the document.review capability; not a status transition (status stays published). OCC via the If-Match ETag, consistent with the sibling submit/publish/schedule-publish operations (CON-01).
+         */
+        post: operations["markDocumentReviewed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/documents/{id}/supersede": {
         parameters: {
             query?: never;
@@ -2516,6 +2536,26 @@ export interface components {
             profile_code_snapshot: string | null;
             process_area_code_snapshot: string | null;
             code: string;
+            /**
+             * Format: date-time
+             * @description Effective date; the moment the published revision takes effect.
+             */
+            effective_from?: string | null;
+            /**
+             * Format: date-time
+             * @description Expiry date; the published revision is no longer effective after this instant.
+             */
+            effective_to?: string | null;
+            /**
+             * Format: date-time
+             * @description Periodic-review due date; NULL means no review cycle is set.
+             */
+            review_due_at?: string | null;
+            /**
+             * Format: date-time
+             * @description Timestamp of the last mark-reviewed action.
+             */
+            last_reviewed_at?: string | null;
         };
         DocumentDetailResponse: {
             id: string;
@@ -2551,6 +2591,26 @@ export interface components {
             current_revision_page_count: number | null;
             /** @enum {string|null} */
             current_revision_page_count_source: "eigenpal_client" | "server_renderer" | null;
+            /**
+             * Format: date-time
+             * @description Effective date; the moment the published revision takes effect.
+             */
+            effective_from?: string | null;
+            /**
+             * Format: date-time
+             * @description Expiry date; the published revision is no longer effective after this instant.
+             */
+            effective_to?: string | null;
+            /**
+             * Format: date-time
+             * @description Periodic-review due date; NULL means no review cycle is set.
+             */
+            review_due_at?: string | null;
+            /**
+             * Format: date-time
+             * @description Timestamp of the last mark-reviewed action.
+             */
+            last_reviewed_at?: string | null;
         };
         DocumentCommentContentNode: {
             [key: string]: unknown;
@@ -3193,6 +3253,13 @@ export interface components {
             route_id: string;
             /** @description SHA-256 hex digest of the content being submitted (autosave-computed). */
             content_hash: string;
+            /** @description Structured reason-for-change (21 CFR Part 11 attributable change reason). Distinct from revision_title (the title of the revision). Optional in the schema; the handler requires it for revision >= 1 (rejected 422 problem+json when missing), and it is optional at initial creation (revision 0). */
+            reason_for_change?: string;
+            /**
+             * @description Optional structured category for the reason-for-change.
+             * @enum {string}
+             */
+            reason_category?: "content" | "corrective" | "regulatory" | "periodic_review" | "administrative";
         };
         SubmitDocumentResponse: {
             /** Format: uuid */
@@ -3257,6 +3324,28 @@ export interface components {
              * @description Optional document to supersede when the scheduled publish fires.
              */
             superseded_document_id?: string;
+            /**
+             * Format: date-time
+             * @description Optional expiry date; the publish is no longer effective after this instant.
+             */
+            effective_to?: string | null;
+            /**
+             * Format: date-time
+             * @description Optional initial periodic-review due date set at schedule/publish time.
+             */
+            review_due_at?: string | null;
+        };
+        MarkDocumentReviewedRequest: {
+            /**
+             * Format: date-time
+             * @description The NEXT periodic-review due date to set on the document (RFC3339 UTC).
+             */
+            review_due_at: string;
+            /**
+             * Format: date-time
+             * @description Optional updated expiry date to set alongside the review completion.
+             */
+            effective_to?: string | null;
         };
         PublishDocumentResponse: {
             /** Format: uuid */
@@ -5909,6 +5998,8 @@ export interface operations {
                 profile_code?: string;
                 q?: string;
                 include_archived?: boolean;
+                /** @description When true, return only documents whose review_due_at <= now() (due for periodic review). */
+                review_due?: boolean;
             };
             header?: never;
             path?: never;
@@ -6954,6 +7045,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SchedulePublishDocumentRequest"];
+            };
+        };
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishDocumentResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            428: components["responses"]["PreconditionRequired"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    markDocumentReviewed: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>", or "*" to skip the check */
+                "If-Match": string;
+            };
+            path: {
+                documentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkDocumentReviewedRequest"];
             };
         };
         responses: {

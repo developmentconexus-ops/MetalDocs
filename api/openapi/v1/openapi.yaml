@@ -2474,6 +2474,11 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: review_due
+          in: query
+          description: When true, return only documents whose review_due_at <= now() (due for periodic review).
+          schema:
+            type: boolean
       responses:
         '200':
           description: ok
@@ -3508,6 +3513,56 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SchedulePublishDocumentRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishDocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /documents/{documentId}/review:
+    post:
+      summary: Mark document reviewed
+      description: >-
+        Records a periodic-review completion on a live published revision. Sets
+        last_reviewed_at and the next review_due_at (and optionally effective_to)
+        under the document.review capability; not a status transition (status
+        stays published). OCC via the If-Match ETag, consistent with the sibling
+        submit/publish/schedule-publish operations (CON-01).
+      tags: [approval]
+      operationId: markDocumentReviewed
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap enforced at tier-2 in the tx-layer service via
+          authz.Require with the area resolved from the document row
+          (LoadDocumentAreaCode); never from a request field. Postgres tripwire
+          (migration 0142b) is the backstop.
+      parameters:
+        - { name: documentId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkDocumentReviewedRequest'
       responses:
         '200':
           description: ok
@@ -5113,6 +5168,26 @@ components:
           nullable: true
         code:
           type: string
+        effective_from:
+          type: string
+          format: date-time
+          nullable: true
+          description: Effective date; the moment the published revision takes effect.
+        effective_to:
+          type: string
+          format: date-time
+          nullable: true
+          description: Expiry date; the published revision is no longer effective after this instant.
+        review_due_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Periodic-review due date; NULL means no review cycle is set.
+        last_reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of the last mark-reviewed action.
     DocumentDetailResponse:
       type: object
       required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, active_session_id, created_at, updated_at, created_by, revision_number, code, values_frozen_at, archived_at, controlled_document_id, revision_title, profile_code_snapshot, process_area_code_snapshot, current_revision_file_size_bytes, current_revision_page_count, current_revision_page_count_source]
@@ -5183,6 +5258,26 @@ components:
           type: string
           nullable: true
           enum: [eigenpal_client, server_renderer]
+        effective_from:
+          type: string
+          format: date-time
+          nullable: true
+          description: Effective date; the moment the published revision takes effect.
+        effective_to:
+          type: string
+          format: date-time
+          nullable: true
+          description: Expiry date; the published revision is no longer effective after this instant.
+        review_due_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Periodic-review due date; NULL means no review cycle is set.
+        last_reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of the last mark-reviewed action.
     DocumentCommentContentNode:
       type: object
       additionalProperties: true
@@ -6202,6 +6297,17 @@ components:
           minLength: 64
           maxLength: 64
           description: SHA-256 hex digest of the content being submitted (autosave-computed).
+        reason_for_change:
+          type: string
+          description: >-
+            Structured reason-for-change (21 CFR Part 11 attributable change reason).
+            Distinct from revision_title (the title of the revision). Optional in the
+            schema; the handler requires it for revision >= 1 (rejected 422 problem+json
+            when missing), and it is optional at initial creation (revision 0).
+        reason_category:
+          type: string
+          enum: [content, corrective, regulatory, periodic_review, administrative]
+          description: Optional structured category for the reason-for-change.
     SubmitDocumentResponse:
       type: object
       required: [instance_id, was_replay, etag]
@@ -6299,6 +6405,29 @@ components:
           type: string
           format: uuid
           description: Optional document to supersede when the scheduled publish fires.
+        effective_to:
+          type: string
+          format: date-time
+          nullable: true
+          description: Optional expiry date; the publish is no longer effective after this instant.
+        review_due_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Optional initial periodic-review due date set at schedule/publish time.
+    MarkDocumentReviewedRequest:
+      type: object
+      required: [review_due_at]
+      properties:
+        review_due_at:
+          type: string
+          format: date-time
+          description: The NEXT periodic-review due date to set on the document (RFC3339 UTC).
+        effective_to:
+          type: string
+          format: date-time
+          nullable: true
+          description: Optional updated expiry date to set alongside the review completion.
     PublishDocumentResponse:
       type: object
       required: [document_id, new_status]
