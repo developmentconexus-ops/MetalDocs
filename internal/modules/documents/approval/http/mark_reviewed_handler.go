@@ -32,7 +32,7 @@ func (h *Handler) MarkReviewedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actorID := actorIDFromRequest(r)
-	documentID := r.PathValue("documentId")
+	documentID := r.PathValue("id")
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {

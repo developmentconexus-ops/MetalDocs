@@ -6,7 +6,7 @@ import (
 )
 
 // MarkReviewedRequest is the decoded body plus header-sourced fields for the
-// mark-reviewed endpoint (POST /documents/{documentId}/review, F6.2).
+// mark-reviewed endpoint (POST /documents/{id}/review, F6.2).
 type MarkReviewedRequest struct {
 	ReviewDueAt    string     `json:"review_due_at"`
 	EffectiveTo    *time.Time `json:"effective_to,omitempty"`

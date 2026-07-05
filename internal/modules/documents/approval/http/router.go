@@ -33,7 +33,7 @@ var idempotentRoutes = map[string]bool{
 	"POST /api/v1/documents/{id}/schedule-publish":         true,
 	"POST /api/v1/documents/{id}/submit":                   true,
 	"POST /api/v1/documents/{id}/supersede":                true,
-	"POST /api/v1/documents/{documentId}/review":           true,
+	"POST /api/v1/documents/{id}/review":                   true,
 }
 
 // RegisterRoutes wires all approval routes onto mux via the generated
