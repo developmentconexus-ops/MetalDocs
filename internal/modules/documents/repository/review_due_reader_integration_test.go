@@ -14,9 +14,13 @@ package repository_test
 //   1. only published + currently-effective docs with review_due_at <= now
 //      are returned (seed one due, one future-due, one NULL review_due_at,
 //      one non-published due doc -> assert exactly the one due+published row);
-//   2. tenant isolation: a due doc seeded in tenant B is invisible to a read
-//      tx whose metaldocs.tenant_id GUC is set to tenant A (RLS FORCE policy
-//      on public.documents, migration baseline :4840);
+//   2. tenant isolation: a due doc seeded in tenant B is invisible to a call
+//      scoped to tenant A via the explicit tenant_id predicate (primary),
+//      independent of RLS (the tx's metaldocs.tenant_id GUC is also seeded,
+//      backstopping via RLS FORCE policy on public.documents, migration
+//      baseline :4840, but is inert under the superuser/BYPASSRLS role used
+//      in dev/CI — the explicit predicate is what actually proves isolation
+//      here);
 //   3. limit is respected and rows are ordered by review_due_at ASC.
 
 import (
@@ -123,7 +127,7 @@ func TestListDueForReview_FiltersPublishedAndDue(t *testing.T) {
 	defer tx.Rollback()
 	testdb.SetCapsOnTx(t, tx, `[{"cap":"document.view"}]`)
 
-	rows, err := reader.ListDueForReview(context.Background(), tx, now, 10)
+	rows, err := reader.ListDueForReview(context.Background(), tx, tnt.ID, now, 10)
 	if err != nil {
 		t.Fatalf("ListDueForReview: %v", err)
 	}
@@ -146,8 +150,13 @@ func TestListDueForReview_FiltersPublishedAndDue(t *testing.T) {
 }
 
 // TestListDueForReview_TenantIsolation proves a due+published document seeded
-// in tenant B is invisible to a read tx scoped to tenant A (RLS FORCE policy),
-// even though ListDueForReview issues no explicit tenant_id predicate itself.
+// in tenant B is invisible when ListDueForReview is called with tenant A's
+// id. This is now proven by the EXPLICIT tenant_id predicate ListDueForReview
+// carries (`tenant_id = $2::uuid`, review_due_reader.go) — not by RLS. The
+// tx's metaldocs.tenant_id GUC is still seeded (openTenantScopedTx) as the
+// RLS backstop, but the dev/CI DB role (metaldocs_app) is superuser +
+// BYPASSRLS, so RLS is inert here; without the explicit predicate this test
+// would be RED (false-negative isolation) under that role.
 func TestListDueForReview_TenantIsolation(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
@@ -166,7 +175,7 @@ func TestListDueForReview_TenantIsolation(t *testing.T) {
 	defer tx.Rollback()
 	testdb.SetCapsOnTx(t, tx, `[{"cap":"document.view"}]`)
 
-	rows, err := reader.ListDueForReview(context.Background(), tx, now, 10)
+	rows, err := reader.ListDueForReview(context.Background(), tx, tntA.ID, now, 10)
 	if err != nil {
 		t.Fatalf("ListDueForReview: %v", err)
 	}
@@ -201,7 +210,7 @@ func TestListDueForReview_LimitAndOrder(t *testing.T) {
 	defer tx.Rollback()
 	testdb.SetCapsOnTx(t, tx, `[{"cap":"document.view"}]`)
 
-	rows, err := reader.ListDueForReview(context.Background(), tx, now, 2)
+	rows, err := reader.ListDueForReview(context.Background(), tx, tnt.ID, now, 2)
 	if err != nil {
 		t.Fatalf("ListDueForReview: %v", err)
 	}

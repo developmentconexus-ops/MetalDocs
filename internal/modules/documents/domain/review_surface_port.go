@@ -36,14 +36,17 @@ type ReviewSurfaceWriter interface {
 	// document eligible again on the next run.
 	//
 	// Runs in the caller-provided tx. Tenant scoping mirrors ListDueForReview:
-	// enforced by the tx's metaldocs.tenant_id GUC via the public.documents
-	// RLS FORCE policy, no explicit tenant_id predicate in the query. The
+	// enforced by an EXPLICIT tenant_id predicate in the UPDATE's WHERE
+	// (primary), matching the module convention for tenant-scoped documents
+	// queries; the public.documents RLS FORCE policy on the tx's
+	// metaldocs.tenant_id GUC is the backstop. The caller still seeds the
+	// tenant GUC (SeedTxTenant) so the RLS backstop is live. The
 	// documents/UPDATE DB tripwire (enforce_capability_asserted) still fires
 	// for this UPDATE; a scheduler caller must set the scheduler bypass
 	// (authz.BypassSystem, requires authz.WithBackgroundBypass on ctx) before
 	// calling this port — MarkSurfaced does not set the bypass itself, mirroring
 	// the existing janitors' own-tx bypass calls rather than hiding it here.
-	MarkSurfaced(ctx context.Context, tx *sql.Tx, now time.Time) ([]SurfacedDoc, error)
+	MarkSurfaced(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time) ([]SurfacedDoc, error)
 }
 
 // NoopReviewSurfaceWriter is the fail-closed default: it surfaces nothing.
@@ -51,6 +54,6 @@ type ReviewSurfaceWriter interface {
 // exercise the review-due surfacer.
 type NoopReviewSurfaceWriter struct{}
 
-func (NoopReviewSurfaceWriter) MarkSurfaced(context.Context, *sql.Tx, time.Time) ([]SurfacedDoc, error) {
+func (NoopReviewSurfaceWriter) MarkSurfaced(context.Context, *sql.Tx, string, time.Time) ([]SurfacedDoc, error) {
 	return nil, nil
 }

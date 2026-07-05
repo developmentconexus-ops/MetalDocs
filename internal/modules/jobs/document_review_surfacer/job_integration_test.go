@@ -142,15 +142,20 @@ func TestIntegration_Surfacer_FullTick_IteratesAllTenants(t *testing.T) {
 // real §4.3 cross-tenant ISOLATION proof: seed the tx as tenant A ONLY
 // (authz.BypassSystem + authz.SeedTxTenant(A), the exact pattern
 // stuck_instance_watchdog.emitStuckAlert uses before its tenant-scoped write),
-// call MarkSurfaced directly, and assert tenant A's due doc is surfaced while
-// tenant B's due doc is NOT touched — RLS (FORCE ROW LEVEL SECURITY +
-// tenant_isolation policy) blocks the write to a row outside the seeded GUC.
+// call MarkSurfaced(ctx, tx, tntA.ID, now) directly, and assert tenant A's due
+// doc is surfaced while tenant B's due doc is NOT touched.
 //
-// Before the fix (unseeded MarkSurfaced relying on the NULL-GUC "all tenants"
-// RLS branch), this test is RED: the writer has no tenant predicate and no
-// seed changes that, so B's due doc gets surfaced regardless of which tenant
-// (if any) is seeded. After the fix (MarkSurfaced called only under a seeded
-// tenant tx, one tenant per call), this test is GREEN.
+// Isolation is proven by the EXPLICIT tenant_id predicate MarkSurfaced now
+// carries (`tenant_id = $2::uuid`, review_surface_writer.go), not by RLS: the
+// dev/CI DB role (metaldocs_app) is superuser + BYPASSRLS, so FORCE RLS is
+// inert here and is only a backstop (the tx's GUC is still seeded via
+// SeedTxTenant for that backstop to be live in a non-superuser deployment).
+// Before the explicit-predicate fix, this test would be RED under the
+// superuser role: an unseeded/BYPASSRLS-inert write relying solely on RLS
+// would surface tenant B's due doc too, regardless of which tenant (if any)
+// is seeded. With the explicit predicate, isolation is correct-by-
+// construction and this test is GREEN independent of the DB role's RLS
+// enforcement.
 func TestIntegration_Surfacer_Writer_TenantSeed_DoesNotSurfaceOtherTenant(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
@@ -165,7 +170,10 @@ func TestIntegration_Surfacer_Writer_TenantSeed_DoesNotSurfaceOtherTenant(t *tes
 	dueDocB := seedSurfacerDoc(t, db, tntB.ID, "published", effectiveFrom, &due)
 
 	writer := documentsrepo.NewReviewSurfaceWriterPG(db)
-	ctx := context.Background()
+	// BypassSystem refuses to bypass tier-2 unless the context is marked
+	// background (scheduler/job root) — the real surfacer sets this in Work();
+	// mirror it here so the direct-writer isolation drive is a faithful proof.
+	ctx := authz.WithBackgroundBypass(context.Background())
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -180,7 +188,7 @@ func TestIntegration_Surfacer_Writer_TenantSeed_DoesNotSurfaceOtherTenant(t *tes
 		t.Fatalf("SeedTxTenant(A): %v", err)
 	}
 
-	if _, err := writer.MarkSurfaced(ctx, tx, now); err != nil {
+	if _, err := writer.MarkSurfaced(ctx, tx, tntA.ID, now); err != nil {
 		t.Fatalf("MarkSurfaced: %v", err)
 	}
 	if err := tx.Commit(); err != nil {

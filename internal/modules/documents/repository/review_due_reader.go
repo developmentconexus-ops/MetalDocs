@@ -33,9 +33,10 @@ var _ documentsdomain.ReviewDueReader = (*ReviewDueReaderPG)(nil)
 // ListTenantsWithDueReviews here, and ReviewSurfaceWriterPG.MarkSurfaced's
 // eligibility clause — references this exact fragment so the definition of
 // "due" cannot drift between reader and writer. It takes one positional
-// parameter: the `now` instant, referenced 3 times (matching the parameter
-// placeholder consumers must supply, e.g. $1 when it is the only prior
-// parameter).
+// parameter: the `now` instant, referenced 3 times as $1 — every consumer
+// binds `now` as its FIRST query argument regardless of what other
+// predicates (e.g. an explicit tenant_id = $2) are spliced around it, so
+// this fragment's $1 numbering never needs to change.
 const dueCorePredicate = `status = 'published'
    AND review_due_at IS NOT NULL
    AND review_due_at <= $1
@@ -46,22 +47,19 @@ const dueCorePredicate = `status = 'published'
 // ListDueForReview returns published, currently-effective documents whose
 // review_due_at <= now, ordered by review_due_at ascending, capped at limit.
 //
-// Tenant scoping is enforced by RLS (public.documents FORCE ROW LEVEL SECURITY
-// + the tenant_isolation policy keyed on the tx-local metaldocs.tenant_id
-// GUC, db/baseline/0001_current_schema.sql:4840) — this query carries no
-// explicit tenant_id predicate, mirroring the read-port's contract that the
-// caller has already seeded tenant identity on tx (M3 backstop). This
-// intentionally differs from same-module sibling queries in this package
-// (e.g. loadDocumentArea) that ALSO filter tenant_id explicitly as a
-// belt-and-suspenders local check; ListDueForReview is the one published
-// cross-module read surface for this projection, and the T3 contract's fixed
-// signature (ctx, tx, now, limit) carries no tenantID parameter to filter on
-// — RLS is the sole enforcement point here, by design.
+// Tenant scoping is enforced by an EXPLICIT tenant_id predicate in the WHERE
+// (primary), matching every other tenant-scoped documents query in this
+// package (e.g. active_instance_reader.go's `WHERE tenant_id = $1::uuid`).
+// RLS (public.documents FORCE ROW LEVEL SECURITY + the tenant_isolation
+// policy keyed on the tx-local metaldocs.tenant_id GUC,
+// db/baseline/0001_current_schema.sql:4840) is the BACKSTOP — the caller is
+// still responsible for seeding tenant identity on tx (M3) so the backstop is
+// live, but isolation no longer depends solely on it.
 //
 // "Currently-effective" = effective_from <= now (already effective) AND
 // (effective_to IS NULL OR effective_to > now) (not yet expired) — the F6.2
 // review/expiry model (validation-contract.md §2).
-func (r *ReviewDueReaderPG) ListDueForReview(ctx context.Context, tx *sql.Tx, now time.Time, limit int) ([]documentsdomain.ReviewDueView, error) {
+func (r *ReviewDueReaderPG) ListDueForReview(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time, limit int) ([]documentsdomain.ReviewDueView, error) {
 	if limit <= 0 {
 		limit = 25
 	}
@@ -69,10 +67,11 @@ func (r *ReviewDueReaderPG) ListDueForReview(ctx context.Context, tx *sql.Tx, no
 	rows, err := tx.QueryContext(ctx, `
 SELECT id::text, tenant_id::text, code, name, status, review_due_at
   FROM public.documents
- WHERE `+dueCorePredicate+`
+ WHERE tenant_id = $2::uuid
+   AND `+dueCorePredicate+`
  ORDER BY review_due_at ASC
- LIMIT $2`,
-		now, limit,
+ LIMIT $3`,
+		now, tenantID, limit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list due for review: query: %w", err)
@@ -83,8 +82,12 @@ SELECT id::text, tenant_id::text, code, name, status, review_due_at
 	for rows.Next() {
 		var v documentsdomain.ReviewDueView
 		var reviewDueAt time.Time
-		if err := rows.Scan(&v.ID, &v.TenantID, &v.Code, &v.Name, &v.Status, &reviewDueAt); err != nil {
+		var code sql.NullString // documents.code is nullable
+		if err := rows.Scan(&v.ID, &v.TenantID, &code, &v.Name, &v.Status, &reviewDueAt); err != nil {
 			return nil, fmt.Errorf("list due for review: scan: %w", err)
+		}
+		if code.Valid {
+			v.Code = &code.String
 		}
 		v.ReviewDueAt = &reviewDueAt
 		out = append(out, v)

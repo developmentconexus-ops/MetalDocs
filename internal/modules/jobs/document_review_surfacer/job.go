@@ -74,10 +74,11 @@ func (w *DocumentReviewSurfacerWorker) Work(ctx context.Context, job *river.Job[
 //     safe unseeded, exactly like stuck_instance_watchdog.listStuckInstances;
 //  2. for EACH tenant returned, a NEW tx that seeds authz.BypassSystem THEN
 //     authz.SeedTxTenant(tenantID) before calling ListDueForReview (for the
-//     count/log) and MarkSurfaced (the idempotent side effect) — mirroring
+//     count/log) and MarkSurfaced (the idempotent side effect), passing that
+//     same tenantID as an explicit parameter to both — mirroring
 //     stuck_instance_watchdog.emitStuckAlert's per-instance SeedTxTenant
-//     pattern. FORCE RLS backstops the write: no unseeded tenant-scoped write
-//     against public.documents survives this job.
+//     pattern. Isolation is now primarily by the explicit tenant_id predicate
+//     each port carries; FORCE RLS on the seeded GUC is the backstop.
 //
 // Per validation-contract.md §4.1, every call goes through documents-owned
 // ports (ListTenantsWithDueReviews, ListDueForReview, MarkSurfaced); this
@@ -141,8 +142,9 @@ func listTenantsWithDueReviews(ctx context.Context, database *sql.DB, reader doc
 
 // surfaceTenant opens a NEW tx seeded to exactly one tenant
 // (authz.BypassSystem then authz.SeedTxTenant(tenantID)) and, within it, reads
-// the tenant's due documents (for the count/log) and marks them surfaced. RLS
-// backstops the write to that tenant's rows only.
+// the tenant's due documents (for the count/log) and marks them surfaced,
+// passing tenantID explicitly to both ports so scoping is correct-by-
+// construction; RLS on the seeded GUC backstops the write.
 func surfaceTenant(ctx context.Context, database *sql.DB, reader documentsdomain.ReviewDueReader, writer documentsdomain.ReviewSurfaceWriter, tenantID string, now time.Time) (dueCount int, surfacedCount int, err error) {
 	tx, err := database.BeginTx(ctx, nil)
 	if err != nil {
@@ -157,12 +159,12 @@ func surfaceTenant(ctx context.Context, database *sql.DB, reader documentsdomain
 		return 0, 0, err
 	}
 
-	due, err := reader.ListDueForReview(ctx, tx, now, BatchSize)
+	due, err := reader.ListDueForReview(ctx, tx, tenantID, now, BatchSize)
 	if err != nil {
 		return 0, 0, err
 	}
 
-	surfaced, err := writer.MarkSurfaced(ctx, tx, now)
+	surfaced, err := writer.MarkSurfaced(ctx, tx, tenantID, now)
 	if err != nil {
 		return 0, 0, err
 	}

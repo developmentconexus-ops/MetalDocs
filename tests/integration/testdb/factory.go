@@ -134,6 +134,7 @@ type Spec struct {
 	hasRevisionVersion    bool
 	hasScheduleGeneration bool
 	hasEffectiveFrom      bool
+	stubSubmitSnapshots   bool
 }
 
 type Opt func(*Spec)
@@ -166,6 +167,17 @@ func WithScheduleGen(g int64) Opt {
 }
 func WithEffectiveFrom(at time.Time) Opt {
 	return func(s *Spec) { s.EffectiveFrom = at; s.hasEffectiveFrom = true }
+}
+
+// WithSubmitReadySnapshots forces the six enforce_snapshot_on_submit columns to
+// be stubbed even for status='draft'. A real draft that is ready to submit for
+// review has already had its template/content snapshot taken, so those columns
+// are populated before the draft->under_review transition; the factory
+// otherwise leaves them NULL for drafts. Opt into this when a test drives
+// SubmitRevisionForReview (or any transition into under_review/approved/
+// scheduled/published) off a factory-seeded draft.
+func WithSubmitReadySnapshots() Opt {
+	return func(s *Spec) { s.stubSubmitSnapshots = true }
 }
 
 func newSpec(opts []Opt) *Spec {
@@ -422,7 +434,9 @@ func NewDocument(t *testing.T, db *sql.DB, opts ...Opt) Document {
 	// enforce_snapshot_on_submit (23514) requires the six snapshot columns for
 	// any non-draft status. Stub them with literal expressions (32-byte hashes
 	// satisfy the *_hash_len checks), mirroring fixtures.go's supersede walk.
-	if status != "draft" {
+	// A draft that a test will drive into under_review needs them too — opt in
+	// via WithSubmitReadySnapshots (a real submit-ready draft has them set).
+	if status != "draft" || s.stubSubmitSnapshots {
 		cols = append(cols,
 			"placeholder_schema_snapshot", "placeholder_schema_hash",
 			"composition_config_snapshot", "composition_config_hash",

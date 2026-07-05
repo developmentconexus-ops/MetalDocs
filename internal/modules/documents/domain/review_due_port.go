@@ -17,8 +17,10 @@ type ReviewDueView struct {
 	// the read itself is tenant-scoped by the caller's tx GUC (RLS), not by an
 	// explicit predicate in the query.
 	TenantID string
-	// Code is the document's business code (public.documents.code).
-	Code string
+	// Code is the document's business code (public.documents.code, NULLABLE —
+	// no NOT NULL constraint on the column, db/baseline/0001_current_schema.sql
+	// documents.code). nil when the row has no code assigned.
+	Code *string
 	// Name is the document's display name.
 	Name string
 	// Status is the document's status at read time (owner vocabulary,
@@ -40,12 +42,15 @@ type ReviewDueView struct {
 type ReviewDueReader interface {
 	// ListDueForReview returns published, currently-effective documents whose
 	// review_due_at <= now, ordered by review_due_at ascending, capped at
-	// limit. Runs in the caller-provided tx: tenant scoping is enforced by the
-	// tx's metaldocs.tenant_id GUC via the public.documents RLS FORCE policy
-	// (the query itself carries no explicit tenant_id predicate) — the caller
-	// is responsible for seeding tenant identity (SeedTxIdentity/SeedTxTenant,
-	// M3 backstop) before calling this port.
-	ListDueForReview(ctx context.Context, tx *sql.Tx, now time.Time, limit int) ([]ReviewDueView, error)
+	// limit. Runs in the caller-provided tx: tenant scoping is enforced by an
+	// EXPLICIT tenant_id predicate in the query (primary), matching the
+	// module convention for tenant-scoped documents queries (e.g.
+	// active_instance_reader.go's `WHERE tenant_id = $1::uuid`); the
+	// public.documents RLS FORCE policy on the tx's metaldocs.tenant_id GUC is
+	// the backstop. The caller is still responsible for seeding tenant
+	// identity (SeedTxIdentity/SeedTxTenant, M3) before calling this port, so
+	// the RLS backstop is live.
+	ListDueForReview(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time, limit int) ([]ReviewDueView, error)
 
 	// ListTenantsWithDueReviews returns the DISTINCT tenant_ids (as text) that
 	// currently have at least one review-due document (the same "due-core"
@@ -64,7 +69,7 @@ type ReviewDueReader interface {
 // and in unit tests that do not exercise the review-due surfacer.
 type NoopReviewDueReader struct{}
 
-func (NoopReviewDueReader) ListDueForReview(context.Context, *sql.Tx, time.Time, int) ([]ReviewDueView, error) {
+func (NoopReviewDueReader) ListDueForReview(context.Context, *sql.Tx, string, time.Time, int) ([]ReviewDueView, error) {
 	return nil, nil
 }
 

@@ -38,31 +38,35 @@ var _ documentsdomain.ReviewSurfaceWriter = (*ReviewSurfaceWriterPG)(nil)
 // (mark-reviewed), review_surfaced_at < review_due_at becomes true again and
 // the document re-surfaces on its next due cycle.
 //
-// Tenant scoping is enforced by RLS (public.documents FORCE ROW LEVEL
-// SECURITY + the tenant_isolation policy keyed on the tx-local
-// metaldocs.tenant_id GUC, db/baseline/0001_current_schema.sql:4840) exactly
-// as ListDueForReview — no explicit tenant_id predicate. Per
-// validation-contract.md §4.2/§4.3, the caller MUST seed exactly one tenant
-// on the tx (authz.BypassSystem then authz.SeedTxTenant(tenantID)) before
-// calling this method — the surfacer job iterates tenants (via
+// Tenant scoping is enforced by an EXPLICIT tenant_id predicate in the
+// UPDATE's WHERE (primary), matching every other tenant-scoped documents
+// query in this package (e.g. active_instance_reader.go's
+// `WHERE tenant_id = $1::uuid`) and mirroring ListDueForReview. RLS
+// (public.documents FORCE ROW LEVEL SECURITY + the tenant_isolation policy
+// keyed on the tx-local metaldocs.tenant_id GUC,
+// db/baseline/0001_current_schema.sql:4840) is the BACKSTOP. Per
+// validation-contract.md §4.2/§4.3, the caller MUST still seed exactly one
+// tenant on the tx (authz.BypassSystem then authz.SeedTxTenant(tenantID))
+// before calling this method — the surfacer job iterates tenants (via
 // ListTenantsWithDueReviews) and calls MarkSurfaced once per seeded tenant
 // tx, mirroring stuck_instance_watchdog.emitStuckAlert's per-instance
-// SeedTxTenant pattern. FORCE RLS then backstops the write: a buggy predicate
-// here can only ever touch the seeded tenant's rows.
+// SeedTxTenant pattern. The explicit predicate makes isolation
+// correct-by-construction; FORCE RLS backstops it.
 //
 // The documents/UPDATE DB tripwire (enforce_capability_asserted) still fires
 // for this UPDATE; the caller is responsible for the scheduler bypass +
 // tenant seed (authz.BypassSystem + authz.SeedTxTenant under
 // authz.WithBackgroundBypass) before calling this port — this adapter issues
 // no authz calls itself.
-func (w *ReviewSurfaceWriterPG) MarkSurfaced(ctx context.Context, tx *sql.Tx, now time.Time) ([]documentsdomain.SurfacedDoc, error) {
+func (w *ReviewSurfaceWriterPG) MarkSurfaced(ctx context.Context, tx *sql.Tx, tenantID string, now time.Time) ([]documentsdomain.SurfacedDoc, error) {
 	rows, err := tx.QueryContext(ctx, `
 UPDATE public.documents
    SET review_surfaced_at = $1
- WHERE `+dueCorePredicate+`
+ WHERE tenant_id = $2::uuid
+   AND `+dueCorePredicate+`
    AND (review_surfaced_at IS NULL OR review_surfaced_at < review_due_at)
 RETURNING id::text, review_due_at`,
-		now,
+		now, tenantID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("mark surfaced: update: %w", err)

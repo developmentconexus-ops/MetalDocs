@@ -76,7 +76,7 @@ func TestSubmitPersistsReason_RealDB(t *testing.T) {
 	// WithRevisionNumber(1): the row must be a governed revision >= 1 so
 	// SubmitRevisionForReview's in-tx derived revision_number (T8b) drives the
 	// REV>=1 gates — the request itself never supplies a revision number.
-	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithOwner(actor.ID), testdb.WithStatus("draft"), testdb.WithRevisionNumber(1))
+	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithOwner(actor.ID), testdb.WithStatus("draft"), testdb.WithRevisionNumber(1), testdb.WithSubmitReadySnapshots())
 
 	var profileCode string
 	if err := dbc.QueryRowContext(ctx,
@@ -134,7 +134,7 @@ func TestSubmitReasonOnAuditTrail_RealDB(t *testing.T) {
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
 	// WithRevisionNumber(1): see TestSubmitPersistsReason_RealDB — the derived
 	// in-tx revision_number (T8b) must come from the row, not the request.
-	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithOwner(actor.ID), testdb.WithStatus("draft"), testdb.WithRevisionNumber(1))
+	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithOwner(actor.ID), testdb.WithStatus("draft"), testdb.WithRevisionNumber(1), testdb.WithSubmitReadySnapshots())
 
 	var profileCode string
 	if err := dbc.QueryRowContext(ctx,
@@ -166,9 +166,12 @@ func TestSubmitReasonOnAuditTrail_RealDB(t *testing.T) {
 		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
 	}
 
+	// resource_id is TEXT (governance_events.resource_id text NOT NULL) — the
+	// actor/resource-id text contract; casting the bound doc id to ::uuid here
+	// raises "operator does not exist: text = uuid" (42883). Compare as text.
 	rows, err := dbc.QueryContext(ctx,
 		`SELECT payload_json FROM public.governance_events
-		  WHERE tenant_id = $1::uuid AND resource_id = $2::uuid AND event_type = 'approval_submitted'`,
+		  WHERE tenant_id = $1::uuid AND resource_id = $2 AND event_type = 'approval_submitted'`,
 		tnt.ID, doc.ID,
 	)
 	if err != nil {
