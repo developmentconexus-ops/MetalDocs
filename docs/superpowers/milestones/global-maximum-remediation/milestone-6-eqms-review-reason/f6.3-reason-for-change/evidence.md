@@ -36,9 +36,9 @@ payload).
 | Audit payload carries reason (unit) | `go test -run 'TestSubmitReasonOnAuditTrail$' ./.../approval/application/...` | `ok` (same run) | fixture (mock emitter) |
 | REV≥1 required → 422; REV 0 optional | `go test -run 'TestSubmitReasonRequiredRev1$\|TestSubmitReasonOptionalAtRev0$\|TestSubmitReasonRequiredRev1_DerivedFromDocumentRow_NoClientRevisionNumber' ./.../approval/application/...` | `ok` (derived-from-row path proven) | real (logic) |
 | `reason_category` outside enum rejected (unit) | `go test -run TestSubmitReasonCategoryInvalidRejected ./.../approval/application/...` | `ok` | fixture |
-| Persist on real DB | `TestSubmitPersistsReason_RealDB` (integration) | authored; **validator-run** (row is not HTTP-readable back — persisted in the same UPDATE proven live to transition the doc) | real (testdb) |
-| Audit event on real DB | `TestSubmitReasonOnAuditTrail_RealDB` (integration) | authored; **validator-run** — the reason lands in `governance_events`, which has **no HTTP read surface**, so it is not live-observable | real (testdb) |
-| `reason_category` DB CHECK | `TestDocumentReviewCheckConstraints` (integration, case 3) | authored; **validator-run** | real (testdb) |
+| Persist on real DB | `TestSubmitPersistsReason_RealDB` (integration) | **executed on real Postgres** (F6.4 gate#7, 2026-07-05) — **PASS 122.30s** (both `reason_for_change`+`reason_category` read back off `public.documents`; `revision_title` untouched) | real (testdb) |
+| Audit event on real DB | `TestSubmitReasonOnAuditTrail_RealDB` (integration) | **executed real DB** (F6.4 gate#7) — **PASS 20.48s** (exactly one `approval_submitted` `governance_events` row carries the reason in `payload_json`; `resource_id` compared as TEXT) | real (testdb) |
+| `reason_category` DB CHECK | `TestDocumentReviewCheckConstraints` (integration, case 3) | **executed real DB** (F6.4 gate#7) — **PASS 76.80s** | real (testdb) |
 | No path writes reason into `revision_title` | grep census + review | census clean (`reason_for_change` never assigned to a `revision_title` target) | real |
 | **Live drive: submit-for-review carrying structured reason** | `.\scripts\start-api.ps1 -Build` → login → submit (see capture) | **GREEN (HTTP path)** — `SUBMIT_STATUS=201` with `reason_for_change`+`reason_category` in the body; `DOC_AFTER {status:under_review, rev_ver:1}` (draft→under_review, rev 0→1). Proves the field is accepted and drives the real business tx end-to-end. Reason **capture on the audit trail is not live-observable** (governance_events has no read endpoint) — that leg is validator-run integration. | real (live) |
 
@@ -46,19 +46,20 @@ payload).
 > real-provider proof that the **structured reason field is accepted and drives the submit business
 > tx end-to-end** (201, draft→under_review, rev bump). The two things the live drive **cannot**
 > show — the reason persisted on the row and the reason on the `governance_events` audit payload —
-> have no HTTP read surface; they are testdb-factory integration tests, authored during TDD and
-> re-run by the `milestone-validator` from clean state (needs `DATABASE_URL`; `.env` is forbidden).
+> have no HTTP read surface; they are testdb-factory integration tests, authored during TDD. At F6.3
+> close they were authored-not-executed (no DB); **F6.4 gate#7 executed them on real Postgres
+> (2026-07-05) — both PASS** (see `../f6.4-surfacer-contract-and-consumer/evidence.md`).
 
 ## Acceptance vs spec Validation Gate
 
 | Acceptance criterion (from spec.md) | Met? | Evidence |
 |-------------------------------------|------|----------|
 | Generated `SubmitRequest` carries reason field(s); oasdiff green | **yes** | contract pin row |
-| REV≥1 submit with reason persists on `public.documents` | **yes** (unit) / **validator-run** (real DB); live drive proved the same UPDATE transitions the doc | persist rows + live drive row |
-| Submit emits **one** audit event carrying the reason | **yes** (unit) / **validator-run** (real DB — governance_events, no HTTP read surface) | audit rows |
+| REV≥1 submit with reason persists on `public.documents` | **yes** (unit) / **executed real DB** (F6.4 gate#7, PASS); live drive proved the same UPDATE transitions the doc | persist rows + live drive row |
+| Submit emits **one** audit event carrying the reason | **yes** (unit) / **executed real DB** (F6.4 gate#7, PASS — governance_events, no HTTP read surface) | audit rows |
 | REV≥1 submit without reason → 422 problem+json | **yes** | required-Rev1 row (derived-from-row proven) |
 | No code path writes reason into `revision_title` | **yes** | grep census row |
-| `reason_category` outside enum rejected by DB CHECK | **validator-run** | CHECK row |
+| `reason_category` outside enum rejected by DB CHECK | **executed real DB** (F6.4 gate#7, PASS) | CHECK row |
 | Live drive: submit carrying structured reason drives the business tx | **yes (HTTP path)** — 201, draft→under_review, rev 0→1 | live drive row (GREEN) |
 
 ## Review disposition

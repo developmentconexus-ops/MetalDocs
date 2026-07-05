@@ -48,30 +48,32 @@ contract-first. Producer matches the `spec.md` consumer contract (FE DTO fields 
 | Read-side DTO + filter wiring | `go test ./internal/modules/documents/delivery/... ./internal/modules/documents/repository/...` | `ok` both packages | real |
 | Wire-contract pin | `go test -run TestDocumentSummaryAndDetail_ReviewFieldsWireContract ./internal/modules/documents/delivery/http/...` | `ok ... 3.564s` | real |
 | Contract lint (post-M6) | `go run ./scripts/api-lint/ -strict api/openapi/v1/openapi.yaml .` | 2 violations — **both pre-existing at M6 base 93cd6114** (verified via worktree); zero M6-introduced | real |
-| DB CHECKs enforced | `go test -run TestDocumentReviewCheckConstraints ./internal/modules/documents/repository/... -tags integration` | authored; **validator-run from clean state** (needs `DATABASE_URL`) | real (testdb) |
-| mark-reviewed authz + dates + OCC + tenant isolation | `TestMarkReviewed_{RequiresDocumentReviewCapability,SetsReviewDates,OCCConflict,RejectsNonPublished,TenantIsolation}` (integration) | authored; **validator-run**. Authz + dates + OCC bump also proven end-to-end by the live HTTP drive below | real (testdb + live) |
-| tripwire arm negative (no-cap UPDATE → P0001) | `TestTripwire_DocumentsUpdate_{DocumentReviewArm,NoCapAssertedIsRejected}` (integration) | authored; **validator-run** | real (testdb) |
-| surfacer flags due, idempotent, tenant-isolated | `TestIntegration_Surfacer_{CrossTenant_MarksDueUntouchedNotDue,Idempotent_SecondRunNoOp,ReSurfacesAfterReviewDueAdvances}` (integration) | authored; **validator-run** (River job is leader-elected hourly `RunOnStart:false` — not HTTP-triggerable in the drive) | real (testdb) |
-| read-port used by surfacer; no documents SQL in jobs | grep census + `TestListDueForReview_*` (integration) | census clean (jobs → ports only); tests authored; **validator-run** | real |
+| DB CHECKs enforced | `go test -run TestDocumentReviewCheckConstraints ./internal/modules/documents/repository/... -tags integration` | **executed on real Postgres** (F6.4 gate#7, 2026-07-05) — `TestDocumentReviewCheckConstraints` **PASS 76.80s** | real (testdb) |
+| mark-reviewed authz + dates + OCC + tenant isolation | `TestMarkReviewed_{RequiresDocumentReviewCapability,SetsReviewDates,OCCConflict,RejectsNonPublished,TenantIsolation}` (integration) | **executed real DB** (F6.4 gate#7) — all 5 **PASS** (62.02/3.18/6.16/3.85/8.85s). Also proven end-to-end by the live HTTP drive below | real (testdb + live) |
+| tripwire arm negative (no-cap UPDATE → P0001) | `TestTripwire_DocumentsUpdate_{DocumentReviewArm,NoCapAssertedIsRejected}` (integration) | **executed real DB** (F6.4 gate#7) — both **PASS** (131.47/2.55s) | real (testdb) |
+| surfacer flags due, idempotent, tenant-isolated | `TestIntegration_Surfacer_{FullTick_IteratesAllTenants,Writer_TenantSeed_DoesNotSurfaceOtherTenant,Idempotent_SecondRunNoOp,ReSurfacesAfterReviewDueAdvances}` (integration; **renamed + isolation rewritten by F6.4** to conform to §4.3) | **executed real DB** (F6.4 gate#7) — all 4 **PASS** (120.45/31.06/7.05/10.62s) | real (testdb) |
+| read-port used by surfacer; no documents SQL in jobs | grep census + `TestListDueForReview_*` (integration) | census clean (jobs → ports only); `TestListDueForReview_{FiltersPublishedAndDue,TenantIsolation,LimitAndOrder}` **executed real DB** (F6.4 gate#7) — **PASS** | real |
 | **Live drive: capability-gated mark-reviewed on a published doc** | `.\scripts\start-api.ps1 -Build` → login → mark-reviewed (see capture below) | **GREEN** — `MARK_REVIEWED_STATUS=200`; `ETag "v3"→"v4"`; `AFTER {last_reviewed:2026-07-05…, review_due:2027-07-05…, rev:4}`; `review_due=true` filter excludes the just-reviewed doc (next-due is future); unauth POST → `401` (tier-1). One real T6 regression caught here (`500 invalid UUID ""` from a missed `documentId`→`id` rename) and root-fixed (`7b3f0f82`). | real (live) |
 
 > **Real-provider proof split (honest labeling).** The live HTTP drive against the real Postgres
 > brought up by `start-api.ps1` is the real-provider proof for the **mark-reviewed flow + read-side
 > DTO/filter** (headline consumer contract). The deeper DB-invariant proofs (CHECK rejection, OCC
 > conflict, cross-tenant isolation) and the **River surfacer** are testdb-factory integration tests
-> authored during each task's TDD but **not runnable in this shell** — `testdb.Open` needs
-> `DATABASE_URL`/`METALDOCS_DATABASE_URL` and sourcing `.env` is forbidden (CLAUDE.md). The
-> `milestone-validator` re-runs them from clean state with DB access as part of the close gate.
+> authored during each task's TDD. At F6.2 close they were **authored-not-executed** (no `DATABASE_URL`
+> in the validator shell). **The M6 milestone-validator FAIL fix-feature F6.4 executed them on real
+> Postgres on 2026-07-05** — all `--- PASS`; full run inventory + timings in `../f6.4-surfacer-contract-and-consumer/evidence.md`.
+> (F6.4 also **conformed** the surfacer to the binding §4.2/§4.3 seed/isolation contract — see that
+> feature; the surfacer rows above reflect the conformed, renamed tests.)
 
 ## Acceptance vs spec Validation Gate
 
 | Acceptance criterion (from spec.md) | Met? | Evidence |
 |-------------------------------------|------|----------|
-| Migration applies; CHECK rejects bad windows/review dates | migration applied live (mark-reviewed wrote real dates); CHECK rejection = **validator-run** | `TestDocumentReviewCheckConstraints` row |
-| `document.review` reachable only with capability; no-cap UPDATE trips tripwire | **yes** (live: capability path 200, unauth 401); tripwire-arm negative = **validator-run** | mark-reviewed authz (live) + tripwire negative rows |
+| Migration applies; CHECK rejects bad windows/review dates | **yes** — migration applied live (mark-reviewed wrote real dates); CHECK rejection **executed real DB** (F6.4 gate#7, PASS) | `TestDocumentReviewCheckConstraints` row |
+| `document.review` reachable only with capability; no-cap UPDATE trips tripwire | **yes** (live: capability path 200, unauth 401); tripwire-arm negative **executed real DB** (F6.4 gate#7, P0001 PASS) | mark-reviewed authz (live) + tripwire negative rows |
 | Registry 34→35; M2 arm drift green; arm includes `document.review` | **yes** | registry + tripwire golden rows (real) |
-| Surfacer flags due doc; idempotent; tenant-isolated | **validator-run** (River job not HTTP-triggerable in drive) | surfacer integration row |
-| Read-port used by surfacer; no documents SQL in jobs | **yes** (census) / **validator-run** (test) | read-port row |
+| Surfacer flags due doc; idempotent; tenant-isolated | **yes — executed real DB** (F6.4 gate#7; surfacer conformed to §4.2/§4.3 + isolation PASS) | surfacer integration row |
+| Read-port used by surfacer; no documents SQL in jobs | **yes** (census) / **executed real DB** (F6.4 gate#7, `TestListDueForReview_*` PASS) | read-port row |
 | mark-reviewed sets dates, published precondition, OCC CAS | **yes (live)** — 200, dates set, ETag v3→v4 (OCC bump) | live drive row + mark-reviewed integration row |
 | Contract: response fields + filter + op in openapi; FE type present | **yes** | wire pin + api-lint + FE `useDocumentArtifact` |
 | Live drive: capability-gated mark-reviewed end-to-end | **yes** | live drive row (GREEN) |
