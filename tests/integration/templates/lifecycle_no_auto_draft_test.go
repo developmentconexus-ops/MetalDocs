@@ -20,6 +20,7 @@ import (
 	"metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/modules/templates/repository"
 	"metaldocs/internal/platform/objectstore"
+	platformtenant "metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -110,12 +111,19 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 	testdb.SeedSystemAdmin(t, db, tenant.ID, author, "Integration Test Author")
 	testdb.SeedSystemAdmin(t, db, tenant.ID, approver, "Integration Test Approver")
 
+	// TxRunner chokepoint (F3.1) seeds GUC identity from ctx only — bind
+	// tenant+actor per caller so authz.Require sees the right identity.
+	authorCtx := platformtenant.WithActorID(
+		platformtenant.WithTenantID(context.Background(), tenant.ID), author)
+	approverCtx := platformtenant.WithActorID(
+		platformtenant.WithTenantID(context.Background(), tenant.ID), approver)
+
 	repo := repository.New(db)
 	svc := application.New(repo, noopPresigner{}, testClock{}, testUUID{}).
 		WithRunner(platformdb.NewTxRunner(db))
 
 	// ── Step 1: create template with v1 draft ──────────────────────────────
-	createRes, err := svc.CreateTemplate(ctx, application.CreateTemplateCmd{
+	createRes, err := svc.CreateTemplate(authorCtx, application.CreateTemplateCmd{
 		TenantID:     tenant.ID,
 		ActorUserID:  author,
 		DocTypeCode:  "po",
@@ -160,7 +168,7 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 
 	// ── Step 3: submit v1 for review ──────────────────────────────────────
 	// No-reviewer path: PendingApproverRole only (no PendingReviewerRole).
-	v1, err := svc.SubmitForReview(ctx, application.SubmitForReviewCmd{
+	v1, err := svc.SubmitForReview(authorCtx, application.SubmitForReviewCmd{
 		TenantID:      tenant.ID,
 		ActorUserID:   author,
 		TemplateID:    templateID,
@@ -176,7 +184,7 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 	// ── Step 4: approve → publish ─────────────────────────────────────────
 	// No-reviewer path: Approve (approver ≠ author — SoD satisfied) transitions
 	// directly to published because PendingReviewerRole was not set.
-	approveRes, err := svc.Approve(ctx, application.ApproveCmd{
+	approveRes, err := svc.Approve(approverCtx, application.ApproveCmd{
 		TenantID:      tenant.ID,
 		ActorUserID:   approver,
 		ActorRoles:    []string{"approver"},
@@ -208,7 +216,7 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 	}
 
 	// ── Step 5: manual CreateNextVersion → v2 draft ───────────────────────
-	v2, err := svc.CreateNextVersion(ctx, application.CreateVersionCmd{
+	v2, err := svc.CreateNextVersion(authorCtx, application.CreateVersionCmd{
 		TenantID:    tenant.ID,
 		ActorUserID: author,
 		TemplateID:  templateID,
