@@ -32,6 +32,7 @@ import (
 	"metaldocs/apps/api/internal/wiring"
 	auditapp "metaldocs/internal/modules/audit/application"
 	auditdelivery "metaldocs/internal/modules/audit/delivery/http"
+	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
 	authapp "metaldocs/internal/modules/auth/application"
 	authdelivery "metaldocs/internal/modules/auth/delivery/http"
 	authdomain "metaldocs/internal/modules/auth/domain"
@@ -98,6 +99,31 @@ type tenantCryptoKeyProvisioner struct {
 
 func (p tenantCryptoKeyProvisioner) ProvisionTenantKey(ctx context.Context, tx *sql.Tx, tenantID string) error {
 	return p.crypto.ProvisionTenantKeyTx(ctx, tx, tenantID)
+}
+
+// auditPayloadCryptoAdapter adapts security's published TenantCrypto port to
+// the audit module's own narrow auditpg.PayloadCrypto port (M7 F7.3 item 2).
+// Lives at the composition root so audit never imports security: it maps
+// securitydomain's ErrKeyNotFound/ErrKeyDestroyed to auditpg's
+// (_, encrypted=false, nil) fall-through-to-plaintext contract, and
+// propagates any other (genuine, unexpected) error unchanged.
+type auditPayloadCryptoAdapter struct {
+	crypto securitydomain.TenantCrypto
+}
+
+func (a auditPayloadCryptoAdapter) EncryptForTenant(ctx context.Context, tenantID string, plaintext []byte) (string, bool, error) {
+	envelope, err := a.crypto.EncryptForTenant(ctx, tenantID, plaintext)
+	if err != nil {
+		if errors.Is(err, securitydomain.ErrKeyNotFound) || errors.Is(err, securitydomain.ErrKeyDestroyed) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return envelope, true, nil
+}
+
+func (a auditPayloadCryptoAdapter) DecryptForTenant(ctx context.Context, tenantID, envelope string) ([]byte, error) {
+	return a.crypto.DecryptForTenant(ctx, tenantID, envelope)
 }
 
 // e2eHandlersEnabled gates the test-only seed/reset/governance endpoints
@@ -205,6 +231,42 @@ func main() {
 		os.Exit(1)
 	}
 
+	// M7 F7.3: tenant DEK/KEK crypto-shred framework. tenantCrypto is nil when
+	// METALDOCS_TENANT_KEK is unset — every consumer below falls back to its
+	// own no-op path (F7.2's nil-safe pattern), so boot still works with
+	// crypto disabled. Constructed here (before audit wiring) so the audit
+	// writer below can be wired with the payload encryptor at boot.
+	var tenantCrypto securitydomain.TenantCrypto
+	if deps.SQLDB != nil {
+		kek, kekConfigured, kekErr := config.LoadTenantKEK()
+		if kekErr != nil {
+			slog.Error("invalid tenant crypto KEK", "err", kekErr)
+			os.Exit(1)
+		}
+		if kekConfigured {
+			svc, err := securityapp.NewTenantCryptoService(securitypg.NewTenantKeyRepository(deps.SQLDB), kek)
+			if err != nil {
+				slog.Error("construct tenant crypto service", "err", err)
+				os.Exit(1)
+			}
+			tenantCrypto = svc
+		} else {
+			slog.Info("tenant crypto disabled: METALDOCS_TENANT_KEK not set")
+		}
+	}
+
+	// M7 F7.3 item 2: wire the audit payload envelope encryptor. deps.AuditWriter
+	// is the same *auditpg.Writer instance backing AuditReader/AuditCounter (see
+	// bootstrap.BuildAPIDependencies), so wiring it here via WithPayloadCrypto
+	// (mutate-and-return-self) takes effect for every consumer of those three
+	// fields. Nil tenantCrypto (KEK unset) leaves the writer's crypto nil —
+	// RecordTx/ListEvents stay on the legacy plaintext path byte-for-byte.
+	if tenantCrypto != nil {
+		if auditWriter, ok := deps.AuditWriter.(*auditpg.Writer); ok {
+			auditWriter.WithPayloadCrypto(auditPayloadCryptoAdapter{crypto: tenantCrypto})
+		}
+	}
+
 	auditService := auditapp.NewService(deps.AuditReader)
 	if deps.AuditCounter != nil && deps.AuditExports != nil {
 		auditService.WithExports(deps.AuditCounter, deps.AuditExports, deps.AuditWriter, func(job auditdomain.ExportJob) string {
@@ -257,29 +319,6 @@ func main() {
 	iamAdminService := iamapp.NewAdminService(deps.RoleAdminRepo, cachedProvider, iamTxRunner, deps.AuditWriter)
 	iamAdminHandler := iamdelivery.NewAdminHandler(iamAdminService, authService, deps.AuditWriter).
 		WithAuditEventLister(auditService)
-
-	// M7 F7.3: tenant DEK/KEK crypto-shred framework. tenantCrypto is nil when
-	// METALDOCS_TENANT_KEK is unset — every consumer below falls back to its
-	// own no-op path (F7.2's nil-safe pattern), so boot still works with
-	// crypto disabled.
-	var tenantCrypto securitydomain.TenantCrypto
-	if deps.SQLDB != nil {
-		kek, kekConfigured, kekErr := config.LoadTenantKEK()
-		if kekErr != nil {
-			slog.Error("invalid tenant crypto KEK", "err", kekErr)
-			os.Exit(1)
-		}
-		if kekConfigured {
-			svc, err := securityapp.NewTenantCryptoService(securitypg.NewTenantKeyRepository(deps.SQLDB), kek)
-			if err != nil {
-				slog.Error("construct tenant crypto service", "err", err)
-				os.Exit(1)
-			}
-			tenantCrypto = svc
-		} else {
-			slog.Info("tenant crypto disabled: METALDOCS_TENANT_KEK not set")
-		}
-	}
 
 	// M7 F7.2: tenant onboarding (POST /tenants). tenantHandler is nil (Router
 	// answers 501) on the SQLDB-less boot path, matching every other

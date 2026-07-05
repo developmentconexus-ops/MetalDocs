@@ -8,26 +8,69 @@ import (
 	"strings"
 
 	"metaldocs/internal/modules/audit/domain"
+	platcrypto "metaldocs/internal/platform/crypto"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/pagination"
 	"metaldocs/internal/platform/sqlescape"
 )
+
+// PayloadCrypto is the audit module's own narrow port for per-tenant payload
+// envelope encryption (M7 F7.3 item 2). It is declared audit-side so this
+// package never imports the security module — the composition root wires an
+// adapter over security's published TenantCrypto port (ADR 0070 decision 4).
+//
+// EncryptForTenant returns (envelope, encrypted=true, nil) when tenantID has
+// an active DEK. When the tenant has no key at all (never onboarded with
+// crypto, or crypto is globally disabled) or its key has been crypto-shredded
+// (ErrKeyDestroyed — a tombstone tenant), the adapter must map that to
+// (_, false, nil) so RecordTx falls through to legacy plaintext storage
+// instead of surfacing an error — a destroyed-key tenant still needs its
+// lifecycle tombstone events to land (spec item 6.5). Only a genuine,
+// unexpected failure (DB error, malformed KEK, etc.) should propagate as a
+// non-nil error, which aborts the write.
+//
+// DecryptForTenant mirrors the read side: (plaintext, nil) on success. The
+// adapter maps ErrKeyDestroyed to a sentinel the reader recognises so it can
+// substitute the redacted marker instead of failing the whole list/export
+// call; other errors propagate.
+type PayloadCrypto interface {
+	EncryptForTenant(ctx context.Context, tenantID string, plaintext []byte) (envelope string, encrypted bool, err error)
+	DecryptForTenant(ctx context.Context, tenantID string, envelope string) (plaintext []byte, err error)
+}
+
+// redactedPayload is what ListEvents substitutes for an envelope payload it
+// cannot decrypt because the tenant's key has been crypto-shredded (erasure).
+// Plaintext legacy rows and successfully-decrypted rows are never touched.
+const redactedPayload = `{"redacted":"crypto-shredded"}`
 
 // Writer is the postgres-backed implementation of domain.Writer/Reader/
 // Counter/IntegrityValidator against metaldocs.audit_events. Every insert
 // takes the audit-hash-chain advisory lock so the prev_hash/row_hash chain is
 // computed and appended without a race between concurrent writers.
 type Writer struct {
-	db *sql.DB
+	db     *sql.DB
+	crypto PayloadCrypto
 }
 
 const auditHashChainLockID int64 = 90120260513004
 const auditIntegrityValidationWindow = 10000
 const auditIntegrityIssueLimit = 256
 
-// NewWriter constructs a Writer backed by db.
+// NewWriter constructs a Writer backed by db. The payload is stored plaintext
+// (today's legacy behavior) unless WithPayloadCrypto is used to wire an
+// encryptor.
 func NewWriter(db *sql.DB) *Writer {
 	return &Writer{db: db}
+}
+
+// WithPayloadCrypto wires crypto into the Writer, returning it for chaining.
+// When crypto is non-nil, RecordTx seals new event payloads under the
+// event's tenant DEK (when one exists) and ListEvents decrypts envelopes for
+// display. Composition root only — audit itself never constructs a crypto
+// implementation.
+func (w *Writer) WithPayloadCrypto(crypto PayloadCrypto) *Writer {
+	w.crypto = crypto
+	return w
 }
 
 // Record appends event in its own new transaction (begin, RecordTx, commit).
@@ -60,6 +103,12 @@ func (w *Writer) RecordTx(ctx context.Context, tx db.Tx, event domain.Event) err
 		return fmt.Errorf("lock audit hash chain: %w", err)
 	}
 
+	payloadJSON, err := w.sealPayload(ctx, event)
+	if err != nil {
+		return fmt.Errorf("seal audit payload: %w", err)
+	}
+	event.PayloadJSON = payloadJSON
+
 	const q = `
 WITH previous AS (
   SELECT row_hash
@@ -86,6 +135,45 @@ FROM prepared
 		return fmt.Errorf("insert audit event (tx): %w", err)
 	}
 	return nil
+}
+
+// sealPayload returns the string to store in the payload column: the
+// envelope JSON when w.crypto is wired and event.TenantID has an active DEK,
+// otherwise event.PayloadJSON unchanged (today's legacy plaintext
+// behavior — byte-identical when crypto is nil). The hash chain hashes
+// whatever this function returns, so encryption is transparent to
+// tamper-evidence: chain semantics are untouched either way.
+func (w *Writer) sealPayload(ctx context.Context, event domain.Event) (string, error) {
+	if w.crypto == nil {
+		return event.PayloadJSON, nil
+	}
+	envelope, encrypted, err := w.crypto.EncryptForTenant(ctx, event.TenantID, []byte(event.PayloadJSON))
+	if err != nil {
+		return "", err
+	}
+	if !encrypted {
+		// No key (never provisioned / crypto disabled) or key destroyed
+		// (tombstone tenant, spec item 6.5) — fall through to plaintext.
+		return event.PayloadJSON, nil
+	}
+	return envelope, nil
+}
+
+// openPayload reverses sealPayload for display: when payloadJSON is a
+// recognised crypto envelope, it is decrypted under tenantID's DEK. A
+// decrypt failure caused by a destroyed key (crypto-shredded tenant) yields
+// the redacted marker instead of propagating an error — the intended,
+// permanent effect of erasure, not a bug. Plaintext rows (IsEnvelope false)
+// and the nil-crypto composition-root path pass through untouched.
+func (w *Writer) openPayload(ctx context.Context, tenantID, payloadJSON string) string {
+	if w.crypto == nil || !platcrypto.IsEnvelope(payloadJSON) {
+		return payloadJSON
+	}
+	plaintext, err := w.crypto.DecryptForTenant(ctx, tenantID, payloadJSON)
+	if err != nil {
+		return redactedPayload
+	}
+	return string(plaintext)
 }
 
 // ValidateIntegrity re-derives prev_hash/row_hash for the most recent
@@ -192,6 +280,7 @@ func (w *Writer) ListEvents(ctx context.Context, query domain.ListEventsQuery) (
 		); err != nil {
 			return nil, false, fmt.Errorf("scan audit event: %w", err)
 		}
+		event.PayloadJSON = w.openPayload(ctx, event.TenantID, event.PayloadJSON)
 		items = append(items, event)
 	}
 	if err := rows.Err(); err != nil {
