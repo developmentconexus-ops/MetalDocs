@@ -18,8 +18,10 @@ import (
 	approvaljobs "metaldocs/internal/modules/documents/approval/jobs"
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
+	documentsrepo "metaldocs/internal/modules/documents/repository"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/modules/jobs/audit_integrity_validator"
+	"metaldocs/internal/modules/jobs/document_review_surfacer"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
 	"metaldocs/internal/modules/jobs/maintenance"
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
@@ -62,6 +64,9 @@ func run(ctx context.Context) error {
 		river.AddWorker(workers, stuck_instance_watchdog.NewWorker(db, approvalEmitter))
 		river.AddWorker(workers, idempotency_janitor.NewWorker(db))
 		river.AddWorker(workers, audit_integrity_validator.NewWorker(auditpg.NewWriter(db)))
+		river.AddWorker(workers, document_review_surfacer.NewWorker(db,
+			documentsrepo.NewReviewDueReaderPG(db),
+			documentsrepo.NewReviewSurfaceWriterPG(db)))
 
 		// Staging pdf/materialize dispatch workers (M5 F5.3 T3): consume the
 		// River jobs the api/worker Enqueuers insert and run on the already-
