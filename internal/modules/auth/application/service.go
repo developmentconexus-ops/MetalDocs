@@ -1029,6 +1029,19 @@ func (s *Service) hashPasswordBytes(password []byte) (authdomain.PasswordHash, e
 	return authdomain.PasswordHash(string(hash)), nil
 }
 
+// HashPassword is auth's published password-hashing seam for cross-module
+// callers (M7 F7.2: iam's OnboardTenantService hashes the first admin's
+// password inside its own provisioning tx). It uses the same bcrypt mechanism
+// and the same unexported bcryptCost as Service.hashPassword, so the cost
+// factor has exactly one home and cannot drift across modules.
+func HashPassword(plain string) (authdomain.PasswordHash, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(plain), bcryptCost)
+	if err != nil {
+		return "", fmt.Errorf("hash password: %w", err)
+	}
+	return authdomain.PasswordHash(string(hash)), nil
+}
+
 type createUserFields struct {
 	userID      string
 	username    string

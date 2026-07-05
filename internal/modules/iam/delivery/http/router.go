@@ -68,6 +68,7 @@ type Router struct {
 	sessions      *SessionsHandler
 	observability *ObservabilityHandler
 	presence      *iampresence.Handler
+	tenants       *TenantHandler
 }
 
 // NewRouter builds the ServerInterface adapter. sessions, observability, and
@@ -84,6 +85,15 @@ func NewRouter(admin *AdminHandler, people *PeopleHandler, memberships *Membersh
 		observability: observability,
 		presence:      presence,
 	}
+}
+
+// WithTenantHandler wires the M7 F7.2 tenant-onboarding handler. When unset,
+// OnboardTenant answers 501 (matching the pre-Task-C stub behavior for boot
+// paths without a configured SQLDB) — mirrors WithAuditEventLister's
+// post-construction wiring convention.
+func (rt *Router) WithTenantHandler(tenants *TenantHandler) *Router {
+	rt.tenants = tenants
+	return rt
 }
 
 // RegisterGenerated mounts the full generated IAM ServerInterface on mux
@@ -279,13 +289,15 @@ func (rt *Router) UnlockUser(w http.ResponseWriter, r *http.Request, _ string) {
 	rt.people.handleUnlock(w, r)
 }
 
-// OnboardTenant: F7.2 Task B stub. POST /tenants was just added to the spec
-// (contract-first) and codegen now requires this method to satisfy
-// iamapi.ServerInterface, but the tenant-onboarding service/handler is Task
-// C's scope. Minimal 501 stub only, following the same pattern as
-// CreateManagedUser above — Task C replaces this with the real delegation.
+// OnboardTenant delegates to TenantHandler.handleOnboardTenant (M7 F7.2 Task
+// C). Answers 501 when tenants is not wired (SQLDB-less boot path), matching
+// the Task B stub's fallback behavior.
 func (rt *Router) OnboardTenant(w http.ResponseWriter, r *http.Request) {
-	writeIAMNotImplemented(w, "onboardTenant is not yet implemented")
+	if rt.tenants == nil {
+		writeIAMNotImplemented(w, "Tenant onboarding service is not configured")
+		return
+	}
+	rt.tenants.handleOnboardTenant(w, r)
 }
 
 func writeIAMNotImplemented(w http.ResponseWriter, detail string) {

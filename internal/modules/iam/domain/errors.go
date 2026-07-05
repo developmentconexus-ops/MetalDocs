@@ -16,4 +16,14 @@ var (
 	// ErrInvalidRole is returned by ParseRole when the input does not match one
 	// of the eight canonical roles.
 	ErrInvalidRole = errors.New("iam invalid role")
+	// ErrTenantOnboardValidation is returned by OnboardTenantService for
+	// blank/malformed input (name, slug, admin_user_id, admin_display_name,
+	// admin_password) before any write is attempted. Maps to 400.
+	ErrTenantOnboardValidation = errors.New("iam: tenant onboarding validation failed")
+	// ErrTenantSlugConflict is returned when the requested slug already exists
+	// on metaldocs.tenants (unique violation on tenants_slug_key). Maps to 409.
+	ErrTenantSlugConflict = errors.New("iam: tenant slug already exists")
+	// ErrTenantAdminUserConflict is returned when the requested admin_user_id
+	// already exists (auth_identities unique violation). Maps to 409.
+	ErrTenantAdminUserConflict = errors.New("iam: tenant admin user already exists")
 )

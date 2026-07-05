@@ -244,6 +244,22 @@ func main() {
 	iamAdminHandler := iamdelivery.NewAdminHandler(iamAdminService, authService, deps.AuditWriter).
 		WithAuditEventLister(auditService)
 
+	// M7 F7.2: tenant onboarding (POST /tenants). tenantHandler is nil (Router
+	// answers 501) on the SQLDB-less boot path, matching every other
+	// conditionally-wired iam handler above/below.
+	var tenantHandler *iamdelivery.TenantHandler
+	if deps.SQLDB != nil {
+		onboardTenantService := iamapp.NewOnboardTenantService(
+			iampg.NewTenantRepository(deps.SQLDB),
+			authpg.NewRepository(deps.SQLDB, iampg.NewUserTenantRepository(deps.SQLDB)),
+			iamTxRunner,
+			deps.AuditWriter,
+			nil, // NoopTenantKeyProvisioner (F7.3 replaces with the real envelope-key provisioner)
+			authapp.HashPassword,
+		)
+		tenantHandler = iamdelivery.NewTenantHandler(onboardTenantService)
+	}
+
 	// PR-7 Sessions & Security tab.
 	var sessionsHandler *iamdelivery.SessionsHandler
 	if sqlDB := deps.SQLDB; sqlDB != nil {
@@ -404,7 +420,8 @@ func main() {
 	// BaseURL "/api/v1" + spec-declared paths); tier-1 authz keys off
 	// r.Method/r.URL.Path (permissions.go), not mux dispatch mechanics, so this
 	// swap changes no auth behavior.
-	iamRouter := iamdelivery.NewRouter(iamAdminHandler, peopleHandler, membershipHandler, rolesCapsHandler, sessionsHandler, observabilityHandler, presenceHandler)
+	iamRouter := iamdelivery.NewRouter(iamAdminHandler, peopleHandler, membershipHandler, rolesCapsHandler, sessionsHandler, observabilityHandler, presenceHandler).
+		WithTenantHandler(tenantHandler)
 	iamRouter.RegisterGenerated(mux)
 
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
