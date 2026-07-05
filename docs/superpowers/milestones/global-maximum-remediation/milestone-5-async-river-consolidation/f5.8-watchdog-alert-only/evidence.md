@@ -78,6 +78,17 @@ Three commits (+ one census-cleanup follow-up):
 | 6. Bypass-surface check | `grep -rn "BypassSystem" internal/modules/documents/approval/ --include=*.go \| grep -v _test.go` | **2 callers remain** (`scheduler_service.go:65`, `scheduled_publish_job.go:56`); the removed system-cancel path dropped the approval module's `BypassSystem` surface by one. Watchdog still roots in `WithBackgroundBypass` for its list/alert reads. |
 | 7. ADR 0068 Accepted + indexed; wiki alert-only | `wiki/decisions/0068-*.md` + `wiki/decisions/index.md` row; `wiki/modules/approval.md` | **done** (T3 `3942b4d1`) |
 
+### Live drive (M5-close, real running system — the F5.8 binary in `metaldocs-jobs`)
+
+`.\scripts\start-api.ps1 -Build` rebuilt all 3 Go hosts (api/worker/**jobs**) from current source
+(census-0, so the jobs binary is the F5.8 build) and launched them; `.\scripts\check-system-runnable.ps1`
+**PASS** (login/session/auth-me/target-route all 200). River DB ground truth (`public.river_job` /
+`river_leader`):
+
+- Leader elected `MN-NTB-LEANDROTH_2` @ `2026-07-05 00:22:45Z` — advisory-lock-free election (ADR 0067), jobs host connected.
+- **`stuck_instance_watchdog` fresh tick `id=30` — `state=completed, attempt=1, finalized 2026-07-05 00:27:50Z`** — i.e. produced *after* this rebuild's leader election, by the F5.8 alert-only binary. It **completed on the first attempt with no error and no cancel path** — the live proof that the alert-only watchdog runs clean in the running system. (Prior ticks id≤29 stop at 22:34Z, from the pre-rebuild binary.)
+- Other consolidated River jobs completing on their correct queues: `idempotency_janitor` (maintenance), `materialize_dispatch` (temporal), `notification_fanout` (temporal, F5.6). The lone `notification_fanout|default|available` row is **id=6** (created 21:18Z, `attempt=0`) — the pre-F5.6 orphan already recorded as a bounded defer in F5.6 evidence, not a regression.
+
 ### Bypass-surface before/after (spec gate 6)
 
 - **Before:** approval-module `BypassSystem` callers = 3 (`cancel_service.go` system path + `scheduler_service.go` + `scheduled_publish_job.go`).
