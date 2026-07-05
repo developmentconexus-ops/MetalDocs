@@ -323,17 +323,22 @@ func SeedSystemAdmin(t *testing.T, db *sql.DB, tenantID, userID, displayName str
 	ctx := context.Background()
 
 	// iam_users.tenant_id FK -> metaldocs.tenants; seed the tenant parent first.
-	// tenants carries no tripwire. slug = tenantID guarantees uniqueness/non-blank.
-	// ON CONFLICT (id) DO NOTHING leaves an already-seeded reference tenant (e.g. the
-	// dev tenant) untouched.
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO metaldocs.tenants (id, name, slug)
-		 VALUES ($1::uuid, $2, $1::text)
-		 ON CONFLICT (id) DO NOTHING`,
-		tenantID, "Test Tenant "+tenantID,
-	); err != nil {
-		t.Fatalf("SeedSystemAdmin: tenants: %v", err)
-	}
+	// slug = tenantID guarantees uniqueness/non-blank. ON CONFLICT (id) DO
+	// NOTHING leaves an already-seeded reference tenant (e.g. the dev tenant)
+	// untouched. Migration 0277 (M7 F7.2, ADR 0070) attached
+	// trg_require_cap_asserted to metaldocs.tenants (INSERT -> tenant.onboard)
+	// — the INSERT now requires tenant.onboard asserted tx-locally
+	// (seedWithCaps, mirrors testdb.NewTenant / every other tripwire-guarded
+	// builder in this package).
+	seedWithCaps(t, db, `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.tenants (id, name, slug)
+			 VALUES ($1::uuid, $2, $1::text)
+			 ON CONFLICT (id) DO NOTHING`,
+			tenantID, "Test Tenant "+tenantID,
+		)
+		return err
+	})
 
 	seedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,

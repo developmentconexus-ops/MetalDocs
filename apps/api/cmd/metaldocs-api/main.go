@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -56,6 +57,7 @@ import (
 	searchdocs "metaldocs/internal/modules/search/infrastructure/v2documents"
 	securityapp "metaldocs/internal/modules/security/application"
 	securitydelivery "metaldocs/internal/modules/security/delivery/http"
+	securitydomain "metaldocs/internal/modules/security/domain"
 	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
 	"metaldocs/internal/modules/taxonomy"
 	taxonomyapp "metaldocs/internal/modules/taxonomy/application"
@@ -84,6 +86,18 @@ import (
 type fanoutComponents struct {
 	client        *fanout.Client
 	freezeService *docapp.FreezeService
+}
+
+// tenantCryptoKeyProvisioner adapts security's published TenantCrypto port
+// to iam's TenantKeyProvisioner seam (M7 F7.3 Task B replaces F7.2's
+// NoopTenantKeyProvisioner). Lives at the composition root, not inside
+// iam or security, so neither module imports the other's internals.
+type tenantCryptoKeyProvisioner struct {
+	crypto securitydomain.TenantCrypto
+}
+
+func (p tenantCryptoKeyProvisioner) ProvisionTenantKey(ctx context.Context, tx *sql.Tx, tenantID string) error {
+	return p.crypto.ProvisionTenantKeyTx(ctx, tx, tenantID)
 }
 
 // e2eHandlersEnabled gates the test-only seed/reset/governance endpoints
@@ -244,17 +258,48 @@ func main() {
 	iamAdminHandler := iamdelivery.NewAdminHandler(iamAdminService, authService, deps.AuditWriter).
 		WithAuditEventLister(auditService)
 
+	// M7 F7.3: tenant DEK/KEK crypto-shred framework. tenantCrypto is nil when
+	// METALDOCS_TENANT_KEK is unset — every consumer below falls back to its
+	// own no-op path (F7.2's nil-safe pattern), so boot still works with
+	// crypto disabled.
+	var tenantCrypto securitydomain.TenantCrypto
+	if deps.SQLDB != nil {
+		kek, kekConfigured, kekErr := config.LoadTenantKEK()
+		if kekErr != nil {
+			slog.Error("invalid tenant crypto KEK", "err", kekErr)
+			os.Exit(1)
+		}
+		if kekConfigured {
+			svc, err := securityapp.NewTenantCryptoService(securitypg.NewTenantKeyRepository(deps.SQLDB), kek)
+			if err != nil {
+				slog.Error("construct tenant crypto service", "err", err)
+				os.Exit(1)
+			}
+			tenantCrypto = svc
+		} else {
+			slog.Info("tenant crypto disabled: METALDOCS_TENANT_KEK not set")
+		}
+	}
+
 	// M7 F7.2: tenant onboarding (POST /tenants). tenantHandler is nil (Router
 	// answers 501) on the SQLDB-less boot path, matching every other
 	// conditionally-wired iam handler above/below.
 	var tenantHandler *iamdelivery.TenantHandler
 	if deps.SQLDB != nil {
+		var keyProvisioner iamapp.TenantKeyProvisioner
+		if tenantCrypto != nil {
+			// Composition-root adapter: iam depends only on its own
+			// TenantKeyProvisioner port; it never imports security's
+			// internals. This wraps security's published TenantCrypto port
+			// (F7.3 replaces F7.2's NoopTenantKeyProvisioner).
+			keyProvisioner = tenantCryptoKeyProvisioner{crypto: tenantCrypto}
+		}
 		onboardTenantService := iamapp.NewOnboardTenantService(
 			iampg.NewTenantRepository(deps.SQLDB),
 			authpg.NewRepository(deps.SQLDB, iampg.NewUserTenantRepository(deps.SQLDB)),
 			iamTxRunner,
 			deps.AuditWriter,
-			nil, // NoopTenantKeyProvisioner (F7.3 replaces with the real envelope-key provisioner)
+			keyProvisioner, // nil -> NoopTenantKeyProvisioner when tenant crypto is disabled
 			authapp.HashPassword,
 		)
 		tenantHandler = iamdelivery.NewTenantHandler(onboardTenantService)

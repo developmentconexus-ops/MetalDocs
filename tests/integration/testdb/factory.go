@@ -199,7 +199,11 @@ func exec(t *testing.T, db *sql.DB, query string, args ...any) {
 // Builders
 // ---------------------------------------------------------------------------
 
-// NewTenant seeds a metaldocs.tenants row. tenants carries no tripwire.
+// NewTenant seeds a metaldocs.tenants row. Migration 0277 (M7 F7.2, ADR
+// 0070) attached trg_require_cap_asserted to metaldocs.tenants (INSERT ->
+// tenant.onboard) — so, unlike when this comment was first written, the
+// INSERT now requires tenant.onboard asserted tx-locally (seedWithCaps,
+// mirrors every other tripwire-guarded builder in this file).
 func NewTenant(t *testing.T, db *sql.DB, opts ...Opt) Tenant {
 	t.Helper()
 	s := newSpec(opts)
@@ -207,12 +211,15 @@ func NewTenant(t *testing.T, db *sql.DB, opts ...Opt) Tenant {
 	if id == "" {
 		id = uuid.NewString()
 	}
-	exec(t, db,
-		`INSERT INTO metaldocs.tenants (id, name, slug)
-		 VALUES ($1::uuid, $2, $1::text)
-		 ON CONFLICT (id) DO NOTHING`,
-		id, "Test Tenant "+id,
-	)
+	seedWithCaps(t, db, `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(),
+			`INSERT INTO metaldocs.tenants (id, name, slug)
+			 VALUES ($1::uuid, $2, $1::text)
+			 ON CONFLICT (id) DO NOTHING`,
+			id, "Test Tenant "+id,
+		)
+		return err
+	})
 	return Tenant{ID: id}
 }
 

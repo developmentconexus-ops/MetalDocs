@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	platformdb "metaldocs/internal/platform/db"
+	platformtenant "metaldocs/internal/platform/tenant"
 
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
@@ -56,12 +57,18 @@ func seedContentHashTx(t *testing.T, db *sql.DB, tenantID, versionID string) {
 // reviewer-stage accept (Service.Review, asserts template.review) must be
 // able to UPDATE templates_template_version under the live tripwire.
 func TestTripwire_ReviewerStageWritesVersionRow(t *testing.T) {
-	ctx := context.Background()
 	db, _ := testdb.Open(t)
 
 	tenant := testdb.NewTenant(t, db)
 	author := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID)).ID
 	reviewer := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID)).ID
+
+	// F3.1 TxRunner auto-seed reads tenant+actor from ctx; authz.Require
+	// fails closed (ErrActorContextMissing) without them. Bind per actor.
+	authorCtx := platformtenant.WithActorID(
+		platformtenant.WithTenantID(context.Background(), tenant.ID), author)
+	reviewerCtx := platformtenant.WithActorID(
+		platformtenant.WithTenantID(context.Background(), tenant.ID), reviewer)
 	testdb.SeedSystemAdmin(t, db, tenant.ID, author, "Tripwire Test Author")
 	testdb.SeedSystemAdmin(t, db, tenant.ID, reviewer, "Tripwire Test Reviewer")
 
@@ -70,7 +77,7 @@ func TestTripwire_ReviewerStageWritesVersionRow(t *testing.T) {
 		WithRunner(platformdb.NewTxRunner(db))
 
 	reviewerRole := "reviewer"
-	createRes, err := svc.CreateTemplate(ctx, application.CreateTemplateCmd{
+	createRes, err := svc.CreateTemplate(authorCtx, application.CreateTemplateCmd{
 		TenantID:     tenant.ID,
 		ActorUserID:  author,
 		DocTypeCode:  "po",
@@ -85,7 +92,7 @@ func TestTripwire_ReviewerStageWritesVersionRow(t *testing.T) {
 	templateID := createRes.Template.ID
 	seedContentHashTx(t, db, tenant.ID, createRes.Version.ID)
 
-	if _, err := svc.SubmitForReview(ctx, application.SubmitForReviewCmd{
+	if _, err := svc.SubmitForReview(authorCtx, application.SubmitForReviewCmd{
 		TenantID:      tenant.ID,
 		ActorUserID:   author,
 		TemplateID:    templateID,
@@ -96,7 +103,7 @@ func TestTripwire_ReviewerStageWritesVersionRow(t *testing.T) {
 
 	// The pinned write: reviewer accept UPDATEs templates_template_version
 	// under asserted cap template.review. Pre-0269 this raised P0001.
-	reviewed, err := svc.Review(ctx, application.ReviewCmd{
+	reviewed, err := svc.Review(reviewerCtx, application.ReviewCmd{
 		TenantID:      tenant.ID,
 		ActorUserID:   reviewer,
 		ActorRoles:    []string{reviewerRole},
@@ -122,6 +129,10 @@ func TestTripwire_ArchiveWritesTemplateRow(t *testing.T) {
 	tenant := testdb.NewTenant(t, db)
 	actor := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID)).ID
 	testdb.SeedSystemAdmin(t, db, tenant.ID, actor, "Tripwire Test Archiver")
+
+	// Bind ctx identity for F3.1 TxRunner auto-seed (see reviewer test above).
+	ctx = platformtenant.WithActorID(
+		platformtenant.WithTenantID(ctx, tenant.ID), actor)
 
 	repo := repository.New(db)
 	svc := application.New(repo, noopPresigner{}, testClock{}, testUUID{}).
