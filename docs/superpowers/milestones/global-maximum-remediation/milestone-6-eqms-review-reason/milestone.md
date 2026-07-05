@@ -1,7 +1,7 @@
 # Milestone 6 — eQMS periodic review/expiry + structured reason-for-change
 
 > **Program:** global-maximum-remediation  ·  **Governing spec:** `../mission.md` (§7 M6)
-> **Status:** in-progress — F6.1 gate done (verdict 🟡 Yellow, committed 93cd6114). F6.2/F6.3 not started. Not pushed. M7 only after operator HS-1 approval, fresh session.
+> **Status:** in-progress — F6.1 gate done (🟡 Yellow, 93cd6114). **F6.2 + F6.3 implemented** (T1–T8b, `b8a32144`…`7b3f0f82`), evidence.md filled with real+honestly-labeled proof, live QA drive GREEN (mark-reviewed 200/dates/OCC/401; submit-with-reason 201/draft→under_review/rev bump; one T6 rename regression caught+fixed live). **milestone-validator dispatch pending** (Phase 4). Not pushed. M7 only after validator PASS + operator HS-1 approval, fresh session.
 > **Authored:** 2026-07-04 — *before any implementation feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** this milestone is,
