@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -163,11 +164,13 @@ func (c fixedClock) Now() time.Time { return c.t }
 //   4. COMMIT/ROLLBACK   — tx lifecycle
 
 type submitTestConn struct {
-	authzGranted  bool
-	areaCode      string
-	actorID       string
-	tenantID      string
-	revisionTitle string
+	authzGranted    bool
+	areaCode        string
+	actorID         string
+	tenantID        string
+	revisionTitle   string
+	reasonForChange sql.NullString
+	reasonCategory  sql.NullString
 }
 
 type submitNoopResult struct{}
@@ -298,6 +301,25 @@ func (s *submitTestStmt) ExecContext(_ context.Context, args []driver.NamedValue
 	if strings.Contains(q, "update documents") && len(args) >= 4 {
 		if title, ok := args[3].Value.(string); ok {
 			s.conn.revisionTitle = title
+		}
+		// args[4]/args[5] = reason_for_change/reason_category ($5/$6). A nil
+		// driver.Value (bound via nullableString) means the field was unset and
+		// persists as SQL NULL; a non-nil value is the trimmed string.
+		if len(args) >= 6 {
+			if v := args[4].Value; v != nil {
+				if reason, ok := v.(string); ok {
+					s.conn.reasonForChange = sql.NullString{String: reason, Valid: true}
+				}
+			} else {
+				s.conn.reasonForChange = sql.NullString{}
+			}
+			if v := args[5].Value; v != nil {
+				if category, ok := v.(string); ok {
+					s.conn.reasonCategory = sql.NullString{String: category, Valid: true}
+				}
+			} else {
+				s.conn.reasonCategory = sql.NullString{}
+			}
 		}
 	}
 	return submitNoopResult{}, nil
@@ -493,6 +515,7 @@ func TestSubmitRevisionForReview_ContentHashUsesGovernedRevisionNumber(t *testin
 		SubmittedBy:     "user-1",
 		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		RevisionTitle:   "Atualizacao",
+		ReasonForChange: "Content hash binding regression coverage",
 		ContentFormData: formData,
 		RevisionVersion: 7,
 		RevisionNumber:  1,
@@ -634,5 +657,233 @@ func TestSubmitRevisionForReview_CapabilityDenied(t *testing.T) {
 	}
 	if len(emitter.Events) != 0 {
 		t.Errorf("no governance event should be emitted on denied capability; got %d", len(emitter.Events))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// F6.3 — structured reason-for-change (validation-contract.md §5)
+// ---------------------------------------------------------------------------
+
+// TestSubmitPersistsReason proves a REV>=1 submit with reason_for_change (+
+// reason_category) persists BOTH on the SAME draft->under_review UPDATE to
+// public.documents that already sets revision_title — not a second write, and
+// NOT stored into revision_title (contract §5.1/§5.2).
+func TestSubmitPersistsReason(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db, conn := newSubmitTestDBWithConn(t, true)
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
+		RevisionTitle:   "Atualizacao de conteudo",
+		ReasonForChange: "Corrected a dimensional tolerance per customer complaint #482",
+		ReasonCategory:  "corrective",
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 3,
+		RevisionNumber:  1,
+	}
+
+	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
+		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
+	}
+
+	if !conn.reasonForChange.Valid || conn.reasonForChange.String != req.ReasonForChange {
+		t.Fatalf("persisted reason_for_change = %+v, want %q", conn.reasonForChange, req.ReasonForChange)
+	}
+	if !conn.reasonCategory.Valid || conn.reasonCategory.String != req.ReasonCategory {
+		t.Fatalf("persisted reason_category = %+v, want %q", conn.reasonCategory, req.ReasonCategory)
+	}
+	// The revision_title UPDATE target must be untouched by the reason value —
+	// proves no code path aliases reason_for_change into revision_title.
+	if conn.revisionTitle != req.RevisionTitle {
+		t.Fatalf("revision_title = %q, want %q (must not be overwritten by reason_for_change)", conn.revisionTitle, req.RevisionTitle)
+	}
+}
+
+// TestSubmitPersistsReason_OptionalCategoryOmitted proves reason_category is
+// genuinely optional: submitting with only reason_for_change persists a NULL
+// reason_category (not an empty-string sentinel).
+func TestSubmitPersistsReason_OptionalCategoryOmitted(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db, conn := newSubmitTestDBWithConn(t, true)
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
+		RevisionTitle:   "Atualizacao",
+		ReasonForChange: "Administrative renumbering only",
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 2,
+		RevisionNumber:  1,
+	}
+
+	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
+		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
+	}
+	if !conn.reasonForChange.Valid || conn.reasonForChange.String != req.ReasonForChange {
+		t.Fatalf("persisted reason_for_change = %+v, want %q", conn.reasonForChange, req.ReasonForChange)
+	}
+	if conn.reasonCategory.Valid {
+		t.Fatalf("persisted reason_category = %+v, want SQL NULL (unset, not empty string)", conn.reasonCategory)
+	}
+}
+
+// TestSubmitReasonOnAuditTrail proves the submit emits exactly ONE
+// approval_submitted governance event whose payload carries reason_for_change
+// (+ reason_category), inside the same business tx (contract §5.2).
+func TestSubmitReasonOnAuditTrail(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db := newSubmitTestDB(t, true)
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
+		RevisionTitle:   "Revisao regulatoria",
+		ReasonForChange: "Updated per new ISO 9001:2026 clause 8.5.6",
+		ReasonCategory:  "regulatory",
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 1,
+		RevisionNumber:  1,
+	}
+
+	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
+		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
+	}
+
+	if len(emitter.Events) != 1 {
+		t.Fatalf("emitted %d governance events, want exactly 1", len(emitter.Events))
+	}
+	ev := emitter.Events[0]
+	if ev.EventType != "approval_submitted" {
+		t.Fatalf("event type = %q, want %q", ev.EventType, "approval_submitted")
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(ev.PayloadJSON, &payload); err != nil {
+		t.Fatalf("unmarshal event payload: %v", err)
+	}
+	if payload["reason_for_change"] != req.ReasonForChange {
+		t.Fatalf("payload.reason_for_change = %v, want %q", payload["reason_for_change"], req.ReasonForChange)
+	}
+	if payload["reason_category"] != req.ReasonCategory {
+		t.Fatalf("payload.reason_category = %v, want %q", payload["reason_category"], req.ReasonCategory)
+	}
+}
+
+// TestSubmitReasonRequiredRev1 proves a REV>=1 submit without reason_for_change
+// is rejected with ErrReasonForChangeRequired (mapped to 422 problem+json at the
+// http layer; see errors_test.go), and no governance event is emitted.
+func TestSubmitReasonRequiredRev1(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db := newSubmitTestDB(t, true)
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
+		RevisionTitle:   "Revisao sem motivo",
+		ReasonForChange: "   ", // whitespace-only counts as empty
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 1,
+		RevisionNumber:  1,
+	}
+
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
+	if !errors.Is(err, ErrReasonForChangeRequired) {
+		t.Fatalf("error = %v, want ErrReasonForChangeRequired", err)
+	}
+	if len(emitter.Events) != 0 {
+		t.Errorf("no governance event should be emitted when reason_for_change is missing; got %d", len(emitter.Events))
+	}
+}
+
+// TestSubmitReasonOptionalAtRev0 proves REV 0 (initial creation) does NOT
+// require reason_for_change, mirroring the RevisionTitle REV-0 default
+// convention (contract §5.3).
+func TestSubmitReasonOptionalAtRev0(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db, conn := newSubmitTestDBWithConn(t, true)
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 1,
+		RevisionNumber:  0,
+	}
+
+	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
+		t.Fatalf("SubmitRevisionForReview: unexpected error at REV 0: %v", err)
+	}
+	if conn.reasonForChange.Valid {
+		t.Fatalf("persisted reason_for_change = %+v, want SQL NULL at REV 0 with no reason supplied", conn.reasonForChange)
+	}
+}
+
+// TestSubmitReasonCategoryInvalidRejected proves an out-of-enum reason_category
+// is rejected at the friendly first-line (app) layer, mirroring the DB CHECK
+// ck_documents_reason_category (contract §5.1; DB-level proof lives in
+// document_review_columns_integration_test.go, T1).
+func TestSubmitReasonCategoryInvalidRejected(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db := newSubmitTestDB(t, true)
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
+		RevisionTitle:   "Revisao",
+		ReasonForChange: "Some reason",
+		ReasonCategory:  "not_a_real_category",
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 1,
+		RevisionNumber:  1,
+	}
+
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
+	if !errors.Is(err, ErrReasonCategoryInvalid) {
+		t.Fatalf("error = %v, want ErrReasonCategoryInvalid", err)
+	}
+	if len(emitter.Events) != 0 {
+		t.Errorf("no governance event should be emitted when reason_category is invalid; got %d", len(emitter.Events))
 	}
 }

@@ -36,6 +36,8 @@ type SubmitRequest struct {
 	RouteID         string // UUID as string
 	SubmittedBy     string // user_id
 	RevisionTitle   string
+	ReasonForChange string         // structured 21 CFR Part 11 change reason (F6.3); distinct from RevisionTitle
+	ReasonCategory  string         // optional enum classifying ReasonForChange (F6.3); "" = unset
 	ContentFormData map[string]any // raw form data for hashing
 	RevisionVersion int            // OCC version from caller
 	RevisionNumber  int            // governed documents.revision_number
@@ -115,6 +117,11 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return err
 		}
 
+		reasonForChange, reasonCategory, err := normalizeReasonForChange(req.RevisionNumber, req.ReasonForChange, req.ReasonCategory)
+		if err != nil {
+			return err
+		}
+
 		// Step 7: create the approval instance.
 		instanceID = uuid.New().String()
 		now := s.clock.Now()
@@ -184,14 +191,17 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 		}
 		res, err := tx.ExecContext(ctx, `
 			UPDATE documents
-			   SET status           = 'under_review',
-			       revision_title   = $4,
-			       revision_version = revision_version + 1
+			   SET status            = 'under_review',
+			       revision_title    = $4,
+			       reason_for_change = $5,
+			       reason_category   = $6,
+			       revision_version  = revision_version + 1
 			 WHERE id               = $1
 			   AND tenant_id        = $2
 			   AND status           = 'draft'
 			   AND revision_version = $3`,
 			req.DocumentID, req.TenantID, req.RevisionVersion, revisionTitle,
+			nullableString(reasonForChange), nullableString(reasonCategory),
 		)
 		if err != nil {
 			return fmt.Errorf("submit: transition document to under_review: %w", err)
@@ -204,11 +214,20 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return repository.ErrStaleRevision
 		}
 
-		// Step 9: emit governance event.
+		// Step 9: emit governance event. reason_for_change/reason_category ride
+		// along in the SAME in-tx payload (F6.3 §5.2) — no second write, no
+		// separate audit call; empty/unset fields are omitted rather than
+		// serialized as "".
 		payloadMap := map[string]any{
 			"instance_id":  instanceID,
 			"route_id":     req.RouteID,
 			"content_hash": contentHash,
+		}
+		if reasonForChange != "" {
+			payloadMap["reason_for_change"] = reasonForChange
+		}
+		if reasonCategory != "" {
+			payloadMap["reason_category"] = reasonCategory
 		}
 		payloadBytes, err := json.Marshal(payloadMap)
 		if err != nil {
@@ -258,4 +277,53 @@ func normalizeGovernedRevisionTitle(revisionNumber int, title string) (string, e
 		return defaultInitialRevisionTitle, nil
 	}
 	return "", ErrRevisionTitleRequired
+}
+
+// validReasonCategories mirrors the DB CHECK ck_documents_reason_category
+// (db/migrations/0274_document_review_and_reason.sql). The app-level check is
+// the friendly first line; the DB CHECK remains the enforced last line.
+var validReasonCategories = map[string]bool{
+	"content":         true,
+	"corrective":      true,
+	"regulatory":      true,
+	"periodic_review": true,
+	"administrative":  true,
+}
+
+// ErrReasonForChangeRequired is returned when a REV>=1 submission omits the
+// structured reason_for_change (F6.3 contract §5.3). Not required at REV 0
+// (initial creation), mirroring normalizeGovernedRevisionTitle's REV-0 default.
+var ErrReasonForChangeRequired = errors.New("reasonForChange is required for revision >= 1")
+
+// ErrReasonCategoryInvalid is returned when a non-empty reason_category is not
+// one of the fixed enum values (content, corrective, regulatory,
+// periodic_review, administrative). Friendly first-line check mirroring the DB
+// CHECK ck_documents_reason_category.
+var ErrReasonCategoryInvalid = errors.New("reasonCategory must be one of: content, corrective, regulatory, periodic_review, administrative")
+
+// normalizeReasonForChange trims and validates reason_for_change/reason_category
+// (F6.3 contract §5.2/§5.3): required for REV>=1 (friendly-first-line before the
+// DB CHECK/422 mapping), optional at REV 0; reason_category, when present, must
+// be in the fixed enum.
+func normalizeReasonForChange(revisionNumber int, reason, category string) (string, string, error) {
+	trimmedReason := strings.TrimSpace(reason)
+	trimmedCategory := strings.TrimSpace(category)
+
+	if trimmedReason == "" && revisionNumber != 0 {
+		return "", "", ErrReasonForChangeRequired
+	}
+	if trimmedCategory != "" && !validReasonCategories[trimmedCategory] {
+		return "", "", ErrReasonCategoryInvalid
+	}
+	return trimmedReason, trimmedCategory, nil
+}
+
+// nullableString maps an empty string to a driver NULL bind (any(nil)) so an
+// unset optional field persists as SQL NULL rather than the literal empty
+// string, matching the migration's nullable columns (expand-only, F6.3 §5.1).
+func nullableString(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }

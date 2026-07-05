@@ -16,9 +16,20 @@ type SubmitRequest struct {
 	RouteID        string `json:"route_id"`
 	IdempotencyKey string
 	ContentHash    string `json:"content_hash"`
+
+	// ReasonForChange (+ optional ReasonCategory) is the F6.3 structured
+	// 21 CFR Part 11 change reason. Distinct from any revision title; required
+	// for REV>=1 (enforced downstream by application.SubmitRevisionForReview,
+	// which knows the governed revision number), optional at REV 0. Both
+	// pointers so an absent field is distinguishable from an explicit "".
+	ReasonForChange *string `json:"reason_for_change,omitempty"`
+	ReasonCategory  *string `json:"reason_category,omitempty"`
 }
 
 // Validate enforces RouteID is a valid UUID and ContentHash is 64 hex characters.
+// reason_for_change/reason_category REV>=1-requiredness is enforced downstream
+// (the service knows the governed revision number; this contract-level Validate
+// does not).
 func (r SubmitRequest) Validate() error {
 	if err := validateUUID("route_id", r.RouteID); err != nil {
 		return wrapValidation(err)

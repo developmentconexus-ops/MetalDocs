@@ -1,9 +1,54 @@
 package contracts
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
+
+// TestSubmitRequestReasonField pins the F6.3 structured reason-for-change
+// fields on the submit-for-review request contract (validation-contract.md
+// §5.1/§5.4): reason_for_change (+ optional reason_category) round-trip
+// through JSON as *string, distinguishing "absent" from an explicit "".
+// REV>=1-requiredness is NOT enforced here (contracts.SubmitRequest.Validate
+// does not know the governed revision number) — that gate lives in
+// application.SubmitRevisionForReview (submit_service_test.go).
+func TestSubmitRequestReasonField(t *testing.T) {
+	reason := "Corrected per audit finding #12"
+	category := "corrective"
+	body := []byte(`{"route_id":"3fa85f64-5717-4562-b3fc-2c963f66afa6","content_hash":"` + strings.Repeat("a", 64) + `","reason_for_change":"` + reason + `","reason_category":"` + category + `"}`)
+
+	var req SubmitRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		t.Fatalf("unmarshal SubmitRequest: %v", err)
+	}
+	if req.ReasonForChange == nil || *req.ReasonForChange != reason {
+		t.Fatalf("ReasonForChange = %v, want %q", req.ReasonForChange, reason)
+	}
+	if req.ReasonCategory == nil || *req.ReasonCategory != category {
+		t.Fatalf("ReasonCategory = %v, want %q", req.ReasonCategory, category)
+	}
+	if err := req.Validate(); err != nil {
+		t.Fatalf("expected valid request with reason fields, got error: %v", err)
+	}
+
+	// Absent fields must decode to nil, not a zero-value "" pointer — the
+	// handler distinguishes "omitted" from "explicit empty string".
+	absentBody := []byte(`{"route_id":"3fa85f64-5717-4562-b3fc-2c963f66afa6","content_hash":"` + strings.Repeat("b", 64) + `"}`)
+	var absent SubmitRequest
+	if err := json.Unmarshal(absentBody, &absent); err != nil {
+		t.Fatalf("unmarshal SubmitRequest (absent reason): %v", err)
+	}
+	if absent.ReasonForChange != nil {
+		t.Fatalf("ReasonForChange = %v, want nil when omitted from the body", absent.ReasonForChange)
+	}
+	if absent.ReasonCategory != nil {
+		t.Fatalf("ReasonCategory = %v, want nil when omitted from the body", absent.ReasonCategory)
+	}
+	if err := absent.Validate(); err != nil {
+		t.Fatalf("expected valid request with reason fields omitted (contract-level Validate does not gate REV>=1), got error: %v", err)
+	}
+}
 
 func TestSubmitRequestValidate(t *testing.T) {
 	valid := SubmitRequest{RouteID: "3fa85f64-5717-4562-b3fc-2c963f66afa6", ContentHash: strings.Repeat("a", 64)}

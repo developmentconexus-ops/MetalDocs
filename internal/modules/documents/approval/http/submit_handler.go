@@ -60,11 +60,21 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var reasonForChange, reasonCategory string
+	if req.ReasonForChange != nil {
+		reasonForChange = *req.ReasonForChange
+	}
+	if req.ReasonCategory != nil {
+		reasonCategory = *req.ReasonCategory
+	}
+
 	result, err := submitSvc.SubmitRevisionForReview(r.Context(), h.runner, application.SubmitRequest{
 		TenantID:        tenantID,
 		DocumentID:      documentID,
 		RouteID:         req.RouteID,
 		SubmittedBy:     actorID,
+		ReasonForChange: reasonForChange,
+		ReasonCategory:  reasonCategory,
 		ContentFormData: map[string]any{"_content_hash": req.ContentHash},
 		RevisionVersion: expectedRevisionVersion,
 		IdempotencyKey:  idempotencyKey,

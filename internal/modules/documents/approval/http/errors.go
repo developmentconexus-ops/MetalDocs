@@ -26,47 +26,49 @@ const internalErrorMessage = "internal error"
 
 // Module-local typed codes for the approval domain (dot-notation taxonomy).
 const (
-	approvalCodeInternalUnknown          problem.Code = "internal.unknown"
-	approvalCodeConflictStaleRevision    problem.Code = "conflict.stale_revision"
-	approvalCodeNotFoundInstance         problem.Code = "not_found.instance"
-	approvalCodeConflictDuplicate        problem.Code = "conflict.duplicate_submission"
-	approvalCodeSignoffDuplicate         problem.Code = "signoff.duplicate"
-	approvalCodePublishInvalidSupersede  problem.Code = "publish.invalid_supersede_target"
-	approvalCodeStateInstanceCompleted   problem.Code = "state.instance_completed"
-	approvalCodeRouteInUse               problem.Code = "route.in_use"
-	approvalCodeRouteDuplicateProfile    problem.Code = "route.duplicate_profile"
-	approvalCodeSignoffNotEligible       problem.Code = "signoff.not_eligible"
-	approvalCodeSodSubmitterCannotSign   problem.Code = "sod.submitter_cannot_sign"
-	approvalCodeSodCrossStageDuplicate   problem.Code = "sod.cross_stage_duplicate"
-	approvalCodeFreezeEffDateMissing     problem.Code = "freeze.effective_date_missing"
-	approvalCodePreconditionIfMatch      problem.Code = "precondition.if_match_required"
-	approvalCodeValidationIfMatchBad     problem.Code = "validation.if_match_malformed"
-	approvalCodeIdempotencyRequired      problem.Code = "idempotency.key_required"
-	approvalCodeIdempotencyKeyConflict   problem.Code = "idempotency.key_conflict"
-	approvalCodePreconditionHashMismatch problem.Code = "precondition.content_hash_mismatch"
-	approvalCodeAuthnSignatureInvalid    problem.Code = "authn.signature_invalid"
-	approvalCodeAuthnRateLimited         problem.Code = "authn.rate_limited"
-	approvalCodeInternalDBPrivilege      problem.Code = "internal.db_privilege_missing"
-	approvalCodeInternalDBUnknown        problem.Code = "internal.db_unknown"
-	approvalCodeInternalSigMisconfigured problem.Code = "internal.signature_misconfigured"
-	approvalCodeValidationParamFormat    problem.Code = "validation.param_format"
-	approvalCodeValidationParamUnmarshal problem.Code = "validation.param_unmarshal"
-	approvalCodeValidationParamRequired  problem.Code = "validation.param_required"
-	approvalCodeValidationHeaderRequired problem.Code = "validation.header_required"
-	approvalCodeValidationParamTooMany   problem.Code = "validation.param_too_many_values"
-	approvalCodeAuthzCapDenied           problem.Code = "authz.capability_denied"
-	approvalCodeApprovalUnresolved       problem.Code = "approval.unresolved_comments"
-	approvalCodeValidationReasonRequired problem.Code = "validation.reason_required"
-	approvalCodeNotFoundRoute            problem.Code = "not_found.route"
-	approvalCodeStateRouteInactive       problem.Code = "state.route_inactive"
-	approvalCodeTimeout                  problem.Code = "timeout"
-	approvalCodeValidationJSONDecode     problem.Code = "validation.json_decode"
-	approvalCodeValidationJSONTypeError  problem.Code = "validation.json_type_error"
-	approvalCodeValidationEmptyBody      problem.Code = "validation.empty_body"
-	approvalCodeValidationContentType    problem.Code = "validation.content_type"
-	approvalCodeValidationBodyTooLarge   problem.Code = "validation.body_too_large"
-	approvalCodeValidationRequestInvalid problem.Code = "validation.request_invalid"
-	approvalCodeValidationProfileUnknown problem.Code = "validation.profile_unknown"
+	approvalCodeInternalUnknown                   problem.Code = "internal.unknown"
+	approvalCodeConflictStaleRevision             problem.Code = "conflict.stale_revision"
+	approvalCodeNotFoundInstance                  problem.Code = "not_found.instance"
+	approvalCodeConflictDuplicate                 problem.Code = "conflict.duplicate_submission"
+	approvalCodeSignoffDuplicate                  problem.Code = "signoff.duplicate"
+	approvalCodePublishInvalidSupersede           problem.Code = "publish.invalid_supersede_target"
+	approvalCodeStateInstanceCompleted            problem.Code = "state.instance_completed"
+	approvalCodeRouteInUse                        problem.Code = "route.in_use"
+	approvalCodeRouteDuplicateProfile             problem.Code = "route.duplicate_profile"
+	approvalCodeSignoffNotEligible                problem.Code = "signoff.not_eligible"
+	approvalCodeSodSubmitterCannotSign            problem.Code = "sod.submitter_cannot_sign"
+	approvalCodeSodCrossStageDuplicate            problem.Code = "sod.cross_stage_duplicate"
+	approvalCodeFreezeEffDateMissing              problem.Code = "freeze.effective_date_missing"
+	approvalCodePreconditionIfMatch               problem.Code = "precondition.if_match_required"
+	approvalCodeValidationIfMatchBad              problem.Code = "validation.if_match_malformed"
+	approvalCodeIdempotencyRequired               problem.Code = "idempotency.key_required"
+	approvalCodeIdempotencyKeyConflict            problem.Code = "idempotency.key_conflict"
+	approvalCodePreconditionHashMismatch          problem.Code = "precondition.content_hash_mismatch"
+	approvalCodeAuthnSignatureInvalid             problem.Code = "authn.signature_invalid"
+	approvalCodeAuthnRateLimited                  problem.Code = "authn.rate_limited"
+	approvalCodeInternalDBPrivilege               problem.Code = "internal.db_privilege_missing"
+	approvalCodeInternalDBUnknown                 problem.Code = "internal.db_unknown"
+	approvalCodeInternalSigMisconfigured          problem.Code = "internal.signature_misconfigured"
+	approvalCodeValidationParamFormat             problem.Code = "validation.param_format"
+	approvalCodeValidationParamUnmarshal          problem.Code = "validation.param_unmarshal"
+	approvalCodeValidationParamRequired           problem.Code = "validation.param_required"
+	approvalCodeValidationHeaderRequired          problem.Code = "validation.header_required"
+	approvalCodeValidationParamTooMany            problem.Code = "validation.param_too_many_values"
+	approvalCodeAuthzCapDenied                    problem.Code = "authz.capability_denied"
+	approvalCodeApprovalUnresolved                problem.Code = "approval.unresolved_comments"
+	approvalCodeValidationReasonRequired          problem.Code = "validation.reason_required"
+	approvalCodeNotFoundRoute                     problem.Code = "not_found.route"
+	approvalCodeStateRouteInactive                problem.Code = "state.route_inactive"
+	approvalCodeTimeout                           problem.Code = "timeout"
+	approvalCodeValidationJSONDecode              problem.Code = "validation.json_decode"
+	approvalCodeValidationJSONTypeError           problem.Code = "validation.json_type_error"
+	approvalCodeValidationEmptyBody               problem.Code = "validation.empty_body"
+	approvalCodeValidationContentType             problem.Code = "validation.content_type"
+	approvalCodeValidationBodyTooLarge            problem.Code = "validation.body_too_large"
+	approvalCodeValidationRequestInvalid          problem.Code = "validation.request_invalid"
+	approvalCodeValidationProfileUnknown          problem.Code = "validation.profile_unknown"
+	approvalCodeValidationReasonForChangeRequired problem.Code = "validation.reason_for_change_required"
+	approvalCodeValidationReasonCategoryInvalid   problem.Code = "validation.reason_category_invalid"
 )
 
 // ValidationError is a generic request-validation failure mapped to HTTP 400
@@ -130,6 +132,15 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, v2dom.ErrEffectiveDateMissing):
 		statusCode = http.StatusUnprocessableEntity
 		code = approvalCodeFreezeEffDateMissing
+	case errors.Is(err, application.ErrReasonForChangeRequired):
+		// F6.3 §5.3: REV>=1 submit without a structured reason is a friendly
+		// first-line validation failure — 422 (semantically valid JSON,
+		// business-rule rejection), mirroring the effective-date-missing case.
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationReasonForChangeRequired
+	case errors.Is(err, application.ErrReasonCategoryInvalid):
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationReasonCategoryInvalid
 	case errors.Is(err, ErrIfMatchRequired):
 		statusCode = http.StatusPreconditionRequired
 		code = approvalCodePreconditionIfMatch

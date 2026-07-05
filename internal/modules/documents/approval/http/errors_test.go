@@ -107,6 +107,20 @@ func TestMapErrorToResponse(t *testing.T) {
 			wantTitle:  v2dom.ErrEffectiveDateMissing.Error(),
 		},
 		{
+			name:       "F6.3 reason for change required",
+			err:        application.ErrReasonForChangeRequired,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   "validation.reason_for_change_required",
+			wantTitle:  application.ErrReasonForChangeRequired.Error(),
+		},
+		{
+			name:       "F6.3 reason category invalid",
+			err:        application.ErrReasonCategoryInvalid,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   "validation.reason_category_invalid",
+			wantTitle:  application.ErrReasonCategoryInvalid.Error(),
+		},
+		{
 			name:       "repository insufficient privilege",
 			err:        repository.ErrInsufficientPrivilege,
 			wantStatus: http.StatusInternalServerError,
