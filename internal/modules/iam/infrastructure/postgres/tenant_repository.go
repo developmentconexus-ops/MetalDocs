@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -44,6 +45,10 @@ VALUES ($1::uuid, $2, $3)
 }
 
 func isTenantUniqueViolation(err error) bool {
-	var pgErr *pq.Error
-	return errors.As(err, &pgErr) && string(pgErr.Code) == "23505"
+	var pgxErr *pgconn.PgError
+	if errors.As(err, &pgxErr) && pgxErr.Code == "23505" {
+		return true
+	}
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && string(pqErr.Code) == "23505"
 }
