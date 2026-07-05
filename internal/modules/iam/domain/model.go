@@ -126,6 +126,18 @@ const (
 	// tenant being created. Tenant-grade; enforced tier-2 in-tx via
 	// authz.Require and backstopped by the tenants/INSERT DB tripwire arm.
 	CapTenantOnboard Capability = "tenant.onboard"
+
+	// CapTenantExport gates requesting a full tenant data export (M7 F7.3):
+	// a tenant-wide, operator-grade action producing a self-evidencing export
+	// artifact. Tenant-grade; enforced tier-2 in-tx via authz.Require and
+	// backstopped by the tenant_lifecycle_jobs/INSERT DB tripwire arm.
+	CapTenantExport Capability = "tenant.export"
+
+	// CapTenantErase gates requesting irreversible tenant erasure /
+	// crypto-shred (M7 F7.3). Seeded to system_admin ONLY. Tenant-grade;
+	// enforced tier-2 in-tx via authz.Require and backstopped by the
+	// tenant_lifecycle_jobs/INSERT DB tripwire arm.
+	CapTenantErase Capability = "tenant.erase"
 )
 
 // ADR 0022 Phase 10 (F2) — the four caps Phase 8 minted (doc.edit_draft,
@@ -173,6 +185,8 @@ var validCapabilities = map[Capability]struct{}{
 	CapTokenView:                   {},
 	CapTokenDictionaryManage:       {},
 	CapTenantOnboard:               {},
+	CapTenantExport:                {},
+	CapTenantErase:                 {},
 }
 
 // IsValidCapability reports whether cap is one of the registered constants in

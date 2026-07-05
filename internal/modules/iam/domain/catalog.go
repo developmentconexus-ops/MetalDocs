@@ -141,6 +141,8 @@ var capabilityDescriptions = map[Capability]string{
 	CapTokenView:                   "Visualizar dicionário de tokens do tenant",
 	CapTokenDictionaryManage:       "Gerenciar entradas do dicionário de tokens do tenant",
 	CapTenantOnboard:               "Provisionar e integrar um novo tenant",
+	CapTenantExport:                "Exportar dados de um tenant",
+	CapTenantErase:                 "Apagar (crypto-shred) os dados de um tenant",
 }
 
 // CapabilityCatalog returns one CapabilityDescriptor per Capability const,

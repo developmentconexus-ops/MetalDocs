@@ -102,6 +102,11 @@ var routeRules = []routeRule{
 	// operator action, gated on tenant.onboard — never a role check (ADR 0022).
 	{method: http.MethodPost, pathExact: "/api/v1/tenants", capability: iamdomain.CapTenantOnboard, visibility: iamdelivery.VisibilityPermissionGuarded},
 
+	// Tenant export/erase (M7 F7.3, ADR 0070): parameterized {tenantId} lifecycle
+	// actions. tenant.erase is seeded system_admin-ONLY (no other role) per spec.
+	{method: http.MethodPost, pathPrefix: "/api/v1/tenants/", pathSuffix: "/export", capability: iamdomain.CapTenantExport, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/tenants/", pathSuffix: "/erase", capability: iamdomain.CapTenantErase, visibility: iamdelivery.VisibilityPermissionGuarded},
+
 	// IAM users. F-001 split: GET view, writes manage.
 	{method: http.MethodGet, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},

@@ -40,18 +40,20 @@ type Arm struct {
 // TripwireArms is the binding source of truth for every gated (table, op)
 // pair enforced by public.enforce_capability_asserted(). Order is stable and
 // mirrors the CASE-branch order in db/migrations/0270_*.sql exactly. The latest
-// rendered migration is db/migrations/0277_*.sql; entry #6 (documents/UPDATE)
+// rendered migration is db/migrations/0279_*.sql; entry #6 (documents/UPDATE)
 // has grown additively across two milestones: 0271 (M2) added document.obsolete
 // + membership.manage per M2 validation-contract.md §1.1/§1.2; 0275 (M6 F6.2)
 // added document.review per M6 validation-contract.md §3; 0277 (M7 F7.2, ADR
 // 0070) added entry #19 (tenants/INSERT gated on tenant.onboard) per M7
-// validation-contract.md §5 touchpoint 6 — the intended registry-driven growth
-// path, not drift.
+// validation-contract.md §5 touchpoint 6; 0279 (M7 F7.3, ADR 0070) added entry
+// #20 (tenant_lifecycle_jobs/INSERT gated on tenant.export OR tenant.erase) —
+// the intended registry-driven growth path, not drift.
 //
 // Content MUST equal M2 validation-contract.md §1.2 (18 gated entries) as
 // extended by M6 validation-contract.md §3 (documents/UPDATE gains
-// document.review) and M7 validation-contract.md §5 (tenants/INSERT arm, 19
-// entries). Any other deviation is HS-7 (see those binding clauses).
+// document.review), M7 validation-contract.md §5 (tenants/INSERT arm, 19
+// entries) and M7 §5 (tenant_lifecycle_jobs/INSERT arm, 20 entries). Any other
+// deviation is HS-7 (see those binding clauses).
 var TripwireArms = []Arm{
 	{ // 1
 		Table: "approval_instances",
@@ -187,5 +189,15 @@ var TripwireArms = []Arm{
 		Table: "tenants",
 		Op:    OpInsert,
 		Caps:  []iamdomain.Capability{iamdomain.CapTenantOnboard},
+	},
+	{ // 20 — M7 F7.3 (ADR 0070): the export/erase handlers each assert exactly
+		// one of tenant.export / tenant.erase then INSERT metaldocs.tenant_lifecycle_jobs
+		// (kind discriminates which). Multi-cap, match-one (OR semantics) — the
+		// same INSERT surface is shared by both workflows, mirroring the
+		// documents/UPDATE (#6) and controlled_documents/UPDATE (#8) multi-cap
+		// arm precedent.
+		Table: "tenant_lifecycle_jobs",
+		Op:    OpInsert,
+		Caps:  []iamdomain.Capability{iamdomain.CapTenantExport, iamdomain.CapTenantErase},
 	},
 }

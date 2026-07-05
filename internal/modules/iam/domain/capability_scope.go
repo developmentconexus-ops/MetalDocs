@@ -83,6 +83,10 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	// tenant.onboard (M7 F7.2) — tenant-wide provisioning action, no area
 	// exists yet for a tenant being created. Tier-2 passes the "tenant" sentinel.
 	CapTenantOnboard: ScopeTenant,
+	// tenant.export / tenant.erase (M7 F7.3, ADR 0070) — tenant-wide lifecycle
+	// actions, no area filter applies.
+	CapTenantExport: ScopeTenant,
+	CapTenantErase:  ScopeTenant,
 }
 
 // ScopeOf returns the declared scope of a capability and whether it is

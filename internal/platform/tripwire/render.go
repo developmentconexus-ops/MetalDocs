@@ -5,15 +5,16 @@ import (
 	"strings"
 )
 
-// RenderMigration renders the full 0277 forward-only migration SQL,
-// regenerated from the prior tripwire migration (0275) with every CASE branch
-// preserved byte-for-byte plus one new branch — tenants/INSERT (M7 F7.2, ADR
-// 0070) — whose v_required_caps literal is produced from TripwireArms entry
-// #19, and the one-time trigger attachment on metaldocs.tenants (0259
-// attachment precedent). Branch order follows M2 validation-contract.md §1.2
-// as extended by M6 §3 (documents/UPDATE gains document.review) and M7 §5
-// (tenants/INSERT arm). Determinism: TripwireArms is a fixed slice, so this
-// returns identical output every call.
+// RenderMigration renders the full 0279 forward-only migration SQL,
+// regenerated from the prior tripwire migration (0277) with every CASE branch
+// preserved byte-for-byte plus one new branch — tenant_lifecycle_jobs/INSERT
+// (M7 F7.3, ADR 0070) — whose v_required_caps literal is produced from
+// TripwireArms entry #20, and the one-time trigger attachment on
+// metaldocs.tenant_lifecycle_jobs (0259/0277 attachment precedent). Branch
+// order follows M2 validation-contract.md §1.2 as extended by M6 §3
+// (documents/UPDATE gains document.review), M7 §5 (tenants/INSERT arm) and M7
+// §5 (tenant_lifecycle_jobs/INSERT arm). Determinism: TripwireArms is a fixed
+// slice, so this returns identical output every call.
 func RenderMigration() string {
 	return migrationHeader +
 		"BEGIN;\n" +
@@ -111,6 +112,12 @@ func RenderMigration() string {
 		"      -- provisioned is the tenant itself).\n" +
 		"      v_required_caps := " + renderArray(findArm("tenants", OpInsert)) + ";\n" +
 		"      v_tenant_id     := NEW.id;\n" +
+		"    WHEN TG_TABLE_NAME = 'tenant_lifecycle_jobs' AND TG_OP = 'INSERT' THEN\n" +
+		"      -- 0279 (M7 F7.3, ADR 0070): the export/erase handlers each assert\n" +
+		"      -- exactly one of tenant.export / tenant.erase then INSERT\n" +
+		"      -- metaldocs.tenant_lifecycle_jobs (kind discriminates which).\n" +
+		"      v_required_caps := " + renderArray(findArm("tenant_lifecycle_jobs", OpInsert)) + ";\n" +
+		"      v_tenant_id     := NEW.tenant_id;\n" +
 		"    ELSE\n" +
 		"      -- Fail-closed: a table carrying this trigger with no capability mapping is a\n" +
 		"      -- wiring error, not a license to pass through. Refuse the write loudly.\n" +
@@ -194,35 +201,46 @@ func RenderMigration() string {
 		"  BEFORE INSERT ON metaldocs.tenants\n" +
 		"  FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();\n" +
 		"\n" +
+		"-- One-time attachment on metaldocs.tenant_lifecycle_jobs (0259/0277\n" +
+		"-- attachment precedent). INSERT only, matching the arm — the table's only\n" +
+		"-- mutation surface at this stage is the enqueue INSERT (Task A); no\n" +
+		"-- UPDATE/DELETE writer exists yet (the worker's status transitions are a\n" +
+		"-- separate later task and would need their own arm/attachment then).\n" +
+		"DROP TRIGGER IF EXISTS trg_require_cap_asserted ON metaldocs.tenant_lifecycle_jobs;\n" +
+		"CREATE TRIGGER trg_require_cap_asserted\n" +
+		"  BEFORE INSERT ON metaldocs.tenant_lifecycle_jobs\n" +
+		"  FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();\n" +
+		"\n" +
 		"-- ── schema_migrations ledger ─────────────────────────────────────────────────────────────\n" +
 		"\n" +
 		"INSERT INTO public.schema_migrations (version, description)\n" +
-		"VALUES ('0277', '" + ledgerDescription + "')\n" +
+		"VALUES ('0279', '" + ledgerDescription + "')\n" +
 		"ON CONFLICT (version) DO NOTHING;\n" +
 		"\n" +
 		"COMMIT;\n"
 }
 
-// migrationHeader is the file-header comment block for 0277, in
-// 0269/0270/0271/0275 house style: goal/incident framing, root cause, writer
-// inventory, fix statement.
-const migrationHeader = `-- 0277_tenants_insert_tripwire_onboard_cap.sql
--- M7 F7.2 (global-maximum-remediation, milestone-7-tenant-lifecycle, ADR 0070):
--- the tenant-onboarding workflow asserts ONLY tenant.onboard (a new capability,
--- ADR 0070) then INSERTs metaldocs.tenants (the provisioning write). Before
--- this migration metaldocs.tenants carried NO trg_require_cap_asserted trigger
--- at all — the tenants INSERT was the one privileged provisioning write with no
--- DB tripwire backstop (the table predates the tripwire program; it was only
--- ever written by bootstrap/seed contexts, which run as the migration owner and
--- never traverse the trigger).
+// migrationHeader is the file-header comment block for 0279, in
+// 0269/0270/0271/0275/0277 house style: goal/incident framing, root cause,
+// writer inventory, fix statement.
+const migrationHeader = `-- 0279_tenant_lifecycle_jobs_tripwire_export_erase_cap.sql
+-- M7 F7.3 Task A (global-maximum-remediation, milestone-7-tenant-lifecycle,
+-- ADR 0070): the tenant export/erase workflows each assert exactly one of
+-- tenant.export / tenant.erase (both new capabilities, ADR 0070) then INSERT
+-- metaldocs.tenant_lifecycle_jobs (kind discriminates which). Before this
+-- migration metaldocs.tenant_lifecycle_jobs (created by 0278) carried NO
+-- trg_require_cap_asserted trigger at all — the enqueue INSERT was a
+-- privileged provisioning write with no DB tripwire backstop.
 --
--- Fix: (1) add a tenants/INSERT CASE branch requiring tenant.onboard —
--- tenants has no tenant_id column; NEW.id IS the tenant id (the row being
--- provisioned is the tenant itself); (2) one-time trigger attachment on
--- metaldocs.tenants (0259 attachment precedent), BEFORE INSERT only to match
--- the arm — the fail-closed ELSE branch would P0001 every UPDATE/DELETE if the
--- trigger fired for ops the CASE does not map, and no tenants update/offboard
--- surface exists yet (F7.3+ owns lifecycle mutations).
+-- Fix: (1) add a tenant_lifecycle_jobs/INSERT CASE branch requiring
+-- {tenant.export, tenant.erase} (match-one / OR semantics, mirroring the
+-- documents/UPDATE (#6) and controlled_documents/UPDATE (#8) multi-cap arm
+-- precedent); (2) one-time trigger attachment on
+-- metaldocs.tenant_lifecycle_jobs (0259/0277 attachment precedent), BEFORE
+-- INSERT only to match the arm — the fail-closed ELSE branch would P0001
+-- every UPDATE/DELETE if the trigger fired for ops the CASE does not map, and
+-- no UPDATE/DELETE writer exists yet at this task boundary (the async
+-- worker's status-transition writes are a separate later task).
 --
 -- Additive only — no cap is removed from any arm. This migration is
 -- machine-generated from internal/platform/tripwire (TripwireArms +
@@ -230,12 +248,12 @@ const migrationHeader = `-- 0277_tenants_insert_tripwire_onboard_cap.sql
 -- global-maximum-remediation/milestone-7-tenant-lifecycle/
 -- validation-contract.md §5 (touchpoint 6) and the M2 regeneration protocol
 -- (milestone-2-authz-enforcement-generation/validation-contract.md §1.2/§1.4).
--- Every other CASE branch is reproduced byte-for-byte from 0275. Supersedes
--- 0275 as the latest definition of public.enforce_capability_asserted().
+-- Every other CASE branch is reproduced byte-for-byte from 0277. Supersedes
+-- 0277 as the latest definition of public.enforce_capability_asserted().
 
 `
 
-const ledgerDescription = "M7 F7.2 (ADR 0070): add tenants/INSERT tripwire arm requiring tenant.onboard and attach trg_require_cap_asserted to metaldocs.tenants (BEFORE INSERT) -- the onboarding workflow asserts only tenant.onboard then INSERTs metaldocs.tenants, previously the one privileged provisioning write with no DB tripwire backstop. Additive-only; all other branches preserved from 0275; machine-generated from internal/platform/tripwire."
+const ledgerDescription = "M7 F7.3 Task A (ADR 0070): add tenant_lifecycle_jobs/INSERT tripwire arm requiring {tenant.export, tenant.erase} (match-one) and attach trg_require_cap_asserted to metaldocs.tenant_lifecycle_jobs (BEFORE INSERT) -- the export/erase enqueue workflows assert only one of tenant.export/tenant.erase then INSERT tenant_lifecycle_jobs, previously with no DB tripwire backstop. Additive-only; all other branches preserved from 0277; machine-generated from internal/platform/tripwire."
 
 // findArm returns the Arm for (table, op), panicking if absent — every
 // branch rendered above must correspond to a TripwireArms entry (parity is
