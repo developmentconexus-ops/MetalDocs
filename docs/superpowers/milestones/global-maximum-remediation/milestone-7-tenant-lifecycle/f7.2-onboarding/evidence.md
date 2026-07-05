@@ -54,5 +54,5 @@
 
 | Defer | Why | Trigger |
 |---|---|---|
-| Run `go test -tags=integration ./tests/integration/iam/... -run 'TestTenantsInsertTripwire|TestOnboardTenant'` (4 tests) | Local runs need `DATABASE_URL`; `.env` sourcing is blocked in this session (auto-mode classifier upheld the CLAUDE.md secret boundary). Every asserted behavior was proven **live** at HTTP+SQL level above | CI, or next session with operator-run env loader (M6 gate#7 precedent) |
+| ~~Run `go test -tags=integration ./tests/integration/iam/... -run 'TestTenantsInsertTripwire|TestOnboardTenant'` (4 tests)~~ **CLOSED 2026-07-05 (F7.3 session)**: integration env became runnable; all 5 tests (incl. e2e) PASS in 7.8s (`ok metaldocs/tests/integration/iam`). Prerequisite: F7.3 Task B's testdb builder repair (NewTenant/SeedSystemAdmin assert tenant.onboard per live 0277 arm, commit d9d21719) | — | closed |
 | `admin_user_id` naming: login identifier = user_id (no separate username field) | Matches iam_users TEXT PK contract; revisit only if a distinct username surface ships | Product decision |
