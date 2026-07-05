@@ -12,7 +12,6 @@ package application
 // PublishService.SchedulePublish.
 
 import (
-	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -29,12 +28,16 @@ import (
 // also writes effective_to and review_due_at when the caller supplies them,
 // alongside the pre-existing effective_from write.
 func TestSchedulePublish_PersistsEffectiveToAndReviewDueAt(t *testing.T) {
-	ctx := context.Background()
 	database, _ := testdb.Open(t)
 	database.SetMaxOpenConns(4)
 
 	tnt := testdb.NewTenant(t, database)
 	user := testdb.NewUser(t, database, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+	// SchedulePublish issues in-tx authz.Require (document.publish/edit); TxRunner's
+	// chokepoint seeds the tenant_id + actor_id GUCs authz reads ONLY when BOTH are
+	// on ctx (runner.go seedTxIdentityFromContext) — the production authn middleware
+	// sets them, so mirror it here (same helper the F6.3 submit proof uses).
+	ctx := submitCtxWithIdentity(tnt.ID, user.ID)
 
 	doc := testdb.NewDocument(t, database,
 		testdb.WithTenant(tnt.ID),
@@ -101,12 +104,14 @@ func TestSchedulePublish_PersistsEffectiveToAndReviewDueAt(t *testing.T) {
 // behavior is preserved when the new fields are omitted (nil): both columns
 // stay NULL, no regression to the F4/F4.5 schedule-publish path.
 func TestSchedulePublish_EffectiveToAndReviewDueAtOptional(t *testing.T) {
-	ctx := context.Background()
 	database, _ := testdb.Open(t)
 	database.SetMaxOpenConns(4)
 
 	tnt := testdb.NewTenant(t, database)
 	user := testdb.NewUser(t, database, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+	// See sibling test: seed identity on ctx so TxRunner seeds the actor_id GUC
+	// authz.Require needs (production authn middleware does this).
+	ctx := submitCtxWithIdentity(tnt.ID, user.ID)
 
 	doc := testdb.NewDocument(t, database,
 		testdb.WithTenant(tnt.ID),
