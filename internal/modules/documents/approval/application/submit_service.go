@@ -40,7 +40,6 @@ type SubmitRequest struct {
 	ReasonCategory  string         // optional enum classifying ReasonForChange (F6.3); "" = unset
 	ContentFormData map[string]any // raw form data for hashing
 	RevisionVersion int            // OCC version from caller
-	RevisionNumber  int            // governed documents.revision_number
 	IdempotencyKey  string         // client Idempotency-Key header, threaded from the handler
 }
 
@@ -56,17 +55,6 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 	// Step 1: validate payload — no float64 values.
 	if err := ValidateEventPayload(req.ContentFormData); err != nil {
 		return SubmitResult{}, err
-	}
-
-	// Step 2: compute content hash.
-	contentHash, err := ComputeContentHash(ContentHashInput{
-		TenantID:       req.TenantID,
-		DocumentID:     req.DocumentID,
-		RevisionNumber: req.RevisionNumber,
-		FormData:       req.ContentFormData,
-	})
-	if err != nil {
-		return SubmitResult{}, fmt.Errorf("submit: content hash: %w", err)
 	}
 
 	// Step 3: require the caller-supplied idempotency key. It is the client's
@@ -85,7 +73,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 	// Step 4: run the submission as one unit of work; the runner owns
 	// begin/commit/rollback.
 	var instanceID string
-	err = runner.Do(ctx, func(tx *sql.Tx) error {
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
 		// document.submit is area-grade: pass the resolved area as-is ("" fail-closes,
@@ -101,6 +89,17 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return err
 		}
 
+		// Step 4b: derive the governed documents.revision_number in-tx (T8b).
+		// This value is NEVER trusted from the client — SubmitRequest has no
+		// RevisionNumber field. Reading it here (tenant-scoped, via the caller's
+		// tx for GUC/RLS correctness) is what makes the REV>=1
+		// reason_for_change/revision_title gates and the content-hash binding
+		// fire correctly on live traffic instead of silently defaulting to 0.
+		revisionNumber, err := s.repo.LoadGovernedRevisionNumber(ctx, tx, req.TenantID, req.DocumentID)
+		if err != nil {
+			return fmt.Errorf("submit: load governed revision number: %w", err)
+		}
+
 		// Step 5: load route with stages.
 		route, err := s.repo.LoadRoute(ctx, tx, req.TenantID, req.RouteID)
 		if err != nil {
@@ -112,14 +111,28 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return fmt.Errorf("submit: invalid route: %w", err)
 		}
 
-		revisionTitle, err := normalizeGovernedRevisionTitle(req.RevisionNumber, req.RevisionTitle)
+		revisionTitle, err := normalizeGovernedRevisionTitle(revisionNumber, req.RevisionTitle)
 		if err != nil {
 			return err
 		}
 
-		reasonForChange, reasonCategory, err := normalizeReasonForChange(req.RevisionNumber, req.ReasonForChange, req.ReasonCategory)
+		reasonForChange, reasonCategory, err := normalizeReasonForChange(revisionNumber, req.ReasonForChange, req.ReasonCategory)
 		if err != nil {
 			return err
+		}
+
+		// Step 6b: compute the content hash bound to the SAME derived governed
+		// revision_number (HS-2: this changes the hash for REV>=1 submits versus
+		// the prior always-0 behavior — see submit_service.go package docs /
+		// T8b handoff notes for the governed-semantics consequence).
+		contentHash, err := ComputeContentHash(ContentHashInput{
+			TenantID:       req.TenantID,
+			DocumentID:     req.DocumentID,
+			RevisionNumber: revisionNumber,
+			FormData:       req.ContentFormData,
+		})
+		if err != nil {
+			return fmt.Errorf("submit: content hash: %w", err)
 		}
 
 		// Step 7: create the approval instance.

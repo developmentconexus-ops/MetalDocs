@@ -764,7 +764,8 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		RevisionTitle:   revisionTitle,
 		ContentFormData: map[string]any{"_content_hash": prereqs.ContentHash},
 		RevisionVersion: expectedRevisionVersion,
-		RevisionNumber:  int(prereqs.RevisionNumber),
+		// RevisionNumber is derived in-tx by SubmitRevisionForReview itself (T8b) —
+		// never trust a caller-supplied value, even one loaded a moment earlier.
 		// Thread the validated client key (checked non-empty + UUID above) so the
 		// created approval_instances.idempotency_key is the client key, not a
 		// server-clock derivation (F-D4).

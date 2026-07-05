@@ -81,6 +81,21 @@ func (r *phase5Repo) UpdateInstanceStatus(_ context.Context, _ db.Tx, _, _ strin
 // are called during Submit; the others during Decision. All delegate to tx so
 // the phase5Conn driver handles the queries.
 
+// LoadGovernedRevisionNumber is called by SubmitRevisionForReview (T8b).
+// Delegates to tx so phase5Conn's governedRevisionNumberRows serves it (fixed
+// at 0 here — these scenarios only exercise the REV-0 default-title path).
+func (r *phase5Repo) LoadGovernedRevisionNumber(ctx context.Context, tx db.Tx, tenantID, documentID string) (int, error) {
+	var n int64
+	err := tx.QueryRowContext(ctx,
+		`SELECT revision_number FROM documents WHERE id = $1 AND tenant_id = $2`,
+		documentID, tenantID,
+	).Scan(&n)
+	if err != nil {
+		return 0, err
+	}
+	return int(n), nil
+}
+
 func (r *phase5Repo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID string) (domain.Route, error) {
 	var route domain.Route
 	err := tx.QueryRowContext(ctx, `
@@ -310,6 +325,10 @@ func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 	}
 	if strings.Contains(q, "content_hash_at_submit") && strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: validContentHash}, nil
+	}
+	if strings.Contains(q, "select revision_number") && strings.Contains(q, "from documents") {
+		// Governed revision_number read (T8b) via ApprovalRepository.LoadGovernedRevisionNumber.
+		return &governedRevisionNumberRows{value: 0}, nil
 	}
 	if strings.Contains(q, "from documents") {
 		return &docAreaRows{snapshot: "QA"}, nil

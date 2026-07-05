@@ -55,6 +55,9 @@ func (stubApprovalRepo) LoadCurrentPublishedHead(_ context.Context, _ platformdb
 func (stubApprovalRepo) GetDocumentRevisionVersion(_ context.Context, _ platformdb.Tx, _, _ string) (int, error) {
 	return 0, nil
 }
+func (stubApprovalRepo) LoadGovernedRevisionNumber(_ context.Context, _ platformdb.Tx, _, _ string) (int, error) {
+	return 0, nil
+}
 func (stubApprovalRepo) ListRoutes(_ context.Context, _ string) ([]repository.Route, error) {
 	return nil, nil
 }

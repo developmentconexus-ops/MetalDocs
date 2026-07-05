@@ -73,7 +73,10 @@ func TestSubmitPersistsReason_RealDB(t *testing.T) {
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithOwner(actor.ID), testdb.WithStatus("draft"))
+	// WithRevisionNumber(1): the row must be a governed revision >= 1 so
+	// SubmitRevisionForReview's in-tx derived revision_number (T8b) drives the
+	// REV>=1 gates — the request itself never supplies a revision number.
+	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithOwner(actor.ID), testdb.WithStatus("draft"), testdb.WithRevisionNumber(1))
 
 	var profileCode string
 	if err := dbc.QueryRowContext(ctx,
@@ -97,7 +100,6 @@ func TestSubmitPersistsReason_RealDB(t *testing.T) {
 		ReasonCategory:  "corrective",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 0,
-		RevisionNumber:  1,
 		IdempotencyKey:  "11111111-1111-1111-1111-111111111111",
 	}
 
@@ -130,7 +132,9 @@ func TestSubmitReasonOnAuditTrail_RealDB(t *testing.T) {
 
 	tnt := testdb.NewTenant(t, dbc)
 	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
-	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithOwner(actor.ID), testdb.WithStatus("draft"))
+	// WithRevisionNumber(1): see TestSubmitPersistsReason_RealDB — the derived
+	// in-tx revision_number (T8b) must come from the row, not the request.
+	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithOwner(actor.ID), testdb.WithStatus("draft"), testdb.WithRevisionNumber(1))
 
 	var profileCode string
 	if err := dbc.QueryRowContext(ctx,
@@ -154,7 +158,6 @@ func TestSubmitReasonOnAuditTrail_RealDB(t *testing.T) {
 		ReasonCategory:  "regulatory",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 0,
-		RevisionNumber:  1,
 		IdempotencyKey:  "22222222-2222-2222-2222-222222222222",
 	}
 

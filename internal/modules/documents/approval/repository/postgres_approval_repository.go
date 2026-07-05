@@ -425,6 +425,29 @@ func (r *postgresApprovalRepository) GetDocumentRevisionVersion(ctx context.Cont
 	return revisionVersion, nil
 }
 
+// LoadGovernedRevisionNumber reads documents.revision_number inside the
+// caller's transaction (T8b). Unlike GetDocumentRevisionVersion this is a
+// plain read (no FOR UPDATE) — the submit path only needs the current
+// governed value to gate the reason/title normalizers and bind the content
+// hash; it does not CAS on revision_number.
+func (r *postgresApprovalRepository) LoadGovernedRevisionNumber(ctx context.Context, tx db.Tx, tenantID, documentID string) (int, error) {
+	var revisionNumber int64
+	err := tx.QueryRowContext(ctx, `
+		SELECT revision_number
+		  FROM documents
+		 WHERE id = $1
+		   AND tenant_id = $2::uuid`,
+		documentID, tenantID,
+	).Scan(&revisionNumber)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrStaleRevision
+	}
+	if err != nil {
+		return 0, MapPgError(err, MapHints{})
+	}
+	return int(revisionNumber), nil
+}
+
 // ListRoutes loads tenant-scoped route configuration and stages in one joined query.
 func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID string) ([]Route, error) {
 	rows, err := r.db.QueryContext(ctx, listRoutesQuery, tenantID)

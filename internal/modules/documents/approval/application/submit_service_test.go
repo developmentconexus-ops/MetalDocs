@@ -97,6 +97,22 @@ func (r *fakeSubmitRepo) LoadRoute(ctx context.Context, tx db.Tx, tenantID, rout
 	return route, nil
 }
 
+// LoadGovernedRevisionNumber is called by SubmitRevisionForReview (T8b) to
+// derive the governed documents.revision_number in-tx instead of trusting a
+// client-supplied value. Delegates to the tx so the fake driver's
+// governedRevisionNumberRows serves it.
+func (r *fakeSubmitRepo) LoadGovernedRevisionNumber(ctx context.Context, tx db.Tx, tenantID, documentID string) (int, error) {
+	var n int64
+	err := tx.QueryRowContext(ctx,
+		`SELECT revision_number FROM documents WHERE id = $1 AND tenant_id = $2`,
+		documentID, tenantID,
+	).Scan(&n)
+	if err != nil {
+		return 0, err
+	}
+	return int(n), nil
+}
+
 func (r *fakeSubmitRepo) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
 	rows, err := tx.QueryContext(ctx,
 		`SELECT user_id
@@ -164,13 +180,33 @@ func (c fixedClock) Now() time.Time { return c.t }
 //   4. COMMIT/ROLLBACK   — tx lifecycle
 
 type submitTestConn struct {
-	authzGranted    bool
-	areaCode        string
-	actorID         string
-	tenantID        string
-	revisionTitle   string
-	reasonForChange sql.NullString
-	reasonCategory  sql.NullString
+	authzGranted           bool
+	areaCode               string
+	actorID                string
+	tenantID               string
+	revisionTitle          string
+	reasonForChange        sql.NullString
+	reasonCategory         sql.NullString
+	governedRevisionNumber int // documents.revision_number the fake DB row reports (T8b)
+}
+
+// governedRevisionNumberRows is the fake-driver result for
+// ApprovalRepository.LoadGovernedRevisionNumber's SELECT revision_number FROM
+// documents ... query (T8b) — one column, one row.
+type governedRevisionNumberRows struct {
+	value int64
+	done  bool
+}
+
+func (r *governedRevisionNumberRows) Columns() []string { return []string{"revision_number"} }
+func (r *governedRevisionNumberRows) Close() error      { return nil }
+func (r *governedRevisionNumberRows) Next(dest []driver.Value) error {
+	if r.done {
+		return io.EOF
+	}
+	r.done = true
+	dest[0] = r.value
+	return nil
 }
 
 type submitNoopResult struct{}
@@ -265,6 +301,12 @@ func (s *submitTestStmt) Exec(_ []driver.Value) (driver.Result, error) {
 
 func (s *submitTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
+	if strings.Contains(q, "select revision_number") && strings.Contains(q, "from documents") {
+		// Governed revision_number read (T8b): SubmitRevisionForReview derives
+		// this in-tx via ApprovalRepository.LoadGovernedRevisionNumber instead of
+		// trusting a client-supplied value.
+		return &governedRevisionNumberRows{value: int64(s.conn.governedRevisionNumber)}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		// Ported area resolver (M2/F2.1) selects two columns
 		// (process_area_code_snapshot, controlled_document_id). A non-NULL
@@ -449,6 +491,7 @@ func TestSubmitRevisionForReview_DefaultsRevisionTitleForFirstGovernedRevision(t
 
 	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
 	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 0
 
 	req := SubmitRequest{
 		TenantID:        "tenant-uuid-1",
@@ -459,7 +502,6 @@ func TestSubmitRevisionForReview_DefaultsRevisionTitleForFirstGovernedRevision(t
 		RevisionTitle:   "",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 1,
-		RevisionNumber:  0,
 	}
 
 	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
@@ -476,7 +518,8 @@ func TestSubmitRevisionForReview_RequiresRevisionTitleAfterFirstGovernedRevision
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
 
 	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
-	db, _ := newSubmitTestDBWithConn(t, true)
+	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 1
 
 	req := SubmitRequest{
 		TenantID:        "tenant-uuid-1",
@@ -487,7 +530,6 @@ func TestSubmitRevisionForReview_RequiresRevisionTitleAfterFirstGovernedRevision
 		RevisionTitle:   "   ",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 1,
-		RevisionNumber:  1,
 	}
 
 	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
@@ -505,7 +547,8 @@ func TestSubmitRevisionForReview_ContentHashUsesGovernedRevisionNumber(t *testin
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
 
 	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
-	db, _ := newSubmitTestDBWithConn(t, true)
+	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 1 // deliberately != RevisionVersion (7) below
 	formData := map[string]any{"title": "My Doc"}
 
 	req := SubmitRequest{
@@ -518,7 +561,6 @@ func TestSubmitRevisionForReview_ContentHashUsesGovernedRevisionNumber(t *testin
 		ReasonForChange: "Content hash binding regression coverage",
 		ContentFormData: formData,
 		RevisionVersion: 7,
-		RevisionNumber:  1,
 	}
 
 	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
@@ -527,7 +569,7 @@ func TestSubmitRevisionForReview_ContentHashUsesGovernedRevisionNumber(t *testin
 	want, err := ComputeContentHash(ContentHashInput{
 		TenantID:       req.TenantID,
 		DocumentID:     req.DocumentID,
-		RevisionNumber: req.RevisionNumber,
+		RevisionNumber: conn.governedRevisionNumber,
 		FormData:       formData,
 	})
 	if err != nil {
@@ -546,7 +588,7 @@ func TestSubmitRevisionForReview_ContentHashUsesGovernedRevisionNumber(t *testin
 		t.Fatalf("ComputeContentHash stale version: %v", err)
 	}
 	if repo.lastInstance.ContentHashAtSubmit == staleVersionHash {
-		t.Fatalf("content hash must not bind to technical RevisionVersion when it differs from governed RevisionNumber")
+		t.Fatalf("content hash must not bind to technical RevisionVersion when it differs from governed revision_number")
 	}
 }
 
@@ -675,6 +717,7 @@ func TestSubmitPersistsReason(t *testing.T) {
 
 	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
 	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 1
 
 	req := SubmitRequest{
 		TenantID:        "tenant-uuid-1",
@@ -687,7 +730,6 @@ func TestSubmitPersistsReason(t *testing.T) {
 		ReasonCategory:  "corrective",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 3,
-		RevisionNumber:  1,
 	}
 
 	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
@@ -717,6 +759,7 @@ func TestSubmitPersistsReason_OptionalCategoryOmitted(t *testing.T) {
 
 	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
 	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 1
 
 	req := SubmitRequest{
 		TenantID:        "tenant-uuid-1",
@@ -728,7 +771,6 @@ func TestSubmitPersistsReason_OptionalCategoryOmitted(t *testing.T) {
 		ReasonForChange: "Administrative renumbering only",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 2,
-		RevisionNumber:  1,
 	}
 
 	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
@@ -751,7 +793,8 @@ func TestSubmitReasonOnAuditTrail(t *testing.T) {
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
 
 	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
-	db := newSubmitTestDB(t, true)
+	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 1
 
 	req := SubmitRequest{
 		TenantID:        "tenant-uuid-1",
@@ -764,7 +807,6 @@ func TestSubmitReasonOnAuditTrail(t *testing.T) {
 		ReasonCategory:  "regulatory",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 1,
-		RevisionNumber:  1,
 	}
 
 	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
@@ -799,7 +841,8 @@ func TestSubmitReasonRequiredRev1(t *testing.T) {
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
 
 	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
-	db := newSubmitTestDB(t, true)
+	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 1
 
 	req := SubmitRequest{
 		TenantID:        "tenant-uuid-1",
@@ -811,7 +854,6 @@ func TestSubmitReasonRequiredRev1(t *testing.T) {
 		ReasonForChange: "   ", // whitespace-only counts as empty
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 1,
-		RevisionNumber:  1,
 	}
 
 	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
@@ -842,7 +884,6 @@ func TestSubmitReasonOptionalAtRev0(t *testing.T) {
 		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 1,
-		RevisionNumber:  0,
 	}
 
 	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
@@ -850,6 +891,152 @@ func TestSubmitReasonOptionalAtRev0(t *testing.T) {
 	}
 	if conn.reasonForChange.Valid {
 		t.Fatalf("persisted reason_for_change = %+v, want SQL NULL at REV 0 with no reason supplied", conn.reasonForChange)
+	}
+}
+
+// TestSubmitReasonRequiredRev1_DerivedFromDocumentRow_NoClientRevisionNumber
+// proves the REV>=1 reason_for_change gate fires from the document row's OWN
+// governed revision_number — read in-tx via
+// ApprovalRepository.LoadGovernedRevisionNumber — even though the request
+// never supplies a client-controlled revision number (T8b root-cause fix:
+// SubmitRequest no longer has a RevisionNumber field at all; the prior bug let
+// every live HTTP submit default to 0 and silently skip this gate for
+// revision-of-published-document submits with a real revision_number >= 1).
+func TestSubmitReasonRequiredRev1_DerivedFromDocumentRow_NoClientRevisionNumber(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 1 // the document row is a revision of a published doc
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
+		RevisionTitle:   "Revisao sem motivo",
+		ReasonForChange: "", // omitted, as a real client payload would never carry revision_number
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 1,
+		// No RevisionNumber field: the value must come from the documents row.
+	}
+
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
+	if !errors.Is(err, ErrReasonForChangeRequired) {
+		t.Fatalf("error = %v, want ErrReasonForChangeRequired (gate must fire from the derived DB revision_number, not a client-supplied value)", err)
+	}
+	if len(emitter.Events) != 0 {
+		t.Errorf("no governance event should be emitted when reason_for_change is missing; got %d", len(emitter.Events))
+	}
+}
+
+// TestSubmitReasonOptionalAtRev0_DerivedFromDocumentRow proves REV 0
+// (documents.revision_number = 0, initial creation) still allows an empty
+// reason_for_change — no regression from deriving the value in-tx instead of
+// trusting a client-supplied field.
+func TestSubmitReasonOptionalAtRev0_DerivedFromDocumentRow(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 0
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 1,
+	}
+
+	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
+		t.Fatalf("SubmitRevisionForReview: unexpected error at derived REV 0: %v", err)
+	}
+	if conn.reasonForChange.Valid {
+		t.Fatalf("persisted reason_for_change = %+v, want SQL NULL at REV 0 with no reason supplied", conn.reasonForChange)
+	}
+}
+
+// TestSubmitRevisionTitleRequiredRev1_DerivedFromDocumentRow proves the
+// sibling REV>=1 revision_title gate also fires from the derived governed
+// revision_number (the latent gap T8b also closes).
+func TestSubmitRevisionTitleRequiredRev1_DerivedFromDocumentRow(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 1
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
+		RevisionTitle:   "   ", // whitespace-only counts as empty
+		ReasonForChange: "Some reason so only the title gate is exercised",
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 1,
+	}
+
+	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)
+	if !errors.Is(err, ErrRevisionTitleRequired) {
+		t.Fatalf("error = %v, want ErrRevisionTitleRequired", err)
+	}
+	if len(emitter.Events) != 0 {
+		t.Errorf("no governance event should be emitted when revision title is missing; got %d", len(emitter.Events))
+	}
+}
+
+// TestSubmitContentHash_UsesDerivedGovernedRevisionNumber proves the derived
+// revision_number reaches ContentHashInput.RevisionNumber (the full-correct
+// fix: one governed value feeds both the normalizers AND the content hash,
+// rather than the content hash silently continuing to hash with 0).
+func TestSubmitContentHash_UsesDerivedGovernedRevisionNumber(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db, conn := newSubmitTestDBWithConn(t, true)
+	conn.governedRevisionNumber = 5
+	formData := map[string]any{"title": "My Doc"}
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		IdempotencyKey:  "33333333-3333-3333-3333-333333333333",
+		RevisionTitle:   "Atualizacao",
+		ReasonForChange: "Content hash must bind to the DB-derived revision_number",
+		ContentFormData: formData,
+		RevisionVersion: 7,
+	}
+
+	if _, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req); err != nil {
+		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
+	}
+	want, err := ComputeContentHash(ContentHashInput{
+		TenantID:       req.TenantID,
+		DocumentID:     req.DocumentID,
+		RevisionNumber: 5, // conn.governedRevisionNumber, NOT req.RevisionVersion (7) NOR 0
+		FormData:       formData,
+	})
+	if err != nil {
+		t.Fatalf("ComputeContentHash: %v", err)
+	}
+	if repo.lastInstance.ContentHashAtSubmit != want {
+		t.Fatalf("content hash must bind to the derived governed revision_number (5): got %s want %s", repo.lastInstance.ContentHashAtSubmit, want)
 	}
 }
 
@@ -876,7 +1063,6 @@ func TestSubmitReasonCategoryInvalidRejected(t *testing.T) {
 		ReasonCategory:  "not_a_real_category",
 		ContentFormData: map[string]any{"title": "My Doc"},
 		RevisionVersion: 1,
-		RevisionNumber:  1,
 	}
 
 	_, err := svc.SubmitRevisionForReview(context.Background(), newTxRunner(db), req)

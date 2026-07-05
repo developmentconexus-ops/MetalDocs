@@ -80,6 +80,13 @@ type ApprovalRepository interface {
 	LoadCurrentPublishedHeadForDocument(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error)
 	LoadCurrentPublishedHead(ctx context.Context, tx db.Tx, tenantID, controlledDocumentID string) (string, error)
 	GetDocumentRevisionVersion(ctx context.Context, tx db.Tx, documentID, tenantID string) (int, error)
+	// LoadGovernedRevisionNumber reads the document's governed
+	// documents.revision_number inside the caller's transaction (tenant-scoped,
+	// GUC/RLS-correct). Added for T8b: SubmitRevisionForReview must derive this
+	// value from the row itself rather than trust a client-supplied
+	// SubmitRequest.RevisionNumber, which defaults to 0 on live traffic and
+	// silently defeats the REV>=1 reason_for_change/revision_title gates.
+	LoadGovernedRevisionNumber(ctx context.Context, tx db.Tx, tenantID, documentID string) (int, error)
 	ListRoutes(ctx context.Context, tenantID string) ([]Route, error)
 	ListRoutesTx(ctx context.Context, tx db.Tx, tenantID string) ([]Route, error)
 	MarkSuperseded(ctx context.Context, tx db.Tx, tenantID, documentID string) error
