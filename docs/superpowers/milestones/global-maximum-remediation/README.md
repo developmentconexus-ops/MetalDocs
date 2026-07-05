@@ -17,7 +17,7 @@ Convert every finding of the 2026-07-03 final architecture review (commit 778f49
 | 4 | `milestone-4-versioning-kernel` | Unified 9-status state machine; publish race proven safe + **live-green** (F4.5 closed the defer); concurrency idiom decided (ADR-split, operator-ratified) | **passed** (2026-07-04) | [PASS](milestone-4-versioning-kernel/qa/milestone-qa.md) |
 | 5 | `milestone-5-async-river-consolidation` | Janitors + staging outbox onto River; lease scheduler retired; outbox retention; fanout ordering; +F5.6 fanout queue-wiring fix, +F5.7 proof-gap closure, +F5.8 watchdog alert-only (ADR 0068) | **passed** (2026-07-04) — HS-7 H-PRE-1-LIVE erratum ratified at HS-1 | [PASS](milestone-5-async-river-consolidation/qa/milestone-qa.md) |
 | 6 | `milestone-6-eqms-review-reason` | Periodic review/expiry + structured reason-for-change (ISO 9001 §7.5.3 / Part 11) | validator PASS (run 2) — HS-1 pending | F6.1–F6.4; run-1 FAIL closed by HS-4 fix-feature F6.4 (surfacer §4 conform + marker consumer + due-core single-source + real-DB suite `--- PASS`) |
-| 7 | `milestone-7-tenant-lifecycle` | Tenant onboarding, export, erasure design (crypto-shredding ADR) | planned | — |
+| 7 | `milestone-7-tenant-lifecycle` | Tenant onboarding, export, erasure design (crypto-shredding ADR) + **F7.4 RLS-truth sweep** (carried from M6: flip CI role to NOSUPERUSER+NOBYPASSRLS so isolation tests stop being false-green; prod already safe) | planned | — |
 | 8 | `milestone-8-ops-readiness` | Dockerfiles, distributed rate limiter, metrics/trace-correlation/backup posture | planned | — |
 | 9 | `milestone-9-governance-hygiene` | ADR hygiene, REQ-ID traceability gate, test policy, CLAUDE.md/wiki truth, structure renames | planned | — |
 
