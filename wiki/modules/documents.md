@@ -228,6 +228,7 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 | POST | `/api/v1/documents/{id}/supersede` | â€” | `ApprovalHandler` | tier-2 |
 | POST | `/api/v1/documents/{id}/obsolete` | â€” | `ApprovalHandler` | tier-2 |
 | GET | `/api/v1/documents/{id}/approval-instance` | `getApprovalInstanceByDocument` | `ApprovalHandler` | role |
+| POST | `/api/v1/documents/{id}/review` | — | `ApprovalHandler.MarkReviewedHandler` (`approval/http/mark_reviewed_handler.go:28`) | tier-2 `document.review` (ADR 0069); mandatory `If-Match` (OCC) |
 | various | `/api/v1/approval-routes/*` | â€” | `ApprovalHandler` admin | role: admin |
 
 Spec gaps (missing `operationId`s on regulated paths) are enumerated in T-002 and `wiki/backlog/contract-first-followups.md`.
@@ -388,6 +389,7 @@ Source: `_artifacts/02-flow-finalizeDocument.md`. Full tripwire defense-in-depth
 | published | superseded | `POST .../supersede` | `document.supersede` | new revision created; old marked superseded |
 | published | obsolete | `POST .../obsolete` | `document.obsolete` | `documents.status='obsolete'` |
 | under_review | draft (rejected) | `POST .../signoff` reject | `document.signoff` | `approval_instances.status='rejected'`; `documents.status` rollback |
+| published | published (no transition) | `POST .../review` (mark-reviewed, ADR 0069) | `document.review` | Sets `last_reviewed_at` + next `review_due_at` (+ optional `effective_to`); OCC CAS bumps `revision_version`; not in `docsdomain.CanTransitionDocumentStatus` by design |
 
 ### Failure modes (current legacy envelope, T-001)
 
@@ -427,6 +429,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 - Typed capabilities: `internal/modules/documents/application/fillin_authz.go:9` consumes `iamdomain.Capability` consts. Module now uses typed namespace exclusively (T-008 closed).
 - Capability adapter: `internal/modules/documents/application/ports.go` declares `CapabilityChecker`; impl `capabilityServiceAdapter` at `apps/api/internal/wiring/documents.go:14`; `NewCapabilityChecker` factory at `:24` (ADR 0007 J2 amendment).
 - Postgres tripwire: `enforce_capability_asserted` function (`migrations/0142b_role_capabilities_v2_enforce.sql:67`), triggers on `approval_instances` (`:201`) and `approval_signoffs` (`:207`). Plan 5 tripwire extension attaches `trg_require_cap_asserted` to `public.documents` (INSERT `CapDocumentCreate`; UPDATE `CapDocumentEdit`) — present in curated baseline (`db/baseline/0001_current_schema.sql:3793`); the originating migration (`archive/migrations/0188_tripwire_extend.sql`) is archived and not replayed at startup. Documents-owned tx paths now seed `metaldocs.tenant_id` + `metaldocs.actor_id` through `iam/authz.SeedTxIdentity(...)` before `authz.Require(...)` appends `metaldocs.asserted_caps`. **T-003 closed.**
+- **`document.review` (ADR 0069, M6 F6.2):** new capability (`ScopeTenant`) gating the mark-reviewed workflow — `authz.Require(ctx, tx, string(iamdomain.CapDocumentReview), "tenant")` (`approval/application/mark_reviewed_service.go:101`). Held by `area_admin`/`qms_admin`; `system_admin` reaches it via tier-2 bypass. Registry size 34→35 (`iam/domain/model.go:89`).
 - Sentinel: `iamapp.ErrCapabilityDenied` imported at `handler.go:17`; `authz.ErrCapDenied` (struct) also imported (iam T-009 closed by Plan 4 â€” renamed from `authz.ErrCapabilityDenied`).
 
 ### 8.2 Error envelope
@@ -462,6 +465,18 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 - `ComputeValuesHash` sorts placeholder IDs and JSON-marshals every value; marshal failure is returned to `FreezeService` as `compute values_hash` instead of producing a silent hash over missing value bytes.
 - `document_placeholder_values` schema bug surfaced: `revision_id REFERENCES documents(id)` (T-009).
 
+### 8.7a Periodic review / expiry (ADR 0069, M6 F6.2)
+
+- **Model:** `public.documents` reuses the pre-existing `effective_from`/`effective_to` pair (effective date = publish date; expiry, previously unwritten, now wired) and adds two nullable columns: `review_due_at`, `last_reviewed_at` (migration `db/migrations/0274_document_review_and_reason.sql`). All expand-only; legacy rows keep NULL = no review cycle. DB CHECKs `ck_documents_effective_window` (`effective_to > effective_from`) and `ck_documents_review_due_sane` (`review_due_at >= effective_from`) are the enforced last line; `MarkReviewedService` mirrors both as friendly first-line checks (`ErrReviewDueBeforeEffective`, `ErrEffectiveToNotAfterEffectiveFrom`).
+- **Mark-reviewed workflow:** `POST /api/v1/documents/{id}/review` → `ApprovalHandler.MarkReviewedHandler` (`internal/modules/documents/approval/http/mark_reviewed_handler.go:28`) → `MarkReviewedService.MarkReviewed` (`internal/modules/documents/approval/application/mark_reviewed_service.go:92`). Tier-2 `authz.Require(document.review, "tenant")`, precondition `status='published'` (`ErrDocumentNotPublished`), OCC CAS UPDATE sets `last_reviewed_at`/`review_due_at`/optional `effective_to` and bumps `revision_version` (mirrors `SchedulePublish`); zero rows affected → `ErrMarkReviewedStaleRevision`. Emits `EventTypeDocumentReviewed` governance event in the same tx. **Not a status transition** — `docsdomain.CanTransitionDocumentStatus` has no `published→published` branch by design (published stays published).
+- **Tripwire arm widened:** the mark-reviewed UPDATE asserts only `document.review`, so the `documents/UPDATE` tripwire arm (`enforce_capability_asserted`) was additively widened to `{document.edit, document.obsolete, membership.manage, document.review}` (`db/migrations/0275_documents_update_tripwire_review_cap.sql`) — same defect class as the 0269/0270/0271 incidents (a mutating UPDATE asserting a cap absent from the arm fails closed `P0001` for every actor). Golden test / api-lint `TRIPWIRE-ARM-PARITY` advance from 0271 to 0275.
+- **Read surface:** `GetDocument` (`internal/modules/documents/repository/repository.go:297`) and `ListDocumentsPaginated` (`repository.go:535,545`) now SELECT `effective_from, effective_to, review_due_at, last_reviewed_at`; `domain.Document` carries all four; `DocumentSummary`/`DocumentDetailResponse` DTOs expose them. `GET /api/v1/documents?review_due=true` filters to published, currently-effective, `review_due_at <= now()` documents (`delivery/http/handler.go:428`, repository query at `repository.go:488-495`).
+- **Two published read/write ports** (documents-owned, consumed by `jobs`, never raw SQL on `public.documents` from the caller side):
+  - `ReviewDueReader.ListDueForReview(ctx, tx, now, limit)` — `internal/modules/documents/domain/review_due_port.go`; Postgres adapter `ReviewDueReaderPG` at `internal/modules/documents/repository/review_due_reader.go:46`. Tenant scoping via RLS only (caller must have seeded tx tenant identity).
+  - `ReviewSurfaceWriter.MarkSurfaced(ctx, tx, now)` — `internal/modules/documents/domain/review_surface_port.go`; adapter `ReviewSurfaceWriterPG` at `internal/modules/documents/repository/review_surface_writer.go:53`. Idempotent: sets `review_surfaced_at`, guarded by `review_surfaced_at IS NULL OR review_surfaced_at < review_due_at` (migration `db/migrations/0276_document_review_surfaced_marker.sql`) so a rerun in the same cycle is a no-op; advancing `review_due_at` (mark-reviewed) re-arms the next cycle.
+  - Both consumed by the River periodic surfacer in the `jobs` module — see [`jobs.md`](jobs.md) §River job: document-review-surfacer.
+- ADR: [`wiki/decisions/0069-document-periodic-review-and-reason-for-change.md`](../decisions/0069-document-periodic-review-and-reason-for-change.md).
+
 ### 8.8 Artifact metadata
 - Technical DOCX revisions in `document_revisions` carry `file_size_bytes`, `page_count`, and `page_count_source`. `file_size_bytes` is server-authoritative for the saved object; `page_count` is currently supplied by EigenPal through `MetalDocsEditorRef.getPageCount()`; `page_count_source='eigenpal_client'` marks that provenance.
 - `GET /api/v1/documents/{id}` exposes governed `revision_number` so frontend submission gates use business revision truth instead of technical `revision_version`. It also surfaces current-head artifact metadata via `current_revision_file_size_bytes`, `current_revision_page_count`, and `current_revision_page_count_source`.
@@ -486,6 +501,13 @@ Key files:
 Documents were already manually versioned (publish transitions status only; a new revision is a deliberate user action). ADR 0052 restored the same semantic for templates, making the shared shell possible with zero `kind` branching. See `wiki/architecture/frontend-structure.md` Section 17 for the four hard rules that govern the shell layer.
 
 
+### 8.9a Structured reason-for-change (ADR 0069, M6 F6.3)
+
+- `SubmitRequest` gains `ReasonForChange`/`ReasonCategory` (`internal/modules/documents/approval/application/submit_service.go:39-40`) — a distinct structured 21 CFR Part 11 change-reason field, separate from the free-text `revision_title`. Wire contract: `contracts.SubmitRequest.ReasonForChange`/`ReasonCategory` (`approval/http/contracts/submit.go:25-26`), both `*string` (optional at REV0).
+- Revision number is derived in-tx via `LoadGovernedRevisionNumber` (`approval/repository/approval_repository.go:89`, called from `submit_service.go:98`) — `normalizeReasonForChange(revisionNumber, reason, category)` (`submit_service.go:321`) requires a non-empty `reason_for_change` for REV≥1 (`ErrReasonForChangeRequired`, 422 `validation.reason_for_change_required`) and validates `reason_category` against the fixed enum `content|corrective|regulatory|periodic_review|administrative` (`ErrReasonCategoryInvalid`, 422 `validation.reason_category_invalid`) — mirrors DB CHECK `ck_documents_reason_category` (migration 0274).
+- Persisted on `public.documents.reason_for_change`/`reason_category` in the submit tx; carried into the `approval_submitted` governance-event payload (no new inline network call, no separate audit write).
+- Nullable in DB for legacy rows; no backfill (intent on legacy rows cannot be reconstructed).
+
 ## 9. Architecture Decisions
 
 | Decision | Link / Status |
@@ -503,6 +525,7 @@ Documents were already manually versioned (publish transitions status only; a ne
 | `document_placeholder_values.revision_id` FK target | `tech-debt: missing-ADR` (T-009) |
 | Cross-module display-name read via iam-owned `UserDisplayNameReader` port (consumer: documents/approval; direct `iam_users.display_name` reads removed — M4/F4.1) | [`wiki/decisions/0029-user-display-name-reader-port.md`](../decisions/0029-user-display-name-reader-port.md) |
 | Documents + templates render through shared controlled-artifact view layer; cancel flow uses `CancelInstanceDialog`; `resolveOwnerDisplay` + `mapApprovalChain` shared; parity with template manual versioning | [`wiki/decisions/0053-shared-controlled-artifact-view-layer.md`](../decisions/0053-shared-controlled-artifact-view-layer.md) (see also ADR 0052) |
+| eQMS periodic review/expiry (`document.review` cap + mark-reviewed workflow) + structured reason-for-change on submit | [`wiki/decisions/0069-document-periodic-review-and-reason-for-change.md`](../decisions/0069-document-periodic-review-and-reason-for-change.md) |
 
 ---
 
@@ -553,6 +576,9 @@ Top 3 (by severity, then blast radius):
 | Tripwire | Postgres trigger `enforce_capability_asserted` reading `metaldocs.asserted_caps` GUC |
 | `SeedTxIdentity` | Shared IAM authz helper that seeds transaction-local `metaldocs.tenant_id` and `metaldocs.actor_id` before `authz.Require` appends asserted capabilities |
 | `document.submit` | Tier-2 capability string asserted at `submit_service.go:85`; renamed from `doc.submit` in Plan 4 (migration 0186) |
+| `document.review` | Tier-2 capability string (ADR 0069, `ScopeTenant`) asserted at `mark_reviewed_service.go:101`; gates the mark-reviewed workflow, distinct from `document.edit`/`document.publish` |
+| Mark-reviewed | Recording a periodic-review completion on a published document (`last_reviewed_at`+next `review_due_at`); NOT a status transition |
+| Review-due | A published, currently-effective document whose `review_due_at <= now()`; surfaced via `GET /documents?review_due=true` and the `document_review_surfacer` River job |
 
 ---
 
@@ -575,7 +601,7 @@ Top 3 (by severity, then blast radius):
 
 ## Cross-links
 
-- Related ADRs: `wiki/decisions/0001-eigenpal-adoption.md`, `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0011-cd-atomic-create.md`, `wiki/decisions/0012-contract-first-api.md`, `wiki/decisions/0052-template-manual-versioning.md`, `wiki/decisions/0053-shared-controlled-artifact-view-layer.md`
+- Related ADRs: `wiki/decisions/0001-eigenpal-adoption.md`, `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0011-cd-atomic-create.md`, `wiki/decisions/0012-contract-first-api.md`, `wiki/decisions/0052-template-manual-versioning.md`, `wiki/decisions/0053-shared-controlled-artifact-view-layer.md`, `wiki/decisions/0069-document-periodic-review-and-reason-for-change.md`
 - Related concepts: `wiki/concepts/placeholders.md`, `wiki/concepts/token-syntax.md`
 - Upstream template publisher: [`wiki/modules/templates.md`](templates.md) â€” publishes the `template_version` rows (with `placeholder_schema`) that documents instantiates from; `documents` snapshots `placeholder_schema` at create time (Â§8.7 of that doc)
 - Frontend counterpart: `frontend/apps/web/src/features/documents/` â€” Library, Wizard, Editor, Published view (see `wiki/architecture/frontend-structure.md`)
@@ -586,12 +612,14 @@ Top 3 (by severity, then blast radius):
 - Auth cross-ref: [`wiki/modules/auth.md Â§8.8`](auth.md) â€” `authdomain.CurrentUserFromContext` is the IN-edge this module reads after middleware injection; Â§8.1 of auth.md covers the middleware that sets the context value
 - See also: [`modules/audit.md`](audit.md) â€” documents emits audit events via `documentsAuditAdapter` (`main.go:477-492`); T-005 (rename outside tx) and T-007 (latent consumer port) are the open gaps in the consumer-side register
 - See also: [`modules/controlled-documents.md`](controlled-documents.md) â€” controlled-documents owns the CD identity (`controlled_documents`); documents exposes the `CreateDocumentTx` port that controlled-documents calls inside the atomic create transaction (ADR 0011)
+- See also: [`modules/jobs.md`](jobs.md) â€” the River `document_review_surfacer` periodic job (M6 F6.2) consumes the `ReviewDueReader`/`ReviewSurfaceWriter` ports published here; documents holds zero knowledge of River, jobs holds zero raw SQL on `public.documents`
 - See also: [`modules/taxonomy.md`](taxonomy.md) â€” documents reads `process_areas.name` live at document-create time for the `area_name_snapshot` column (`repository.go:94-101`); taxonomy Â§8.9 documents this cross-module data contract
 
 - Research artifacts: `wiki/modules/documents/_artifacts/00-context.md` â€¦ `06-selfreview.md`
 
 ## Changelog (this doc)
 
+- 2026-07-04 - M6 (ADR 0069): eQMS periodic review/expiry + structured reason-for-change. New capability `document.review` (ScopeTenant, registry 34->35) gates a mark-reviewed workflow (`POST /documents/{id}/review`) that sets `last_reviewed_at`+next `review_due_at` (+optional `effective_to`) without a status transition (OCC CAS bump on `revision_version`). `public.documents` gained `review_due_at`/`last_reviewed_at`/`reason_for_change`/`reason_category`/`review_surfaced_at` (migrations 0274/0275/0276), reusing the existing `effective_from`/`effective_to` pair; the `documents/UPDATE` tripwire arm widened to include `document.review`. New published ports `ReviewDueReader`/`ReviewSurfaceWriter` let the `jobs` module's River periodic surfacer find/mark review-due documents. `GET /documents` gained `review_due=true` filter; `GetDocument`/`ListDocumentsPaginated` now select the four new fields. Submit-for-review now requires structured `reason_for_change`(+optional `reason_category`) for REV>=1, derived revision number via `LoadGovernedRevisionNumber`.
 - 2026-06-30 - ADR 0052 + ADR 0053: documents now render through the shared controlled-artifact view layer (`ArtifactDetailView` shell + `ArtifactApprovalScreen`); per-kind adapters `useDocumentArtifact` + `useDocumentApprovalArtifact` compose `ArtifactViewModel`; `SignoffDetailPage` is the thin route wrapper and owns `CancelInstanceDialog` (replaces `window.prompt` cancel). `resolveOwnerDisplay` extracted to `features/shared/controlled-artifact/resolveOwnerDisplay.ts`; `mapApprovalChain` canonically in `features/documents/lib/approvalWorkflow.ts`, shared by both document adapters. Documents were already manually versioned; ADR 0052 restores the same semantic for templates so the shared shell has zero `kind` branching.
 - 2026-05-25 - PDF webhook tenant hardening sync: `POST /api/v1/documents/{id}/pdf-complete` now resolves canonical tenant from `documents.id` and rejects mismatched body `tenant_id` before persisting PDF metadata.
 - 2026-05-25 - Finalize C1/C2 hardening sync: `finalizeDocument` now treats `sql.ErrNoRows` from the `document_revisions` content-hash lookup as an allowed empty hash but fails closed with `500 internal_error` on real DB errors; duplicate document 500 paths no longer echo `err.Error()` in HTTP responses and now log server-side details only.

@@ -1,16 +1,16 @@
 # Module: jobs
 
-> **Last verified:** 2026-06-11 (Wave 1)
+> **Last verified:** 2026-07-04 (M6 F6.2 — ADR 0069: added the `document_review_surfacer` River periodic job, hourly, `maintenance` queue, `RunOnStart:false`; consumes the documents-owned `ReviewDueReader`/`ReviewSurfaceWriter` ports, zero raw SQL on `public.documents`) | prior: 2026-07-04 (ADR 0067/0068 — River is the single async primitive; 3 janitors + lease scheduler retired; watchdog is alert-only. NOTE: this doc's body below still narrates the pre-ADR-0067 lease-scheduler architecture and has not yet been fully rewritten to the post-ADR-0067 shape — treat the River periodic-job facts as current and the Scheduler/lease-reaper narrative as historical pending a full rewrite) | prior: 2026-06-11 (Wave 1)
 > **Status:** active
 > **Maturity:** L0 — Stage-1 audit draft — not yet promoted via metaldocs-module-doc
-> **Scope:** The `internal/modules/jobs` module — the in-API Scheduler, its four maintenance jobs (stuck-instance watchdog, idempotency janitor, audit-integrity validator, lease reaper), and the lightweight document sweepers under `internal/modules/documents/jobs`. The River-based `ScheduledPublishWorker` under `internal/modules/documents/approval/jobs` is included because it is the sole job consumed by the `apps/jobs` binary.
+> **Scope:** The `internal/modules/jobs` module — the in-API Scheduler, its four maintenance jobs (stuck-instance watchdog, idempotency janitor, audit-integrity validator, lease reaper), the lightweight document sweepers under `internal/modules/documents/jobs`, and the River periodic jobs registered in `internal/modules/jobs/maintenance`. The River-based `ScheduledPublishWorker` under `internal/modules/documents/approval/jobs` is included because it is a job consumed by the `apps/jobs` binary; the M6 `document_review_surfacer` (`internal/modules/jobs/document_review_surfacer`) is included as the newest River periodic job on the same `maintenance` queue.
 > **Out of scope:** The platform packages that underpin async execution (`internal/platform/worker`, `internal/platform/messaging`, `internal/platform/jobs/river`) — those are documented in [../backend/platform/async-messaging.md](../backend/platform/async-messaging.md). The worker binary itself — [../backend/binaries/worker.md](../backend/binaries/worker.md). The jobs binary — [../backend/binaries/jobs.md](../backend/binaries/jobs.md).
 > **Key files:**
-> - `internal/modules/jobs/scheduler/scheduler.go` — distributed lease scheduler
-> - `internal/modules/jobs/scheduler/lease_reaper.go` — lease-reclaim job
-> - `internal/modules/jobs/stuck_instance_watchdog/job.go`
+> - `internal/modules/jobs/stuck_instance_watchdog/job.go` — now a River `WorkerDefaults` job (ADR 0067); the old `internal/modules/jobs/scheduler` lease-scheduler package and `lease_reaper.go` cited in earlier verifications of this doc no longer exist in the tree — retired by ADR 0067 (M5 F5.1), superseded by River periodic jobs. §Scheduler/§Registered maintenance jobs below still narrate the pre-0067 architecture (Known gap, not yet rewritten).
 > - `internal/modules/jobs/idempotency_janitor/job.go`
 > - `internal/modules/jobs/audit_integrity_validator/job.go`
+> - `internal/modules/jobs/maintenance/periodic.go` — shared River `PeriodicJobs()` definitions (4 jobs, `maintenance` queue), consumed by both `metaldocs-api` and `metaldocs-jobs`
+> - `internal/modules/jobs/document_review_surfacer/job.go` — M6 F6.2 review-due surfacer (ADR 0069)
 > - `internal/modules/documents/jobs/session_sweeper.go`
 > - `internal/modules/documents/jobs/orphan_pending_sweeper.go`
 > - `internal/modules/documents/approval/jobs/scheduled_publish_job.go`
@@ -19,6 +19,8 @@
 ---
 
 ## Approach
+
+> **Drift notice (2026-07-04):** The narrative below (Scheduler / lease-based leader election) describes the pre-ADR-0067 architecture. As of ADR 0067 (M5 F5.1, 2026-07-04) the custom `internal/modules/jobs/scheduler` lease scheduler and `lease_reaper.go` were **deleted** — all four maintenance jobs (stuck-instance watchdog, idempotency janitor, audit-integrity validator, and now the M6 `document_review_surfacer`) are River periodic jobs registered via `internal/modules/jobs/maintenance.PeriodicJobs()` and run on the `maintenance` queue, leader-elected by River itself. This section is retained as historical context pending a full Arc42 rewrite of this L0 doc; treat statements about `Scheduler`/`JobConfig`/lease TTL as **superseded**, and the River job facts in this doc's other sections (River job: scheduled-publish cutover, River job: document-review-surfacer) as current truth.
 
 The `jobs` module provides three distinct async execution mechanisms:
 
@@ -134,6 +136,28 @@ River fires `ScheduledPublishWorker.Work` at `ScheduledAt`. Work calls `service.
 
 ---
 
+## River job: document-review-surfacer (M6 F6.2, ADR 0069)
+
+`internal/modules/jobs/document_review_surfacer/job.go`
+
+Periodic eQMS review/expiry surfacer. Registered as a River periodic job (not the custom lease scheduler) — `PeriodicInterval(time.Hour)`, `PeriodicJobOpts{ID: "document-review-surfacer", RunOnStart: false}`, queue `"maintenance"` (`internal/modules/jobs/maintenance/periodic.go:52-58`). Definitions are shared between `metaldocs-api` (which enqueues via its own elected leader's periodic scheduler) and `metaldocs-jobs` (which registers the `Workers` and actually executes) — only `metaldocs-jobs` subscribes the `maintenance` queue.
+
+### Types
+
+- `DocumentReviewSurfacerArgs` (`job.go:32`): empty River job args struct. `Kind()` returns `"document_review_surfacer"`.
+- `DocumentReviewSurfacerWorker` (`job.go:42`): River `WorkerDefaults[DocumentReviewSurfacerArgs]`. Cluster-wide single-runner comes from River's leader-elected periodic insert + queue dequeue semantics — no advisory lock (mirrors `stuck_instance_watchdog` post-ADR-0067, ADR 0067 §H-PRE-1).
+- `NewWorker(database, reader, writer)` (`job.go:51`) wires the documents-owned `ReviewDueReader`/`ReviewSurfaceWriter` ports (see [`documents.md`](documents.md) §8.7a) — this package holds **zero raw SQL** against `public.documents`.
+
+### Execution (`Work` → `run`, `job.go:61-117`)
+
+1. `authz.WithBackgroundBypass(ctx)` — no HTTP-request identity exists for a periodic job.
+2. Opens a tx, calls `authz.BypassSystem(ctx, tx)` (scheduler bypass token, satisfies the `documents/UPDATE` tripwire for the write step).
+3. `reader.ListDueForReview(ctx, tx, now, BatchSize=100)` — read-port call, for the observability count only.
+4. `writer.MarkSurfaced(ctx, tx, now)` — write-port call, the idempotent side effect (sets `review_surfaced_at`; a rerun in the same review cycle is a no-op).
+5. Commits; logs `due_count`/`surfaced_count`.
+
+**Cross-tenant scope by design:** the tx runs under the scheduler bypass with no tenant GUC seeded — `public.documents`' RLS `tenant_isolation` policy treats an unset `metaldocs.tenant_id` GUC as "all tenants" (mirrors `stuck_instance_watchdog.listStuckInstances`), so one tx sweeps every tenant's due documents per tick. This is deliberate: there is one idempotent marker write per due document per cycle and no per-tenant side effect requiring isolation (contrast `stuck_instance_watchdog`'s per-instance governance-event emission, which does iterate).
+
 ## Public surface
 
 | Export | Package | Consumers |
@@ -144,6 +168,8 @@ River fires `ScheduledPublishWorker.Work` at `ScheduledAt`. Work calls `service.
 | `New` (watchdog), `JobName` | `modules/jobs/stuck_instance_watchdog` | `apps/api/cmd/metaldocs-api/main.go` |
 | `StartSessionSweeper`, `StartOrphanPendingSweeper` | `modules/documents/jobs` | `apps/api/cmd/metaldocs-api/main.go` |
 | `NewWorkers`, `NewScheduledPublishEnqueuer`, `ScheduledPublishArgs`, `ScheduledPublishWorker`, `RiverScheduledPublishEnqueuer` | `modules/documents/approval/jobs` | `apps/jobs/main.go` (execution), `apps/api/cmd/metaldocs-api/main.go` (enqueue) |
+| `NewWorker`, `DocumentReviewSurfacerArgs`, `DocumentReviewSurfacerWorker`, `JobName`, `BatchSize` | `modules/jobs/document_review_surfacer` | `apps/jobs/cmd/metaldocs-jobs/main.go:67` (registration) |
+| `PeriodicJobs` | `modules/jobs/maintenance` | `apps/jobs/cmd/metaldocs-jobs/main.go`, `apps/api/cmd/metaldocs-api/main.go` (shared periodic-job definitions across both binaries) |
 
 HTTP routes: none. The jobs module exposes no HTTP surface.
 
@@ -159,6 +185,7 @@ HTTP routes: none. The jobs module exposes no HTTP surface.
 | `metaldocs.audit_events` | (outside this module) | `audit_integrity_validator` (read-only) | — |
 | `approval_instances` | Approval module | `stuck_instance_watchdog` (read + cancel) | — |
 | `documents` | Approval module | `scheduled_publish_job.go` (UPDATE status) | Via `approval/application/scheduler_service.go` |
+| `documents` (`review_due_at`, `last_reviewed_at`, `review_surfaced_at`) | Documents module (mark-reviewed) | `document_review_surfacer` (read via `ReviewDueReader`, write via `ReviewSurfaceWriter` — never raw SQL from this module) | ADR 0069, migrations 0274/0276 |
 | River schema tables | `MigrateRiverSchema` at startup | River client | Schema location determined by `METALDOCS_JOBS_RIVER_SCHEMA` |
 
 ---
@@ -195,7 +222,9 @@ HTTP routes: none. The jobs module exposes no HTTP surface.
 - [../backend/flows/async-job-pipeline.md](../backend/flows/async-job-pipeline.md) — end-to-end async flows with Mermaid diagrams
 - [../backend/platform/async-messaging.md](../backend/platform/async-messaging.md) — messaging platform packages
 - [./approval.md](./approval.md) — approval module (owns `ScheduledPublishWorker`)
-- [../decisions/](../decisions/) — ADR 0015 (async DOCX materialization)
+- [./documents.md](documents.md) §8.7a — owns the `ReviewDueReader`/`ReviewSurfaceWriter` ports consumed by `document_review_surfacer`
+- [../decisions/0069-document-periodic-review-and-reason-for-change.md](../decisions/0069-document-periodic-review-and-reason-for-change.md) — ADR 0069 (M6 eQMS periodic review)
+- [../decisions/](../decisions/) — ADR 0015 (async DOCX materialization), ADR 0067 (River consolidation), ADR 0068 (watchdog alert-only)
 
 ---
 
