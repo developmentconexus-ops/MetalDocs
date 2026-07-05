@@ -279,6 +279,15 @@ func (rt *Router) UnlockUser(w http.ResponseWriter, r *http.Request, _ string) {
 	rt.people.handleUnlock(w, r)
 }
 
+// OnboardTenant: F7.2 Task B stub. POST /tenants was just added to the spec
+// (contract-first) and codegen now requires this method to satisfy
+// iamapi.ServerInterface, but the tenant-onboarding service/handler is Task
+// C's scope. Minimal 501 stub only, following the same pattern as
+// CreateManagedUser above — Task C replaces this with the real delegation.
+func (rt *Router) OnboardTenant(w http.ResponseWriter, r *http.Request) {
+	writeIAMNotImplemented(w, "onboardTenant is not yet implemented")
+}
+
 func writeIAMNotImplemented(w http.ResponseWriter, detail string) {
 	if err := problem.Write(w, problem.New(http.StatusNotImplemented, problem.CodeNotImplemented, detail)); err != nil {
 		panic(err) // writer failure is unrecoverable here; surfaces as a panic caught by platform/middleware.Recovery

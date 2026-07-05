@@ -80,6 +80,9 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	// Token dictionary (SP-1) — tenant-wide, not area-scoped.
 	CapTokenView:             ScopeTenant,
 	CapTokenDictionaryManage: ScopeTenant,
+	// tenant.onboard (M7 F7.2) — tenant-wide provisioning action, no area
+	// exists yet for a tenant being created. Tier-2 passes the "tenant" sentinel.
+	CapTenantOnboard: ScopeTenant,
 }
 
 // ScopeOf returns the declared scope of a capability and whether it is

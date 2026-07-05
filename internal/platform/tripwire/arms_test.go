@@ -25,7 +25,9 @@ func TestTripwireArms_CapsAreRegistryReal(t *testing.T) {
 
 // TestTripwireArms_MatchesContractTable pins the 18-entry table in M2
 // validation-contract.md §1.2 exactly, as extended by M6 validation-contract.md
-// §3 (documents/UPDATE additionally gains document.review). Divergence is HS-7.
+// §3 (documents/UPDATE additionally gains document.review) and M7
+// validation-contract.md §5 (F7.2, ADR 0070: +1 tenants/INSERT arm gated on
+// tenant.onboard — 19 entries). Divergence is HS-7.
 func TestTripwireArms_MatchesContractTable(t *testing.T) {
 	type key struct {
 		table string
@@ -57,6 +59,9 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 		{"iam_groups", OpAny}:        {iamdomain.CapUserManage},
 		{"iam_group_members", OpAny}: {iamdomain.CapUserManage},
 		{"iam_group_roles", OpAny}:   {iamdomain.CapUserManage},
+		// M7 F7.2 (ADR 0070, M7 validation-contract.md §5 touchpoint 6):
+		// onboarding INSERTs metaldocs.tenants under tenant.onboard.
+		{"tenants", OpInsert}: {iamdomain.CapTenantOnboard},
 	}
 
 	if len(TripwireArms) != len(want) {
@@ -95,15 +100,16 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 
 // TestRenderMigration_MatchesCommittedFile is the golden test: RenderMigration()
 // must byte-equal the latest committed tripwire migration. M2 pinned 0271; M6
-// F6.2 re-renders it to db/migrations/0275_*.sql (documents/UPDATE gains
-// document.review), so the golden target advances with the latest rendered
-// migration (M6 validation-contract.md §3, M2 §1.4/§1.5.a).
+// F6.2 re-rendered it to 0275; M7 F7.2 re-renders it to
+// db/migrations/0277_*.sql (adds the tenants/INSERT arm + one-time attachment,
+// ADR 0070), so the golden target advances with the latest rendered migration
+// (M7 validation-contract.md §5, M6 §3, M2 §1.4/§1.5.a).
 func TestRenderMigration_MatchesCommittedFile(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		t.Fatalf("locate repo root: %v", err)
 	}
-	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0275_documents_update_tripwire_review_cap.sql")
+	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0277_tenants_insert_tripwire_onboard_cap.sql")
 
 	committed, err := os.ReadFile(migrationPath)
 	if err != nil {

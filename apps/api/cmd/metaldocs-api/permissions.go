@@ -98,6 +98,10 @@ var routeRules = []routeRule{
 	// Search.
 	{method: http.MethodGet, pathExact: "/api/v1/search/documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
+	// Tenant onboarding (M7 F7.2): provisioning a new tenant is a tenant-wide
+	// operator action, gated on tenant.onboard — never a role check (ADR 0022).
+	{method: http.MethodPost, pathExact: "/api/v1/tenants", capability: iamdomain.CapTenantOnboard, visibility: iamdelivery.VisibilityPermissionGuarded},
+
 	// IAM users. F-001 split: GET view, writes manage.
 	{method: http.MethodGet, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},

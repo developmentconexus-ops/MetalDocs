@@ -1,6 +1,7 @@
 // Command gen-tripwire writes the machine-generated tripwire migration SQL
 // (internal/platform/tripwire.RenderMigration()) to the latest canonical
-// migration path (0275 as of M6 F6.2, documents/UPDATE gains document.review).
+// migration path (0277 as of M7 F7.2, tenants/INSERT arm gated on
+// tenant.onboard, ADR 0070).
 //
 // Usage: go run ./cmd/gen-tripwire [output-path]
 // With no argument, writes to the canonical path relative to the repo root
@@ -15,7 +16,7 @@ import (
 	"metaldocs/internal/platform/tripwire"
 )
 
-const defaultRelPath = "db/migrations/0275_documents_update_tripwire_review_cap.sql"
+const defaultRelPath = "db/migrations/0277_tenants_insert_tripwire_onboard_cap.sql"
 
 func main() {
 	out := defaultRelPath

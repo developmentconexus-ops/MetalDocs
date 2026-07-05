@@ -243,6 +243,34 @@ paths:
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /tenants:
+    post:
+      summary: Provisiona novo tenant com usuario administrador inicial
+      tags: [iam]
+      operationId: onboardTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardTenantRequest'
+      responses:
+        '201':
+          description: Tenant provisionado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardTenantResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /iam/users/{user_id}:
     patch:
       summary: Atomic metadata + tenant role update (single tx)
@@ -4892,6 +4920,38 @@ components:
       required: [user_id]
       properties:
         user_id:
+          type: string
+    OnboardTenantRequest:
+      type: object
+      required: [name, slug, admin_user_id, admin_display_name, admin_password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Nome de exibicao do tenant
+        slug:
+          type: string
+          minLength: 1
+          pattern: '^[a-z0-9-]+$'
+          description: Slug unico, URL-safe, do tenant
+        admin_user_id:
+          type: string
+          minLength: 1
+          description: Identificador do usuario administrador inicial
+        admin_display_name:
+          type: string
+          minLength: 1
+        admin_password:
+          type: string
+          minLength: 1
+    OnboardTenantResponse:
+      type: object
+      required: [tenant_id, admin_user_id]
+      properties:
+        tenant_id:
+          type: string
+          format: uuid
+        admin_user_id:
           type: string
     UpdateManagedUserRequest:
       type: object

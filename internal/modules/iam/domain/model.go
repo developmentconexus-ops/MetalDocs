@@ -120,6 +120,12 @@ const (
 	// Token dictionary (SP-1). Both ScopeTenant — tenant-wide, not area-scoped.
 	CapTokenView             Capability = "token.view"
 	CapTokenDictionaryManage Capability = "token_dictionary.manage"
+
+	// CapTenantOnboard gates provisioning a new tenant (M7 F7.2): a tenant-wide,
+	// operator-grade action performed before any area/membership exists for the
+	// tenant being created. Tenant-grade; enforced tier-2 in-tx via
+	// authz.Require and backstopped by the tenants/INSERT DB tripwire arm.
+	CapTenantOnboard Capability = "tenant.onboard"
 )
 
 // ADR 0022 Phase 10 (F2) — the four caps Phase 8 minted (doc.edit_draft,
@@ -166,6 +172,7 @@ var validCapabilities = map[Capability]struct{}{
 	CapNotificationRead:            {},
 	CapTokenView:                   {},
 	CapTokenDictionaryManage:       {},
+	CapTenantOnboard:               {},
 }
 
 // IsValidCapability reports whether cap is one of the registered constants in

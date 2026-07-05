@@ -7,8 +7,8 @@ package main
 //
 // TRIPWIRE-ARM-PARITY (a) binds internal/platform/tripwire.TripwireArms to the
 // registry (every cap real) and to the generated migration (RenderMigration()
-// byte-equal to the latest committed tripwire migration, db/migrations/0275_*.sql
-// as of M6 F6.2) — a Go map / registry / generated-SQL three-way drift catcher.
+// byte-equal to the latest committed tripwire migration, db/migrations/0277_*.sql
+// as of M7 F7.2) — a Go map / registry / generated-SQL three-way drift catcher.
 //
 // TRIPWIRE-ARM-DRIFT (b) is the function-local generalization of
 // checkTripwirePairing (code_rules.go): pairing checks *presence* of
@@ -37,9 +37,10 @@ import (
 
 // tripwireMigrationPath is the committed golden file TRIPWIRE-ARM-PARITY
 // compares tripwire.RenderMigration() against. Advances with the latest
-// rendered tripwire migration: M2 pinned 0271; M6 F6.2 re-renders it to 0275
-// (documents/UPDATE gains document.review).
-const tripwireMigrationPath = "db/migrations/0275_documents_update_tripwire_review_cap.sql"
+// rendered tripwire migration: M2 pinned 0271; M6 F6.2 re-rendered it to 0275
+// (documents/UPDATE gains document.review); M7 F7.2 re-renders it to 0277
+// (tenants/INSERT arm gated on tenant.onboard + attachment, ADR 0070).
+const tripwireMigrationPath = "db/migrations/0277_tenants_insert_tripwire_onboard_cap.sql"
 
 // gatedTableSet returns the set of table names present in TripwireArms — the
 // tables TRIPWIRE-ARM-DRIFT restricts its attention to (contract §1.5.b: "only

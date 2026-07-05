@@ -40,15 +40,18 @@ type Arm struct {
 // TripwireArms is the binding source of truth for every gated (table, op)
 // pair enforced by public.enforce_capability_asserted(). Order is stable and
 // mirrors the CASE-branch order in db/migrations/0270_*.sql exactly. The latest
-// rendered migration is db/migrations/0275_*.sql; entry #6 (documents/UPDATE)
+// rendered migration is db/migrations/0277_*.sql; entry #6 (documents/UPDATE)
 // has grown additively across two milestones: 0271 (M2) added document.obsolete
 // + membership.manage per M2 validation-contract.md §1.1/§1.2; 0275 (M6 F6.2)
-// added document.review per M6 validation-contract.md §3 — the intended
-// registry-driven growth path, not drift.
+// added document.review per M6 validation-contract.md §3; 0277 (M7 F7.2, ADR
+// 0070) added entry #19 (tenants/INSERT gated on tenant.onboard) per M7
+// validation-contract.md §5 touchpoint 6 — the intended registry-driven growth
+// path, not drift.
 //
 // Content MUST equal M2 validation-contract.md §1.2 (18 gated entries) as
 // extended by M6 validation-contract.md §3 (documents/UPDATE gains
-// document.review). Any other deviation is HS-7 (see those binding clauses).
+// document.review) and M7 validation-contract.md §5 (tenants/INSERT arm, 19
+// entries). Any other deviation is HS-7 (see those binding clauses).
 var TripwireArms = []Arm{
 	{ // 1
 		Table: "approval_instances",
@@ -176,5 +179,13 @@ var TripwireArms = []Arm{
 		Table: "iam_group_roles",
 		Op:    OpAny,
 		Caps:  []iamdomain.Capability{iamdomain.CapUserManage},
+	},
+	{ // 19 — M7 F7.2 (ADR 0070): tenant onboarding INSERTs metaldocs.tenants
+		// under tenant.onboard. tenants has no tenant_id column — NEW.id IS the
+		// tenant id (the row being provisioned is the tenant itself). INSERT-only:
+		// no update/offboard mutation surface exists yet (F7.3+ owns lifecycle).
+		Table: "tenants",
+		Op:    OpInsert,
+		Caps:  []iamdomain.Capability{iamdomain.CapTenantOnboard},
 	},
 }

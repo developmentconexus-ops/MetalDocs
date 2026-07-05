@@ -140,6 +140,7 @@ var capabilityDescriptions = map[Capability]string{
 	CapNotificationRead:            "Visualizar as próprias notificações",
 	CapTokenView:                   "Visualizar dicionário de tokens do tenant",
 	CapTokenDictionaryManage:       "Gerenciar entradas do dicionário de tokens do tenant",
+	CapTenantOnboard:               "Provisionar e integrar um novo tenant",
 }
 
 // CapabilityCatalog returns one CapabilityDescriptor per Capability const,

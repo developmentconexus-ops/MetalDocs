@@ -5,13 +5,15 @@ import (
 	"strings"
 )
 
-// RenderMigration renders the full 0275 forward-only migration SQL,
-// regenerated from the prior tripwire migration (0271) with every CASE branch
-// preserved byte-for-byte except the documents/UPDATE arm, whose v_required_caps
-// literal is produced from TripwireArms in the same order as M2
-// validation-contract.md §1.2 as extended by M6 §3 (gains document.review).
-// Determinism: TripwireArms is a fixed slice, so this returns identical output
-// every call.
+// RenderMigration renders the full 0277 forward-only migration SQL,
+// regenerated from the prior tripwire migration (0275) with every CASE branch
+// preserved byte-for-byte plus one new branch — tenants/INSERT (M7 F7.2, ADR
+// 0070) — whose v_required_caps literal is produced from TripwireArms entry
+// #19, and the one-time trigger attachment on metaldocs.tenants (0259
+// attachment precedent). Branch order follows M2 validation-contract.md §1.2
+// as extended by M6 §3 (documents/UPDATE gains document.review) and M7 §5
+// (tenants/INSERT arm). Determinism: TripwireArms is a fixed slice, so this
+// returns identical output every call.
 func RenderMigration() string {
 	return migrationHeader +
 		"BEGIN;\n" +
@@ -102,6 +104,13 @@ func RenderMigration() string {
 		"      -- (pre-0258) / templates_v2_template_version (0188) precedent for\n" +
 		"      -- tenant_id-less tables.\n" +
 		"      v_tenant_id     := NULL;\n" +
+		"    WHEN TG_TABLE_NAME = 'tenants' AND TG_OP = 'INSERT' THEN\n" +
+		"      -- 0277 (M7 F7.2, ADR 0070): tenant onboarding — OnboardTenant asserts\n" +
+		"      -- tenant.onboard then INSERTs metaldocs.tenants. tenants has no\n" +
+		"      -- tenant_id column: NEW.id IS the tenant id (the row being\n" +
+		"      -- provisioned is the tenant itself).\n" +
+		"      v_required_caps := " + renderArray(findArm("tenants", OpInsert)) + ";\n" +
+		"      v_tenant_id     := NEW.id;\n" +
 		"    ELSE\n" +
 		"      -- Fail-closed: a table carrying this trigger with no capability mapping is a\n" +
 		"      -- wiring error, not a license to pass through. Refuse the write loudly.\n" +
@@ -173,52 +182,60 @@ func RenderMigration() string {
 		"END;\n" +
 		"$$;\n" +
 		"\n" +
+		"-- ── trigger attachment ───────────────────────────────────────────────────────────────────\n" +
+		"\n" +
+		"-- One-time attachment on metaldocs.tenants (0259 attachment precedent:\n" +
+		"-- DROP TRIGGER IF EXISTS + CREATE TRIGGER trg_require_cap_asserted). INSERT\n" +
+		"-- only, matching the arm: the trigger's fail-closed ELSE branch would P0001\n" +
+		"-- every UPDATE/DELETE if attached for ops the CASE does not map, and no\n" +
+		"-- tenants update/offboard surface exists yet (F7.3+ owns lifecycle).\n" +
+		"DROP TRIGGER IF EXISTS trg_require_cap_asserted ON metaldocs.tenants;\n" +
+		"CREATE TRIGGER trg_require_cap_asserted\n" +
+		"  BEFORE INSERT ON metaldocs.tenants\n" +
+		"  FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();\n" +
+		"\n" +
 		"-- ── schema_migrations ledger ─────────────────────────────────────────────────────────────\n" +
 		"\n" +
 		"INSERT INTO public.schema_migrations (version, description)\n" +
-		"VALUES ('0275', '" + ledgerDescription + "')\n" +
+		"VALUES ('0277', '" + ledgerDescription + "')\n" +
 		"ON CONFLICT (version) DO NOTHING;\n" +
 		"\n" +
 		"COMMIT;\n"
 }
 
-// migrationHeader is the file-header comment block for 0275, in 0269/0270/0271
-// house style: goal/incident framing, root cause, writer inventory, fix
-// statement.
-const migrationHeader = `-- 0275_documents_update_tripwire_review_cap.sql
--- M6 F6.2 (global-maximum-remediation, milestone-6-eqms-review-reason):
--- the eQMS periodic-review mark-reviewed workflow asserts ONLY document.review
--- (a new capability, ADR 0069) then UPDATEs public.documents (SET
--- last_reviewed_at, review_due_at). enforce_capability_asserted()'s
--- documents/UPDATE branch (post-0271) accepts {document.edit, document.obsolete,
--- membership.manage} — document.review is absent — so every mark-reviewed
--- UPDATE would fail-closed with SQLSTATE P0001 for EVERY actor (the trigger
--- checks the recorded asserted-cap set, not the role; authz.Require records
--- whatever cap was actually asserted). This is the exact defect class as the
--- 0269/0270/0271 incidents: a single non-arm capability asserted in the same
--- function as the mutating UPDATE.
+// migrationHeader is the file-header comment block for 0277, in
+// 0269/0270/0271/0275 house style: goal/incident framing, root cause, writer
+// inventory, fix statement.
+const migrationHeader = `-- 0277_tenants_insert_tripwire_onboard_cap.sql
+-- M7 F7.2 (global-maximum-remediation, milestone-7-tenant-lifecycle, ADR 0070):
+-- the tenant-onboarding workflow asserts ONLY tenant.onboard (a new capability,
+-- ADR 0070) then INSERTs metaldocs.tenants (the provisioning write). Before
+-- this migration metaldocs.tenants carried NO trg_require_cap_asserted trigger
+-- at all — the tenants INSERT was the one privileged provisioning write with no
+-- DB tripwire backstop (the table predates the tripwire program; it was only
+-- ever written by bootstrap/seed contexts, which run as the migration owner and
+-- never traverse the trigger).
 --
--- Never caught for the same reason as 0269/0270/0271: application tests are
--- sqlmock and cannot exercise the live trigger; only an integration drive
--- against a tripwire-enforced DB can pin this
--- (tests/integration/documents/tripwire_documents_test.go, extended alongside
--- this migration).
+-- Fix: (1) add a tenants/INSERT CASE branch requiring tenant.onboard —
+-- tenants has no tenant_id column; NEW.id IS the tenant id (the row being
+-- provisioned is the tenant itself); (2) one-time trigger attachment on
+-- metaldocs.tenants (0259 attachment precedent), BEFORE INSERT only to match
+-- the arm — the fail-closed ELSE branch would P0001 every UPDATE/DELETE if the
+-- trigger fired for ops the CASE does not map, and no tenants update/offboard
+-- surface exists yet (F7.3+ owns lifecycle mutations).
 --
--- Fix: widen the documents/UPDATE arm to
--- {document.edit, document.obsolete, membership.manage, document.review}.
 -- Additive only — no cap is removed from any arm. This migration is
 -- machine-generated from internal/platform/tripwire (TripwireArms +
 -- RenderMigration) — see docs/superpowers/milestones/
--- global-maximum-remediation/milestone-6-eqms-review-reason/
--- validation-contract.md §3 (touchpoint 6) and the M2 regeneration protocol
+-- global-maximum-remediation/milestone-7-tenant-lifecycle/
+-- validation-contract.md §5 (touchpoint 6) and the M2 regeneration protocol
 -- (milestone-2-authz-enforcement-generation/validation-contract.md §1.2/§1.4).
--- Every other CASE branch is reproduced byte-for-byte from 0271; this is a
--- function-only swap, no trigger-attachment change, no backfill. Supersedes
--- 0271 as the latest definition of public.enforce_capability_asserted().
+-- Every other CASE branch is reproduced byte-for-byte from 0275. Supersedes
+-- 0275 as the latest definition of public.enforce_capability_asserted().
 
 `
 
-const ledgerDescription = "M6 F6.2: widen documents/UPDATE tripwire arm to {document.edit, document.obsolete, membership.manage, document.review} -- the mark-reviewed workflow asserts only document.review (ADR 0069) then UPDATEs documents (last_reviewed_at, review_due_at) and would be fail-closed P0001 for every actor without the arm, same defect class as 0269/0270/0271. Additive-only; all other branches preserved from 0271; machine-generated from internal/platform/tripwire."
+const ledgerDescription = "M7 F7.2 (ADR 0070): add tenants/INSERT tripwire arm requiring tenant.onboard and attach trg_require_cap_asserted to metaldocs.tenants (BEFORE INSERT) -- the onboarding workflow asserts only tenant.onboard then INSERTs metaldocs.tenants, previously the one privileged provisioning write with no DB tripwire backstop. Additive-only; all other branches preserved from 0275; machine-generated from internal/platform/tripwire."
 
 // findArm returns the Arm for (table, op), panicking if absent — every
 // branch rendered above must correspond to a TripwireArms entry (parity is
