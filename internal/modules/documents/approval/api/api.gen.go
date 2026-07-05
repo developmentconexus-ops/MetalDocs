@@ -645,14 +645,6 @@ type DeactivateApprovalRouteParams struct {
 	IfMatch string `json:"If-Match"`
 }
 
-// MarkDocumentReviewedParams defines parameters for MarkDocumentReviewed.
-type MarkDocumentReviewedParams struct {
-	IdempotencyKey string `json:"Idempotency-Key"`
-
-	// IfMatch Expected revision version ETag in the form "v<N>", or "*" to skip the check
-	IfMatch string `json:"If-Match"`
-}
-
 // CancelDocumentApprovalParams defines parameters for CancelDocumentApproval.
 type CancelDocumentApprovalParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
@@ -671,6 +663,14 @@ type ObsoleteDocumentParams struct {
 
 // PublishDocumentParams defines parameters for PublishDocument.
 type PublishDocumentParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+
+	// IfMatch Expected revision version ETag in the form "v<N>", or "*" to skip the check
+	IfMatch string `json:"If-Match"`
+}
+
+// MarkDocumentReviewedParams defines parameters for MarkDocumentReviewed.
+type MarkDocumentReviewedParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
 
 	// IfMatch Expected revision version ETag in the form "v<N>", or "*" to skip the check
@@ -724,14 +724,14 @@ type UpdateApprovalRouteJSONRequestBody = UpdateRouteRequest
 // DeactivateApprovalRouteJSONRequestBody defines body for DeactivateApprovalRoute for application/json ContentType.
 type DeactivateApprovalRouteJSONRequestBody = DeactivateRouteRequest
 
-// MarkDocumentReviewedJSONRequestBody defines body for MarkDocumentReviewed for application/json ContentType.
-type MarkDocumentReviewedJSONRequestBody = MarkDocumentReviewedRequest
-
 // CancelDocumentApprovalJSONRequestBody defines body for CancelDocumentApproval for application/json ContentType.
 type CancelDocumentApprovalJSONRequestBody = CancelDocumentApprovalRequest
 
 // ObsoleteDocumentJSONRequestBody defines body for ObsoleteDocument for application/json ContentType.
 type ObsoleteDocumentJSONRequestBody = ObsoleteDocumentRequest
+
+// MarkDocumentReviewedJSONRequestBody defines body for MarkDocumentReviewed for application/json ContentType.
+type MarkDocumentReviewedJSONRequestBody = MarkDocumentReviewedRequest
 
 // ScheduleDocumentPublishJSONRequestBody defines body for ScheduleDocumentPublish for application/json ContentType.
 type ScheduleDocumentPublishJSONRequestBody = SchedulePublishDocumentRequest
@@ -1649,9 +1649,6 @@ type ServerInterface interface {
 	// Deactivate an approval route
 	// (POST /approval/routes/{id}/deactivate)
 	DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params DeactivateApprovalRouteParams)
-	// Mark document reviewed
-	// (POST /documents/{documentId}/review)
-	MarkDocumentReviewed(w http.ResponseWriter, r *http.Request, documentId openapi_types.UUID, params MarkDocumentReviewedParams)
 	// Get approval instance by document
 	// (GET /documents/{id}/approval-instance)
 	GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -1664,6 +1661,9 @@ type ServerInterface interface {
 	// Publish document
 	// (POST /documents/{id}/publish)
 	PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params PublishDocumentParams)
+	// Mark document reviewed
+	// (POST /documents/{id}/review)
+	MarkDocumentReviewed(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params MarkDocumentReviewedParams)
 	// Schedule document publish
 	// (POST /documents/{id}/schedule-publish)
 	ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params ScheduleDocumentPublishParams)
@@ -2196,89 +2196,6 @@ func (siw *ServerInterfaceWrapper) DeactivateApprovalRoute(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
-// MarkDocumentReviewed operation middleware
-func (siw *ServerInterfaceWrapper) MarkDocumentReviewed(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "documentId" -------------
-	var documentId openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "documentId", r.PathValue("documentId"), &documentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "documentId", Err: err})
-		return
-	}
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params MarkDocumentReviewedParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "Idempotency-Key" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
-		var IdempotencyKey string
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
-			return
-		}
-
-		params.IdempotencyKey = IdempotencyKey
-
-	} else {
-		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
-		return
-	}
-
-	// ------------- Required header parameter "If-Match" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
-		var IfMatch string
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
-			return
-		}
-
-		params.IfMatch = IfMatch
-
-	} else {
-		err := fmt.Errorf("Header parameter If-Match is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.MarkDocumentReviewed(w, r, documentId, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // GetApprovalInstanceByDocument operation middleware
 func (siw *ServerInterfaceWrapper) GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request) {
 
@@ -2551,6 +2468,89 @@ func (siw *ServerInterfaceWrapper) PublishDocument(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PublishDocument(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkDocumentReviewed operation middleware
+func (siw *ServerInterfaceWrapper) MarkDocumentReviewed(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params MarkDocumentReviewedParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkDocumentReviewed(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3020,11 +3020,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/approval/routes", wrapper.CreateApprovalRoute)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/approval/routes/{id}", wrapper.UpdateApprovalRoute)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/approval/routes/{id}/deactivate", wrapper.DeactivateApprovalRoute)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{documentId}/review", wrapper.MarkDocumentReviewed)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/documents/{id}/approval-instance", wrapper.GetApprovalInstanceByDocument)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/cancel", wrapper.CancelDocumentApproval)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/obsolete", wrapper.ObsoleteDocument)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/publish", wrapper.PublishDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/review", wrapper.MarkDocumentReviewed)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/schedule-publish", wrapper.ScheduleDocumentPublish)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/signoff", wrapper.RecordDocumentSignoff)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/submit", wrapper.SubmitDocumentForApproval)
@@ -3938,142 +3938,6 @@ func (response DeactivateApprovalRoute500ApplicationProblemPlusJSONResponse) Vis
 	return err
 }
 
-type MarkDocumentReviewedRequestObject struct {
-	DocumentId openapi_types.UUID `json:"documentId"`
-	Params     MarkDocumentReviewedParams
-	Body       *MarkDocumentReviewedJSONRequestBody
-}
-
-type MarkDocumentReviewedResponseObject interface {
-	VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error
-}
-
-type MarkDocumentReviewed200JSONResponse PublishDocumentResponse
-
-func (response MarkDocumentReviewed200JSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type MarkDocumentReviewed400ApplicationProblemPlusJSONResponse struct {
-	BadRequestApplicationProblemPlusJSONResponse
-}
-
-func (response MarkDocumentReviewed400ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type MarkDocumentReviewed401ApplicationProblemPlusJSONResponse struct {
-	UnauthorizedApplicationProblemPlusJSONResponse
-}
-
-func (response MarkDocumentReviewed401ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type MarkDocumentReviewed403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
-}
-
-func (response MarkDocumentReviewed403ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type MarkDocumentReviewed404ApplicationProblemPlusJSONResponse struct {
-	NotFoundApplicationProblemPlusJSONResponse
-}
-
-func (response MarkDocumentReviewed404ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(404)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type MarkDocumentReviewed409ApplicationProblemPlusJSONResponse struct {
-	ConflictApplicationProblemPlusJSONResponse
-}
-
-func (response MarkDocumentReviewed409ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(409)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type MarkDocumentReviewed428ApplicationProblemPlusJSONResponse struct {
-	PreconditionRequiredApplicationProblemPlusJSONResponse
-}
-
-func (response MarkDocumentReviewed428ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(428)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type MarkDocumentReviewed500ApplicationProblemPlusJSONResponse struct {
-	InternalServerErrorApplicationProblemPlusJSONResponse
-}
-
-func (response MarkDocumentReviewed500ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
 type GetApprovalInstanceByDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -4556,6 +4420,142 @@ type PublishDocument500ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response PublishDocument500ApplicationProblemPlusJSONResponse) VisitPublishDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkDocumentReviewedRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params MarkDocumentReviewedParams
+	Body   *MarkDocumentReviewedJSONRequestBody
+}
+
+type MarkDocumentReviewedResponseObject interface {
+	VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error
+}
+
+type MarkDocumentReviewed200JSONResponse PublishDocumentResponse
+
+func (response MarkDocumentReviewed200JSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkDocumentReviewed400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response MarkDocumentReviewed400ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkDocumentReviewed401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response MarkDocumentReviewed401ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkDocumentReviewed403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response MarkDocumentReviewed403ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkDocumentReviewed404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response MarkDocumentReviewed404ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkDocumentReviewed409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response MarkDocumentReviewed409ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkDocumentReviewed428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response MarkDocumentReviewed428ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkDocumentReviewed500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response MarkDocumentReviewed500ApplicationProblemPlusJSONResponse) VisitMarkDocumentReviewedResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5163,9 +5163,6 @@ type StrictServerInterface interface {
 	// Deactivate an approval route
 	// (POST /approval/routes/{id}/deactivate)
 	DeactivateApprovalRoute(ctx context.Context, request DeactivateApprovalRouteRequestObject) (DeactivateApprovalRouteResponseObject, error)
-	// Mark document reviewed
-	// (POST /documents/{documentId}/review)
-	MarkDocumentReviewed(ctx context.Context, request MarkDocumentReviewedRequestObject) (MarkDocumentReviewedResponseObject, error)
 	// Get approval instance by document
 	// (GET /documents/{id}/approval-instance)
 	GetApprovalInstanceByDocument(ctx context.Context, request GetApprovalInstanceByDocumentRequestObject) (GetApprovalInstanceByDocumentResponseObject, error)
@@ -5178,6 +5175,9 @@ type StrictServerInterface interface {
 	// Publish document
 	// (POST /documents/{id}/publish)
 	PublishDocument(ctx context.Context, request PublishDocumentRequestObject) (PublishDocumentResponseObject, error)
+	// Mark document reviewed
+	// (POST /documents/{id}/review)
+	MarkDocumentReviewed(ctx context.Context, request MarkDocumentReviewedRequestObject) (MarkDocumentReviewedResponseObject, error)
 	// Schedule document publish
 	// (POST /documents/{id}/schedule-publish)
 	ScheduleDocumentPublish(ctx context.Context, request ScheduleDocumentPublishRequestObject) (ScheduleDocumentPublishResponseObject, error)
@@ -5470,40 +5470,6 @@ func (sh *strictHandler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.
 	}
 }
 
-// MarkDocumentReviewed operation middleware
-func (sh *strictHandler) MarkDocumentReviewed(w http.ResponseWriter, r *http.Request, documentId openapi_types.UUID, params MarkDocumentReviewedParams) {
-	var request MarkDocumentReviewedRequestObject
-
-	request.DocumentId = documentId
-	request.Params = params
-
-	var body MarkDocumentReviewedJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.MarkDocumentReviewed(ctx, request.(MarkDocumentReviewedRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "MarkDocumentReviewed")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(MarkDocumentReviewedResponseObject); ok {
-		if err := validResponse.VisitMarkDocumentReviewedResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // GetApprovalInstanceByDocument operation middleware
 func (sh *strictHandler) GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request GetApprovalInstanceByDocumentRequestObject
@@ -5618,6 +5584,40 @@ func (sh *strictHandler) PublishDocument(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PublishDocumentResponseObject); ok {
 		if err := validResponse.VisitPublishDocumentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkDocumentReviewed operation middleware
+func (sh *strictHandler) MarkDocumentReviewed(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params MarkDocumentReviewedParams) {
+	var request MarkDocumentReviewedRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body MarkDocumentReviewedJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkDocumentReviewed(ctx, request.(MarkDocumentReviewedRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkDocumentReviewed")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkDocumentReviewedResponseObject); ok {
+		if err := validResponse.VisitMarkDocumentReviewedResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -5766,106 +5766,106 @@ func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"EgZ/fvfuAryV3ugrJkYDlh/Iu/tw9/8BAAD//w==",
+	"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",
+	"6CsmRgOWH8S7/Xj7/wEAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

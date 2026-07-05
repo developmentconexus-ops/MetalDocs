@@ -3534,7 +3534,7 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /documents/{documentId}/review:
+  /documents/{id}/review:
     post:
       summary: Mark document reviewed
       description: >-
@@ -3554,7 +3554,7 @@ paths:
           (LoadDocumentAreaCode); never from a request field. Postgres tripwire
           (migration 0142b) is the backstop.
       parameters:
-        - { name: documentId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>", or "*" to skip the check' }
       requestBody:
@@ -5112,7 +5112,7 @@ components:
           type: string
     DocumentSummary:
       type: object
-      required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, revision_number, active_session_id, created_at, updated_at, created_by, code, values_frozen_at, archived_at, controlled_document_id, revision_title, profile_code_snapshot, process_area_code_snapshot]
+      required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, revision_number, active_session_id, created_at, updated_at, created_by, code, values_frozen_at, archived_at, controlled_document_id, revision_title, profile_code_snapshot, process_area_code_snapshot, effective_from, effective_to, review_due_at, last_reviewed_at]
       properties:
         id:
           type: string
@@ -5190,7 +5190,7 @@ components:
           description: Timestamp of the last mark-reviewed action.
     DocumentDetailResponse:
       type: object
-      required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, active_session_id, created_at, updated_at, created_by, revision_number, code, values_frozen_at, archived_at, controlled_document_id, revision_title, profile_code_snapshot, process_area_code_snapshot, current_revision_file_size_bytes, current_revision_page_count, current_revision_page_count_source]
+      required: [id, tenant_id, template_version_id, name, status, form_data_json, current_revision_id, revision_version, active_session_id, created_at, updated_at, created_by, revision_number, code, values_frozen_at, archived_at, controlled_document_id, revision_title, profile_code_snapshot, process_area_code_snapshot, current_revision_file_size_bytes, current_revision_page_count, current_revision_page_count_source, effective_from, effective_to, review_due_at, last_reviewed_at]
       properties:
         id:
           type: string

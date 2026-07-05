@@ -425,6 +425,15 @@ func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (appli
 		opts.IncludeArchived = v
 	}
 
+	reviewDue := strings.TrimSpace(query.Get("review_due"))
+	if reviewDue != "" {
+		v, err := strconv.ParseBool(reviewDue)
+		if err != nil {
+			return opts, "", errors.New("review_due must be a valid boolean")
+		}
+		opts.ReviewDue = v
+	}
+
 	effectiveUserID := ""
 	if !isAdmin && callerUserID != "" {
 		opts.CreatedBy = callerUserID
@@ -507,6 +516,9 @@ func listOptionsFromParams(r *http.Request, params documentsapi.ListDocumentsPar
 	if params.IncludeArchived != nil {
 		opts.IncludeArchived = *params.IncludeArchived
 	}
+	if params.ReviewDue != nil {
+		opts.ReviewDue = *params.ReviewDue
+	}
 
 	effectiveUserID := ""
 	if !isAdmin && callerUserID != "" {
@@ -559,11 +571,15 @@ func toDocumentSummary(doc domain.Document) (documentsapi.DocumentSummary, error
 		CreatedAt:               doc.CreatedAt,
 		CreatedBy:               doc.CreatedBy,
 		CurrentRevisionId:       doc.CurrentRevisionID,
+		EffectiveFrom:           doc.EffectiveFrom,
+		EffectiveTo:             doc.EffectiveTo,
 		FormDataJson:            formMap,
 		Id:                      doc.ID,
+		LastReviewedAt:          doc.LastReviewedAt,
 		Name:                    doc.Name,
 		ProcessAreaCodeSnapshot: doc.ProcessAreaCodeSnapshot,
 		ProfileCodeSnapshot:     doc.ProfileCodeSnapshot,
+		ReviewDueAt:             doc.ReviewDueAt,
 		RevisionNumber:          doc.RevisionNumber,
 		RevisionTitle:           doc.RevisionTitle,
 		RevisionVersion:         doc.RevisionVersion,
@@ -605,11 +621,15 @@ func toDocumentDetailResponse(doc domain.Document) (*documentsapi.DocumentDetail
 		CurrentRevisionId:              doc.CurrentRevisionID,
 		CurrentRevisionPageCount:       doc.CurrentRevisionPageCount,
 		CurrentRevisionPageCountSource: pageCountSource,
+		EffectiveFrom:                  doc.EffectiveFrom,
+		EffectiveTo:                    doc.EffectiveTo,
 		FormDataJson:                   formMap,
 		Id:                             doc.ID,
+		LastReviewedAt:                 doc.LastReviewedAt,
 		Name:                           doc.Name,
 		ProcessAreaCodeSnapshot:        doc.ProcessAreaCodeSnapshot,
 		ProfileCodeSnapshot:            doc.ProfileCodeSnapshot,
+		ReviewDueAt:                    doc.ReviewDueAt,
 		RevisionNumber:                 doc.RevisionNumber,
 		RevisionTitle:                  doc.RevisionTitle,
 		RevisionVersion:                doc.RevisionVersion,

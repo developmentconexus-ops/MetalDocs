@@ -293,7 +293,8 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		        d.archived_at, d.created_at, d.updated_at, d.created_by, d.revision_title,
 		        d.controlled_document_id, d.profile_code_snapshot, d.process_area_code_snapshot,
 		        coalesce(d.code,''), d.revision_version, d.revision_number,
-		        cr.file_size_bytes, cr.page_count, cr.page_count_source
+		        cr.file_size_bytes, cr.page_count, cr.page_count_source,
+		        d.effective_from, d.effective_to, d.review_due_at, d.last_reviewed_at
 		 FROM documents d
 		 LEFT JOIN document_revisions cr
 		   ON cr.id = d.current_revision_id
@@ -303,7 +304,8 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 		&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.RevisionTitle, &d.ControlledDocumentID, &d.ProfileCodeSnapshot,
 		&d.ProcessAreaCodeSnapshot, &d.Code,
-		&d.RevisionVersion, &d.RevisionNumber, &currentFileSize, &currentPageCount, &currentPageCountSource)
+		&d.RevisionVersion, &d.RevisionNumber, &currentFileSize, &currentPageCount, &currentPageCountSource,
+		&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
@@ -439,6 +441,10 @@ type ListOptions struct {
 	ProfileCode     string
 	Q               string
 	IncludeArchived bool
+	// ReviewDue filters to documents currently due for periodic review (M6
+	// F6.2): published, effective, and review_due_at <= now(). See
+	// buildDocumentFilter for the exact predicate.
+	ReviewDue bool
 }
 
 // Limit clamps the page size to the design-system bounds (default 20, max 100).
@@ -475,6 +481,18 @@ func buildDocumentFilter(tenantID string, opts ListOptions) (whereClause string,
 		// matching ESCAPE clause below.
 		args = append(args, "%"+sqlescape.LikeEscape(opts.Q)+"%")
 		conds = append(conds, fmt.Sprintf("name ILIKE $%d ESCAPE '\\'", len(args)))
+	}
+	if opts.ReviewDue {
+		// Mirrors the "due for review" semantics used by the review-due
+		// read-port (repository/review_due_reader.go ListDueForReview, M6
+		// F6.2 §4.1): published, currently-effective (effective_from <= now
+		// and not yet expired), and review_due_at <= now. No arg needed —
+		// now() is evaluated server-side so it matches the same statement
+		// snapshot as the rest of the query.
+		conds = append(conds, `status = 'published'
+		   AND review_due_at IS NOT NULL AND review_due_at <= now()
+		   AND effective_from IS NOT NULL AND effective_from <= now()
+		   AND (effective_to IS NULL OR effective_to > now())`)
 	}
 
 	return strings.Join(conds, " AND "), args
@@ -514,6 +532,7 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 				controlled_document_id, coalesce(code,'') AS code,
 				profile_code_snapshot, process_area_code_snapshot,
 				revision_version, revision_number,
+				effective_from, effective_to, review_due_at, last_reviewed_at,
 				COUNT(*) OVER() AS total_count
 			FROM documents
 			WHERE %s
@@ -522,7 +541,8 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 			current_revision_id, active_session_id, archived_at, created_at, updated_at,
 			created_by, controlled_document_id, code,
 			profile_code_snapshot, process_area_code_snapshot,
-			revision_version, revision_number, total_count
+			revision_version, revision_number,
+			effective_from, effective_to, review_due_at, last_reviewed_at, total_count
 		FROM filtered%s
 		ORDER BY updated_at DESC, id DESC
 		LIMIT $%d`, where, cursorClause, len(args))
@@ -541,7 +561,8 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 			&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code,
 			&d.ProfileCodeSnapshot, &d.ProcessAreaCodeSnapshot,
-			&d.RevisionVersion, &d.RevisionNumber, &rowTotal); err != nil {
+			&d.RevisionVersion, &d.RevisionNumber,
+			&d.EffectiveFrom, &d.EffectiveTo, &d.ReviewDueAt, &d.LastReviewedAt, &rowTotal); err != nil {
 			return nil, 0, false, err
 		}
 		total = rowTotal // identical on every row (window over the full filtered set)

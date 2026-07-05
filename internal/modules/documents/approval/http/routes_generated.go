@@ -31,7 +31,7 @@ func (h *Handler) SupersedeDocument(w http.ResponseWriter, r *http.Request, id o
 // operation: records a periodic-review completion on a live published
 // revision (last_reviewed_at + next review_due_at) under CapDocumentReview.
 // Not a status transition — the document stays published (T5).
-func (h *Handler) MarkDocumentReviewed(w http.ResponseWriter, r *http.Request, documentId openapi_types.UUID, params approvalapi.MarkDocumentReviewedParams) {
+func (h *Handler) MarkDocumentReviewed(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.MarkDocumentReviewedParams) {
 	h.MarkReviewedHandler(w, r)
 }
 

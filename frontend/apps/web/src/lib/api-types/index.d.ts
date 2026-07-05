@@ -1724,7 +1724,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/documents/{documentId}/review": {
+    "/documents/{id}/review": {
         parameters: {
             query?: never;
             header?: never;
@@ -2540,22 +2540,22 @@ export interface components {
              * Format: date-time
              * @description Effective date; the moment the published revision takes effect.
              */
-            effective_from?: string | null;
+            effective_from: string | null;
             /**
              * Format: date-time
              * @description Expiry date; the published revision is no longer effective after this instant.
              */
-            effective_to?: string | null;
+            effective_to: string | null;
             /**
              * Format: date-time
              * @description Periodic-review due date; NULL means no review cycle is set.
              */
-            review_due_at?: string | null;
+            review_due_at: string | null;
             /**
              * Format: date-time
              * @description Timestamp of the last mark-reviewed action.
              */
-            last_reviewed_at?: string | null;
+            last_reviewed_at: string | null;
         };
         DocumentDetailResponse: {
             id: string;
@@ -2595,22 +2595,22 @@ export interface components {
              * Format: date-time
              * @description Effective date; the moment the published revision takes effect.
              */
-            effective_from?: string | null;
+            effective_from: string | null;
             /**
              * Format: date-time
              * @description Expiry date; the published revision is no longer effective after this instant.
              */
-            effective_to?: string | null;
+            effective_to: string | null;
             /**
              * Format: date-time
              * @description Periodic-review due date; NULL means no review cycle is set.
              */
-            review_due_at?: string | null;
+            review_due_at: string | null;
             /**
              * Format: date-time
              * @description Timestamp of the last mark-reviewed action.
              */
-            last_reviewed_at?: string | null;
+            last_reviewed_at: string | null;
         };
         DocumentCommentContentNode: {
             [key: string]: unknown;
@@ -7075,7 +7075,7 @@ export interface operations {
                 "If-Match": string;
             };
             path: {
-                documentId: string;
+                id: string;
             };
             cookie?: never;
         };

@@ -237,8 +237,8 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
     {
       key: 'nextReview',
       label: 'Próxima revisão',
-      value: EM_DASH,
-      hint: 'sem data de revisão definida',
+      value: doc?.review_due_at ? formatShortDate(doc.review_due_at) : EM_DASH,
+      hint: doc?.review_due_at ? 'ciclo de revisão periódica' : 'sem data de revisão definida',
     },
     {
       key: 'pages',
@@ -273,8 +273,12 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
       fileSizeBytes: doc?.current_revision_file_size_bytes ?? null,
       pageCount: doc?.current_revision_page_count ?? null,
       createdAt: doc?.created_at ?? null,
-      effectiveFrom: approval?.completed_at ?? null,
-      nextReviewAt: null,
+      // M6 F6.2: effective_from/review_due_at now flow from the document
+      // response (contract-first, T6). Fall back to the approval-completion
+      // timestamp for effectiveFrom when the document has no explicit
+      // effective_from set (legacy rows / pre-review-model documents).
+      effectiveFrom: doc?.effective_from ?? approval?.completed_at ?? null,
+      nextReviewAt: doc?.review_due_at ?? null,
       ownerName,
       ownerDescriptor: statusPresentation.ownerMeta,
     },

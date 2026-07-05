@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	documentsapi "metaldocs/internal/modules/documents/api"
+	"metaldocs/internal/modules/documents/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
@@ -158,7 +159,8 @@ func TestDocumentFinalizeResult_WireContract(t *testing.T) {
 
 // TestDocumentCommentResponse_WireContract locks the comment body (F9.2),
 // formerly a hand-rolled map, to the OpenAPI key set. resolved_at and
-// parent_library_id are omitempty pointers — absent when unset.
+// parent_library_id are spec-required+nullable, so oapi-codegen omits
+// `omitempty` — both keys always serialize (null when unset).
 func TestDocumentCommentResponse_WireContract(t *testing.T) {
 	now := time.Date(2026, 6, 20, 12, 0, 0, 0, time.UTC)
 	resp := documentsapi.DocumentCommentResponse{
@@ -171,7 +173,7 @@ func TestDocumentCommentResponse_WireContract(t *testing.T) {
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
-	if got, want := jsonTopKeys(t, resp), "author,author_id,content,created_at,done,id,library_comment_id,updated_at"; got != want {
+	if got, want := jsonTopKeys(t, resp), "author,author_id,content,created_at,done,id,library_comment_id,parent_library_id,resolved_at,updated_at"; got != want {
 		t.Fatalf("comment keys (unresolved) = %q, want %q", got, want)
 	}
 	resolved := resp
@@ -193,5 +195,72 @@ func TestPDFCompleteResponse_WireContract(t *testing.T) {
 	raw, _ := json.Marshal(resp)
 	if string(raw) != `{"document_id":"d-1","final_pdf_s3_key":"final/r.pdf"}` {
 		t.Fatalf("pdf-complete wire = %s", raw)
+	}
+}
+
+// TestDocumentSummaryAndDetail_ReviewFieldsWireContract pins M6 F6.2 T6: the
+// generated DocumentSummary/DocumentDetailResponse types carry
+// effective_from/effective_to/review_due_at/last_reviewed_at as
+// required+nullable (ADR 0035 flat-body discipline — present-and-null, never
+// omitted) and toDocumentSummary/toDocumentDetailResponse populate them
+// nil-safe from the domain.Document.
+func TestDocumentSummaryAndDetail_ReviewFieldsWireContract(t *testing.T) {
+	reviewDueAt := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	// All four unset (nil) on the domain document -> all four keys still
+	// present in the JSON body, serialized as null (never omitted).
+	empty, err := toDocumentSummary(domain.Document{FormDataJSON: []byte(`{}`)})
+	if err != nil {
+		t.Fatalf("toDocumentSummary: %v", err)
+	}
+	raw, _ := json.Marshal(empty)
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	for _, key := range []string{"effective_from", "effective_to", "review_due_at", "last_reviewed_at"} {
+		got, ok := m[key]
+		if !ok {
+			t.Fatalf("DocumentSummary missing required+nullable key %q in wire body %s", key, raw)
+		}
+		if string(got) != "null" {
+			t.Fatalf("DocumentSummary[%q] = %s, want null when unset on the domain doc", key, got)
+		}
+	}
+
+	// review_due_at set on the domain document flows through to the wire
+	// value (nil-safe passthrough, not a fixed null).
+	withReview, err := toDocumentSummary(domain.Document{FormDataJSON: []byte(`{}`), ReviewDueAt: &reviewDueAt})
+	if err != nil {
+		t.Fatalf("toDocumentSummary: %v", err)
+	}
+	rawWith, _ := json.Marshal(withReview)
+	var mWith map[string]json.RawMessage
+	if err := json.Unmarshal(rawWith, &mWith); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	wantReviewDue, _ := json.Marshal(reviewDueAt)
+	if string(mWith["review_due_at"]) != string(wantReviewDue) {
+		t.Fatalf("DocumentSummary[review_due_at] = %s, want %s", mWith["review_due_at"], wantReviewDue)
+	}
+
+	// Same required+nullable contract on DocumentDetailResponse.
+	detail, err := toDocumentDetailResponse(domain.Document{FormDataJSON: []byte(`{}`)})
+	if err != nil {
+		t.Fatalf("toDocumentDetailResponse: %v", err)
+	}
+	rawDetail, _ := json.Marshal(detail)
+	var mDetail map[string]json.RawMessage
+	if err := json.Unmarshal(rawDetail, &mDetail); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	for _, key := range []string{"effective_from", "effective_to", "review_due_at", "last_reviewed_at"} {
+		got, ok := mDetail[key]
+		if !ok {
+			t.Fatalf("DocumentDetailResponse missing required+nullable key %q in wire body %s", key, rawDetail)
+		}
+		if string(got) != "null" {
+			t.Fatalf("DocumentDetailResponse[%q] = %s, want null when unset on the domain doc", key, got)
+		}
 	}
 }

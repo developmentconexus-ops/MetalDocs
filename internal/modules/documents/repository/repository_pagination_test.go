@@ -26,10 +26,11 @@ func TestListDocumentsPaginated_StatusFilter(t *testing.T) {
 		"id", "tenant_id", "template_version_id", "name", "status", "form_data_json",
 		"current_revision_id", "active_session_id", "archived_at",
 		"created_at", "updated_at", "created_by", "controlled_document_id", "code",
-		"profile_code_snapshot", "process_area_code_snapshot", "revision_version", "revision_number", "total_count",
+		"profile_code_snapshot", "process_area_code_snapshot", "revision_version", "revision_number",
+		"effective_from", "effective_to", "review_due_at", "last_reviewed_at", "total_count",
 	}).
-		AddRow("doc-1", "tenant-1", "tpl-1", "Doc B", "under_review", []byte(`{}`), "", "", nil, now, now, "user-1", nil, "", "prof", "area", int64(1), int64(0), int64(2)).
-		AddRow("doc-2", "tenant-1", "tpl-1", "Doc C", "under_review", []byte(`{}`), "", "", nil, now, now, "user-2", nil, "", "prof", "area", int64(1), int64(0), int64(2))
+		AddRow("doc-1", "tenant-1", "tpl-1", "Doc B", "under_review", []byte(`{}`), "", "", nil, now, now, "user-1", nil, "", "prof", "area", int64(1), int64(0), nil, nil, nil, nil, int64(2)).
+		AddRow("doc-2", "tenant-1", "tpl-1", "Doc C", "under_review", []byte(`{}`), "", "", nil, now, now, "user-2", nil, "", "prof", "area", int64(1), int64(0), nil, nil, nil, nil, int64(2))
 
 	// First page (no cursor): the single CTE query computes COUNT(*) OVER() over the
 	// base-filtered set; filter args + limit+1 probe (=11).
@@ -77,10 +78,11 @@ func TestListDocumentsPaginated_CursorKeyset(t *testing.T) {
 			"id", "tenant_id", "template_version_id", "name", "status", "form_data_json",
 			"current_revision_id", "active_session_id", "archived_at",
 			"created_at", "updated_at", "created_by", "controlled_document_id", "code",
-			"profile_code_snapshot", "process_area_code_snapshot", "revision_version", "revision_number", "total_count",
+			"profile_code_snapshot", "process_area_code_snapshot", "revision_version", "revision_number",
+			"effective_from", "effective_to", "review_due_at", "last_reviewed_at", "total_count",
 		})
 		for i := 0; i < n; i++ {
-			rows.AddRow("doc-id", "tenant-1", "tpl-1", "Doc", "draft", []byte(`{}`), "", "", nil, now, now, "user-1", nil, "", "prof", "area", int64(1), int64(0), int64(25))
+			rows.AddRow("doc-id", "tenant-1", "tpl-1", "Doc", "draft", []byte(`{}`), "", "", nil, now, now, "user-1", nil, "", "prof", "area", int64(1), int64(0), nil, nil, nil, nil, int64(25))
 		}
 		return rows
 	}

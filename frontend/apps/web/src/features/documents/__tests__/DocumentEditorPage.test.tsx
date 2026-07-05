@@ -98,6 +98,16 @@ describe('DocumentEditorPage', () => {
       current_revision_file_size_bytes: 1304,
       current_revision_page_count: 3,
       current_revision_page_count_source: 'eigenpal_client',
+      values_frozen_at: null,
+      archived_at: null,
+      controlled_document_id: null,
+      revision_title: null,
+      profile_code_snapshot: null,
+      process_area_code_snapshot: null,
+      effective_from: null,
+      effective_to: null,
+      review_due_at: null,
+      last_reviewed_at: null,
     };
     vi.mocked(api.getDocument).mockResolvedValue(doc);
     vi.mocked(api.signedRevisionURL).mockReturnValue('/api/v1/documents/doc-1/revisions/rev-1/url');

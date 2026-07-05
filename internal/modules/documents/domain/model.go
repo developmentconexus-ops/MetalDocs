@@ -52,6 +52,13 @@ type Document struct {
 	CurrentRevisionFileSizeBytes   *int64                `json:"current_revision_file_size_bytes,omitempty"`
 	CurrentRevisionPageCount       *int                  `json:"current_revision_page_count,omitempty"`
 	CurrentRevisionPageCountSource *string               `json:"current_revision_page_count_source,omitempty"`
+	// Review/expiry model (M6 F6.2, migrations 0274/0276). effective_from/
+	// effective_to already existed on the row; review_due_at/last_reviewed_at
+	// are new. All four nullable — legacy rows keep NULL (no review cycle set).
+	EffectiveFrom  *time.Time `json:"effective_from,omitempty"`
+	EffectiveTo    *time.Time `json:"effective_to,omitempty"`
+	ReviewDueAt    *time.Time `json:"review_due_at,omitempty"`
+	LastReviewedAt *time.Time `json:"last_reviewed_at,omitempty"`
 	// TemplateVersionID is already present above — now semantically write-once after this migration
 
 	// TemplateSnapshot is the frozen template payload. Populated by Service.Create
