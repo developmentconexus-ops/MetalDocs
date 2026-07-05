@@ -2,13 +2,16 @@
 // documents due for periodic eQMS review (M6 F6.2 T4). It contains NO raw SQL
 // against public.documents — per validation-contract.md §4.1, it calls only
 // the documents module's published ports: ReviewDueReader.ListDueForReview
-// (read, for count/log) and ReviewSurfaceWriter.MarkSurfaced (the idempotent
-// side effect).
+// (read, for count/log), ReviewDueReader.ListTenantsWithDueReviews (the
+// cross-tenant enumeration read), and ReviewSurfaceWriter.MarkSurfaced (the
+// idempotent, per-tenant-seeded side effect — validation-contract.md
+// §4.2/§4.3).
 package document_review_surfacer
 
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -63,55 +66,110 @@ func (w *DocumentReviewSurfacerWorker) Work(ctx context.Context, job *river.Job[
 	return run(ctx, w.database, w.reader, w.writer, time.Now().UTC())
 }
 
-// run executes one review-due-surfacer tick. It first calls the documents
-// read-port (ListDueForReview) for an observability count of what is due,
-// then calls the write-port (MarkSurfaced) for the idempotent side effect —
-// per validation-contract.md §4.1, both calls go through documents-owned
-// ports; this package holds no raw SQL against public.documents.
+// run executes one review-due-surfacer tick in two phases, per
+// validation-contract.md §4.2/§4.3:
 //
-// Cross-tenant scope: mirrors stuck_instance_watchdog.listStuckInstances —
-// the tx runs under the scheduler bypass (authz.BypassSystem) with NO tenant
-// GUC seeded. public.documents' tenant_isolation RLS policy treats an unset
-// metaldocs.tenant_id GUC as "all tenants" (its NULLIF(...) IS NULL branch),
-// so this single tx sweeps every tenant's due documents in one MarkSurfaced
-// UPDATE — not a per-tenant iterate+seed loop. This is deliberate: the
-// contract requires ONE idempotent marker write per due document per cycle,
-// and iterating tenants would multiply transactions for no isolation benefit
-// (there is no per-tenant side effect to keep separate, unlike
-// emitStuckAlert's per-instance governance event).
+//  1. a single cross-tenant SYSTEM READ (ListTenantsWithDueReviews) under the
+//     scheduler bypass with no tenant GUC seeded — enumerating tenants is
+//     safe unseeded, exactly like stuck_instance_watchdog.listStuckInstances;
+//  2. for EACH tenant returned, a NEW tx that seeds authz.BypassSystem THEN
+//     authz.SeedTxTenant(tenantID) before calling ListDueForReview (for the
+//     count/log) and MarkSurfaced (the idempotent side effect) — mirroring
+//     stuck_instance_watchdog.emitStuckAlert's per-instance SeedTxTenant
+//     pattern. FORCE RLS backstops the write: no unseeded tenant-scoped write
+//     against public.documents survives this job.
+//
+// Per validation-contract.md §4.1, every call goes through documents-owned
+// ports (ListTenantsWithDueReviews, ListDueForReview, MarkSurfaced); this
+// package holds no raw SQL against public.documents.
 func run(ctx context.Context, database *sql.DB, reader documentsdomain.ReviewDueReader, writer documentsdomain.ReviewSurfaceWriter, now time.Time) error {
-	tx, err := database.BeginTx(ctx, nil)
+	tenantIDs, err := listTenantsWithDueReviews(ctx, database, reader, now)
 	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if err := authz.BypassSystem(ctx, tx); err != nil {
-		return err
-	}
-
-	due, err := reader.ListDueForReview(ctx, tx, now, BatchSize)
-	if err != nil {
-		slog.ErrorContext(ctx, "document_review_surfacer: list due for review failed",
+		slog.ErrorContext(ctx, "document_review_surfacer: list tenants with due reviews failed",
 			"job", JobName, "error", err)
 		return err
 	}
 
-	surfaced, err := writer.MarkSurfaced(ctx, tx, now)
-	if err != nil {
-		slog.ErrorContext(ctx, "document_review_surfacer: mark surfaced failed",
-			"job", JobName, "error", err)
-		return err
-	}
+	var totalDue, totalSurfaced int
+	var runErr error
 
-	if err := tx.Commit(); err != nil {
-		return err
+	for _, tenantID := range tenantIDs {
+		due, surfaced, err := surfaceTenant(ctx, database, reader, writer, tenantID, now)
+		if err != nil {
+			slog.ErrorContext(ctx, "document_review_surfacer: surface tenant failed",
+				"job", JobName, "tenant_id", tenantID, "error", err)
+			runErr = errors.Join(runErr, err)
+			continue
+		}
+		totalDue += due
+		totalSurfaced += surfaced
 	}
 
 	slog.InfoContext(ctx, "document_review_surfacer: tick complete",
 		"job", JobName,
-		"due_count", len(due),
-		"surfaced_count", len(surfaced))
+		"tenants_with_due", len(tenantIDs),
+		"due_count", totalDue,
+		"surfaced_count", totalSurfaced)
 
-	return nil
+	return runErr
+}
+
+// listTenantsWithDueReviews opens a single bypass tx (no tenant GUC seeded —
+// this is a system-level cross-tenant read, safe unseeded) and returns the
+// distinct tenant_ids with at least one review-due document.
+func listTenantsWithDueReviews(ctx context.Context, database *sql.DB, reader documentsdomain.ReviewDueReader, now time.Time) ([]string, error) {
+	tx, err := database.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if err := authz.BypassSystem(ctx, tx); err != nil {
+		return nil, err
+	}
+
+	tenantIDs, err := reader.ListTenantsWithDueReviews(ctx, tx, now)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return tenantIDs, nil
+}
+
+// surfaceTenant opens a NEW tx seeded to exactly one tenant
+// (authz.BypassSystem then authz.SeedTxTenant(tenantID)) and, within it, reads
+// the tenant's due documents (for the count/log) and marks them surfaced. RLS
+// backstops the write to that tenant's rows only.
+func surfaceTenant(ctx context.Context, database *sql.DB, reader documentsdomain.ReviewDueReader, writer documentsdomain.ReviewSurfaceWriter, tenantID string, now time.Time) (dueCount int, surfacedCount int, err error) {
+	tx, err := database.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback()
+
+	if err := authz.BypassSystem(ctx, tx); err != nil {
+		return 0, 0, err
+	}
+	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+		return 0, 0, err
+	}
+
+	due, err := reader.ListDueForReview(ctx, tx, now, BatchSize)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	surfaced, err := writer.MarkSurfaced(ctx, tx, now)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, 0, err
+	}
+
+	return len(due), len(surfaced), nil
 }

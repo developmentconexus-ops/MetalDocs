@@ -7,11 +7,11 @@ package document_review_surfacer
 // core run() body against real Postgres via the canonical testdb factory
 // (ADR 0034). Per validation-contract.md §4.3, proves:
 //
-//  1. cross-tenant coverage in one sweep: a due+published+effective document
-//     in tenant A AND one in tenant B both get review_surfaced_at set by a
-//     single run() call (the surfacer runs cross-tenant under the scheduler
-//     bypass with no tenant GUC seeded — mirrors stuck_instance_watchdog);
-//     a not-yet-due document in tenant A is left untouched;
+//  1. cross-tenant coverage: a due+published+effective document in tenant A
+//     AND one in tenant B both get review_surfaced_at set by a single run()
+//     call (run() enumerates tenants via a cross-tenant bypass READ, then
+//     seeds + writes per tenant — mirrors stuck_instance_watchdog); a
+//     not-yet-due document in tenant A is left untouched;
 //  2. idempotency: running run() twice surfaces a due document ONCE — the
 //     second run flips 0 rows and review_surfaced_at is unchanged;
 //  3. re-surfacing: after review_due_at is advanced past the stored
@@ -96,12 +96,15 @@ func readReviewSurfacedAt(t *testing.T, db *sql.DB, docID string) *time.Time {
 	return &ts.Time
 }
 
-// TestIntegration_Surfacer_CrossTenant_MarksDueUntouchedNotDue proves one
-// run() sweeps due+published+effective documents across BOTH tenant A and
-// tenant B in a single tick (cross-tenant scheduler-bypass sweep, no
-// per-tenant iteration), while a not-yet-due document in tenant A is left
-// untouched.
-func TestIntegration_Surfacer_CrossTenant_MarksDueUntouchedNotDue(t *testing.T) {
+// TestIntegration_Surfacer_FullTick_IteratesAllTenants proves one run() tick
+// iterates EVERY tenant with due documents (per validation-contract.md §4.2:
+// the tick enumerates tenants via a cross-tenant bypass READ, then seeds and
+// writes per tenant) — due+published+effective documents in BOTH tenant A and
+// tenant B end up surfaced by a single run() call, while a not-yet-due
+// document in tenant A is left untouched. This is the correct full-tick
+// end-state; it does NOT assert HOW isolation is achieved (that is
+// TestIntegration_Surfacer_Writer_TenantSeed_DoesNotSurfaceOtherTenant below).
+func TestIntegration_Surfacer_FullTick_IteratesAllTenants(t *testing.T) {
 	db, _ := testdb.Open(t)
 	db.SetMaxOpenConns(1)
 
@@ -128,10 +131,67 @@ func TestIntegration_Surfacer_CrossTenant_MarksDueUntouchedNotDue(t *testing.T) 
 		t.Fatalf("tenant A due doc review_surfaced_at = %v, want %v", got, now)
 	}
 	if got := readReviewSurfacedAt(t, db, dueDocB); got == nil || !got.Equal(now) {
-		t.Fatalf("tenant B due doc review_surfaced_at = %v, want %v (cross-tenant sweep must cover both tenants)", got, now)
+		t.Fatalf("tenant B due doc review_surfaced_at = %v, want %v (full tick must iterate every tenant)", got, now)
 	}
 	if got := readReviewSurfacedAt(t, db, notDueDocA); got != nil {
 		t.Fatalf("tenant A not-yet-due doc review_surfaced_at = %v, want nil (untouched)", got)
+	}
+}
+
+// TestIntegration_Surfacer_Writer_TenantSeed_DoesNotSurfaceOtherTenant is the
+// real §4.3 cross-tenant ISOLATION proof: seed the tx as tenant A ONLY
+// (authz.BypassSystem + authz.SeedTxTenant(A), the exact pattern
+// stuck_instance_watchdog.emitStuckAlert uses before its tenant-scoped write),
+// call MarkSurfaced directly, and assert tenant A's due doc is surfaced while
+// tenant B's due doc is NOT touched — RLS (FORCE ROW LEVEL SECURITY +
+// tenant_isolation policy) blocks the write to a row outside the seeded GUC.
+//
+// Before the fix (unseeded MarkSurfaced relying on the NULL-GUC "all tenants"
+// RLS branch), this test is RED: the writer has no tenant predicate and no
+// seed changes that, so B's due doc gets surfaced regardless of which tenant
+// (if any) is seeded. After the fix (MarkSurfaced called only under a seeded
+// tenant tx, one tenant per call), this test is GREEN.
+func TestIntegration_Surfacer_Writer_TenantSeed_DoesNotSurfaceOtherTenant(t *testing.T) {
+	db, _ := testdb.Open(t)
+	db.SetMaxOpenConns(1)
+
+	tntA := testdb.NewTenant(t, db)
+	tntB := testdb.NewTenant(t, db)
+	now := time.Now().UTC().Truncate(time.Second)
+	effectiveFrom := now.Add(-30 * 24 * time.Hour)
+	due := now.Add(-1 * time.Hour)
+
+	dueDocA := seedSurfacerDoc(t, db, tntA.ID, "published", effectiveFrom, &due)
+	dueDocB := seedSurfacerDoc(t, db, tntB.ID, "published", effectiveFrom, &due)
+
+	writer := documentsrepo.NewReviewSurfaceWriterPG(db)
+	ctx := context.Background()
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	if err := authz.BypassSystem(ctx, tx); err != nil {
+		t.Fatalf("BypassSystem: %v", err)
+	}
+	if err := authz.SeedTxTenant(ctx, tx, tntA.ID); err != nil {
+		t.Fatalf("SeedTxTenant(A): %v", err)
+	}
+
+	if _, err := writer.MarkSurfaced(ctx, tx, now); err != nil {
+		t.Fatalf("MarkSurfaced: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+
+	if got := readReviewSurfacedAt(t, db, dueDocA); got == nil || !got.Equal(now) {
+		t.Fatalf("tenant A due doc review_surfaced_at = %v, want %v (seeded tenant must be surfaced)", got, now)
+	}
+	if got := readReviewSurfacedAt(t, db, dueDocB); got != nil {
+		t.Fatalf("tenant B due doc review_surfaced_at = %v, want nil (RLS must block write outside seeded tenant A)", got)
 	}
 }
 

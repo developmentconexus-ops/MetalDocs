@@ -46,13 +46,28 @@ type ReviewDueReader interface {
 	// is responsible for seeding tenant identity (SeedTxIdentity/SeedTxTenant,
 	// M3 backstop) before calling this port.
 	ListDueForReview(ctx context.Context, tx *sql.Tx, now time.Time, limit int) ([]ReviewDueView, error)
+
+	// ListTenantsWithDueReviews returns the DISTINCT tenant_ids (as text) that
+	// currently have at least one review-due document (the same "due-core"
+	// eligibility as ListDueForReview). This is a system-level, cross-tenant
+	// enumeration READ — called by the jobs surfacer under authz.BypassSystem
+	// with NO tenant GUC seeded, exactly like
+	// stuck_instance_watchdog.listStuckInstances. It exists so the surfacer
+	// can iterate tenants and seed each one (authz.SeedTxTenant) before its
+	// tenant-scoped MarkSurfaced write, per validation-contract.md §4.2/§4.3 —
+	// reads are safe unseeded; only the write must be seeded.
+	ListTenantsWithDueReviews(ctx context.Context, tx *sql.Tx, now time.Time) ([]string, error)
 }
 
-// NoopReviewDueReader is the fail-closed default: it reports no due documents.
-// Used as the nil-guard default at wiring and in unit tests that do not
-// exercise the review-due surfacer.
+// NoopReviewDueReader is the fail-closed default: it reports no due documents
+// and no tenants with due documents. Used as the nil-guard default at wiring
+// and in unit tests that do not exercise the review-due surfacer.
 type NoopReviewDueReader struct{}
 
 func (NoopReviewDueReader) ListDueForReview(context.Context, *sql.Tx, time.Time, int) ([]ReviewDueView, error) {
+	return nil, nil
+}
+
+func (NoopReviewDueReader) ListTenantsWithDueReviews(context.Context, *sql.Tx, time.Time) ([]string, error) {
 	return nil, nil
 }

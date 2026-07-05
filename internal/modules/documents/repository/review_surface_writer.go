@@ -41,23 +41,25 @@ var _ documentsdomain.ReviewSurfaceWriter = (*ReviewSurfaceWriterPG)(nil)
 // Tenant scoping is enforced by RLS (public.documents FORCE ROW LEVEL
 // SECURITY + the tenant_isolation policy keyed on the tx-local
 // metaldocs.tenant_id GUC, db/baseline/0001_current_schema.sql:4840) exactly
-// as ListDueForReview — no explicit tenant_id predicate. The scheduler
-// surfacer runs this cross-tenant with the tenant GUC left unset, which the
-// tenant_isolation policy's NULLIF(...) IS NULL branch treats as "all
-// tenants" (mirrors stuck_instance_watchdog.listStuckInstances).
+// as ListDueForReview — no explicit tenant_id predicate. Per
+// validation-contract.md §4.2/§4.3, the caller MUST seed exactly one tenant
+// on the tx (authz.BypassSystem then authz.SeedTxTenant(tenantID)) before
+// calling this method — the surfacer job iterates tenants (via
+// ListTenantsWithDueReviews) and calls MarkSurfaced once per seeded tenant
+// tx, mirroring stuck_instance_watchdog.emitStuckAlert's per-instance
+// SeedTxTenant pattern. FORCE RLS then backstops the write: a buggy predicate
+// here can only ever touch the seeded tenant's rows.
 //
 // The documents/UPDATE DB tripwire (enforce_capability_asserted) still fires
-// for this UPDATE; the caller is responsible for the scheduler bypass
-// (authz.BypassSystem under authz.WithBackgroundBypass) before calling this
-// port — this adapter issues no authz calls itself.
+// for this UPDATE; the caller is responsible for the scheduler bypass +
+// tenant seed (authz.BypassSystem + authz.SeedTxTenant under
+// authz.WithBackgroundBypass) before calling this port — this adapter issues
+// no authz calls itself.
 func (w *ReviewSurfaceWriterPG) MarkSurfaced(ctx context.Context, tx *sql.Tx, now time.Time) ([]documentsdomain.SurfacedDoc, error) {
 	rows, err := tx.QueryContext(ctx, `
 UPDATE public.documents
    SET review_surfaced_at = $1
- WHERE review_due_at IS NOT NULL AND review_due_at <= $1
-   AND status = 'published'
-   AND effective_from IS NOT NULL AND effective_from <= $1
-   AND (effective_to IS NULL OR effective_to > $1)
+ WHERE `+dueCorePredicate+`
    AND (review_surfaced_at IS NULL OR review_surfaced_at < review_due_at)
 RETURNING id::text, review_due_at`,
 		now,
