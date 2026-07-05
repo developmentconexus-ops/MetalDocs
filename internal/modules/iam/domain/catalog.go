@@ -113,6 +113,7 @@ var capabilityDescriptions = map[Capability]string{
 	CapDocumentPublish:             "Publicar documento",
 	CapDocumentObsolete:            "Tornar documento obsoleto",
 	CapDocumentSupersede:           "Tornar documento obsoleto/sucessor",
+	CapDocumentReview:              "Registrar revisão periódica de documento publicado",
 	CapTemplateView:                "Visualizar templates",
 	CapTemplateCreate:              "Criar templates",
 	CapTemplateEdit:                "Editar templates",

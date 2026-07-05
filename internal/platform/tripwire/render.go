@@ -5,12 +5,13 @@ import (
 	"strings"
 )
 
-// RenderMigration renders the full 0271 forward-only migration SQL,
-// regenerated from db/migrations/0270_templates_template_tripwire_archive_cap.sql
-// (the template) with every CASE branch preserved byte-for-byte except the
-// documents/UPDATE arm, whose v_required_caps literal is produced from
-// TripwireArms in the same order as validation-contract.md §1.2. Determinism:
-// TripwireArms is a fixed slice, so this returns identical output every call.
+// RenderMigration renders the full 0275 forward-only migration SQL,
+// regenerated from the prior tripwire migration (0271) with every CASE branch
+// preserved byte-for-byte except the documents/UPDATE arm, whose v_required_caps
+// literal is produced from TripwireArms in the same order as M2
+// validation-contract.md §1.2 as extended by M6 §3 (gains document.review).
+// Determinism: TripwireArms is a fixed slice, so this returns identical output
+// every call.
 func RenderMigration() string {
 	return migrationHeader +
 		"BEGIN;\n" +
@@ -45,12 +46,15 @@ func RenderMigration() string {
 		"      v_required_caps := " + renderArray(findArm("documents", OpInsert)) + ";\n" +
 		"      v_tenant_id     := NEW.tenant_id;\n" +
 		"    WHEN TG_TABLE_NAME = 'documents' AND TG_OP = 'UPDATE' THEN\n" +
-		"      -- 0271: 'document.obsolete' and 'membership.manage' added — see file\n" +
-		"      -- header. Two function-local write-paths assert only one of these\n" +
-		"      -- caps (no co-asserted document.edit) and were fail-closed P0001 for\n" +
-		"      -- every actor: ForceReleaseSession/ForceReleaseSessionTx\n" +
+		"      -- 0271: 'document.obsolete' and 'membership.manage' added — two\n" +
+		"      -- function-local write-paths assert only one of these caps (no\n" +
+		"      -- co-asserted document.edit) and were fail-closed P0001 for every\n" +
+		"      -- actor: ForceReleaseSession/ForceReleaseSessionTx\n" +
 		"      -- (documents/repository/repository.go:798,828) and MarkObsolete\n" +
 		"      -- (documents/approval/application/obsolete_service.go:88->93).\n" +
+		"      -- 0275 (M6 F6.2): 'document.review' added — the mark-reviewed\n" +
+		"      -- workflow asserts only document.review then UPDATEs documents\n" +
+		"      -- (last_reviewed_at + review_due_at); see file header.\n" +
 		"      v_required_caps := " + renderArray(findArm("documents", OpUpdate)) + ";\n" +
 		"      v_tenant_id     := NEW.tenant_id;\n" +
 		"    WHEN TG_TABLE_NAME = 'controlled_documents' AND TG_OP = 'INSERT' THEN\n" +
@@ -172,55 +176,49 @@ func RenderMigration() string {
 		"-- ── schema_migrations ledger ─────────────────────────────────────────────────────────────\n" +
 		"\n" +
 		"INSERT INTO public.schema_migrations (version, description)\n" +
-		"VALUES ('0271', '" + ledgerDescription + "')\n" +
+		"VALUES ('0275', '" + ledgerDescription + "')\n" +
 		"ON CONFLICT (version) DO NOTHING;\n" +
 		"\n" +
 		"COMMIT;\n"
 }
 
-// migrationHeader is the file-header comment block for 0271, in 0269/0270
+// migrationHeader is the file-header comment block for 0275, in 0269/0270/0271
 // house style: goal/incident framing, root cause, writer inventory, fix
 // statement.
-const migrationHeader = `-- 0271_documents_update_tripwire_membership_obsolete.sql
--- M2 F2.1 (global-maximum-remediation, milestone-2-authz-enforcement-generation):
--- two function-local write-paths on public.documents are bricked at the DB
--- layer, the same defect class as 0269/0270. enforce_capability_asserted()'s
--- documents/UPDATE branch accepts only {document.edit} — but two callers
--- assert a different, single capability (never document.edit) in the same
--- function as the mutating UPDATE, so every call fails with SQLSTATE P0001
--- for EVERY actor (the trigger checks the recorded asserted-cap set, not the
--- role; authz.Require records whatever cap was actually asserted):
+const migrationHeader = `-- 0275_documents_update_tripwire_review_cap.sql
+-- M6 F6.2 (global-maximum-remediation, milestone-6-eqms-review-reason):
+-- the eQMS periodic-review mark-reviewed workflow asserts ONLY document.review
+-- (a new capability, ADR 0069) then UPDATEs public.documents (SET
+-- last_reviewed_at, review_due_at). enforce_capability_asserted()'s
+-- documents/UPDATE branch (post-0271) accepts {document.edit, document.obsolete,
+-- membership.manage} — document.review is absent — so every mark-reviewed
+-- UPDATE would fail-closed with SQLSTATE P0001 for EVERY actor (the trigger
+-- checks the recorded asserted-cap set, not the role; authz.Require records
+-- whatever cap was actually asserted). This is the exact defect class as the
+-- 0269/0270/0271 incidents: a single non-arm capability asserted in the same
+-- function as the mutating UPDATE.
 --
---   1. ForceReleaseSession / ForceReleaseSessionTx
---      (internal/modules/documents/repository/repository.go:798, :828)
---      assert only CapMembershipManage (deliberate per ADR 0022 Phase 11 F4),
---      then UPDATE documents.active_session_id. Recorded cap
---      'membership.manage' not in {document.edit} -> P0001, unconditionally.
---   2. MarkObsolete (internal/modules/documents/approval/application/
---      obsolete_service.go:88 -> :93) asserts only CapDocumentObsolete, then
---      UPDATE documents SET status='obsolete', revision_version =
---      revision_version + 1. Recorded cap 'document.obsolete' not in
---      {document.edit} -> P0001, unconditionally.
---
--- Never caught for the same reason as 0269/0270: application tests are
+-- Never caught for the same reason as 0269/0270/0271: application tests are
 -- sqlmock and cannot exercise the live trigger; only an integration drive
--- against a tripwire-enforced DB can pin these
--- (tests/integration/documents/tripwire_documents_test.go, added alongside
+-- against a tripwire-enforced DB can pin this
+-- (tests/integration/documents/tripwire_documents_test.go, extended alongside
 -- this migration).
 --
 -- Fix: widen the documents/UPDATE arm to
--- {document.edit, document.obsolete, membership.manage}. Additive only — no
--- cap is removed from any arm. This migration is machine-generated from
--- internal/platform/tripwire (TripwireArms + RenderMigration) — see
--- docs/superpowers/milestones/global-maximum-remediation/
--- milestone-2-authz-enforcement-generation/validation-contract.md §1.2/§1.4.
--- Every other CASE branch is reproduced byte-for-byte from 0270; this is a
+-- {document.edit, document.obsolete, membership.manage, document.review}.
+-- Additive only — no cap is removed from any arm. This migration is
+-- machine-generated from internal/platform/tripwire (TripwireArms +
+-- RenderMigration) — see docs/superpowers/milestones/
+-- global-maximum-remediation/milestone-6-eqms-review-reason/
+-- validation-contract.md §3 (touchpoint 6) and the M2 regeneration protocol
+-- (milestone-2-authz-enforcement-generation/validation-contract.md §1.2/§1.4).
+-- Every other CASE branch is reproduced byte-for-byte from 0271; this is a
 -- function-only swap, no trigger-attachment change, no backfill. Supersedes
--- 0270 as the latest definition of public.enforce_capability_asserted().
+-- 0271 as the latest definition of public.enforce_capability_asserted().
 
 `
 
-const ledgerDescription = "M2 F2.1: widen documents/UPDATE tripwire arm to {document.edit, document.obsolete, membership.manage} -- ForceReleaseSession/ForceReleaseSessionTx (repository.go:798,828) and MarkObsolete (obsolete_service.go:88->93) each assert a single non-document.edit capability in the same function as the mutating UPDATE and were fail-closed P0001 for every actor, same defect class as 0269/0270. Additive-only; all other branches preserved from 0270; machine-generated from internal/platform/tripwire."
+const ledgerDescription = "M6 F6.2: widen documents/UPDATE tripwire arm to {document.edit, document.obsolete, membership.manage, document.review} -- the mark-reviewed workflow asserts only document.review (ADR 0069) then UPDATEs documents (last_reviewed_at, review_due_at) and would be fail-closed P0001 for every actor without the arm, same defect class as 0269/0270/0271. Additive-only; all other branches preserved from 0271; machine-generated from internal/platform/tripwire."
 
 // findArm returns the Arm for (table, op), panicking if absent — every
 // branch rendered above must correspond to a TripwireArms entry (parity is

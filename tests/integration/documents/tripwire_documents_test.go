@@ -14,6 +14,7 @@
 //   - document.obsolete: ObsoleteService.MarkObsolete
 //     (documents/approval/application/obsolete_service.go:88 -> :93) —
 //     transitioning a document to obsolete (UPDATE status/revision_version).
+//
 // A missing arm fail-closes the write with SQLSTATE P0001 for EVERY actor (the
 // trigger checks the recorded asserted-cap set, not the role), bricking the
 // path as a 500. Both were latent (never shipped fixed; found only by the M2
@@ -40,6 +41,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"testing"
 
 	"metaldocs/tests/integration/testdb"
@@ -103,4 +105,91 @@ func TestTripwire_DocumentsUpdate_DocumentObsoleteArm(t *testing.T) {
 	docID, tenantID := testdb.InsertDraftDocument(t, db, "", tnt.ID)
 
 	driveGuardedDocumentUpdate(t, db, tenantID, docID, `[{"cap":"document.obsolete"}]`)
+}
+
+// TestTripwire_DocumentsUpdate_DocumentReviewArm pins migration 0275's
+// document.review arm (M6 F6.2): the mark-reviewed workflow asserts ONLY
+// document.review before UPDATEing documents (last_reviewed_at + review_due_at).
+// Pre-0275 ({document.edit, document.obsolete, membership.manage}) this raised
+// P0001 for every actor — the same defect class as 0269/0270/0271. This proves
+// the arm accepts document.review independently of the T5 mark-reviewed handler
+// (which does not yet exist): the DB tripwire is the last line, and it is wired.
+//
+// The UPDATE writes the real review columns (last_reviewed_at, review_due_at)
+// rather than the neutral active_session_id used by the sibling arms, mirroring
+// exactly what the mark-reviewed path writes. review_due_at satisfies
+// ck_documents_review_due (review_due_at >= effective_from) trivially because a
+// draft fixture leaves effective_from NULL (0274 CHECK's NULL branch).
+func TestTripwire_DocumentsUpdate_DocumentReviewArm(t *testing.T) {
+	db, _ := testdb.Open(t)
+	tnt := testdb.NewTenant(t, db)
+	docID, tenantID := testdb.InsertDraftDocument(t, db, "", tnt.ID)
+
+	ctx := context.Background()
+	testdb.SeedWithCaps(t, db, `[{"cap":"document.review"}]`, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`SELECT set_config('metaldocs.tenant_id', $1, true)`, tenantID,
+		); err != nil {
+			return fmt.Errorf("set tenant_id GUC: %w", err)
+		}
+		res, err := tx.ExecContext(ctx,
+			`UPDATE public.documents
+			    SET last_reviewed_at = now(),
+			        review_due_at    = now() + interval '365 days',
+			        updated_at       = now()
+			  WHERE id = $1::uuid`,
+			docID,
+		)
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("rows affected: %w", err)
+		}
+		if n != 1 {
+			return fmt.Errorf("mark-reviewed UPDATE affected %d rows, want 1 (RLS hid the row / trigger never fired -> false green)", n)
+		}
+		return nil
+	})
+}
+
+// TestTripwire_DocumentsUpdate_NoCapAssertedIsRejected is the arm-level NEGATIVE
+// proof (M6 validation-contract.md §3.1): the SAME mark-reviewed UPDATE, run in
+// a tx that asserts NO capability, must be rejected by the DB tripwire with
+// SQLSTATE P0001 (ErrCapabilityNotAsserted). This proves the arm + trigger are
+// live and fail-closed, not decorative — the review UPDATE succeeds ONLY because
+// document.review is in the arm, never by default.
+func TestTripwire_DocumentsUpdate_NoCapAssertedIsRejected(t *testing.T) {
+	db, _ := testdb.Open(t)
+	tnt := testdb.NewTenant(t, db)
+	docID, tenantID := testdb.InsertDraftDocument(t, db, "", tnt.ID)
+
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx,
+		`SELECT set_config('metaldocs.tenant_id', $1, true)`, tenantID,
+	); err != nil {
+		t.Fatalf("set tenant_id GUC: %v", err)
+	}
+	// Deliberately assert NO caps (metaldocs.asserted_caps unset on this tx).
+	_, err = tx.ExecContext(ctx,
+		`UPDATE public.documents
+		    SET last_reviewed_at = now(),
+		        review_due_at    = now() + interval '365 days',
+		        updated_at       = now()
+		  WHERE id = $1::uuid`,
+		docID,
+	)
+	if err == nil {
+		t.Fatal("mark-reviewed UPDATE with NO asserted cap succeeded, want tripwire rejection (P0001) — the arm/trigger is not enforcing")
+	}
+	if !strings.Contains(err.Error(), "ErrCapabilityNotAsserted") && !strings.Contains(err.Error(), "P0001") {
+		t.Fatalf("want P0001/ErrCapabilityNotAsserted rejection, got: %v", err)
+	}
 }

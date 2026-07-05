@@ -49,7 +49,11 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	CapMembershipManage:            ScopeArea,
 
 	// --- Tenant-grade: tenant-wide authority ---
-	CapDocumentView:     ScopeTenant,
+	CapDocumentView: ScopeTenant,
+	// document.review (M6 F6.2, ADR 0069) is tenant-grade: the mark-reviewed
+	// act is a tenant-wide governance action, not an area-scoped WRITE like
+	// document.edit/publish/obsolete. Tier-2 passes the "tenant" sentinel.
+	CapDocumentReview:   ScopeTenant,
 	CapTemplateView:     ScopeTenant,
 	CapTemplateCreate:   ScopeTenant,
 	CapTemplateEdit:     ScopeTenant,

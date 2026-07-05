@@ -23,8 +23,9 @@ func TestTripwireArms_CapsAreRegistryReal(t *testing.T) {
 	}
 }
 
-// TestTripwireArms_MatchesContractTable pins the 18-entry table in
-// validation-contract.md §1.2 exactly. Divergence is HS-7.
+// TestTripwireArms_MatchesContractTable pins the 18-entry table in M2
+// validation-contract.md §1.2 exactly, as extended by M6 validation-contract.md
+// §3 (documents/UPDATE additionally gains document.review). Divergence is HS-7.
 func TestTripwireArms_MatchesContractTable(t *testing.T) {
 	type key struct {
 		table string
@@ -37,7 +38,7 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 		{"iam_user_roles", OpAny}:          {iamdomain.CapUserManage},
 		{"user_process_areas", OpAny}:      {iamdomain.CapMembershipManage},
 		{"documents", OpInsert}:            {iamdomain.CapDocumentCreate},
-		{"documents", OpUpdate}:            {iamdomain.CapDocumentEdit, iamdomain.CapDocumentObsolete, iamdomain.CapMembershipManage},
+		{"documents", OpUpdate}:            {iamdomain.CapDocumentEdit, iamdomain.CapDocumentObsolete, iamdomain.CapMembershipManage, iamdomain.CapDocumentReview},
 		{"controlled_documents", OpInsert}: {iamdomain.CapControlledDocumentCreate},
 		{"controlled_documents", OpUpdate}: {iamdomain.CapControlledDocumentObsolete, iamdomain.CapControlledDocumentSupersede},
 		{"cd_sequence_counters", OpAny}:    {iamdomain.CapControlledDocumentCreate},
@@ -93,16 +94,16 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 }
 
 // TestRenderMigration_MatchesCommittedFile is the golden test: RenderMigration()
-// must byte-equal the committed db/migrations/0271_*.sql (validation-contract.md
-// §1.4/§1.5.a). This test is written to fail first — before the 0271 file
-// exists and before render.go is correct — and made to pass by generating the
-// migration from RenderMigration() itself (T1.2).
+// must byte-equal the latest committed tripwire migration. M2 pinned 0271; M6
+// F6.2 re-renders it to db/migrations/0275_*.sql (documents/UPDATE gains
+// document.review), so the golden target advances with the latest rendered
+// migration (M6 validation-contract.md §3, M2 §1.4/§1.5.a).
 func TestRenderMigration_MatchesCommittedFile(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		t.Fatalf("locate repo root: %v", err)
 	}
-	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0271_documents_update_tripwire_membership_obsolete.sql")
+	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0275_documents_update_tripwire_review_cap.sql")
 
 	committed, err := os.ReadFile(migrationPath)
 	if err != nil {

@@ -110,6 +110,17 @@ to 0270. The `templates_template` `submit` entry (#13) is a **deliberately retai
 `NULL` for iam_group_roles) and the scheduler-bypass block and the JSONB match loop are preserved
 byte-for-byte from 0270.
 
+> **Forward erratum — 2026-07-04 (M6 F6.2):** the `documents, UPDATE` arm (entry #6) additionally
+> gains **`document.review`** — the eQMS mark-reviewed workflow asserts it before UPDATEing
+> `public.documents` (sets `last_reviewed_at` + next `review_due_at`), so without the arm every
+> mark-reviewed UPDATE fail-closes `P0001`, the same additive extension as 0271. Rendered into
+> migration **0275** (`0275_documents_update_tripwire_review_cap.sql`), which supersedes 0271 as the
+> latest `enforce_capability_asserted()` definition; the M2 golden test and `TRIPWIRE-ARM-PARITY`
+> target advance from 0271→0275. This is the intended registry-driven growth of the generate-from-Go
+> mechanism (governed by M6 `validation-contract.md` §3), **not drift** of this frozen table — the
+> §1.2 table itself is unchanged; this note records the sanctioned M6 extension per the mission §9
+> HS-7 surface-don't-hide rule.
+
 ### 1.3 Retained-superset & pruning non-goal
 
 `templates_template`'s arm keeps `template.submit` even though no writer asserts submit while writing

@@ -15,8 +15,8 @@ import (
 
 // --- TRIPWIRE-ARM-PARITY ----------------------------------------------------
 
-// Clean tree: the real TripwireArms + the real committed 0271 migration must
-// be 0 violations (contract §1.5.a POSITIVE proof).
+// Clean tree: the real TripwireArms + the real committed tripwire migration
+// (0275 as of M6 F6.2) must be 0 violations (contract §1.5.a POSITIVE proof).
 func TestTripwireArmParity_CleanTreeGreen(t *testing.T) {
 	got, err := checkTripwireArmParity(repoRoot(t), true)
 	if err != nil {
@@ -54,7 +54,7 @@ func TestTripwireArmParity_NonRegistryCapFiresDirectly(t *testing.T) {
 	}
 }
 
-// NEGATIVE (ii): a hand-edited 0271 that no longer byte-equals
+// NEGATIVE (ii): a hand-edited tripwire migration that no longer byte-equals
 // tripwire.RenderMigration() must fire. We cannot mutate the committed file
 // (forbidden), so we point checkTripwireArmParity at a temp modulesRoot that
 // carries a deliberately WRONG copy of the migration at the same relative
@@ -326,11 +326,11 @@ func TestRenderMigration_Deterministic(t *testing.T) {
 	}
 }
 
-// sanity: the real committed 0271 file exists and is non-empty (guards
-// against an accidental deletion silently turning the PARITY rule green via
-// checkTripwireArmParity's missing-file violation not firing for the wrong
-// reason).
-func TestCommitted0271Exists(t *testing.T) {
+// sanity: the real committed latest tripwire migration file (0275 as of M6
+// F6.2) exists and is non-empty (guards against an accidental deletion silently
+// turning the PARITY rule green via checkTripwireArmParity's missing-file
+// violation not firing for the wrong reason).
+func TestCommittedTripwireMigrationExists(t *testing.T) {
 	path := filepath.Join(repoRoot(t), filepath.FromSlash(tripwireMigrationPath))
 	info, err := os.Stat(path)
 	if err != nil {

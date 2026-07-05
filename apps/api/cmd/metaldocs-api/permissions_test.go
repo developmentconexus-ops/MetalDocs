@@ -271,6 +271,7 @@ func TestRouteCoverage(t *testing.T) {
 		{"documents", http.MethodPost, "/api/v1/documents/d1/signoff"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/publish"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/schedule-publish"},
+		{"documents", http.MethodPost, "/api/v1/documents/d1/review"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/supersede"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/obsolete"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/finalize"},
@@ -343,9 +344,10 @@ func matchedByRule(method, path string) bool {
 
 // TestPermissionsTable_NoMethodlessWriteShadowing locks the F-001 authoring
 // invariants. Fails if any rule:
-//   (a) has empty method AND a Manage/Submit/write-grade cap, OR
-//   (b) has empty method on a prefix where some OTHER rule declares a write
-//       verb (so the methodless row would shadow per-verb intent).
+//
+//	(a) has empty method AND a Manage/Submit/write-grade cap, OR
+//	(b) has empty method on a prefix where some OTHER rule declares a write
+//	    verb (so the methodless row would shadow per-verb intent).
 //
 // See wiki/concepts/authz-tiers.md §Tier-1 rule authoring rules.
 func TestPermissionsTable_NoMethodlessWriteShadowing(t *testing.T) {

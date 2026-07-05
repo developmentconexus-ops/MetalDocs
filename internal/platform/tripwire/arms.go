@@ -39,13 +39,16 @@ type Arm struct {
 
 // TripwireArms is the binding source of truth for every gated (table, op)
 // pair enforced by public.enforce_capability_asserted(). Order is stable and
-// mirrors the CASE-branch order in db/migrations/0270_*.sql exactly (and,
-// transitively, db/migrations/0271_*.sql — the only content difference is
-// entry #6, documents/UPDATE, which gains document.obsolete and
-// membership.manage per validation-contract.md §1.1/§1.2).
+// mirrors the CASE-branch order in db/migrations/0270_*.sql exactly. The latest
+// rendered migration is db/migrations/0275_*.sql; entry #6 (documents/UPDATE)
+// has grown additively across two milestones: 0271 (M2) added document.obsolete
+// + membership.manage per M2 validation-contract.md §1.1/§1.2; 0275 (M6 F6.2)
+// added document.review per M6 validation-contract.md §3 — the intended
+// registry-driven growth path, not drift.
 //
-// Content MUST equal validation-contract.md §1.2 table exactly (18 entries).
-// Deviation is HS-7 (see that document's binding clause).
+// Content MUST equal M2 validation-contract.md §1.2 (18 gated entries) as
+// extended by M6 validation-contract.md §3 (documents/UPDATE gains
+// document.review). Any other deviation is HS-7 (see those binding clauses).
 var TripwireArms = []Arm{
 	{ // 1
 		Table: "approval_instances",
@@ -72,19 +75,26 @@ var TripwireArms = []Arm{
 		Op:    OpInsert,
 		Caps:  []iamdomain.Capability{iamdomain.CapDocumentCreate},
 	},
-	{ // 6 — the only entry that changes vs 0270. Widened (additive) to cover
-		// two function-local latent P0001 incidents: ForceReleaseSession /
-		// ForceReleaseSessionTx (documents/repository/repository.go:798,828)
-		// assert only CapMembershipManage; MarkObsolete's obsolete_service.go
-		// :88->93 asserts only CapDocumentObsolete. Neither co-asserts
-		// document.edit, so the pre-0271 arm ({document.edit}) fail-closed
-		// unconditionally on both paths. See validation-contract.md §1.1.
+	{ // 6 — the documents/UPDATE arm. Widened (additive) across two milestones.
+		// M2 (0271): covers two function-local latent P0001 incidents —
+		// ForceReleaseSession / ForceReleaseSessionTx
+		// (documents/repository/repository.go:798,828) assert only
+		// CapMembershipManage; MarkObsolete's obsolete_service.go:88->93 asserts
+		// only CapDocumentObsolete. Neither co-asserts document.edit, so the
+		// pre-0271 arm ({document.edit}) fail-closed unconditionally on both
+		// paths. See M2 validation-contract.md §1.1.
+		// M6 (0275): gains CapDocumentReview — the F6.2 mark-reviewed workflow
+		// asserts only document.review then UPDATEs documents (last_reviewed_at +
+		// review_due_at); without the arm every mark-reviewed UPDATE is
+		// fail-closed P0001, the same defect class as 0269/0270/0271. Additive
+		// registry-driven growth per M6 validation-contract.md §3 (touchpoint 6).
 		Table: "documents",
 		Op:    OpUpdate,
 		Caps: []iamdomain.Capability{
 			iamdomain.CapDocumentEdit,
 			iamdomain.CapDocumentObsolete,
 			iamdomain.CapMembershipManage,
+			iamdomain.CapDocumentReview,
 		},
 	},
 	{ // 7

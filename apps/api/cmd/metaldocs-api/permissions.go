@@ -167,6 +167,9 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/signoff", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/publish", capability: iamdomain.CapDocumentPublish, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/schedule-publish", capability: iamdomain.CapDocumentPublish, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// M6 F6.2 (markDocumentReviewed): the eQMS mark-reviewed governance action —
+	// tier-1 gates document.review, tier-2 authz.Require lands in the T5 service.
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/review", capability: iamdomain.CapDocumentReview, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/supersede", capability: iamdomain.CapDocumentSupersede, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/obsolete", capability: iamdomain.CapDocumentObsolete, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/cancel", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},

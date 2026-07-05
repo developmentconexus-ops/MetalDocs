@@ -81,6 +81,12 @@ const (
 	CapDocumentPublish   Capability = "document.publish"
 	CapDocumentObsolete  Capability = "document.obsolete"
 	CapDocumentSupersede Capability = "document.supersede"
+	// CapDocumentReview gates the eQMS periodic-review mark-reviewed workflow
+	// (M6 F6.2): recording a review completion on a live published revision
+	// (sets last_reviewed_at + the next review_due_at). Tenant-grade; enforced
+	// tier-2 in-tx via authz.Require and backstopped by the documents/UPDATE DB
+	// tripwire arm. ADR 0069.
+	CapDocumentReview Capability = "document.review"
 
 	CapTemplateView    Capability = "template.view"
 	CapTemplateCreate  Capability = "template.create"
@@ -133,6 +139,7 @@ var validCapabilities = map[Capability]struct{}{
 	CapDocumentPublish:             {},
 	CapDocumentObsolete:            {},
 	CapDocumentSupersede:           {},
+	CapDocumentReview:              {},
 	CapTemplateView:                {},
 	CapTemplateCreate:              {},
 	CapTemplateEdit:                {},
