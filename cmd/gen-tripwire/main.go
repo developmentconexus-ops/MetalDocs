@@ -1,7 +1,7 @@
 // Command gen-tripwire writes the machine-generated tripwire migration SQL
 // (internal/platform/tripwire.RenderMigration()) to the latest canonical
-// migration path (0279 as of M7 F7.3, tenant_lifecycle_jobs/INSERT arm gated
-// on tenant.export OR tenant.erase, ADR 0070).
+// migration path (0283 as of M7 F7.3 Task F fix: DELETE paths RETURN OLD —
+// RETURN NEW on a BEFORE DELETE trigger silently cancelled every DELETE).
 //
 // Usage: go run ./cmd/gen-tripwire [output-path]
 // With no argument, writes to the canonical path relative to the repo root
@@ -16,7 +16,7 @@ import (
 	"metaldocs/internal/platform/tripwire"
 )
 
-const defaultRelPath = "db/migrations/0279_tenant_lifecycle_jobs_tripwire_export_erase_cap.sql"
+const defaultRelPath = "db/migrations/0283_tripwire_delete_return_old.sql"
 
 func main() {
 	out := defaultRelPath

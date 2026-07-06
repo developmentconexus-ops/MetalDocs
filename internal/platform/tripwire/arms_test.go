@@ -107,16 +107,17 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 // TestRenderMigration_MatchesCommittedFile is the golden test: RenderMigration()
 // must byte-equal the latest committed tripwire migration. M2 pinned 0271; M6
 // F6.2 re-rendered it to 0275; M7 F7.2 re-rendered it to 0277 (tenants/INSERT
-// arm); M7 F7.3 re-renders it to db/migrations/0279_*.sql (adds the
-// tenant_lifecycle_jobs/INSERT arm + one-time attachment, ADR 0070), so the
-// golden target advances with the latest rendered migration (M7
+// arm); M7 F7.3 re-rendered it to 0279 (tenant_lifecycle_jobs/INSERT arm +
+// one-time attachment, ADR 0070), then to db/migrations/0283_*.sql (DELETE
+// paths RETURN OLD — RETURN NEW on BEFORE DELETE silently cancelled DELETEs),
+// so the golden target advances with the latest rendered migration (M7
 // validation-contract.md §5, M6 §3, M2 §1.4/§1.5.a).
 func TestRenderMigration_MatchesCommittedFile(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		t.Fatalf("locate repo root: %v", err)
 	}
-	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0279_tenant_lifecycle_jobs_tripwire_export_erase_cap.sql")
+	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0283_tripwire_delete_return_old.sql")
 
 	committed, err := os.ReadFile(migrationPath)
 	if err != nil {

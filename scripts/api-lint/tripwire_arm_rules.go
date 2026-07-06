@@ -40,9 +40,10 @@ import (
 // rendered tripwire migration: M2 pinned 0271; M6 F6.2 re-rendered it to 0275
 // (documents/UPDATE gains document.review); M7 F7.2 re-rendered it to 0277
 // (tenants/INSERT arm gated on tenant.onboard + attachment, ADR 0070); M7 F7.3
-// re-renders it to 0279 (tenant_lifecycle_jobs/INSERT arm gated on
-// tenant.export OR tenant.erase + attachment, ADR 0070).
-const tripwireMigrationPath = "db/migrations/0279_tenant_lifecycle_jobs_tripwire_export_erase_cap.sql"
+// re-rendered it to 0279 (tenant_lifecycle_jobs/INSERT arm gated on
+// tenant.export OR tenant.erase + attachment, ADR 0070), then to 0283 (DELETE
+// paths RETURN OLD — RETURN NEW on BEFORE DELETE silently cancelled DELETEs).
+const tripwireMigrationPath = "db/migrations/0283_tripwire_delete_return_old.sql"
 
 // gatedTableSet returns the set of table names present in TripwireArms — the
 // tables TRIPWIRE-ARM-DRIFT restricts its attention to (contract §1.5.b: "only

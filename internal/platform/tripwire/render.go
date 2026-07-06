@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// RenderMigration renders the full 0279 forward-only migration SQL,
+// RenderMigration renders the full 0283 forward-only migration SQL,
 // regenerated from the prior tripwire migration (0277) with every CASE branch
 // preserved byte-for-byte plus one new branch — tenant_lifecycle_jobs/INSERT
 // (M7 F7.3, ADR 0070) — whose v_required_caps literal is produced from
@@ -35,19 +35,19 @@ func RenderMigration() string {
 		"  CASE\n" +
 		"    WHEN TG_TABLE_NAME = 'approval_instances' AND TG_OP = 'INSERT' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("approval_instances", OpInsert)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'approval_signoffs' AND TG_OP = 'INSERT' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("approval_signoffs", OpInsert)) + ";\n" +
 		"      v_tenant_id     := NEW.actor_tenant_id;\n" +
 		"    WHEN TG_TABLE_NAME = 'iam_user_roles' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("iam_user_roles", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'user_process_areas' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("user_process_areas", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'documents' AND TG_OP = 'INSERT' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("documents", OpInsert)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'documents' AND TG_OP = 'UPDATE' THEN\n" +
 		"      -- 0271: 'document.obsolete' and 'membership.manage' added — two\n" +
 		"      -- function-local write-paths assert only one of these caps (no\n" +
@@ -59,45 +59,45 @@ func RenderMigration() string {
 		"      -- workflow asserts only document.review then UPDATEs documents\n" +
 		"      -- (last_reviewed_at + review_due_at); see file header.\n" +
 		"      v_required_caps := " + renderArray(findArm("documents", OpUpdate)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'controlled_documents' AND TG_OP = 'INSERT' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("controlled_documents", OpInsert)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'controlled_documents' AND TG_OP = 'UPDATE' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("controlled_documents", OpUpdate)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'cd_sequence_counters' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("cd_sequence_counters", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'document_profiles' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("document_profiles", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'document_process_areas' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("document_process_areas", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'document_families' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("document_families", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'templates_template' THEN\n" +
 		"      -- 0270: 'template.archive' added — Service.ArchiveTemplate updates this\n" +
 		"      -- table under CapTemplateArchive; see file header.\n" +
 		"      v_required_caps := " + renderArray(findArm("templates_template", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'templates_template_version' THEN\n" +
 		"      -- 0269: 'template.review' added — the reviewer stage (Service.Review)\n" +
 		"      -- writes this table under CapTemplateReview; see file header.\n" +
 		"      v_required_caps := " + renderArray(findArm("templates_template_version", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    -- ── New branches (SEC-05 / T-004 residual) ──────────────────────────────\n" +
 		"    WHEN TG_TABLE_NAME = 'iam_users' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("iam_users", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'iam_groups' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("iam_groups", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'iam_group_members' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("iam_group_members", OpAny)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'iam_group_roles' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("iam_group_roles", OpAny)) + ";\n" +
 		"      -- iam_group_roles has no tenant_id column (scoped transitively via\n" +
@@ -117,7 +117,7 @@ func RenderMigration() string {
 		"      -- exactly one of tenant.export / tenant.erase then INSERT\n" +
 		"      -- metaldocs.tenant_lifecycle_jobs (kind discriminates which).\n" +
 		"      v_required_caps := " + renderArray(findArm("tenant_lifecycle_jobs", OpInsert)) + ";\n" +
-		"      v_tenant_id     := NEW.tenant_id;\n" +
+		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    ELSE\n" +
 		"      -- Fail-closed: a table carrying this trigger with no capability mapping is a\n" +
 		"      -- wiring error, not a license to pass through. Refuse the write loudly.\n" +
@@ -136,7 +136,7 @@ func RenderMigration() string {
 		"          'authz.bypass_used',\n" +
 		"          'system:scheduler',\n" +
 		"          TG_TABLE_NAME,\n" +
-		"          COALESCE(NEW.id::TEXT, 'unknown'),\n" +
+		"          COALESCE(NEW.id::TEXT, OLD.id::TEXT, 'unknown'),\n" +
 		"          'scheduler bypass for ' || v_required_caps[1],\n" +
 		"          pg_catalog.to_jsonb(jsonb_build_object(\n" +
 		"            'required_caps', to_jsonb(v_required_caps),\n" +
@@ -148,6 +148,12 @@ func RenderMigration() string {
 		"      EXCEPTION WHEN others THEN\n" +
 		"        RAISE NOTICE 'enforce_capability_asserted: governance_events insert failed: %', SQLERRM;\n" +
 		"      END;\n" +
+		"      -- BEFORE-trigger return contract: returning NEW on a DELETE returns\n" +
+		"      -- NULL (NEW is unassigned for DELETE), which SILENTLY CANCELS the\n" +
+		"      -- row deletion. 0283 root-cause fix: return OLD for DELETE.\n" +
+		"      IF TG_OP = 'DELETE' THEN\n" +
+		"        RETURN OLD;\n" +
+		"      END IF;\n" +
 		"      RETURN NEW;\n" +
 		"    ELSE\n" +
 		"      RAISE EXCEPTION 'ErrCapabilityNotAsserted: unrecognised bypass token; caps % required on %', v_required_caps, TG_TABLE_NAME\n" +
@@ -185,6 +191,10 @@ func RenderMigration() string {
 		"      USING ERRCODE = 'P0001';\n" +
 		"  END IF;\n" +
 		"\n" +
+		"  -- Same BEFORE-trigger return contract as the bypass path above (0283).\n" +
+		"  IF TG_OP = 'DELETE' THEN\n" +
+		"    RETURN OLD;\n" +
+		"  END IF;\n" +
 		"  RETURN NEW;\n" +
 		"END;\n" +
 		"$$;\n" +
@@ -214,7 +224,7 @@ func RenderMigration() string {
 		"-- ── schema_migrations ledger ─────────────────────────────────────────────────────────────\n" +
 		"\n" +
 		"INSERT INTO public.schema_migrations (version, description)\n" +
-		"VALUES ('0279', '" + ledgerDescription + "')\n" +
+		"VALUES ('0283', '" + ledgerDescription + "')\n" +
 		"ON CONFLICT (version) DO NOTHING;\n" +
 		"\n" +
 		"COMMIT;\n"
@@ -223,37 +233,35 @@ func RenderMigration() string {
 // migrationHeader is the file-header comment block for 0279, in
 // 0269/0270/0271/0275/0277 house style: goal/incident framing, root cause,
 // writer inventory, fix statement.
-const migrationHeader = `-- 0279_tenant_lifecycle_jobs_tripwire_export_erase_cap.sql
--- M7 F7.3 Task A (global-maximum-remediation, milestone-7-tenant-lifecycle,
--- ADR 0070): the tenant export/erase workflows each assert exactly one of
--- tenant.export / tenant.erase (both new capabilities, ADR 0070) then INSERT
--- metaldocs.tenant_lifecycle_jobs (kind discriminates which). Before this
--- migration metaldocs.tenant_lifecycle_jobs (created by 0278) carried NO
--- trg_require_cap_asserted trigger at all — the enqueue INSERT was a
--- privileged provisioning write with no DB tripwire backstop.
+const migrationHeader = `-- 0283_tripwire_delete_return_old.sql
+-- M7 F7.3 Task F fix (global-maximum-remediation, milestone-7-tenant-lifecycle,
+-- ADR 0070): public.enforce_capability_asserted() is a BEFORE INSERT OR UPDATE
+-- OR DELETE row trigger, and every code path ended in RETURN NEW. For a DELETE,
+-- NEW is unassigned (NULL), and a BEFORE row trigger returning NULL SILENTLY
+-- CANCELS the row operation — so every DELETE on a trigger-carrying table was
+-- a no-op with a success result: no error, 0 rows actually deleted. Latent
+-- since the trigger's introduction; surfaced by M7 tenant erasure
+-- (TestTenantErasure_ChainStaysGreen: erased tenant kept its iam_users rows
+-- while the INSERT-only-armed tenant_lifecycle_jobs table erased fine).
 --
--- Fix: (1) add a tenant_lifecycle_jobs/INSERT CASE branch requiring
--- {tenant.export, tenant.erase} (match-one / OR semantics, mirroring the
--- documents/UPDATE (#6) and controlled_documents/UPDATE (#8) multi-cap arm
--- precedent); (2) one-time trigger attachment on
--- metaldocs.tenant_lifecycle_jobs (0259/0277 attachment precedent), BEFORE
--- INSERT only to match the arm — the fail-closed ELSE branch would P0001
--- every UPDATE/DELETE if the trigger fired for ops the CASE does not map, and
--- no UPDATE/DELETE writer exists yet at this task boundary (the async
--- worker's status-transition writes are a separate later task).
+-- Fix, at the generator (internal/platform/tripwire/render.go), regenerated
+-- here: (1) both success exits (scheduler-bypass path and cap-asserted path)
+-- RETURN OLD when TG_OP = 'DELETE', NEW otherwise; (2) v_tenant_id branches
+-- read COALESCE(NEW.tenant_id, OLD.tenant_id) so DELETE governance rows carry
+-- the real tenant; (3) the governance_events resource_id falls back
+-- NEW.id -> OLD.id -> 'unknown'.
 --
--- Additive only — no cap is removed from any arm. This migration is
--- machine-generated from internal/platform/tripwire (TripwireArms +
--- RenderMigration) — see docs/superpowers/milestones/
--- global-maximum-remediation/milestone-7-tenant-lifecycle/
--- validation-contract.md §5 (touchpoint 6) and the M2 regeneration protocol
+-- No arm/cap change of any kind — the CASE branch inventory and every
+-- v_required_caps literal are reproduced byte-for-byte from 0279. This
+-- migration is machine-generated from internal/platform/tripwire
+-- (TripwireArms + RenderMigration) per the M2 regeneration protocol
 -- (milestone-2-authz-enforcement-generation/validation-contract.md §1.2/§1.4).
--- Every other CASE branch is reproduced byte-for-byte from 0277. Supersedes
--- 0277 as the latest definition of public.enforce_capability_asserted().
+-- Supersedes 0279 as the latest definition of
+-- public.enforce_capability_asserted().
 
 `
 
-const ledgerDescription = "M7 F7.3 Task A (ADR 0070): add tenant_lifecycle_jobs/INSERT tripwire arm requiring {tenant.export, tenant.erase} (match-one) and attach trg_require_cap_asserted to metaldocs.tenant_lifecycle_jobs (BEFORE INSERT) -- the export/erase enqueue workflows assert only one of tenant.export/tenant.erase then INSERT tenant_lifecycle_jobs, previously with no DB tripwire backstop. Additive-only; all other branches preserved from 0277; machine-generated from internal/platform/tripwire."
+const ledgerDescription = "M7 F7.3 Task F fix: enforce_capability_asserted() returned NEW on every path -- NULL for DELETE, silently cancelling every DELETE on a trigger-carrying table. Now RETURN OLD when TG_OP is DELETE (both bypass and cap-asserted exits), v_tenant_id = COALESCE(NEW.tenant_id, OLD.tenant_id), governance resource_id falls back to OLD.id. No arm/cap change; branches byte-for-byte from 0279; machine-generated from internal/platform/tripwire."
 
 // findArm returns the Arm for (table, op), panicking if absent — every
 // branch rendered above must correspond to a TripwireArms entry (parity is
