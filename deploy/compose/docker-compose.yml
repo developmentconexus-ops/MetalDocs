@@ -71,11 +71,20 @@ services:
         condition: service_started
     restart: "no"
     entrypoint: ["/bin/sh"]
+    volumes:
+      # Deterministic system blank template artifact (1289 bytes, sha256 pinned in
+      # db/reference-data/0001_product_reference_data.sql content_hash). The
+      # reference-data row points at system/templates/blank.docx; controlled-document
+      # creation fails 409 template.artifact_missing if the object is absent. Seeding
+      # it here makes cold-start self-contained instead of depending on the manual
+      # scripts/seed-system-blank-template.ps1 step.
+      - ./assets/system-blank.docx:/seed/system-blank.docx:ro
     command:
       - -c
       - |
         until mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do sleep 2; done;
-        mc mb -p local/${METALDOCS_MINIO_BUCKET} || true
+        mc mb -p local/${METALDOCS_MINIO_BUCKET} || true;
+        mc cp /seed/system-blank.docx local/${METALDOCS_MINIO_BUCKET}/system/templates/blank.docx
 
   gotenberg:
     image: gotenberg/gotenberg:8
