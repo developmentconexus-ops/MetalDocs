@@ -1,7 +1,7 @@
 # Milestone 8 — Ops Readiness
 
 > **Program:** global-maximum-remediation  ·  **Governing spec:** `../mission.md` §7 M8
-> **Status:** PASSED — milestone-validator VERDICT: PASS (2026-07-06, `qa/milestone-qa.md`); HS-1 operator gate pending
+> **Status:** PASSED — milestone-validator VERDICT: PASS + operator HS-1 approval (2026-07-06, `qa/milestone-qa.md`)
 > **Authored:** 2026-07-05 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** M8 is, **which features** it contains,
