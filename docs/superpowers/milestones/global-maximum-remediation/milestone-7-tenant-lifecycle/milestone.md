@@ -1,7 +1,7 @@
 # Milestone 7 — Tenant Lifecycle Kernel
 
 > **Program:** global-maximum-remediation  ·  **Governing spec:** `../mission.md` §7 M7
-> **Status:** ✅ **PASSED** (milestone-validator VERDICT: PASS, 2026-07-05 — `qa/milestone-qa.md`). Awaiting HS-1 operator gate: must ratify the two F7.4 §4.2/§4.5 deviations (dedicated non-owner role; wrong-GUC-blocks proof). Commits local, not pushed.
+> **Status:** ✅ **PASSED — operator-approved** (milestone-validator VERDICT: PASS, 2026-07-05 — `qa/milestone-qa.md`; **HS-1 ratified 2026-07-05**). Both F7.4 §4.2/§4.5 deviations (dedicated non-owner `metaldocs_ci` role; wrong-GUC-blocks reconciliation of the no-GUC-0-rows premise) **ratified by operator**. Commits local, not pushed. Next: M8 (ops-readiness) on operator go.
 > **Authored:** 2026-07-05 — *before any feature in this milestone began (F7.1 gate+ADR excepted — F7.1 is the gate itself and completed first per D7).*
 
 > This file is a **spec**, authored up front. It says **what** M7 is, **which features** it contains,
