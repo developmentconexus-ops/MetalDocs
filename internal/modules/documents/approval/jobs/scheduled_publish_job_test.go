@@ -19,7 +19,7 @@ import (
 	"github.com/riverqueue/river"
 
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
-	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
+	approvalrepo "metaldocs/internal/modules/documents/approval/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/tests/integration/testdb"
 )

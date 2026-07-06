@@ -9,7 +9,7 @@ import (
 	"time"
 
 	docapp "metaldocs/internal/modules/documents/application"
-	docrepo "metaldocs/internal/modules/documents/repository"
+	docrepo "metaldocs/internal/modules/documents/infrastructure"
 	fanoutpkg "metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/fanout/dispatchjobs"
 	"metaldocs/internal/modules/render/resolvers"

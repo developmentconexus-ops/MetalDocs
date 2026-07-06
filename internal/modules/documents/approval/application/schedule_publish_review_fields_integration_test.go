@@ -18,7 +18,7 @@ import (
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
@@ -50,7 +50,7 @@ func TestSchedulePublish_PersistsEffectiveToAndReviewDueAt(t *testing.T) {
 		testdb.WithStatus("approved"),
 	)
 
-	repo := repository.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
+	repo := infrastructure.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
 	emitter := NewSQLEmitter()
 	clock := RealClock{}
 	cdRead := controlleddocumentsdomain.NoopCDFieldReader{}
@@ -124,7 +124,7 @@ func TestSchedulePublish_EffectiveToAndReviewDueAtOptional(t *testing.T) {
 		testdb.WithStatus("approved"),
 	)
 
-	repo := repository.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
+	repo := infrastructure.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
 	svcs := NewServices(repo, NewSQLEmitter(), RealClock{}, controlleddocumentsdomain.NoopCDFieldReader{})
 	runner := db.NewTxRunner(database)
 

@@ -10,7 +10,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -62,7 +62,7 @@ func TestCancelHandler(t *testing.T) {
 		{
 			name:         "instance completed",
 			body:         `{"reason":"request withdrawn"}`,
-			svcErr:       repository.ErrInstanceCompleted,
+			svcErr:       infrastructure.ErrInstanceCompleted,
 			wantStatus:   http.StatusConflict,
 			wantSvcCalls: true,
 		},

@@ -16,7 +16,7 @@ import (
 	documentsapi "metaldocs/internal/modules/documents/api"
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
-	approvalrepository "metaldocs/internal/modules/documents/approval/repository"
+	approvalrepository "metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/documents/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	"metaldocs/internal/modules/iam/authz"

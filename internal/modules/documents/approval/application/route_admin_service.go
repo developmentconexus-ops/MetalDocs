@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -27,7 +27,7 @@ const routeProfileFKConstraint = "approval_routes_document_profile_fk"
 
 // RouteAdminService manages approval route configuration changes.
 type RouteAdminService struct {
-	repo       repository.ApprovalRepository
+	repo       infrastructure.ApprovalRepository
 	emitter    EventEmitter
 	clock      Clock
 	idempStore RouteAdminIdempStore
@@ -109,7 +109,7 @@ type DeactivateRouteResult struct {
 
 // ListRoutesResult is returned by List.
 type ListRoutesResult struct {
-	Routes []repository.Route
+	Routes []infrastructure.Route
 }
 
 // Create creates a new approval route and all route stages.
@@ -182,11 +182,11 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			in.TenantID, in.ProfileCode, in.Name, in.ActorUserID,
 		).Scan(&routeID)
 		if err != nil {
-			mapped := repository.MapPgError(err, repository.MapHints{})
+			mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
 			// Only a 23503 violation of the profile FK means the profile is not
 			// registered for the tenant — map that to a validation error. Any other
 			// FK violation falls through to a wrapped error so WriteError logs it at 500.
-			if errors.Is(mapped, repository.ErrFKViolation) {
+			if errors.Is(mapped, infrastructure.ErrFKViolation) {
 				var pgErr *pgconn.PgError
 				if errors.As(err, &pgErr) && pgErr.ConstraintName == routeProfileFKConstraint {
 					return ErrRouteProfileUnknown
@@ -317,10 +317,10 @@ func (s *RouteAdminService) updateTx(ctx context.Context, runner db.TxRunner, in
 		).Scan(&newVersion)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return repository.ErrStaleRevision
+				return infrastructure.ErrStaleRevision
 			}
-			mapped := repository.MapPgError(err, repository.MapHints{})
-			if errors.Is(mapped, repository.ErrRouteInUse) {
+			mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
+			if errors.Is(mapped, infrastructure.ErrRouteInUse) {
 				return mapped
 			}
 			return fmt.Errorf("update route: %w", mapped)
@@ -443,7 +443,7 @@ func (s *RouteAdminService) deactivateTx(ctx context.Context, runner db.TxRunner
 		}
 		if !lockedRoute.Active {
 			if in.ExpectedVersion > 0 && lockedRoute.Version != in.ExpectedVersion {
-				return repository.ErrStaleRevision
+				return infrastructure.ErrStaleRevision
 			}
 			return ErrRouteAlreadyInactive
 		}
@@ -459,8 +459,8 @@ func (s *RouteAdminService) deactivateTx(ctx context.Context, runner db.TxRunner
 			in.RouteID, in.TenantID, in.ExpectedVersion,
 		)
 		if err != nil {
-			mapped := repository.MapPgError(err, repository.MapHints{})
-			if errors.Is(mapped, repository.ErrRouteInUse) {
+			mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
+			if errors.Is(mapped, infrastructure.ErrRouteInUse) {
 				return mapped
 			}
 			return fmt.Errorf("deactivate route: %w", mapped)
@@ -470,7 +470,7 @@ func (s *RouteAdminService) deactivateTx(ctx context.Context, runner db.TxRunner
 			return fmt.Errorf("deactivate route rows affected: %w", err)
 		}
 		if rows == 0 {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 
 		payload, err := json.Marshal(map[string]any{
@@ -549,9 +549,9 @@ func isPassThroughRouteAdminErr(err error) bool {
 		errors.Is(err, ErrRouteAlreadyInactive),
 		errors.Is(err, ErrRouteDeactivateReasonRequired),
 		errors.Is(err, ErrRouteProfileUnknown),
-		errors.Is(err, repository.ErrStaleRevision),
-		errors.Is(err, repository.ErrRouteInUse),
-		errors.Is(err, repository.ErrDuplicateRouteProfile):
+		errors.Is(err, infrastructure.ErrStaleRevision),
+		errors.Is(err, infrastructure.ErrRouteInUse),
+		errors.Is(err, infrastructure.ErrDuplicateRouteProfile):
 		return true
 	}
 	var capDenied authz.ErrCapDenied
@@ -613,7 +613,7 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages [
 			(route_id, stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift)
 		VALUES ` + strings.Join(placeholders, ",")
 	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("route_admin: insert stages: %w", repository.MapPgError(err, repository.MapHints{}))
+		return fmt.Errorf("route_admin: insert stages: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
 	}
 	return nil
 }
@@ -627,7 +627,7 @@ func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domai
 		routeID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("route_admin: load stages: %w", repository.MapPgError(err, repository.MapHints{}))
+		return nil, fmt.Errorf("route_admin: load stages: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
 	}
 	defer rows.Close()
 

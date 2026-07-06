@@ -19,14 +19,14 @@ import (
 	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
 	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
-	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
-	docsrepo "metaldocs/internal/modules/documents/repository"
+	approvalrepo "metaldocs/internal/modules/documents/approval/infrastructure"
+	docsrepo "metaldocs/internal/modules/documents/infrastructure"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	jobstenantdata "metaldocs/internal/modules/jobs/tenantdata"
 	notificationsinfra "metaldocs/internal/modules/notifications/infrastructure"
 	renderfanout "metaldocs/internal/modules/render/fanout"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
-	templatesrepo "metaldocs/internal/modules/templates/repository"
+	templatesrepo "metaldocs/internal/modules/templates/infrastructure"
 	tokensinfra "metaldocs/internal/modules/tokens/infrastructure"
 )
 

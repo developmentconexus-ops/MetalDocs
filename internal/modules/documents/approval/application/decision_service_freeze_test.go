@@ -12,7 +12,7 @@ import (
 	"time"
 
 	docapp "metaldocs/internal/modules/documents/application"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
@@ -210,7 +210,7 @@ func TestRecordSignoff_PinError_RollsBackTransaction(t *testing.T) {
 	signedAt := time.Date(2026, 4, 23, 12, 10, 0, 0, time.UTC)
 	repo := &fakeDecisionRepo{
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
-		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-b", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-b", WasReplay: false},
 	}
 	pin := &fakePinInvoker{err: errors.New("pin failed")}
 	conn := &freezeDecisionConn{
@@ -273,7 +273,7 @@ func TestRecordSignoff_WasReplay_DoesNotPin(t *testing.T) {
 	signedAt := time.Date(2026, 4, 23, 12, 30, 0, 0, time.UTC)
 	repo := &fakeDecisionRepo{
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
-		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-d", WasReplay: true},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-d", WasReplay: true},
 	}
 	pin := &fakePinInvoker{}
 	conn := &freezeDecisionConn{actorID: actorID}
@@ -310,7 +310,7 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 	signedAt := time.Date(2026, 4, 23, 12, 40, 0, 0, time.UTC)
 	repo := &fakeDecisionRepo{
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
-		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-comments", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-comments", WasReplay: false},
 	}
 	pin := &fakePinInvoker{}
 	conn := &freezeDecisionConn{
@@ -373,7 +373,7 @@ func TestRecordSignoff_PinInvoker_CallsPin(t *testing.T) {
 	signedAt := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
 	repo := &fakeDecisionRepo{
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
-		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-pin-1", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-pin-1", WasReplay: false},
 	}
 	pin := &fakePinInvoker{}
 	conn := &freezeDecisionConn{
@@ -431,7 +431,7 @@ func TestRecordSignoff_PinInvoker_PDFOutboxNotEnqueued(t *testing.T) {
 	signedAt := time.Date(2026, 6, 1, 11, 0, 0, 0, time.UTC)
 	repo := &fakeDecisionRepo{
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
-		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-pin-2", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-pin-2", WasReplay: false},
 	}
 	pdfOutbox := &fakePDFOutboxEnqueuer{}
 	conn := &freezeDecisionConn{
@@ -484,7 +484,7 @@ func TestRecordSignoff_RejectPath_AssertsDocumentEditBeforeDocumentWrite(t *test
 	signedAt := time.Date(2026, 4, 23, 12, 50, 0, 0, time.UTC)
 	repo := &fakeDecisionRepo{
 		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
-		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-reject", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-reject", WasReplay: false},
 	}
 	conn := &freezeDecisionConn{
 		actorID: actorID,

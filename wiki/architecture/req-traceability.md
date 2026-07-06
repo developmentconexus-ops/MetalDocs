@@ -36,7 +36,7 @@
 | REQ-AUTHZ-8 | MUST | doc-annotation | contract doc is refactor item RF-3. |
 | REQ-IAM-1 | MUST | commit | commit 50ce3bc8 — F7.2 Task C: OnboardTenantService — one-tx tenant provisioning, audited, admin-surface identity lifecycle; commit 50ce3bc8. |
 | REQ-IAM-2 | SHOULD | none | — |
-| REQ-TEN-1 | MUST | test | internal/modules/templates/repository/tenant_id_rls_integration_test.go |
+| REQ-TEN-1 | MUST | test | internal/modules/templates/infrastructure/tenant_id_rls_integration_test.go |
 | REQ-TEN-2 | MUST | commit | commit 552b7a97 — TST-09: rewrites 6 tenant-isolation stubs as real integration tests, the live proof for cross-tenant references resolving to 404; commit 552b7a97. |
 | REQ-TEN-3 | MUST | doc-annotation | regression-locked already. |
 | REQ-TEN-4 | MUST | commit | commit 501e6a37 — Onda 2A: object-store tenant guards — tenant-namespaced blob keys enforced at the store boundary; commit 501e6a37 (also: c570135d tenant-scoped presign keys). |

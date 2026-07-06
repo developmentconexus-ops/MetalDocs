@@ -9,7 +9,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/platform/strictjson"
 )
 
@@ -213,7 +213,7 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func mapListRoute(route repository.Route) contracts.ListRouteItem {
+func mapListRoute(route infrastructure.Route) contracts.ListRouteItem {
 	createdAt := route.CreatedAt.UTC().Format(time.RFC3339)
 	updatedAt := route.UpdatedAt.UTC().Format(time.RFC3339)
 	if route.UpdatedAt.IsZero() {

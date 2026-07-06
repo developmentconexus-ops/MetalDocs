@@ -11,7 +11,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -94,7 +94,7 @@ func TestSubmitHandler(t *testing.T) {
 			ifMatch:        "\"v2\"",
 			idempotencyKey: "22222222-2222-2222-2222-222222222222",
 			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
-			svcErr:         repository.ErrStaleRevision,
+			svcErr:         infrastructure.ErrStaleRevision,
 			wantStatus:     http.StatusConflict,
 		},
 		{

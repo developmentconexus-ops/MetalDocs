@@ -13,7 +13,7 @@ import (
 
 	documentsapi "metaldocs/internal/modules/documents/api"
 	v2domain "metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
@@ -23,7 +23,7 @@ import (
 
 type FillInService interface {
 	SetPlaceholderValue(ctx context.Context, tenantID, actorID, revisionID, placeholderID, value string) error
-	GetPlaceholderValues(ctx context.Context, tenantID, docID string) ([]repository.PlaceholderValue, error)
+	GetPlaceholderValues(ctx context.Context, tenantID, docID string) ([]infrastructure.PlaceholderValue, error)
 	GetFillInSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error)
 }
 

@@ -10,7 +10,7 @@ import (
 
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/modules/templates/application"
-	"metaldocs/internal/modules/templates/repository"
+	"metaldocs/internal/modules/templates/infrastructure"
 	"metaldocs/internal/platform/objectstore"
 )
 
@@ -18,10 +18,10 @@ import (
 // templates repository: which tenants own templates, and which object keys each
 // tenant's template versions reference. Defined here (consumer side) so the
 // sweeper depends on an interface, not the concrete repository, and stays
-// unit-testable without a database. *repository.Repository satisfies it.
+// unit-testable without a database. *infrastructure.Repository satisfies it.
 type OrphanObjectRepo interface {
 	TenantIDsWithTemplates(ctx context.Context) ([]string, error)
-	ReferencedTemplateObjectRefs(ctx context.Context, tenantID string) ([]repository.ReferencedTemplateObjectRef, error)
+	ReferencedTemplateObjectRefs(ctx context.Context, tenantID string) ([]infrastructure.ReferencedTemplateObjectRef, error)
 }
 
 // OrphanObjectStore is the narrow object-store surface the sweeper needs:

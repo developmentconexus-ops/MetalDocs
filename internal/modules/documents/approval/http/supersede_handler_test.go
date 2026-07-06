@@ -15,7 +15,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -119,7 +119,7 @@ func TestSupersedeHandler(t *testing.T) {
 		},
 		{
 			name:       "stale occ",
-			svcErr:     repository.ErrStaleRevision,
+			svcErr:     infrastructure.ErrStaleRevision,
 			wantStatus: http.StatusConflict,
 		},
 	}

@@ -14,14 +14,14 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
 // Ensure fakeSubmitRepo satisfies ApprovalRepository at compile time.
-var _ repository.ApprovalRepository = (*fakeSubmitRepo)(nil)
+var _ infrastructure.ApprovalRepository = (*fakeSubmitRepo)(nil)
 
 // ---------------------------------------------------------------------------
 // Fake repo — only implements the methods called by SubmitRevisionForReview.
@@ -32,7 +32,7 @@ type fakeSubmitRepo struct {
 	insertStageInstancesErr error
 	lastInstance            domain.Instance
 	// Embed a no-op for the full interface; all other methods panic if called.
-	repository.ApprovalRepository
+	infrastructure.ApprovalRepository
 }
 
 func (r *fakeSubmitRepo) InsertInstance(_ context.Context, _ db.Tx, inst domain.Instance) error {
@@ -143,7 +143,7 @@ func (r *fakeSubmitRepo) ResolveEligibleActors(ctx context.Context, tx db.Tx, te
 }
 
 // The remaining 4 new interface methods are not called by SubmitRevisionForReview.
-// The embedded repository.ApprovalRepository is nil, so these must be explicitly
+// The embedded infrastructure.ApprovalRepository is nil, so these must be explicitly
 // implemented to avoid a nil-pointer panic if the compiler checks the interface.
 
 func (r *fakeSubmitRepo) LoadPriorSignoffs(_ context.Context, _ db.Tx, _, _, _ string) ([]domain.Signoff, error) {
@@ -638,7 +638,7 @@ func TestSubmitRevisionForReview_AssertsDocumentEditBeforeDocumentsUpdate(t *tes
 
 func TestSubmitRevisionForReview_DuplicateSubmission(t *testing.T) {
 	repo := &fakeSubmitRepo{
-		insertInstanceErr: repository.ErrDuplicateSubmission,
+		insertInstanceErr: infrastructure.ErrDuplicateSubmission,
 	}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
@@ -660,8 +660,8 @@ func TestSubmitRevisionForReview_DuplicateSubmission(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected ErrDuplicateSubmission; got nil")
 	}
-	if !errors.Is(err, repository.ErrDuplicateSubmission) {
-		t.Errorf("expected errors.Is(err, repository.ErrDuplicateSubmission); got %v", err)
+	if !errors.Is(err, infrastructure.ErrDuplicateSubmission) {
+		t.Errorf("expected errors.Is(err, infrastructure.ErrDuplicateSubmission); got %v", err)
 	}
 	if len(emitter.Events) != 0 {
 		t.Errorf("no governance event should be emitted on duplicate; got %d", len(emitter.Events))

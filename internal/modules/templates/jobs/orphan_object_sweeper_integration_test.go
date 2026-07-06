@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"metaldocs/internal/modules/templates/application"
-	"metaldocs/internal/modules/templates/repository"
+	"metaldocs/internal/modules/templates/infrastructure"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/tests/integration/testdb"
 )
@@ -94,7 +94,7 @@ func seedTemplateWithVersion(t *testing.T, db *sql.DB, tenantID, templateID stri
 
 func TestTemplateOrphanSweeper_DeletesOnlyAgedUnreferenced(t *testing.T) {
 	db, _ := testdb.Open(t)
-	repo := repository.New(db)
+	repo := infrastructure.New(db)
 
 	tenantA := uuid.NewString()
 	tenantB := uuid.NewString()

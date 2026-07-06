@@ -14,7 +14,7 @@ import (
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -23,7 +23,7 @@ import (
 
 // SubmitService handles document submission for approval.
 type SubmitService struct {
-	repo    repository.ApprovalRepository
+	repo    infrastructure.ApprovalRepository
 	emitter EventEmitter
 	clock   Clock
 	cdRead  controlleddocumentsdomain.CDFieldReader
@@ -49,7 +49,7 @@ type SubmitResult struct {
 }
 
 // SubmitRevisionForReview creates a new approval instance for the document revision.
-// Returns repository.ErrDuplicateSubmission (unwrapped) when a concurrent submission
+// Returns infrastructure.ErrDuplicateSubmission (unwrapped) when a concurrent submission
 // with the same idempotency key already exists so callers can check via errors.Is.
 func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.TxRunner, req SubmitRequest) (SubmitResult, error) {
 	// Step 1: validate payload — no float64 values.
@@ -155,7 +155,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 
 		if err := s.repo.InsertInstance(ctx, tx, inst); err != nil {
 			// Pass through duplicate submission sentinel unwrapped.
-			if errors.Is(err, repository.ErrDuplicateSubmission) {
+			if errors.Is(err, infrastructure.ErrDuplicateSubmission) {
 				return err
 			}
 			return fmt.Errorf("submit: %w", err)
@@ -224,7 +224,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return fmt.Errorf("submit: rows affected: %w", err)
 		}
 		if n == 0 {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 
 		// Step 9: emit governance event. reason_for_change/reason_category ride

@@ -11,7 +11,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -19,7 +19,7 @@ import (
 )
 
 type readServiceRepoSpy struct {
-	repository.ApprovalRepository
+	infrastructure.ApprovalRepository
 	called bool
 	inst   *domain.Instance
 }

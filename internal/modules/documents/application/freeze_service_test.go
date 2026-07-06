@@ -6,7 +6,7 @@ import (
 	"time"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/resolvers"
 )
@@ -30,11 +30,11 @@ type fakeSnapshotReader struct {
 	err            error
 }
 
-func (f fakeSnapshotReader) ReadSnapshotWithFreezeAt(_ context.Context, _, _ string, _ ...repository.DBTX) (v2dom.TemplateSnapshot, *time.Time, error) {
+func (f fakeSnapshotReader) ReadSnapshotWithFreezeAt(_ context.Context, _, _ string, _ ...infrastructure.DBTX) (v2dom.TemplateSnapshot, *time.Time, error) {
 	return f.snap, f.valuesFrozenAt, f.err
 }
 
-func (f fakeSnapshotReader) ReadFreezeAt(_ context.Context, _, _ string, _ ...repository.DBTX) (*time.Time, error) {
+func (f fakeSnapshotReader) ReadFreezeAt(_ context.Context, _, _ string, _ ...infrastructure.DBTX) (*time.Time, error) {
 	return f.valuesFrozenAt, f.err
 }
 
@@ -55,12 +55,12 @@ func (f *fakeFanoutClient) Fanout(_ context.Context, req fanout.FanoutRequest) (
 }
 
 type fakeValuesReader struct {
-	values []repository.PlaceholderValue
+	values []infrastructure.PlaceholderValue
 	err    error
 	calls  int
 }
 
-func (f *fakeValuesReader) ListValues(_ context.Context, _, _ string) ([]repository.PlaceholderValue, error) {
+func (f *fakeValuesReader) ListValues(_ context.Context, _, _ string) ([]infrastructure.PlaceholderValue, error) {
 	f.calls++
 	if f.err != nil {
 		return nil, f.err
@@ -75,7 +75,7 @@ type fakeFreezeFinalizer struct {
 	err   error
 }
 
-func (f *fakeFreezeFinalizer) WriteFreeze(_ context.Context, _, _ string, valuesHash []byte, frozenAt time.Time, _ ...repository.DBTX) error {
+func (f *fakeFreezeFinalizer) WriteFreeze(_ context.Context, _, _ string, valuesHash []byte, frozenAt time.Time, _ ...infrastructure.DBTX) error {
 	if f.err != nil {
 		return f.err
 	}

@@ -14,7 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	approvalsignature "metaldocs/internal/modules/documents/approval/infrastructure/signature"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/problem"
@@ -31,38 +31,38 @@ func TestMapErrorToResponse(t *testing.T) {
 	}{
 		{
 			name:       "repository stale revision",
-			err:        repository.ErrStaleRevision,
+			err:        infrastructure.ErrStaleRevision,
 			wantStatus: http.StatusConflict,
 			wantCode:   "conflict.stale_revision",
-			wantTitle:  repository.ErrStaleRevision.Error(),
+			wantTitle:  infrastructure.ErrStaleRevision.Error(),
 		},
 		{
 			name:       "repository no active instance",
-			err:        repository.ErrNoActiveInstance,
+			err:        infrastructure.ErrNoActiveInstance,
 			wantStatus: http.StatusNotFound,
 			wantCode:   "not_found.instance",
-			wantTitle:  repository.ErrNoActiveInstance.Error(),
+			wantTitle:  infrastructure.ErrNoActiveInstance.Error(),
 		},
 		{
 			name:       "repository duplicate submission",
-			err:        repository.ErrDuplicateSubmission,
+			err:        infrastructure.ErrDuplicateSubmission,
 			wantStatus: http.StatusConflict,
 			wantCode:   "conflict.duplicate_submission",
-			wantTitle:  repository.ErrDuplicateSubmission.Error(),
+			wantTitle:  infrastructure.ErrDuplicateSubmission.Error(),
 		},
 		{
 			name:       "repository actor already signed",
-			err:        repository.ErrActorAlreadySigned,
+			err:        infrastructure.ErrActorAlreadySigned,
 			wantStatus: http.StatusConflict,
 			wantCode:   "signoff.duplicate",
-			wantTitle:  repository.ErrActorAlreadySigned.Error(),
+			wantTitle:  infrastructure.ErrActorAlreadySigned.Error(),
 		},
 		{
 			name:       "repository instance completed",
-			err:        repository.ErrInstanceCompleted,
+			err:        infrastructure.ErrInstanceCompleted,
 			wantStatus: http.StatusConflict,
 			wantCode:   "state.instance_completed",
-			wantTitle:  repository.ErrInstanceCompleted.Error(),
+			wantTitle:  infrastructure.ErrInstanceCompleted.Error(),
 		},
 		{
 			name:       "domain no active stage",
@@ -73,17 +73,17 @@ func TestMapErrorToResponse(t *testing.T) {
 		},
 		{
 			name:       "repository route in use",
-			err:        repository.ErrRouteInUse,
+			err:        infrastructure.ErrRouteInUse,
 			wantStatus: http.StatusConflict,
 			wantCode:   "route.in_use",
-			wantTitle:  repository.ErrRouteInUse.Error(),
+			wantTitle:  infrastructure.ErrRouteInUse.Error(),
 		},
 		{
 			name:       "repository duplicate route profile",
-			err:        repository.ErrDuplicateRouteProfile,
+			err:        infrastructure.ErrDuplicateRouteProfile,
 			wantStatus: http.StatusConflict,
 			wantCode:   "route.duplicate_profile",
-			wantTitle:  repository.ErrDuplicateRouteProfile.Error(),
+			wantTitle:  infrastructure.ErrDuplicateRouteProfile.Error(),
 		},
 		{
 			name:       "domain sod submitter cannot sign",
@@ -122,14 +122,14 @@ func TestMapErrorToResponse(t *testing.T) {
 		},
 		{
 			name:       "repository insufficient privilege",
-			err:        repository.ErrInsufficientPrivilege,
+			err:        infrastructure.ErrInsufficientPrivilege,
 			wantStatus: http.StatusInternalServerError,
 			wantCode:   "internal.db_privilege_missing",
 			wantTitle:  "internal error",
 		},
 		{
 			name:       "repository unknown db",
-			err:        repository.ErrUnknownDB,
+			err:        infrastructure.ErrUnknownDB,
 			wantStatus: http.StatusInternalServerError,
 			wantCode:   "internal.db_unknown",
 			wantTitle:  "internal error",
@@ -301,7 +301,7 @@ func TestMapErrorToResponse(t *testing.T) {
 }
 
 func TestMapErrorToResponse_WrappedSentinel(t *testing.T) {
-	err := fmt.Errorf("service: %w", repository.ErrStaleRevision)
+	err := fmt.Errorf("service: %w", infrastructure.ErrStaleRevision)
 	prob := MapErrorToResponse(err)
 
 	if prob.Status != http.StatusConflict {
@@ -329,7 +329,7 @@ func TestMapErrorToResponse_ErrNoActiveStage(t *testing.T) {
 func TestWriteError(t *testing.T) {
 	rr := httptest.NewRecorder()
 
-	WriteError(rr, repository.ErrStaleRevision)
+	WriteError(rr, infrastructure.ErrStaleRevision)
 
 	if rr.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusConflict)

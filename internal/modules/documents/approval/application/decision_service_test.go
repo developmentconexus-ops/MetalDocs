@@ -13,14 +13,14 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
 
 // Ensure fakeDecisionRepo satisfies ApprovalRepository at compile time.
-var _ repository.ApprovalRepository = (*fakeDecisionRepo)(nil)
+var _ infrastructure.ApprovalRepository = (*fakeDecisionRepo)(nil)
 
 // ---------------------------------------------------------------------------
 // Fake repo — only the methods called by RecordSignoff.
@@ -28,11 +28,11 @@ var _ repository.ApprovalRepository = (*fakeDecisionRepo)(nil)
 
 type fakeDecisionRepo struct {
 	// Embed no-op to satisfy interface; listed methods are real overrides.
-	repository.ApprovalRepository
+	infrastructure.ApprovalRepository
 
 	instance           *domain.Instance
 	loadInstanceErr    error
-	insertSignoffRes   repository.SignoffInsertResult
+	insertSignoffRes   infrastructure.SignoffInsertResult
 	insertSignoffErr   error
 	insertedSignoff    *domain.Signoff
 	updateStageErr     error
@@ -49,7 +49,7 @@ func (r *fakeDecisionRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string)
 	return r.instance, r.loadInstanceErr
 }
 
-func (r *fakeDecisionRepo) InsertSignoff(_ context.Context, _ db.Tx, s domain.Signoff) (repository.SignoffInsertResult, error) {
+func (r *fakeDecisionRepo) InsertSignoff(_ context.Context, _ db.Tx, s domain.Signoff) (infrastructure.SignoffInsertResult, error) {
 	r.insertedSignoff = &s
 	return r.insertSignoffRes, r.insertSignoffErr
 }
@@ -173,13 +173,13 @@ func (r *fakeDecisionRepo) LoadActiveDocumentContentHash(ctx context.Context, tx
 		documentID, tenantID,
 	).Scan(&hash)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", repository.ErrNoActiveContentHash
+		return "", infrastructure.ErrNoActiveContentHash
 	}
 	if err != nil {
 		return "", err
 	}
 	if !hash.Valid {
-		return "", repository.ErrNoActiveContentHash
+		return "", infrastructure.ErrNoActiveContentHash
 	}
 	return hash.String, nil
 }
@@ -516,7 +516,7 @@ func TestRecordSignoff_ApprovePath_QuorumMet(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{
 		instance:         inst,
-		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-1", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-1", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: signedAt}
@@ -594,7 +594,7 @@ func TestRecordSignoff_ApprovePath_QuorumNotYetMet(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{
 		instance:         inst,
-		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-2", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-2", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: signedAt}
@@ -802,7 +802,7 @@ func TestRecordSignoff_RejectPath(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{
 		instance:         inst,
-		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-r1", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-r1", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
 	clock := fixedClock{t: signedAt}
@@ -1053,7 +1053,7 @@ func TestRecordSignoff_FinalApprovalBlockedByUnresolvedComments(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{
 		instance:         inst,
-		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-comments-1", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-comments-1", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
 	pin := &fakePinInvoker{}

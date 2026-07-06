@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/tenant"
 
@@ -234,8 +234,8 @@ VALUES
 }
 
 func TestProbeF_CancelAfterTerminal(t *testing.T) {
-	if repository.ErrInstanceCompleted == nil {
-		t.Fatal("repository.ErrInstanceCompleted must be defined")
+	if infrastructure.ErrInstanceCompleted == nil {
+		t.Fatal("infrastructure.ErrInstanceCompleted must be defined")
 	}
 	t.Log("ErrInstanceCompleted covered by application/cancel_service_test.go")
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/resolvers"
 	tmpldom "metaldocs/internal/modules/templates/domain"
@@ -16,12 +16,12 @@ import (
 )
 
 type FreezeFinalizer interface {
-	WriteFreeze(ctx context.Context, tenantID, revisionID string, valuesHash []byte, frozenAt time.Time, q ...repository.DBTX) error
+	WriteFreeze(ctx context.Context, tenantID, revisionID string, valuesHash []byte, frozenAt time.Time, q ...infrastructure.DBTX) error
 }
 
 type SnapshotReader interface {
-	ReadSnapshotWithFreezeAt(ctx context.Context, tenantID, revisionID string, q ...repository.DBTX) (v2dom.TemplateSnapshot, *time.Time, error)
-	ReadFreezeAt(ctx context.Context, tenantID, revisionID string, q ...repository.DBTX) (*time.Time, error)
+	ReadSnapshotWithFreezeAt(ctx context.Context, tenantID, revisionID string, q ...infrastructure.DBTX) (v2dom.TemplateSnapshot, *time.Time, error)
+	ReadFreezeAt(ctx context.Context, tenantID, revisionID string, q ...infrastructure.DBTX) (*time.Time, error)
 }
 
 type FanoutClient interface {
@@ -46,7 +46,7 @@ type FreezeService struct {
 	schemas    SchemaReader
 	values     FillInWriter
 	valuesRead interface {
-		ListValues(ctx context.Context, tenantID, revisionID string) ([]repository.PlaceholderValue, error)
+		ListValues(ctx context.Context, tenantID, revisionID string) ([]infrastructure.PlaceholderValue, error)
 	}
 	resolvers         *resolvers.Registry
 	finalize          FreezeFinalizer
@@ -71,7 +71,7 @@ var _ FanoutClient = (*fanout.Client)(nil)
 func NewFreezeService(
 	schemas SchemaReader, values FillInWriter,
 	valuesRead interface {
-		ListValues(ctx context.Context, tenantID, revisionID string) ([]repository.PlaceholderValue, error)
+		ListValues(ctx context.Context, tenantID, revisionID string) ([]infrastructure.PlaceholderValue, error)
 	},
 	reg *resolvers.Registry, final FreezeFinalizer, ctxBuilder ResolverContextBuilder,
 	snapshots SnapshotReader,
@@ -107,7 +107,7 @@ func (s *FreezeService) pinValidateAndHash(
 	if err != nil {
 		return nil, nil, err
 	}
-	byID := map[string]repository.PlaceholderValue{}
+	byID := map[string]infrastructure.PlaceholderValue{}
 	for _, v := range existing {
 		byID[v.PlaceholderID] = v
 	}
@@ -149,7 +149,7 @@ func (s *FreezeService) pinValidateAndHash(
 		}
 		strVal := fmt.Sprintf("%v", rv.Value)
 		key, ver := *p.ResolverKey, rv.ResolverVer
-		if err := s.values.UpsertValue(ctx, repository.PlaceholderValue{
+		if err := s.values.UpsertValue(ctx, infrastructure.PlaceholderValue{
 			TenantID: tenantID, RevisionID: revisionID, PlaceholderID: p.ID,
 			ValueText: &strVal, Source: "computed",
 			ComputedFrom: &key, ResolverVersion: &ver,
@@ -157,7 +157,7 @@ func (s *FreezeService) pinValidateAndHash(
 		}, tx); err != nil {
 			return nil, nil, err
 		}
-		byID[p.ID] = repository.PlaceholderValue{ValueText: &strVal}
+		byID[p.ID] = infrastructure.PlaceholderValue{ValueText: &strVal}
 	}
 
 	valMap := make(map[string]any, len(byID))

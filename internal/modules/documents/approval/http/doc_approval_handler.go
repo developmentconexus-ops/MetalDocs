@@ -10,7 +10,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/strictjson"
 )
@@ -57,8 +57,8 @@ func (h *Handler) GetInstanceByDocumentHandler(w http.ResponseWriter, r *http.Re
 
 	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.runner, tenantID, docID)
 	if err != nil {
-		if errors.Is(err, repository.ErrNoActiveInstance) {
-			WriteError(w, repository.ErrNoActiveInstance)
+		if errors.Is(err, infrastructure.ErrNoActiveInstance) {
+			WriteError(w, infrastructure.ErrNoActiveInstance)
 			return
 		}
 		WriteError(w, err)
@@ -151,8 +151,8 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	inst, err := h.loadActiveInstanceByDocumentForMutation(r, tenantID, docID)
 	if err != nil {
 		failReplaySlot(replayHandle, err)
-		if errors.Is(err, repository.ErrNoActiveInstance) {
-			WriteError(w, repository.ErrNoActiveInstance)
+		if errors.Is(err, infrastructure.ErrNoActiveInstance) {
+			WriteError(w, infrastructure.ErrNoActiveInstance)
 			return
 		}
 		WriteError(w, err)
@@ -161,8 +161,8 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 
 	activeStage := inst.Active()
 	if activeStage == nil {
-		failReplaySlot(replayHandle, repository.ErrInstanceCompleted)
-		WriteError(w, repository.ErrInstanceCompleted)
+		failReplaySlot(replayHandle, infrastructure.ErrInstanceCompleted)
+		WriteError(w, infrastructure.ErrInstanceCompleted)
 		return
 	}
 	if err := domain.CheckEligibility(actorID, activeStage.EligibleActorIDs); err != nil {
@@ -235,8 +235,8 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 
 	inst, err := h.loadActiveInstanceByDocumentForMutation(r, tenantID, docID)
 	if err != nil {
-		if errors.Is(err, repository.ErrNoActiveInstance) {
-			WriteError(w, repository.ErrNoActiveInstance)
+		if errors.Is(err, infrastructure.ErrNoActiveInstance) {
+			WriteError(w, infrastructure.ErrNoActiveInstance)
 			return
 		}
 		WriteError(w, err)

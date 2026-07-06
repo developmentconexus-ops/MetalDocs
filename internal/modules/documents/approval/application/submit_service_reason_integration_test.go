@@ -37,7 +37,7 @@ import (
 	platformtenant "metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 
-	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
+	approvalrepo "metaldocs/internal/modules/documents/approval/infrastructure"
 )
 
 // seedSubmitRouteWithStage seeds one approval_routes row + one

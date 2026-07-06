@@ -1,6 +1,6 @@
 // Package application holds the approval subsystem's application services —
 // submit, decision, publish, scheduler, supersede, obsolete, cancel, read, and
-// route-admin — each a thin orchestration layer over repository.ApprovalRepository
+// route-admin — each a thin orchestration layer over infrastructure.ApprovalRepository
 // and domain. All mutating operations run inside a single caller-owned
 // transaction (state-write + governance-event emit + outbox enqueue never
 // span more than one tx), and callers are expected to seed authz identity and
@@ -13,7 +13,7 @@ import (
 	"time"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/platform/db"
 )
@@ -68,7 +68,7 @@ var ErrContentHashMismatch = errors.New("approval: content hash mismatch")
 // NewServices constructs a fully wired Services value. cdRead is the
 // controlleddocuments read-port (M2/F2.1) used by the area-grade authz checks in
 // Submit/Publish/Supersede/Decision; a nil reader fail-closes the CD area to "".
-func NewServices(repo repository.ApprovalRepository, emitter EventEmitter, clock Clock, cdRead controlleddocumentsdomain.CDFieldReader) *Services {
+func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, clock Clock, cdRead controlleddocumentsdomain.CDFieldReader) *Services {
 	return &Services{
 		Submit:     &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
 		Decision:   &DecisionService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},

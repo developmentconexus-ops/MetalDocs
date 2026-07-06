@@ -1,8 +1,8 @@
 package application
 
-import "metaldocs/internal/modules/documents/repository"
+import "metaldocs/internal/modules/documents/infrastructure"
 
-// ListOptions is an alias for repository.ListOptions so handlers depend
+// ListOptions is an alias for infrastructure.ListOptions so handlers depend
 // only on application-package types. The canonical struct lives in the
-// repository package next to its SQL.
-type ListOptions = repository.ListOptions
+// infrastructure package next to its SQL.
+type ListOptions = infrastructure.ListOptions

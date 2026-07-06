@@ -13,7 +13,7 @@ import (
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -22,7 +22,7 @@ import (
 
 // PublishService handles transitioning an approved document to published state.
 type PublishService struct {
-	repo                     repository.ApprovalRepository
+	repo                     infrastructure.ApprovalRepository
 	emitter                  EventEmitter
 	clock                    Clock
 	scheduledPublishEnqueuer ScheduledPublishEnqueuer
@@ -61,15 +61,15 @@ func (s *PublishService) PublishApproved(ctx context.Context, runner db.TxRunner
 		instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return repository.ErrNoActiveInstance
+				return infrastructure.ErrNoActiveInstance
 			}
 			return fmt.Errorf("publishApproved: load instance: %w", err)
 		}
 		if instance == nil {
-			return repository.ErrNoActiveInstance
+			return infrastructure.ErrNoActiveInstance
 		}
 		if req.ExpectedRevisionVersion > 0 && req.ExpectedRevisionVersion != instance.RevisionVersion {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 
 		// Verify instance is in approved state.
@@ -115,7 +115,7 @@ func (s *PublishService) PublishApproved(ctx context.Context, runner db.TxRunner
 			return fmt.Errorf("publishApproved: rows affected: %w", err)
 		}
 		if affected == 0 {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 
 		// Step 4: emit "document_published" governance event.
@@ -231,15 +231,15 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 		instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return repository.ErrNoActiveInstance
+				return infrastructure.ErrNoActiveInstance
 			}
 			return fmt.Errorf("schedulePublish: load instance: %w", err)
 		}
 		if instance == nil {
-			return repository.ErrNoActiveInstance
+			return infrastructure.ErrNoActiveInstance
 		}
 		if req.ExpectedRevision > 0 && req.ExpectedRevision != instance.RevisionVersion {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 
 		// Verify instance is in approved state.
@@ -266,14 +266,14 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 		}
 		if req.SupersededDocumentID != "" {
 			if req.SupersededDocumentID == instance.DocumentID {
-				return repository.ErrInvalidScheduledSupersedeTarget
+				return infrastructure.ErrInvalidScheduledSupersedeTarget
 			}
 			if supersededDocumentID == "" || req.SupersededDocumentID != supersededDocumentID {
-				return repository.ErrInvalidScheduledSupersedeTarget
+				return infrastructure.ErrInvalidScheduledSupersedeTarget
 			}
 		}
 		if supersededDocumentID == instance.DocumentID {
-			return repository.ErrInvalidScheduledSupersedeTarget
+			return infrastructure.ErrInvalidScheduledSupersedeTarget
 		}
 
 		// Step 4: OCC transition the document from "approved" to "scheduled".
@@ -301,7 +301,7 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 			nullableTime(req.EffectiveTo), nullableTime(req.ReviewDueAt),
 		).Scan(&scheduleGeneration)
 		if errors.Is(err, sql.ErrNoRows) {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 		if err != nil {
 			return fmt.Errorf("schedulePublish: update document state: %w", err)

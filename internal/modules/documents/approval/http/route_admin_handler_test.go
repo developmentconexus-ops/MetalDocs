@@ -11,7 +11,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -186,7 +186,7 @@ func TestCreateRoute_DuplicateProfile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := &fakeRouteAdminService{createErr: repository.ErrDuplicateRouteProfile}
+			svc := &fakeRouteAdminService{createErr: infrastructure.ErrDuplicateRouteProfile}
 			h := &Handler{routeAdmin: svc}
 			mux := routeAdminTestMux(h)
 
@@ -242,11 +242,11 @@ func TestListRoutes_CanonicalStageNames(t *testing.T) {
 	// The list response must serialise stages with canonical field names
 	// (`name`, `quorum`) — not the legacy `label`/`quorum_kind`.
 	svc := &fakeRouteAdminService{
-		listResult: application.ListRoutesResult{Routes: []repository.Route{
+		listResult: application.ListRoutesResult{Routes: []infrastructure.Route{
 			{
 				ID: "r1", Name: "Ops", TenantID: "tenant-1", ProfileCode: "ops",
 				Active: true, Version: 3, Total: 1,
-				Stages: []repository.RouteStage{
+				Stages: []infrastructure.RouteStage{
 					{Order: 1, Name: "Review", RequiredRole: "approver", RequiredCapability: "document.signoff", AreaCode: "ops", Quorum: "any_1_of", DriftPolicy: "reduce_quorum"},
 				},
 			},
@@ -351,7 +351,7 @@ func TestUpdateRoute_RouteInUse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := &fakeRouteAdminService{updateErr: repository.ErrRouteInUse}
+			svc := &fakeRouteAdminService{updateErr: infrastructure.ErrRouteInUse}
 			h := &Handler{routeAdmin: svc}
 			mux := routeAdminTestMux(h)
 
@@ -608,7 +608,7 @@ func TestUpdateRoute_RejectsIfMatchV0(t *testing.T) {
 
 func TestListRoutes_TotalReflectsRepoCount(t *testing.T) {
 	svc := &fakeRouteAdminService{
-		listResult: application.ListRoutesResult{Routes: []repository.Route{
+		listResult: application.ListRoutesResult{Routes: []infrastructure.Route{
 			{ID: "r1", Total: 42},
 		}},
 	}

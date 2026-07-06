@@ -9,7 +9,7 @@ import (
 	"log/slog"
 	"time"
 
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
@@ -17,7 +17,7 @@ import (
 
 // SchedulerService processes River-delivered scheduled publish jobs.
 type SchedulerService struct {
-	repo    repository.ApprovalRepository
+	repo    infrastructure.ApprovalRepository
 	emitter EventEmitter
 	clock   Clock
 }
@@ -123,7 +123,7 @@ func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *s
 			return fmt.Errorf("scheduler: load current published head for doc %s: %w", row.DocumentID, err)
 		}
 		if currentPublishedID != row.SupersededDocumentID.String {
-			return repository.ErrScheduledSupersedeConflict
+			return infrastructure.ErrScheduledSupersedeConflict
 		}
 		if err := s.repo.MarkSuperseded(ctx, tx, row.TenantID, row.SupersededDocumentID.String); err != nil {
 			return fmt.Errorf("scheduler: supersede prior head for doc %s: %w", row.DocumentID, err)

@@ -10,7 +10,7 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -32,11 +32,11 @@ type InboxView struct {
 
 // ReadService exposes read-only operations for approval HTTP handlers.
 type ReadService struct {
-	repo   repository.ApprovalRepository
+	repo   infrastructure.ApprovalRepository
 	cdRead controlleddocumentsdomain.CDFieldReader
 }
 
-func newReadService(repo repository.ApprovalRepository, cdRead controlleddocumentsdomain.CDFieldReader) *ReadService {
+func newReadService(repo infrastructure.ApprovalRepository, cdRead controlleddocumentsdomain.CDFieldReader) *ReadService {
 	if cdRead == nil {
 		cdRead = controlleddocumentsdomain.NoopCDFieldReader{}
 	}
@@ -55,7 +55,7 @@ func (s *ReadService) LoadInstance(ctx context.Context, runner db.TxRunner, tena
 			return fmt.Errorf("read load instance: load area: %w", err)
 		}
 		if !found {
-			return repository.ErrNoActiveInstance
+			return infrastructure.ErrNoActiveInstance
 		}
 
 		ctx := authz.WithCapCache(ctx)
@@ -69,12 +69,12 @@ func (s *ReadService) LoadInstance(ctx context.Context, runner db.TxRunner, tena
 		loaded, err := s.repo.LoadInstance(ctx, tx, tenantID, instanceID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return repository.ErrNoActiveInstance
+				return infrastructure.ErrNoActiveInstance
 			}
 			return err
 		}
 		if loaded == nil {
-			return repository.ErrNoActiveInstance
+			return infrastructure.ErrNoActiveInstance
 		}
 
 		inst = loaded
@@ -102,12 +102,12 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, runner d
 		loaded, err := s.repo.LoadActiveInstanceByDocument(ctx, tx, tenantID, documentID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return repository.ErrNoActiveInstance
+				return infrastructure.ErrNoActiveInstance
 			}
 			return err
 		}
 		if loaded == nil {
-			return repository.ErrNoActiveInstance
+			return infrastructure.ErrNoActiveInstance
 		}
 
 		inst = loaded
@@ -128,12 +128,12 @@ func (s *ReadService) LoadActiveInstanceByDocumentForMutation(ctx context.Contex
 		loaded, err := s.repo.LoadActiveInstanceByDocument(ctx, tx, tenantID, documentID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return repository.ErrNoActiveInstance
+				return infrastructure.ErrNoActiveInstance
 			}
 			return err
 		}
 		if loaded == nil {
-			return repository.ErrNoActiveInstance
+			return infrastructure.ErrNoActiveInstance
 		}
 
 		inst = loaded

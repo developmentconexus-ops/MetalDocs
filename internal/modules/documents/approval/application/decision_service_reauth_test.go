@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"metaldocs/internal/modules/documents/approval/infrastructure/signature"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 )
 
 // reauthFakeUserReader satisfies signature.IamUserReader for the reauth tests.
@@ -97,7 +97,7 @@ func newReauthRegistryWithLimiter(reader signature.IamUserReader, limiter signat
 	return reg
 }
 
-func newReauthDecisionService(reg *signature.Registry, repo repository.ApprovalRepository, emitter EventEmitter) *DecisionService {
+func newReauthDecisionService(reg *signature.Registry, repo infrastructure.ApprovalRepository, emitter EventEmitter) *DecisionService {
 	return (&DecisionService{
 		repo:          repo,
 		emitter:       emitter,
@@ -196,7 +196,7 @@ func TestRecordSignoff_Reauth_AcceptsCorrectPassword(t *testing.T) {
 	conn := &decisionTestConn{stageSignoffs: stageSignoffs, authzGranted: true, areaCode: "QA", actorID: actorID}
 	repo := &fakeDecisionRepo{
 		instance:         inst,
-		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-reauth-ok", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-reauth-ok", WasReplay: false},
 	}
 	reg := newReauthRegistry(newReauthReader(t, map[string]string{actorID: "correct-pass"}))
 	svc := newReauthDecisionService(reg, repo, &MemoryEmitter{})

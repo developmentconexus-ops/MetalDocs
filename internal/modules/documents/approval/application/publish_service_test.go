@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
@@ -35,7 +35,7 @@ type fakePublishRepo struct {
 	validateSupersedeDocumentID   string
 	validateSupersedeTargetID     string
 	validateSupersedeErr          error
-	repository.ApprovalRepository // no-op embed for unused methods
+	infrastructure.ApprovalRepository // no-op embed for unused methods
 }
 
 func (r *fakePublishRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
@@ -547,7 +547,7 @@ func TestSchedulePublish_RejectsSelfSupersede(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected self-supersede validation error; got nil")
 	}
-	if !errors.Is(err, repository.ErrInvalidScheduledSupersedeTarget) {
+	if !errors.Is(err, infrastructure.ErrInvalidScheduledSupersedeTarget) {
 		t.Fatalf("error = %v, want ErrInvalidScheduledSupersedeTarget", err)
 	}
 	if repo.validateSupersedeCalls != 0 {
@@ -558,7 +558,7 @@ func TestSchedulePublish_RejectsSelfSupersede(t *testing.T) {
 func TestSchedulePublish_ValidatesSupersedeTarget(t *testing.T) {
 	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
 	future := now.Add(24 * time.Hour)
-	expectedErr := repository.ErrInvalidScheduledSupersedeTarget
+	expectedErr := infrastructure.ErrInvalidScheduledSupersedeTarget
 
 	inst := &domain.Instance{
 		ID:              "inst-sched-validate-1",
@@ -663,7 +663,7 @@ func TestSchedulePublish_RejectsMismatchedRevisionVersion(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected ErrStaleRevision; got nil")
 	}
-	if !errors.Is(err, repository.ErrStaleRevision) {
+	if !errors.Is(err, infrastructure.ErrStaleRevision) {
 		t.Fatalf("expected ErrStaleRevision; got %v", err)
 	}
 	if len(emitter.Events) != 0 {

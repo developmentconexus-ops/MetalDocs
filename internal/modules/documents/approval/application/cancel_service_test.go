@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
@@ -24,7 +24,7 @@ import (
 // ---------------------------------------------------------------------------
 
 type cancelFakeRepo struct {
-	repository.ApprovalRepository
+	infrastructure.ApprovalRepository
 	instance      *domain.Instance
 	loadErr       error
 	updateInstErr error
@@ -290,7 +290,7 @@ func TestCancelInstance_InstanceCompleted(t *testing.T) {
 	_, err := svc.CancelInstance(context.Background(), newTxRunner(db), CancelInput{
 		TenantID: "t", InstanceID: "i", ActorUserID: "u", Reason: "reason",
 	})
-	if !errors.Is(err, repository.ErrInstanceCompleted) {
+	if !errors.Is(err, infrastructure.ErrInstanceCompleted) {
 		t.Errorf("expected ErrInstanceCompleted; got %v", err)
 	}
 }

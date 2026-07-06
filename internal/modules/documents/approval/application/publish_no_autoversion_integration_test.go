@@ -16,7 +16,7 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
@@ -75,7 +75,7 @@ func TestPublishApproved_DoesNotAutoCreateNextVersion(t *testing.T) {
 	// -----------------------------------------------------------------------
 	// 4. Build the services and call PublishApproved.
 	// -----------------------------------------------------------------------
-	repo := repository.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
+	repo := infrastructure.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
 	emitter := NewSQLEmitter()
 	clock := RealClock{}
 	cdRead := controlleddocumentsdomain.NoopCDFieldReader{}

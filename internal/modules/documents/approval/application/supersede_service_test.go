@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/tenant"
 )
@@ -267,7 +267,7 @@ func TestPublishSuperseding_OCC_NewConflict(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected ErrStaleRevision; got nil")
 	}
-	if !errors.Is(err, repository.ErrStaleRevision) {
+	if !errors.Is(err, infrastructure.ErrStaleRevision) {
 		t.Errorf("expected errors.Is(err, ErrStaleRevision); got %v", err)
 	}
 	if len(emitter.Events) != 0 {
@@ -296,7 +296,7 @@ func TestPublishSuperseding_OCC_PriorConflict(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected ErrStaleRevision; got nil")
 	}
-	if !errors.Is(err, repository.ErrStaleRevision) {
+	if !errors.Is(err, infrastructure.ErrStaleRevision) {
 		t.Errorf("expected errors.Is(err, ErrStaleRevision); got %v", err)
 	}
 	if len(emitter.Events) != 0 {

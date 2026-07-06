@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/tenant"
 )
@@ -32,13 +32,13 @@ import (
 // ---------------------------------------------------------------------------
 // Phase 5 combined fake repo
 //
-// Satisfies repository.ApprovalRepository for the three scenarios.
+// Satisfies infrastructure.ApprovalRepository for the three scenarios.
 // Each service only calls the methods it needs; all others forward to the
 // embedded no-op and would panic if unexpectedly called.
 // ---------------------------------------------------------------------------
 
 type phase5Repo struct {
-	repository.ApprovalRepository // no-op embed
+	infrastructure.ApprovalRepository // no-op embed
 
 	// Submit methods
 	insertInstanceErr       error
@@ -47,7 +47,7 @@ type phase5Repo struct {
 	// Decision methods
 	instance          *domain.Instance
 	loadInstanceErr   error
-	insertSignoffRes  repository.SignoffInsertResult
+	insertSignoffRes  infrastructure.SignoffInsertResult
 	insertSignoffErr  error
 	updateStageErr    error
 	updateInstanceErr error
@@ -65,7 +65,7 @@ func (r *phase5Repo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*dom
 	return r.instance, r.loadInstanceErr
 }
 
-func (r *phase5Repo) InsertSignoff(_ context.Context, _ db.Tx, _ domain.Signoff) (repository.SignoffInsertResult, error) {
+func (r *phase5Repo) InsertSignoff(_ context.Context, _ db.Tx, _ domain.Signoff) (infrastructure.SignoffInsertResult, error) {
 	return r.insertSignoffRes, r.insertSignoffErr
 }
 
@@ -247,13 +247,13 @@ func (r *phase5Repo) LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx
 		documentID, tenantID,
 	).Scan(&hash)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", repository.ErrNoActiveContentHash
+		return "", infrastructure.ErrNoActiveContentHash
 	}
 	if err != nil {
 		return "", err
 	}
 	if !hash.Valid {
-		return "", repository.ErrNoActiveContentHash
+		return "", infrastructure.ErrNoActiveContentHash
 	}
 	return hash.String, nil
 }
@@ -512,7 +512,7 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 
 	decisionRepo := &phase5Repo{
 		instance:         inProgressInstance,
-		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-p5-1", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-p5-1", WasReplay: false},
 	}
 	decisionConn := &phase5Conn{stageSignoffs: decisionStageSignoffs}
 	decisionDB := newPhase5DB(t, decisionConn)
@@ -659,7 +659,7 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 	// --- Phase A: Submit #1 + reject signoff ---
 	repo := &phase5Repo{
 		instance:         inProgressInstance,
-		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-rej-1", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-rej-1", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
 

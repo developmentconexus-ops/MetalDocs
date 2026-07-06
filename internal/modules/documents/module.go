@@ -9,7 +9,7 @@ import (
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	dhttp "metaldocs/internal/modules/documents/delivery/http"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
@@ -29,7 +29,7 @@ type Module struct {
 	PlaceholderOptionsHandler *dhttp.PlaceholderOptionsHandler
 	ViewHandler               *dhttp.ViewHandler
 	ReconstructHandler        *dhttp.ReconstructHandler
-	repo                      *repository.Repository
+	repo                      *infrastructure.Repository
 }
 
 type Dependencies struct {
@@ -87,7 +87,7 @@ func New(deps Dependencies) *Module {
 	if areaCatalog == nil {
 		areaCatalog = taxonomydomain.NoopAreaCatalogReader{}
 	}
-	repo := repository.New(deps.DB, displayNameReader, cdFieldReader, areaCatalog)
+	repo := infrastructure.New(deps.DB, displayNameReader, cdFieldReader, areaCatalog)
 	var svc *application.Service
 	if deps.SnapshotReader != nil {
 		snapSvc := application.NewSnapshotService(deps.SnapshotReader)
@@ -114,7 +114,7 @@ func New(deps Dependencies) *Module {
 		exportHandler = dhttp.NewExportHandler(exportSvc)
 	}
 
-	fillInRepo := repository.NewFillInRepository(deps.DB)
+	fillInRepo := infrastructure.NewFillInRepository(deps.DB)
 	fillInSvc := application.NewFillInService(db.NewTxRunner(deps.DB), application.NewSnapshotSchemaReader(deps.DB), fillInRepo).
 		WithReader(fillInRepo).
 		WithCDFieldReader(cdFieldReader).
@@ -162,7 +162,7 @@ func (m *Module) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.M
 	m.Handler.RegisterRoutesWithRateLimit(mux, rl, userFn)
 }
 
-func (m *Module) Repo() *repository.Repository { return m.repo }
+func (m *Module) Repo() *infrastructure.Repository { return m.repo }
 
 type placeholderOptionsIAMAdapter struct {
 	reader application.IAMUserOptionsReader

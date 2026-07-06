@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	v2domain "metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
@@ -28,7 +28,7 @@ func (f *fakeFillInService) SetPlaceholderValue(_ context.Context, tenantID, act
 	return f.setPlaceholderErr
 }
 
-func (f *fakeFillInService) GetPlaceholderValues(_ context.Context, _, _ string) ([]repository.PlaceholderValue, error) {
+func (f *fakeFillInService) GetPlaceholderValues(_ context.Context, _, _ string) ([]infrastructure.PlaceholderValue, error) {
 	return nil, nil
 }
 

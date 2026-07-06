@@ -7,7 +7,7 @@ import (
 	"time"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/resolvers"
 	tmpldom "metaldocs/internal/modules/templates/domain"
@@ -39,7 +39,7 @@ func TestFreezeService_Pin_NoNetworkCall(t *testing.T) {
 		{ID: "p_user", Name: "user_field", Required: true},
 		{ID: "p_comp", Name: "doc_code_field", Computed: true, ResolverKey: &resolverKey},
 	}
-	existing := []repository.PlaceholderValue{
+	existing := []infrastructure.PlaceholderValue{
 		{PlaceholderID: "p_user", ValueText: strPtr("user-value"), Source: "user"},
 	}
 	writer := &fakeFillInWriter{}
@@ -114,7 +114,7 @@ func TestFreezeService_Pin_IdempotentWhenAlreadyFrozen(t *testing.T) {
 
 func TestFreezeService_Pin_FailsWithoutMaterializeOutbox(t *testing.T) {
 	schema := []tmpldom.Placeholder{{ID: "p_user", Required: true}}
-	existing := []repository.PlaceholderValue{
+	existing := []infrastructure.PlaceholderValue{
 		{PlaceholderID: "p_user", ValueText: strPtr("v"), Source: "user"},
 	}
 	svc := NewFreezeService(
@@ -146,7 +146,7 @@ func TestFreezeService_Materialize_CallsFanoutAndReturnsResult(t *testing.T) {
 	schema := []tmpldom.Placeholder{
 		{ID: "p_user", Name: "user_field", Required: true},
 	}
-	valuesRead := &fakeValuesReader{values: []repository.PlaceholderValue{
+	valuesRead := &fakeValuesReader{values: []infrastructure.PlaceholderValue{
 		{PlaceholderID: "p_user", ValueText: strPtr("user-value"), Source: "user"},
 	}}
 	fanoutClient := &fakeFanoutClient{resp: fanout.FanoutResponse{
@@ -219,7 +219,7 @@ func TestFreezeService_Materialize_ErrorsWithoutFanoutClient(t *testing.T) {
 
 func TestFreezeService_Pin_OutboxEnqueueError_Returns(t *testing.T) {
 	schema := []tmpldom.Placeholder{{ID: "p_user", Required: true}}
-	existing := []repository.PlaceholderValue{
+	existing := []infrastructure.PlaceholderValue{
 		{PlaceholderID: "p_user", ValueText: strPtr("v"), Source: "user"},
 	}
 	materializeOutbox := &fakeMaterializeOutboxEnqueuer{err: errors.New("db error")}

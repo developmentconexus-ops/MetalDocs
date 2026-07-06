@@ -18,7 +18,7 @@ import (
 	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/infrastructure/signature"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -57,7 +57,7 @@ type pdfDispatchEnqueuer interface {
 
 // DecisionService handles approver approve/reject decisions.
 type DecisionService struct {
-	repo       repository.ApprovalRepository
+	repo       infrastructure.ApprovalRepository
 	emitter    EventEmitter
 	clock      Clock
 	pinInvoker  PinInvoker
@@ -73,7 +73,7 @@ type DecisionService struct {
 // seam is wired separately via WithPinInvoker (ADR 0015); RecordSignoff requires
 // a PinInvoker to be set before the approval-quorum path runs.
 func NewDecisionService(
-	repo repository.ApprovalRepository,
+	repo infrastructure.ApprovalRepository,
 	emitter EventEmitter,
 	clock Clock,
 ) *DecisionService {
@@ -207,20 +207,20 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("recordSignoff: %w", repository.ErrNoActiveInstance)
+				return fmt.Errorf("recordSignoff: %w", infrastructure.ErrNoActiveInstance)
 			}
 			return fmt.Errorf("recordSignoff: load instance: %w", err)
 		}
 		if instance == nil {
-			return repository.ErrNoActiveInstance
+			return infrastructure.ErrNoActiveInstance
 		}
 		if req.ExpectedRevisionVersion > 0 && req.ExpectedRevisionVersion != instance.RevisionVersion {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 
 		// Reject if instance is already terminal.
 		if instance.Status != domain.InstanceInProgress {
-			return repository.ErrInstanceCompleted
+			return infrastructure.ErrInstanceCompleted
 		}
 
 		// document.signoff is area-grade: pass the resolved area as-is ("" fail-closes).
@@ -251,7 +251,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		// is irreproducible at signoff time.
 		contentHash, err := s.repo.LoadActiveDocumentContentHash(ctx, tx, req.TenantID, instance.DocumentID)
 		if err != nil {
-			if errors.Is(err, repository.ErrNoActiveContentHash) {
+			if errors.Is(err, infrastructure.ErrNoActiveContentHash) {
 				return ErrContentHashMismatch
 			}
 			return fmt.Errorf("recordSignoff: load active document content hash: %w", err)
@@ -274,7 +274,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		}
 		// Ensure the requested StageInstanceID matches the active stage.
 		if req.StageInstanceID == "" || activeStage.ID != req.StageInstanceID {
-			return repository.ErrStageNotActive
+			return infrastructure.ErrStageNotActive
 		}
 
 		// Step 5b: eligibility check — actor must be in the eligible_actor_ids snapshot (J1).
@@ -325,7 +325,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 		// Step 8: persist the signoff, handling idempotent replay.
 		insertResult, err := s.repo.InsertSignoff(ctx, tx, *signoff)
 		if err != nil {
-			if errors.Is(err, repository.ErrActorAlreadySigned) {
+			if errors.Is(err, infrastructure.ErrActorAlreadySigned) {
 				return err
 			}
 			return fmt.Errorf("recordSignoff: insert signoff: %w", err)
@@ -427,7 +427,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 					return fmt.Errorf("recordSignoff: approve document rows affected: %w", err)
 				}
 				if rows == 0 {
-					return repository.ErrStaleRevision
+					return infrastructure.ErrStaleRevision
 				}
 				result.InstanceApproved = true
 				shouldDispatchPDF = true
@@ -490,7 +490,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 				return fmt.Errorf("recordSignoff: reject document rows affected: %w", err)
 			}
 			if rows == 0 {
-				return repository.ErrStaleRevision
+				return infrastructure.ErrStaleRevision
 			}
 
 		default:

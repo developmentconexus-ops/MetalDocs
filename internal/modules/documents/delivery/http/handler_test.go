@@ -18,7 +18,7 @@ import (
 
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
-	approvalrepository "metaldocs/internal/modules/documents/approval/repository"
+	approvalrepository "metaldocs/internal/modules/documents/approval/infrastructure"
 	httphandler "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
@@ -820,7 +820,7 @@ func TestFinalizeDocument_ContentHashQueryNoRows_ContinuesWithEmptyHash(t *testi
 // TestFinalizeDocument_ContentHashQueryUsesDeterministicTieBreaker verifies that the
 // repository's content-hash query uses a deterministic tie-breaker order.
 func TestFinalizeDocument_ContentHashQueryUsesDeterministicTieBreaker(t *testing.T) {
-	src, err := os.ReadFile("../../../../modules/documents/repository/repository.go")
+	src, err := os.ReadFile("../../../../modules/documents/infrastructure/repository.go")
 	if err != nil {
 		t.Fatalf("read repository.go: %v", err)
 	}

@@ -11,7 +11,7 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	controlleddocumentsinfrastructure "metaldocs/internal/modules/controlleddocuments/infrastructure"
-	docrepo "metaldocs/internal/modules/documents/repository"
+	docrepo "metaldocs/internal/modules/documents/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"

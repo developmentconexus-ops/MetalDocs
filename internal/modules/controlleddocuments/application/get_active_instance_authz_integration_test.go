@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	controlleddocumentsinfrastructure "metaldocs/internal/modules/controlleddocuments/infrastructure"
-	docrepo "metaldocs/internal/modules/documents/repository"
+	docrepo "metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	platformdb "metaldocs/internal/platform/db"

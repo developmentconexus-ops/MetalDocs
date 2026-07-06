@@ -14,7 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	approvalsignature "metaldocs/internal/modules/documents/approval/infrastructure/signature"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/idempotency"
@@ -101,28 +101,28 @@ func MapErrorToResponse(err error) *problem.Problem {
 	code := approvalCodeInternalUnknown
 
 	switch {
-	case errors.Is(err, repository.ErrStaleRevision):
+	case errors.Is(err, infrastructure.ErrStaleRevision):
 		statusCode = http.StatusConflict
 		code = approvalCodeConflictStaleRevision
-	case errors.Is(err, repository.ErrNoActiveInstance):
+	case errors.Is(err, infrastructure.ErrNoActiveInstance):
 		statusCode = http.StatusNotFound
 		code = approvalCodeNotFoundInstance
-	case errors.Is(err, repository.ErrDuplicateSubmission):
+	case errors.Is(err, infrastructure.ErrDuplicateSubmission):
 		statusCode = http.StatusConflict
 		code = approvalCodeConflictDuplicate
-	case errors.Is(err, repository.ErrActorAlreadySigned):
+	case errors.Is(err, infrastructure.ErrActorAlreadySigned):
 		statusCode = http.StatusConflict
 		code = approvalCodeSignoffDuplicate
-	case errors.Is(err, repository.ErrInvalidScheduledSupersedeTarget):
+	case errors.Is(err, infrastructure.ErrInvalidScheduledSupersedeTarget):
 		statusCode = http.StatusConflict
 		code = approvalCodePublishInvalidSupersede
-	case errors.Is(err, repository.ErrInstanceCompleted):
+	case errors.Is(err, infrastructure.ErrInstanceCompleted):
 		statusCode = http.StatusConflict
 		code = approvalCodeStateInstanceCompleted
-	case errors.Is(err, repository.ErrRouteInUse):
+	case errors.Is(err, infrastructure.ErrRouteInUse):
 		statusCode = http.StatusConflict
 		code = approvalCodeRouteInUse
-	case errors.Is(err, repository.ErrDuplicateRouteProfile):
+	case errors.Is(err, infrastructure.ErrDuplicateRouteProfile):
 		statusCode = http.StatusConflict
 		code = approvalCodeRouteDuplicateProfile
 	case errors.Is(err, domain.ErrActorNotEligible):
@@ -178,10 +178,10 @@ func MapErrorToResponse(err error) *problem.Problem {
 		// DB-layer 500. Client body stays the generic "internal error".
 		statusCode = http.StatusInternalServerError
 		code = approvalCodeInternalSigMisconfigured
-	case errors.Is(err, repository.ErrInsufficientPrivilege):
+	case errors.Is(err, infrastructure.ErrInsufficientPrivilege):
 		statusCode = http.StatusInternalServerError
 		code = approvalCodeInternalDBPrivilege
-	case errors.Is(err, repository.ErrUnknownDB):
+	case errors.Is(err, infrastructure.ErrUnknownDB):
 		statusCode = http.StatusInternalServerError
 		code = approvalCodeInternalDBUnknown
 	case errors.Is(err, domain.ErrNoActiveStage):
@@ -197,7 +197,7 @@ func MapErrorToResponse(err error) *problem.Problem {
 		statusCode = http.StatusConflict
 		code = approvalCodeStateDocumentNotPublished
 	case errors.Is(err, application.ErrMarkReviewedStaleRevision):
-		// 409, mirroring repository.ErrStaleRevision above: the mark-reviewed
+		// 409, mirroring infrastructure.ErrStaleRevision above: the mark-reviewed
 		// route's openapi response set is {400,401,403,404,409,428,500} — no
 		// 412 — so the OCC conflict is a 409 Conflict, not 412.
 		statusCode = http.StatusConflict

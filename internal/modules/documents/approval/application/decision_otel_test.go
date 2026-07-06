@@ -14,11 +14,11 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	platformdb "metaldocs/internal/platform/db"
 )
 
-// stubApprovalRepo implements repository.ApprovalRepository; all methods return
+// stubApprovalRepo implements infrastructure.ApprovalRepository; all methods return
 // zero/nil or a sentinel error so the tx function short-circuits on first call.
 type stubApprovalRepo struct{}
 
@@ -28,8 +28,8 @@ func (stubApprovalRepo) InsertInstance(_ context.Context, _ platformdb.Tx, _ dom
 func (stubApprovalRepo) InsertStageInstances(_ context.Context, _ platformdb.Tx, _ []domain.StageInstance) error {
 	return nil
 }
-func (stubApprovalRepo) InsertSignoff(_ context.Context, _ platformdb.Tx, _ domain.Signoff) (repository.SignoffInsertResult, error) {
-	return repository.SignoffInsertResult{}, nil
+func (stubApprovalRepo) InsertSignoff(_ context.Context, _ platformdb.Tx, _ domain.Signoff) (infrastructure.SignoffInsertResult, error) {
+	return infrastructure.SignoffInsertResult{}, nil
 }
 func (stubApprovalRepo) LoadSignoffByActor(_ context.Context, _ platformdb.Tx, _, _, _ string) (*domain.Signoff, error) {
 	return nil, nil
@@ -58,10 +58,10 @@ func (stubApprovalRepo) GetDocumentRevisionVersion(_ context.Context, _ platform
 func (stubApprovalRepo) LoadGovernedRevisionNumber(_ context.Context, _ platformdb.Tx, _, _ string) (int, error) {
 	return 0, nil
 }
-func (stubApprovalRepo) ListRoutes(_ context.Context, _ string) ([]repository.Route, error) {
+func (stubApprovalRepo) ListRoutes(_ context.Context, _ string) ([]infrastructure.Route, error) {
 	return nil, nil
 }
-func (stubApprovalRepo) ListRoutesTx(_ context.Context, _ platformdb.Tx, _ string) ([]repository.Route, error) {
+func (stubApprovalRepo) ListRoutesTx(_ context.Context, _ platformdb.Tx, _ string) ([]infrastructure.Route, error) {
 	return nil, nil
 }
 func (stubApprovalRepo) MarkSuperseded(_ context.Context, _ platformdb.Tx, _, _ string) error {

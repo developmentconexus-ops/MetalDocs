@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	docapp "metaldocs/internal/modules/documents/application"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -19,7 +19,7 @@ import (
 
 // ObsoleteService marks a document as obsolete (end-of-life).
 type ObsoleteService struct {
-	repo              repository.ApprovalRepository
+	repo              infrastructure.ApprovalRepository
 	emitter           EventEmitter
 	clock             Clock
 	lifecycleEnqueuer docsdomain.LifecycleEventEnqueuer
@@ -72,7 +72,7 @@ func (s *ObsoleteService) MarkObsolete(ctx context.Context, runner db.TxRunner, 
 		).Scan(&priorStatus, &currentRevision, &areaCode)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return repository.ErrNoActiveInstance
+				return infrastructure.ErrNoActiveInstance
 			}
 			return fmt.Errorf("markObsolete: load document: %w", err)
 		}
@@ -108,7 +108,7 @@ func (s *ObsoleteService) MarkObsolete(ctx context.Context, runner db.TxRunner, 
 			return fmt.Errorf("markObsolete: rows affected: %w", err)
 		}
 		if affected == 0 {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 
 		// Step 5: cancel any in-progress approval instance (no error if none exist).

@@ -15,7 +15,7 @@ package application
 //   - Multi-stage progression: completing stage 1 reports StageCompleted while
 //     the instance is not yet approved (stage 2 pending).
 //   - OCC stale-revision conflict on PublishApproved and SchedulePublish.
-//   - Not-found → repository.ErrNoActiveInstance mapping for signoff, publish,
+//   - Not-found → infrastructure.ErrNoActiveInstance mapping for signoff, publish,
 //     and obsolete entrypoints.
 //   - SchedulePublish requires an approved instance.
 //
@@ -34,7 +34,7 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 )
 
 // ============================================================
@@ -200,7 +200,7 @@ func TestRecordSignoff_LoadInstanceNotFound(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
-	if !errors.Is(err, repository.ErrNoActiveInstance) {
+	if !errors.Is(err, infrastructure.ErrNoActiveInstance) {
 		t.Errorf("want ErrNoActiveInstance; got %v", err)
 	}
 }
@@ -223,7 +223,7 @@ func TestRecordSignoff_InstanceAlreadyCompleted(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
-	if !errors.Is(err, repository.ErrInstanceCompleted) {
+	if !errors.Is(err, infrastructure.ErrInstanceCompleted) {
 		t.Errorf("want ErrInstanceCompleted; got %v", err)
 	}
 }
@@ -244,7 +244,7 @@ func TestRecordSignoff_StageNotActive(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
-	if !errors.Is(err, repository.ErrStageNotActive) {
+	if !errors.Is(err, infrastructure.ErrStageNotActive) {
 		t.Errorf("want ErrStageNotActive; got %v", err)
 	}
 }
@@ -263,7 +263,7 @@ func TestRecordSignoff_RequiresStageInstanceID(t *testing.T) {
 		Decision:        "approve",
 		ContentFormData: map[string]any{"_content_hash": validContentHash},
 	})
-	if !errors.Is(err, repository.ErrStageNotActive) {
+	if !errors.Is(err, infrastructure.ErrStageNotActive) {
 		t.Errorf("want ErrStageNotActive for missing stage instance id; got %v", err)
 	}
 }
@@ -321,7 +321,7 @@ func TestRecordSignoff_ActorAlreadySigned(t *testing.T) {
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{
 		instance:         inst,
-		insertSignoffErr: repository.ErrActorAlreadySigned,
+		insertSignoffErr: infrastructure.ErrActorAlreadySigned,
 	}
 	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, pinInvoker: &fakePinInvoker{}}
 	db := newDecisionTestDB(t, conn)
@@ -335,7 +335,7 @@ func TestRecordSignoff_ActorAlreadySigned(t *testing.T) {
 		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), req)
-	if !errors.Is(err, repository.ErrActorAlreadySigned) {
+	if !errors.Is(err, infrastructure.ErrActorAlreadySigned) {
 		t.Errorf("want ErrActorAlreadySigned; got %v", err)
 	}
 }
@@ -347,7 +347,7 @@ func TestRecordSignoff_IdempotentReplay(t *testing.T) {
 	conn := &decisionTestConn{}
 	repo := &fakeDecisionRepo{
 		instance:         inst,
-		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-replay", WasReplay: true},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-replay", WasReplay: true},
 	}
 	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
 	db := newDecisionTestDB(t, conn)
@@ -438,7 +438,7 @@ func TestRecordSignoff_ActivateNextStage(t *testing.T) {
 	conn := &decisionTestConn{stageSignoffs: stageSignoffs}
 	repo := &fakeDecisionRepo{
 		instance:         inst,
-		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-ts-1", WasReplay: false},
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "sig-ts-1", WasReplay: false},
 	}
 	emitter := &MemoryEmitter{}
 	svc := &DecisionService{repo: repo, emitter: emitter, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
@@ -479,7 +479,7 @@ func TestPublishApproved_LoadInstanceNotFound(t *testing.T) {
 		InstanceID:  "inst",
 		PublishedBy: "u",
 	})
-	if !errors.Is(err, repository.ErrNoActiveInstance) {
+	if !errors.Is(err, infrastructure.ErrNoActiveInstance) {
 		t.Errorf("want ErrNoActiveInstance; got %v", err)
 	}
 }
@@ -502,7 +502,7 @@ func TestPublishApproved_OCC_StaleRevision(t *testing.T) {
 		InstanceID:  "inst-stale-pub",
 		PublishedBy: "u",
 	})
-	if !errors.Is(err, repository.ErrStaleRevision) {
+	if !errors.Is(err, infrastructure.ErrStaleRevision) {
 		t.Errorf("want ErrStaleRevision; got %v", err)
 	}
 }
@@ -552,7 +552,7 @@ func TestSchedulePublish_OCC_StaleRevision(t *testing.T) {
 		EffectiveDate: future,
 		ScheduledBy:   "u",
 	})
-	if !errors.Is(err, repository.ErrStaleRevision) {
+	if !errors.Is(err, infrastructure.ErrStaleRevision) {
 		t.Errorf("want ErrStaleRevision; got %v", err)
 	}
 }
@@ -573,7 +573,7 @@ func TestMarkObsolete_DocumentNotFound(t *testing.T) {
 		RevisionVersion: 1,
 		Reason:          "test",
 	})
-	if !errors.Is(err, repository.ErrNoActiveInstance) {
+	if !errors.Is(err, infrastructure.ErrNoActiveInstance) {
 		t.Errorf("want ErrNoActiveInstance for not-found doc; got %v", err)
 	}
 }

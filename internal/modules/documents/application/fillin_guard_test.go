@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
@@ -16,10 +16,10 @@ type guardWriter struct {
 	upsertCalled bool
 }
 
-func (g *guardWriter) UpsertValue(context.Context, repository.PlaceholderValue, ...repository.DBTX) error {
+func (g *guardWriter) UpsertValue(context.Context, infrastructure.PlaceholderValue, ...infrastructure.DBTX) error {
 	return nil
 }
-func (g *guardWriter) UpsertAuthorValue(_ context.Context, _ repository.PlaceholderValue, _ ...repository.DBTX) (int64, error) {
+func (g *guardWriter) UpsertAuthorValue(_ context.Context, _ infrastructure.PlaceholderValue, _ ...infrastructure.DBTX) (int64, error) {
 	g.upsertCalled = true
 	return 1, nil
 }

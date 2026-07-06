@@ -18,7 +18,7 @@ package application
 //
 //   - Scheduled-seed half (status='scheduled'): proves the PREDICATE-DIVERGENCE
 //     guarantee. The manual UPDATE (WHERE status='approved') matches zero rows
-//     regardless of interleaving and loses with repository.ErrStaleRevision; the
+//     regardless of interleaving and loses with infrastructure.ErrStaleRevision; the
 //     scheduler wins. There is no genuine lock contention here — manual never
 //     touches the row because its predicate cannot match.
 //
@@ -42,7 +42,7 @@ import (
 	"time"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -56,7 +56,7 @@ type seedState int
 
 const (
 	// seedScheduled: document status='scheduled' — scheduler wins, manual loses
-	// with repository.ErrStaleRevision (predicate-divergence half).
+	// with infrastructure.ErrStaleRevision (predicate-divergence half).
 	seedScheduled seedState = iota
 	// seedApproved: document status='approved' — manual wins, scheduler no-ops
 	// to nil (lock-contention half).
@@ -151,7 +151,7 @@ func runPublishRaceInterleaving(t *testing.T, seed seedState, manualFirst bool) 
 		ScheduleGeneration:      5,
 	}
 
-	repo := repository.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
+	repo := infrastructure.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
 	emitter := NewSQLEmitter()
 	clock := RealClock{}
 	cdRead := controlleddocumentsdomain.NoopCDFieldReader{}
@@ -228,8 +228,8 @@ func runPublishRaceInterleaving(t *testing.T, seed seedState, manualFirst bool) 
 		// Predicate-divergence half: only the scheduler's predicate
 		// (status='scheduled') matches. Manual loses with ErrStaleRevision
 		// (its UPDATE ... WHERE status='approved' affects 0 rows); scheduler wins.
-		if !errors.Is(manualErr, repository.ErrStaleRevision) {
-			t.Fatalf("%s: PublishApproved error = %v; want repository.ErrStaleRevision (doc was scheduled, not approved)", label, manualErr)
+		if !errors.Is(manualErr, infrastructure.ErrStaleRevision) {
+			t.Fatalf("%s: PublishApproved error = %v; want infrastructure.ErrStaleRevision (doc was scheduled, not approved)", label, manualErr)
 		}
 		if schedErr != nil {
 			t.Fatalf("%s: RunScheduledPublishJob error = %v; want nil (scheduler must win)", label, schedErr)

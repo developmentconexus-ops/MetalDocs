@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
+	approvalrepo "metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	platformdb "metaldocs/internal/platform/db"

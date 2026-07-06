@@ -17,7 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/idempotency"
@@ -420,7 +420,7 @@ func TestRouteAdminCreate_OtherFKViolation(t *testing.T) {
 		t.Errorf("expected an error for FK violation; got nil")
 	}
 	// The wrapped error must still carry FK violation context.
-	if !errors.Is(err, repository.ErrFKViolation) {
+	if !errors.Is(err, infrastructure.ErrFKViolation) {
 		t.Errorf("expected wrapped ErrFKViolation; got %v", err)
 	}
 }
@@ -485,7 +485,7 @@ func TestRouteAdminUpdate_RouteInUse(t *testing.T) {
 		ExpectedVersion: 3,
 		Stages:          validRouteStages(),
 	})
-	if !errors.Is(err, repository.ErrRouteInUse) {
+	if !errors.Is(err, infrastructure.ErrRouteInUse) {
 		t.Fatalf("expected ErrRouteInUse; got %v", err)
 	}
 }
@@ -542,7 +542,7 @@ func TestRouteAdminUpdate_StaleVersion(t *testing.T) {
 		ExpectedVersion: 9,
 		Stages:          validRouteStages(),
 	})
-	if !errors.Is(err, repository.ErrStaleRevision) {
+	if !errors.Is(err, infrastructure.ErrStaleRevision) {
 		t.Fatalf("expected ErrStaleRevision; got %v", err)
 	}
 }
@@ -567,7 +567,7 @@ func TestRouteAdminDeactivate_StaleVersion(t *testing.T) {
 		Reason:          "stale check",
 		ExpectedVersion: 5,
 	})
-	if !errors.Is(err, repository.ErrStaleRevision) {
+	if !errors.Is(err, infrastructure.ErrStaleRevision) {
 		t.Fatalf("expected ErrStaleRevision; got %v", err)
 	}
 }
@@ -811,14 +811,14 @@ func TestRouteAdminDeactivate_ReasonInGovernancePayload(t *testing.T) {
 }
 
 type stubRouteListRepo struct {
-	repository.ApprovalRepository
+	infrastructure.ApprovalRepository
 	called   bool
 	tenant   string
-	routes   []repository.Route
+	routes   []infrastructure.Route
 	returnTx db.Tx
 }
 
-func (s *stubRouteListRepo) ListRoutesTx(_ context.Context, tx db.Tx, tenantID string) ([]repository.Route, error) {
+func (s *stubRouteListRepo) ListRoutesTx(_ context.Context, tx db.Tx, tenantID string) ([]infrastructure.Route, error) {
 	s.called = true
 	s.tenant = tenantID
 	s.returnTx = tx
@@ -829,7 +829,7 @@ func TestRouteAdminList_RunsUnderTenantGUC(t *testing.T) {
 	conn := &routeAdminConn{authzGranted: true}
 	db := newRouteAdminTestDB(t, conn)
 
-	repo := &stubRouteListRepo{routes: []repository.Route{{ID: "r1", TenantID: "tenant-list"}}}
+	repo := &stubRouteListRepo{routes: []infrastructure.Route{{ID: "r1", TenantID: "tenant-list"}}}
 	svc := &RouteAdminService{
 		repo:    repo,
 		emitter: &MemoryEmitter{},
@@ -1052,7 +1052,7 @@ func TestRouteAdminList_PassesThroughTotalFromRepo(t *testing.T) {
 	db := newRouteAdminTestDB(t, conn)
 
 	repo := &stubRouteListRepo{
-		routes: []repository.Route{
+		routes: []infrastructure.Route{
 			{ID: "r1", TenantID: "tenant-list", Total: 3},
 			{ID: "r2", TenantID: "tenant-list", Total: 3},
 			{ID: "r3", TenantID: "tenant-list", Total: 3},

@@ -11,7 +11,7 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
@@ -21,9 +21,9 @@ import (
 )
 
 // Type aliases so handlers depend only on application types.
-type PendingCommitMeta = repository.PendingCommitMeta
-type CommitResult = repository.CommitResult
-type RestoreResult = repository.RestoreResult
+type PendingCommitMeta = infrastructure.PendingCommitMeta
+type CommitResult = infrastructure.CommitResult
+type RestoreResult = infrastructure.RestoreResult
 type RevisionHistoryItem = domain.RevisionHistoryItem
 
 type Repository interface {

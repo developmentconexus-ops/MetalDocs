@@ -1,0 +1,199 @@
+package infrastructure
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"time"
+
+	"metaldocs/internal/modules/documents/domain"
+)
+
+// SnapshotRepository reads and writes the template snapshot columns on documents.
+type SnapshotRepository struct {
+	db     *sql.DB
+	schema string // optional schema prefix; empty = bare table name
+}
+
+type DBTX interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// NewSnapshotRepository creates a SnapshotRepository using bare table names.
+// In tests, use NewSnapshotRepositoryWithSchema to point at the isolated test schema.
+func NewSnapshotRepository(db *sql.DB) *SnapshotRepository {
+	return &SnapshotRepository{db: db}
+}
+
+// NewSnapshotRepositoryWithSchema creates a SnapshotRepository that qualifies
+// table names with the given schema. Used by integration tests.
+func NewSnapshotRepositoryWithSchema(db *sql.DB, schema string) *SnapshotRepository {
+	return &SnapshotRepository{db: db, schema: schema}
+}
+
+func (r *SnapshotRepository) table(name string) string {
+	if r.schema == "" {
+		return name
+	}
+	return fmt.Sprintf("%q.%q", r.schema, name)
+}
+
+func requireRowsAffected(result sql.Result, action string) error {
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%s rows affected: %w", action, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("%s: not found or already in target state", action)
+	}
+	return nil
+}
+
+// ReadSnapshotWithFreezeAt reads snapshot columns and values_frozen_at for idempotency checks.
+func (r *SnapshotRepository) ReadSnapshotWithFreezeAt(ctx context.Context, tenantID, docID string, q ...DBTX) (domain.TemplateSnapshot, *time.Time, error) {
+	exec := DBTX(r.db)
+	if len(q) > 0 && q[0] != nil {
+		exec = q[0]
+	}
+	return r.readSnapshot(ctx, exec, tenantID, docID)
+}
+
+// ReadFreezeAt reads only values_frozen_at — used by Pin to check idempotency without
+// fetching the snapshot blobs that Pin does not consume.
+func (r *SnapshotRepository) ReadFreezeAt(ctx context.Context, tenantID, docID string, q ...DBTX) (*time.Time, error) {
+	exec := DBTX(r.db)
+	if len(q) > 0 && q[0] != nil {
+		exec = q[0]
+	}
+	var valuesFrozenAt *time.Time
+	err := exec.QueryRowContext(ctx, fmt.Sprintf(`
+		SELECT values_frozen_at
+		  FROM %s
+		 WHERE tenant_id = $1::uuid AND id = $2::uuid`, r.table("documents")),
+		tenantID, docID,
+	).Scan(&valuesFrozenAt)
+	return valuesFrozenAt, err
+}
+
+func (r *SnapshotRepository) readSnapshot(ctx context.Context, exec DBTX, tenantID, docID string) (domain.TemplateSnapshot, *time.Time, error) {
+	var s domain.TemplateSnapshot
+	var valuesFrozenAt *time.Time
+	err := exec.QueryRowContext(ctx, fmt.Sprintf(`
+		SELECT placeholder_schema_snapshot,
+		       composition_config_snapshot,
+		       coalesce(body_docx_snapshot_s3_key, ''),
+		       values_frozen_at
+		  FROM %s
+		 WHERE tenant_id = $1::uuid AND id = $2::uuid`, r.table("documents")),
+		tenantID, docID,
+	).Scan(
+		&s.PlaceholderSchemaJSON,
+		&s.CompositionJSON,
+		&s.BodyDocxS3Key,
+		&valuesFrozenAt,
+	)
+	return s, valuesFrozenAt, err
+}
+
+func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenantID, docID string, valuesHash []byte, frozenAt time.Time, q ...DBTX) error {
+	exec := DBTX(r.db)
+	if len(q) > 0 && q[0] != nil {
+		exec = q[0]
+	}
+	result, err := exec.ExecContext(ctx, fmt.Sprintf(`
+        UPDATE %s
+           SET values_hash=$1, values_frozen_at=$2
+         WHERE tenant_id=$3::uuid AND id=$4::uuid`, r.table("documents")),
+		valuesHash, frozenAt, tenantID, docID)
+	if err != nil {
+		return fmt.Errorf("write freeze: %w", err)
+	}
+	return requireRowsAffected(result, "write freeze")
+}
+
+// WriteFinalDocx persists the fanout output pointer and content hash onto a document.
+func (r *SnapshotRepository) WriteFinalDocx(ctx context.Context, tenantID, docID, s3Key string, contentHash []byte, q ...DBTX) error {
+	exec := DBTX(r.db)
+	if len(q) > 0 && q[0] != nil {
+		exec = q[0]
+	}
+	result, err := exec.ExecContext(ctx, fmt.Sprintf(`
+        UPDATE %s
+           SET final_docx_s3_key=$1, content_hash=$2
+         WHERE tenant_id=$3::uuid AND id=$4::uuid`, r.table("documents")),
+		s3Key, contentHash, tenantID, docID)
+	if err != nil {
+		return fmt.Errorf("write final docx: %w", err)
+	}
+	return requireRowsAffected(result, "write final docx")
+}
+
+// ReadFinalDocxS3Key returns the frozen DOCX S3 key for a document.
+// Returns an error if the document does not exist or has not been frozen yet.
+func (r *SnapshotRepository) ReadFinalDocxS3Key(ctx context.Context, tenantID, docID string) (string, error) {
+	var key sql.NullString
+	err := r.db.QueryRowContext(ctx, fmt.Sprintf(`
+		SELECT final_docx_s3_key
+		  FROM %s
+		 WHERE tenant_id=$1::uuid AND id=$2::uuid`, r.table("documents")),
+		tenantID, docID).Scan(&key)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("document not found: %s", docID)
+		}
+		return "", err
+	}
+	if !key.Valid || key.String == "" {
+		return "", fmt.Errorf("document not frozen: no final_docx_s3_key for %s", docID)
+	}
+	return key.String, nil
+}
+
+// WritePDF persists the rendered PDF pointer, hash, and generation timestamp.
+// An optional DBTX (q) lets the caller run this inside its own transaction
+// (M3 F3.2 — the pdf job runner wraps this write in a SeedTxTenant-seeded tx);
+// omitted, it runs directly against the pool as before.
+func (r *SnapshotRepository) WritePDF(ctx context.Context, tenantID, docID, s3Key string, pdfHash []byte, generatedAt time.Time, q ...DBTX) error {
+	exec := DBTX(r.db)
+	if len(q) > 0 && q[0] != nil {
+		exec = q[0]
+	}
+	result, err := exec.ExecContext(ctx, fmt.Sprintf(`
+        UPDATE %s
+           SET final_pdf_s3_key=$1, pdf_hash=$2, pdf_generated_at=$3
+         WHERE tenant_id=$4::uuid AND id=$5::uuid`, r.table("documents")),
+		s3Key, pdfHash, generatedAt, tenantID, docID)
+	if err != nil {
+		return fmt.Errorf("write pdf: %w", err)
+	}
+	return requireRowsAffected(result, "write pdf")
+}
+
+func (r *SnapshotRepository) ResolveTenantByDocumentID(ctx context.Context, docID string) (string, error) {
+	var tenantID string
+	if err := r.db.QueryRowContext(ctx, fmt.Sprintf(`
+		SELECT tenant_id::text
+		  FROM %s
+		 WHERE id = $1::uuid`, r.table("documents")),
+		docID,
+	).Scan(&tenantID); err != nil {
+		return "", err
+	}
+	return tenantID, nil
+}
+
+// AppendReconstruction appends a forensic attempt entry onto documents.reconstruction_attempts.
+// Never touches final_docx_s3_key or content_hash.
+func (r *SnapshotRepository) AppendReconstruction(ctx context.Context, tenantID, docID string, entry []byte) error {
+	result, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+        UPDATE %s
+           SET reconstruction_attempts = reconstruction_attempts || $1::jsonb
+         WHERE tenant_id=$2::uuid AND id=$3::uuid`, r.table("documents")),
+		entry, tenantID, docID)
+	if err != nil {
+		return fmt.Errorf("append reconstruction: %w", err)
+	}
+	return requireRowsAffected(result, "append reconstruction")
+}

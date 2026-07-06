@@ -12,7 +12,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
@@ -82,12 +82,12 @@ func TestPublishHandler(t *testing.T) {
 		},
 		{
 			name:       "stale occ",
-			svcErr:     repository.ErrStaleRevision,
+			svcErr:     infrastructure.ErrStaleRevision,
 			wantStatus: http.StatusConflict,
 		},
 		{
 			name:       "invalid supersede target",
-			svcErr:     repository.ErrInvalidScheduledSupersedeTarget,
+			svcErr:     infrastructure.ErrInvalidScheduledSupersedeTarget,
 			wantStatus: http.StatusConflict,
 		},
 	}
@@ -163,7 +163,7 @@ func TestSchedulePublishHandler(t *testing.T) {
 		},
 		{
 			name:       "stale occ",
-			svcErr:     repository.ErrStaleRevision,
+			svcErr:     infrastructure.ErrStaleRevision,
 			wantStatus: http.StatusConflict,
 		},
 	}
@@ -301,7 +301,7 @@ func TestSchedulePublishHandler_PassesExpectedRevisionAndSupersededDocumentID(t 
 
 func TestSchedulePublishHandler_ReturnsErrorWhenActiveInstanceLookupFails(t *testing.T) {
 	fakeRead := &fakeReadServicePublish{
-		err: repository.ErrNoActiveInstance,
+		err: infrastructure.ErrNoActiveInstance,
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-approved-1/schedule-publish", strings.NewReader(`{

@@ -10,7 +10,7 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docapp "metaldocs/internal/modules/documents/application"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -19,7 +19,7 @@ import (
 
 // SupersedeService marks a published document as superseded by a newer revision.
 type SupersedeService struct {
-	repo              repository.ApprovalRepository
+	repo              infrastructure.ApprovalRepository
 	emitter           EventEmitter
 	clock             Clock
 	cdRead            controlleddocumentsdomain.CDFieldReader
@@ -52,7 +52,7 @@ type SupersedeResult struct {
 // PublishSuperseding atomically transitions a new document from "approved" to
 // "published" and the prior document from "published" to "superseded".
 // Both OCC guards must pass; otherwise the transaction is rolled back and
-// repository.ErrStaleRevision is returned.
+// infrastructure.ErrStaleRevision is returned.
 func (s *SupersedeService) PublishSuperseding(ctx context.Context, runner db.TxRunner, req SupersedeRequest) (SupersedeResult, error) {
 	var result SupersedeResult
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
@@ -104,7 +104,7 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, runner db.TxR
 			return fmt.Errorf("publishSuperseding: rows affected (new): %w", err)
 		}
 		if newAffected == 0 {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 
 		// Step 3: OCC UPDATE for prior document (published → superseded). Friendly
@@ -131,7 +131,7 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, runner db.TxR
 			return fmt.Errorf("publishSuperseding: rows affected (prior): %w", err)
 		}
 		if priorAffected == 0 {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 
 		// Step 4: emit "document_superseded" governance event.

@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -18,7 +18,7 @@ import (
 // CancelService cancels an in-progress approval instance and reverts the
 // document back to draft status.
 type CancelService struct {
-	repo    repository.ApprovalRepository
+	repo    infrastructure.ApprovalRepository
 	emitter EventEmitter
 	clock   Clock
 }
@@ -59,10 +59,10 @@ func (s *CancelService) CancelInstance(ctx context.Context, runner db.TxRunner, 
 			return fmt.Errorf("cancel: load instance: %w", err)
 		}
 		if inst == nil {
-			return repository.ErrNoActiveInstance
+			return infrastructure.ErrNoActiveInstance
 		}
 		if inst.Status != domain.InstanceInProgress {
-			return repository.ErrInstanceCompleted
+			return infrastructure.ErrInstanceCompleted
 		}
 
 		docID = inst.DocumentID
@@ -143,7 +143,7 @@ func (s *CancelService) CancelInstance(ctx context.Context, runner db.TxRunner, 
 			return fmt.Errorf("cancel: rows affected: %w", err)
 		}
 		if rows == 0 {
-			return repository.ErrStaleRevision
+			return infrastructure.ErrStaleRevision
 		}
 
 		// Emit governance event.
@@ -176,6 +176,6 @@ func (s *CancelService) CancelInstance(ctx context.Context, runner db.TxRunner, 
 }
 
 // newCancelService constructs a CancelService.
-func newCancelService(repo repository.ApprovalRepository, emitter EventEmitter, clock Clock) *CancelService {
+func newCancelService(repo infrastructure.ApprovalRepository, emitter EventEmitter, clock Clock) *CancelService {
 	return &CancelService{repo: repo, emitter: emitter, clock: clock}
 }

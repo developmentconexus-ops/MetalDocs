@@ -9,7 +9,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/approval/infrastructure"
 )
 
 // GetInstanceHandler returns a single approval instance by ID, with an ETag
@@ -29,8 +29,8 @@ func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
 
 	inst, err := h.readSvc.LoadInstance(r.Context(), h.runner, tenantID, instanceID)
 	if err != nil {
-		if errors.Is(err, repository.ErrNoActiveInstance) {
-			WriteError(w, repository.ErrNoActiveInstance)
+		if errors.Is(err, infrastructure.ErrNoActiveInstance) {
+			WriteError(w, infrastructure.ErrNoActiveInstance)
 			return
 		}
 		WriteError(w, err)

@@ -11,7 +11,7 @@ import (
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	v2domain "metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
@@ -28,11 +28,11 @@ func (f fakeSchemaReader) LoadPlaceholderSchema(_ context.Context, _, _ string) 
 }
 
 type fakeFillInWriter struct {
-	upserts []repository.PlaceholderValue
+	upserts []infrastructure.PlaceholderValue
 	err     error
 }
 
-func (f *fakeFillInWriter) UpsertValue(_ context.Context, v repository.PlaceholderValue, _ ...repository.DBTX) error {
+func (f *fakeFillInWriter) UpsertValue(_ context.Context, v infrastructure.PlaceholderValue, _ ...infrastructure.DBTX) error {
 	if f.err != nil {
 		return f.err
 	}
@@ -42,7 +42,7 @@ func (f *fakeFillInWriter) UpsertValue(_ context.Context, v repository.Placehold
 
 // UpsertAuthorValue satisfies the expanded FillInWriter interface; delegates to
 // UpsertValue semantics for test purposes (no governing rows in existing tests).
-func (f *fakeFillInWriter) UpsertAuthorValue(_ context.Context, v repository.PlaceholderValue, _ ...repository.DBTX) (int64, error) {
+func (f *fakeFillInWriter) UpsertAuthorValue(_ context.Context, v infrastructure.PlaceholderValue, _ ...infrastructure.DBTX) (int64, error) {
 	if f.err != nil {
 		return 0, f.err
 	}

@@ -12,7 +12,7 @@ import (
 	"metaldocs/internal/modules/documents/application"
 	dhttp "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/ratelimit"
@@ -98,7 +98,7 @@ type moduleFillInService struct{}
 func (s *moduleFillInService) SetPlaceholderValue(context.Context, string, string, string, string, string) error {
 	return nil
 }
-func (s *moduleFillInService) GetPlaceholderValues(context.Context, string, string) ([]repository.PlaceholderValue, error) {
+func (s *moduleFillInService) GetPlaceholderValues(context.Context, string, string) ([]infrastructure.PlaceholderValue, error) {
 	return nil, nil
 }
 func (s *moduleFillInService) GetFillInSchema(context.Context, string, string) ([]templatesdomain.Placeholder, error) {

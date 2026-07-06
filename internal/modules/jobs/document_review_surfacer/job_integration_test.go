@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	documentsrepo "metaldocs/internal/modules/documents/repository"
+	documentsrepo "metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/tests/integration/testdb"
 )

@@ -12,7 +12,7 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	v2domain "metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/db"
 )
@@ -27,8 +27,8 @@ type SchemaReader interface {
 }
 
 type FillInWriter interface {
-	UpsertValue(ctx context.Context, v repository.PlaceholderValue, q ...repository.DBTX) error
-	UpsertAuthorValue(ctx context.Context, v repository.PlaceholderValue, q ...repository.DBTX) (int64, error)
+	UpsertValue(ctx context.Context, v infrastructure.PlaceholderValue, q ...infrastructure.DBTX) error
+	UpsertAuthorValue(ctx context.Context, v infrastructure.PlaceholderValue, q ...infrastructure.DBTX) (int64, error)
 	CurrentSource(ctx context.Context, tenantID, revisionID, placeholderID string) (string, bool, error)
 }
 
@@ -144,7 +144,7 @@ func (s *FillInService) SetPlaceholderValue(ctx context.Context, tenantID, actor
 	}
 
 	value := raw
-	affected, err := s.writer.UpsertAuthorValue(ctx, repository.PlaceholderValue{
+	affected, err := s.writer.UpsertAuthorValue(ctx, infrastructure.PlaceholderValue{
 		TenantID:      tenantID,
 		RevisionID:    revisionID,
 		PlaceholderID: placeholderID,
@@ -241,7 +241,7 @@ func validateValue(ctx context.Context, tenantID string, p templatesdomain.Place
 
 // FillInReader reads current fill-in values from the DB.
 type FillInReader interface {
-	ListValues(ctx context.Context, tenantID, docID string) ([]repository.PlaceholderValue, error)
+	ListValues(ctx context.Context, tenantID, docID string) ([]infrastructure.PlaceholderValue, error)
 }
 
 // TemplateVersionSchemaReader reads fill-in schema from the template version
@@ -300,7 +300,7 @@ func (s *FillInService) WithTemplateSchemaReader(r *TemplateVersionSchemaReader)
 	return s
 }
 
-func (s *FillInService) GetPlaceholderValues(ctx context.Context, tenantID, docID string) ([]repository.PlaceholderValue, error) {
+func (s *FillInService) GetPlaceholderValues(ctx context.Context, tenantID, docID string) ([]infrastructure.PlaceholderValue, error) {
 	if s.reader == nil {
 		return nil, errors.New("fill-in reader not configured")
 	}
