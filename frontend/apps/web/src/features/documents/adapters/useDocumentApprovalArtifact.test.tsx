@@ -47,6 +47,7 @@ function makeInstance(): ApprovalInstance {
     status: 'in_progress',
     submitted_by: 'maria',
     submitted_at: '2026-04-15T10:00:00.000Z',
+    completed_at: null,
     stages: [
       {
         id: 'stage-0',

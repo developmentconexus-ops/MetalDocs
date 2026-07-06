@@ -1,22 +1,34 @@
-FROM node:20-alpine AS builder
-# Build context is the repo root so shared/ is accessible alongside frontend/.
-# canvas (dep of pdf-img-convert devDep) requires native compilation on musl Linux.
-# Install build tools so it compiles from source; only affects the builder stage.
-RUN apk add --no-cache python3 make g++ cairo-dev pango-dev jpeg-dev giflib-dev librsvg-dev
+# MetalDocs web — pnpm workspace build (repo root context).
+# The repo is a pnpm monorepo (packageManager pnpm@11.8.0, workspace:* deps);
+# @metaldocs/web depends on workspace packages (editor-ui, shared-tokens), so the
+# install MUST run through pnpm at the workspace root — npm ci cannot resolve
+# workspace:* and there is no package-lock.json.
+FROM node:22-alpine AS builder
+RUN corepack enable
+WORKDIR /repo
 
-WORKDIR /app
-# Install dependencies from the web app subdirectory so node_modules land next to package.json.
-COPY frontend/apps/web/package.json frontend/apps/web/package-lock.json ./frontend/apps/web/
-RUN cd frontend/apps/web && npm ci
+# Manifests first for layer caching: lockfile + workspace config + every package.json.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY frontend/apps/web/package.json ./frontend/apps/web/
+COPY packages/docx-editor/package.json ./packages/docx-editor/
+COPY packages/editor-ui/package.json ./packages/editor-ui/
+COPY packages/eigenpal-adapter/package.json ./packages/eigenpal-adapter/
+COPY packages/form-ui/package.json ./packages/form-ui/
+COPY packages/shared-tokens/package.json ./packages/shared-tokens/
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY apps/docx-renderer/package.json ./apps/docx-renderer/
 
-# Copy web app source and the shared schemas that pipeline.ts / adapter.test.ts import
-# via relative paths (e.g. ../../../../../../../../../shared/schemas/canonicalize).
+RUN pnpm install --frozen-lockfile --filter @metaldocs/web...
+
+# Source: the web app + the workspace packages it consumes.
+COPY packages/ ./packages/
 COPY frontend/apps/web/ ./frontend/apps/web/
-COPY shared/ ./shared/
+# The web build generates API types from the OpenAPI contract at gen time in dev;
+# the committed src/lib/api-types are used as-is here (contract-first: spec is truth).
 
-RUN cd frontend/apps/web && npm run build
+RUN pnpm --filter @metaldocs/web run build
 
 FROM nginx:1.27-alpine
-COPY --from=builder /app/frontend/apps/web/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/frontend/apps/web/dist /usr/share/nginx/html
+COPY --from=builder /repo/frontend/apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /repo/frontend/apps/web/dist /usr/share/nginx/html
 EXPOSE 4173

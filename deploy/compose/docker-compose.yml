@@ -11,12 +11,26 @@ services:
       - "${POSTGRES_HOST_PORT}:5432"
     volumes:
       - metaldocs_postgres_data:/var/lib/postgresql/data
+      # Curated-baseline cold-start bootstrap. Postgres runs /docker-entrypoint-initdb.d/*
+      # exactly once, on first init of an empty data volume, in filename order, BEFORE the
+      # server accepts connections (so the api's service_healthy gate cannot race it). This
+      # is the faithful compose translation of scripts/dev-bootstrap-baseline.ps1 steps
+      # 1-3 (prerequisites -> schema -> reference-data); the api container applies the
+      # post-baseline forward migrations (0257+) itself at startup. See internal/platform/
+      # migrate/migrate.go: "the curated baseline bootstrap is owned by [the bootstrap]".
+      - ../../db/prerequisites/0001_extensions.sql:/docker-entrypoint-initdb.d/01_extensions.sql:ro
+      - ../../db/baseline/0001_current_schema.sql:/docker-entrypoint-initdb.d/02_baseline.sql:ro
+      - ../../db/reference-data/0001_product_reference_data.sql:/docker-entrypoint-initdb.d/03_reference_data.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 10s
+      # Cold start applies the curated baseline (~166 KB schema + reference data) via
+      # initdb.d BEFORE the server accepts connections; that can take 1-2 min. Failures
+      # during start_period do NOT count toward retries, so give initdb generous room —
+      # otherwise the api/worker service_healthy gate aborts before the schema is loaded.
+      start_period: 180s
 
   redis:
     image: redis:7

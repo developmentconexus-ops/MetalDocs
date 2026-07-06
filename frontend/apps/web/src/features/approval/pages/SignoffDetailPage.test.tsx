@@ -68,6 +68,7 @@ describe('SignoffDetailPage', () => {
       status: 'in_progress',
       submitted_by: 'maria',
       submitted_at: '2026-04-14T10:00:00.000Z',
+      completed_at: null,
       stages: [],
       etag: '"v3"',
     } as Awaited<ReturnType<typeof approvalApi.getInstance>>);

@@ -107,6 +107,7 @@ describe('DocumentEditorPage', () => {
       effective_from: null,
       effective_to: null,
       review_due_at: null,
+      review_surfaced_at: null,
       last_reviewed_at: null,
     };
     vi.mocked(api.getDocument).mockResolvedValue(doc);

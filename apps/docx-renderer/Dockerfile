@@ -1,38 +1,42 @@
-FROM node:20.11-alpine AS build
-WORKDIR /app
+# MetalDocs docx-renderer — pnpm workspace build (repo root context).
+# Pre-pnpm history: this file once npm-installed a vendored eigenpal tarball from
+# apps/docx-renderer/vendor. The repo has since migrated to pnpm workspaces and
+# @eigenpal/* resolves from the registry via pnpm-lock.yaml — no vendor dir exists.
+FROM node:22-alpine AS build
+RUN corepack enable
+WORKDIR /repo
 
-# Copy manifests for the workspace packages this service needs
-COPY package.json package-lock.json ./
-COPY packages/shared-tokens/package.json ./packages/shared-tokens/
+# Manifests first for layer caching.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/docx-renderer/package.json ./apps/docx-renderer/
+COPY packages/docx-editor/package.json ./packages/docx-editor/
+COPY packages/editor-ui/package.json ./packages/editor-ui/
+COPY packages/eigenpal-adapter/package.json ./packages/eigenpal-adapter/
+COPY packages/form-ui/package.json ./packages/form-ui/
+COPY packages/shared-tokens/package.json ./packages/shared-tokens/
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY frontend/apps/web/package.json ./frontend/apps/web/
 
-# Vendor tarball lives alongside the app (not in Go's /vendor root, which is
-# excluded by .dockerignore)
-COPY apps/docx-renderer/vendor ./apps/docx-renderer/vendor
+RUN pnpm install --frozen-lockfile --filter @metaldocs/docx-renderer...
 
-# Install workspace deps (includes esbuild devDep + shared-tokens transitive deps)
-RUN npm ci --workspace @metaldocs/docx-renderer --include-workspace-root
-
-# Copy source for the bundle step
-COPY packages/shared-tokens/src ./packages/shared-tokens/src
+# Source for the renderer + the workspace packages it imports.
+COPY packages/shared-tokens/ ./packages/shared-tokens/
+COPY packages/eigenpal-adapter/ ./packages/eigenpal-adapter/
 COPY apps/docx-renderer/src ./apps/docx-renderer/src
 COPY apps/docx-renderer/build.mjs apps/docx-renderer/tsconfig.json ./apps/docx-renderer/
 
-# Bundle our code + @metaldocs/shared-tokens into dist/index.js; node_modules
-# deps stay external (see build.mjs). Then drop devDeps for a lean runtime.
-RUN npm run build --workspace @metaldocs/docx-renderer \
- && npm prune --omit=dev
+# Bundle our code (+ workspace deps) into dist/index.js; registry deps stay
+# external (see build.mjs). Then produce a lean prod-only deployment.
+RUN pnpm --filter @metaldocs/docx-renderer run build \
+ && pnpm --filter @metaldocs/docx-renderer --prod deploy --legacy /out \
+ && cp -r apps/docx-renderer/dist /out/dist
 
-FROM node:20.11-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-
-# Ship the pruned workspace: dist bundle + the external node_modules deps it
-# imports at runtime (fastify, eigenpal, minio, etc.)
-COPY --from=build /app ./
-
+COPY --from=build /out ./
 USER node
 EXPOSE 3100
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3100/health || exit 1
-CMD ["node", "apps/docx-renderer/dist/index.js"]
+CMD ["node", "dist/index.js"]

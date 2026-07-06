@@ -12,6 +12,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@eigenpal/docx-editor-core": "1.9.0",
+    "@eigenpal/docx-editor-react": "1.9.0",
     "@metaldocs/eigenpal-adapter": "workspace:*",
     "@metaldocs/shared-tokens": "workspace:*",
     "@opentelemetry/api": "1.9.1",
