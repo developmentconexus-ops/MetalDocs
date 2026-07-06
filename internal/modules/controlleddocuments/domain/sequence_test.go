@@ -15,6 +15,7 @@ import (
 
 	"metaldocs/internal/modules/controlleddocuments/infrastructure"
 	"metaldocs/internal/platform/tenant"
+	"metaldocs/tests/integration/testdb"
 )
 
 func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
@@ -53,13 +54,10 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("begin setup tx: %v", err)
 	}
-	if _, err := setupTx.ExecContext(context.Background(),
-		`SELECT set_config('metaldocs.asserted_caps',
-			'[{"cap":"taxonomy.manage"},{"cap":"controlled_documents.create"}]', true)`,
-	); err != nil {
-		_ = setupTx.Rollback()
-		t.Fatalf("assert setup caps: %v", err)
-	}
+	// Assert the setup caps tx-locally via the sanctioned testdb helper (no inline
+	// tripwire config in the test file — R1). Same effect the service layer's
+	// authz.Require has: the asserted-caps GUC set transaction-locally.
+	testdb.SetCapsOnTx(t, setupTx, `[{"cap":"taxonomy.manage"},{"cap":"controlled_documents.create"}]`)
 	if _, err := setupTx.ExecContext(context.Background(), `
 		INSERT INTO metaldocs.document_profiles
 			(code, tenant_id, family_code, name, description, review_interval_days, editable_by_role, alias)
@@ -118,15 +116,9 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 			}
 			// NextAndIncrement writes cd_sequence_counters (ensure-INSERT + locked
 			// UPDATE), both gated by the controlled_documents.create tripwire — the
-			// service asserts it tx-locally, so the test must too.
-			if _, err := tx.ExecContext(context.Background(),
-				`SELECT set_config('metaldocs.asserted_caps',
-					'[{"cap":"controlled_documents.create"}]', true)`,
-			); err != nil {
-				_ = tx.Rollback()
-				t.Errorf("assert worker cap: %v", err)
-				return
-			}
+			// service asserts it tx-locally, so the test must too. Sanctioned helper,
+			// no inline set_config (R1).
+			testdb.SetCapsOnTx(t, tx, `[{"cap":"controlled_documents.create"}]`)
 			next, err := allocator.NextAndIncrement(context.Background(), tx, tenantID, profileCode, areaCode)
 			if err != nil {
 				_ = tx.Rollback()

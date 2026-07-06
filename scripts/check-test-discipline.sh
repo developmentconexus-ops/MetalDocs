@@ -56,7 +56,10 @@ R2_ALLOWLIST=(
   # RLS probe: SET ROLE + tenant_id GUC + policy-filtered SELECTs must share ONE
   # pinned *sql.Conn across multiple statements with no wrapping tx — a tx-local
   # GUC would be discarded before the reads the test exists to make.
-  "internal/modules/templates/repository/tenant_id_rls_integration_test.go"
+  # Path reconciled 2026-07-06 (M10 F-R3): F9.5 renamed templates/repository/ →
+  # templates/infrastructure/; this is a path correction of an existing entry,
+  # NOT a new allowlist widening.
+  "internal/modules/templates/infrastructure/tenant_id_rls_integration_test.go"
   # applyMigrationWithBypass: the migration script under test carries its own
   # BEGIN/COMMIT, so a tx-local GUC set from a wrapping Go tx cannot survive
   # into it; bypass is set session-locally on a pinned conn and explicitly

@@ -183,7 +183,7 @@ func assertDocumentStatus(t *testing.T, db *sql.DB, docID, want string) {
 	t.Helper()
 	var got string
 	if err := db.QueryRowContext(context.Background(),
-		`SELECT status FROM documents WHERE id = $1::uuid`, docID,
+		`SELECT status FROM metaldocs.documents WHERE id = $1::uuid`, docID,
 	).Scan(&got); err != nil {
 		t.Fatalf("assertDocumentStatus: %v", err)
 	}
