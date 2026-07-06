@@ -39,7 +39,14 @@ func TestTemplateVersionReader_GetTemplateVersionState_Live(t *testing.T) {
 	// templates_template and templates_template_version carry the template.create
 	// authz tripwire; assert the cap tx-locally via SeedWithCaps (pool-safe,
 	// mirrors production — assertion is discarded on commit, never leaks).
+	// templates_template_version also carries trg_template_version_tenant_consistent
+	// which requires metaldocs.tenant_id GUC set tx-locally before the insert.
 	testdb.SeedWithCaps(t, db, `[{"cap":"template.create"}]`, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`SELECT set_config('metaldocs.tenant_id', $1, true)`, tnt.ID,
+		); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO public.templates_template (
 				id, tenant_id, doc_type_code, key, name, latest_version, published_version_id, created_by
