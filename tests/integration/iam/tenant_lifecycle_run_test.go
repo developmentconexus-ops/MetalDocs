@@ -34,6 +34,9 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,6 +47,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	securityapp "metaldocs/internal/modules/security/application"
+	securitydomain "metaldocs/internal/modules/security/domain"
 	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
 	platcrypto "metaldocs/internal/platform/crypto"
 	"metaldocs/internal/platform/db"
@@ -135,6 +139,14 @@ func seedTenantWithSpread(t *testing.T, sqlDB *sql.DB, cryptoSvc *securityapp.Te
 	extraUser := testdb.NewUser(t, sqlDB, testdb.WithTenant(tenant.ID), testdb.WithDisplayName(namePrefix+" Extra User"))
 	extraUserID = extraUser.ID
 
+	// Seed a real metaldocs.auth_identities credential row for the admin
+	// user (bypass_authz='scheduler', same idiom insertPendingLifecycleJob
+	// uses for direct-SQL setup rows outside the enqueue-side authz path) —
+	// this is the F7.3 Defect 1 regression fixture: without it, the
+	// erasure assertion below (auth_identities count = 0 post-erase) would
+	// trivially pass on an empty table and prove nothing.
+	seedAuthIdentity(t, sqlDB, adminUserID)
+
 	runner := db.NewTxRunner(sqlDB)
 	provisionCtx := runContextForTenant(tenant.ID)
 	if err := runner.Do(provisionCtx, func(tx *sql.Tx) error {
@@ -162,6 +174,24 @@ func seedTenantWithSpread(t *testing.T, sqlDB *sql.DB, cryptoSvc *securityapp.Te
 	}
 
 	return tenant, extraUserID, adminUserID
+}
+
+// seedAuthIdentity inserts a minimal metaldocs.auth_identities credential row
+// for userID directly via SQL under the scheduler bypass token, mirroring
+// insertPendingLifecycleJob's direct-SQL-setup idiom in this same file.
+func seedAuthIdentity(t *testing.T, sqlDB *sql.DB, userID string) {
+	t.Helper()
+	if err := withBypassErr(sqlDB, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(), `
+INSERT INTO metaldocs.auth_identities
+	(user_id, username, email, display_name, is_active, password_hash, password_algo, must_change_password, failed_login_attempts, created_at, updated_at)
+VALUES ($1, $1, NULL, $1, TRUE, 'x', 'bcrypt', FALSE, 0, NOW(), NOW())
+ON CONFLICT (user_id) DO NOTHING
+`, userID)
+		return err
+	}); err != nil {
+		t.Fatalf("seed auth_identities row for %s: %v", userID, err)
+	}
 }
 
 func itoa(n int) string {
@@ -196,7 +226,23 @@ type runAuditCryptoAdapter struct {
 func (a runAuditCryptoAdapter) EncryptForTenant(ctx context.Context, tenantID string, plaintext []byte) (string, bool, error) {
 	envelope, err := a.crypto.EncryptForTenant(ctx, tenantID, plaintext)
 	if err != nil {
-		return "", false, nil //nolint:nilerr // sentinel fall-through mirrors the composition-root adapter contract
+		if errors.Is(err, securitydomain.ErrKeyNotFound) || errors.Is(err, securitydomain.ErrKeyDestroyed) {
+			return "", false, nil // no key / crypto-shredded → plaintext fall-through
+		}
+		return "", false, err // genuine failure propagates, mirroring composition-root adapter
+	}
+	return envelope, true, nil
+}
+
+// EncryptForTenantTx mirrors the composition-root adapter's tx-aware variant
+// (same-tx key-visibility fix): delegates to TenantCrypto.EncryptForTenantTx.
+func (a runAuditCryptoAdapter) EncryptForTenantTx(ctx context.Context, tx *sql.Tx, tenantID string, plaintext []byte) (string, bool, error) {
+	envelope, err := a.crypto.EncryptForTenantTx(ctx, tx, tenantID, plaintext)
+	if err != nil {
+		if errors.Is(err, securitydomain.ErrKeyNotFound) || errors.Is(err, securitydomain.ErrKeyDestroyed) {
+			return "", false, nil // no key / crypto-shredded → plaintext fall-through
+		}
+		return "", false, err // genuine failure propagates, mirroring composition-root adapter
 	}
 	return envelope, true, nil
 }
@@ -317,7 +363,11 @@ func TestTenantErasure_ChainStaysGreen(t *testing.T) {
 	sqlDB := openDB(t)
 	svc, cryptoSvc := newRunSideTenantLifecycleService(t, sqlDB)
 
-	tenant, _, adminUserID := seedTenantWithSpread(t, sqlDB, cryptoSvc, "erase-chain-green")
+	tenant, extraUserID, adminUserID := seedTenantWithSpread(t, sqlDB, cryptoSvc, "erase-chain-green")
+	// Capture the tenant's user ids BEFORE erasure runs — iam_users rows
+	// (and, by extension, the join-key this test checks against) are
+	// erased by the iam port, so this must be read pre-erase.
+	formerUserIDs := []string{adminUserID, extraUserID}
 
 	jobID := insertPendingLifecycleJob(t, sqlDB, tenant.ID, "erase", adminUserID)
 
@@ -330,6 +380,7 @@ func TestTenantErasure_ChainStaysGreen(t *testing.T) {
 	assertTenantKeyDestroyed(t, sqlDB, tenant.ID)
 	assertTenantTombstoned(t, sqlDB, tenant.ID)
 	assertGovernanceEventsCount(t, sqlDB, tenant.ID, 0)
+	assertAuthIdentitiesErased(t, sqlDB, formerUserIDs)
 	assertIAMUsersCount(t, sqlDB, tenant.ID, 0)
 }
 
@@ -508,6 +559,31 @@ func assertGovernanceEventsCount(t *testing.T, sqlDB *sql.DB, tenantID string, w
 	}
 	if n != want {
 		t.Errorf("governance_events count for %s = %d, want %d", tenantID, n, want)
+	}
+}
+
+// assertAuthIdentitiesErased is the F7.3 Defect 1 regression guard: proves
+// metaldocs.auth_identities holds ZERO rows for any of the erased tenant's
+// FORMER user ids (captured before erasure ran, since iam_users itself is
+// erased by the iam port and can no longer resolve the join afterward).
+func assertAuthIdentitiesErased(t *testing.T, sqlDB *sql.DB, formerUserIDs []string) {
+	t.Helper()
+	if len(formerUserIDs) == 0 {
+		t.Fatalf("assertAuthIdentitiesErased: no former user ids captured — test setup bug")
+	}
+	placeholders := make([]string, len(formerUserIDs))
+	args := make([]any, len(formerUserIDs))
+	for i, id := range formerUserIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	query := "SELECT count(*) FROM metaldocs.auth_identities WHERE user_id IN (" + strings.Join(placeholders, ",") + ")"
+	var n int
+	if err := sqlDB.QueryRowContext(context.Background(), query, args...).Scan(&n); err != nil {
+		t.Fatalf("count auth_identities for former user ids %v: %v", formerUserIDs, err)
+	}
+	if n != 0 {
+		t.Errorf("auth_identities rows surviving for erased tenant's former user ids %v = %d, want 0", formerUserIDs, n)
 	}
 }
 

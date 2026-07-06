@@ -14,6 +14,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
+
 	securitydomain "metaldocs/internal/modules/security/domain"
 
 	"metaldocs/internal/modules/security/application"
@@ -24,6 +26,12 @@ import (
 // error mapping) be proven without a database.
 type fakeTenantKeyRepository struct {
 	rows map[string]*fakeKeyRow
+
+	// txRows, when non-nil, models a store visible ONLY via WrappedDEKTx —
+	// i.e. a row inserted in an open tx that the pool-backed WrappedDEK
+	// cannot see yet. Left nil by default so existing tests (which never
+	// distinguish tx/pool visibility) are unaffected.
+	txRows map[string]*fakeKeyRow
 
 	insertErr error
 }
@@ -57,6 +65,26 @@ func (f *fakeTenantKeyRepository) WrappedDEK(ctx context.Context, tenantID strin
 		return nil, true, nil
 	}
 	return row.wrappedDEK, false, nil
+}
+
+// WrappedDEKTx models the tx-visible store separately from the pool-visible
+// one (txRows), so tests can prove EncryptForTenantTx actually reads via the
+// tx path rather than silently delegating to the pool-backed WrappedDEK.
+// When txRows is nil, it mirrors WrappedDEK exactly (no tx/pool visibility
+// difference modeled) — sufficient for tests that only care that the Tx
+// variant delegates correctly.
+func (f *fakeTenantKeyRepository) WrappedDEKTx(ctx context.Context, tx *sql.Tx, tenantID string) ([]byte, bool, error) {
+	if f.txRows != nil {
+		row, ok := f.txRows[tenantID]
+		if !ok {
+			return nil, false, nil
+		}
+		if row.destroyedAt {
+			return nil, true, nil
+		}
+		return row.wrappedDEK, false, nil
+	}
+	return f.WrappedDEK(ctx, tenantID)
 }
 
 func (f *fakeTenantKeyRepository) DestroyTx(ctx context.Context, tx *sql.Tx, tenantID string) error {
@@ -168,6 +196,78 @@ func TestTenantCryptoService_DecryptForTenant_NoKeyReturnsErrKeyNotFound(t *test
 
 	if _, err := svc.DecryptForTenant(ctx, "no-such-tenant", `{"enc":"aesgcm.v1","data":"AAAA"}`); !errors.Is(err, securitydomain.ErrKeyNotFound) {
 		t.Fatalf("DecryptForTenant() error = %v, want ErrKeyNotFound", err)
+	}
+}
+
+// TestTenantCryptoService_EncryptForTenantTx_ReadsThroughTxOnly proves the
+// tx-aware seal-chain fix (F7.3 defect: tenant.onboarded audit payload landed
+// plaintext because the same-tx key row, still uncommitted, was invisible to
+// a pool read): a key visible ONLY via the fake's txRows (never via the
+// pool-backed WrappedDEK) must still be resolvable by EncryptForTenantTx when
+// a non-nil tx is passed, and the pool-only EncryptForTenant call for the
+// same tenant must still fail with ErrKeyNotFound — proving the Tx variant
+// actually delegates to WrappedDEKTx rather than silently falling back to
+// the pool path.
+func TestTenantCryptoService_EncryptForTenantTx_ReadsThroughTxOnly(t *testing.T) {
+	repo := newFakeRepo()
+	svc, err := application.NewTenantCryptoService(repo, mustKEK(t))
+	if err != nil {
+		t.Fatalf("NewTenantCryptoService() error = %v", err)
+	}
+	ctx := context.Background()
+	tenantID := "tenant-tx-only"
+
+	// Provision normally (writes into repo.rows, the pool-visible store),
+	// then relocate the row into txRows and clear rows — this models a
+	// key visible ONLY through the tx path (mirrors an
+	// INSERT ... tenant_keys row that hasn't committed yet, so a pool
+	// read cannot see it but a same-tx read can).
+	if err := svc.ProvisionTenantKeyTx(ctx, nil, tenantID); err != nil {
+		t.Fatalf("ProvisionTenantKeyTx() error = %v", err)
+	}
+	repo.txRows = map[string]*fakeKeyRow{tenantID: repo.rows[tenantID]}
+	delete(repo.rows, tenantID)
+
+	// Pool-only read must still miss: the row is only in txRows.
+	if _, err := svc.EncryptForTenant(ctx, tenantID, []byte("x")); !errors.Is(err, securitydomain.ErrKeyNotFound) {
+		t.Fatalf("EncryptForTenant() (pool path) error = %v, want ErrKeyNotFound (proves txRows is tx-only)", err)
+	}
+
+	// A non-nil tx is required to take the tx-read path (the fake never
+	// inspects tx's contents, but resolveDEKTx branches on tx == nil, so a
+	// real, non-nil *sql.Tx is needed here — a sqlmock-backed one, since
+	// the fake repo never issues SQL against it).
+	mockDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	defer mockDB.Close()
+	mock.ExpectBegin()
+	tx, err := mockDB.Begin()
+	if err != nil {
+		t.Fatalf("mockDB.Begin() error = %v", err)
+	}
+	defer tx.Rollback()
+
+	envelope, err := svc.EncryptForTenantTx(ctx, tx, tenantID, []byte("classified payload"))
+	if err != nil {
+		t.Fatalf("EncryptForTenantTx() error = %v, want success reading through the tx-only key", err)
+	}
+	if envelope == "" {
+		t.Fatalf("EncryptForTenantTx() returned empty envelope")
+	}
+
+	// Simulate the tx committing: the row becomes pool-visible again, so the
+	// round-trip decrypt below (pool path — there is no DecryptForTenantTx,
+	// matching the spec's Encrypt-only tx variant) can resolve it.
+	repo.rows[tenantID] = repo.txRows[tenantID]
+
+	plaintext, err := svc.DecryptForTenant(ctx, tenantID, envelope)
+	if err != nil {
+		t.Fatalf("DecryptForTenant() error = %v", err)
+	}
+	if string(plaintext) != "classified payload" {
+		t.Fatalf("DecryptForTenant() = %q, want %q", plaintext, "classified payload")
 	}
 }
 

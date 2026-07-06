@@ -53,6 +53,21 @@ func (a auditPayloadCryptoAdapter) EncryptForTenant(ctx context.Context, tenantI
 	return envelope, true, nil
 }
 
+// EncryptForTenantTx mirrors the composition-root adapter's tx-aware variant
+// (apps/api/cmd/metaldocs-api/main.go): delegates to
+// TenantCrypto.EncryptForTenantTx so this test exercises the exact seam
+// shape production wires for RecordTx's same-tx key-visibility fix.
+func (a auditPayloadCryptoAdapter) EncryptForTenantTx(ctx context.Context, tx *sql.Tx, tenantID string, plaintext []byte) (string, bool, error) {
+	envelope, err := a.crypto.EncryptForTenantTx(ctx, tx, tenantID, plaintext)
+	if err != nil {
+		if isSentinel(err) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return envelope, true, nil
+}
+
 func (a auditPayloadCryptoAdapter) DecryptForTenant(ctx context.Context, tenantID, envelope string) ([]byte, error) {
 	return a.crypto.DecryptForTenant(ctx, tenantID, envelope)
 }

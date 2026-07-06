@@ -31,6 +31,19 @@ type TenantCrypto interface {
 	// if the tenant's key has been crypto-shredded.
 	EncryptForTenant(ctx context.Context, tenantID string, plaintext []byte) (string, error)
 
+	// EncryptForTenantTx is EncryptForTenant's tx-aware variant: when tx is
+	// non-nil, the DEK is resolved by reading tenant_keys through tx rather
+	// than the pool. This closes a same-transaction visibility gap: a
+	// caller that provisions a tenant's key (ProvisionTenantKeyTx) and then
+	// seals a payload for that same tenant in the SAME still-open
+	// transaction (e.g. OnboardTenantService sealing its tenant.onboarded
+	// audit event) would otherwise have its pool-backed EncryptForTenant
+	// read race the uncommitted insert and always miss it, silently
+	// falling through to plaintext storage. Falls back to the ordinary
+	// pool-backed resolution when tx is nil (byte-identical to
+	// EncryptForTenant).
+	EncryptForTenantTx(ctx context.Context, tx *sql.Tx, tenantID string, plaintext []byte) (string, error)
+
 	// DecryptForTenant reverses EncryptForTenant. Returns ErrKeyNotFound if
 	// the tenant has no key row, ErrKeyDestroyed if the tenant's key has
 	// been crypto-shredded (the intended, permanent failure mode of

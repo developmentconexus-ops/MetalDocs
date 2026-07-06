@@ -63,6 +63,22 @@ func (a auditPayloadCryptoAdapter) EncryptForTenant(ctx context.Context, tenantI
 	return envelope, true, nil
 }
 
+// EncryptForTenantTx is the tx-aware variant RecordTx uses whenever it holds
+// a live *sql.Tx (always, in practice) — same-tx key-visibility fix mirrored
+// from apps/api's twin adapter (see that file's comment for the full
+// rationale): delegates to TenantCrypto.EncryptForTenantTx so the DEK
+// lookup reads through the SAME transaction as the audit INSERT.
+func (a auditPayloadCryptoAdapter) EncryptForTenantTx(ctx context.Context, tx *sql.Tx, tenantID string, plaintext []byte) (string, bool, error) {
+	envelope, err := a.crypto.EncryptForTenantTx(ctx, tx, tenantID, plaintext)
+	if err != nil {
+		if errors.Is(err, securitydomain.ErrKeyNotFound) || errors.Is(err, securitydomain.ErrKeyDestroyed) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return envelope, true, nil
+}
+
 func (a auditPayloadCryptoAdapter) DecryptForTenant(ctx context.Context, tenantID, envelope string) ([]byte, error) {
 	return a.crypto.DecryptForTenant(ctx, tenantID, envelope)
 }

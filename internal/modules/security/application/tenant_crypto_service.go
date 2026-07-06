@@ -40,6 +40,15 @@ type tenantKeyRepository interface {
 	// has been destroyed. found=false means no row exists at all.
 	WrappedDEK(ctx context.Context, tenantID string) (wrappedDEK []byte, destroyed bool, err error)
 
+	// WrappedDEKTx is WrappedDEK's tx-scoped variant: it reads through tx
+	// rather than the pool, so a caller that is inserting the tenant_keys
+	// row and reading it back in the same still-open transaction (e.g. the
+	// audit writer sealing a tenant.onboarded event in the same tx as
+	// ProvisionTenantKeyTx) actually sees the just-inserted row instead of
+	// racing an uncommitted write via the pool (which always misses,
+	// yielding a false ErrKeyNotFound).
+	WrappedDEKTx(ctx context.Context, tx *sql.Tx, tenantID string) (wrappedDEK []byte, destroyed bool, err error)
+
 	// DestroyTx crypto-shreds tenantID's key inside tx: sets
 	// destroyed_at = now() and zeroes wrapped_dek. No-op (not an error) if
 	// the tenant has no key row, or the key is already destroyed.
@@ -110,6 +119,29 @@ func (s *TenantCryptoService) EncryptForTenant(ctx context.Context, tenantID str
 	return platcrypto.EncodeEnvelope(sealed), nil
 }
 
+// EncryptForTenantTx is EncryptForTenant's tx-aware variant: when tx is
+// non-nil, the DEK is resolved via WrappedDEKTx (a read through tx) instead
+// of the pool, so a caller sealing a payload in the SAME transaction that
+// just provisioned the tenant's key (e.g. OnboardTenantService's
+// tenant.onboarded audit event, written in the same tx as
+// ProvisionTenantKeyTx) sees the just-inserted, still-uncommitted key row
+// rather than racing a pool read that always misses it. When tx is nil, this
+// falls back to the ordinary pool-backed resolution (byte-identical to
+// EncryptForTenant).
+func (s *TenantCryptoService) EncryptForTenantTx(ctx context.Context, tx *sql.Tx, tenantID string, plaintext []byte) (string, error) {
+	dek, err := s.resolveDEKTx(ctx, tx, tenantID)
+	if err != nil {
+		return "", err
+	}
+	defer zeroBytes(dek)
+
+	sealed, err := platcrypto.Seal(dek, plaintext)
+	if err != nil {
+		return "", fmt.Errorf("security: encrypt for tenant: %w", err)
+	}
+	return platcrypto.EncodeEnvelope(sealed), nil
+}
+
 // DecryptForTenant reverses EncryptForTenant.
 func (s *TenantCryptoService) DecryptForTenant(ctx context.Context, tenantID string, envelope string) ([]byte, error) {
 	dek, err := s.resolveDEK(ctx, tenantID)
@@ -152,6 +184,33 @@ func (s *TenantCryptoService) resolveDEK(ctx context.Context, tenantID string) (
 	if err != nil {
 		return nil, fmt.Errorf("security: resolve tenant key: %w", err)
 	}
+	return s.unwrapAndCheck(wrapped, destroyed)
+}
+
+// resolveDEKTx is resolveDEK's tx-aware variant: when tx is non-nil, the
+// wrapped DEK is read via WrappedDEKTx (through tx) instead of the pool.
+func (s *TenantCryptoService) resolveDEKTx(ctx context.Context, tx *sql.Tx, tenantID string) ([]byte, error) {
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" {
+		return nil, errors.New("security: tenant id required")
+	}
+	if tx == nil {
+		wrapped, destroyed, err := s.repo.WrappedDEK(ctx, tenantID)
+		if err != nil {
+			return nil, fmt.Errorf("security: resolve tenant key: %w", err)
+		}
+		return s.unwrapAndCheck(wrapped, destroyed)
+	}
+	wrapped, destroyed, err := s.repo.WrappedDEKTx(ctx, tx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("security: resolve tenant key: %w", err)
+	}
+	return s.unwrapAndCheck(wrapped, destroyed)
+}
+
+// unwrapAndCheck maps repository key-state to the published typed errors and
+// unwraps the DEK on success. Shared by resolveDEK and resolveDEKTx.
+func (s *TenantCryptoService) unwrapAndCheck(wrapped []byte, destroyed bool) ([]byte, error) {
 	if destroyed {
 		return nil, securitydomain.ErrKeyDestroyed
 	}

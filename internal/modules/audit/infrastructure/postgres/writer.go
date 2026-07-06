@@ -33,8 +33,21 @@ import (
 // adapter maps ErrKeyDestroyed to a sentinel the reader recognises so it can
 // substitute the redacted marker instead of failing the whole list/export
 // call; other errors propagate.
+//
+// EncryptForTenantTx is the tx-aware variant RecordTx uses when it is
+// running inside a *sql.Tx (always, in practice — RecordTx's tx parameter is
+// db.Tx, and *sql.Tx satisfies it at runtime; see sealPayload's type
+// assertion). It exists to close a same-transaction key-visibility gap: a
+// caller that provisions a tenant's crypto key and writes an audit event for
+// that same tenant in the SAME still-open transaction (e.g.
+// OnboardTenantService's tenant.onboarded event, written in the same tx as
+// ProvisionTenantKeyTx) must have its key lookup read through that tx, not
+// the pool — a pool read cannot see the uncommitted insert and always
+// misses, which previously caused the payload to silently fall through to
+// plaintext. Same fall-through contract as EncryptForTenant otherwise.
 type PayloadCrypto interface {
 	EncryptForTenant(ctx context.Context, tenantID string, plaintext []byte) (envelope string, encrypted bool, err error)
+	EncryptForTenantTx(ctx context.Context, tx *sql.Tx, tenantID string, plaintext []byte) (envelope string, encrypted bool, err error)
 	DecryptForTenant(ctx context.Context, tenantID string, envelope string) (plaintext []byte, err error)
 }
 
@@ -103,7 +116,7 @@ func (w *Writer) RecordTx(ctx context.Context, tx db.Tx, event domain.Event) err
 		return fmt.Errorf("lock audit hash chain: %w", err)
 	}
 
-	payloadJSON, err := w.sealPayload(ctx, event)
+	payloadJSON, err := w.sealPayload(ctx, tx, event)
 	if err != nil {
 		return fmt.Errorf("seal audit payload: %w", err)
 	}
@@ -143,11 +156,26 @@ FROM prepared
 // behavior — byte-identical when crypto is nil). The hash chain hashes
 // whatever this function returns, so encryption is transparent to
 // tamper-evidence: chain semantics are untouched either way.
-func (w *Writer) sealPayload(ctx context.Context, event domain.Event) (string, error) {
+//
+// tx is type-asserted to *sql.Tx so the key lookup can go through the SAME
+// transaction as this INSERT: RecordTx always receives a live *sql.Tx in
+// practice (db.Tx is satisfied only by *sql.Tx at runtime), so this closes
+// the same-tx key-visibility gap (a tenant_keys row inserted earlier in this
+// same tx, not yet committed, is invisible to a pool read). If the assertion
+// ever fails (a future non-*sql.Tx db.Tx implementation), this falls back to
+// EncryptForTenant's pool-backed read rather than erroring.
+func (w *Writer) sealPayload(ctx context.Context, tx db.Tx, event domain.Event) (string, error) {
 	if w.crypto == nil {
 		return event.PayloadJSON, nil
 	}
-	envelope, encrypted, err := w.crypto.EncryptForTenant(ctx, event.TenantID, []byte(event.PayloadJSON))
+	var envelope string
+	var encrypted bool
+	var err error
+	if sqlTx, ok := tx.(*sql.Tx); ok && sqlTx != nil {
+		envelope, encrypted, err = w.crypto.EncryptForTenantTx(ctx, sqlTx, event.TenantID, []byte(event.PayloadJSON))
+	} else {
+		envelope, encrypted, err = w.crypto.EncryptForTenant(ctx, event.TenantID, []byte(event.PayloadJSON))
+	}
 	if err != nil {
 		return "", err
 	}

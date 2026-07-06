@@ -87,7 +87,16 @@ func TestTenantsInsertTripwire(t *testing.T) {
 // onboarding surface exactly; no update/offboard mutation exists yet), so a
 // plain DELETE suffices. Error-discarding by design, matching the established
 // cleanup convention in this package (cleanupIAMUser).
+//
+// The metaldocs.tenant_keys row (provisioned by a crypto-wired OnboardTenant
+// — TestOnboardTenant_AuditPayloadSealedWhenCryptoWired) FKs metaldocs.tenants,
+// so it must be deleted BEFORE the tenant row or the tenants DELETE fails on
+// the FK and (being error-discarded) leaks the row — poisoning the next run's
+// deterministic slug. Noop-provisioner tests write no tenant_keys row, so this
+// extra DELETE is a harmless no-op for them.
 func cleanupTenant(db *sql.DB, slug string) {
+	_, _ = db.ExecContext(context.Background(),
+		`DELETE FROM metaldocs.tenant_keys WHERE tenant_id IN (SELECT id FROM metaldocs.tenants WHERE slug = $1)`, slug)
 	_, _ = db.ExecContext(context.Background(),
 		`DELETE FROM metaldocs.tenants WHERE slug = $1`, slug)
 }

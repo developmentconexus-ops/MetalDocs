@@ -23,6 +23,7 @@ package iam_test
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"errors"
 	"testing"
@@ -32,12 +33,103 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	securityapp "metaldocs/internal/modules/security/application"
+	securitydomain "metaldocs/internal/modules/security/domain"
+	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
+	platcrypto "metaldocs/internal/platform/crypto"
 	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
 func isTenantSlugConflict(err error) bool {
 	return errors.Is(err, iamdomain.ErrTenantSlugConflict)
+}
+
+// onboardTenantKeyProvisionerAdapter adapts security's published TenantCrypto
+// port to iam's TenantKeyProvisioner seam — a local copy of the composition
+// root's tenantCryptoKeyProvisioner (apps/api/cmd/metaldocs-api/main.go),
+// kept here so this test package does not need to import the main package.
+type onboardTenantKeyProvisionerAdapter struct {
+	crypto securitydomain.TenantCrypto
+}
+
+func (p onboardTenantKeyProvisionerAdapter) ProvisionTenantKey(ctx context.Context, tx *sql.Tx, tenantID string) error {
+	return p.crypto.ProvisionTenantKeyTx(ctx, tx, tenantID)
+}
+
+// onboardAuditCryptoAdapter mirrors the composition-root's
+// auditPayloadCryptoAdapter (same seam shape used by
+// tests/integration/audit/payload_crypto_test.go's auditPayloadCryptoAdapter
+// and tests/integration/iam/tenant_lifecycle_run_test.go's
+// runAuditCryptoAdapter) — a third, locally named copy because Go test
+// packages cannot share unexported types across files in different
+// directories/packages.
+type onboardAuditCryptoAdapter struct {
+	crypto securitydomain.TenantCrypto
+}
+
+func (a onboardAuditCryptoAdapter) EncryptForTenant(ctx context.Context, tenantID string, plaintext []byte) (string, bool, error) {
+	envelope, err := a.crypto.EncryptForTenant(ctx, tenantID, plaintext)
+	if err != nil {
+		if errors.Is(err, securitydomain.ErrKeyNotFound) || errors.Is(err, securitydomain.ErrKeyDestroyed) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return envelope, true, nil
+}
+
+func (a onboardAuditCryptoAdapter) EncryptForTenantTx(ctx context.Context, tx *sql.Tx, tenantID string, plaintext []byte) (string, bool, error) {
+	envelope, err := a.crypto.EncryptForTenantTx(ctx, tx, tenantID, plaintext)
+	if err != nil {
+		if errors.Is(err, securitydomain.ErrKeyNotFound) || errors.Is(err, securitydomain.ErrKeyDestroyed) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return envelope, true, nil
+}
+
+func (a onboardAuditCryptoAdapter) DecryptForTenant(ctx context.Context, tenantID, envelope string) ([]byte, error) {
+	return a.crypto.DecryptForTenant(ctx, tenantID, envelope)
+}
+
+// mustOnboardKEK mints a fresh 32-byte KEK, mirroring the established
+// mustKEK/mustRunKEK helpers in the sibling security/audit/iam integration
+// suites.
+func mustOnboardKEK(t *testing.T) []byte {
+	t.Helper()
+	kek := make([]byte, platcrypto.KeySize)
+	if _, err := rand.Read(kek); err != nil {
+		t.Fatalf("rand.Read kek: %v", err)
+	}
+	return kek
+}
+
+// newOnboardTenantServiceWithCrypto builds the same OnboardTenantService as
+// newOnboardTenantService, but with a REAL TenantCryptoService wired for both
+// key provisioning (ProvisionTenantKeyTx, called inside OnboardTenant's tx)
+// and audit payload sealing (RecordTx, called later in that SAME tx) — the
+// exact composition-root wiring shape production uses, reproducing the F7.3
+// defect scenario: the tenant_keys row and the tenant.onboarded audit event
+// are written in one transaction, so sealing must read the just-inserted key
+// through that transaction, not the pool.
+func newOnboardTenantServiceWithCrypto(t *testing.T, sqlDB *sql.DB) *iamapp.OnboardTenantService {
+	t.Helper()
+	cryptoSvc, err := securityapp.NewTenantCryptoService(securitypg.NewTenantKeyRepository(sqlDB), mustOnboardKEK(t))
+	if err != nil {
+		t.Fatalf("NewTenantCryptoService() error = %v", err)
+	}
+	authRepo := authpg.NewRepository(sqlDB, iampg.NewUserTenantRepository(sqlDB))
+	auditWriter := auditpg.NewWriter(sqlDB).WithPayloadCrypto(onboardAuditCryptoAdapter{crypto: cryptoSvc})
+	return iamapp.NewOnboardTenantService(
+		iampg.NewTenantRepository(sqlDB),
+		authRepo,
+		db.NewTxRunner(sqlDB),
+		auditWriter,
+		onboardTenantKeyProvisionerAdapter{crypto: cryptoSvc},
+		nil, // defaults to authapp.HashPassword
+	)
 }
 
 func newOnboardTenantService(sqlDB *sql.DB) *iamapp.OnboardTenantService {
@@ -152,6 +244,53 @@ func TestOnboardTenant_CreatesTenantAdminAndAudit(t *testing.T) {
 	}
 	if containsSubstring(auditPayload, "admin_password") || containsSubstring(auditPayload, "correct-horse-battery-staple") {
 		t.Fatalf("audit_events payload leaked admin_password material: %s", auditPayload)
+	}
+}
+
+// TestOnboardTenant_AuditPayloadSealedWhenCryptoWired is the F7.3 defect
+// regression guard: OnboardTenant's tx does ProvisionTenantKeyTx (insert
+// tenant_keys) then audit.RecordTx (tenant.onboarded event) in the SAME
+// still-open transaction. Before the tx-aware seal-chain fix, the audit
+// writer's key lookup read via the POOL, which cannot see the uncommitted
+// tenant_keys insert — ErrKeyNotFound — so the payload silently fell through
+// to plaintext forever, even though crypto was fully wired. This test proves
+// the stored payload is an envelope ({"enc":...}), not plaintext, once the
+// tx-aware EncryptForTenantTx path is wired end to end.
+func TestOnboardTenant_AuditPayloadSealedWhenCryptoWired(t *testing.T) {
+	sqlDB := openDB(t)
+	ctx := context.Background()
+
+	actor := testdb.DeterministicID(t, "onboard-crypto-actor")
+	seedIdentity(t, sqlDB, actor)
+	seedSystemAdminRole(t, sqlDB, actor)
+
+	slug := "onboard-crypto-" + testdb.DeterministicID(t, "onboard-crypto-slug")
+	adminUserID := testdb.DeterministicID(t, "onboard-crypto-admin")
+	t.Cleanup(func() { cleanupOnboardedTenant(sqlDB, slug, adminUserID) })
+
+	svc := newOnboardTenantServiceWithCrypto(t, sqlDB)
+	result, err := svc.OnboardTenant(ctx, iamapp.OnboardTenantInput{
+		Name:             "Onboard Crypto Tenant",
+		Slug:             slug,
+		AdminUserID:      adminUserID,
+		AdminDisplayName: "Onboard Crypto Admin",
+		AdminPassword:    "correct-horse-battery-staple",
+	}, actor, devTenant)
+	if err != nil {
+		t.Fatalf("OnboardTenant() = %v, want nil", err)
+	}
+
+	var auditPayload string
+	if err := sqlDB.QueryRowContext(ctx,
+		`SELECT payload::text FROM metaldocs.audit_events
+		  WHERE action = 'tenant.onboarded' AND resource_id = $1`,
+		result.TenantID,
+	).Scan(&auditPayload); err != nil {
+		t.Fatalf("read audit_events payload: %v", err)
+	}
+	if !platcrypto.IsEnvelope(auditPayload) {
+		t.Fatalf("tenant.onboarded audit payload for %s is NOT an envelope (landed plaintext despite crypto being wired): %s",
+			result.TenantID, auditPayload)
 	}
 }
 

@@ -78,6 +78,33 @@ WHERE tenant_id = $1::uuid
 	return wrapped, false, nil
 }
 
+// WrappedDEKTx is WrappedDEK's tx-scoped variant: it reads through tx rather
+// than the pool, so a caller resolving a key inside the SAME transaction
+// that just inserted the tenant_keys row (e.g. sealing an audit event in the
+// same tx as ProvisionTenantKeyTx) sees the just-inserted, still-uncommitted
+// row instead of racing a pool read that always misses an uncommitted
+// insert. Same query/semantics as WrappedDEK otherwise.
+func (r *TenantKeyRepository) WrappedDEKTx(ctx context.Context, tx *sql.Tx, tenantID string) ([]byte, bool, error) {
+	const q = `
+SELECT wrapped_dek, destroyed_at IS NOT NULL
+FROM metaldocs.tenant_keys
+WHERE tenant_id = $1::uuid
+`
+	var wrapped []byte
+	var destroyed bool
+	err := tx.QueryRowContext(ctx, q, tenantID).Scan(&wrapped, &destroyed)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("select tenant key (tx): %w", err)
+	}
+	if destroyed {
+		return nil, true, nil
+	}
+	return wrapped, false, nil
+}
+
 // DestroyTx crypto-shreds tenantID's key inside tx: sets destroyed_at and
 // zeroes wrapped_dek. Explicit tenant_id predicate; no-op (0 rows affected)
 // if the tenant has no key row or the key is already destroyed — both are
