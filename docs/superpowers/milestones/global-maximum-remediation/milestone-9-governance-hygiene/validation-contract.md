@@ -81,6 +81,11 @@ There is **no `docs` module**; `tokens` exists. CLAUDE.md currently lists
 
 ### 2.2 Proof pair (both mandatory in evidence)
 - **POSITIVE:** gate run on the clean final tree → exit 0, output captured.
+  **[AMENDED — see Erratum E1, 2026-07-06]** First-population positive proof = gate run on the clean
+  final tree whose output (a) is anti-rot clean (`stale=false`, matches the committed
+  `req-traceability.md` exactly) and (b) reports an uncovered-MUST set equal to **exactly** the four
+  ledgered defers of E1 — no more, no fewer. The tool itself stays strict (exit ≠0 on any uncovered
+  MUST); the erratum redefines the *acceptance check*, not the gate.
 - **NEGATIVE:** a planted uncovered MUST REQ (or a temporarily removed citation) → exit ≠0, output
   captured, plant reverted. The negative run drives the REAL gate entrypoint (script or CI job step),
   not an internal function.
@@ -161,7 +166,8 @@ There is **no `docs` module**; `tokens` exists. CLAUDE.md currently lists
 1. `go build ./...` — exit 0.
 2. `scripts/check-module-boundaries.ps1` — OK.
 3. `go run ./scripts/api-lint …` blocking gate — 0 blocking (same invocation as CI `lint.yml`).
-4. F9.2 gate — positive run green (its negative proof is in F9.2 evidence, not re-planted at close).
+4. F9.2 gate — positive run per §2.2 as amended by Erratum E1: anti-rot clean AND uncovered set ==
+   exactly the four E1 defers (its negative proof is in F9.2 evidence, not re-planted at close).
 5. ADR status sweep (§1.1) — 0 violations.
 6. Targeted test suites: the F9.3 named package set + documents/templates/approval packages —
    green. Full suite explicitly NOT required locally (box constraint, mission §10); the bounded
@@ -179,6 +185,35 @@ There is **no `docs` module**; `tokens` exists. CLAUDE.md currently lists
 - Marking 0013 Superseded without a researched superseding reference.
 - F9.2 map entries whose evidence pointer does not resolve (anti-gaming §2.3).
 - Push to any remote.
+
+## Errata
+
+### E1 — 2026-07-06 — §2.2 POSITIVE proof & §6.4 close gate (operator-approved, HS-7 path)
+
+**Trigger:** F9.2's gate, run honestly on the clean tree, found **4 MUST REQs with zero real
+evidence** — genuine doc-vs-runtime falsity and coverage gaps of exactly the mission's meta-defect
+class. Satisfying the literal "exit 0" of §2.2 would require inventing evidence (§2.3 forbidden) or
+weakening the gate (§7 forbidden).
+
+**Operator disposition:** operator was presented the three options (accept-RED erratum / fix-in-M9
+F9.6 / defer-to-HS-1) and responded: *"What do you recommend and why? to be global maximum"* —
+delegating to the session's recommendation with rationale recorded. Recommendation adopted:
+accept documented RED; all 4 gaps become **bounded defers with named triggers**; no normative-doc
+edits inside M9; gate strictness unchanged.
+
+**Ledgered defers (the exact allowed uncovered set):**
+
+| REQ | Finding | Trigger |
+|-----|---------|---------|
+| REQ-AUTHN-1 | Doc mandates Argon2id; runtime is bcrypt cost-12 (`internal/modules/auth/domain/model.go:12`). Constant-time verify + uniform failure real (b5f00d73). | Post-mission operator security-posture ADR: accept bcrypt-12 (re-grade doc line) **or** plan Argon2id migration. Not decidable inside a hygiene milestone. |
+| REQ-AUTHN-3 | Doc assumes RFC 8725 JWT handling; runtime is opaque server-side session cookies — no JWT exists anywhere in `internal/modules/auth/`. | Post-mission ADR recording token-format truth (opaque sessions; RFC 8725 inapplicable) + doc-line amendment. |
+| REQ-SEARCH-1 | No reindex/rebuild procedure or test; search is SQL-backed read projections. | Backlog feature: rebuild procedure + reindex test, or ADR re-grade if projections proven trivially rebuildable. |
+| REQ-SEC-3 | OWASP ASVS referenced descriptively, never operationalized as a review checklist/gate. | Backlog feature: ASVS checklist wired into review gate (api-lint/governance-check family). |
+
+**Amendment:** §2.2 POSITIVE and §6.4 now accept the first-population state defined above. Any
+uncovered MUST **outside** this table remains a hard FAIL. The req-trace tool's own exit semantics
+are unchanged (strict). These 4 defers are presented at HS-1 and carried into the mission close-out
+defers ledger.
 
 ## 8. Feature → evidence map (shape fixed now, filled at close)
 

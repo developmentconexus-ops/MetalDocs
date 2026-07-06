@@ -1,0 +1,45 @@
+name: req-traceability
+
+# F9.2 traceability-gate. Fails the build if any MUST-classified REQ ID in
+# wiki/architecture/backend-target-architecture.md has zero resolvable
+# evidence (test citation, manual commit-map entry, or an inline doc
+# satisfied-by annotation), or if the committed coverage report
+# (wiki/architecture/req-traceability.md) has drifted from a fresh
+# regeneration (anti-rot — the map cannot silently rot). SHOULD/MAY REQs are
+# reported only, never exit-affecting. See
+# docs/superpowers/milestones/global-maximum-remediation/
+# milestone-9-governance-hygiene/f9.2-traceability-gate/ for the feature spec
+# and validation-contract.md §2 for the binding acceptance criteria.
+#
+# fetch-depth: 0 (full history) so the tool's manual-map commit-hash
+# verification (`git cat-file -e`) can actually resolve refs cited in
+# wiki/architecture/req-trace-map.yaml; a shallow checkout would make every
+# entry warn-skip instead of verify.
+
+on:
+  pull_request:
+    paths:
+      - 'wiki/architecture/backend-target-architecture.md'
+      - 'wiki/architecture/req-trace-map.yaml'
+      - 'wiki/architecture/req-traceability.md'
+      - 'scripts/req-trace/**'
+      - 'internal/**/*_test.go'
+      - 'apps/**/*_test.go'
+      - '.github/workflows/req-traceability.yml'
+  push:
+    branches: [main]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-go@v5
+        with: { go-version: 1.25.x, cache: true }
+
+      - name: req-trace unit tests
+        run: go test ./scripts/req-trace/... -count=1
+
+      - name: REQ traceability gate (BLOCKING on any uncovered MUST or a stale report)
+        run: go run ./scripts/req-trace
