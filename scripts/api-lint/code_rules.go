@@ -206,11 +206,22 @@ func closureCallsRequire(body *ast.BlockStmt) bool {
 	return found
 }
 
-// paginationCursorFile is the ONE file allowed to name base64.StdEncoding's
-// sibling — actually it owns the canonical codec and now uses RawURLEncoding, so
-// it is allow-listed defensively in case a future edit reaches for the wrong
-// dialect there (the unit tests in cursor_test.go are the behavioral guard).
-const paginationCursorFile = "internal/platform/pagination/cursor.go"
+// paginationCodecExemptFiles are the ONLY files allowed to name
+// base64.StdEncoding. The rule protects keyset cursors (query-string
+// round-tripping), so exemptions are limited to files whose StdEncoding use
+// is provably not a cursor:
+//   - pagination/cursor.go owns the canonical codec (now RawURLEncoding) and
+//     is allow-listed defensively (cursor_test.go is the behavioral guard);
+//   - platform/crypto/envelope.go encodes wrapped-DEK/ciphertext blobs stored
+//     in DB text columns (M7 crypto-shred) — padded StdEncoding is already the
+//     stored-value format, never a query string;
+//   - platform/config/tenant_crypto.go decodes the METALDOCS_TENANT_KEK env
+//     var, which follows the industry-standard padded-base64 key convention.
+var paginationCodecExemptFiles = map[string]bool{
+	"internal/platform/pagination/cursor.go":    true,
+	"internal/platform/crypto/envelope.go":      true,
+	"internal/platform/config/tenant_crypto.go": true,
+}
 
 // checkPaginationCodec flags any non-generated source that references
 // base64.StdEncoding. Keyset cursors must use the shared URL-safe codec in
@@ -240,7 +251,7 @@ func checkPaginationCodec(modulesRoot string, fset *token.FileSet) ([]Violation,
 		}
 		// Anchored repo-relative match (mirrors tripwireKey): a bare HasSuffix could
 		// false-exempt any file whose path merely ends in cursor.go.
-		if rel, err := filepath.Rel(modulesRoot, path); err == nil && filepath.ToSlash(rel) == paginationCursorFile {
+		if rel, err := filepath.Rel(modulesRoot, path); err == nil && paginationCodecExemptFiles[filepath.ToSlash(rel)] {
 			return nil
 		}
 		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)

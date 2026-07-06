@@ -636,10 +636,12 @@ func TestAtomicCreate_UsesGeneratedResponse(t *testing.T) {
 	if body.Document.Id.String() != "99999999-9999-9999-9999-999999999999" || body.Document.ContentHash != "hash-1" {
 		t.Fatalf("document = %+v, want id 9999… hash hash-1", body.Document)
 	}
-	// Absent optionals must be omitted, not null (the ,omitempty contract).
-	for _, key := range []string{`"department_code"`, `"override_template_version_id"`, `"sequence_num"`} {
-		if strings.Contains(rec.Body.String(), key) {
-			t.Fatalf("absent optional %s must be omitted, not present; body=%s", key, rec.Body.String())
+	// Since M1 F1.2 (SHAPE-NULLABLE-NOT-REQUIRED) these fields are REQUIRED +
+	// nullable in the contract — absent values serialize as explicit null,
+	// never as an omitted key.
+	for _, key := range []string{`"department_code":null`, `"override_template_version_id":null`, `"sequence_num":null`} {
+		if !strings.Contains(rec.Body.String(), key) {
+			t.Fatalf("absent nullable %s must serialize as explicit null (required+nullable contract); body=%s", key, rec.Body.String())
 		}
 	}
 }

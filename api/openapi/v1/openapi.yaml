@@ -271,13 +271,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /tenants/{tenantId}/export:
+  /tenants/{tenant_id}/export:
     post:
       summary: Solicita exportacao completa dos dados de um tenant (assincrono)
       tags: [iam]
       operationId: exportTenant
       parameters:
-        - name: tenantId
+        - name: tenant_id
           in: path
           required: true
           schema:
@@ -300,13 +300,13 @@ paths:
           $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /tenants/{tenantId}/erase:
+  /tenants/{tenant_id}/erase:
     post:
       summary: Solicita apagamento (crypto-shred) irreversivel dos dados de um tenant (assincrono)
       tags: [iam]
       operationId: eraseTenant
       parameters:
-        - name: tenantId
+        - name: tenant_id
           in: path
           required: true
           schema:
