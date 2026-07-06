@@ -9,7 +9,11 @@ import (
 // Per-route quotas from spec §Rate limits. Values are requests-per-minute
 // per user. Routes not listed here are unlimited.
 //
-// Envvar overrides: METALDOCS_RLIMIT_<ROUTE_KEY> (e.g. EXPORT_PDF=30).
+// Quotas are compiled-in, not env-overridable: build a map via NewConfig, or
+// use DefaultConfig for the spec defaults; main.go selects/wires the Config
+// for each Middleware instance. The store *backend* (in-memory vs Redis) is
+// the one env-controlled knob — see StoreConfig / LoadStoreConfig in
+// store_config.go for METALDOCS_RATELIMIT_STORE and related vars.
 type RouteKey string
 
 const (
@@ -49,6 +53,14 @@ type Config struct {
 	// METALDOCS_TRUSTED_PROXY_CIDRS via config.LoadTrustedProxyCIDRs.
 	// Drives the IP-fallback path when userExtractor returns "" (H2).
 	TrustedProxyCIDRs []netip.Prefix
+
+	// Store, when non-nil, is used by New as the backing Store instead of
+	// constructing a fresh in-memory store. This lets callers (main.go, or
+	// tests) share one Store instance — e.g. one Redis-backed store — across
+	// multiple Middleware instances. When nil, New builds a private
+	// in-memory store per the SweepInterval/IdleThreshold/MaxEntries fields
+	// above (unchanged default behavior).
+	Store Store
 }
 
 // NewConfig validates that every quota value is >= 1 and returns an immutable

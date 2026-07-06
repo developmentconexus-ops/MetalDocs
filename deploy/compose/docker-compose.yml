@@ -171,6 +171,12 @@ services:
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGSSLMODE: disable
+      # Rate limiting: shared Redis store so limits stay correct when api scales to N
+      # replicas (per-replica in-memory counting would multiply limits ×N — ADR 0071).
+      # MULTI_REPLICA=true makes a memory-store misconfig fail-fast at boot.
+      METALDOCS_RATELIMIT_STORE: ${METALDOCS_RATELIMIT_STORE:-redis}
+      METALDOCS_RATELIMIT_REDIS_ADDR: ${METALDOCS_RATELIMIT_REDIS_ADDR:-redis:6379}
+      METALDOCS_MULTI_REPLICA: ${METALDOCS_MULTI_REPLICA:-true}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/api/v1/health/live >/dev/null || exit 1"]
       interval: 5s

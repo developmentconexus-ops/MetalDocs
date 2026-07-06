@@ -7,86 +7,76 @@ import (
 	"net/http"
 	"net/netip"
 	"strconv"
-	"sync"
-	"sync/atomic"
 	"time"
-
-	"golang.org/x/time/rate"
 
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/security"
 )
 
-const (
-	defaultSweepInterval     = time.Minute
-	defaultIdleThreshold     = 2 * time.Minute
-	defaultMaxLimiterEntries = 100_000
-)
-
-type limiterEntry struct {
-	lim        *rate.Limiter
-	lastAccess atomic.Int64 // unix nano; updated on every Limit() call
-}
-
 type Middleware struct {
-	cfg           Config
-	sweepInterval time.Duration
-	idleThreshold time.Duration
-	maxEntries    int
-	trustedCIDRs  []netip.Prefix
-	now           func() time.Time
-	logger        *slog.Logger
-	limiters      sync.Map     // key: "<route_key>:user:<user_id>" or "<route_key>:ip:<addr>" → *limiterEntry
-	size          atomic.Int64 // limiter cardinality for fail-closed cap enforcement
-	wg            sync.WaitGroup
+	cfg          Config
+	trustedCIDRs []netip.Prefix
+	logger       *slog.Logger
+	store        Store
 }
 
-// New constructs a rate-limit middleware with a background sweeper that evicts
-// limiter entries idle for longer than the idle threshold. The sweeper exits
-// when ctx is cancelled. Pass a long-lived (app-wide) context — never a
-// per-request context.
+// New constructs a rate-limit middleware. When cfg.Store is set, that Store
+// is used directly (letting callers share one Store — e.g. one Redis
+// connection — across multiple Middleware instances). Otherwise New builds a
+// private in-memory Store (single-replica semantics; see memoryStore doc
+// comment for the multi-replica caveat). Pass a long-lived (app-wide)
+// context — never a per-request context — since the in-memory store's
+// sweeper goroutine keys its lifetime off it.
 func New(ctx context.Context, cfg Config) *Middleware {
-	sweep := cfg.SweepInterval
-	if sweep <= 0 {
-		sweep = defaultSweepInterval
+	store := cfg.Store
+	if store == nil {
+		store = newMemoryStore(ctx, cfg.SweepInterval, cfg.IdleThreshold, cfg.MaxEntries, slog.Default())
 	}
-	idle := cfg.IdleThreshold
-	if idle <= 0 {
-		idle = defaultIdleThreshold
+	return &Middleware{
+		cfg:          cfg,
+		trustedCIDRs: cfg.TrustedProxyCIDRs,
+		logger:       slog.Default(),
+		store:        store,
 	}
-	maxN := cfg.MaxEntries
-	if maxN <= 0 {
-		maxN = defaultMaxLimiterEntries
-	}
-	m := &Middleware{
-		cfg:           cfg,
-		sweepInterval: sweep,
-		idleThreshold: idle,
-		maxEntries:    maxN,
-		trustedCIDRs:  cfg.TrustedProxyCIDRs,
-		now:           time.Now,
-		logger:        slog.Default(),
-	}
-	m.wg.Add(1)
-	go m.sweepLoop(ctx)
-	return m
 }
 
-// Wait blocks until the sweeper goroutine has exited. Intended for tests
-// asserting the goroutine terminates on context cancel.
-func (m *Middleware) Wait() { m.wg.Wait() }
+// NewWithStore constructs a rate-limit middleware backed by an
+// already-constructed Store — used to share one Store (e.g. one Redis
+// client) across multiple Middleware instances (pre-auth login limiter +
+// global envelope limiter), and by tests that want to exercise a specific
+// backend (redisStore, or a second memoryStore instance) directly.
+func NewWithStore(cfg Config, store Store) *Middleware {
+	return &Middleware{
+		cfg:          cfg,
+		trustedCIDRs: cfg.TrustedProxyCIDRs,
+		logger:       slog.Default(),
+		store:        store,
+	}
+}
 
-// WithClock injects a deterministic time source. Intended for tests; must be
-// called before the middleware sees traffic.
+// Wait blocks until the underlying store's background goroutines (if any)
+// have exited. Intended for tests asserting the in-memory sweeper's
+// goroutine terminates on context cancel. No-op for stores without
+// background work.
+func (m *Middleware) Wait() {
+	if ms, ok := m.store.(*memoryStore); ok {
+		ms.Wait()
+	}
+}
+
+// WithClock injects a deterministic time source into the underlying
+// in-memory store. Intended for tests; must be called before the middleware
+// sees traffic. No-op when the backing store is not the in-memory store.
 func (m *Middleware) WithClock(now func() time.Time) *Middleware {
-	if now != nil {
-		m.now = now
+	if ms, ok := m.store.(*memoryStore); ok {
+		ms.WithClock(now)
 	}
 	return m
 }
 
-// WithLogger replaces the slog.Logger used for sweep / fallback / overflow
-// records. Intended for tests that want to assert log content.
+// WithLogger replaces the slog.Logger used for fallback / overflow records
+// logged directly by Middleware. Intended for tests that want to assert log
+// content.
 func (m *Middleware) WithLogger(l *slog.Logger) *Middleware {
 	if l != nil {
 		m.logger = l
@@ -94,60 +84,29 @@ func (m *Middleware) WithLogger(l *slog.Logger) *Middleware {
 	return m
 }
 
-// SweepNow runs one sweep pass synchronously against the current clock.
-// Intended for tests that want deterministic eviction timing.
-func (m *Middleware) SweepNow() { m.sweep() }
-
-// Size returns the current limiter-entry count. Intended for tests.
-func (m *Middleware) Size() int {
-	n := 0
-	m.limiters.Range(func(_, _ any) bool {
-		n++
-		return true
-	})
-	return n
-}
-
-func (m *Middleware) sweepLoop(ctx context.Context) {
-	defer m.wg.Done()
-	t := time.NewTicker(m.sweepInterval)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			m.sweep()
-		}
+// SweepNow runs one sweep pass synchronously against the current clock, when
+// the backing store is the in-memory store. Intended for tests that want
+// deterministic eviction timing.
+func (m *Middleware) SweepNow() {
+	if ms, ok := m.store.(*memoryStore); ok {
+		ms.SweepNow()
 	}
 }
 
-func (m *Middleware) sweep() {
-	cutoff := m.now().Add(-m.idleThreshold).UnixNano()
-	evicted := 0
-	remaining := 0
-	m.limiters.Range(func(k, v any) bool {
-		e, ok := v.(*limiterEntry)
-		if !ok {
-			m.limiters.Delete(k)
-			m.size.Add(-1)
-			evicted++
-			return true
-		}
-		if e.lastAccess.Load() < cutoff {
-			m.limiters.Delete(k)
-			m.size.Add(-1)
-			evicted++
-		} else {
-			remaining++
-		}
-		return true
-	})
-	if evicted > 0 {
-		m.logger.Warn("ratelimit: swept idle limiters",
-			"evicted", evicted,
-			"remaining", remaining,
-		)
+// Size returns the current limiter-entry count of the backing in-memory
+// store. Intended for tests. Returns 0 for non-memory backends.
+func (m *Middleware) Size() int {
+	if ms, ok := m.store.(*memoryStore); ok {
+		return ms.Size()
+	}
+	return 0
+}
+
+// Close releases the backing store's resources (e.g. a Redis connection).
+// Safe to call multiple times.
+func (m *Middleware) Close() {
+	if m.store != nil {
+		m.store.Close()
 	}
 }
 
@@ -169,7 +128,6 @@ func (m *Middleware) Limit(key RouteKey, userExtractor func(*http.Request) strin
 		m.logger.Error("ratelimit: invalid quota, degrading to no-limit", "route", string(key), "quota", quota)
 		return next
 	}
-	interval := time.Minute / time.Duration(quota)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		lk, ok := m.bucketKey(r, key, userExtractor)
 		if !ok {
@@ -182,30 +140,25 @@ func (m *Middleware) Limit(key RouteKey, userExtractor func(*http.Request) strin
 			writeRateLimitError(w, quota, 60)
 			return
 		}
-		nowNS := m.now().UnixNano()
 
-		entry, ok := m.loadOrInsert(lk, interval, quota, nowNS)
-		if !ok {
-			// Limiter map cap reached. Mirrors security.RateLimiter
-			// fail-closed cap contract from C2.
-			m.logger.WarnContext(r.Context(), "ratelimit: limiter map full, denying new key",
-				"route", string(key),
-				"key", lk,
-				"max_entries", m.maxEntries,
-			)
-			writeRateLimitError(w, quota, 60)
+		allowed, retryAfter, err := m.store.Allow(r.Context(), lk, quota, time.Minute)
+		if err != nil {
+			// Store implementations are expected to fail open internally
+			// (see redisStore) rather than return err for a backend outage.
+			// A non-nil err here is unexpected; fail open rather than deny
+			// traffic for a rate-limiter-internal problem — same
+			// availability-over-strictness rationale as redisStore's
+			// documented fail-open branch.
+			m.logger.ErrorContext(r.Context(), "ratelimit: store error, failing open", "route", string(key), "err", err)
+			next.ServeHTTP(w, r)
 			return
 		}
-		entry.lastAccess.Store(nowNS)
-
-		reservation := entry.lim.Reserve()
-		if !reservation.OK() {
-			writeRateLimitError(w, quota, 60)
-			return
-		}
-		if d := reservation.Delay(); d > 0 {
-			reservation.Cancel()
-			writeRateLimitError(w, quota, int(d.Seconds())+1)
+		if !allowed {
+			retrySec := int(retryAfter.Seconds())
+			if retrySec < 1 {
+				retrySec = 1
+			}
+			writeRateLimitError(w, quota, retrySec)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -231,28 +184,6 @@ func (m *Middleware) bucketKey(r *http.Request, key RouteKey, userExtractor func
 		return "", false
 	}
 	return string(key) + ":ip:" + addr.String(), true
-}
-
-// loadOrInsert returns the limiter entry for lk, allocating one on miss while
-// enforcing the maxEntries cap. Returns (entry, true) on success;
-// (nil, false) when inserting would exceed the cap (caller must fail-closed).
-func (m *Middleware) loadOrInsert(lk string, interval time.Duration, quota int, nowNS int64) (*limiterEntry, bool) {
-	if v, ok := m.limiters.Load(lk); ok {
-		return v.(*limiterEntry), true
-	}
-	fresh := &limiterEntry{lim: rate.NewLimiter(rate.Every(interval), quota)}
-	fresh.lastAccess.Store(nowNS)
-	actual, loaded := m.limiters.LoadOrStore(lk, fresh)
-	if loaded {
-		return actual.(*limiterEntry), true
-	}
-	if n := m.size.Add(1); n > int64(m.maxEntries) {
-		// Lost the cap race — roll back the insert.
-		m.limiters.Delete(lk)
-		m.size.Add(-1)
-		return nil, false
-	}
-	return fresh, true
 }
 
 // GlobalEnvelopeWrap returns an http.Handler wrapper that enforces the

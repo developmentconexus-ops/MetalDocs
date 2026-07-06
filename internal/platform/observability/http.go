@@ -45,6 +45,7 @@ type HTTPObservability struct {
 	userIDResolver   func(*http.Request) string
 	mu               sync.RWMutex
 	byKey            map[string]*routeMetrics
+	prom             *promState
 }
 
 type metricItem struct {
@@ -140,6 +141,17 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 			}
 			atomic.AddUint64(&m.durationMs, durationMs)
 			m.record(durationMs)
+
+			// Prometheus instrumentation reuses the same route/method/duration
+			// already computed above — no double-counting, no second timer.
+			// This coexists with the JSON byKey snapshot; each has its own
+			// storage (atomic counters vs. prometheus vecs).
+			prom := o.prometheusState()
+			prom.requestsTotal.WithLabelValues(route, method).Inc()
+			if isError {
+				prom.errorsTotal.WithLabelValues(route, method).Inc()
+			}
+			prom.durationSeconds.WithLabelValues(route, method).Observe(float64(durationMs) / 1000.0)
 
 			// Attribution order: principal slot (set outward by authn when
 			// this middleware runs outside auth, REQ-MW-4) → injected

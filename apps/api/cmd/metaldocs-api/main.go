@@ -415,6 +415,30 @@ func main() {
 	)
 	cors := security.NewCORS(corsCfg)
 
+	// Rate-limit store backend selection (M8/F8.2): memory (default,
+	// single-replica) or a shared Redis store so N api replicas enforce ONE
+	// combined budget instead of N independent ones. The startup guard
+	// refuses to boot when METALDOCS_MULTI_REPLICA=true with the in-memory
+	// store (per-process counters would silently multiply the limits ×N).
+	rlStoreCfg, err := ratelimit.LoadStoreConfig(os.Getenv)
+	if err != nil {
+		slog.Error("rate limit store config", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
+	}
+	// nil for the memory backend — each limiter then builds its own private
+	// in-memory store (unchanged behavior). Non-nil (redis) is shared by BOTH
+	// limiter mounts below so the process holds exactly one Redis client.
+	rlStore, err := ratelimit.NewStoreFromConfig(rlStoreCfg, slog.Default())
+	if err != nil {
+		slog.Error("rate limit store init", "err", err)
+		deps.Cleanup()
+		os.Exit(1)
+	}
+	if rlStore != nil {
+		defer rlStore.Close()
+	}
+
 	// Pre-auth IP-keyed rate limit for the login endpoint (REQ-MW-5). Runs
 	// before authn in the chain; always keys by client IP. 10 attempts/min
 	// per IP — brute force is additionally bounded by account lockout.
@@ -425,6 +449,7 @@ func main() {
 		os.Exit(1)
 	}
 	loginRateCfg.TrustedProxyCIDRs = authCfg.TrustedProxyCIDRs
+	loginRateCfg.Store = rlStore
 	preAuthLimiter := ratelimit.New(ctx, loginRateCfg)
 
 	// Post-authn global envelope limiter (F-05/D-04, Wave 2.8): replaces the
@@ -435,6 +460,7 @@ func main() {
 	// are now dead — see commit body for mapping.
 	globalRateCfg := ratelimit.DefaultConfig()
 	globalRateCfg.TrustedProxyCIDRs = authCfg.TrustedProxyCIDRs
+	globalRateCfg.Store = rlStore // shared with preAuthLimiter (one Redis client when redis)
 	globalLimiter := ratelimit.New(ctx, globalRateCfg)
 	// userIDExtractor resolves the authenticated principal from context. Runs
 	// after authn + iamMiddleware in the chain, so both auth and IAM user IDs
@@ -767,6 +793,14 @@ func main() {
 	defer stopOrphans()
 	defer stopTemplateOrphans()
 	mux.Handle("/api/v1/metrics", httpObs.MetricsHandler())
+	// Prometheus text-exposition scrape endpoint. Deliberately NOT mounted on
+	// mux (which the API chain below wraps with authn/iam/httpObs/rate-limit)
+	// — it is served from a top-level dispatch mux, ahead of and outside the
+	// entire API chain (see rootMux below, after handler is built). Contract
+	// §3.2: /metrics is a platform scrape surface, not a versioned product
+	// route, so it is NOT declared in api/openapi/v1/openapi.yaml. Coexists
+	// with the JSON endpoint above; they read from separate storage
+	// (prometheus vecs vs. byKey atomics).
 
 	// Audit retention - AUDIT_RETENTION_DAYS=0 disables (default disabled).
 	retentionCfg, err := config.LoadRetentionConfig()
@@ -808,6 +842,16 @@ func main() {
 		// method-routed ServeMux emits into problem+json, preserving Allow (D-03).
 		platformmw.MethodNotAllowedJSON,
 	))
+
+	// /metrics is an out-of-band platform scrape surface: served ahead of the
+	// API middleware chain so a credential-less Prometheus target can reach it
+	// (bypasses authn/iam) and so self-scrapes never feed httpObs.Wrap counters
+	// or the global rate limiter. Panic recovery still wraps it. Not in openapi
+	// (contract §3.2); gateway does not proxy it (nginx routes only /api/ and /).
+	rootMux := http.NewServeMux()
+	rootMux.Handle("GET /metrics", httpObs.PrometheusHandler())
+	rootMux.Handle("/", handler)
+	handler = platformmw.Recovery(rootMux)
 
 	serverCfg, err := config.LoadServerConfig()
 	if err != nil {
