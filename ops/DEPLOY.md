@@ -1,139 +1,163 @@
-# Deploy Runbook — Approval v2 (Spec 2)
+# Deploy Runbook — v1 (Docker Compose)
 
-**SRE sign-off required before production deploy.**  
-Each step links to a runbook section. Complete in order.
+> **v1 deployment target: Docker Compose** (`deploy/compose/docker-compose.yml`).
+> Kubernetes is a **post-v1 decision** — not built, not the current path. Any future move to
+> Kubernetes must land as a named ADR trigger against ADR 0071 (multi-replica rate-limit store)
+> before it is adopted, since ADR 0071 already assumes a shared Redis-backed rate limiter for
+> when the API scales beyond a single Compose replica.
+>
+> Historical: the Approval-v2 K8s canary procedure is archived at
+> [`ops/archive/approval-v2-k8s-canary.md`](archive/approval-v2-k8s-canary.md) — retained for
+> reference, not runnable against the current stack.
+
+**SRE sign-off required before production deploy.**
 
 ---
 
-## Pre-Deploy Checklist
+## Stack Overview
 
-- [ ] All CI gates green on release branch
-- [ ] Perf benchmarks run on `main` (check Actions: `Perf Benchmarks / perf-full`)
-- [ ] `CAPABILITY_CATALOG.sha256` matches current catalog
-- [ ] Database backup confirmed (ops: `pg_dump` snapshot tagged `pre-spec2-deploy`)
-- [ ] On-call SRE notified + PagerDuty maintenance window opened
+`deploy/compose/docker-compose.yml` defines the full v1 stack:
+
+| Service | Role | Notes |
+|---|---|---|
+| `postgres` | Primary DB | healthcheck-gated (`pg_isready`) |
+| `redis` | Rate-limit store, shared across API replicas (ADR 0071) | healthcheck-gated |
+| `minio` | S3-compatible object storage (attachments, docx templates) | + `minio-init` one-shot bucket bootstrap |
+| `gotenberg` | PDF rendering backend for docx-renderer | healthcheck-gated |
+| `docx-renderer` | Internal-only render/fanout service | healthcheck-gated; depends on minio + gotenberg |
+| `api` | `metaldocs-api` — sync + authz, stateless; also hosts the 4 leader-elected janitors | healthcheck-gated (`/api/v1/health/live`) |
+| `worker` | `metaldocs-worker` — async outbox consumers | depends on healthy api + docx-renderer |
+| `jobs` | `metaldocs-jobs` — River-scheduled publish + notifications fanout | depends on healthy api |
+| `web` | Frontend static/preview server | healthcheck-gated |
+| `gateway` | nginx — public entrypoint (port 80) | depends on healthy api + web |
+
+Three Go images (`api`, `worker`, `jobs`) build non-root per F8.1.
 
 ---
 
-## Step 1 — Apply Additive Migrations
+## Prerequisites
 
-Migrations 0141-0148 are additive (new tables, columns, functions). Safe to run against live DB.
+- Docker Engine + Docker Compose v2 (`docker compose` CLI, not the legacy `docker-compose` binary).
+- A populated env file for compose (default `.env` at repo root). Start from
+  [`.env.example`](../.env.example) — **never** inline secrets in this doc or in compose files.
+  Required env groups (see `.env.example` for the full variable list and defaults):
+  - **Postgres**: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST_PORT`
+  - **MinIO**: `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `METALDOCS_MINIO_BUCKET`, `METALDOCS_MINIO_*`
+  - **Auth/session**: `METALDOCS_AUTH_ENABLED`, `METALDOCS_AUTH_SESSION_SECRET`,
+    `METALDOCS_AUTH_SESSION_COOKIE_NAME`, `METALDOCS_AUTH_SESSION_TTL_HOURS`,
+    `METALDOCS_AUTH_SESSION_IDLE_MINUTES`, `METALDOCS_AUTH_COOKIE_SECURE`,
+    `METALDOCS_AUTH_PASSWORD_MIN_LENGTH`, `METALDOCS_AUTH_LOGIN_MAX_FAILED_ATTEMPTS`,
+    `METALDOCS_AUTH_LOGIN_LOCK_MINUTES`
+  - **Bootstrap admin**: `METALDOCS_BOOTSTRAP_ADMIN_ENABLED`, `METALDOCS_BOOTSTRAP_ADMIN_USER_ID`,
+    `METALDOCS_BOOTSTRAP_ADMIN_USERNAME`, `METALDOCS_BOOTSTRAP_ADMIN_EMAIL`,
+    `METALDOCS_BOOTSTRAP_ADMIN_DISPLAY_NAME`, `METALDOCS_BOOTSTRAP_ADMIN_PASSWORD`
+  - **Rate-limit store**: `METALDOCS_RATELIMIT_STORE` (must be `redis` for multi-replica —
+    ADR 0071), `METALDOCS_RATELIMIT_REDIS_ADDR`, `METALDOCS_MULTI_REPLICA`
+  - **River schema**: `METALDOCS_JOBS_RIVER_SCHEMA` — must match exactly between `api` and `jobs`
+    services (both default to the public schema when unset; set explicitly so they cannot diverge)
+  - **docx-renderer**: `DOCX_RENDERER_SERVICE_TOKEN`, `DOCX_RENDERER_VERSION`
+- Sufficient disk for the named volumes: `metaldocs_postgres_data`, `metaldocs_redis_data`,
+  `metaldocs_minio_data`.
+
+---
+
+## Build
+
+Build the three Go images (non-root, F8.1) plus the frontend image:
 
 ```bash
-# Run in order:
-psql $DATABASE_URL -f migrations/0141_approval_routes.sql
-psql $DATABASE_URL -f migrations/0142_approval_instances.sql
-psql $DATABASE_URL -f migrations/0143_approval_signoffs.sql
-psql $DATABASE_URL -f migrations/0144_governance_events.sql
-psql $DATABASE_URL -f migrations/0145_idempotency_keys.sql
-psql $DATABASE_URL -f migrations/0146_job_leases.sql
-psql $DATABASE_URL -f migrations/0147_approval_rls.sql
-psql $DATABASE_URL -f migrations/0148_approval_security_definer.sql
+docker compose -f deploy/compose/docker-compose.yml build
 ```
 
-**Verify:** `SELECT count(*) FROM approval_routes;` returns 0 (no data yet).
-
----
-
-## Step 2 — Deploy API (feature flag OFF)
-
-Deploy new API build with `APPROVAL_V2_PCT=0`.
+To build a single service (e.g. after an API-only change):
 
 ```bash
-kubectl set image deployment/metaldocs-api api=metaldocs:${RELEASE_TAG}
-kubectl rollout status deployment/metaldocs-api --timeout=5m
-```
-
-**Verify:** smoke probe passes with `APPROVAL_V2_PCT=0`.
-
----
-
-## Step 3 — Run Smoke
-
-```bash
-BASE_URL=https://api.metaldocs.app bash ops/smoke/healthz.sh
-BASE_URL=https://api.metaldocs.app SMOKE_ADMIN_TOKEN=$TOKEN bash ops/smoke/approval_roundtrip.sh
-```
-
-**If smoke fails:** roll back deployment (`kubectl rollout undo deployment/metaldocs-api`).
-
----
-
-## Step 4 — Canary Ramp
-
-```bash
-# Start canary at 1%
-export APPROVAL_V2_PCT=1
-go run ./ops/canary --step
-
-# Monitor for 30 min, then advance:
-go run ./ops/canary --step  # 5%
-# ... repeat each 30 min: 25%, 50%, 100%
-```
-
-Canary controller validates metrics automatically before each advance.  
-**If breach detected:** controller sets `APPROVAL_V2_PCT=0` and exits 2.
-
----
-
-## Step 5 — Apply Enforcement Migrations
-
-After 100% traffic, apply enforcement (0149 lease epoch monotonicity):
-
-```bash
-psql $DATABASE_URL -f migrations/0149_job_leases_epoch_monotonic.sql
+docker compose -f deploy/compose/docker-compose.yml build api
 ```
 
 ---
 
-## Step 6 — Enable Jobs
+## Up
 
 ```bash
-kubectl set env deployment/metaldocs-api \
-  ENABLE_SCHEDULER=true \
-  ENABLE_REAPER=true \
-  ENABLE_STUCK_WATCHDOG=true
-kubectl rollout status deployment/metaldocs-api --timeout=3m
+docker compose -f deploy/compose/docker-compose.yml up -d
 ```
+
+Startup order is enforced by healthcheck-gated `depends_on`:
+
+1. `postgres`, `redis` become healthy; `minio` starts; `minio-init` bootstraps the bucket and exits.
+2. `gotenberg` becomes healthy; `docx-renderer` waits on `minio` + `minio-init` + `gotenberg`, then
+   becomes healthy.
+3. `api` waits on healthy `postgres` + `redis` + started `minio`, then becomes healthy
+   (`GET /api/v1/health/live` inside the container).
+4. `worker` and `jobs` wait on healthy `api` (and `worker` also waits on healthy `docx-renderer`).
+5. `web` waits on healthy `api`; `gateway` waits on healthy `api` + `web` and publishes port 80.
+
+Check status:
+
+```bash
+docker compose -f deploy/compose/docker-compose.yml ps
+```
+
+## Down
+
+```bash
+docker compose -f deploy/compose/docker-compose.yml down
+```
+
+Add `-v` only if you intend to discard the named volumes (Postgres/Redis/MinIO data) — this is
+destructive and not part of a normal stop/restart cycle.
 
 ---
 
-## Step 7 — Final Smoke
+## Verify
 
-```bash
-BASE_URL=https://api.metaldocs.app bash ops/smoke/healthz.sh
-BASE_URL=https://api.metaldocs.app SMOKE_ADMIN_TOKEN=$TOKEN bash ops/smoke/approval_roundtrip.sh
+The API is published on host port `${APP_PORT}` mapped to the container's `8081`. With
+`APP_PORT=8081` (the default `check-system-runnable.ps1` target), run the runnable check against
+the containerized API:
+
+```powershell
+.\scripts\check-system-runnable.ps1
 ```
+
+This checks: system blank-template object present in MinIO, `/api/v1/health/ready`,
+login + session cookie, `/api/v1/auth/me`, and the target route (default
+`/api/v1/health/ready`). Pass `-TargetRoute` to check a different route once the stack is up.
+
+Do **not** pass `-StartApi` when verifying the Compose stack — that switch drives the local
+non-container dev flow (`scripts/dev-api.ps1`), not compose.
 
 ---
 
-## Rollback Playbook
+## Upgrade / Rollout
 
-Reverse order. Run if any step fails:
+Compose has no native canary/rolling mechanism; upgrades are recreate-in-place:
 
-```bash
-# 1. Flag back to 0
-export APPROVAL_V2_PCT=0
+1. **Back up first.** Follow the pre-upgrade backup step in the backup/restore runbook:
+   [`wiki/runbooks/backup-restore.md`](../wiki/runbooks/backup-restore.md).
+2. Pull or rebuild the new images:
+   ```bash
+   docker compose -f deploy/compose/docker-compose.yml build
+   # or, if pulling pre-built images tagged via API_IMAGE / WORKER_IMAGE / WEB_IMAGE:
+   docker compose -f deploy/compose/docker-compose.yml pull
+   ```
+3. Recreate the changed services:
+   ```bash
+   docker compose -f deploy/compose/docker-compose.yml up -d
+   ```
+   Compose recreates only containers whose image/config changed; healthcheck gating still applies
+   to dependents.
+4. Re-run `scripts/check-system-runnable.ps1` to confirm the upgraded stack is healthy end-to-end.
+5. **Rollback:** re-tag/rebuild the previous image version and repeat step 3, or
+   `docker compose down` + restore from the pre-upgrade backup per the backup/restore runbook.
 
-# 2. Roll back API
-kubectl rollout undo deployment/metaldocs-api
-kubectl rollout status deployment/metaldocs-api
+---
 
-# 3. Disable jobs
-kubectl set env deployment/metaldocs-api ENABLE_SCHEDULER=false ENABLE_REAPER=false
+## Historical
 
-# 4. Revert enforcement migration (if applied)
-psql $DATABASE_URL -c "
-  -- Revert 0149: restore DELETE behavior on release_lease
-  CREATE OR REPLACE FUNCTION release_lease(p_name text, p_holder text)
-  RETURNS void LANGUAGE plpgsql AS \$\$
-  BEGIN
-    DELETE FROM job_leases WHERE name = p_name AND holder = p_holder;
-  END;
-  \$\$;"
-
-# 5. Run smoke to confirm rollback
-bash ops/smoke/healthz.sh
-```
+The Approval-v2 K8s canary procedure (feature-flagged rollout, `kubectl set image` /
+`kubectl rollout` / `kubectl set env`) is archived verbatim at
+[`ops/archive/approval-v2-k8s-canary.md`](archive/approval-v2-k8s-canary.md). It documents a
+Kubernetes deployment path that was never the actual v1 stack and is retained for reference only.
 
 **SRE sign-off:** _______________________ Date: _______
