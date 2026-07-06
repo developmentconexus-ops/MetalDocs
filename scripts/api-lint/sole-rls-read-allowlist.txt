@@ -1,0 +1,6 @@
+# SOLE-RLS-ASYNC-READ sanctioned allowlist (M7 F7.4 §4.3). Format mirrors
+# async-tenant-seed-allowlist.txt: `relative/path.go:LINE  # reason`.
+# `#`-comments and blank lines ignored. Empty by construction — no genuinely
+# intended cross-tenant async SELECT against a tenant-scoped table has been
+# identified. Add an entry only for a confirmed sanctioned exception, with a
+# recorded reason category.

@@ -107,6 +107,15 @@ func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error
 	}
 	out = append(out, asyncTenantSeed...)
 
+	// M7 F7.4 §4.3 — SOLE-RLS-ASYNC-READ: a worker/jobs SELECT against a
+	// tenant-scoped (FORCE RLS) table must carry an explicit tenant_id/
+	// actor_tenant_id predicate in its own SQL text, unless allowlisted.
+	soleRLSRead, err := checkSoleRLSAsyncRead(modulesRoot, strict)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, soleRLSRead...)
+
 	return out, nil
 }
 
