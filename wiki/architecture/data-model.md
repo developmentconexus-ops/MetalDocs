@@ -1,6 +1,6 @@
 # Architecture: Data Model
 
-> **Last verified:** 2026-07-03 (DB-01: legacy template family `public.templates`/`public.template_versions` retired via `db/migrations/0268_drop_legacy_template_family.sql`; `public.templates_template`/`public.templates_template_version` is now the only template store — `internal/platform/docgenv2` reads canonical only, `FanoutTemplateReader` and the legacy fallback reader deleted in the same change-set) | **Prior:** 2026-07-02 (DB-06: templates audit sink is fully canonical — `public.templates_audit_log` retired via `db/migrations/0262_drop_templates_audit_log.sql`; both `AppendAudit`/`AppendAuditTx` writes and `ListAudit` reads go through `metaldocs.audit_events`) | **Prior:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257) | **Prior-2:** 2026-06-08 (Phase F F4: ListDocumentsPaginated cursor migration; repository.go line anchors updated)
+> **Last verified:** 2026-07-06 (F9.4 doc-truth pass: Key-files header block fully re-verified — all `repository/`→`infrastructure/` F9.5 renames applied; corrected two independently-stale entries found on inspection — `documents/repository/repository.go:37` was wrong symbol name (`CreateDocument` doesn't exist, corrected to `CreateDocumentTx:125`) and `approval/infrastructure/repo/` was missing `documents/` prefix + nonexistent `/repo/` subdir; also fixed `templates/infrastructure/repo/` and `taxonomy/infrastructure/repo/` (no such `/repo/` subdir), and `buildDocumentFilter`/`ListOptions` body anchors) | **Prior:** 2026-07-03 (DB-01: legacy template family `public.templates`/`public.template_versions` retired via `db/migrations/0268_drop_legacy_template_family.sql`; `public.templates_template`/`public.templates_template_version` is now the only template store — `internal/platform/docgenv2` reads canonical only, `FanoutTemplateReader` and the legacy fallback reader deleted in the same change-set) | **Prior:** 2026-07-02 (DB-06: templates audit sink is fully canonical — `public.templates_audit_log` retired via `db/migrations/0262_drop_templates_audit_log.sql`; both `AppendAudit`/`AppendAuditTx` writes and `ListAudit` reads go through `metaldocs.audit_events`) | **Prior:** 2026-07-01 (DOC-02 drift fix: template version status `in_review` renamed `under_review` per migration 0257) | **Prior-2:** 2026-06-08 (Phase F F4: ListDocumentsPaginated cursor migration; repository.go line anchors updated)
 > **Status:** Stub. Expand with ERD + per-table schema notes when SQL stabilizes.
 > **Scope:** Postgres tables, key relationships, snapshot columns, hash columns.
 > **Out of scope:** Migration archaeology (the legacy DB-research notes were removed at the v1 re-baseline, commit `c7f06f2e`; retained historical `migrations/` evidence remains).
@@ -10,11 +10,11 @@
 > - `db/reference-data/0001_product_reference_data.sql` - product reference data required at runtime
 > - `db/dev-seeds/0001_local_dev_seed.sql` - optional local-only developer accounts/data
 > - `db/migrations/` - post-baseline forward migrations
-> - `internal/modules/templates/infrastructure/repo/` — template tables
-> - `internal/modules/documents/repository/repository.go:37` — document tables; `CreateDocument` INSERT (accepts `requiredPlaceholders`; seeds `document_placeholder_values` atomically)
+> - `internal/modules/templates/infrastructure/` — template tables (**verify** — was `.../infrastructure/repo/`, nonexistent `/repo/` subdir; no such subdir in current tree)
+> - `internal/modules/documents/infrastructure/repository.go:125` — document tables; `CreateDocumentTx` INSERT (accepts `requiredPlaceholders`; seeds `document_placeholder_values` atomically) (**verify** — dir renamed repository/→infrastructure/ per F9.5; symbol was `CreateDocument`, no such func found in current tree, corrected to `CreateDocumentTx` per grep, line 125 per prior verification in wiki/modules/documents.md)
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:11` — document_families SQL impl
-> - `internal/modules/taxonomy/infrastructure/repo/` — profiles, areas
-> - `internal/modules/approval/infrastructure/repo/` — routes, signoffs
+> - `internal/modules/taxonomy/infrastructure/` — profiles, areas (**verify** — was `.../infrastructure/repo/`, nonexistent `/repo/` subdir; no such subdir in current tree)
+> - `internal/modules/documents/approval/infrastructure/` — routes, signoffs (**verify** — was `internal/modules/approval/infrastructure/repo/`, missing `documents/` module prefix and a nonexistent `/repo/` subdir; corrected path confirmed to exist via directory listing)
 
 ## Core entities (high-level)
 
@@ -90,7 +90,7 @@ See [concepts/freeze-and-hashing.md](../concepts/freeze-and-hashing.md).
 
 ## Audit sink (templates)
 
-Template audit history has one sink, not two: `metaldocs.audit_events` — a tamper-evident, hash-chained append-only log (`prev_hash`/`row_hash` via `metaldocs.audit_event_row_hash`, ordered by `audit_sequence`). `internal/modules/templates/repository/postgres.go` `AppendAudit`/`AppendAuditTx` (:604-624) write to it through `auditdomain.Writer`; `ListAudit` (:660-706) reads from it filtered to `resource_type = 'template'`. The former module-local `public.templates_audit_log` table (write path closed 2026-05-11 Plan 6a; read path closed earlier in Wave 1.8/F-07-sub-split) was dropped by `db/migrations/0262_drop_templates_audit_log.sql`, which backfilled any pre-cutover rows into the hash chain first. See `wiki/modules/templates-tech-debt.md` T-013 (closed).
+Template audit history has one sink, not two: `metaldocs.audit_events` — a tamper-evident, hash-chained append-only log (`prev_hash`/`row_hash` via `metaldocs.audit_event_row_hash`, ordered by `audit_sequence`). `internal/modules/templates/infrastructure/postgres.go` `AppendAudit`/`AppendAuditTx` (:604-624) write to it through `auditdomain.Writer`; `ListAudit` (:660-706) reads from it filtered to `resource_type = 'template'`. The former module-local `public.templates_audit_log` table (write path closed 2026-05-11 Plan 6a; read path closed earlier in Wave 1.8/F-07-sub-split) was dropped by `db/migrations/0262_drop_templates_audit_log.sql`, which backfilled any pre-cutover rows into the hash chain first. See `wiki/modules/templates-tech-debt.md` T-013 (closed).
 
 ## Runtime DB user permissions (metaldocs_app)
 
@@ -110,14 +110,14 @@ Without `0161`: all family API endpoints fail with Postgres permission errors.
 
 ## List/stats query pattern (Library)
 
-`ListDocumentsPaginated` and its sibling queries (`CountDocuments`, `StatsByStatus`, `StatsByArea`) all share a single `buildDocumentFilter` helper at `internal/modules/documents/repository/repository.go:429`.
+`ListDocumentsPaginated` and its sibling queries (`CountDocuments`, `StatsByStatus`, `StatsByArea`) all share a single `buildDocumentFilter` helper at `internal/modules/documents/infrastructure/repository.go:429` (**verify** — line not re-confirmed this pass).
 
 The **keyset cursor pattern** used by the Library screen (Phase F F4):
 - `ListDocumentsPaginated` returns `(items, hasMore)` using an opaque cursor from `internal/platform/pagination` (`EncodeCursor`/`DecodeCursor`/`ClampLimit`).
 - The service layer re-exports `hasMore` and builds `next_cursor` in the handler envelope `{items, page:{next_cursor, has_more}}`.
 - A `total` count query still runs via `CountDocuments` for pagination controls where needed.
 
-`ListOptions` struct lives in `repository.go:412`; it is re-exported as a type alias at `application/list_options.go:1` so handlers depend only on the `application` package.
+`ListOptions` struct lives in `internal/modules/documents/infrastructure/repository.go:434` (**verify** — was `repository.go:412`, dir renamed + line re-grepped this pass); it is re-exported as a type alias at `application/list_options.go:1` so handlers depend only on the `application` package.
 
 Index note: `(tenant_id, status)` and `(tenant_id, process_area_code_snapshot)` may benefit from a composite index under real-data load — tracked as a backend follow-up in `wiki/implementation/plan-library.md`.
 

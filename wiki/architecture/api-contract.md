@@ -2,7 +2,7 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-07-03 (ADR 0065 — `TemplateDTO` version pointers are now nested value objects:
+> **Last verified:** 2026-07-06 (F9.4 doc-truth pass: F9.5 `repository/`→`infrastructure/` rename fixed for `templates/infrastructure/postgres.go`; `strictjson.go` re-pointed to its actual current location `internal/platform/strictjson/strictjson.go:25` (platform-package move, predates/unrelated to F9.5); `controlleddocuments/.../handler.go:95`→`:139` and `routes.go` `missingAtomicCreateField` line drift fixed (pre-existing, unrelated to F9.5); `migrations/0183_documents_name_not_empty.sql` flagged **verify** — `migrations/` dir gone, constraint not located in current baseline, out of scope this pass) | prior: 2026-07-03 (ADR 0065 — `TemplateDTO` version pointers are now nested value objects:
 > `latest_version` (required) and `published_version` (required-and-nullable, present-and-null) are both
 > `TemplateVersionRef {id, number, revision_number, status}`; the four coupled flat scalars
 > `latest_revision_number`/`published_version_id`/`published_version_number`/`current_revision_number` are
@@ -43,10 +43,10 @@
 > - `internal/modules/documents/api/cfg.yaml:1` - documents codegen config (include-tags: documents)
 > - `internal/modules/documents/api/gen.go:1` - `//go:generate` invocation for documents
 > - `internal/modules/documents/api/api.gen.go:1` - generated; DO NOT EDIT
-> - `internal/modules/documents/approval/http/contracts/strictjson.go:23` - `Decode` helper; `DisallowUnknownFields` pattern used at handler boundaries
-> - `internal/modules/controlleddocuments/delivery/http/handler.go:95` - `HandlerWithOptions` wiring pattern (controlled-documents)
+> - `internal/platform/strictjson/strictjson.go:25` - `Decode` helper; `DisallowUnknownFields` pattern used at handler boundaries
+> - `internal/modules/controlleddocuments/delivery/http/handler.go:139` - `HandlerWithOptions` wiring pattern (controlled-documents) (was `:95`, drift predates F9.5)
 > - `internal/modules/templates/delivery/http/handler.go:32` - `ServerInterfaceWrapper` wiring pattern (templates)
-> - `migrations/0183_documents_name_not_empty.sql:27` - DB invariant floor for `documents.name`
+> - `migrations/0183_documents_name_not_empty.sql:27` - DB invariant floor for `documents.name` (**verify** — top-level `migrations/` dir not found in current tree, replaced by `migrations_baseline/`/`db/migrations/`; constraint text not located in `migrations_baseline/0001_baseline_2026_05.sql`; pre-existing drift unrelated to F9.5, flagged not fixed)
 > - `.github/workflows/api-contract.yml:1` - CI drift guard (3 jobs)
 > - `frontend/apps/web/package.json:13` - `gen:api` script (`openapi-typescript`)
 
@@ -111,8 +111,8 @@ The handler struct (`*Handler`) implements `ServerInterface`; the generated `Han
 
 oapi-codegen does **not** enforce:
 
-- **Unknown fields:** Use `contracts.Decode` from `internal/modules/documents/approval/http/contracts/strictjson.go:23`. It sets `decoder.DisallowUnknownFields()`. Call it instead of `json.NewDecoder(r.Body).Decode(...)` at handler boundaries.
-- **Required fields:** oapi-codegen generates pointer fields for optional and value fields for required, but does not produce 400 responses for missing required fields at runtime. Handlers must check explicitly (e.g., `missingAtomicCreateField` at `internal/modules/controlleddocuments/delivery/http/routes.go:102`).
+- **Unknown fields:** Use `strictjson.Decode` from `internal/platform/strictjson/strictjson.go:25` (moved from module-local `internal/modules/documents/approval/http/contracts/strictjson.go`, a platform-package extraction predating and unrelated to F9.5). It sets `decoder.DisallowUnknownFields()`. Call it instead of `json.NewDecoder(r.Body).Decode(...)` at handler boundaries.
+- **Required fields:** oapi-codegen generates pointer fields for optional and value fields for required, but does not produce 400 responses for missing required fields at runtime. Handlers must check explicitly (e.g., `missingAtomicCreateField` at `internal/modules/controlleddocuments/delivery/http/routes.go:162`, called at `:90`; was cited `:102`, drift predates F9.5).
 
 ---
 
@@ -230,7 +230,7 @@ semantics: list view carries a compact ref, detail view carries the full object 
 
 **Backend implication — read/write model split.** `internal/modules/templates/domain/read_model.go` adds
 `VersionRef` (compact) and `TemplateRead` (embeds the write-side `Template` + `Latest`/`Published
-VersionRef`). `internal/modules/templates/repository/postgres.go` GetTemplate/GetTemplateByKey/ListTemplates
+VersionRef`). `internal/modules/templates/infrastructure/postgres.go` GetTemplate/GetTemplateByKey/ListTemplates
 double-join `templates_template_version` (`lv`/`pv` aliases) and return `*domain.TemplateRead`. The mapper
 (`internal/modules/templates/delivery/http/routes_mapping.go:122` `toAPIVersionRef`, `:147`
 `toAPITemplateDTO`) converts the read model to the wire shape.

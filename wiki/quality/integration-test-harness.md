@@ -1,6 +1,6 @@
 # Integration Test Harness
 
-> Last verified: 2026-07-05 — M7 F7.4 added `testdb.OpenAsCIRole` (§"Other helpers"); rest of `factory.go`
+> Last verified: 2026-07-06 — F9.4 doc-truth pass: fixed import path `internal/modules/documents/repository` → `internal/modules/documents/infrastructure` (F9.5 rename) in the code sample. | prior: 2026-07-05 — M7 F7.4 added `testdb.OpenAsCIRole` (§"Other helpers"); rest of `factory.go`
 > API unchanged since F4c.5.
 > See also: [test-discipline.md](test-discipline.md) (CI guard rules R1–R4), [ADR 0034](../decisions/0034-integration-test-fixture-framework.md), [ADR 0027 Amendment 2026-07-05](../decisions/0027-rls-adoption-sequencing.md) (why a second DB role exists for isolation proofs).
 
@@ -178,7 +178,7 @@ import (
     "context"
     "testing"
 
-    "metaldocs/internal/modules/documents/repository"
+    "metaldocs/internal/modules/documents/infrastructure"
     iamdomain "metaldocs/internal/modules/iam/domain"
     "metaldocs/tests/integration/testdb"
 )

@@ -1,11 +1,7 @@
 # Feature F9.4 — Evidence — doc-truth
 
-> **Milestone:** 9 · **Feature:** `f9.4-doc-truth` · **Pass:** INITIAL PASS — Tasks 1-4 only.
-> Task 5 (wiki-curator over the enumerated list) and Task 6 (final verification) are **deferred**
-> to the FINAL pass, which runs after F9.5 lands (structure-hygiene renames `documents/repository/`
-> and `templates/repository/` out of existence and settles the approval nested-vs-promoted decision).
-> Running the curator now would fix file:line anchors that F9.5 is about to move again — spec.md
-> and plan.md both call this out explicitly ("final verification pass runs after F9.5").
+> **Milestone:** 9 · **Feature:** `f9.4-doc-truth` · **Pass:** BOTH passes complete (initial + final,
+> the latter run after F9.5 landed at commit `de0df6b1`).
 >
 > Contract: `../validation-contract.md` §4 (binding).
 
@@ -234,10 +230,111 @@ framing was written, and a 5th periodic job (outbox retention/purge) is appended
 the mechanism (River periodic jobs + leader election, dual-define per ADR 0067) so it does not go
 stale again the next time a periodic job is added.
 
-## Diff scope (this pass)
+## Final pass (post-F9.5) — Task 5 wiki-curator + Task 6 verification
 
-- `CLAUDE.md` (System Facts section only — module list, lifecycle line, binaries/janitor sentence).
+Run after F9.5 landed (`de0df6b1`): documents/repository, templates/repository, and
+documents/approval/repository no longer exist; contents live under the respective
+`infrastructure/` (approval idemp stores split further into `infrastructure/idempotency/`).
+
+### Task 6 — final verification (re-run post-rename)
+
+- `ls internal/modules/` — still the 14 dirs of §1.1 (`tokens` present, no `docs`); CLAUDE.md
+  inventory line matches exactly.
+- `apps/api/cmd/metaldocs-api/chain.go:25` — still the correct anchor (func signature line,
+  untouched by the persistence-layer rename); chain order in CLAUDE.md unchanged and still true.
+- CLAUDE.md footnote — reads `(ADR: approval nested exception, ADR 0072)`, placeholder resolved by
+  F9.5's implementer to the real ADR number. Confirmed by direct read.
+- `internal/modules/documents/approval/application/signoff_idemp.go` — path unchanged (F9.5 moved
+  the `infrastructure`/persistence layer only, not `application`); CLAUDE.md's idempotency
+  per-handler citation still resolves.
+- `.claude/skills/developing-new-work/references/invariant-checklist.md` — lifecycle correction
+  intact; `Last verified` stamp = 2026-07-06 (set in the initial pass, still current).
+
+No CLAUDE.md/skill-file edit was needed this pass — every claim already matched the post-F9.5 tree.
+
+### Task 5 — wiki-curator pass
+
+Dispatched over (a) the 43-doc mission-touched set enumerated in the initial pass and (b) 8
+additional living docs discovered to reference the old `repository/` paths during the sweep.
+Constraints held: stamps/anchors/one-line factual corrections only; zero edits to
+`wiki/architecture/backend-target-architecture.md`, `wiki/architecture/req-trace-map.yaml`,
+`wiki/architecture/req-traceability.md`, or any ADR **decision content** (status-field-only edits
+would have been in-scope but none of the touched ADRs needed one).
+
+**JOB A — 43-doc mission set:**
+
+| Doc | Disposition | Notes |
+|---|---|---|
+| `wiki/modules/approval.md` | stamped + anchor-fixed | 13 fixes + 4 flags (authz_guc.go gone, cutover_service.go gone, migrations/ dir gone ×2, router.go structural) |
+| `wiki/modules/approval-tech-debt.md` | stamped + anchor-fixed | 1 verify-flag (T-008 historical) |
+| `wiki/decisions/index.md` | unchanged-ok | ADR 0072 already listed correctly |
+| `wiki/modules/documents.md` | stamped + anchor-fixed | 9 fixes + 3 verify flags |
+| `wiki/modules/templates.md` | stamped + anchor-fixed | 7 fixes |
+| `wiki/modules/iam.md` | unchanged-ok | zero repository/ hits |
+| `wiki/modules/jobs.md` | unchanged-ok | zero repository/ hits |
+| `wiki/quality/index.md` | unchanged-ok | zero hits |
+| `wiki/quality/test-discipline.md` | unchanged-ok | zero hits |
+| `wiki/runbooks/backup-restore.md` | unchanged-ok | zero hits |
+| `wiki/runbooks/index.md` | unchanged-ok | zero hits |
+| `wiki/standards/documentation-governance.md` | unchanged-ok | zero hits |
+| `wiki/quality/legacy-test-policy.md` | anchor-fixed | 1 fix; stamp already 2026-07-06 from F9.3, not double-bumped |
+| `wiki/quality/integration-test-harness.md` | stamped + anchor-fixed | 1 fix (import path in code sample) |
+| `wiki/architecture/api-contract.md` | stamped + anchor-fixed | 3 fixes + 2 flags (migrations/ dir gone) |
+| `wiki/architecture/backend-blueprint.md` | unchanged-ok | zero repository/ hits; stale module-count flagged, not fixed (exceeds one-liner scope) |
+| `wiki/architecture/tenant-context.md` | unchanged-ok | zero repository/ hits |
+| `wiki/backend/legacy-register.md` | anchor-fixed (report-only) | 4 verify-flags on dated findings tables; stamp not bumped (closed/dated register, flags are annotations) |
+| `wiki/backend/repo-topology.md` | unchanged-ok | zero repository/ hits; stale module-count flagged, not fixed |
+| `wiki/backend/_artifacts/stage1/module-iam.md` | unchanged-historical | dated Stage-1 artifact, old paths preserved per constraint |
+| `wiki/database/tables/approval_signoffs.md` | unchanged-ok | zero hits |
+| `wiki/database/tables/documents.md` | unchanged-ok | zero hits |
+| `wiki/decisions/0013-template-revision-labels.md` | report-only-ADR | old path in decision content — unchanged per constraint |
+| `wiki/decisions/0015-async-freeze-pin-materialize.md` | unchanged-ok | zero hits |
+| `wiki/decisions/0018-approval-route-lifecycle.md` | report-only-ADR | old path in decision content — unchanged per constraint |
+| `wiki/decisions/0022-authz-capability-coherence.md` | report-only-ADR | 1 old path in decision content — unchanged per constraint |
+| `wiki/decisions/0022-execution-history.md` | unchanged-ok | zero hits |
+| `wiki/decisions/0027-rls-adoption-sequencing.md` | unchanged-ok | zero hits |
+| `wiki/decisions/0052-template-manual-versioning.md` | report-only-ADR | 1 old path in decision content — unchanged per constraint |
+| `wiki/decisions/0065`–`0071` (7 ADRs) | unchanged-ok | zero repository/ hits in any |
+| `wiki/README.md` | unchanged-ok | zero repository/ hits |
+
+**JOB B — 8 additional living docs found referencing old paths:**
+
+| Doc | Disposition | Notes |
+|---|---|---|
+| `wiki/modules/documents-tech-debt.md` | stamped + anchor-fixed | 1 verify-flag (T-003 historical) |
+| `wiki/modules/templates-tech-debt.md` | stamped + anchor-fixed | 6 fixes (T-011/T-013 rewritten; T-002 flagged verify, historical) |
+| `wiki/modules/taxonomy.md` | anchor-fixed | 1 hit |
+| `wiki/architecture/data-model.md` | stamped + anchor-fixed | 6 fixes (postgres.go dir; buildDocumentFilter; CreateDocument→CreateDocumentTx symbol correction; approval/infrastructure prefix; nonexistent /repo/ subdir fix; ListOptions line) |
+| `wiki/backend/platform/http-toolkit.md` | stamped + anchor-fixed | 1 fix |
+| `wiki/backlog/editor.md` | anchor-fixed | 1 fix (dated 2026-05-18 audit section) |
+| `wiki/backlog/roadmap.md` | stamped + anchor-fixed | 2 fixes |
+| `wiki/backlog/templates.md` | stamped + anchor-fixed | 1 fix (FE-08 closure narrative) |
+
+**Totals:** ~62 anchor fixes/flags across both jobs (JOB A ≈ 41, JOB B ≈ 21).
+
+**Flags left unresolved (out of scope, reported not fixed):**
+- Top-level `migrations/` dir referenced by several docs no longer exists (replaced by
+  `migrations_baseline/` + `db/migrations/`) — pre-existing drift, unrelated to F9.5.
+- Stale "12/11 business modules" counts in `backend-blueprint.md`, `legacy-register.md`,
+  `repo-topology.md` — pre-existing, exceeds one-liner scope.
+- `wiki/modules/approval.md` router.go structural change (RegisterRoutes → generated
+  HandlerWithOptions) — predates/broader than F9.5, not rewritten.
+- ADRs with old paths in decision content (`0013`, `0018`, `0022`, `0052`) — content is
+  historical/decision-record, out of scope per F9.1's "no ADR body decision content altered" rule.
+
+## Diff scope (both passes)
+
+- `CLAUDE.md` (System Facts section — module list, lifecycle line, binaries/janitor sentence,
+  approval footnote resolved to ADR 0072).
 - `.claude/skills/developing-new-work/references/invariant-checklist.md` (lifecycle line + stamp).
+- `wiki/**` (curator pass, final pass only): `architecture/api-contract.md`, `architecture/data-model.md`,
+  `backend/legacy-register.md`, `backend/platform/http-toolkit.md`, `backlog/editor.md`,
+  `backlog/roadmap.md`, `backlog/templates.md`, `concepts/approval-routes.md`,
+  `concepts/authz-tiers.md`, `modules/approval-tech-debt.md`, `modules/approval.md`,
+  `modules/documents-tech-debt.md`, `modules/documents.md`, `modules/templates-tech-debt.md`,
+  `modules/templates.md`, `quality/integration-test-harness.md`, `quality/legacy-test-policy.md`
+  (17 files — stamps/anchors/one-liners only, no content rewrites, no ADR/normative-doc/generated-map
+  edits).
 - `docs/superpowers/milestones/global-maximum-remediation/milestone-9-governance-hygiene/f9.4-doc-truth/evidence.md` (this file).
 
-No `wiki/**` edits this pass (Task 5 deferred). No `internal/modules/` edits. No commits made.
+No `internal/modules/` edits. No commits made (main session commits).

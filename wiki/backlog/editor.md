@@ -186,7 +186,7 @@ Evidence used:
 - Screen route/page: `frontend/apps/web/src/features/documents/pages/DocumentEditorRoutePage.tsx`, `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx`
 - Editor hooks/wrappers: `useDocumentAutosave.ts`, `useDocumentComments.ts`, `useDocumentSession.ts`, `api/documents.ts`, `queries/useDocumentCommentsQuery.ts`
 - Query key ownership: `frontend/apps/web/src/lib/queryKeys.ts`
-- Runtime/handler truth: `internal/modules/documents/delivery/http/handler.go`, `internal/modules/documents/application/service.go`, `internal/modules/documents/repository/repository.go`, `internal/modules/documents/approval/application/decision_service.go`
+- Runtime/handler truth: `internal/modules/documents/delivery/http/handler.go`, `internal/modules/documents/application/service.go`, `internal/modules/documents/infrastructure/repository.go` (**verify** — dir renamed repository/→infrastructure/ per F9.5), `internal/modules/documents/approval/application/decision_service.go`
 - Contract truth: `api/openapi/v1/openapi.yaml`
 
 | Item | Source | Runtime/API reality | Frontend reality | Classification | Action |

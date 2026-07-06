@@ -277,7 +277,7 @@ Two additional structural problems compound this:
 | `internal/modules/documents/application/service.go:843-848` | MarkArchived committed | audit.Write after | crash between |
 | `internal/modules/documents/approval/application/decision_service.go` | approval decisions committed | audit write post-commit | same pattern |
 | `internal/modules/taxonomy/application/governance_logger.go:15-17` | — | Deprecated sink still active as nil fallback | — |
-| `internal/modules/templates/repository/postgres.go:631-650` vs `:676-714` | AppendAudit writes audit_events | ListAudit reads templates_audit_log | write/read split: new events invisible to read |
+| `internal/modules/templates/repository/postgres.go:631-650` vs `:676-714` (**verify** — dir renamed to `infrastructure/` per F9.5; historical Stage-1 snapshot, not re-verified) | AppendAudit writes audit_events | ListAudit reads templates_audit_log | write/read split: new events invisible to read |
 
 **Stage-2 question:** Which mutating flows have a silent audit-drop window and what is the outbox migration scope?
 
@@ -500,7 +500,7 @@ Multiple files or types are confirmed dead code — either explicitly deprecated
 | `AreaService.SetParent` (cycle-safe, transactional) | Only called from `area_service_test.go:49`; production updateArea handler calls AreaService.Update instead (without cycle check) | `internal/modules/taxonomy/application/area_service.go:111` |
 | `SnapshotService.SnapshotFromTemplate` | Marked deprecated; retained for unnamed backfill scripts | `internal/modules/documents/application/snapshot_service.go:46` |
 | `WorkerConfig.ReviewReminderDays` | Parsed and logged at startup but referenced by nothing; planned feature never implemented | `internal/platform/config/worker.go:13,25,50`; `apps/worker/cmd/metaldocs-worker/main.go:109` |
-| Legacy `areas`, `visibility`, `specific_areas` columns on templates | Written by INSERT as empty values; not scanned; no domain.Template fields | `internal/modules/templates/repository/postgres.go:52-53` |
+| Legacy `areas`, `visibility`, `specific_areas` columns on templates | Written by INSERT as empty values; not scanned; no domain.Template fields | `internal/modules/templates/repository/postgres.go:52-53` (**verify** — dir renamed to `infrastructure/` per F9.5; historical snapshot, not re-verified) |
 | `document_profiles.is_active` column | Added by migration 0023; superseded by `archived_at` in 0122; never read or written by Go code | `archive/migrations/0023_init_document_family_and_profile_registry.sql:14`; `archive/migrations/0122_taxonomy_extend_document_profiles.sql:13` |
 | `document_subjects` table | Created by migration 0025; zero Go code references it | `archive/migrations/0025_init_document_taxonomy.sql:9-16` |
 | `resolvePermissionFallback` function | Switch with only a default case and a discarded path parameter; leftover scaffolding | `apps/api/cmd/metaldocs-api/permissions.go:270-279` |
@@ -670,9 +670,9 @@ Several confirmed SQL patterns produce unnecessary query load. All are currently
 |---|---|
 | ILIKE on `payload::text` (full-table sequential scan on JSONB; no GIN/GiST index) | `internal/modules/audit/infrastructure/postgres/writer.go:260-264` |
 | TODO(phase11) leading-wildcard ILIKE for CD full-text search | `internal/modules/controlleddocuments/infrastructure/repository.go:128` |
-| `listRoutesQuery` correlated `SELECT COUNT(*)` re-evaluated per row | `internal/modules/documents/approval/repository/postgres_approval_repository.go:439` |
+| `listRoutesQuery` correlated `SELECT COUNT(*)` re-evaluated per row | `internal/modules/documents/approval/repository/postgres_approval_repository.go:439` (**verify** — dir renamed to `infrastructure/` per F9.5; historical snapshot, not re-verified) |
 | document_profiles family subquery duplicated identically in SELECT and WHERE | `internal/modules/search/infrastructure/v2documents/reader.go:34-41, 59-66` |
-| `listRoutesQuery` aliases `created_at AS updated_at`; no `updated_at` column exists on `approval_routes` | `internal/modules/documents/approval/repository/postgres_approval_repository.go:437` |
+| `listRoutesQuery` aliases `created_at AS updated_at`; no `updated_at` column exists on `approval_routes` | `internal/modules/documents/approval/repository/postgres_approval_repository.go:437` (**verify** — dir renamed to `infrastructure/` per F9.5; historical snapshot, not re-verified) |
 | `InMemoryAuthFailureRateLimiter` wired in production — process-local, no cross-replica coordination | `internal/modules/documents/approval/infrastructure/signature/password_reauth.go:118-127`; `apps/api/cmd/metaldocs-api/reauth.go:49` |
 | Sequential security rule evaluation (4 independent SQL queries in series, no early exit) | `internal/modules/security/application/service.go:93-149` |
 

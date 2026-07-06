@@ -95,7 +95,7 @@ structurally removed with no isolate-retry policy.
 
 ### 3. Repair-class, currently broken at HEAD — `tenant_id_rls_integration_test.go`
 
-`internal/modules/templates/repository/tenant_id_rls_integration_test.go`
+`internal/modules/templates/infrastructure/tenant_id_rls_integration_test.go`
 (`TestTemplateVersion_TenantID_RLSParity`) guards a **DB invariant** and a **REQ ID**: migration
 0256's own-column `tenant_id` + FORCE-RLS `tenant_isolation` policy on
 `templates_template_version` (REQ-TEN-1 / F-DB5). As of 2026-07-06 it fails at seeding: the

@@ -1,6 +1,6 @@
 # Platform — HTTP Toolkit
 
-> **Last verified:** 2026-06-11
+> **Last verified:** 2026-07-06 (F9.4 doc-truth pass: fixed 1 anchor — `modules/documents/repository`→`modules/documents/infrastructure` in the pagination-consumers table, F9.5 rename) | **Prior:** 2026-06-11
 > **Scope:** The eight shared packages under `internal/platform/` that constitute the API design system's runtime enforcement surface: `httpresponse`, `problem`, `pagination`, `idempotency`, `requesttrace`, `useragent`, `httpclient`, and `formval`. Covers what each package provides, its public surface, the logic flows it implements, which domain modules consume it, and all flags identified in Stage-1 audit.
 > **Out of scope:** The higher-level observability and security platform packages (`platform/observability`, `platform/ratelimit`, `platform/security`). Those are adjacent to this layer but warrant their own docs.
 > **Key files:**
@@ -316,7 +316,7 @@ sequenceDiagram
 |---|---|
 | `httpresponse` | `modules/audit`, `modules/auth`, `modules/controlleddocuments`, `modules/documents`, `modules/iam`, `modules/search`, `modules/security`, `modules/taxonomy`, `modules/templates` — 10 handler files |
 | `problem` | All of the above + `platform/idempotency`, `platform/ratelimit`, `platform/security` — 32 files total |
-| `pagination` | `modules/audit/delivery/http`, `modules/audit/infrastructure/postgres`, `modules/controlleddocuments/delivery/http`, `modules/controlleddocuments/infrastructure`, `modules/documents/delivery/http`, `modules/documents/repository` — 7 files |
+| `pagination` | `modules/audit/delivery/http`, `modules/audit/infrastructure/postgres`, `modules/controlleddocuments/delivery/http`, `modules/controlleddocuments/infrastructure`, `modules/documents/delivery/http`, `modules/documents/infrastructure` — 7 files |
 | `idempotency` | `modules/controlleddocuments/delivery/http`, `modules/documents/delivery/http`, `modules/documents/approval/infrastructure`, `modules/documents/approval/application`, `modules/documents/approval/http`, `modules/templates/delivery/http` — 14 files |
 | `requesttrace` | `platform/observability/http`, `modules/auth/delivery/http`, `apps/api/cmd/metaldocs-api/main.go` — 4 files |
 | `useragent` | `modules/iam/delivery/http/sessions_handler.go` — 1 file only |

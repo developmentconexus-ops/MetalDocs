@@ -1,11 +1,11 @@
 # Concept: Approval Routes
 
-> **Last verified:** 2026-06-01
+> **Last verified:** 2026-07-06 (anchor refresh: route.go:39→41, Validate :48→50; drift.go/db baseline/ADR refs re-checked, unchanged)
 > **Status:** Canonical concept doc.
 > **Scope:** Plain-language explanation of approval routes, stages, quorum kinds, drift policies, and the route lifecycle. Reader audience: anyone who needs to *understand* the route catalogue without reading service code.
 > **Out of scope:** Per-instance signoff runtime (see `wiki/modules/approval.md` §6). Quorum evaluation math edge cases (see `internal/modules/documents/approval/domain/quorum.go` and `drift.go`). HTTP contract (see [`wiki/decisions/0018-approval-route-lifecycle.md`](../decisions/0018-approval-route-lifecycle.md) and OpenAPI).
 > **Key files:**
-> - `internal/modules/documents/approval/domain/route.go:39` — `Route` aggregate, `Stage` value object, `Validate`
+> - `internal/modules/documents/approval/domain/route.go:41` — `Route` aggregate, `Stage` value object, `Validate` (:50)
 > - `internal/modules/documents/approval/domain/quorum.go` — quorum evaluation
 > - `internal/modules/documents/approval/domain/drift.go:17` — `ApplyEligibilityDrift`
 > - `db/baseline/0001_current_schema.sql:1865` — `approval_routes` table
@@ -40,7 +40,7 @@ Route
     └── on_eligibility_drift   ─── reduce_quorum / fail_stage / keep_snapshot
 ```
 
-Constraint: stage `order` must be dense and start at 1; stage `name` must be unique within the route. Both are enforced by `Route.Validate` at `domain/route.go:48`.
+Constraint: stage `order` must be dense and start at 1; stage `name` must be unique within the route. Both are enforced by `Route.Validate` at `domain/route.go:50`.
 
 ## Quorum kinds
 
