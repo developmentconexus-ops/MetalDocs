@@ -1,7 +1,8 @@
 # ADR 0013 — Template Revision Labels (REV-style, Backend-Canonical)
 
-> **Status:** Accepted
-> **Last verified:** 2026-06-05
+> **Status:** Accepted (amended by 0052 — version-creation trigger; REV labels + persisted
+> revision_number unchanged)
+> **Last verified:** 2026-07-06 (F9.1 research confirmed the counter mechanics are still live)
 > **Scope:** Adopt `REV{nn}` chip labels for template versions, mirroring documents' existing revision-code convention. Make `revision_number` a **first-class persisted column** on `templates_template_version`, exposed via OpenAPI as `current_revision_number` on `TemplateDTO`. Frontend renders the field directly through a shared formatter — no off-by-one math in the UI.
 > **Out of scope:** Renaming `version_number` column (kept — it remains the lifecycle counter). Documents-side changes (already uses REV).
 > **Key files (touched in implementation PR):**

@@ -1,9 +1,19 @@
 # ADR 0015: Async Freeze — Split into Pin (in-tx) and Materialize (outbox)
 
-> **Status:** Accepted (amended 2026-06-13 — optional-tx-enlistment retired by Wave Z Z-5; tx is mandatory)
-> **Current reality (2026-06):** `Pin` and `Freeze` both require a non-nil `db.Tx`; passing nil returns an explicit error. The three `//cilint:allow-dualmode` directives have been removed; no autocommit path exists. `Materialize` is unchanged — it has no tx parameter (runs outside any transaction).
+> **Status:** Accepted (amended 2026-06-13 by Wave Z Z-5 — tx is mandatory, no autocommit path)
+> **Status history:** [below](#status-history).
 
 **Affects:** approval signoff flow, freeze service, worker, docx-renderer coupling
+
+## Status history
+
+> Relocated from the ADR's `> **Current reality**` status-field line 2026-07-06 (F9.1 adr-hygiene).
+> Zero information loss.
+
+- **2026-06-13 — amended by Wave Z Z-5.** Optional-tx-enlistment retired; tx is mandatory.
+  **Current reality (2026-06):** `Pin` and `Freeze` both require a non-nil `db.Tx`; passing nil returns
+  an explicit error. The three `//cilint:allow-dualmode` directives have been removed; no autocommit
+  path exists. `Materialize` is unchanged — it has no tx parameter (runs outside any transaction).
 
 ## Context
 

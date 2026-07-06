@@ -4,6 +4,35 @@
 > **Scope:** Ownership model for durable project knowledge, section boundaries, safe promotion rules, and the secrets-in-documentation rule.
 > **Out of scope:** Rewriting every legacy document or mass-moving existing trees in one session.
 
+## ADR status field (F9.1 — permanent rule)
+
+An ADR's `> **Status:**` block — from the `> **Status:**` line through any following `>`-continuation
+lines up to (not including) the next `> **Field:**` marker — MUST be **≤3 physical lines AND ≤400
+characters total**. This is the "mega-status anti-pattern" guard: architecture review `778f494a` finding
+105 flagged ADR 0022's status field growing to a 2757-character, 13-phase execution changelog, making the
+decision state unreadable at a glance.
+
+**Canonical vocabulary** for the status line: `Proposed | Accepted | Accepted (amended YYYY-MM-DD by
+NNNN) | Superseded by NNNN | Deprecated | Historical`. The status line MAY be followed by one optional
+date-and-scope clause and one optional history-pointer line (e.g. `Execution history:
+[NNNN-execution-history.md]`) — still counted inside the 3-line/400-char budget.
+
+**Execution history, phase-by-phase changelogs, and amendment narratives live OUTSIDE the status
+field** — either in the ADR's own body (a `## Status history` / `## Amendment` section) or, when the
+history is long enough to itself risk sprawl, in a companion doc `wiki/decisions/NNNN-execution-history.md`
+linked from the status block's history-pointer line. Relocating history must not lose information —
+restructure into dated entries, never summarize away facts.
+
+**Repeatable sweep** (run from `wiki/decisions/`, bash/awk one-liner; reports every file whose status
+block exceeds the budget — 0 output lines = pass):
+
+```bash
+cd wiki/decisions && for f in [0-9]*.md; do awk -v fn="$f" '/^> \*\*Status:\*\*/{inb=1; total=0; lines=0} inb { if (!/^>/) {inb=0} else if (lines>0 && /^> \*\*[A-Za-z ]+:\*\*/) {inb=0} else {total+=length($0); lines++} } END{ if (total>400 || lines>3) print fn": "lines" lines, "total" chars" }' "$f"; done; cd ../..
+```
+
+Wiring this sweep into CI (extending `governance-check.yml` or a new job) is an optional future
+extension, not required for the rule to be in force.
+
 ## Secrets in documentation (D-4a — permanent rule)
 
 Secrets are **referenced by location, never quoted** — in any doc, report, commit message, audit artifact, or chat-derived summary. Write `<redacted — see .env>` (or the owning store, e.g. "see the CI secret `X`") instead of the value. This applies to *audit and security findings as well*: a report about a leaked credential must not itself reproduce the credential (the Stage-1/2 backend audit made exactly this mistake across 5 committed files — that is the incident this rule comes from, decision D-4a in `docs/superpowers/specs/2026-06-11-backend-professionalization-design.md`).

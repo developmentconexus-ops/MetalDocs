@@ -1,9 +1,9 @@
 # ADR 0027 — RLS Adoption Sequencing + auth_identities Tenant-Global by Design
 
-> **Status:** Accepted (executed in full by Wave Z, 2026-06-13) — originally Accepted 2026-06-11 (binding decision D-3 of the backend professionalization design spec). The three-tier *sequencing* below is now historical: Wave Z Z-2 (operator override of D-3) collapsed all three tiers into a single migration (`db/migrations/0237_rls_all_tenant_tables.sql`), enabling ENABLE+FORCE RLS + the NULL-permissive `tenant_isolation` policy on **all 27 remaining tenant-scoped tables** (29 total including the 2 already enabled in migration 0234) at once (Tier 2 iam_users + Tier 3 external-tenant tables included). The by-design `auth_identities` decision is unchanged.
-> **Last verified:** 2026-06-13
->
-> **Current reality (2026-06):** RLS is live on every tenant-scoped table (29 total = 2 from 0234 + 27 from 0237). The "first external tenant" / RF-6 triggers below never fired — Wave Z executed the full program ahead of them. `metaldocs.user_process_areas` is a VIEW over `public.user_process_areas` (the base table IS covered); views cannot carry RLS, so the census of 28 `tenant_id`-bearing relations minus that view = 27 base tables in 0237. NOSUPERUSER probe (Wave Z): GUC-unset→all rows, GUC=A→only A, GUC=B→only B, verified live on `iam_users` + `documents`.
+> **Status:** Accepted (executed in full by Wave Z, 2026-06-13).
+> **Status history:** [below](#status-history) (originally Accepted 2026-06-11; three-tier plan
+> collapsed into one migration by Wave Z Z-2; amended 2026-07-03 M3, amended 2026-07-05 M7 F7.4).
+> **Last verified:** 2026-07-05 (M7 F7.4 RLS-truth sweep — see Status history)
 > **Scope:** Two related decisions: (1) `auth_identities` has no `tenant_id` by deliberate design; (2) the sequencing and rationale for Row-Level Security adoption across the MetalDocs schema. Closes tech-debt item T-008 as by-design. Documents the partial-coverage RLS model and its trigger conditions.
 > **Out of scope:** The two-tier authz model itself (ADR 0007); capability coherence (ADR 0022); the specific SQL for the Wave 2.3 migration (executed in item 2.3 using the `current_setting('metaldocs.tenant_id', true)` GUC pattern verified here).
 > **Key files:**
@@ -17,6 +17,33 @@
 > - `tests/integration/testdb/ci_role.go:38` — (M7 F7.4 amendment) `OpenAsCIRole`
 > - `tests/integration/security/rls_truth_test.go:41` — (M7 F7.4 amendment) `TestRLSTruth_NonOwnerRoleEnforcesIsolation`
 > - `scripts/api-lint/sole_rls_read_rule.go:189` — (M7 F7.4 amendment) `checkSoleRLSAsyncRead` (`SOLE-RLS-ASYNC-READ` rule)
+
+## Status history
+
+> Relocated from the ADR's `> **Status:**`/`> **Last verified:**` fields 2026-07-06 (F9.1 adr-hygiene).
+> Zero information loss — this is the same text, restructured into dated entries.
+
+- **2026-06-11 — originally Accepted.** Binding decision D-3 of the backend professionalization design
+  spec (three-tier RLS sequencing, `auth_identities` tenant-global by design).
+- **2026-06-13 — executed in full by Wave Z.** Wave Z Z-2 (operator override of D-3) collapsed all
+  three tiers into a single migration (`db/migrations/0237_rls_all_tenant_tables.sql`), enabling
+  ENABLE+FORCE RLS + the NULL-permissive `tenant_isolation` policy on **all 27 remaining tenant-scoped
+  tables** (29 total including the 2 already enabled in migration 0234) at once (Tier 2 `iam_users` +
+  Tier 3 external-tenant tables included). The three-tier *sequencing* documented in the ADR body below
+  is retained as the historical record of how the rollout was originally planned; it no longer
+  describes future work. The by-design `auth_identities` decision is unchanged. **Current reality
+  (2026-06):** RLS is live on every tenant-scoped table (29 total = 2 from 0234 + 27 from 0237). The
+  "first external tenant" / RF-6 triggers documented in the ADR body never fired — Wave Z executed the
+  full program ahead of them. `metaldocs.user_process_areas` is a VIEW over `public.user_process_areas`
+  (the base table IS covered); views cannot carry RLS, so the census of 28 `tenant_id`-bearing relations
+  minus that view = 27 base tables in 0237. NOSUPERUSER probe (Wave Z): GUC-unset→all rows, GUC=A→only
+  A, GUC=B→only B, verified live on `iam_users` + `documents`.
+- **2026-07-03 — M3 tenancy-chokepoint amendment.** See "Amendment 2026-07-03 (M3 tenancy chokepoint)"
+  below in this document for the full text (unabridged, not relocated — it was already outside the
+  status field).
+- **2026-07-05 — M7 F7.4 RLS-truth sweep amendment.** See "Amendment 2026-07-05 (M7 F7.4 RLS-truth
+  sweep)" below in this document for the full text (unabridged, not relocated — it was already outside
+  the status field).
 
 ## Context
 

@@ -5,6 +5,7 @@
 - **Date:** 2026-06-30
 - **Scope:** Removes the automatic creation of a next-version draft when a template version is approved or published. After this decision, `CreateNextVersion` (`POST /api/v1/templates/{id}/versions`) is the **only** path that starts a new template revision. Also records the lifecycle status-vocabulary alignment (`in_review` → `under_review`) shipped alongside it.
 - **Supersedes:** The `feat/templates-approve-next-draft-response` behaviour (2026-05-31) that had `Approve` (accept path) and `PublishTemplateVersion` auto-spawn the next draft and return it as `next_draft` / `next_draft_id` / `next_draft_version_num`. That was a feature-branch decision (documented in the `wiki/modules/templates.md` changelog), not a prior ADR.
+- **Amends:** ADR [`0013`](0013-template-revision-labels.md) — this decision amends 0013's *version-creation trigger* (removes the implicit auto-spawn on approve/publish; `CreateNextVersion` is the sole trigger going forward). It does **not** touch 0013's `revision_number` persisted-column mechanics or `REV{nn}` labeling — those stay exactly as 0013 specified (the counter allocation in `internal/modules/templates/repository/postgres.go` is unchanged by this ADR).
 
 ---
 

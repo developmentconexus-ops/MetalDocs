@@ -1,7 +1,7 @@
 # ADR 0070 — Tenant lifecycle: onboarding API, per-module export/erasure ports, and crypto-shred erasure with an immutable audit skeleton
 
 > **Status:** Accepted 2026-07-05
-> **Module(s):** `iam` (tenant onboarding + lifecycle orchestrator, capability registry) · `security` (per-tenant key envelope) · `audit` (immutable skeleton + crypto-shred payload) · `documents` · `templates` · `controlleddocuments` · `documents/approval` · `notifications` · `render` · `taxonomy` (each publishes a `TenantDataPort`) · `internal/platform/db` + migrations + `tests/integration/testdb` (F7.4 RLS-truth sweep)
+> **Modules:** `iam` (tenant onboarding + lifecycle orchestrator, capability registry) · `security` (per-tenant key envelope) · `audit` (immutable skeleton + crypto-shred payload) · `documents` · `templates` · `controlleddocuments` · `documents/approval` · `notifications` · `render` · `taxonomy` (each publishes a `TenantDataPort`) · `internal/platform/db` + migrations + `tests/integration/testdb` (F7.4 RLS-truth sweep)
 > **REQ IDs:** `backend-target-architecture.md` REQ-AUTHZ-5 (capability coherence), REQ-TENANT-* (pooled multi-tenancy / RLS), REQ-DB-* (DB-enforced invariants), REQ-AUDIT-* (append-only hash chain)
 > **Supersedes / amends:** none. Extends ADR 0022 (capabilities-never-roles) with three new capabilities; extends the M2 tripwire-generation mechanism (migrations 0269/0270/0271/0275) with the M7 arm migration; complements ADR 0027 (tenancy NULL-permissive + async posture) and ADR 0067 (async on River). Reaffirms the audit append-only immutability grant (`0266`).
 > **Gate:** `docs/superpowers/analysis/2026-07-05-m7-tenant-lifecycle-system-impact.md` (developing-new-work, Yellow — no AS-1/AS-2/AS-3).
