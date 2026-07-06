@@ -257,10 +257,26 @@ services:
       api:
         condition: service_healthy
     environment:
+      APP_ENV: ${APP_ENV}
       METALDOCS_JOBS_ENABLED: ${METALDOCS_JOBS_ENABLED:-true}
       METALDOCS_JOBS_TEMPORAL_MAX_WORKERS: ${METALDOCS_JOBS_TEMPORAL_MAX_WORKERS:-10}
       # Must match the api service's value (both default to "" / public schema).
       METALDOCS_JOBS_RIVER_SCHEMA: ${METALDOCS_JOBS_RIVER_SCHEMA:-}
+      # Storage stanza — REQUIRED, not optional: the jobs binary builds the M7
+      # tenant-lifecycle (export/erase) worker, which calls LoadAttachmentsConfig
+      # at boot and fails closed without the signing secret, then needs the full
+      # minio config for the export-artifact write / blob-deletion path. Mirrors
+      # the api service's storage block exactly so provider truth cannot diverge.
+      METALDOCS_STORAGE_PROVIDER: ${METALDOCS_STORAGE_PROVIDER}
+      METALDOCS_ATTACHMENTS_SIGNING_SECRET: ${METALDOCS_ATTACHMENTS_SIGNING_SECRET}
+      METALDOCS_ATTACHMENTS_DOWNLOAD_TTL_SECONDS: ${METALDOCS_ATTACHMENTS_DOWNLOAD_TTL_SECONDS}
+      METALDOCS_MINIO_ENDPOINT: minio:9000
+      METALDOCS_MINIO_PUBLIC_ENDPOINT: 127.0.0.1:9000
+      METALDOCS_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      METALDOCS_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      METALDOCS_MINIO_BUCKET: ${METALDOCS_MINIO_BUCKET}
+      METALDOCS_MINIO_USE_SSL: ${METALDOCS_MINIO_USE_SSL}
+      METALDOCS_MINIO_AUTO_CREATE_BUCKET: ${METALDOCS_MINIO_AUTO_CREATE_BUCKET}
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}
