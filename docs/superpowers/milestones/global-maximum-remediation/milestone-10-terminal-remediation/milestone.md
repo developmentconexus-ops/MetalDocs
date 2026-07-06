@@ -1,7 +1,7 @@
 # Milestone 10 — Terminal Remediation (HS-5)
 
 > **Program:** global-maximum-remediation  ·  **Governing spec:** `../mission.md` §8 (Terminal acceptance) + §9 HS-5
-> **Status:** milestone-validator **PASS** (2026-07-06) — all 3 fix-features (F-R1/F-R2/F-R3) closed; every gate re-run clean from scratch; C0 scope fence held. **HS-1 operator gate pending.** On approval → re-dispatch `mission-validator` for the second §8 terminal run.
+> **Status:** **passed** (operator-approved HS-1, 2026-07-06 — operator "Okay approved"). milestone-validator PASS; all 3 fix-features (F-R1/F-R2/F-R3) closed; every gate re-run clean from scratch; C0 scope fence held. Terminal acceptance run 2 (`mission-validator` §8) re-dispatched.
 > **Authored:** 2026-07-06 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** M10 is, **which features** it contains,
