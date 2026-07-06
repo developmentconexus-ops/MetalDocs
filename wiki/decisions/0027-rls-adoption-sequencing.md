@@ -12,6 +12,11 @@
 > - `db/migrations/0231_db_hardening_tripwire_and_dead_schema.sql:101` — `current_setting('metaldocs.asserted_caps', true)` — same GUC family; precedent for the pattern
 > - `wiki/concepts/authz-tiers.md` — two-tier model; `metaldocs.tenant_id` GUC context
 > - `wiki/backend/stage2-evaluation.md` — ADR-A paragraph (F-12 verdict row)
+> - `db/migrations/0284_ci_rls_role.sql` — (M7 F7.4 amendment) dedicated non-owner, NOSUPERUSER+NOBYPASSRLS `metaldocs_ci` role for real RLS proofs
+> - `db/migrations/0285_approval_signoffs_rls.sql` — (M7 F7.4 amendment) FORCE RLS + `tenant_isolation` policy on `public.approval_signoffs` (keyed on `actor_tenant_id`)
+> - `tests/integration/testdb/ci_role.go:38` — (M7 F7.4 amendment) `OpenAsCIRole`
+> - `tests/integration/security/rls_truth_test.go:41` — (M7 F7.4 amendment) `TestRLSTruth_NonOwnerRoleEnforcesIsolation`
+> - `scripts/api-lint/sole_rls_read_rule.go:189` — (M7 F7.4 amendment) `checkSoleRLSAsyncRead` (`SOLE-RLS-ASYNC-READ` rule)
 
 ## Context
 
@@ -111,6 +116,88 @@ Application-layer predicates in Go repositories (and the tripwire for write path
 - OWASP ASVS V4.1.3: defense-in-depth tenant isolation
 - ADR [`0007-two-tier-authz.md`](0007-two-tier-authz.md) — two-tier model; trigger tripwire background
 - ADR [`0022-authz-capability-coherence.md`](0022-authz-capability-coherence.md) Phase 5 §Item 7 — native RLS vs. trigger-tripwire finding; `NOSUPERUSER` deployment constraint
+
+## Amendment 2026-07-05 (M7 F7.4 RLS-truth sweep)
+
+> **Last verified (amendment):** 2026-07-05. Does not alter the Wave Z execution record or the M3
+> amendment above — closes two remaining gaps: (1) every prior "RLS is enforced" integration proof ran
+> against `metaldocs_app` (SUPERUSER + BYPASSRLS + owner of every table), under which RLS is
+> unconditionally inert regardless of policy correctness — a false green; (2) one tenant-scoped table
+> (`public.approval_signoffs`) was missed by the Wave Z / M3 FORCE-RLS census because it keys its tenant
+> column `actor_tenant_id`, not `tenant_id`.
+> Source: `db/migrations/0284_ci_rls_role.sql`, `db/migrations/0285_approval_signoffs_rls.sql`,
+> `scripts/api-lint/sole_rls_read_rule.go`, `tests/integration/security/rls_truth_test.go`.
+
+### 1. A dedicated non-owner, non-bypass role now proves RLS for real
+
+Migration `db/migrations/0284_ci_rls_role.sql` creates `metaldocs_ci`: `NOSUPERUSER NOBYPASSRLS
+NOCREATEDB NOCREATEROLE NOINHERIT LOGIN`, owning no tables, with DML-only grants (`USAGE` on schemas
+`metaldocs`+`public`; `SELECT/INSERT/UPDATE/DELETE` on all tables; `USAGE/SELECT` on all sequences;
+`ALTER DEFAULT PRIVILEGES` so future migrations' tables/sequences — created as `metaldocs_app` — inherit
+the same grants automatically).
+
+`tests/integration/testdb/ci_role.go` (`OpenAsCIRole`) opens a second connection to the same per-test
+cloned database as this role, so the integration suite can seed setup data via the owner handle
+(`testdb.Open`, still `metaldocs_app`) and then run isolation-proof reads through `metaldocs_ci`, which
+cannot bypass RLS. `tests/integration/security/rls_truth_test.go`
+(`TestRLSTruth_NonOwnerRoleEnforcesIsolation`) is the first proof to run this way: it asserts
+`metaldocs_ci` has `rolsuper=false`, `rolbypassrls=false`, and owns 0 tables (all three would silently
+neuter RLS if true), then proves wrong-tenant-GUC blocks, right-tenant-GUC allows, and the deliberate
+NULL-GUC escape hatch (§below) admits all rows — pinning it as sanctioned, not a leak. It also documents,
+as a comment, that the pre-fix owner-connection behavior would have been a false green.
+
+**DEVIATION (HS-1):** the source contract for this work suggested reassigning ownership of all
+tenant-scoped tables to a distinct owner role. MetalDocs instead adds a fresh, ownerless role with
+DML-only grants. This satisfies the actual requirement — the connecting proof role is a non-owner under
+`NOBYPASSRLS`, so plain `ENABLE ROW LEVEL SECURITY` applies to it without needing `FORCE` (`FORCE` matters
+only for a table's owner) — without a schema-wide ownership migration that would break dev bootstrap,
+forward migrations, or the leader-elected janitors, all of which run as `metaldocs_app`. `metaldocs_app`
+remains the dev/bootstrap/migration owner identity; this is unchanged by the amendment.
+
+### 2. `public.approval_signoffs` joins the FORCE-RLS set
+
+Migration `db/migrations/0285_approval_signoffs_rls.sql` adds `ENABLE`/`FORCE ROW LEVEL SECURITY` +
+a `tenant_isolation` policy to `public.approval_signoffs`, keyed on `actor_tenant_id` (its tenant column —
+see `wiki/database/tables/approval_signoffs.md`). The table carries e-signature PII (signer identity,
+display-name snapshot, signature payload) and was omitted from the Wave Z (0237) and M3 census because
+both were driven by a `tenant_id`-column search; `approval_signoffs` has no such column. The policy idiom
+(GUC name, `NULLIF(...) IS NULL` null-GUC escape-hatch branch, policy name `tenant_isolation`) is copied
+verbatim from `0281`/`0278` — only the schema (`public`) and tenant column (`actor_tenant_id`) differ. No
+cross-tenant co-sign semantics exist (a signoff's `actor_tenant_id` is always the signer's own tenant), so
+the strict policy needs no ADR 0070-style carve-out. This brings the FORCE-RLS tenant-scoped table count
+to 34 (33 from the M3 amendment + this one).
+
+### 3. New lint rule closes the read-side of the same seam M3 closed for writes
+
+`scripts/api-lint/sole_rls_read_rule.go` registers `SOLE-RLS-ASYNC-READ` (blocking, alongside M3's
+`ASYNC-TENANT-SEED`). M3's rule guards async **writes**: a worker/jobs mutating write against a
+FORCE-RLS tenant table must sit in a function that also seeds `metaldocs.tenant_id`. The new rule guards
+async **reads** the same handler roots: a `Query`/`QueryRow`/`QueryContext`/`QueryRowContext` call whose
+SQL is a `SELECT` against a tenant-scoped table (same `async-tenant-tables.txt` data file as M3) with
+**no** explicit `tenant_id`/`actor_tenant_id` token anywhere in its own SQL text is a violation, because
+the `tenant_isolation` policy's NULL-GUC branch silently returns all tenants' rows if the enclosing
+async tx's GUC was never seeded (or was seeded for the wrong tenant) — belt-and-suspenders so correctness
+does not depend solely on upstream seeding discipline. This rule was carried forward from the M6 F6.4
+fix-feature (review-due ports false-negative, closed by adding an explicit `tenant_id` predicate) and
+makes that fix class a static, blocking guard instead of a one-off. Allowlist:
+`scripts/api-lint/sole-rls-read-allowlist.txt` (same format as M3's async-tenant-seed allowlist).
+
+### 4. What this amendment does NOT change
+
+- The RLS **policy** shape (NULL-permissive on unset GUC) is unchanged and remains deliberate — see §4.1
+  of the M3 amendment above. This continues to mean "no-GUC → all rows visible," not "no-GUC → 0 rows."
+  The isolation proof this amendment adds is therefore "wrong-tenant GUC blocks the other tenant's row,"
+  not "unset GUC blocks everything" — the escape hatch is pinned explicitly in the new test, not
+  mistaken for a leak.
+- `metaldocs_app` is still the dev/bootstrap/migration owner identity and is **not** the only DB role —
+  production already runs a NOSUPERUSER/NOBYPASSRLS/non-owner app role; `metaldocs_ci` is a second,
+  test-only, DML-only role layered on top for CI isolation proofs specifically.
+
+### 5. Cross-references
+
+- `wiki/quality/integration-test-harness.md` — general harness usage (`testdb.Open`, factories); does not
+  yet describe `OpenAsCIRole` (narrow, isolation-proof-only usage; see `ci_role.go` directly).
+- `wiki/database/tables/approval_signoffs.md` — table dictionary entry, updated for FORCE RLS coverage.
 
 ## Amendment 2026-07-03 (M3 tenancy chokepoint)
 

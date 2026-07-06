@@ -1,7 +1,8 @@
 # Integration Test Harness
 
-> Last verified: 2026-06-15 — F4c.5 (harness doc authored; `factory.go` API accurate at this date).
-> See also: [test-discipline.md](test-discipline.md) (CI guard rules R1–R4), [ADR 0034](../decisions/0034-integration-test-fixture-framework.md).
+> Last verified: 2026-07-05 — M7 F7.4 added `testdb.OpenAsCIRole` (§"Other helpers"); rest of `factory.go`
+> API unchanged since F4c.5.
+> See also: [test-discipline.md](test-discipline.md) (CI guard rules R1–R4), [ADR 0034](../decisions/0034-integration-test-fixture-framework.md), [ADR 0027 Amendment 2026-07-05](../decisions/0027-rls-adoption-sequencing.md) (why a second DB role exists for isolation proofs).
 
 This page is for developers **writing a new integration test**. It explains the harness choice,
 how to open a database, which factory builders are available, and how to handle guarded writes.
@@ -210,6 +211,7 @@ func TestCreateDocument_StoresNameCorrectly(t *testing.T) {
 | `testdb.DeterministicID(t, suffix)` | `db.go` | Stable UUID derived from the test name + suffix — useful for seeding IDs that must survive an idempotency replay without collision |
 | `testdb.InsertDraftDocument(t, db, schema, tenantID)` | `fixtures.go` | Low-level draft document seeder (prefer `NewDocument` / `Scenario` for new tests) |
 | `testdb.SeedWithCaps` / `SetCapsOnTx` / `SetCapsOnDB` | `fixtures.go` | Guarded-write helpers (see above) |
+| `testdb.OpenAsCIRole(t, dbName)` | `ci_role.go:38` | Opens a second connection to the same per-test clone as `metaldocs_ci` — a dedicated non-owner, `NOSUPERUSER`+`NOBYPASSRLS` role (migration `0284_ci_rls_role.sql`). Use **only** for RLS isolation-proof reads; keep schema setup and row seeding on the owner handle from `testdb.Open` (`metaldocs_app`), because `metaldocs_ci` holds DML-only grants (no DDL). `metaldocs_app` is SUPERUSER+BYPASSRLS+owner, so RLS is inert on that connection — real isolation proofs must go through `OpenAsCIRole`. See [ADR 0027 Amendment 2026-07-05](../decisions/0027-rls-adoption-sequencing.md) and `tests/integration/security/rls_truth_test.go`. |
 
 ---
 
