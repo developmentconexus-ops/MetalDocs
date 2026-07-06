@@ -1,6 +1,6 @@
 # Invariant checklist — the 6 non-negotiables
 
-**Last verified:** 2026-06-28
+**Last verified:** 2026-07-06
 
 These are MetalDocs' non-negotiable invariants (CLAUDE.md). Violating one is a defect, not a design
 choice. For each: is the work *touched* by it? *how* is it satisfied? which *helper* do you reuse?
@@ -53,8 +53,11 @@ module's application service or published Go interface.
   `internal/platform/db/runner.go:21` (`Do` / `DoReadOnly`).
 - **Errors are RFC 9457 `problem+json`**: never bare `http.Error`.
   `internal/platform/problem/problem.go:77` (`Write`); codes `internal/platform/problem/codes.go:9`.
-- **Fixed request lifecycle**: panic→trace→obs→cors→rate-limit→authn→tier-1 authz→idempotency→handler
-  is inherited; new routes don't re-wire it. `apps/api/cmd/metaldocs-api/chain.go:25`.
+- **Fixed request lifecycle**: `panic_recovery → otel → http_obs → cors → origin_protection →
+  pre_auth_login_rate_limit → authn → iam_authz → presence_bump → rate_limit → method_not_allowed`
+  is inherited; new routes don't re-wire it. `apps/api/cmd/metaldocs-api/chain.go:25`. Idempotency is
+  **not** a chain link — it is enforced per-handler/per-service where needed (e.g.
+  `internal/modules/documents/approval/application/signoff_idemp.go`).
 - **H-PRE-1** (LIVE — never retired): never call an authz-recording read inside a lock-holding atomic tx;
   hoist it off-tx. Motivating lock = the audit hash-chain writer's `pg_advisory_xact_lock`
   (`internal/modules/audit/infrastructure/postgres/writer.go:59`) + `authz.Require` recording a
