@@ -48,15 +48,11 @@ func TestIsEligibleApprover(t *testing.T) {
 
 	// Seed an in_progress approval_instance for doc. NewApprovalInstance accepts
 	// WithStatus to set the status column directly (document.submit tripwire).
-	route := testdb.NewApprovalRoute(t, db,
-		testdb.WithTenant(tnt.ID),
-		testdb.WithProfile(doc.ControlledDocumentID), // re-used as profile hint; auto-looked-up inside factory
-	)
-	_ = route // route wired into instance via NewApprovalInstance's WithRoute option
-
+	// No explicit route: letting NewApprovalInstance auto-wire one resolves the
+	// route's profile_code from the document's controlled-doc via its internal
+	// profileForCD lookup, satisfying approval_routes_document_profile_fk.
 	inst := testdb.NewApprovalInstance(t, db,
 		testdb.WithDocument(doc),
-		testdb.WithRoute(route),
 		testdb.WithStatus("in_progress"),
 	)
 

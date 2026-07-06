@@ -89,15 +89,18 @@ func TestListRevisionHistory_ReturnsGovernedDocumentsNotAutosaveRows(t *testing.
 		return nil
 	})
 
-	// Seed owner user (iam_users has no tripwire).
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
-		 VALUES ($1, 'Owner', $2::uuid)
-		 ON CONFLICT (user_id) DO NOTHING`,
-		ownerUserID, tnt.ID,
-	); err != nil {
-		t.Fatalf("insert iam_user: %v", err)
-	}
+	// Seed owner user — iam_users now carries a trg_require_cap_asserted
+	// tripwire (user.manage), so the insert must run inside a seedWithCaps tx
+	// like testdb.NewUser does.
+	testdb.SeedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
+			 VALUES ($1, 'Owner', $2::uuid)
+			 ON CONFLICT (user_id) DO NOTHING`,
+			ownerUserID, tnt.ID,
+		)
+		return err
+	})
 
 	// Seed controlled document — guarded by controlled_documents.create tripwire.
 	testdb.SeedWithCaps(t, db, `[{"cap":"controlled_documents.create"}]`, func(tx *sql.Tx) error {

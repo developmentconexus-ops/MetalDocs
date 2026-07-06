@@ -49,7 +49,7 @@ VALUES
    $4::uuid, $5, $6, $7,
    CASE WHEN $8 THEN now() ELSE NULL END,
    CASE WHEN $9 THEN now() ELSE NULL END,
-   CASE WHEN $9 THEN now() ELSE NULL END,
+   CASE WHEN $9 THEN now() + interval '1 year' ELSE NULL END,
    3)
 RETURNING id::text`
 	var id string

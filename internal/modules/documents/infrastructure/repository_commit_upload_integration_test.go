@@ -24,6 +24,10 @@ func TestCommitUpload_PersistsRevisionAndFormDataSnapshot(t *testing.T) {
 	testdb.SetCapsOnDB(t, db, `[{"cap":"document.create"},{"cap":"document.edit"}]`)
 
 	tenantID := testdb.DeterministicID(t, "tenant")
+	// templates_template_version now carries fk_templates_template_version_tenant
+	// (FK to metaldocs.tenants(id)); the tenant row must exist before
+	// InsertDraftDocument seeds the template/version family.
+	testdb.NewTenant(t, db, testdb.WithTenant(tenantID))
 	docID, _ := testdb.InsertDraftDocument(t, db, schema, tenantID)
 
 	var sessionID, userID, baseRevisionID string
@@ -35,7 +39,6 @@ func TestCommitUpload_PersistsRevisionAndFormDataSnapshot(t *testing.T) {
 		t.Fatalf("load document session/base: %v", err)
 	}
 
-	testdb.NewTenant(t, db, testdb.WithTenant(tenantID))
 	testdb.NewUser(t, db, testdb.WithUserID(userID), testdb.WithTenant(tenantID), testdb.WithRole("system_admin"))
 
 	pendingID := testdb.DeterministicID(t, "pending")
@@ -122,6 +125,10 @@ func TestCommitUpload_IdempotentReplayReturnsExistingMetadata(t *testing.T) {
 	testdb.SetCapsOnDB(t, db, `[{"cap":"document.create"},{"cap":"document.edit"}]`)
 
 	tenantID := testdb.DeterministicID(t, "tenant")
+	// templates_template_version now carries fk_templates_template_version_tenant
+	// (FK to metaldocs.tenants(id)); the tenant row must exist before
+	// InsertDraftDocument seeds the template/version family.
+	testdb.NewTenant(t, db, testdb.WithTenant(tenantID))
 	docID, _ := testdb.InsertDraftDocument(t, db, schema, tenantID)
 
 	var sessionID, userID, baseRevisionID string
@@ -132,7 +139,6 @@ func TestCommitUpload_IdempotentReplayReturnsExistingMetadata(t *testing.T) {
 	).Scan(&sessionID, &userID, &baseRevisionID); err != nil {
 		t.Fatalf("load document session/base: %v", err)
 	}
-	testdb.NewTenant(t, db, testdb.WithTenant(tenantID))
 	testdb.NewUser(t, db, testdb.WithUserID(userID), testdb.WithTenant(tenantID), testdb.WithRole("system_admin"))
 
 	pendingID := testdb.DeterministicID(t, "pending-replay")

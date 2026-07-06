@@ -70,6 +70,12 @@ func TestTemplateVersion_TenantID_RLSParity(t *testing.T) {
 		); err != nil {
 			return err
 		}
+		// enforce_template_version_tenant_consistent (migration 0255) requires
+		// the tx-local metaldocs.tenant_id GUC to match the parent template's
+		// tenant; seed it per row alongside the asserted caps.
+		if _, err := tx.ExecContext(ctx, `SELECT set_config('metaldocs.tenant_id', $1, true)`, tntA.ID); err != nil {
+			return err
+		}
 		if err := repo.CreateVersionTx(ctx, tx, &domain.TemplateVersion{
 			ID:                versionA,
 			TenantID:          tntA.ID,
@@ -81,6 +87,9 @@ func TestTemplateVersion_TenantID_RLSParity(t *testing.T) {
 			AuthorID:          actorA,
 			DocxStorageKey:    "templates/rls-a/body.docx",
 		}); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `SELECT set_config('metaldocs.tenant_id', $1, true)`, tntB.ID); err != nil {
 			return err
 		}
 		return repo.CreateVersionTx(ctx, tx, &domain.TemplateVersion{

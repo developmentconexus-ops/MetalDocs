@@ -131,6 +131,9 @@ func TestUpdateDocumentNameTx_NoGrant_Denied(t *testing.T) {
 		t.Fatalf("begin tx: %v", err)
 	}
 	defer tx.Rollback()
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, stranger.ID); err != nil {
+		t.Fatalf("seed tx identity: %v", err)
+	}
 
 	err = repo.UpdateDocumentNameTx(ctx, tx, tenantID, stranger.ID, docID, "Renamed by stranger")
 	var denied authz.ErrCapDenied
@@ -156,6 +159,9 @@ func TestUpdateDocumentNameTx_WithGrant_PassesAuthz(t *testing.T) {
 		t.Fatalf("begin tx: %v", err)
 	}
 	defer tx.Rollback()
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, author.ID); err != nil {
+		t.Fatalf("seed tx identity: %v", err)
+	}
 
 	if err := repo.UpdateDocumentNameTx(ctx, tx, tenantID, author.ID, docID, "Renamed by author"); err != nil {
 		var denied authz.ErrCapDenied
@@ -220,6 +226,9 @@ func TestMarkArchivedTx_NoGrant_Denied(t *testing.T) {
 		t.Fatalf("begin tx: %v", err)
 	}
 	defer tx.Rollback()
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, stranger.ID); err != nil {
+		t.Fatalf("seed tx identity: %v", err)
+	}
 
 	err = repo.MarkArchivedTx(ctx, tx, tenantID, docID, stranger.ID)
 	var denied authz.ErrCapDenied
@@ -245,6 +254,9 @@ func TestMarkArchivedTx_WithGrant_PassesAuthz(t *testing.T) {
 		t.Fatalf("begin tx: %v", err)
 	}
 	defer tx.Rollback()
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, author.ID); err != nil {
+		t.Fatalf("seed tx identity: %v", err)
+	}
 
 	if err := repo.MarkArchivedTx(ctx, tx, tenantID, docID, author.ID); err != nil {
 		var denied authz.ErrCapDenied
