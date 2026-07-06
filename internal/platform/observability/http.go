@@ -112,6 +112,15 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 		}
 		r = r.WithContext(withPrincipalSlot(requesttrace.WithTraceID(r.Context(), traceID)))
 
+		// Emit the resolved trace id on the response so a client can
+		// correlate its request to server logs/traces (closes the
+		// log<->trace<->response-header correlation triple). Must be set
+		// before the downstream handler runs, since headers can't be
+		// added after the body/status has started writing.
+		if traceID != "" {
+			w.Header().Set("X-Trace-Id", traceID)
+		}
+
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		panicked := true
