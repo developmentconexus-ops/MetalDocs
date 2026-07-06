@@ -23,15 +23,17 @@ history is long enough to itself risk sprawl, in a companion doc `wiki/decisions
 linked from the status block's history-pointer line. Relocating history must not lose information —
 restructure into dated entries, never summarize away facts.
 
-**Repeatable sweep** (run from `wiki/decisions/`, bash/awk one-liner; reports every file whose status
-block exceeds the budget — 0 output lines = pass):
+**Repeatable sweep** — run the single-source gate script (reports every file whose status block
+exceeds the budget; prints `adr-status: clean` and exits 0 when all pass):
 
 ```bash
-cd wiki/decisions && for f in [0-9]*.md; do awk -v fn="$f" '/^> \*\*Status:\*\*/{inb=1; total=0; lines=0} inb { if (!/^>/) {inb=0} else if (lines>0 && /^> \*\*[A-Za-z ]+:\*\*/) {inb=0} else {total+=length($0); lines++} } END{ if (total>400 || lines>3) print fn": "lines" lines, "total" chars" }' "$f"; done; cd ../..
+bash scripts/check-adr-status.sh
 ```
 
-Wiring this sweep into CI (extending `governance-check.yml` or a new job) is an optional future
-extension, not required for the rule to be in force.
+**CI-enforced (F-R2).** This gate runs on every pull request as a **blocking** step in
+`.github/workflows/governance-check.yml` (the `check` job invokes `scripts/check-adr-status.sh`). A PR
+that introduces an over-budget ADR status block fails CI. The script — not an inline one-liner — is
+the single source of the sweep, so the local command above and the CI gate can never diverge.
 
 ## Secrets in documentation (D-4a — permanent rule)
 

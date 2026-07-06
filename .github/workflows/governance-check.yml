@@ -20,6 +20,13 @@ jobs:
         shell: pwsh
         run: ./scripts/check-governance.ps1 -BaseRef "origin/${{ github.base_ref }}"
 
+      # ADR status-field budget gate (F-R2, Dim-10): fails the PR if any ADR's
+      # `> **Status:**` block exceeds 3 physical lines or 400 chars — the
+      # "mega-status anti-pattern" guard. Blocking (no continue-on-error); the
+      # sweep logic is the single-source script, not an inline one-liner.
+      - name: ADR status-field budget gate
+        run: bash scripts/check-adr-status.sh
+
   docx-v2-isolation:
     name: docx-v2 PR must not touch CK5 paths
     runs-on: ubuntu-latest
