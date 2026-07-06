@@ -1,7 +1,7 @@
 # Milestone 9 — Governance & Hygiene Close-out
 
 > **Program:** global-maximum-remediation  ·  **Governing spec:** `../mission.md` §7 M9
-> **Status:** validator PASS (2026-07-06) — HS-1 operator gate pending
+> **Status:** passed (operator-approved HS-1, 2026-07-06 — operator "Approved")
 > **Authored:** 2026-07-06 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** M9 is, **which features** it contains,
