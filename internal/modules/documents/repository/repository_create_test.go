@@ -7,6 +7,7 @@ import (
 )
 
 func TestCreateDocumentTx_AssertsEditBeforeDocumentUpdates(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("repository.go")
 	if err != nil {
 		t.Fatalf("read repository.go: %v", err)
@@ -37,6 +38,7 @@ func TestCreateDocumentTx_AssertsEditBeforeDocumentUpdates(t *testing.T) {
 }
 
 func TestCreateDocumentTx_AllocatesZeroBasedGovernedRevisionNumbers(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("repository.go")
 	if err != nil {
 		t.Fatalf("read repository.go: %v", err)
@@ -59,6 +61,7 @@ func TestCreateDocumentTx_AllocatesZeroBasedGovernedRevisionNumbers(t *testing.T
 }
 
 func TestCreateDocumentTx_IncludesBridgeSnapshots(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("repository.go")
 	if err != nil {
 		t.Fatalf("read repository.go: %v", err)

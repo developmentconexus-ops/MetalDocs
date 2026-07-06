@@ -25,6 +25,7 @@ func (r *recordingDBTX) QueryRowContext(_ context.Context, _ string, _ ...any) *
 }
 
 func TestUpsertValue_UsesTxWhenProvided(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -55,6 +56,7 @@ func TestUpsertValue_UsesTxWhenProvided(t *testing.T) {
 }
 
 func TestUpsertValue_FallsBackToDB(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	db, mock, err := sqlmock.New()
 	if err != nil {

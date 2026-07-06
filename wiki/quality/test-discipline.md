@@ -8,6 +8,10 @@ were established in Milestone 4c (F4c.4) after the unified `testdb` factory fram
 the sanctioned patterns available. The guard fails CI on any new violation; the allowlist (in the
 script) tracks pre-F4c.4 debt — it can only shrink.
 
+> **Related policy:** when a *legacy* test breaks or blocks a change, triage it via
+> [legacy-test-policy.md](legacy-test-policy.md) (repair-class vs delete-class) before repairing
+> or deleting anything.
+
 ---
 
 ## The Rules

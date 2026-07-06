@@ -19,6 +19,7 @@ import (
 // revision_version, and revision_number so they reach the API response.
 // The query is also exercised with NULL snapshot values to confirm *string scan safety.
 func TestListDocumentsPaginated_ScansSnapshotAndRevisionColumns(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)

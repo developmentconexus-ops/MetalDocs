@@ -19,6 +19,7 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestMapPgError(t *testing.T) {
+	t.Parallel()
 	makePgErr := func(code, constraint, msg string) error {
 		return &pgconn.PgError{Code: code, ConstraintName: constraint, Message: msg}
 	}
@@ -146,6 +147,7 @@ func applyStageOCC(res sql.Result, execErr error) error {
 }
 
 func TestUpdateStageStatusOCC(t *testing.T) {
+	t.Parallel()
 	t.Run("zero_rows_returns_ErrStageNotActive", func(t *testing.T) {
 		err := applyStageOCC(fakeResult{rowsAffected: 0}, nil)
 		if !errors.Is(err, ErrStageNotActive) {
@@ -208,6 +210,7 @@ func makeTestSignoff(t *testing.T, id, instanceID, stageID, actor, decision, has
 const testHash = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 
 func TestInsertSignoffReplayDetection(t *testing.T) {
+	t.Parallel()
 	t.Run("exact_match_is_replay", func(t *testing.T) {
 		incoming := makeTestSignoff(t, "id-1", "inst-1", "stage-1", "actor-1", "approve", testHash)
 		existing := makeTestSignoff(t, "id-1", "inst-1", "stage-1", "actor-1", "approve", testHash)
@@ -263,6 +266,7 @@ func TestInsertSignoffReplayDetection(t *testing.T) {
 // TestScheduledPublishRowShape verifies the repository surface still exposes the
 // scheduled publish persistence shape needed by approval tests.
 func TestScheduledPublishRowShape(t *testing.T) {
+	t.Parallel()
 	// Compile-time interface conformance check.
 	var _ ApprovalRepository = (*postgresApprovalRepository)(nil)
 
@@ -290,6 +294,7 @@ func TestScheduledPublishRowShape(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestSignoffInsertResultFields(t *testing.T) {
+	t.Parallel()
 	r := SignoffInsertResult{ID: "abc", WasReplay: true}
 	if r.ID != "abc" {
 		t.Errorf("ID: got %q, want abc", r.ID)
@@ -315,6 +320,7 @@ func applyInstanceOCC(res sql.Result, execErr error) error {
 }
 
 func TestUpdateInstanceStatusOCC(t *testing.T) {
+	t.Parallel()
 	t.Run("zero_rows_returns_ErrInstanceCompleted", func(t *testing.T) {
 		err := applyInstanceOCC(fakeResult{rowsAffected: 0}, nil)
 		if !errors.Is(err, ErrInstanceCompleted) {
@@ -335,6 +341,7 @@ func TestUpdateInstanceStatusOCC(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestNewPostgresApprovalRepository(t *testing.T) {
+	t.Parallel()
 	// NewPostgresApprovalRepository must return an ApprovalRepository.
 	// We pass nil for *sql.DB; this is fine as long as we don't execute queries.
 	repo := NewPostgresApprovalRepository(nil, iamdomain.NoopUserDisplayNameReader{})
@@ -348,6 +355,7 @@ func TestNewPostgresApprovalRepository(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestInsertStageInstancesBulk(t *testing.T) {
+	t.Parallel()
 	// If stages is empty, InsertStageInstances returns nil immediately.
 	repo := &postgresApprovalRepository{}
 	err := repo.InsertStageInstances(context.Background(), nil, nil)

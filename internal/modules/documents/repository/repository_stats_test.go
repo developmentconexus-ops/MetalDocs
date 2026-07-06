@@ -12,6 +12,7 @@ import (
 )
 
 func TestStatsByStatus_GroupsCorrectly(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -40,6 +41,7 @@ func TestStatsByStatus_GroupsCorrectly(t *testing.T) {
 }
 
 func TestStatsByArea_GroupsCorrectly(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)

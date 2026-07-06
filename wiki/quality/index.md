@@ -17,6 +17,7 @@
 - [release-closeout-checklist.md](release-closeout-checklist.md) - final close-out checklist before merge/release declaration
 - [integration-test-harness.md](integration-test-harness.md) - how-to guide for writing integration tests: harness choice, factory builders, guarded writes, qualified table names, working examples
 - [test-discipline.md](test-discipline.md) - integration test harness rules (R1–R4), sanctioned patterns, and CI guard reference
+- [legacy-test-policy.md](legacy-test-policy.md) - repair-class vs delete-class triage for broken legacy tests, decision procedure, worked examples, NumGoroutine anti-pattern
 
 ## Current source inputs and compatibility areas
 

@@ -14,6 +14,7 @@ import (
 // query orders by t.created_at DESC, t.id DESC so OFFSET-based pages don't
 // interleave/duplicate rows when multiple templates share a created_at value.
 func TestListTemplates_OrderByHasStableTiebreaker(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -60,6 +61,7 @@ func TestListTemplates_OrderByHasStableTiebreaker(t *testing.T) {
 // since /templates is x-pagination-exempt with an explicit permanent-exemption
 // note) and the offset<0 -> 0 defensive clamp.
 func TestListTemplates_ClampsLimitAndOffset(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		inLimit    int
@@ -116,6 +118,7 @@ func TestListTemplates_ClampsLimitAndOffset(t *testing.T) {
 // (default) must pass false so the guard is a no-op and the management view
 // (every status) is preserved.
 func TestListTemplates_PublishedOnlyEmitsPredicate(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name          string
 		publishedOnly bool
@@ -160,6 +163,7 @@ func TestListTemplates_PublishedOnlyEmitsPredicate(t *testing.T) {
 }
 
 func TestClampTemplatesLimit(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   int
 		want int

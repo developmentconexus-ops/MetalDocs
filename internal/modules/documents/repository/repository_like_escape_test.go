@@ -10,6 +10,7 @@ import (
 // cannot be injected (CWE-943), and the surrounding clause must carry the
 // matching ESCAPE so Postgres interprets the backslash escapes.
 func TestBuildDocumentFilter_EscapesLikeWildcards(t *testing.T) {
+	t.Parallel()
 	where, args := buildDocumentFilter("tenant-1", ListOptions{Q: `a%b_c\d`})
 
 	if !strings.Contains(where, "name ILIKE") || !strings.Contains(where, `ESCAPE '\'`) {

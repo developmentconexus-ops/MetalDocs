@@ -11,6 +11,7 @@ import (
 )
 
 func TestUpdateVersionIncrementsLockVersion(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -46,6 +47,7 @@ func TestUpdateVersionIncrementsLockVersion(t *testing.T) {
 }
 
 func TestUpdateVersionReturnsStaleLockVersion(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -84,6 +86,7 @@ func TestUpdateVersionReturnsStaleLockVersion(t *testing.T) {
 }
 
 func TestGetVersionMatchesUUIDTenantID(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -132,6 +135,7 @@ WHERE v.template_id = $1 AND v.version_number = $2 AND t.tenant_id = $3::uuid`))
 // This pins the column order so a scanner/projection drift (the class of bug
 // that produced "column lv.revision_number does not exist") is caught here.
 func TestGetTemplateProjectsRevisionNumbers(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)

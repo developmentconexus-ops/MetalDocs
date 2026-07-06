@@ -7,6 +7,7 @@ import (
 )
 
 func TestCommitUpload_AssertsDocumentEditBeforeDocumentsUpdate(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("repository.go")
 	if err != nil {
 		t.Fatalf("read repository.go: %v", err)
@@ -44,6 +45,7 @@ func TestCommitUpload_AssertsDocumentEditBeforeDocumentsUpdate(t *testing.T) {
 }
 
 func TestSessionCleanup_AssertsOrBypassesBeforeClearingDocumentSession(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("repository.go")
 	if err != nil {
 		t.Fatalf("read repository.go: %v", err)
@@ -89,6 +91,7 @@ func TestSessionCleanup_AssertsOrBypassesBeforeClearingDocumentSession(t *testin
 }
 
 func TestAcquireSession_AssertsDocumentEditBeforeSettingDocumentSession(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("repository.go")
 	if err != nil {
 		t.Fatalf("read repository.go: %v", err)
@@ -126,6 +129,7 @@ func TestAcquireSession_AssertsDocumentEditBeforeSettingDocumentSession(t *testi
 }
 
 func TestExpireStaleSessions_ReturnsZeroWhenNothingExpires(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("repository.go")
 	if err != nil {
 		t.Fatalf("read repository.go: %v", err)

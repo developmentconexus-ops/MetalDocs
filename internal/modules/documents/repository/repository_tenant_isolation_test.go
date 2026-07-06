@@ -7,6 +7,7 @@ import (
 )
 
 func TestSessionQueriesIncludeTenantScope(t *testing.T) {
+	t.Parallel()
 	src := readRepositorySource(t)
 
 	cases := []struct {
@@ -36,6 +37,7 @@ func TestSessionQueriesIncludeTenantScope(t *testing.T) {
 }
 
 func TestCheckpointAndRevisionQueriesIncludeTenantScope(t *testing.T) {
+	t.Parallel()
 	src := readRepositorySource(t)
 
 	cases := []struct {
@@ -67,6 +69,7 @@ func TestCheckpointAndRevisionQueriesIncludeTenantScope(t *testing.T) {
 // authz.Require (F-D2 fix, mirrors CommitUpload). A missing authz gate is a
 // security defect that must be caught statically.
 func TestCreateCheckpoint_HasAuthzRequire(t *testing.T) {
+	t.Parallel()
 	src := readRepositorySource(t)
 	body := repositoryFuncBody(t, src, "CreateCheckpoint", "ListCheckpoints")
 	for _, want := range []string{"authz.SeedTxIdentity", "authz.Require", "CapDocumentEdit"} {
@@ -80,6 +83,7 @@ func TestCreateCheckpoint_HasAuthzRequire(t *testing.T) {
 // repository.go does NOT contain authz.Require (the gate is in the Service,
 // per the fix spec for F-D2, mirroring how view-grade reads gate above the repo).
 func TestListCheckpoints_AuthzGatedAtServiceLayer(t *testing.T) {
+	t.Parallel()
 	src := readRepositorySource(t)
 	body := repositoryFuncBody(t, src, "ListCheckpoints", "ListRevisionHistory")
 	// The repo-level ListCheckpoints must remain a pure data fetch.

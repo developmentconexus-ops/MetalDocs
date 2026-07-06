@@ -14,6 +14,7 @@ import (
 )
 
 func TestListDocumentsPaginated_StatusFilter(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -62,6 +63,7 @@ func TestListDocumentsPaginated_StatusFilter(t *testing.T) {
 }
 
 func TestListDocumentsPaginated_CursorKeyset(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -125,6 +127,7 @@ func TestListDocumentsPaginated_CursorKeyset(t *testing.T) {
 }
 
 func TestListDocumentsPaginated_InvalidCursor(t *testing.T) {
+	t.Parallel()
 	db, _, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
@@ -137,6 +140,7 @@ func TestListDocumentsPaginated_InvalidCursor(t *testing.T) {
 }
 
 func TestCountDocuments_RespectsFilters(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)

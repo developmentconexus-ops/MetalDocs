@@ -20,6 +20,7 @@ import (
 // non-system actors (the SQL predicate ($2='tenant' OR area_code=$2) cannot match
 // an empty area). A present row returns its real area.
 func TestLoadDocumentArea_FailClosed(t *testing.T) {
+	t.Parallel()
 	const q = "SELECT process_area_code_snapshot FROM documents WHERE tenant_id=$1 AND id=$2"
 
 	t.Run("missing row -> empty, no error", func(t *testing.T) {
@@ -55,6 +56,7 @@ func TestLoadDocumentArea_FailClosed(t *testing.T) {
 }
 
 func TestMarkArchived_StampsTimestampWithoutStatusChange(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +80,7 @@ func TestMarkArchived_StampsTimestampWithoutStatusChange(t *testing.T) {
 }
 
 func TestMarkArchived_NoRowsReturnsError(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
@@ -102,6 +105,7 @@ func TestMarkArchived_NoRowsReturnsError(t *testing.T) {
 }
 
 func TestUnarchive_ClearsTimestamp(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)
@@ -125,6 +129,7 @@ func TestUnarchive_ClearsTimestamp(t *testing.T) {
 }
 
 func TestUnarchive_NoRowsReturnsError(t *testing.T) {
+	t.Parallel()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)

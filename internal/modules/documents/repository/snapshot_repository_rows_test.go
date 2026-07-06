@@ -10,6 +10,7 @@ import (
 )
 
 func TestSnapshotRepository_WriteMethodsNoRowsReturnError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		run  func(context.Context, *SnapshotRepository) error
