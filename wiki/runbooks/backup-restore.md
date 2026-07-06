@@ -54,8 +54,29 @@ This is intentional, not a bug to route around:
   principle says the runtime identity should never also be able to run
   filesystem-writing backup operations, and a backup credential should never
   carry the app's read/write/DDL surface used at request time.
-- A dedicated backup role should be **read-only** (`SELECT` on all tables in
-  the `metaldocs` schema), narrowing blast radius if the credential leaks.
+- A dedicated backup role should be **read-only** (`SELECT` on all tables),
+  narrowing blast radius if the credential leaks.
+
+**The role MUST also have the `BYPASSRLS` attribute.** The M7 RLS-truth
+sweep put several tables under `FORCE ROW LEVEL SECURITY` (e.g.
+`metaldocs.audit_events`, `metaldocs.approval_signoffs`). A plain
+`SELECT`-only role without `BYPASSRLS` fails a full-DB `pg_dump` against
+those tables with:
+
+```
+ERROR: query would be affected by row-level security policy for table "audit_events"
+```
+
+`BYPASSRLS` grants read-past-RLS for `COPY`/`pg_dump` purposes while the role
+stays **non-superuser and SELECT-only** — it is NOT equivalent to granting
+superuser and does not add write/DDL privileges. This is the standard
+Postgres attribute for backup roles over RLS-protected tables.
+
+The role also needs `SELECT` on **both** the `metaldocs` and `public`
+schemas, not just `metaldocs` — `backup-postgres.ps1` runs a full-database
+`pg_dump` (no schema scope), and `public` holds real data too (River jobs +
+migrations, ~30 tables). A role scoped to `metaldocs` alone would silently
+miss `public` in the dump.
 
 Create the role once per environment with the provided SQL, connecting as an
 admin/superuser (never `metaldocs_app`):
@@ -67,9 +88,13 @@ psql --host 127.0.0.1 --port 5433 --username postgres --dbname metaldocs `
   --file scripts/sql/create-backup-role.sql
 ```
 
-This creates role `metaldocs_backup` with `CONNECT` + schema `USAGE` +
-`SELECT` on all tables/sequences in `metaldocs` (and default privileges for
-future tables). Do not grant it write privileges.
+The current `scripts/sql/create-backup-role.sql` provisions all of this: it
+creates (or, if the role predates this update, idempotently alters)
+`metaldocs_backup` with `CONNECT` + `BYPASSRLS`, and `USAGE` + `SELECT` on
+all tables/sequences in **both** `metaldocs` and `public` (plus default
+privileges for future tables in both schemas). Do not grant it write
+privileges — `BYPASSRLS` bypasses row-level security checks only, it does
+not grant `INSERT`/`UPDATE`/`DELETE`/DDL.
 
 For the **restore** side, use a role with `CREATEDB`/owner-level privileges
 on the target database (e.g. the admin/superuser `postgres` role, or

@@ -125,6 +125,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      gotenberg:
+        condition: service_healthy
     environment:
       APP_ENV: ${APP_ENV}
       APP_HOST: ${APP_HOST}
@@ -159,7 +161,11 @@ services:
       METALDOCS_MINIO_BUCKET: ${METALDOCS_MINIO_BUCKET}
       METALDOCS_MINIO_USE_SSL: ${METALDOCS_MINIO_USE_SSL}
       METALDOCS_MINIO_AUTO_CREATE_BUCKET: ${METALDOCS_MINIO_AUTO_CREATE_BUCKET}
-      METALDOCS_GOTENBERG_URL: ${METALDOCS_GOTENBERG_URL}
+      # Internal service-to-service URL: use the Docker-DNS name, NOT the dev
+      # .env localhost value (the /health/ready gotenberg probe runs from inside
+      # the api container, where localhost is the api itself). Mirrors the
+      # hardcoded FANOUT_URL below and docx-renderer's DOCX_RENDERER_GOTENBERG_URL.
+      METALDOCS_GOTENBERG_URL: http://gotenberg:3000
       METALDOCS_FANOUT_URL: http://docx-renderer:3100
       METALDOCS_DOCX_RENDERER_SERVICE_TOKEN: ${DOCX_RENDERER_SERVICE_TOKEN}
       # River schema must match the jobs service exactly — both default to ""
