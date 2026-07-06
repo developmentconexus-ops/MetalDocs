@@ -62,3 +62,19 @@ logs/**
 .gomodcache/**
 backups
 backups/**
+
+# F8.1 Task A: secrets must never enter the build context.
+.env
+.env.*
+# (.env.local / .env.*.local already excluded above; kept as-is.)
+
+# F8.1 Task A: docs tree is not a build input.
+docs/
+docs/**
+
+# F8.1 Task A: vendored third-party sources verified not a Go build input.
+third_party/
+third_party/**
+
+# F8.1 Task A: stray local build artifacts (e.g. apps/api/cmd/metaldocs-api/metaldocs-api.exe).
+**/*.exe
