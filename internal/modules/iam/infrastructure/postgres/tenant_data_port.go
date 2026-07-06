@@ -24,7 +24,9 @@ import (
 //  1. iam_group_members (FK -> iam_groups)
 //  2. iam_user_roles (FK -> iam_users)
 //  3. user_process_areas (FK -> iam_users via tenant_id+granted_by/revoked_by)
-//  4. tenant_lifecycle_jobs (FK -> tenants; independent of the rest)
+//  4. tenant_lifecycle_jobs — NOT deleted: it is the lifecycle ledger (the
+//     running erase job's own row lives here); rows are retained with
+//     requested_by scrubbed to 'erased' (see EraseTenantData)
 //  5. iam_groups (FK -> tenants)
 //  6. iam_users
 //  7. tenant_plans (independent, PK = tenant_id)
@@ -113,10 +115,22 @@ func (p *TenantDataPort) EraseTenantData(ctx context.Context, tx *sql.Tx, tenant
 	counts["public.user_process_areas"] = n
 
 	if p.hasTenantLifecycleJobs {
-		n, err = tenantdata.EraseTable(ctx, tx, "metaldocs.tenant_lifecycle_jobs", "tenant_id", tenantID)
+		// tenant_lifecycle_jobs is the lifecycle LEDGER — deleting it would
+		// destroy the running erase job's own compliance record mid-erasure
+		// (the RUNNING row is in this very table; deleting it made
+		// MarkLifecycleJobReady a silent 0-row no-op). Rows are retained like
+		// the audit skeleton — its only FK targets the tombstoned tenants row
+		// — and the one PII-bearing column (requested_by, a TEXT user id
+		// whose iam_users row this erasure deletes) is scrubbed instead. The
+		// table's tripwire trigger is BEFORE INSERT only, so this UPDATE
+		// needs no arm.
+		res, err := tx.ExecContext(ctx,
+			`UPDATE metaldocs.tenant_lifecycle_jobs SET requested_by = 'erased' WHERE tenant_id = $1::uuid`,
+			tenantID)
 		if err != nil {
 			return nil, err
 		}
+		n, _ = res.RowsAffected()
 		counts["metaldocs.tenant_lifecycle_jobs"] = n
 	}
 

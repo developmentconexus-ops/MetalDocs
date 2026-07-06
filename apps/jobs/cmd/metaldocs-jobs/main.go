@@ -36,6 +36,7 @@ import (
 	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
+	platformdb "metaldocs/internal/platform/db"
 	outboxpg "metaldocs/internal/platform/messaging/outbox/postgres"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
@@ -206,7 +207,11 @@ func buildTenantLifecycleWorker(db *sql.DB) (*iamjobs.TenantLifecycleWorker, err
 		nil, // lifecycleJobInserter: enqueue-side only, wired in apps/api
 		iampg.NewTenantLifecycleRepository(db),
 		nil, // iamdomain.TenantLifecycleEnqueuer: enqueue-side only, wired in apps/api
-		nil, // db.TxRunner: enqueue-side only, wired in apps/api
+		// TxRunner is NOT enqueue-side-only: runErase's phase-1 (row erase)
+		// and phase-3 (key-destroy + tombstone) txs run through it. A nil
+		// here panics on the first erase job (caught by
+		// TestTenantErasure_ChainStaysGreen).
+		platformdb.NewTxRunner(db),
 		auditWriter,
 		db,
 		registry.AllTenantDataPorts(db),
