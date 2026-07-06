@@ -131,6 +131,12 @@ services:
       APP_ENV: ${APP_ENV}
       APP_HOST: ${APP_HOST}
       APP_PORT: ${APP_PORT}
+      # Prometheus scrape surface on a DEDICATED listener (F-R1, Dim-9). This
+      # port is intentionally NOT host-published below — the api service exposes
+      # only ${APP_PORT}:8081. The metrics listener is reachable only on the
+      # compose (infra) network, e.g. by an in-network Prometheus at api:9090.
+      # The public API port structurally cannot serve /metrics.
+      METRICS_ADDR: ":9090"
       METALDOCS_REPOSITORY: postgres
       METALDOCS_AUTH_ENABLED: ${METALDOCS_AUTH_ENABLED}
       METALDOCS_AUTHZ_CACHE_TTL_SECONDS: ${METALDOCS_AUTHZ_CACHE_TTL_SECONDS}

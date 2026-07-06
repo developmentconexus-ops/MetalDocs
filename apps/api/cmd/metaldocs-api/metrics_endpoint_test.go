@@ -11,25 +11,25 @@ import (
 )
 
 // denyAllMiddleware simulates authMiddleware.Wrap/iamMiddleware.Wrap failing
-// closed for any request that reaches them: every request that is NOT routed
-// around the API chain gets a 401. This proves the dispatch-mux fix works by
-// construction (the scrape never enters the chain) rather than merely proving
-// the tier-1 resolver classifies /metrics as public.
+// closed for any request that reaches them: every request routed through the
+// API chain gets a 401. It lets the public-handler test prove — by construction
+// — that /metrics is NOT served on the public listener (it enters the chain and
+// fails closed) rather than merely proving a resolver classification.
 func denyAllMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 }
 
-// buildComposedServerHandler assembles the same shape of handler main.go
-// builds: apiChain(...) + buildChain(...) for the API mux, then (post-fix) a
-// root dispatch mux that serves GET /metrics ahead of the chain and falls
-// through everything else to the chained handler, all wrapped in
-// platformmw.Recovery. Reuses chain_test.go's apiChain/buildChain harness
-// (TestAPIChainOrder_REQMW7) rather than standing up the full production
-// wiring (DB, auth service, IAM service, rate limiters), which is unnecessary
-// to prove the routing/bypass behavior under test here.
-func buildComposedServerHandler(httpObs *observability.HTTPObservability) http.Handler {
+// buildPublicHandler assembles the same shape of PUBLIC handler main.go builds
+// post-F-R1: apiChain(...) + buildChain(...) over the API mux, wrapped by the
+// chain's own Recovery — and NOTHING mounts /metrics. This mirrors production,
+// where the public http.Server.Handler is the chained API handler only; the
+// scrape surface lives on a separate listener (buildMetricsHandler). Reuses
+// chain_test.go's apiChain/buildChain harness rather than the full production
+// wiring (DB, auth, IAM, rate limiters), which is unnecessary to prove the
+// routing/isolation behavior under test.
+func buildPublicHandler(httpObs *observability.HTTPObservability) http.Handler {
 	apiMux := http.NewServeMux()
 	apiMux.Handle("/api/v1/metrics", httpObs.MetricsHandler())
 	apiMux.HandleFunc("GET /api/v1/health/live", func(w http.ResponseWriter, r *http.Request) {
@@ -49,55 +49,55 @@ func buildComposedServerHandler(httpObs *observability.HTTPObservability) http.H
 		func(next http.Handler) http.Handler { return next },  // global rate limit stub
 		platformmw.MethodNotAllowedJSON,
 	)
-	chained := buildChain(apiMux, links)
-
-	// Post-fix wiring under test: /metrics is served from a top-level dispatch
-	// mux ahead of the chained API handler, so it bypasses authn/iam/httpObs
-	// counting/rate-limit entirely. Recovery still wraps the whole thing.
-	rootMux := http.NewServeMux()
-	rootMux.Handle("GET /metrics", httpObs.PrometheusHandler())
-	rootMux.Handle("/", chained)
-
-	return platformmw.Recovery(rootMux)
+	return buildChain(apiMux, links)
 }
 
-// TestMetricsEndpoint_BypassesAuthChain_REQF83 is the spec-review regression
-// test for the M8 F8.3 defect: main.go previously mounted GET /metrics on the
-// SAME mux wrapped by authMiddleware.Wrap + iamMiddleware.Wrap, and
-// permissions.go's routeRules had no /metrics entry, so it failed closed to
-// 401 for an unauthenticated Prometheus scraper. It also passed through
-// httpObs.Wrap (self-counting the scrape) and the global rate limiter.
+// buildMetricsHandler assembles the DEDICATED metrics listener's handler exactly
+// as main.go builds it post-F-R1: platformmw.Recovery over a mux that serves
+// GET /metrics from the Prometheus handler. This listener is never part of the
+// API chain, so the scrape is credential-less and never self-counts.
+func buildMetricsHandler(httpObs *observability.HTTPObservability) http.Handler {
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("GET /metrics", httpObs.PrometheusHandler())
+	return platformmw.Recovery(metricsMux)
+}
+
+// TestMetricsEndpoint_DedicatedListener_REQF83 is the F-R1 regression test for
+// the M8 F8.3 → Dim-9 DEBT: /metrics used to be served on a top-level dispatch
+// mux fronting the SAME listener as the public API, so it was reachable (unauth)
+// on any host-published API port. F-R1 moves it to a dedicated listener. This
+// test pins the split structurally:
 //
-// Uses the apiChain/buildChain harness from chain_test.go (see
-// buildComposedServerHandler) with real platformmw.Recovery and real
-// observability.HTTPObservability, and deny-all stand-ins for
-// authn/iam — proving bypass by construction, not by resolver classification.
-func TestMetricsEndpoint_BypassesAuthChain_REQF83(t *testing.T) {
+//   - PUBLIC handler: GET /metrics must NOT be an unauthenticated 200 scrape.
+//     The public mux has no /metrics route, so the request enters the fail-closed
+//     auth chain and returns 401. The scrape surface has left the public port.
+//   - METRICS handler: GET /metrics returns 200 Prometheus exposition,
+//     unauthenticated, with the binding metric families and a go_/process_ line,
+//     and never self-counts (no route="/metrics" series).
+func TestMetricsEndpoint_DedicatedListener_REQF83(t *testing.T) {
 	httpObs := observability.NewHTTPObservability(func(*http.Request) string { return "" })
-	handler := buildComposedServerHandler(httpObs)
+	public := buildPublicHandler(httpObs)
+	metrics := buildMetricsHandler(httpObs)
 
-	// Drive one non-metrics request through the full chain first so the
-	// metaldocs_http_requests_total / errors_total / duration_seconds
-	// CounterVec/HistogramVec families have at least one observed label
-	// combination — Prometheus vecs emit nothing for a family with zero
-	// samples, so scraping before any traffic would make the "family present"
-	// assertion below vacuous.
+	// Warm up one request through the PUBLIC chain so the
+	// metaldocs_http_requests_total / errors_total / duration_seconds families
+	// have at least one observed label combination — Prometheus vecs emit nothing
+	// for a family with zero samples, so scraping before any traffic would make
+	// the "family present" assertions below vacuous. health/live hits
+	// denyAllMiddleware and returns 401; that is fine — httpObs.Wrap runs OUTSIDE
+	// authn (REQ-MW-4) and records the request regardless of downstream status.
+	// Deliberately a NON-/metrics path: we scrape before probing /metrics so the
+	// self-count assertion is meaningful.
 	warmup := httptest.NewRequest(http.MethodGet, "/api/v1/health/live", nil)
-	// health/live has no rule in this stub (only authn/iam stand-ins exist),
-	// so it hits denyAllMiddleware and returns 401 — that is fine, httpObs.Wrap
-	// runs OUTSIDE authn (REQ-MW-4) and records the request regardless of the
-	// downstream status.
-	handler.ServeHTTP(httptest.NewRecorder(), warmup)
+	public.ServeHTTP(httptest.NewRecorder(), warmup)
 
-	// The regression assertion: GET /metrics with NO auth cookie/header must
-	// succeed. Pre-fix (mux.Handle("/metrics", ...) inside the chain) this
-	// would hit denyAllMiddleware and return 401.
+	// (1) Scrape: GET /metrics on the DEDICATED metrics handler succeeds
+	// unauthenticated, before any /metrics traffic has touched the public chain.
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
+	metrics.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("GET /metrics with no auth = %d, want 200 (must bypass the API auth chain entirely)", rec.Code)
+		t.Fatalf("GET /metrics on the metrics listener with no auth = %d, want 200", rec.Code)
 	}
 	ct := rec.Header().Get("Content-Type")
 	if !strings.Contains(ct, "text/plain") {
@@ -118,32 +118,47 @@ func TestMetricsEndpoint_BypassesAuthChain_REQF83(t *testing.T) {
 		t.Error("scrape body missing a go_ or process_ collector line")
 	}
 
-	// Self-scrape must not be counted: /metrics never passes through
-	// httpObs.Wrap (it is served ahead of the chain), so no
-	// metaldocs_http_requests_total series should ever carry route="/metrics".
+	// Self-scrape must not be counted: the metrics listener is not part of the
+	// API chain, so scraping it never records a metaldocs_http_* sample. At this
+	// point no /metrics request has hit the public chain either, so no
+	// route="/metrics" series may exist.
 	if strings.Contains(body, `route="/metrics"`) {
-		t.Error("scrape body contains a route=\"/metrics\" label series — the scrape endpoint is self-counting, meaning it did not bypass httpObs.Wrap")
+		t.Error("scrape body contains a route=\"/metrics\" label series before any /metrics traffic — the scrape endpoint is self-counting")
 	}
-
-	// A second scrape must not change that either (proves it structurally,
-	// not just as an artifact of the first call being the very first scrape).
+	// A second scrape must not create one either (structural, not an artifact of
+	// the first call being the very first scrape).
 	rec2 := httptest.NewRecorder()
-	handler.ServeHTTP(rec2, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	metrics.ServeHTTP(rec2, httptest.NewRequest(http.MethodGet, "/metrics", nil))
 	if rec2.Code != http.StatusOK {
-		t.Fatalf("second GET /metrics = %d, want 200", rec2.Code)
+		t.Fatalf("second GET /metrics on the metrics listener = %d, want 200", rec2.Code)
 	}
 	if strings.Contains(rec2.Body.String(), `route="/metrics"`) {
-		t.Error("second scrape body contains a route=\"/metrics\" label series — self-scrape pollution")
+		t.Error("second metrics scrape produced a route=\"/metrics\" series — self-scrape pollution")
 	}
 
-	// Non-GET methods on /metrics fall through to "/" → the full chain (Go
-	// 1.22 ServeMux: "GET /metrics" matches GET only). denyAllMiddleware sits
-	// in that chain, so POST must be 401, NOT 200 and NOT routed to the
-	// Prometheus handler.
+	// (2) Isolation: GET /metrics on the PUBLIC handler must NOT be a 200 scrape.
+	// The public mux has no /metrics route → the request runs the chain and
+	// denyAllMiddleware returns 401. Pre-F-R1 (rootMux dispatch on the same
+	// listener) this returned 200 unauthenticated. (This 401 IS counted by
+	// httpObs.Wrap with route="/metrics" — legitimate, it is a real request to
+	// the public port, not a self-scrape; hence the assertions above run first.)
+	pubReq := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	pubRec := httptest.NewRecorder()
+	public.ServeHTTP(pubRec, pubReq)
+	if pubRec.Code == http.StatusOK {
+		t.Fatalf("GET /metrics on the PUBLIC listener = 200 — the scrape surface must NOT be served on the public port")
+	}
+	if pubRec.Code != http.StatusUnauthorized {
+		t.Fatalf("GET /metrics on the PUBLIC listener = %d, want 401 (fail-closed auth chain; no /metrics route on the public mux)", pubRec.Code)
+	}
+
+	// (3) Non-GET on the metrics listener: the mux registers "GET /metrics" only,
+	// so POST does not match → non-200 from the mux (NOT routed to the Prometheus
+	// handler).
 	postReq := httptest.NewRequest(http.MethodPost, "/metrics", nil)
 	postRec := httptest.NewRecorder()
-	handler.ServeHTTP(postRec, postReq)
-	if postRec.Code != http.StatusUnauthorized {
-		t.Fatalf("POST /metrics = %d, want 401 (must fall through to the full API chain, not the scrape handler)", postRec.Code)
+	metrics.ServeHTTP(postRec, postReq)
+	if postRec.Code == http.StatusOK {
+		t.Fatalf("POST /metrics on the metrics listener = 200, want non-200 (only GET is registered)")
 	}
 }

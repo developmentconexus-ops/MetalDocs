@@ -843,16 +843,6 @@ func main() {
 		platformmw.MethodNotAllowedJSON,
 	))
 
-	// /metrics is an out-of-band platform scrape surface: served ahead of the
-	// API middleware chain so a credential-less Prometheus target can reach it
-	// (bypasses authn/iam) and so self-scrapes never feed httpObs.Wrap counters
-	// or the global rate limiter. Panic recovery still wraps it. Not in openapi
-	// (contract §3.2); gateway does not proxy it (nginx routes only /api/ and /).
-	rootMux := http.NewServeMux()
-	rootMux.Handle("GET /metrics", httpObs.PrometheusHandler())
-	rootMux.Handle("/", handler)
-	handler = platformmw.Recovery(rootMux)
-
 	serverCfg, err := config.LoadServerConfig()
 	if err != nil {
 		slog.Error("invalid server config", "err", err)
@@ -884,8 +874,26 @@ func main() {
 		})
 	}
 
+	// /metrics is served on a DEDICATED listener (METRICS_ADDR, default :9090),
+	// never on the public API server above. This isolates the scrape surface by
+	// process topology: the public port structurally cannot serve /metrics, so
+	// exposure no longer depends on ops/ingress discipline (F-R1, Dim-9). The
+	// scrape stays credential-less (bypasses authn/iam) and self-scrapes never
+	// feed httpObs.Wrap counters or the global rate limiter, because this mux is
+	// not part of the API chain. Panic recovery still wraps it. Not in openapi
+	// (contract §3.2). Compose does not host-publish this port — infra-network
+	// reachable only (see ops/DEPLOY.md).
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("GET /metrics", httpObs.PrometheusHandler())
+	metricsServer := &http.Server{
+		Addr:              serverCfg.MetricsAddr,
+		Handler:           platformmw.Recovery(metricsMux),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
 	slog.Info("MetalDocs API listening",
-		"addr", serverCfg.Addr, "repository", repoMode, "auth_enabled", authn.Enabled(),
+		"addr", serverCfg.Addr, "metrics_addr", serverCfg.MetricsAddr,
+		"repository", repoMode, "auth_enabled", authn.Enabled(),
 		"auth_cache_ttl", authn.CacheTTL(), "cors_enabled", corsCfg.Enabled,
 		"cors_allowed_origins", len(corsCfg.AllowedOrigins))
 
@@ -894,7 +902,12 @@ func main() {
 		serverErr <- server.ListenAndServe()
 	}()
 
-	exitCode := shutdownServer(ctx, stop, server, serverErr)
+	metricsErr := make(chan error, 1)
+	go func() {
+		metricsErr <- metricsServer.ListenAndServe()
+	}()
+
+	exitCode := shutdownServer(ctx, stop, server, metricsServer, serverErr, metricsErr)
 	if exitCode != 0 {
 		// os.Exit skips deferred functions, including deps.Cleanup. Invoke
 		// cleanup explicitly so DB / object-store handles are released on
@@ -905,22 +918,31 @@ func main() {
 	}
 }
 
-// shutdownServer waits for either a server-listen error or ctx cancellation,
-// then runs the same graceful-teardown sequence on both paths: server.Shutdown,
-// stop signal handler, worker join. Returns a non-zero exit code only if a
-// real failure occurred (genuine ListenAndServe error or a Shutdown that
+// shutdownServer waits for a listen error on EITHER server or ctx cancellation,
+// then drains both listeners: the public API server and the dedicated metrics
+// server. A fatal bind error on the metrics listener is treated the same as one
+// on the public listener (fail-fast) — a misconfigured METRICS_ADDR must not
+// silently leave the scrape surface down. Returns a non-zero exit code only if
+// a real failure occurred (genuine ListenAndServe error or a Shutdown that
 // didn't drain cleanly).
 func shutdownServer(
 	ctx context.Context,
 	stop context.CancelFunc,
 	server *http.Server,
+	metricsServer *http.Server,
 	serverErr <-chan error,
+	metricsErr <-chan error,
 ) int {
 	exitCode := 0
 	select {
 	case err := <-serverErr:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("server failed", "err", err)
+			exitCode = 1
+		}
+	case err := <-metricsErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("metrics server failed", "err", err)
 			exitCode = 1
 		}
 	case <-ctx.Done():
@@ -935,6 +957,12 @@ func shutdownServer(
 		}
 	} else {
 		slog.Info("graceful shutdown complete")
+	}
+	// Drain the metrics listener too; best-effort within the same budget. A
+	// failure here is logged but does not by itself fail an otherwise-clean
+	// shutdown of the public server.
+	if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+		slog.Error("metrics server shutdown incomplete", "err", err)
 	}
 	stop()
 	slog.Info("workers stopped")

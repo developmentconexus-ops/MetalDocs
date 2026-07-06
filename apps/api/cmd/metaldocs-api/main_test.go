@@ -26,12 +26,14 @@ func TestShutdownServer_ServerErrorReturnsExitOne(t *testing.T) {
 	defer stop()
 
 	server := &http.Server{Addr: "127.0.0.1:0"}
+	metricsServer := &http.Server{Addr: "127.0.0.1:0"}
 	serverErr := make(chan error, 1)
 	serverErr <- errors.New("simulated listen failure")
+	metricsErr := make(chan error, 1) // intentionally empty
 
 	done := make(chan int, 1)
 	go func() {
-		done <- shutdownServer(ctx, stop, server, serverErr)
+		done <- shutdownServer(ctx, stop, server, metricsServer, serverErr, metricsErr)
 	}()
 
 	select {
@@ -54,10 +56,12 @@ func TestShutdownServer_ErrServerClosedReturnsZero(t *testing.T) {
 	defer stop()
 
 	server := &http.Server{Addr: "127.0.0.1:0"}
+	metricsServer := &http.Server{Addr: "127.0.0.1:0"}
 	serverErr := make(chan error, 1)
 	serverErr <- http.ErrServerClosed
+	metricsErr := make(chan error, 1) // intentionally empty
 
-	exitCode := shutdownServer(ctx, stop, server, serverErr)
+	exitCode := shutdownServer(ctx, stop, server, metricsServer, serverErr, metricsErr)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0 for ErrServerClosed, got %d", exitCode)
 	}
@@ -72,11 +76,13 @@ func TestShutdownServer_ContextCancellation(t *testing.T) {
 	defer stop()
 
 	server := &http.Server{Addr: "127.0.0.1:0"}
-	serverErr := make(chan error, 1) // intentionally empty
+	metricsServer := &http.Server{Addr: "127.0.0.1:0"}
+	serverErr := make(chan error, 1)  // intentionally empty
+	metricsErr := make(chan error, 1) // intentionally empty
 
 	stop() // simulate SIGTERM arriving before any listen error
 
-	exitCode := shutdownServer(ctx, stop, server, serverErr)
+	exitCode := shutdownServer(ctx, stop, server, metricsServer, serverErr, metricsErr)
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0 on context cancel, got %d", exitCode)
 	}

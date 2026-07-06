@@ -129,6 +129,29 @@ non-container dev flow (`scripts/dev-api.ps1`), not compose.
 
 ---
 
+## Observability — metrics listener isolation (F-R1, Dim-9)
+
+The API process serves **two** listeners:
+
+| Listener | Address (in container) | Serves | Host-published? |
+|---|---|---|---|
+| Public API | `:8081` (`APP_PORT`) | the versioned API + auth chain | **Yes** — `${APP_PORT}:8081` |
+| Metrics | `:9090` (`METRICS_ADDR`) | `GET /metrics` (Prometheus, unauthenticated) | **No** — infra-network only |
+
+`/metrics` is served **only** on the dedicated metrics listener. The public API server has no
+`/metrics` route registered, so the scrape surface cannot be reached on `${APP_PORT}` — isolation is
+a property of the process topology, not of ingress/firewall configuration. The scrape stays
+credential-less by design; it is protected by **not being host-published**, not by auth.
+
+- **Scrape target:** a Prometheus running on the compose (infra) network scrapes `http://api:9090/metrics`.
+  Do **not** add a `ports:` mapping for `9090` on the `api` service — that would re-expose the scrape
+  surface on the host and re-open the Dim-9 defect.
+- **Override:** set `METRICS_ADDR` (e.g. `:9191`) to move the listener; a malformed value fails the
+  API fast at boot (same discipline as `APP_PORT`).
+- The nginx `gateway` proxies only `/api/` and `/` — it never proxied `/metrics` and still does not.
+
+---
+
 ## Upgrade / Rollout
 
 Compose has no native canary/rolling mechanism; upgrades are recreate-in-place:
