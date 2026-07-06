@@ -13,8 +13,6 @@ import (
 	"metaldocs/tests/integration/testdb"
 )
 
-const tenantA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-const tenantB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 
 // SEC-05 / migration 0259: iam_users and iam_user_roles carry
 // trg_require_cap_asserted (user.manage) — seed via the scheduler bypass GUC
@@ -64,6 +62,11 @@ func TestRoleProvider_TenantIsolation(t *testing.T) {
 	ctx := context.Background()
 	userID := testdb.DeterministicID(t, "tenant-isolation-user")
 
+	// Real tenants rows — iam_users/iam_user_roles FK to metaldocs.tenants,
+	// so hardcoded literal ids violate the tenant_id FKs.
+	tenantA := testdb.NewTenant(t, db).ID
+	tenantB := testdb.NewTenant(t, db).ID
+
 	insertUserRoleForTenant(t, userID, "viewer", tenantA)
 
 	provider := iampostgres.NewRoleProvider(db)
@@ -96,22 +99,30 @@ func TestHasAnyRole_TenantIsolation(t *testing.T) {
 	db := openDB(t)
 	ctx := context.Background()
 
-	tenantC := "33333333-3333-3333-3333-333333333333"
-	tenantD := "44444444-4444-4444-4444-444444444444"
+	// Real tenants rows — iam_user_roles carries an FK to metaldocs.tenants,
+	// so hardcoded literal ids violate iam_user_roles_tenant_id_fkey.
+	tenantC := testdb.NewTenant(t, db).ID
+	tenantD := testdb.NewTenant(t, db).ID
 	userID := testdb.DeterministicID(t, "alice-admin")
 
 	// SEC-05 / migration 0259: iam_users/iam_user_roles carry
 	// trg_require_cap_asserted (user.manage) — seed via the scheduler bypass GUC.
 	withBypass(t, db, func(tx *sql.Tx) {
+		// pgx's extended protocol rejects multi-command parameterized
+		// statements — one Exec per statement.
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.iam_users (user_id, display_name, is_active)
 VALUES ($1, 'Alice Admin', TRUE)
-ON CONFLICT (user_id) DO NOTHING;
+ON CONFLICT (user_id) DO NOTHING
+`, userID); err != nil {
+			t.Fatalf("seed iam_users: %v", err)
+		}
+		if _, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code)
 VALUES ($1, $2::uuid, 'system_admin')
 ON CONFLICT (tenant_id, user_id) DO UPDATE SET role_code = EXCLUDED.role_code
 `, userID, tenantC); err != nil {
-			t.Fatalf("seed: %v", err)
+			t.Fatalf("seed iam_user_roles: %v", err)
 		}
 	})
 	t.Cleanup(func() {

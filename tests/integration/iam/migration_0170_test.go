@@ -25,10 +25,25 @@ func TestMigration0170_FlipsApproverFromSystemAdminToApprover(t *testing.T) {
 
 	const tenantID = tenant.DevTenantID
 
-	// Seed: approver user with system_admin role (simulates pre-0170 state)
+	// Seed: approver user with system_admin role (simulates pre-0170 state).
+	// pgx's extended protocol rejects multi-command parameterized statements —
+	// one Exec per statement.
 	withBypass(t, db, func(tx *sql.Tx) {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM metaldocs.iam_user_roles WHERE user_id = 'approver'`); err != nil {
+			t.Fatalf("seed delete: %v", err)
+		}
+		// testdb.Open clones the curated-baseline template, which carries no
+		// dev-seed users — the 'approver' iam_users row must be seeded here
+		// (iam_user_roles.user_id FKs to iam_users).
 		if _, err := tx.ExecContext(ctx, `
-DELETE FROM metaldocs.iam_user_roles WHERE user_id = 'approver';
+INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
+VALUES ('approver', 'Approver', $1::uuid)
+ON CONFLICT (user_id) DO NOTHING
+`, tenantID); err != nil {
+			t.Fatalf("seed iam_users: %v", err)
+		}
+		if _, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code)
 VALUES ('approver', $1::uuid, 'system_admin')
 `, tenantID); err != nil {
@@ -69,9 +84,24 @@ func TestMigration0170_Idempotent(t *testing.T) {
 	ctx := context.Background()
 	const tenantID = tenant.DevTenantID
 
+	// pgx's extended protocol rejects multi-command parameterized statements —
+	// one Exec per statement.
 	withBypass(t, db, func(tx *sql.Tx) {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM metaldocs.iam_user_roles WHERE user_id = 'approver'`); err != nil {
+			t.Fatalf("seed delete: %v", err)
+		}
+		// testdb.Open clones the curated-baseline template, which carries no
+		// dev-seed users — the 'approver' iam_users row must be seeded here
+		// (iam_user_roles.user_id FKs to iam_users).
 		if _, err := tx.ExecContext(ctx, `
-DELETE FROM metaldocs.iam_user_roles WHERE user_id = 'approver';
+INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
+VALUES ('approver', 'Approver', $1::uuid)
+ON CONFLICT (user_id) DO NOTHING
+`, tenantID); err != nil {
+			t.Fatalf("seed iam_users: %v", err)
+		}
+		if _, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code)
 VALUES ('approver', $1::uuid, 'system_admin')
 `, tenantID); err != nil {

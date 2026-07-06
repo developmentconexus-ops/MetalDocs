@@ -38,7 +38,7 @@ func TestCapabilityService_SystemAdmin_AllowsAnyCapability(t *testing.T) {
 	svc := application.NewCapabilityService(db)
 
 	for _, cap := range []string{
-		"doc.view", "doc.create", "doc.submit", "doc.signoff",
+		"document.view", "document.create", "document.submit", "document.signoff",
 		"user.manage", "taxonomy.manage", "membership.manage",
 	} {
 		if err := svc.CanDo(ctx, userID, devTenant, cap); err != nil {
@@ -55,11 +55,11 @@ func TestCapabilityService_Viewer_AllowedDocView_DeniedDocCreate(t *testing.T) {
 	insertUserRole(t, db, userID, "viewer")
 	svc := application.NewCapabilityService(db)
 
-	if err := svc.CanDo(ctx, userID, devTenant, "doc.view"); err != nil {
-		t.Fatalf("CanDo(doc.view) = %v, want nil", err)
+	if err := svc.CanDo(ctx, userID, devTenant, "document.view"); err != nil {
+		t.Fatalf("CanDo(document.view) = %v, want nil", err)
 	}
-	if err := svc.CanDo(ctx, userID, devTenant, "doc.create"); !errors.Is(err, application.ErrCapabilityDenied) {
-		t.Fatalf("CanDo(doc.create) = %v, want ErrCapabilityDenied", err)
+	if err := svc.CanDo(ctx, userID, devTenant, "document.create"); !errors.Is(err, application.ErrCapabilityDenied) {
+		t.Fatalf("CanDo(document.create) = %v, want ErrCapabilityDenied", err)
 	}
 }
 
@@ -69,8 +69,8 @@ func TestCapabilityService_UnknownUser_Denied(t *testing.T) {
 	userID := testdb.DeterministicID(t, "unknown")
 
 	svc := application.NewCapabilityService(db)
-	if err := svc.CanDo(ctx, userID, devTenant, "doc.view"); !errors.Is(err, application.ErrCapabilityDenied) {
-		t.Fatalf("CanDo(doc.view) = %v, want ErrCapabilityDenied", err)
+	if err := svc.CanDo(ctx, userID, devTenant, "document.view"); !errors.Is(err, application.ErrCapabilityDenied) {
+		t.Fatalf("CanDo(document.view) = %v, want ErrCapabilityDenied", err)
 	}
 }
 

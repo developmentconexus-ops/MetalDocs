@@ -15,6 +15,8 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -215,9 +217,26 @@ func TestAuditPayloadCrypto_DestroyedKey_ReaderRedacts_RealDB(t *testing.T) {
 	if platcrypto.IsEnvelope(stored) {
 		t.Fatalf("tombstone event stored as envelope, want plaintext: %s", stored)
 	}
-	if stored != tombstone.PayloadJSON {
-		t.Fatalf("tombstone stored payload = %q, want %q", stored, tombstone.PayloadJSON)
+	// payload is a jsonb column — Postgres canonicalizes spacing on write, so
+	// the contract is semantic identity, not byte identity.
+	if !jsonSemanticallyEqual(t, stored, tombstone.PayloadJSON) {
+		t.Fatalf("tombstone stored payload = %q, want semantically %q", stored, tombstone.PayloadJSON)
 	}
+}
+
+// jsonSemanticallyEqual compares two JSON documents by value (the payload
+// column is jsonb: Postgres rewrites whitespace/key-order, making byte
+// comparison meaningless for plaintext payloads).
+func jsonSemanticallyEqual(t *testing.T, a, b string) bool {
+	t.Helper()
+	var va, vb any
+	if err := json.Unmarshal([]byte(a), &va); err != nil {
+		t.Fatalf("unmarshal %q: %v", a, err)
+	}
+	if err := json.Unmarshal([]byte(b), &vb); err != nil {
+		t.Fatalf("unmarshal %q: %v", b, err)
+	}
+	return reflect.DeepEqual(va, vb)
 }
 
 // (c) chain integrity across a mix of plaintext (no-key tenant) and
@@ -267,8 +286,9 @@ func TestAuditPayloadCrypto_NilCrypto_PlaintextByteIdentical_RealDB(t *testing.T
 	}
 
 	stored := rawPayload(t, sqlDB, event.ID)
-	if stored != event.PayloadJSON {
-		t.Fatalf("stored payload = %q, want byte-identical plaintext %q", stored, event.PayloadJSON)
+	// jsonb canonicalizes spacing — semantic identity is the contract.
+	if !jsonSemanticallyEqual(t, stored, event.PayloadJSON) {
+		t.Fatalf("stored payload = %q, want semantically %q", stored, event.PayloadJSON)
 	}
 
 	items, _, err := writer.ListEvents(context.Background(), auditdomain.ListEventsQuery{
@@ -277,7 +297,7 @@ func TestAuditPayloadCrypto_NilCrypto_PlaintextByteIdentical_RealDB(t *testing.T
 	if err != nil {
 		t.Fatalf("ListEvents() error = %v", err)
 	}
-	if len(items) != 1 || items[0].PayloadJSON != event.PayloadJSON {
-		t.Fatalf("ListEvents() payload = %+v, want byte-identical plaintext %q", items, event.PayloadJSON)
+	if len(items) != 1 || !jsonSemanticallyEqual(t, items[0].PayloadJSON, event.PayloadJSON) {
+		t.Fatalf("ListEvents() payload = %+v, want semantically %q", items, event.PayloadJSON)
 	}
 }

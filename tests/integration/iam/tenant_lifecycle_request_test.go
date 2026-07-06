@@ -146,6 +146,19 @@ func TestRequestTenantLifecycle_SuccessCreatesJobRowAndRiverJob(t *testing.T) {
 	}
 	targetTenantID := result.TenantID
 
+	// The export request below inserts a tenant_lifecycle_jobs row whose FK
+	// references the tenants row — without this cleanup (LIFO: runs BEFORE
+	// cleanupOnboardedTenant above) the tenants DELETE fails silently inside
+	// withBypassErr and the deterministic slug leaks into the shared dev DB,
+	// breaking the next run's OnboardTenant with "tenant slug already exists".
+	t.Cleanup(func() {
+		_ = withBypassErr(sqlDB, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(context.Background(),
+				`DELETE FROM metaldocs.tenant_lifecycle_jobs WHERE tenant_id = $1::uuid`, targetTenantID)
+			return err
+		})
+	})
+
 	svc := newTenantLifecycleServiceForTest(t, sqlDB)
 
 	// adminUserID holds system_admin in targetTenantID (granted by
@@ -188,7 +201,9 @@ func TestRequestTenantLifecycle_SuccessCreatesJobRowAndRiverJob(t *testing.T) {
 
 	var auditCount int
 	if err := sqlDB.QueryRowContext(ctx,
-		`SELECT count(*) FROM metaldocs.audit_events WHERE action = 'tenant.lifecycle.requested' AND resource_id = $1`, jobID,
+		// The event's resource is the TENANT (resource_id = tenant id); the job
+		// id travels in the payload (buildLifecycleRequestedEvent).
+		`SELECT count(*) FROM metaldocs.audit_events WHERE action = 'tenant.lifecycle.requested' AND resource_id = $1 AND payload->>'job_id' = $2`, targetTenantID, jobID,
 	).Scan(&auditCount); err != nil {
 		t.Fatalf("count audit_events rows: %v", err)
 	}
