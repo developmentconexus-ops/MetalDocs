@@ -1,7 +1,7 @@
 # Milestone 1 — Canonical Submit Backend
 
 > **Program:** lifecycle-ux-coherence  ·  **Governing spec:** `docs/superpowers/specs/2026-07-06-lifecycle-ux-coherence-design.md`
-> **Status:** Validated (milestone-validator PASS 2026-07-06, `qa/milestone-qa.md`) — pending HS-1 operator gate
+> **Status:** PASSED (validator PASS + HS-1 operator approval 2026-07-06, `qa/milestone-qa.md`)
 > **Authored:** 2026-07-06 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front: **what** M1 is, **which features** it
