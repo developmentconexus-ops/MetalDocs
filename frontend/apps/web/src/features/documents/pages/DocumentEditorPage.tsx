@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
+import type { MetalDocsEditorRef } from '@metaldocs/editor-ui';
 import type { EditorComment } from '@metaldocs/editor-ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ApiError, resolveErrorMessage, apiFetch } from '../../../lib/api';
+import { ApiError, resolveErrorMessage } from '../../../lib/api';
 import { QK } from '../../../lib/queryKeys';
 import { useDocumentSession } from '../hooks/editor/useDocumentSession';
 import { useDocumentAutosave } from '../hooks/editor/useDocumentAutosave';
@@ -12,7 +12,6 @@ import {
   getApprovalInstance,
   getDocumentRevisionHistory,
   renameDocument,
-  signedRevisionURL,
 } from '../api/documents';
 import type { DocumentDetail } from '../api/documents';
 import { submit as submitForReviewRequest } from '../../approval/api/approvalApi';
@@ -23,12 +22,12 @@ import { ArtifactMetaSidebar } from '../../shared/controlled-artifact/ArtifactMe
 import type { VersionHistoryItem } from '../../shared/controlled-artifact/types';
 import { actorStatusToFlowState } from '../lib/approvalWorkflow';
 import {
-  EditorChrome,
   editorChromeStyles,
   VersionBadge,
   AutosaveStatus,
   type AutosaveState,
 } from '../../shared/components/editor-chrome';
+import { DocumentShell } from '../components/DocumentShell';
 import { CodeChip, StatusPill } from '../../../components/ui';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { useAreasQuery } from '../queries/useAreasQuery';
@@ -58,9 +57,7 @@ const REASON_CATEGORY_OPTIONS: Array<{ value: ReasonCategory; label: string }> =
 export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPageProps): React.ReactElement {
   const queryClient = useQueryClient();
   const docQuery = useDocumentDetailQuery(documentID);
-  const [editorLoadError, setEditorLoadError] = useState<string | null>(null);
   const [documentName, setDocumentName] = useState('');
-  const [buffer, setBuffer] = useState<ArrayBuffer | null | undefined>(undefined);
   const [revisionTitleDialogOpen, setRevisionTitleDialogOpen] = useState(false);
   const [revisionTitleInput, setRevisionTitleInput] = useState('');
   const [revisionTitleError, setRevisionTitleError] = useState<string | null>(null);
@@ -106,58 +103,24 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     }
   }, [baseDoc]);
 
-  const fetchRevisionBuffer = useCallback(async (revisionID: string) => {
-    if (!revisionID) {
-      setBuffer(null);
-      return;
-    }
-    const signedPayload = await apiFetch<{ url?: string }>(signedRevisionURL(documentID, revisionID));
-    if (!signedPayload.url) {
-      throw new Error('missing_signed_url');
-    }
-    const fileRes = await fetch(signedPayload.url);
-    if (!fileRes.ok) throw Object.assign(new Error(`http_${fileRes.status}`), { status: fileRes.status });
-    setBuffer(await fileRes.arrayBuffer());
-  }, [documentID]);
   useEffect(() => {
     if (!doc) {
-      setBuffer(docQuery.isLoading ? undefined : null);
-      setEditorLoadError(null);
       return;
     }
-
-    const name = doc.name ?? 'Document';
-    const revisionID = doc.current_revision_id ?? '';
-    let cancelled = false;
-
-    setDocumentName(name);
+    setDocumentName(doc.name ?? 'Document');
     setArtifactMetadata({
       fileSizeBytes: doc.current_revision_file_size_bytes ?? null,
       pageCount: doc.current_revision_page_count ?? null,
     });
-    setEditorLoadError(null);
-    setBuffer(undefined);
+  }, [doc]);
 
-    void (async () => {
-      try {
-        await fetchRevisionBuffer(revisionID);
-      } catch {
-        if (cancelled) return;
-        setBuffer(null);
-        setEditorLoadError('Falha ao carregar o arquivo do documento. Tente novamente.');
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [doc, docQuery.isLoading, fetchRevisionBuffer]);
-
+  // Buffer ownership moved to DocumentShell; the dirty-guard resets whenever the
+  // current revision changes (a fresh buffer load is imminent), matching the old
+  // per-buffer reset without the page tracking the buffer itself.
   useEffect(() => {
-    if (buffer === undefined) return;
     skipInitialEditorChangeRef.current = true;
     setEditorDirty(false);
-  }, [buffer]);
+  }, [doc?.current_revision_id]);
 
   const pageLoadError = (() => {
     const err = docQuery.error;
@@ -414,8 +377,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const canMountEditor = !!doc
     && (docStatus === 'draft'
       ? session.state.phase !== 'idle' && session.state.phase !== 'acquiring'
-      : true)
-    && buffer !== undefined;
+      : true);
 
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(
     () => localStorage.getItem('editor-sidebar-open') !== 'false'
@@ -476,66 +438,61 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
             <div role="alert" className={styles.error}>
               {pageLoadError}
             </div>
-          ) : (
-            <EditorChrome
-            center={
-              <>
-                {docCode && <CodeChip>{docCode}</CodeChip>}
-                {displayName && <span className={editorChromeStyles.docTitle}>{displayName}</span>}
-                {revisionBadge && <VersionBadge>{revisionBadge}</VersionBadge>}
-                {statusForPill && <StatusPill status={statusForPill} />}
-              </>
-            }
-            right={
-              <>
-                <AutosaveStatus status={autosaveState} />
-                  <button
-                    type="button"
-                    className={editorChromeStyles.primaryBtn}
-                    onClick={handleSubmitForReview}
-                    disabled={!canEditContent || isSubmitting}
-                  >
-                  Submeter para revisão
-                </button>
-              </>
-            }
-          >
-            {commentsHook.loadError ? (
-              <div className={styles.errorBanner} role="alert">
-                <span>{commentsHook.loadError}</span>
-                <button
-                  type="button"
-                  className={styles.retryButton}
-                  onClick={() => void commentsHook.retry()}
-                >
-                  Tentar novamente
-                </button>
-              </div>
-            ) : null}
-            {editorLoadError ? (
-              <div role="alert" className={styles.error}>
-                {editorLoadError}
-              </div>
-            ) : canMountEditor ? (
-              <MetalDocsEditor
-                ref={editorRef}
-                mode={canEditContent ? 'document-edit' : 'readonly'}
-                documentBuffer={buffer ?? undefined}
-                author={authorDisplay}
-                comments={commentsHook.comments}
-                onCommentsChange={commentsHook.setComments}
-                onCommentAdd={(c: EditorComment) => { if (canUseComments) void commentsHook.add(c); }}
-                onCommentResolve={(c: EditorComment) => { if (canUseComments) void (c.resolved ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
-                onCommentDelete={(c: EditorComment) => { if (canUseComments) void commentsHook.remove(c); }}
-                onCommentReply={(reply: EditorComment, parent: EditorComment) => { if (canUseComments) void commentsHook.reply(reply, parent); }}
-                onAutoSave={handleSave}
-                onChange={handleEditorChange}
-                onDocumentNameChange={handleRename}
-                showRuler={false}
-              />
-            ) : null}
-          </EditorChrome>
-          )}
+          ) : canMountEditor ? (
+            <DocumentShell
+              documentId={documentID}
+              currentRevisionId={doc?.current_revision_id ?? null}
+              editorMode={canEditContent ? 'document-edit' : 'readonly'}
+              editorRef={editorRef}
+              author={authorDisplay}
+              comments={commentsHook.comments}
+              onCommentsChange={commentsHook.setComments}
+              onCommentAdd={(c: EditorComment) => { if (canUseComments) void commentsHook.add(c); }}
+              onCommentResolve={(c: EditorComment) => { if (canUseComments) void (c.resolved ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
+              onCommentDelete={(c: EditorComment) => { if (canUseComments) void commentsHook.remove(c); }}
+              onCommentReply={(reply: EditorComment, parent: EditorComment) => { if (canUseComments) void commentsHook.reply(reply, parent); }}
+              onAutoSave={handleSave}
+              onChange={handleEditorChange}
+              onDocumentNameChange={handleRename}
+              chrome={{
+                center: (
+                  <>
+                    {docCode && <CodeChip>{docCode}</CodeChip>}
+                    {displayName && <span className={editorChromeStyles.docTitle}>{displayName}</span>}
+                    {revisionBadge && <VersionBadge>{revisionBadge}</VersionBadge>}
+                    {statusForPill && <StatusPill status={statusForPill} />}
+                  </>
+                ),
+                right: (
+                  <>
+                    <AutosaveStatus status={autosaveState} />
+                    <button
+                      type="button"
+                      className={editorChromeStyles.primaryBtn}
+                      onClick={handleSubmitForReview}
+                      disabled={!canEditContent || isSubmitting}
+                    >
+                      Submeter para revisão
+                    </button>
+                  </>
+                ),
+              }}
+              notice={
+                commentsHook.loadError ? (
+                  <div className={styles.errorBanner} role="alert">
+                    <span>{commentsHook.loadError}</span>
+                    <button
+                      type="button"
+                      className={styles.retryButton}
+                      onClick={() => void commentsHook.retry()}
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                ) : null
+              }
+            />
+          ) : null}
         </main>
         {!pageLoadError ? (
           <ArtifactMetaSidebar

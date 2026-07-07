@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import type { TrackedChange } from '@metaldocs/editor-ui';
 
 import { formatSignedAt } from '../../../lib/format/dates';
 import { useAuthStore } from '../../../store/auth.store';
@@ -10,11 +11,12 @@ import {
   useDocumentApprovalArtifact,
   type DocumentApprovalHandlers,
 } from '../../documents/adapters/useDocumentApprovalArtifact';
+import type { StageInstance } from '../api/approvalTypes';
 import { toApprovalState } from '../../documents/lib/approvalWorkflow';
 import { ArtifactApprovalScreen } from '../../shared/controlled-artifact/ArtifactApprovalScreen';
 import { CancelInstanceDialog } from '../components/CancelInstanceDialog';
 import { DocumentApprovalExtras } from '../components/DocumentApprovalExtras';
-import { ReviewDocumentCanvas, type ReviewDocumentCanvasRef } from '../components/ReviewDocumentCanvas';
+import { DocumentShell } from '../../documents/components/DocumentShell';
 import { SupersedePublishDialog } from '../components/SupersedePublishDialog';
 import { useSignoffMutation } from '../hooks/useSignoffMutation';
 import { commentPlainText } from '../lib/commentPlainText';
@@ -29,18 +31,52 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 /**
+ * Resolve the cockpit editor mode from the active approval stage (F3, C1/W2).
+ *
+ * `'review'` iff the active stage is a review stage AND the current user is an
+ * eligible actor on it (present in `actors` with status active/waiting).
+ * Everything else — approval stage, non-eligible actor, oversee observer, no
+ * active stage — is `'readonly'` (fail-safe default: no writable affordance
+ * without positive eligibility, per the spec's mode-resolution table).
+ */
+export function resolveEditorMode(
+  activeStage: StageInstance | undefined,
+  currentUserId: string | null | undefined,
+): 'review' | 'readonly' {
+  if (!activeStage || activeStage.stage_kind !== 'review') {
+    return 'readonly';
+  }
+  if (!currentUserId) {
+    return 'readonly';
+  }
+  const eligible = activeStage.actors.some(
+    (actor) => actor.user_id === currentUserId && (actor.status === 'active' || actor.status === 'waiting'),
+  );
+  return eligible ? 'review' : 'readonly';
+}
+
+/**
  * Document-specific route wrapper for the shared ArtifactApprovalScreen. Composes
  * the shared DecisionModel for the inline sign-off (password re-auth + legal-effect
  * confirmation — the document's legal e-signature), owns the remaining interactive
- * state (publish / cancel dialogs, the review-canvas ref + flushSave) and injects
- * the document review tabs as the `main` slot, the integrity / lock / timeline as
- * the `decisionExtras` slot, and the publish / cancel modals as the `dialogs` slot.
+ * state (publish / cancel dialogs) and injects the document review tabs as the
+ * `main` slot, the integrity / lock / timeline as the `decisionExtras` slot, and
+ * the publish / cancel modals as the `dialogs` slot.
+ *
+ * F3 (C1/W2): the "Documento" tab mounts `DocumentShell` — the SAME editor-canvas
+ * region the author page uses — in a resolved mode (`readonly` for approval
+ * stages / non-eligible actors, `review` for eligible review-stage actors). The
+ * cockpit mounts NO writer session and NO autosave: DocumentShell is passed no
+ * `onAutoSave`, so a reviewer's edits never persist as a document revision (the
+ * W2 fix). Suggestions are surfaced via `onTrackedChangesChange` (wired here,
+ * rendered by F4); comments still persist through the comments API below.
+ *
  * The cockpit is approver-only — submitting a document for review happens
  * exclusively on the document editor, so this route has no submit-picker. The
  * `?decision=` param preselects the sign-off option via `defaultOptionKey`. Gating
  * + data + the action set come from useDocumentApprovalArtifact.
  */
-export function SignoffDetailPage() {
+export function ApprovalCockpitPage() {
   const { documentId = '' } = useParams<{ documentId: string }>();
   const [searchParams] = useSearchParams();
   const decisionParam = searchParams.get('decision');
@@ -48,7 +84,9 @@ export function SignoffDetailPage() {
     decisionParam === 'approve' || decisionParam === 'reject' ? decisionParam : undefined;
 
   const [tab, setTab] = useState<Tab>('documento');
-  const canvasRef = useRef<ReviewDocumentCanvasRef>(null);
+  // F4 surface: client-side tracked-change suggestions from review mode. Wired
+  // through DocumentShell here, not yet rendered (SuggestionList lands in F4).
+  const [trackedChanges, setTrackedChanges] = useState<TrackedChange[]>([]);
   // Bridges the one-hop ordering cycle: decisionSubmit (built before the adapter
   // call) needs refetchInstance (returned BY the adapter call). See below.
   const refetchInstanceRef = useRef<() => Promise<void>>(async () => {});
@@ -62,10 +100,6 @@ export function SignoffDetailPage() {
   const doc = docQuery.data ?? null;
 
   const commentsQuery = useDocumentCommentsQuery(documentId);
-
-  const flushSave = async () => {
-    await canvasRef.current?.flushSave();
-  };
 
   // Signing routes exclusively through the DecisionPanel now — the adapter emits no
   // 'signoff' action, so there is no handler for it.
@@ -89,12 +123,9 @@ export function SignoffDetailPage() {
     revisionVersion,
   });
 
+  // No writable canvas to flush — DocumentShell in review mode carries no
+  // autosave (W2 fix). decisionSubmit is now signOff -> refetchInstance.
   const decisionSubmit = async (input: { optionKey: string; reason: string; password: string }) => {
-    try {
-      await flushSave();
-    } catch {
-      throw new Error('Não foi possível salvar as alterações antes de registrar a decisão.');
-    }
     await signOff({
       decision: input.optionKey === 'approve' ? 'approve' : 'reject',
       reason: input.reason || undefined,
@@ -185,15 +216,18 @@ export function SignoffDetailPage() {
 
   // The document sign-off decision model (password re-auth + legal-effect
   // confirmation) is now constructed by the adapter via `buildDocumentSignoffDecision`
-  // (FE-02) — this route only supplied the `submit` sequencing above (flushSave →
-  // signOff → refetchInstance) since that depends on route-owned state (canvas ref,
-  // the lifted signoff mutation).
+  // (FE-02) — this route only supplied the `submit` sequencing above (signOff →
+  // refetchInstance) since that depends on route-owned state (the lifted signoff
+  // mutation).
   const decision = model.decision;
 
   // Suppress the action buttons until the sidebar is ready. Signing is not among
   // model.actions (it routes through the DecisionPanel), so no filtering is needed.
   const baseActions = sidebarReady ? model.actions : [];
   const screenModel: ArtifactViewModel = { ...model, actions: baseActions, decision };
+
+  const activeStage = instance?.stages.find((s) => s.status === 'active');
+  const editorMode = resolveEditorMode(activeStage, currentUser?.userId ?? null);
 
   const main = (
     <div className={styles.main}>
@@ -228,12 +262,12 @@ export function SignoffDetailPage() {
         {tab === 'documento' ? (
           <div className={styles.a4}>
             {doc.current_revision_id ? (
-              <ReviewDocumentCanvas
-                ref={canvasRef}
+              <DocumentShell
                 documentId={documentId}
                 currentRevisionId={doc.current_revision_id}
-                status={doc.status}
-                approverDisplay={currentUser?.displayName ?? ''}
+                editorMode={editorMode}
+                author={currentUser?.displayName ?? ''}
+                onTrackedChangesChange={setTrackedChanges}
               />
             ) : (
               <div className={styles.a4State}>Este documento ainda não possui conteúdo para revisão.</div>
