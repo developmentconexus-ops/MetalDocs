@@ -5,11 +5,27 @@ type InstanceStatus string
 
 // InstanceStatus values.
 const (
-	InstanceStatusApproved   InstanceStatus = "approved"
-	InstanceStatusCancelled  InstanceStatus = "cancelled"
-	InstanceStatusInProgress InstanceStatus = "in_progress"
-	InstanceStatusRejected   InstanceStatus = "rejected"
+	InstanceStatusApproved         InstanceStatus = "approved"
+	InstanceStatusCancelled        InstanceStatus = "cancelled"
+	InstanceStatusInProgress       InstanceStatus = "in_progress"
+	InstanceStatusRejected         InstanceStatus = "rejected"
+	InstanceStatusChangesRequested InstanceStatus = "changes_requested"
 )
+
+// IsValidInstanceStatus reports whether s is a wire-representable instance
+// status. The wire enum must cover every domain status (domain/instance.go):
+// changes_requested (F4/W11) was the last carried gap — a review verdict of
+// request_changes transitions the instance to this non-terminal status, so a
+// read of that instance must serialize a value the FE can parse.
+func IsValidInstanceStatus(s string) bool {
+	switch InstanceStatus(s) {
+	case InstanceStatusApproved, InstanceStatusCancelled, InstanceStatusInProgress,
+		InstanceStatusRejected, InstanceStatusChangesRequested:
+		return true
+	default:
+		return false
+	}
+}
 
 // SignoffDecision is the wire representation of an approve/reject vote.
 type SignoffDecision string

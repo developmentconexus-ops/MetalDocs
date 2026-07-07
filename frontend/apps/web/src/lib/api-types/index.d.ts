@@ -1720,6 +1720,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/approval/instances/{instance_id}/stages/{stage_id}/review-verdict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record review-stage runtime verdict
+         * @description Records a `ready`/`request_changes` verdict against a review-kind stage (StageKind=review). `ready` is quorum-counted exactly like a signoff approval; `request_changes` immediately collapses the instance to changes_requested and reverts the document to draft (no quorum needed) — requires a non-empty comment (M2b F4).
+         */
+        post: operations["recordApprovalReviewVerdict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/documents/{id}/publish": {
         parameters: {
             query?: never;
@@ -1820,6 +1840,46 @@ export interface paths {
         /** Cancel approval instance */
         post: operations["cancelApprovalInstance"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approval/delegations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an approval delegation
+         * @description F9 (spec.md §4/W5, ADR 0077): the calling actor delegates their OWN eligibility (never a third party's) to another user for a time window. The delegate must independently hold the relevant capability (document.signoff / approval.review) — delegation widens per-instance eligibility only, it never grants a capability. delegator_id is always derived from the authenticated session, never accepted from the body.
+         */
+        post: operations["createApprovalDelegation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approval/delegations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke an approval delegation
+         * @description F9 (spec.md §4/W5, ADR 0077): real-time revocation — hard-deletes the delegation row. Only the delegator, or a CapApprovalOversee holder, may revoke. A subsequent signoff/review-verdict attempt by the delegate re-evaluates eligibility fresh, in-tx, at use-time; there is no cached or soft-flag state to go stale.
+         */
+        delete: operations["revokeApprovalDelegation"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1936,7 +1996,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update an approval route (new version) */
+        /**
+         * Update an approval route (new version)
+         * @description If the target route has never been referenced by an approval instance, the update mutates the same row in place: the response `route_id` equals the path `id` and `new_version` is the incremented version. If the route IS referenced by at least one approval instance (routes are otherwise immutable once used — F2/W1), the update instead creates a new route version as a new row and marks the prior row superseded; the response `route_id` is the NEW row's id, which differs from the path `id`. In-flight instances keep resolving stages from their original (now-superseded) route row, unaffected.
+         */
         put: operations["updateApprovalRoute"];
         post?: never;
         delete?: never;
@@ -3261,7 +3324,7 @@ export interface components {
             /** Format: uuid */
             tenant_id: string;
             /** @enum {string} */
-            status: "in_progress" | "approved" | "rejected" | "cancelled";
+            status: "in_progress" | "approved" | "rejected" | "cancelled" | "changes_requested";
             submitted_by: string;
             /** Format: date-time */
             submitted_at: string;
@@ -3269,6 +3332,8 @@ export interface components {
             completed_at: string | null;
             stages: components["schemas"]["ApprovalStageInstanceResponse"][];
             etag: string;
+            /** @description F6/F8 — the SHA-256 hex digest pinned at freeze time (no-fallback principle, spec §11). null when the instance has not yet reached the freeze boundary. */
+            frozen_content_hash: string | null;
         };
         ApprovalStageInstanceResponse: {
             /** Format: uuid */
@@ -3279,6 +3344,16 @@ export interface components {
             status: "pending" | "active" | "passed" | "failed" | "cancelled";
             signoffs: components["schemas"]["ApprovalSignoffRecordResponse"][];
             actors: components["schemas"]["ApprovalStageActorResponse"][];
+            /**
+             * @description F8 (spec.md §4/W4) — distinguishes a review (comment/feedback) stage from an approval (signoff) stage.
+             * @enum {string}
+             */
+            stage_kind?: "review" | "approval";
+            /**
+             * Format: date-time
+             * @description F8 (spec.md §4/W4) — this stage's SLA due date, set on activation from due_in_days_snapshot. null while pending, or when no SLA is configured (no-fallback principle, spec §11).
+             */
+            due_at: string | null;
         };
         ApprovalStageActorResponse: {
             user_id: string;
@@ -3298,6 +3373,11 @@ export interface components {
             signature_method: string;
             /** Format: date-time */
             signed_at: string;
+            /**
+             * @description What this signature legally attests (21 CFR 11.50(a)(3)) — derived from the actor's decision at signoff time, never client-writable.
+             * @enum {string}
+             */
+            signature_meaning: "approval" | "rejection";
         };
         SubmitDocumentRequest: {
             /**
@@ -3348,6 +3428,17 @@ export interface components {
             /** @description SHA-256 hex digest of the content being signed off. */
             content_hash: string;
         };
+        ReviewVerdictRequest: {
+            /** @enum {string} */
+            verdict: "ready" | "request_changes";
+            /** @description Required when verdict is request_changes. */
+            comment?: string;
+        };
+        ReviewVerdictResponse: {
+            verdict_id: string;
+            was_replay: boolean;
+            outcome: string;
+        };
         ApprovalInboxItem: {
             /** Format: uuid */
             instance_id: string;
@@ -3363,6 +3454,16 @@ export interface components {
             stage_label: string;
             /** @description Human-readable quorum progress for the actor's pending stage, e.g. "1/2". */
             quorum_progress: string;
+            /**
+             * @description F8 (spec.md §4/W4) — the actor's pending stage's kind.
+             * @enum {string}
+             */
+            stage_kind?: "review" | "approval";
+            /**
+             * Format: date-time
+             * @description F8 (spec.md §4/W4) — the actor's pending stage's SLA due date, if configured (due_in_days_snapshot non-null). null when no SLA is configured for the stage (no-fallback principle, spec §11: never a substitute default).
+             */
+            due_at: string | null;
         };
         ApprovalInboxResponse: {
             items: components["schemas"]["ApprovalInboxItem"][];
@@ -3427,6 +3528,31 @@ export interface components {
         CancelDocumentApprovalResponse: {
             /** Format: uuid */
             document_id: string;
+        };
+        CreateApprovalDelegationRequest: {
+            /** @description user_id of the user receiving the delegated eligibility. */
+            delegate_id: string;
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            ends_at: string;
+            reason: string;
+        };
+        ApprovalDelegation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            tenant_id: string;
+            delegator_id: string;
+            delegate_id: string;
+            /** Format: date-time */
+            starts_at: string;
+            /** Format: date-time */
+            ends_at: string;
+            reason: string;
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
         };
         SupersedeDocumentRequest: {
             /**
@@ -3493,6 +3619,11 @@ export interface components {
             /** @description Required when `quorum` is `m_of_n`; must be omitted otherwise. */
             quorum_m?: number;
             drift_policy: components["schemas"]["DriftPolicy"];
+            /**
+             * @description F0 (spec.md §4/W2) — review (comment/suggestion) vs approval (signoff) stage. Optional; omitted defaults to approval at persistence. A review-kind route is only creatable by supplying this field.
+             * @enum {string}
+             */
+            stage_kind?: "review" | "approval";
         } & {
             [key: string]: unknown;
         };
@@ -3505,6 +3636,11 @@ export interface components {
             quorum: components["schemas"]["QuorumKind"];
             quorum_m: number | null;
             drift_policy: components["schemas"]["DriftPolicy"];
+            /**
+             * @description F0 (spec.md §4/W2) — review vs approval stage; defaults to approval.
+             * @enum {string}
+             */
+            stage_kind?: "review" | "approval";
         } & {
             [key: string]: unknown;
         };
@@ -7053,6 +7189,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["UnprocessableEntity"];
             428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };
@@ -7084,6 +7221,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SignoffDocumentResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    recordApprovalReviewVerdict: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>" */
+                "If-Match": string;
+            };
+            path: {
+                instance_id: string;
+                stage_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewVerdictRequest"];
+            };
+        };
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewVerdictResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -7314,6 +7490,61 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    createApprovalDelegation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateApprovalDelegationRequest"];
+            };
+        };
+        responses: {
+            /** @description created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalDelegation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["UnprocessableEntity"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    revokeApprovalDelegation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     getApprovalInstance: {
         parameters: {
             query?: never;
@@ -7373,6 +7604,12 @@ export interface operations {
                 area_code?: string;
                 limit?: number;
                 offset?: number;
+                /** @description F8 (spec.md §4/W4): filter to stages of this kind only. */
+                stage_kind?: "review" | "approval";
+                /** @description F8 (spec.md §4/W4): filter to stages whose due_at is non-null and <= this RFC3339 UTC timestamp. */
+                due_before?: string;
+                /** @description F8 (spec.md §6.3, P2/P3/P8): when set to "oversee", lists ALL in-progress instances in the tenant (not just the actor's own eligible-pool items) and REQUIRES the actor hold CapApprovalOversee — a 403 if the capability is missing. Omitted (default) preserves the existing eligibility-based inbox (actor's own pending stages). */
+                scope?: "oversee";
             };
             header?: never;
             path?: never;

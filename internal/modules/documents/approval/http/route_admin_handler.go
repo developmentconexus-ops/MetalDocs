@@ -231,6 +231,7 @@ func mapListRoute(route infrastructure.Route) contracts.ListRouteItem {
 			Quorum:             contracts.QuorumKind(stage.Quorum),
 			QuorumM:            stage.QuorumM,
 			DriftPolicy:        contracts.DriftPolicyKind(stage.DriftPolicy),
+			StageKind:          mapStageKind(stage.Kind),
 		})
 	}
 
@@ -264,9 +265,26 @@ func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 			Quorum:             domain.QuorumPolicy(s.Quorum),
 			QuorumM:            s.QuorumM,
 			OnEligibilityDrift: domain.DriftPolicy(s.DriftPolicy),
+			// F0: empty stage_kind stays the domain zero value ("") and is
+			// defaulted to approval at the persistence layer (insertRouteStages,
+			// migration 0286 DEFAULT 'approval'); a supplied review makes a
+			// review-kind stage. Validated as review|approval|"" in contracts.
+			Kind: domain.StageKind(s.StageKind),
 		})
 	}
 	return out
+}
+
+// mapStageKind normalizes a persisted stage-kind string for the wire. The DB
+// column is NOT NULL DEFAULT 'approval', but a legacy row read before the
+// backfill (or a zero value) is defaulted here so the response is never an
+// empty enum value (no-fallback: a known-safe canonical default, not a masked
+// unknown — the two kinds are exhaustive).
+func mapStageKind(kind string) contracts.StageKind {
+	if kind == string(contracts.StageKindReview) {
+		return contracts.StageKindReview
+	}
+	return contracts.StageKindApproval
 }
 
 func intPtr(v int) *int {

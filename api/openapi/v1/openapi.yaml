@@ -6443,7 +6443,7 @@ components:
         tenant_id: { type: string, format: uuid }
         status:
           type: string
-          enum: [in_progress, approved, rejected, cancelled]
+          enum: [in_progress, approved, rejected, cancelled, changes_requested]
         submitted_by: { type: string }
         submitted_at: { type: string, format: date-time }
         completed_at:
@@ -6892,6 +6892,14 @@ components:
           minimum: 1
           description: Required when `quorum` is `m_of_n`; must be omitted otherwise.
         drift_policy: { $ref: '#/components/schemas/DriftPolicy' }
+        stage_kind:
+          type: string
+          enum: [review, approval]
+          description: >-
+            F0 (spec.md §4/W2) — review (comment/suggestion) vs approval
+            (signoff) stage. Optional; omitted defaults to approval at
+            persistence. A review-kind route is only creatable by supplying
+            this field.
     StageSummary:
       type: object
       additionalProperties: true
@@ -6908,6 +6916,10 @@ components:
           minimum: 1
           nullable: true
         drift_policy: { $ref: '#/components/schemas/DriftPolicy' }
+        stage_kind:
+          type: string
+          enum: [review, approval]
+          description: F0 (spec.md §4/W2) — review vs approval stage; defaults to approval.
     CreateRouteRequest:
       type: object
       additionalProperties: true

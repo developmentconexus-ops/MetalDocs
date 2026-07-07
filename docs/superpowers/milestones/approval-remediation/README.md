@@ -20,7 +20,7 @@ gated by the operator (HS-1) at each boundary.
 | # | Milestone | Objective (one line) | Status | Gate result |
 |---|-----------|----------------------|--------|-------------|
 | 2b | `milestone-2b-approval-kernel-backend` | Backend workflow/permission/contract remediation (W1-W13, P1-P8) inside `documents/approval` + `iam` | passed (operator HS-1 approved 2026-07-07) | [PASS](milestone-2b-approval-kernel-backend/qa/milestone-qa.md) |
-| 2c | `milestone-2c-approval-screen-fe` | Cockpit → editor-shell + sidebar reuse, worklist single destination, suggestion UX | planned | — |
+| 2c | `milestone-2c-approval-screen-fe` | Cockpit → editor-shell + sidebar reuse, worklist single destination, suggestion UX | in-progress | — |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) /
 `blocked` (hard-stop open). The **Gate result** column links the milestone-validator's
@@ -30,7 +30,7 @@ verdict (`qa/milestone-qa.md`); `passed` requires a validator **PASS** *and* ope
 
 | When | HS id | What | Resolution |
 |------|-------|------|------------|
-| | | | |
+| M2c F0 (2026-07-07) | HS-2 | Plan F0-Step-3 wired the docx-XML markup gate (`ScanForUnresolvedMarkup`) into `executeFreeze`. Runtime truth: MetalDocs content = form-data JSON; docx only rendered externally (markup-free by construction); reviewer suggestions/comments persist as structured JSON (`document_comments`), never `w:ins`/`w:del`; in-tx blob fetch is forbidden (`reconstruct_service.go` precedent). The docx-XML scan checks a state that cannot occur at freeze. | Surfaced to operator; **path A** chosen (global maximum): freeze integrity already complete via the hash chain (`FrozenContentHash` pin+echo) + `HasUnresolvedInstanceComments` server gate + F6 client clean-buffer. `ScanForUnresolvedMarkup` (+test) deleted as misdirected dead code. Server-authoritative suggestion-resolution gate registered as a **bounded defer** (see close-out list). F0 re-scoped to wire enum `changes_requested` + route `stage_kind` + regen. |
 
 ## Program close-out / reconciliation
 
@@ -38,6 +38,6 @@ Fill in only when the last milestone (2c) has passed:
 
 - [ ] Every planned feature has a complete evidence row.
 - [ ] Zero unplanned scope (anything added is recorded with rationale).
-- [ ] Every bounded defer has a written trigger and an owner (incl. W12 parallel-stage DAG routing, spec §10).
+- [ ] Every bounded defer has a written trigger and an owner (incl. W12 parallel-stage DAG routing, spec §10; **server-authoritative suggestion-resolution freeze gate** — trigger: a requirement that the *server* must independently prove no unaccepted suggestion exists, at which point model suggestions as structured resolvable state like `document_comments` and gate freeze on that JSON state; today suggestion resolution is client-authoritative via eigenpal + caught by the hash chain — HS-2, F0).
 - [ ] Terminal acceptance passed — link the evidence.
 - [ ] Operator sign-off: <date / name>

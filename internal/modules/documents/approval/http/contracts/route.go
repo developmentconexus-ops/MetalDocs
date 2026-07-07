@@ -33,6 +33,15 @@ var (
 	requiredCapabilityPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*\.[a-z0-9._]*[a-z0-9]$`)
 )
 
+// StageKind is the wire representation of a stage's kind (review vs approval).
+type StageKind string
+
+// StageKind values.
+const (
+	StageKindReview   StageKind = "review"
+	StageKindApproval StageKind = "approval"
+)
+
 // StageRequest is the wire representation of one stage in a create/update route request.
 type StageRequest struct {
 	Order              int             `json:"order"`
@@ -43,6 +52,12 @@ type StageRequest struct {
 	Quorum             QuorumKind      `json:"quorum"`
 	QuorumM            *int            `json:"quorum_m,omitempty"`
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
+	// StageKind (F0, spec.md §4/W2): review or approval. Optional on the wire;
+	// empty defaults to approval at the persistence layer (route_admin_service,
+	// migration 0286 DEFAULT 'approval') so pre-existing approval-only callers
+	// are unchanged. A review-kind route is only creatable once this field can
+	// be supplied.
+	StageKind StageKind `json:"stage_kind,omitempty"`
 }
 
 // CreateRouteRequest is the decoded body for the create-route endpoint.
@@ -141,6 +156,13 @@ func validateStages(stages []StageRequest) error {
 		default:
 			return fmt.Errorf("stages[%d].drift_policy must be one of: reduce_quorum, fail_stage, keep_snapshot", i)
 		}
+		// stage_kind is optional; empty defaults to approval downstream. When
+		// supplied it must be one of the two canonical kinds (no free text).
+		switch stage.StageKind {
+		case "", StageKindReview, StageKindApproval:
+		default:
+			return fmt.Errorf("stages[%d].stage_kind must be one of: review, approval", i)
+		}
 	}
 	return nil
 }
@@ -219,6 +241,7 @@ type StageResponse struct {
 	Quorum             QuorumKind      `json:"quorum"`
 	QuorumM            *int            `json:"quorum_m,omitempty"`
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
+	StageKind          StageKind       `json:"stage_kind"`
 }
 
 // ListStageItem is the wire representation of one stage within a ListRouteItem.
@@ -231,6 +254,7 @@ type ListStageItem struct {
 	Quorum             QuorumKind      `json:"quorum"`
 	QuorumM            *int            `json:"quorum_m,omitempty"`
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
+	StageKind          StageKind       `json:"stage_kind"`
 }
 
 // ListRouteItem is one row of the list-routes response.
