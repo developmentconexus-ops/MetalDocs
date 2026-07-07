@@ -212,6 +212,23 @@ func (r *fakeDecisionRepo) LoadRoute(_ context.Context, _ db.Tx, _, _ string) (d
 	panic("fakeDecisionRepo.LoadRoute: not expected to be called in decision tests")
 }
 
+func (r *fakeDecisionRepo) InsertDelegation(_ context.Context, _ db.Tx, _ domain.Delegation) error {
+	return nil
+}
+
+func (r *fakeDecisionRepo) DeleteDelegation(_ context.Context, _ db.Tx, _, _, _ string, _ bool) (bool, error) {
+	return false, nil
+}
+
+// LoadActiveDelegationsFor returns no delegations (F9 default fake behavior):
+// RecordSignoff now calls this on every invocation to resolve
+// domain.ResolveEligibleIdentity's widened eligibility input. Existing
+// decision tests exercise direct-actor eligibility only, so an empty result
+// preserves their prior behavior unchanged.
+func (r *fakeDecisionRepo) LoadActiveDelegationsFor(_ context.Context, _ db.Tx, _, _ string, _ time.Time) ([]domain.Delegation, error) {
+	return nil, nil
+}
+
 // ---------------------------------------------------------------------------
 // Minimal in-memory SQL driver for DecisionService tests.
 //

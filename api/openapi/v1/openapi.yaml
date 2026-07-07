@@ -3800,6 +3800,71 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /approval/delegations:
+    post:
+      summary: Create an approval delegation
+      description: >-
+        F9 (spec.md §4/W5, ADR 0077): the calling actor delegates their OWN
+        eligibility (never a third party's) to another user for a time window.
+        The delegate must independently hold the relevant capability
+        (document.signoff / approval.review) — delegation widens per-instance
+        eligibility only, it never grants a capability. delegator_id is always
+        derived from the authenticated session, never accepted from the body.
+      tags: [approval]
+      operationId: createApprovalDelegation
+      security:
+        - sessionCookie: []
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApprovalDelegationRequest'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalDelegation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /approval/delegations/{id}:
+    delete:
+      summary: Revoke an approval delegation
+      description: >-
+        F9 (spec.md §4/W5, ADR 0077): real-time revocation — hard-deletes the
+        delegation row. Only the delegator, or a CapApprovalOversee holder, may
+        revoke. A subsequent signoff/review-verdict attempt by the delegate
+        re-evaluates eligibility fresh, in-tx, at use-time; there is no cached
+        or soft-flag state to go stale.
+      tags: [approval]
+      operationId: revokeApprovalDelegation
+      security:
+        - sessionCookie: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204':
+          description: revoked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /approval/instances/{instance_id}:
     get:
       summary: Get approval instance
@@ -6689,6 +6754,49 @@ components:
         document_id:
           type: string
           format: uuid
+    CreateApprovalDelegationRequest:
+      type: object
+      required: [delegate_id, starts_at, ends_at, reason]
+      properties:
+        delegate_id:
+          type: string
+          description: user_id of the user receiving the delegated eligibility.
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          minLength: 1
+    ApprovalDelegation:
+      type: object
+      required: [id, tenant_id, delegator_id, delegate_id, starts_at, ends_at, reason, created_by, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        delegator_id:
+          type: string
+        delegate_id:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
     SupersedeDocumentRequest:
       type: object
       required: [superseded_document_id]

@@ -87,6 +87,11 @@ const (
 	approvalCodeValidationReviewDueBeforeEffective problem.Code = "validation.review_due_before_effective"
 	approvalCodeValidationEffectiveToNotAfterFrom  problem.Code = "validation.effective_to_not_after_effective_from"
 	approvalCodeValidationEmptyEligiblePool        problem.Code = "validation.empty_eligible_pool"
+
+	// F9/ADR 0077 — approval delegation.
+	approvalCodeValidationSelfDelegation    problem.Code = "validation.self_delegation"
+	approvalCodeValidationDelegationWindow  problem.Code = "validation.delegation_window_invalid"
+	approvalCodeNotFoundDelegation          problem.Code = "not_found.delegation"
 )
 
 // ValidationError is a generic request-validation failure mapped to HTTP 400
@@ -248,6 +253,15 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, application.ErrEffectiveToNotAfterEffectiveFrom):
 		statusCode = http.StatusUnprocessableEntity
 		code = approvalCodeValidationEffectiveToNotAfterFrom
+	case errors.Is(err, domain.ErrSelfDelegation):
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationSelfDelegation
+	case errors.Is(err, domain.ErrInvalidDelegationWindow):
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationDelegationWindow
+	case errors.Is(err, application.ErrDelegationNotFoundOrNotOwned):
+		statusCode = http.StatusNotFound
+		code = approvalCodeNotFoundDelegation
 	case errors.Is(err, domain.ErrEmptyEligiblePool):
 		// F2 (W6): a stage whose eligibility resolution yields zero actors is a
 		// business-rule rejection at submit time (422), not a 500 — and this

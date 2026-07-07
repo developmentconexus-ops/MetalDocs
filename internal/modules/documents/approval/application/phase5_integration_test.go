@@ -278,6 +278,22 @@ func (r *phase5Repo) LoadActorDisplayName(_ context.Context, _, _ string) (strin
 	return "", nil
 }
 
+func (r *phase5Repo) InsertDelegation(_ context.Context, _ db.Tx, _ domain.Delegation) error {
+	return nil
+}
+
+func (r *phase5Repo) DeleteDelegation(_ context.Context, _ db.Tx, _, _, _ string, _ bool) (bool, error) {
+	return false, nil
+}
+
+// LoadActiveDelegationsFor returns no delegations — the F9 default. The
+// decision service now calls this on every RecordSignoff to resolve
+// domain.ResolveEligibleIdentity's widened eligibility input; this scenario
+// exercises direct-actor eligibility only.
+func (r *phase5Repo) LoadActiveDelegationsFor(_ context.Context, _ db.Tx, _, _ string, _ time.Time) ([]domain.Delegation, error) {
+	return nil, nil
+}
+
 // ---------------------------------------------------------------------------
 // Phase 5 combined fake SQL driver
 //

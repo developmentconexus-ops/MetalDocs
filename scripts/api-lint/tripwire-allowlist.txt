@@ -48,6 +48,15 @@ internal/modules/documents/approval/infrastructure/postgres_approval_repository.
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateInstanceStatus
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateInstanceStatusWithReason
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateStageStatus
+# F9/ADR 0077 approval delegation: tier-2 authz lives one layer up in
+# DelegationService (same tx). CreateDelegation's authorization is ownership-
+# by-construction (delegatorID is always the caller's own actor id, derived
+# server-side, never client-supplied — no capability check needed to grant
+# your own eligibility). RevokeDelegation calls authz.Require(CapApprovalOversee)
+# before the delete to decide oversee-widened scope, then the repo's own
+# WHERE clause (delegator_id = $3 OR $4::boolean) is the final ownership gate.
+internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|InsertDelegation
+internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|DeleteDelegation
 internal/modules/documents/infrastructure/repository.go|SeedDictionaryValuesTx
 internal/modules/documents/infrastructure/repository.go|DeleteComment
 internal/modules/documents/infrastructure/repository.go|DeleteExpiredPending

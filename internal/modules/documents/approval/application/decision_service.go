@@ -278,8 +278,19 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 			return infrastructure.ErrStageNotActive
 		}
 
-		// Step 5b: eligibility check — actor must be in the eligible_actor_ids snapshot (J1).
-		if err := domain.CheckEligibility(req.ActorUserID, activeStage.EligibleActorIDs); err != nil {
+		// Step 5b: eligibility check — actor must be in the eligible_actor_ids
+		// snapshot (J1), widened by any active delegation (F9/ADR 0077):
+		// domain.ResolveEligibleIdentity tries the direct membership check
+		// first (unchanged fast path) and only falls back to the actor's
+		// active delegations — loaded fresh, in-tx, at this exact moment — on
+		// failure. It calls the SAME domain.CheckEligibility either way; this
+		// is not a second, parallel eligibility rule.
+		delegations, err := s.repo.LoadActiveDelegationsFor(ctx, tx, req.TenantID, req.ActorUserID, s.clock.Now())
+		if err != nil {
+			return fmt.Errorf("recordSignoff: load active delegations: %w", err)
+		}
+		onBehalfOf, err := domain.ResolveEligibleIdentity(req.ActorUserID, activeStage.EligibleActorIDs, delegations)
+		if err != nil {
 			event := GovernanceEvent{
 				TenantID:     req.TenantID,
 				EventType:    EventTypeSignoffRejected,
@@ -293,12 +304,15 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 			return err
 		}
 
-		// Step 6: SoD check — author cannot sign, actor cannot sign twice in same instance.
+		// Step 6: SoD check — author cannot sign, actor cannot sign twice in
+		// same instance, and (F9/ADR 0077) a delegate cannot act on behalf of
+		// a delegator who is the author — same shared predicate, widened
+		// input.
 		priorSignoffs, err := s.repo.LoadPriorSignoffs(ctx, tx, req.TenantID, req.InstanceID, activeStage.ID)
 		if err != nil {
 			return fmt.Errorf("recordSignoff: load prior signoffs: %w", err)
 		}
-		if err := domain.CheckSoD(instance.SubmittedBy, req.ActorUserID, priorSignoffs); err != nil {
+		if err := domain.CheckSoD(instance.SubmittedBy, req.ActorUserID, onBehalfOf, priorSignoffs); err != nil {
 			return err
 		}
 
@@ -329,6 +343,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 			ContentHash:              contentHash,
 			ActorDisplayNameSnapshot: actorDisplayName,
 			SignatureMeaning:         signatureMeaning,
+			OnBehalfOfUserID:         onBehalfOf,
 		})
 		if err != nil {
 			return fmt.Errorf("recordSignoff: build signoff: %w", err)
@@ -517,6 +532,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 			"stage_instance_id": activeStage.ID,
 			"decision":          req.Decision,
 			"content_hash":      contentHash,
+			"on_behalf_of":      onBehalfOf,
 		}
 		payloadBytes, err := json.Marshal(payloadMap)
 		if err != nil {

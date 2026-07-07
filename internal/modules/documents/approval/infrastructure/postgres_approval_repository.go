@@ -155,13 +155,18 @@ func (r *postgresApprovalRepository) InsertSignoff(ctx context.Context, tx db.Tx
 		actorDisplayNameSnapshot = sql.NullString{String: v, Valid: true}
 	}
 
+	var onBehalfOf sql.NullString
+	if v := s.OnBehalfOf(); v != "" {
+		onBehalfOf = sql.NullString{String: v, Valid: true}
+	}
+
 	var returnedID string
 	err := tx.QueryRowContext(ctx, `
 		INSERT INTO approval_signoffs
 		  (id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id,
 		   decision, comment, signed_at, signature_method, signature_payload, content_hash,
-		   actor_display_name_snapshot, signature_meaning)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		   actor_display_name_snapshot, signature_meaning, on_behalf_of_user_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		ON CONFLICT (stage_instance_id, actor_user_id) DO NOTHING
 		RETURNING id`,
 		s.ID(),
@@ -177,6 +182,7 @@ func (r *postgresApprovalRepository) InsertSignoff(ctx context.Context, tx db.Tx
 		s.ContentHash(),
 		actorDisplayNameSnapshot,
 		s.SignatureMeaning(),
+		onBehalfOf,
 	).Scan(&returnedID)
 
 	if err == nil {
@@ -212,7 +218,8 @@ func (r *postgresApprovalRepository) LoadSignoffByActor(ctx context.Context, tx 
 	row := tx.QueryRowContext(ctx, `
 		SELECT s.id, s.approval_instance_id, s.stage_instance_id, s.actor_user_id,
 		       s.actor_tenant_id, s.decision, coalesce(s.comment,''), s.signed_at,
-		       s.signature_method, s.signature_payload, s.content_hash, s.signature_meaning
+		       s.signature_method, s.signature_payload, s.content_hash, s.signature_meaning,
+		       coalesce(s.on_behalf_of_user_id,'')
 		FROM approval_signoffs s
 		JOIN approval_instances i ON i.id = s.approval_instance_id
 		WHERE s.approval_instance_id = $1
@@ -227,7 +234,8 @@ func (r *postgresApprovalRepository) loadSignoffByStageActor(ctx context.Context
 	row := tx.QueryRowContext(ctx, `
 		SELECT s.id, s.approval_instance_id, s.stage_instance_id, s.actor_user_id,
 		       s.actor_tenant_id, s.decision, coalesce(s.comment,''), s.signed_at,
-		       s.signature_method, s.signature_payload, s.content_hash, s.signature_meaning
+		       s.signature_method, s.signature_payload, s.content_hash, s.signature_meaning,
+		       coalesce(s.on_behalf_of_user_id,'')
 		FROM approval_signoffs s
 		JOIN approval_instances i ON i.id = s.approval_instance_id
 		WHERE s.stage_instance_id = $1
@@ -247,11 +255,13 @@ func scanSignoff(row rowScanner) (*domain.Signoff, error) {
 		id, instanceID, stageID, actorUserID, actorTenantID string
 		decision, comment, signatureMethod, contentHash     string
 		signatureMeaning                                    string
+		onBehalfOf                                           string
 		signedAt                                            time.Time
 		sigPayload                                          []byte
 	)
 	err := row.Scan(&id, &instanceID, &stageID, &actorUserID, &actorTenantID,
-		&decision, &comment, &signedAt, &signatureMethod, &sigPayload, &contentHash, &signatureMeaning)
+		&decision, &comment, &signedAt, &signatureMethod, &sigPayload, &contentHash, &signatureMeaning,
+		&onBehalfOf)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, sql.ErrNoRows
 	}
@@ -267,6 +277,7 @@ func scanSignoff(row rowScanner) (*domain.Signoff, error) {
 		ActorTenantID:      actorTenantID,
 		Decision:           domain.Decision(decision),
 		Comment:            comment,
+		OnBehalfOfUserID:   onBehalfOf,
 		SignedAt:           signedAt,
 		SignatureMethod:    signatureMethod,
 		SignaturePayload:   json.RawMessage(sigPayload),
@@ -1152,12 +1163,17 @@ func (r *postgresApprovalRepository) InsertVerdict(ctx context.Context, tx db.Tx
 		actorDisplayNameSnapshot = sql.NullString{String: name, Valid: true}
 	}
 
+	var onBehalfOf sql.NullString
+	if val := v.OnBehalfOf(); val != "" {
+		onBehalfOf = sql.NullString{String: val, Valid: true}
+	}
+
 	var returnedID string
 	err := tx.QueryRowContext(ctx, `
 		INSERT INTO approval_review_verdicts
 		  (id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id,
-		   verdict, comment, verdict_at, actor_display_name_snapshot)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		   verdict, comment, verdict_at, actor_display_name_snapshot, on_behalf_of_user_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (stage_instance_id, actor_user_id) DO NOTHING
 		RETURNING id`,
 		v.ID(),
@@ -1169,6 +1185,7 @@ func (r *postgresApprovalRepository) InsertVerdict(ctx context.Context, tx db.Tx
 		v.Comment(),
 		v.VerdictAt(),
 		actorDisplayNameSnapshot,
+		onBehalfOf,
 	).Scan(&returnedID)
 
 	if err == nil {
@@ -1194,7 +1211,7 @@ func (r *postgresApprovalRepository) loadVerdictByStageActor(ctx context.Context
 	row := tx.QueryRowContext(ctx, `
 		SELECT v.id, v.approval_instance_id, v.stage_instance_id, v.actor_user_id,
 		       v.actor_tenant_id, v.verdict, coalesce(v.comment,''), v.verdict_at,
-		       coalesce(v.actor_display_name_snapshot,'')
+		       coalesce(v.actor_display_name_snapshot,''), coalesce(v.on_behalf_of_user_id,'')
 		FROM approval_review_verdicts v
 		JOIN approval_instances i ON i.id = v.approval_instance_id
 		WHERE v.stage_instance_id = $1
@@ -1209,10 +1226,11 @@ func scanVerdict(row rowScanner) (*domain.ReviewVerdict, error) {
 	var (
 		id, instanceID, stageID, actorUserID, actorTenantID string
 		verdict, comment, displayName                       string
+		onBehalfOf                                          string
 		verdictAt                                           time.Time
 	)
 	err := row.Scan(&id, &instanceID, &stageID, &actorUserID, &actorTenantID,
-		&verdict, &comment, &verdictAt, &displayName)
+		&verdict, &comment, &verdictAt, &displayName, &onBehalfOf)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, sql.ErrNoRows
 	}
@@ -1235,6 +1253,7 @@ func scanVerdict(row rowScanner) (*domain.ReviewVerdict, error) {
 		Comment:                  comment,
 		VerdictAt:                verdictAt,
 		ActorDisplayNameSnapshot: displayName,
+		OnBehalfOfUserID:         onBehalfOf,
 	})
 }
 
@@ -1244,7 +1263,8 @@ func (r *postgresApprovalRepository) LoadStageVerdicts(ctx context.Context, tx d
 	rows, err := tx.QueryContext(ctx, `
 		SELECT v.id, v.approval_instance_id, v.stage_instance_id,
 		       v.actor_user_id, v.actor_tenant_id, v.verdict,
-		       coalesce(v.comment,''), v.verdict_at, coalesce(v.actor_display_name_snapshot,'')
+		       coalesce(v.comment,''), v.verdict_at, coalesce(v.actor_display_name_snapshot,''),
+		       coalesce(v.on_behalf_of_user_id,'')
 		  FROM approval_review_verdicts v
 		  JOIN approval_instances ai
 		    ON ai.id = v.approval_instance_id
@@ -1264,10 +1284,11 @@ func (r *postgresApprovalRepository) LoadStageVerdicts(ctx context.Context, tx d
 		var (
 			id, instanceID, stageID, actorUserID, actorTenantID string
 			verdict, comment, displayName                       string
+			onBehalfOf                                          string
 			verdictAt                                           time.Time
 		)
 		if err := rows.Scan(&id, &instanceID, &stageID, &actorUserID, &actorTenantID,
-			&verdict, &comment, &verdictAt, &displayName); err != nil {
+			&verdict, &comment, &verdictAt, &displayName, &onBehalfOf); err != nil {
 			return nil, err
 		}
 		v, err := domain.NewVerdict(domain.VerdictParams{
@@ -1281,6 +1302,7 @@ func (r *postgresApprovalRepository) LoadStageVerdicts(ctx context.Context, tx d
 			Comment:                  comment,
 			VerdictAt:                verdictAt,
 			ActorDisplayNameSnapshot: displayName,
+			OnBehalfOfUserID:         onBehalfOf,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("scan verdict %s: %w", id, err)
@@ -1299,7 +1321,7 @@ func (r *postgresApprovalRepository) LoadPriorSignoffs(ctx context.Context, tx d
 		SELECT id, approval_instance_id, stage_instance_id,
 		       actor_user_id, actor_tenant_id, decision,
 		       comment, signed_at, signature_method, signature_payload, content_hash,
-		       signature_meaning
+		       signature_meaning, coalesce(on_behalf_of_user_id,'')
 		FROM approval_signoffs
 		WHERE approval_instance_id = $1
 		  AND stage_instance_id != $2
@@ -1320,7 +1342,7 @@ func (r *postgresApprovalRepository) LoadStageSignoffs(ctx context.Context, tx d
 		SELECT s.id, s.approval_instance_id, s.stage_instance_id,
 		       s.actor_user_id, s.actor_tenant_id, s.decision,
 		       s.comment, s.signed_at, s.signature_method, s.signature_payload, s.content_hash,
-		       s.signature_meaning
+		       s.signature_meaning, coalesce(s.on_behalf_of_user_id,'')
 		  FROM approval_signoffs s
 		  JOIN approval_stage_instances asi
 		    ON asi.id = s.stage_instance_id
@@ -1357,12 +1379,13 @@ func scanSignoffsRows(rows *sql.Rows) ([]domain.Signoff, error) {
 			signaturePayload   []byte
 			contentHash        string
 			signatureMeaning   string
+			onBehalfOf         string
 		)
 		if err := rows.Scan(
 			&id, &approvalInstanceID, &stageInstanceID,
 			&actorUserID, &actorTenantID, &decision,
 			&comment, &signedAt, &signatureMethod, &signaturePayload, &contentHash,
-			&signatureMeaning,
+			&signatureMeaning, &onBehalfOf,
 		); err != nil {
 			return nil, err
 		}
@@ -1379,6 +1402,7 @@ func scanSignoffsRows(rows *sql.Rows) ([]domain.Signoff, error) {
 			SignaturePayload:   json.RawMessage(signaturePayload),
 			ContentHash:        contentHash,
 			SignatureMeaning:   signatureMeaning,
+			OnBehalfOfUserID:   onBehalfOf,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("scan signoff %s: %w", id, err)
@@ -1651,4 +1675,85 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 	}
 
 	return route, nil
+}
+
+// ── F9 delegation (ADR 0077) ─────────────────────────────────────────────────
+
+// InsertDelegation persists a new approval_delegations row. Plain insert — no
+// idempotency-replay concept; overlapping active grants for the same
+// delegator are explicitly allowed (union semantics, spec.md Interview #7).
+func (r *postgresApprovalRepository) InsertDelegation(ctx context.Context, tx db.Tx, d domain.Delegation) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO approval_delegations
+		  (id, tenant_id, delegator_id, delegate_id, starts_at, ends_at, reason, created_by, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		d.ID(), d.TenantID(), d.DelegatorID(), d.DelegateID(),
+		d.StartsAt(), d.EndsAt(), d.Reason(), d.CreatedBy(), d.CreatedAt(),
+	)
+	if err != nil {
+		return MapPgError(err, MapHints{})
+	}
+	return nil
+}
+
+// DeleteDelegation hard-deletes an approval_delegations row IFF tenant_id
+// matches and the caller owns it (is the delegator) or holds oversee. The
+// ownership check is expressed in the WHERE clause itself (same OCC-via-WHERE
+// idiom this package already uses, e.g. CancelInstance's revision-version
+// guard) so the delete is atomic — no separate load-then-check race window.
+func (r *postgresApprovalRepository) DeleteDelegation(ctx context.Context, tx db.Tx, tenantID, delegationID, callerID string, callerIsOversee bool) (bool, error) {
+	res, err := tx.ExecContext(ctx, `
+		DELETE FROM approval_delegations
+		 WHERE id = $1
+		   AND tenant_id = $2
+		   AND (delegator_id = $3 OR $4::boolean)`,
+		delegationID, tenantID, callerID, callerIsOversee,
+	)
+	if err != nil {
+		return false, MapPgError(err, MapHints{})
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+// LoadActiveDelegationsFor returns every approval_delegations row where
+// delegate_id matches and the window covers asOf. Always called in-tx at
+// actual use-time (F9/ADR 0077 §5) — no caching, no off-tx read.
+func (r *postgresApprovalRepository) LoadActiveDelegationsFor(ctx context.Context, tx db.Tx, tenantID, delegateID string, asOf time.Time) ([]domain.Delegation, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, tenant_id, delegator_id, delegate_id, starts_at, ends_at, reason, created_by, created_at
+		  FROM approval_delegations
+		 WHERE tenant_id = $1
+		   AND delegate_id = $2
+		   AND starts_at <= $3
+		   AND ends_at > $3`,
+		tenantID, delegateID, asOf,
+	)
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	defer rows.Close()
+
+	var delegations []domain.Delegation
+	for rows.Next() {
+		var (
+			id, tid, delegatorID, delegateIDCol, reason, createdBy string
+			startsAt, endsAt, createdAt                            time.Time
+		)
+		if err := rows.Scan(&id, &tid, &delegatorID, &delegateIDCol, &startsAt, &endsAt, &reason, &createdBy, &createdAt); err != nil {
+			return nil, err
+		}
+		d, err := domain.NewDelegation(domain.DelegationParams{
+			ID: id, TenantID: tid, DelegatorID: delegatorID, DelegateID: delegateIDCol,
+			StartsAt: startsAt, EndsAt: endsAt, Reason: reason, CreatedBy: createdBy, CreatedAt: createdAt,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("scan delegation %s: %w", id, err)
+		}
+		delegations = append(delegations, *d)
+	}
+	return delegations, rows.Err()
 }

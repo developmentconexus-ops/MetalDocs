@@ -41,6 +41,7 @@ type ReviewVerdict struct {
 	comment                  string
 	verdictAt                time.Time
 	actorDisplayNameSnapshot string
+	onBehalfOfUserID         string // F9/ADR 0077: delegator's user_id, "" when acting as self
 }
 
 // ID returns the verdict's identifier.
@@ -71,6 +72,11 @@ func (v *ReviewVerdict) VerdictAt() time.Time { return v.verdictAt }
 // verdict time.
 func (v *ReviewVerdict) ActorDisplayNameSnapshot() string { return v.actorDisplayNameSnapshot }
 
+// OnBehalfOf returns the delegator's user_id when this verdict was recorded
+// via an active delegation (F9/ADR 0077); "" when the actor acted as
+// themselves.
+func (v *ReviewVerdict) OnBehalfOf() string { return v.onBehalfOfUserID }
+
 // VerdictParams holds constructor inputs for NewVerdict.
 type VerdictParams struct {
 	ID                       string
@@ -83,6 +89,7 @@ type VerdictParams struct {
 	Comment                  string
 	VerdictAt                time.Time
 	ActorDisplayNameSnapshot string
+	OnBehalfOfUserID         string // F9/ADR 0077: delegator's user_id, "" when acting as self
 }
 
 // NewVerdict constructs an immutable ReviewVerdict value object. Enforces:
@@ -130,6 +137,7 @@ func NewVerdict(p VerdictParams) (*ReviewVerdict, error) {
 		comment:                  p.Comment,
 		verdictAt:                p.VerdictAt,
 		actorDisplayNameSnapshot: p.ActorDisplayNameSnapshot,
+		onBehalfOfUserID:         p.OnBehalfOfUserID,
 	}, nil
 }
 
@@ -145,5 +153,6 @@ func (v *ReviewVerdict) MarshalJSON() ([]byte, error) {
 		"comment":                     v.comment,
 		"verdict_at":                  v.verdictAt,
 		"actor_display_name_snapshot": v.actorDisplayNameSnapshot,
+		"on_behalf_of_user_id":        v.onBehalfOfUserID,
 	})
 }

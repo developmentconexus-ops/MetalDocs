@@ -161,4 +161,26 @@ type ApprovalRepository interface {
 	// which the NULL-permissive tenant_isolation policy (migration 0237) allows.
 	LoadActorDisplayName(ctx context.Context, tenantID, userID string) (string, error)
 	LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID string) (domain.Route, error)
+
+	// InsertDelegation persists a new approval_delegations row (F9/ADR 0077).
+	// Plain insert — no idempotency-replay concept, since overlapping grants
+	// for the same delegator are explicitly allowed (union semantics).
+	InsertDelegation(ctx context.Context, tx db.Tx, d domain.Delegation) error
+	// DeleteDelegation hard-deletes an approval_delegations row IFF tenant_id
+	// matches and the caller is either the delegator or (when
+	// callerIsOversee is true) an oversee-holder. Real-time revocation: after
+	// this returns deleted=true, the very next LoadActiveDelegationsFor call
+	// (in-tx, at actual use-time) cannot see the row — there is no soft flag
+	// anywhere for a stale reader to miss. Returns deleted=false (not an
+	// error) when no matching row was found or the caller doesn't own it;
+	// callers surface this as a single not-found/not-owned error rather than
+	// distinguishing the two cases (avoids leaking whether a foreign
+	// delegation exists).
+	DeleteDelegation(ctx context.Context, tx db.Tx, tenantID, delegationID, callerID string, callerIsOversee bool) (deleted bool, err error)
+	// LoadActiveDelegationsFor returns every approval_delegations row where
+	// delegate_id matches and the window covers asOf (starts_at <= asOf <
+	// ends_at), evaluated fresh against current data — always call this in-tx
+	// at actual use-time, never from a cached/previously-loaded value, so
+	// revocation and window expiry are honored immediately (F9/ADR 0077 §5).
+	LoadActiveDelegationsFor(ctx context.Context, tx db.Tx, tenantID, delegateID string, asOf time.Time) ([]domain.Delegation, error)
 }

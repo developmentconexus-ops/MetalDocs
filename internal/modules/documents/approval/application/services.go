@@ -44,6 +44,7 @@ type Services struct {
 	RouteAdmin    *RouteAdminService
 	MarkReviewed  *MarkReviewedService
 	ReviewVerdict *ReviewVerdictService
+	Delegation    *DelegationService
 	clock         Clock
 }
 
@@ -88,6 +89,7 @@ func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, c
 		RouteAdmin:    &RouteAdminService{repo: repo, emitter: emitter, clock: clock},
 		MarkReviewed:  NewMarkReviewedService(emitter, clock),
 		ReviewVerdict: &ReviewVerdictService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		Delegation:    newDelegationService(repo, emitter, clock),
 		clock:         clock,
 	}
 }

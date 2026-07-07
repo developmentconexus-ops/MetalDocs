@@ -261,6 +261,16 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathPrefix: "/api/v1/approval/instances/", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/approval/inbox", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
+	// Approval delegation (F9/ADR 0077, spec.md Interview #11): delegation only
+	// widens WHO may exercise an eligibility a stage already requires — it never
+	// grants a new capability. Grant/revoke are gated on the same capability as
+	// the runtime act being delegated (document.signoff), consistent with the
+	// module's "capability, not role" invariant: a user with no signoff capability
+	// at all has nothing meaningful to delegate. Tier-2 ownership (delegator-or-
+	// oversee) is enforced in DelegationService, not here.
+	{method: http.MethodPost, pathExact: "/api/v1/approval/delegations", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/approval/delegations/", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
+
 	// Notifications — self-scoped read surface (M3/F3.2, F3.4). CapNotificationRead at tier-1
 	// (mirrors CapAuditRead). Most specific first: read-all (exact) and unread-count (exact)
 	// and /read (suffix) precede the bare collection GET.

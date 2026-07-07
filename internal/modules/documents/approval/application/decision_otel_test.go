@@ -109,6 +109,15 @@ func (stubApprovalRepo) InsertVerdict(_ context.Context, _ platformdb.Tx, _ doma
 func (stubApprovalRepo) LoadStageVerdicts(_ context.Context, _ platformdb.Tx, _, _ string) ([]domain.ReviewVerdict, error) {
 	return nil, nil
 }
+func (stubApprovalRepo) InsertDelegation(_ context.Context, _ platformdb.Tx, _ domain.Delegation) error {
+	return nil
+}
+func (stubApprovalRepo) DeleteDelegation(_ context.Context, _ platformdb.Tx, _, _, _ string, _ bool) (bool, error) {
+	return false, nil
+}
+func (stubApprovalRepo) LoadActiveDelegationsFor(_ context.Context, _ platformdb.Tx, _, _ string, _ time.Time) ([]domain.Delegation, error) {
+	return nil, nil
+}
 
 // stubDecisionTxRunner calls fn(ctx) so the flow enters the tx func and hits the repo.
 type stubDecisionTxRunner struct{}

@@ -34,6 +34,7 @@ type Signoff struct {
 	contentHash              string // always lowercase hex sha-256
 	actorDisplayNameSnapshot string
 	signatureMeaning         string
+	onBehalfOfUserID         string // F9/ADR 0077: delegator's user_id, "" when acting as self
 }
 
 // Getters — no setters exist; immutable after construction.
@@ -77,6 +78,11 @@ func (s *Signoff) ActorDisplayNameSnapshot() string { return s.actorDisplayNameS
 // SignatureMeaning returns the meaning of this signature: "approval" or "rejection".
 func (s *Signoff) SignatureMeaning() string { return s.signatureMeaning }
 
+// OnBehalfOf returns the delegator's user_id when this signoff was recorded
+// via an active delegation (F9/ADR 0077); "" when the actor signed as
+// themselves.
+func (s *Signoff) OnBehalfOf() string { return s.onBehalfOfUserID }
+
 // SignoffParams holds constructor inputs.
 type SignoffParams struct {
 	ID                       string
@@ -92,6 +98,7 @@ type SignoffParams struct {
 	ContentHash              string
 	ActorDisplayNameSnapshot string
 	SignatureMeaning         string
+	OnBehalfOfUserID         string // F9/ADR 0077: delegator's user_id, "" when acting as self
 }
 
 // NewSignoff constructs an immutable Signoff value object.
@@ -148,6 +155,7 @@ func NewSignoff(p SignoffParams) (*Signoff, error) {
 		contentHash:              hash,
 		actorDisplayNameSnapshot: p.ActorDisplayNameSnapshot,
 		signatureMeaning:         signatureMeaning,
+		onBehalfOfUserID:         p.OnBehalfOfUserID,
 	}, nil
 }
 
@@ -166,5 +174,6 @@ func (s *Signoff) MarshalJSON() ([]byte, error) {
 		"content_hash":                s.contentHash,
 		"actor_display_name_snapshot": s.actorDisplayNameSnapshot,
 		"signature_meaning":           s.signatureMeaning,
+		"on_behalf_of_user_id":        s.onBehalfOfUserID,
 	})
 }

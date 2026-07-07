@@ -178,6 +178,18 @@ func (r *fakeSubmitRepo) LoadFrozenContentHash(_ context.Context, _ db.Tx, _, _ 
 	panic("fakeSubmitRepo.LoadFrozenContentHash: not expected to be called in submit tests")
 }
 
+func (r *fakeSubmitRepo) InsertDelegation(_ context.Context, _ db.Tx, _ domain.Delegation) error {
+	panic("fakeSubmitRepo.InsertDelegation: not expected to be called in submit tests")
+}
+
+func (r *fakeSubmitRepo) DeleteDelegation(_ context.Context, _ db.Tx, _, _, _ string, _ bool) (bool, error) {
+	panic("fakeSubmitRepo.DeleteDelegation: not expected to be called in submit tests")
+}
+
+func (r *fakeSubmitRepo) LoadActiveDelegationsFor(_ context.Context, _ db.Tx, _, _ string, _ time.Time) ([]domain.Delegation, error) {
+	panic("fakeSubmitRepo.LoadActiveDelegationsFor: not expected to be called in submit tests")
+}
+
 // ---------------------------------------------------------------------------
 // Fixed clock for deterministic idempotency keys.
 // ---------------------------------------------------------------------------

@@ -19,14 +19,27 @@ var (
 //
 // Rules:
 //   - actorUserID must not equal authorUserID
+//   - onBehalfOfUserID (when non-empty) must not equal authorUserID — a
+//     delegate acting on behalf of the author inherits the author's own
+//     cannot-sign-own-document constraint (F9/ADR 0077, spec.md §4/W5)
 //   - actorUserID must not appear in any priorSignoffs (same instance, earlier stages)
 //
 // Callers with no same-shape prior-record source (e.g. review verdicts, which
 // live in a differently-shaped table with their own per-stage-actor
 // uniqueness enforcement) pass nil for priorSignoffs — the cross-stage clause
 // is then simply a no-op, and only the author self-check applies.
-func CheckSoD(authorUserID string, actorUserID string, priorSignoffs []Signoff) error {
+//
+// onBehalfOfUserID is "" when the actor is acting as themselves (the common,
+// non-delegated case — this keeps every existing call site byte-identical in
+// behavior) and the delegator's user_id when eligibility for this action was
+// satisfied via an active approval_delegations row. This is the SAME shared
+// predicate every call site uses — delegation widens its input, it does not
+// introduce a second SoD rule.
+func CheckSoD(authorUserID string, actorUserID string, onBehalfOfUserID string, priorSignoffs []Signoff) error {
 	if actorUserID == authorUserID {
+		return ErrAuthorCannotSign
+	}
+	if onBehalfOfUserID != "" && onBehalfOfUserID == authorUserID {
 		return ErrAuthorCannotSign
 	}
 	for _, s := range priorSignoffs {

@@ -30,6 +30,16 @@ const (
 	EventTypeRouteConfigCreated     EventType = "route.config.created"
 	EventTypeRouteConfigUpdated     EventType = "route.config.updated"
 	EventTypeRouteConfigDeactivated EventType = "route.config.deactivated"
+
+	// EventTypeDelegationGranted / EventTypeDelegationRevoked (F9/ADR 0077):
+	// approval delegation grant/revoke audit trail. "Use" of a delegation is
+	// NOT a separate event type — the existing EventTypeSignoffRecorded /
+	// EventTypeReviewVerdictRecorded events already carry the full audit
+	// trail for the action and are widened with an "on_behalf_of" payload
+	// field (mirrors F7's precedent of extending an existing event's payload
+	// rather than inventing a new event type).
+	EventTypeDelegationGranted EventType = "delegation.granted"
+	EventTypeDelegationRevoked EventType = "delegation.revoked"
 )
 
 // GovernanceEvent mirrors the governance_events table columns.
