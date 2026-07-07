@@ -96,7 +96,11 @@ describe('InboxPage', () => {
 
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Nenhuma aprovação pendente.')).toBeTruthy();
+      expect(
+        screen.getByText(
+          'Nenhuma aprovação pendente. Documentos submetidos a rotas onde você é revisor ou aprovador aparecem aqui.',
+        ),
+      ).toBeTruthy();
     });
 
     expect(screen.queryByText('POP-QUA-0148')).toBeNull();
@@ -208,68 +212,13 @@ describe('InboxPage', () => {
     expect(screen.queryByText('POP-QUA-0148')).toBeNull();
   });
 
-  it('Abrir documento navigates to the modern editor route', async () => {
-    vi.mocked(fetchActiveDocumentInstance).mockResolvedValue({
-      document_id: 'doc-123',
-      content_hash: 'hash-123',
-      approval_instance_id: 'inst-123',
-    } as Awaited<ReturnType<typeof fetchActiveDocumentInstance>>);
-    vi.mocked(useInboxQuery).mockReturnValue({
-      data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useInboxQuery>);
-
-    renderPage();
-    fireEvent.click(screen.getByText('Abrir documento'));
-
-    await waitFor(() => {
-      expect(fetchActiveDocumentInstance).toHaveBeenCalledWith('cd-123');
-    });
-    expect(navigateMock).toHaveBeenCalledWith('/documents/doc-123/edit');
-  });
-
-  it('Abrir documento keeps navigation in modern editor flow', async () => {
-    vi.mocked(fetchActiveDocumentInstance).mockResolvedValue({
-      document_id: 'doc-modern',
-      content_hash: 'hash-modern',
-      approval_instance_id: 'inst-modern',
-    } as Awaited<ReturnType<typeof fetchActiveDocumentInstance>>);
-    vi.mocked(useInboxQuery).mockReturnValue({
-      data: { items: [makeItem({ controlled_document_id: 'cd-modern' })], total: 1 },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useInboxQuery>);
-
-    renderPage();
-    fireEvent.click(screen.getByText('Abrir documento'));
-
-    await waitFor(() => {
-      expect(fetchActiveDocumentInstance).toHaveBeenCalledWith('cd-modern');
-    });
-    expect(navigateMock).toHaveBeenCalledWith('/documents/doc-modern/edit');
-    expect(navigateMock).not.toHaveBeenCalledWith('/controlled-documents/cd-modern');
-  });
-
-  it('Abrir documento shows modern-flow error when active context is unavailable', async () => {
-    vi.mocked(fetchActiveDocumentInstance).mockRejectedValue(new Error('context unavailable'));
-    vi.mocked(useInboxQuery).mockReturnValue({
-      data: { items: [makeItem({ controlled_document_id: 'cd-fail' })], total: 1 },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useInboxQuery>);
-
-    renderPage();
-    fireEvent.click(screen.getByText('Abrir documento'));
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Documento indisponivel no editor moderno no momento.');
-    });
-    expect(navigateMock).not.toHaveBeenCalledWith('/controlled-documents/cd-fail');
-  });
+  // NOTE: the three "Abrir documento navigates to the modern editor route" /
+  // "keeps navigation in modern editor flow" / "shows modern-flow error..."
+  // tests that lived here were deleted under F5 (M2c C3, single destination).
+  // They asserted the exact bug C3 fixes — the primary worklist open landing
+  // on `/documents/:id/edit` (the author editor) via fetchActiveDocumentInstance.
+  // That vector is gone; see "primary open (Abrir documento) navigates to the
+  // approval cockpit, not the editor" below, which supersedes them.
 
   it('approve action navigates to the signoff cockpit with decision=approve', async () => {
     vi.mocked(fetchActiveDocumentInstance).mockResolvedValue({
@@ -333,6 +282,162 @@ describe('InboxPage', () => {
 
     await waitFor(() => {
       expect(navigateMock).toHaveBeenCalledWith('/approvals/doc-9?decision=reject');
+    });
+  });
+
+  // F5 (M2c C3): single-destination — primary item open must land on the
+  // cockpit, never the author editor. This replaces the old
+  // fetchActiveDocumentInstance -> /documents/:id/edit vector.
+  it('primary open (Abrir documento) navigates to the approval cockpit, not the editor', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [makeItem({ document_id: 'doc-cockpit', controlled_document_id: 'cd-cockpit' })], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+    fireEvent.click(screen.getByText('Abrir documento'));
+
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith('/approvals/doc-cockpit');
+    });
+    expect(fetchActiveDocumentInstance).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalledWith(expect.stringContaining('/edit'));
+  });
+
+  it('filter selection re-queries useInboxQuery with mapped params', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [], total: 0 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('Estágio'), { target: { value: 'review' } });
+
+    await waitFor(() => {
+      const lastCall = vi.mocked(useInboxQuery).mock.calls.at(-1)?.[0];
+      expect(lastCall).toMatchObject({ stage_kind: 'review' });
+    });
+  });
+
+  it('sorts items due-date ascending with null due_at last', async () => {
+    const noDue = makeItem({ instance_id: 'i-none', document_title: 'Sem prazo', due_at: null });
+    const later = makeItem({ instance_id: 'i-later', document_title: 'Prazo distante', due_at: '2026-08-01T00:00:00.000Z' });
+    const sooner = makeItem({ instance_id: 'i-sooner', document_title: 'Prazo próximo', due_at: '2026-04-15T00:00:00.000Z' });
+
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [noDue, later, sooner], total: 3 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+    fireEvent.click(screen.getByText('Linha do tempo'));
+
+    await waitFor(() => {
+      const titles = screen.getAllByText(/Prazo|Sem prazo/).map((el) => el.textContent);
+      const sortedIdx = {
+        sooner: titles.indexOf('Prazo próximo'),
+        later: titles.indexOf('Prazo distante'),
+        none: titles.indexOf('Sem prazo'),
+      };
+      expect(sortedIdx.sooner).toBeLessThan(sortedIdx.later);
+      expect(sortedIdx.later).toBeLessThan(sortedIdx.none);
+    });
+  });
+
+  it('shows the no-work teaching empty state when there is no filter active', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [], total: 0 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Nenhuma aprovação pendente. Documentos submetidos a rotas onde você é revisor ou aprovador aparecem aqui.',
+        ),
+      ).toBeTruthy();
+    });
+  });
+
+  it('shows the filtered-empty teaching state when a filter is active and yields nothing', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [], total: 0 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText('Estágio'), { target: { value: 'review' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Nenhuma aprovação corresponde aos filtros.')).toBeTruthy();
+    });
+  });
+
+  it('renders an overdue chip for a past due_at', async () => {
+    const overdueItem = makeItem({
+      instance_id: 'i-overdue',
+      document_title: 'Doc atrasado',
+      due_at: '2020-01-01T00:00:00.000Z',
+    });
+
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [overdueItem], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText(/atrasado há/)).toBeTruthy();
+    });
+  });
+
+  it('reverts the oversee toggle and shows a note on a 403 while oversee scope is active', async () => {
+    const { ApiError } = await import('../../../lib/api/errors');
+    vi.mocked(useInboxQuery).mockImplementation((params) => {
+      if (params?.scope === 'oversee') {
+        return {
+          data: undefined,
+          isLoading: false,
+          isError: true,
+          error: new ApiError('forbidden', 403, 'Forbidden'),
+          refetch: vi.fn(),
+        } as unknown as ReturnType<typeof useInboxQuery>;
+      }
+      return {
+        data: { items: [], total: 0 },
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      } as unknown as ReturnType<typeof useInboxQuery>;
+    });
+
+    renderPage();
+
+    fireEvent.click(screen.getByLabelText(/Supervisão/i));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Você não tem permissão de supervisão.');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Supervisão/i)).not.toBeChecked();
     });
   });
 });

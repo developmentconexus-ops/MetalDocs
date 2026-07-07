@@ -138,6 +138,11 @@
   color: var(--text-faint);
 }
 
+.dueOverdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 /* ─── Card Area ───────────────────────────────────────────── */
 
 .cardArea {

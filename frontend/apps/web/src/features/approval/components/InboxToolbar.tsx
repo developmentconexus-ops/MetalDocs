@@ -4,6 +4,8 @@ import styles from './InboxToolbar.module.css';
 type Props = {
   view: 'stack' | 'timeline';
   onViewChange: (v: 'stack' | 'timeline') => void;
+  filtersOpen?: boolean;
+  onToggleFilters?: () => void;
 };
 
 const StackIcon = () => (
@@ -23,14 +25,19 @@ const TimelineIcon = () => (
   </svg>
 );
 
-export function InboxToolbar({ view, onViewChange }: Props) {
+export function InboxToolbar({ view, onViewChange, filtersOpen, onToggleFilters }: Props) {
   return (
     <div className={styles.toolbar}>
       <span className={`${styles.kicker} kicker`}>APROVAÇÕES</span>
       <span className={styles.breadcrumbSep}>›</span>
       <span className={styles.breadcrumbTitle}>Caixa de entrada</span>
       <span className={styles.spacer} />
-      <button type="button" className={`${styles.filtersBtn} btn btn-sm`} disabled aria-disabled="true" title="Em breve">
+      <button
+        type="button"
+        className={`${styles.filtersBtn} btn btn-sm`}
+        aria-pressed={filtersOpen}
+        onClick={onToggleFilters}
+      >
         <Icon name="filter" size={13} /> Filtros
       </button>
       <div className={styles.viewSwitcher}>

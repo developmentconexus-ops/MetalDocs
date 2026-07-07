@@ -373,6 +373,11 @@
   /* uses .btn .btn-primary .btn-sm from globals */
 }
 
+.dueOverdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 /* ─── Empty bucket ───────────────────────────────────────── */
 
 .emptyBucket {

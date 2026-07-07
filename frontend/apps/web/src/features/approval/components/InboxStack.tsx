@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { InboxItem } from '../api/approvalTypes';
+import { formatDueRelative } from '../../../lib/format/dates';
 import { InboxApprovalCard } from './InboxApprovalCard';
 import styles from './InboxStack.module.css';
 
@@ -11,10 +12,18 @@ interface InboxStackProps {
   onPrev: () => void;
   isLoading?: boolean;
   isError?: boolean;
+  // F5 (M2c C3): when a filter is active and yields no items, the empty state
+  // must teach "no match for filters" instead of "no work at all" — otherwise
+  // a filtered-empty result reads as "you have nothing to do".
+  isFiltered?: boolean;
   onOpenDocument?: (item: InboxItem) => void;
   onApprove?: (item: InboxItem) => void;
   onReject?: (item: InboxItem) => void;
 }
+
+const NO_WORK_EMPTY =
+  'Nenhuma aprovação pendente. Documentos submetidos a rotas onde você é revisor ou aprovador aparecem aqui.';
+const FILTERED_EMPTY = 'Nenhuma aprovação corresponde aos filtros.';
 
 export function InboxStack({
   items,
@@ -24,6 +33,7 @@ export function InboxStack({
   onPrev,
   isLoading,
   isError,
+  isFiltered,
   onOpenDocument,
   onApprove,
   onReject,
@@ -64,7 +74,7 @@ export function InboxStack({
       );
     }
     if (items.length === 0) {
-      return <div className={styles.empty}>Nenhuma aprovação pendente.</div>;
+      return <div className={styles.empty}>{isFiltered ? FILTERED_EMPTY : NO_WORK_EMPTY}</div>;
     }
     return (
       <>
@@ -125,29 +135,34 @@ export function InboxStack({
           )}
         </div>
 
-        {items.map((item, idx) => (
-          <button
-            key={item.instance_id}
-            type="button"
-            className={`${styles.queueItem}${idx === selectedIdx ? ` ${styles.queueItemActive}` : ''}`}
-            onClick={() => onSelect(idx)}
-          >
-            <div className={styles.queueItemNumber}>{String(idx + 1).padStart(2, '0')}</div>
-              <div className={styles.queueItemMeta}>
-                <div className={styles.queueItemTop}>
-                  <span className={`${styles.queueItemCode} mono`}>{item.controlled_document_id}</span>
-                </div>
-                <div className={styles.queueItemTitle}>{item.document_title}</div>
-                <div className={styles.queueItemSub}>
-                  <span className={styles.queueItemDeadline}>
-                    {new Date(item.submitted_at).toLocaleDateString('pt-BR')}
-                  </span>
-                  <span className={styles.dot}>·</span>
-                  <span>{item.area_code}</span>
-                </div>
-            </div>
-          </button>
-        ))}
+        {items.map((item, idx) => {
+          const due = formatDueRelative(item.due_at);
+          return (
+            <button
+              key={item.instance_id}
+              type="button"
+              className={`${styles.queueItem}${idx === selectedIdx ? ` ${styles.queueItemActive}` : ''}`}
+              onClick={() => onSelect(idx)}
+            >
+              <div className={styles.queueItemNumber}>{String(idx + 1).padStart(2, '0')}</div>
+                <div className={styles.queueItemMeta}>
+                  <div className={styles.queueItemTop}>
+                    <span className={`${styles.queueItemCode} mono`}>{item.controlled_document_id}</span>
+                  </div>
+                  <div className={styles.queueItemTitle}>{item.document_title}</div>
+                  <div className={styles.queueItemSub}>
+                    <span className={styles.queueItemDeadline}>
+                      {new Date(item.submitted_at).toLocaleDateString('pt-BR')}
+                    </span>
+                    <span className={styles.dot}>·</span>
+                    <span>{item.area_code}</span>
+                    <span className={styles.dot}>·</span>
+                    <span className={due.overdue ? styles.dueOverdue : undefined}>{due.label}</span>
+                  </div>
+              </div>
+            </button>
+          );
+        })}
       </aside>
 
       <main className={styles.cardArea}>

@@ -1,11 +1,21 @@
 import { Avatar } from '../../../components/ui/Avatar';
 import type { InboxItem } from '../api/approvalTypes';
+import { formatDueRelative } from '../../../lib/format/dates';
 import styles from './InboxTimeline.module.css';
 
 interface InboxTimelineProps {
   items: InboxItem[];
   onOpenDocument?: (item: InboxItem) => void;
+  isLoading?: boolean;
+  isError?: boolean;
+  // F5 (M2c C3): mirrors InboxStack's isFiltered — distinguishes "no work" vs
+  // "filter matched nothing" empty copy.
+  isFiltered?: boolean;
 }
+
+const NO_WORK_EMPTY =
+  'Nenhuma aprovação pendente. Documentos submetidos a rotas onde você é revisor ou aprovador aparecem aqui.';
+const FILTERED_EMPTY = 'Nenhuma aprovação corresponde aos filtros.';
 
 interface Bucket {
   label: string;
@@ -55,8 +65,28 @@ function handleRowKeyDown(
   }
 }
 
-export function InboxTimeline({ items, onOpenDocument }: InboxTimelineProps) {
+export function InboxTimeline({ items, onOpenDocument, isLoading, isError, isFiltered }: InboxTimelineProps) {
   const buckets = groupBySubmittedBucket(items);
+
+  if (isLoading) {
+    return <div className={styles.timelineContainer}>Carregando...</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className={styles.timelineContainer} role="alert">
+        Erro ao carregar aprovações.
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className={styles.timelineContainer}>
+        {isFiltered ? FILTERED_EMPTY : NO_WORK_EMPTY}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.timelineContainer}>
@@ -123,6 +153,7 @@ export function InboxTimeline({ items, onOpenDocument }: InboxTimelineProps) {
                       const handleClick = () => {
                         onOpenDocument?.(item);
                       };
+                      const due = formatDueRelative(item.due_at);
                       return (
                         <div
                           key={item.instance_id}
@@ -159,6 +190,9 @@ export function InboxTimeline({ items, onOpenDocument }: InboxTimelineProps) {
                           <div className={styles.stageProgress}>
                             <div className={`${styles.stageLabel} caption mono`}>
                               {item.stage_label}
+                            </div>
+                            <div className={`caption${due.overdue ? ` ${styles.dueOverdue}` : ''}`}>
+                              {due.label}
                             </div>
                           </div>
                           <button
