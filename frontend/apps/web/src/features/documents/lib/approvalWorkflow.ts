@@ -33,7 +33,6 @@ export interface TransitionPolicy {
   disabledReason?: string;
   readOnly?: boolean;
   actions: {
-    submit: boolean;
     signoff: boolean;
     cancelInstance: boolean;
     publishOrSchedule: boolean;
@@ -42,41 +41,41 @@ export interface TransitionPolicy {
 
 export const TRANSITION_POLICY: Record<ApprovalState, TransitionPolicy> = {
   draft: {
-    actions: { submit: true, signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
   },
   under_review: {
     disabledReason: 'Documento em revisão — edição bloqueada',
-    actions: { submit: false, signoff: true, cancelInstance: true, publishOrSchedule: false },
+    actions: { signoff: true, cancelInstance: true, publishOrSchedule: false },
   },
   approved: {
-    actions: { submit: false, signoff: false, cancelInstance: false, publishOrSchedule: true },
+    actions: { signoff: false, cancelInstance: false, publishOrSchedule: true },
   },
   scheduled: {
     disabledReason: 'Aguardando data de vigência agendada',
     readOnly: true,
-    actions: { submit: false, signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
   },
   published: {
-    actions: { submit: false, signoff: false, cancelInstance: false, publishOrSchedule: true },
+    actions: { signoff: false, cancelInstance: false, publishOrSchedule: true },
   },
   superseded: {
     disabledReason: 'Versão substituída — somente leitura',
     readOnly: true,
-    actions: { submit: false, signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
   },
   rejected: {
     disabledReason: 'Documento rejeitado — edite e submeta novamente',
-    actions: { submit: false, signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
   },
   obsolete: {
     disabledReason: 'Documento obsoleto — somente leitura',
     readOnly: true,
-    actions: { submit: false, signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
   },
   cancelled: {
     disabledReason: 'Aprovação cancelada',
     readOnly: true,
-    actions: { submit: false, signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
   },
 };
 

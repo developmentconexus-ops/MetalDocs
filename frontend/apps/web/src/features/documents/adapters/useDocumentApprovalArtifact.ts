@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { getInstance } from '../../approval/api/approvalApi';
-import { etagCache } from '../../approval/api/etagCache';
 import type { ApprovalInstance } from '../../approval/api/approvalTypes';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import { useAuthStore } from '../../../store/auth.store';
@@ -25,8 +24,6 @@ import { parseDocumentStatus } from '../lib/parseDocumentStatus';
  * wires their `run` to these handlers.
  */
 export interface DocumentApprovalHandlers {
-  /** Open the inline submit route-picker. */
-  openSubmit: () => void;
   /** Open the CancelInstanceDialog to collect a reason and cancel the approval instance. */
   cancelInstance: () => void;
   /** Open the SupersedePublishDialog. */
@@ -83,10 +80,12 @@ export interface DocumentApprovalArtifact {
  * `ArtifactViewModel` (approvalChain + the ordered, gated `actions`). The route
  * wrapper owns dialog state and passes the openers in via `handlers`.
  *
- * The plain actions appear per state (submit → cancel → publish); signing routes
- * through the shared DecisionPanel instead of a button (gated on
- * `policy.actions.signoff` in the route). The 404 fallback seeds a "v0" ETag so a
- * cold submit still sends a valid If-Match.
+ * The plain actions appear per state (cancel → publish); signing routes through
+ * the shared DecisionPanel instead of a button (gated on `policy.actions.signoff`
+ * in the route). The cockpit is approver-only: submitting a document for review
+ * happens exclusively on the document editor, so there is no cold-submit path or
+ * ETag seed here — when there is no active instance the document is in draft and
+ * no cockpit write is possible.
  */
 export function useDocumentApprovalArtifact(
   documentId: string,
@@ -130,7 +129,6 @@ export function useDocumentApprovalArtifact(
       if ((err as { status?: number }).status === 404) {
         setInstance(null);
         setLastFetchedAt(Date.now());
-        if (!etagCache.get(documentId)) etagCache.set(documentId, '"v0"');
       } else {
         setInstanceError('Erro ao carregar dados de aprovação.');
         setInstance(null);
@@ -166,20 +164,13 @@ export function useDocumentApprovalArtifact(
   const approvalChain: ApprovalChainItem[] | null = instance ? mapApprovalChain(instance.stages) : null;
 
   // Ordered, gated actions — emit ONLY the allowed actions, in display order
-  // (submit → cancel → publish), matching the old "button appears only when
-  // allowed" behavior. Signing is NOT a plain action: it routes exclusively
-  // through the shared DecisionPanel, gated on `policy.actions.signoff` in the
-  // route (SignoffDetailPage), so no 'signoff' button is emitted here.
+  // (cancel → publish), matching the old "button appears only when allowed"
+  // behavior. Signing is NOT a plain action: it routes exclusively through the
+  // shared DecisionPanel, gated on `policy.actions.signoff` in the route
+  // (SignoffDetailPage), so no 'signoff' button is emitted here. The cockpit is
+  // approver-only, so there is no 'submit' action either — submitting for review
+  // lives exclusively on the document editor.
   const actions: ArtifactAction[] = [];
-  if (policy.actions.submit) {
-    actions.push({
-      key: 'submit',
-      label: 'Submeter para revisão',
-      variant: 'primary',
-      available: true,
-      run: handlers.openSubmit,
-    });
-  }
   if (policy.actions.cancelInstance) {
     actions.push({
       key: 'cancel',

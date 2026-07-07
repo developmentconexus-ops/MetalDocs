@@ -32,12 +32,13 @@ const TABS: { id: Tab; label: string }[] = [
  * Document-specific route wrapper for the shared ArtifactApprovalScreen. Composes
  * the shared DecisionModel for the inline sign-off (password re-auth + legal-effect
  * confirmation — the document's legal e-signature), owns the remaining interactive
- * state (publish / cancel / submit-picker dialogs, the review-canvas ref + flushSave)
- * and injects the document review tabs as the `main` slot, the integrity / lock /
- * timeline / submit-picker as the `decisionExtras` slot, and the publish / cancel
- * modals as the `dialogs` slot. The `?decision=` param preselects the sign-off
- * option via `defaultOptionKey`. Gating + data + the action set come from
- * useDocumentApprovalArtifact.
+ * state (publish / cancel dialogs, the review-canvas ref + flushSave) and injects
+ * the document review tabs as the `main` slot, the integrity / lock / timeline as
+ * the `decisionExtras` slot, and the publish / cancel modals as the `dialogs` slot.
+ * The cockpit is approver-only — submitting a document for review happens
+ * exclusively on the document editor, so this route has no submit-picker. The
+ * `?decision=` param preselects the sign-off option via `defaultOptionKey`. Gating
+ * + data + the action set come from useDocumentApprovalArtifact.
  */
 export function SignoffDetailPage() {
   const { documentId = '' } = useParams<{ documentId: string }>();
@@ -53,7 +54,6 @@ export function SignoffDetailPage() {
   const refetchInstanceRef = useRef<() => Promise<void>>(async () => {});
 
   const [showPublish, setShowPublish] = useState(false);
-  const [showSubmit, setShowSubmit] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
 
   const currentUser = useAuthStore((s) => s.user);
@@ -70,7 +70,6 @@ export function SignoffDetailPage() {
   // Signing routes exclusively through the DecisionPanel now — the adapter emits no
   // 'signoff' action, so there is no handler for it.
   const handlers: DocumentApprovalHandlers = {
-    openSubmit: () => setShowSubmit(true),
     cancelInstance: () => setShowCancel(true),
     openPublish: () => setShowPublish(true),
   };
@@ -180,8 +179,6 @@ export function SignoffDetailPage() {
         instance={instance}
         isStale={isStale}
         onRefetchInstance={refetchInstance}
-        showSubmit={showSubmit}
-        onCloseSubmit={() => setShowSubmit(false)}
       />
     );
   }

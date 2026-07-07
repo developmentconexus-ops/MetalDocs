@@ -21,6 +21,7 @@ vi.mock('../../approval/api/approvalApi', () => ({
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
 import { getInstance } from '../../approval/api/approvalApi';
+import { etagCache } from '../../approval/api/etagCache';
 import {
   useDocumentApprovalArtifact,
   type DocumentApprovalHandlers,
@@ -73,7 +74,6 @@ function makeInstance(): ApprovalInstance {
 }
 
 const handlers: DocumentApprovalHandlers = {
-  openSubmit: vi.fn(),
   cancelInstance: vi.fn(),
   openPublish: vi.fn(),
 };
@@ -109,14 +109,15 @@ describe('useDocumentApprovalArtifact', () => {
     vi.mocked(getInstance).mockResolvedValue(makeInstance());
   });
 
-  it('emits ONLY the submit action in draft state', async () => {
+  it('emits NO actions in draft state (cockpit is approver-only; submit lives on the editor)', async () => {
     mockContext('draft', { approval_instance_id: undefined });
     const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
     const keys = result.current.model?.actions.map((a) => a.key);
-    expect(keys).toEqual(['submit']);
+    expect(keys).toEqual([]);
+    expect(keys).not.toContain('submit');
   });
 
   it('emits ONLY the cancel action in under_review (signing routes through the decision panel)', async () => {
@@ -212,6 +213,18 @@ describe('useDocumentApprovalArtifact', () => {
 
     const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
     expect(result.current.noActiveContext).toBe(true);
+  });
+
+  it('does NOT seed a "v0" etag on the 404 branch (no cold-submit path — cockpit is approver-only)', async () => {
+    etagCache.clear();
+    mockContext('draft', { approval_instance_id: undefined });
+    vi.mocked(getInstance).mockRejectedValue({ status: 404 });
+
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+
+    await waitFor(() => expect(result.current.instance).toBeNull());
+
+    expect(etagCache.get('doc-1')).toBeUndefined();
   });
 
   // ── FE-02: model.decision is the single ArtifactDecisionModel construction path

@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import { submit } from '../api/approvalApi';
 import { etagCache } from '../api/etagCache';
-import { listRoutes, type RouteSummary } from '../api/routeAdminApi';
 import type { ApprovalInstance, ApprovalState } from '../api/approvalTypes';
 import type { TransitionPolicy } from '../../documents/lib/approvalWorkflow';
 import { ApprovalTimelinePanel } from './ApprovalTimelinePanel';
@@ -23,12 +21,8 @@ interface DocumentApprovalExtrasProps {
   instance: ApprovalInstance | null;
   /** True when the last instance fetch is older than 30s. */
   isStale: boolean;
-  /** Imperative instance refetch (Atualizar + post-submit). */
+  /** Imperative instance refetch (Atualizar). */
   onRefetchInstance: () => Promise<void> | void;
-  /** Whether the inline submit route-picker is open (driven by the Submeter action). */
-  showSubmit: boolean;
-  /** Close the inline submit route-picker. */
-  onCloseSubmit: () => void;
 }
 
 /**
@@ -36,7 +30,7 @@ interface DocumentApprovalExtrasProps {
  * rendered into ArtifactApprovalScreen's `decisionExtras` slot. Holds the
  * LockBadge + StateBadge row, the integrity block (content_hash + copy,
  * revision_version, ETag), the staleness banner, the embedded ApprovalTimelinePanel,
- * the disabledReason / read-only tags, and the inline submit route-picker.
+ * and the disabledReason / read-only tags.
  *
  * All approval workflow ACTION buttons live in the shared sidebar (model.actions);
  * this component renders only the supporting decision context lifted verbatim from
@@ -52,53 +46,11 @@ export function DocumentApprovalExtras({
   instance,
   isStale,
   onRefetchInstance,
-  showSubmit,
-  onCloseSubmit,
 }: DocumentApprovalExtrasProps) {
   const [copied, setCopied] = useState(false);
 
-  const [routes, setRoutes] = useState<RouteSummary[]>([]);
-  const [routesLoading, setRoutesLoading] = useState(false);
-  const [routesError, setRoutesError] = useState<string | null>(null);
-  const [selectedRouteId, setSelectedRouteId] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
   const etag = etagCache.get(documentId) ?? '-';
   const shortHash = contentHash.length > 8 ? `${contentHash.slice(0, 8)}…` : contentHash;
-
-  // Load active routes when the submit picker opens (parity with openSubmitSection).
-  useEffect(() => {
-    if (!showSubmit) {
-      return;
-    }
-    let cancelled = false;
-    setRoutesLoading(true);
-    setRoutesError(null);
-    setSubmitError(null);
-    void (async () => {
-      try {
-        const response = await listRoutes();
-        const activeRoutes = response.routes.filter((route) => route.active);
-        if (cancelled) {
-          return;
-        }
-        setRoutes(activeRoutes);
-        setSelectedRouteId((prev) => prev || activeRoutes[0]?.id || '');
-      } catch (_error) {
-        if (!cancelled) {
-          setRoutesError('Erro ao carregar rotas.');
-        }
-      } finally {
-        if (!cancelled) {
-          setRoutesLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [showSubmit]);
 
   const handleCopyHash = async () => {
     try {
@@ -107,26 +59,6 @@ export function DocumentApprovalExtras({
       window.setTimeout(() => setCopied(false), 1200);
     } catch (_error) {
       setCopied(false);
-    }
-  };
-
-  const handleSubmitForReview = async () => {
-    if (!selectedRouteId || submitting) {
-      return;
-    }
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      await submit(documentId, {
-        route_id: selectedRouteId,
-        content_hash: contentHash,
-      });
-      onCloseSubmit();
-      await onRefetchInstance();
-    } catch (_error) {
-      setSubmitError('Erro ao submeter para revisão.');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -177,48 +109,6 @@ export function DocumentApprovalExtras({
         <div className={styles.section}>
           {policy.disabledReason ? <p className={styles.disabledReason}>{policy.disabledReason}</p> : null}
           {policy.readOnly ? <p className={styles.readOnlyTag}>Somente leitura</p> : null}
-        </div>
-      ) : null}
-
-      {showSubmit ? (
-        <div className={styles.submitSection}>
-          <h4>Submeter para revisão</h4>
-          {routesLoading ? <p>Carregando rotas...</p> : null}
-          {routesError ? <p role="alert">{routesError}</p> : null}
-          {!routesLoading && !routesError ? (
-            <>
-              <label htmlFor="route-select" className={styles.label}>
-                Rota
-              </label>
-              <select
-                id="route-select"
-                className={styles.select}
-                value={selectedRouteId}
-                onChange={(event) => setSelectedRouteId(event.target.value)}
-              >
-                {routes.map((route) => (
-                  <option key={route.id} value={route.id}>
-                    {route.name}
-                  </option>
-                ))}
-              </select>
-              {routes.length === 0 ? <p>Nenhuma rota configurada.</p> : null}
-              {submitError ? <p role="alert">{submitError}</p> : null}
-              <div className={styles.inlineActions}>
-                <button
-                  type="button"
-                  className={styles.actionButton}
-                  onClick={() => void handleSubmitForReview()}
-                  disabled={!selectedRouteId || submitting}
-                >
-                  {submitting ? 'Enviando...' : 'Submeter'}
-                </button>
-                <button type="button" className={styles.actionButtonSecondary} onClick={onCloseSubmit}>
-                  Cancelar
-                </button>
-              </div>
-            </>
-          ) : null}
         </div>
       ) : null}
 
