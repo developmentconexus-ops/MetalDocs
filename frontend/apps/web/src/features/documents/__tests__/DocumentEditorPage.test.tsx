@@ -13,7 +13,10 @@ const emittedBuffer = new Uint8Array([9]).buffer;
 vi.mock('../api/documents', () => ({
   getDocument: vi.fn(),
   signedRevisionURL: vi.fn(),
-  finalizeDocument: vi.fn(),
+}));
+
+vi.mock('../../approval/api/approvalApi', () => ({
+  submit: vi.fn(),
 }));
 
 vi.mock('../hooks/editor/useDocumentAutosave', () => ({

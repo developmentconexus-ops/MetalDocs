@@ -1,12 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  finalizeDocument,
   getApprovalInstance,
   getDocument,
   listComments,
   listDocuments,
 } from '../api/documents';
-import { ApiError } from '../../../lib/api';
 import type { components } from '../../../lib/api-types';
 
 type ApprovalInstanceContract = components['schemas']['ApprovalInstanceByDocumentResponse'];
@@ -44,19 +42,6 @@ describe('documents with apiFetch', () => {
     const docs = await listDocuments();
     expect(docs).toHaveLength(1);
     expect(docs[0].id).toBe('1');
-  });
-
-  it('finalizeDocument throws ApiError on 404 with parsed code', async () => {
-    vi.spyOn(global, 'fetch').mockImplementation(() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({ type: 'about:blank', title: 'Not Found', status: 404, code: 'not_found.route' }),
-          { status: 404, headers: { 'Content-Type': 'application/problem+json' } },
-        ),
-      ),
-    );
-    await expect(finalizeDocument('doc-1', 1, { revision_title: 'Ajuste operacional' })).rejects.toBeInstanceOf(ApiError);
-    await expect(finalizeDocument('doc-1', 1, { revision_title: 'Ajuste operacional' })).rejects.toMatchObject({ code: 'not_found.route', status: 404 });
   });
 
   it('getDocument returns typed detail payload with embedded FormDataJSON', async () => {
@@ -108,26 +93,6 @@ describe('documents with apiFetch', () => {
     expect(comments).toHaveLength(1);
     expect(comments[0].library_comment_id).toBe(42);
     expect(comments[0].content[0]).toMatchObject({ type: 'paragraph' });
-  });
-
-  it('finalizeDocument sends Idempotency-Key and returns instanceId on 201', async () => {
-    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({ instance_id: 'inst_1' }),
-        { status: 201, headers: { 'content-type': 'application/json' } },
-      ),
-    );
-
-    const result = await finalizeDocument('doc-1', 3, { revision_title: 'Ajuste operacional' });
-
-    expect(result).toEqual({ instance_id: 'inst_1' });
-    const [, init] = fetchSpy.mock.calls[0] ?? [];
-    const headers = init?.headers as Record<string, string> | undefined;
-    // CON-01: If-Match is now mandatory server-side (OCC parity with canonical
-    // /submit, DEC-01), derived from the caller-supplied revisionVersion.
-    expect(headers).toMatchObject({ 'Idempotency-Key': '11111111-1111-4111-8111-111111111111', 'If-Match': '"v3"' });
-    expect(JSON.parse(String(init?.body))).toEqual({ revision_title: 'Ajuste operacional' });
   });
 
   it('reads approval-instance with runtime-aligned statuses and signoff payload', async () => {

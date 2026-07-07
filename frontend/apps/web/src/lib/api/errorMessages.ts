@@ -33,10 +33,14 @@ export const errorMessages: Record<string, string> = {
   'validation.param_required': 'Um parâmetro obrigatório não foi enviado.',
   'validation.param_too_many_values': 'Um parâmetro foi enviado com valores demais.',
   'validation.param_unmarshal': 'Um parâmetro não pôde ser interpretado.',
+  'validation.profile_not_configured': 'Perfil de documento não configurado.',
   'validation.profile_unknown':
     'O perfil informado não está cadastrado para este tenant. Verifique o código do perfil.',
+  'validation.reason_category_invalid': 'A categoria do motivo informada é inválida.',
+  'validation.reason_for_change_required': 'Informe o motivo da alteração para submeter.',
   'validation.reason_required': 'Informe o motivo para continuar.',
   'validation.request_invalid': 'A requisição enviada é inválida.',
+  'validation.revision_title_required': 'Informe o título da revisão para submeter.',
 
   // ─── Platform: auth / session ─────────────────────────────────────────────
   'authn.expired': 'Sua sessão expirou. Faça login novamente.',
@@ -60,6 +64,7 @@ export const errorMessages: Record<string, string> = {
   // ─── Platform: concurrency / idempotency / rate ───────────────────────────
   CONCURRENT_MODIFICATION: 'O recurso foi alterado por outro usuário. Recarregue para continuar.',
   CONFLICT_ERROR: 'A operação conflita com o estado atual do recurso.',
+  PRECONDITION_REQUIRED: 'Cabeçalho de pré-condição obrigatório (If-Match).',
   IDEMPOTENCY_KEY_REQUIRED: 'Identificador de operação ausente. Recarregue e tente novamente.',
   IDEMPOTENCY_KEY_INVALID: 'Identificador de operação inválido. Recarregue e tente novamente.',
   IDEMPOTENCY_KEY_REUSED: 'A chave de idempotência já foi usada com outro conteúdo.',
@@ -74,9 +79,12 @@ export const errorMessages: Record<string, string> = {
   // ─── Platform: not-found / already-exists / state ─────────────────────────
   NOT_FOUND: 'O recurso solicitado não foi encontrado.',
   METHOD_NOT_ALLOWED: 'Operação não suportada para este recurso.',
+  'not_found.document': 'Documento não encontrado.',
   'not_found.revision': 'Revisão do documento não encontrada.',
   ALREADY_EXISTS: 'O recurso informado já existe.',
   STATE_TRANSITION_INVALID: 'A transição de estado solicitada não é permitida.',
+  'state.document_not_draft': 'O documento não está em rascunho.',
+  'state.document_not_published': 'O documento não está publicado.',
   'state.revision_not_draft': 'A revisão não está em rascunho e não pode ser alterada.',
 
   // ─── Platform: internal ───────────────────────────────────────────────────
@@ -97,6 +105,7 @@ export const errorMessages: Record<string, string> = {
   // ─── Approval / workflow ──────────────────────────────────────────────────
   'approval.unresolved_comments': 'Resolva os comentários pendentes antes de aprovar ou liberar este documento.',
   'conflict.duplicate_submission': 'Esta submissão já foi registrada.',
+  'conflict.mark_reviewed_stale_revision': 'A revisão mudou; recarregue antes de marcar como revisado.',
   'conflict.stale_revision': 'O documento foi alterado por outro usuário. Atualize e tente novamente.',
   'freeze.effective_date_missing': 'Informe a data de vigência para concluir a publicação.',
   'not_found.instance': 'Documento não encontrado.',
@@ -110,12 +119,18 @@ export const errorMessages: Record<string, string> = {
   'signoff.not_eligible': 'Você não está elegível para assinar esta etapa.',
   'sod.cross_stage_duplicate': 'Este usuário já assinou em outra etapa e não pode assinar novamente.',
   'sod.submitter_cannot_sign': 'Você submeteu este documento e não pode aprová-lo. Outro usuário precisa assinar.',
+  'state.approval_route_missing': 'Nenhuma rota de aprovação configurada para este documento.',
   'state.instance_completed': 'Este fluxo já foi concluído.',
   'state.route_inactive': 'Esta rota está inativa e não pode ser usada.',
+  'validation.effective_to_not_after_effective_from':
+    'A data de fim de vigência deve ser posterior à de início.',
+  'validation.review_due_before_effective':
+    'A data de revisão não pode ser anterior ao início da vigência.',
 
   // ─── Documents (instances / sessions / checkpoints) ───────────────────────
   APPROVAL_ROUTE_MISSING: 'Nenhuma rota de aprovação configurada para este perfil. Configure uma rota antes de continuar.',
   not_a_choice_placeholder: 'Este campo não é uma lista de opções.',
+  'state.placeholder_not_author_editable': 'Este campo não pode ser editado pelo autor.',
 
   // ─── Controlled documents ─────────────────────────────────────────────────
   ACTIVE_REVISION_ALREADY_EXISTS: 'Já existe uma revisão ativa para este documento.',
@@ -126,6 +141,7 @@ export const errorMessages: Record<string, string> = {
   CONTROLLED_DOCUMENT_NOT_ACTIVE: 'O documento controlado não está ativo.',
   CONTROLLED_DOCUMENT_NOT_FOUND: 'Documento controlado não encontrado.',
   DEFAULT_TEMPLATE_OBSOLETE: 'O template padrão do perfil está obsoleto.',
+  DICTIONARY_TOKEN_MISSING: 'Um token de dicionário referenciado não existe.',
   MANUAL_CODE_REASON_REQUIRED: 'Informe a justificativa para o código manual.',
   NO_ACTIVE_INSTANCE: 'Não há instância ativa para este documento controlado.',
   OVERRIDE_REASON_REQUIRED: 'Informe a justificativa da substituição.',
@@ -145,6 +161,10 @@ export const errorMessages: Record<string, string> = {
   PROFILE_NOT_FOUND: 'Perfil não encontrado.',
   TEMPLATE_NOT_PUBLISHED: 'A versão do template não está publicada.',
   TEMPLATE_PROFILE_MISMATCH: 'A versão do template pertence a outro perfil.',
+
+  // ─── Tokens (dictionary entries) ──────────────────────────────────────────
+  immutable_field: 'Este campo não pode ser alterado.',
+  reserved_name: 'Este nome é reservado e não pode ser usado.',
 
   // ─── IAM ──────────────────────────────────────────────────────────────────
   MEMBERSHIP_EXISTS: 'Já existe um vínculo ativo para este usuário nesta área.',

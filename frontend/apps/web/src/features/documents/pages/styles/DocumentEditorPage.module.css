@@ -156,12 +156,19 @@
   font-weight: 600;
 }
 
-.dialogField input {
+.dialogField input,
+.dialogField textarea,
+.dialogField select {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--slate-border);
   border-radius: 14px;
   font: inherit;
+}
+
+.dialogField textarea {
+  resize: vertical;
+  min-height: 84px;
 }
 
 .dialogError {

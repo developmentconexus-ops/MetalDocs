@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolveErrorMessage } from '../../../lib/api';
 
-describe('E3 — finalize error message resolution', () => {
+describe('E3 — submit error message resolution', () => {
   it('not_found.route maps to Portuguese route missing message', () => {
     expect(resolveErrorMessage('not_found.route', 'no route')).toContain('Nenhuma rota de aprovação');
   });

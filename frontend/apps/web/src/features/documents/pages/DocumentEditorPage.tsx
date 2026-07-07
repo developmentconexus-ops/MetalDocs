@@ -9,13 +9,14 @@ import { useDocumentSession } from '../hooks/editor/useDocumentSession';
 import { useDocumentAutosave } from '../hooks/editor/useDocumentAutosave';
 import { useDocumentComments } from '../hooks/editor/useDocumentComments';
 import {
-  finalizeDocument,
   getApprovalInstance,
   getDocumentRevisionHistory,
   renameDocument,
   signedRevisionURL,
 } from '../api/documents';
 import type { DocumentDetail } from '../api/documents';
+import { submit as submitForReviewRequest } from '../../approval/api/approvalApi';
+import type { components } from '../../../lib/api-types';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
 import { ArtifactMetaSidebar } from '../../shared/controlled-artifact/ArtifactMetaSidebar';
@@ -43,6 +44,16 @@ export type DocumentEditorPageProps = {
 
 type EditorDocumentDetail = DocumentDetail;
 type ArtifactMetadata = { fileSizeBytes?: number | null; pageCount?: number | null };
+type SubmitDocumentRequest = components['schemas']['SubmitDocumentRequest'];
+type ReasonCategory = NonNullable<SubmitDocumentRequest['reason_category']>;
+
+const REASON_CATEGORY_OPTIONS: Array<{ value: ReasonCategory; label: string }> = [
+  { value: 'content', label: 'Conteúdo' },
+  { value: 'corrective', label: 'Corretiva' },
+  { value: 'regulatory', label: 'Regulatória' },
+  { value: 'periodic_review', label: 'Revisão periódica' },
+  { value: 'administrative', label: 'Administrativa' },
+];
 
 export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPageProps): React.ReactElement {
   const queryClient = useQueryClient();
@@ -53,6 +64,11 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const [revisionTitleDialogOpen, setRevisionTitleDialogOpen] = useState(false);
   const [revisionTitleInput, setRevisionTitleInput] = useState('');
   const [revisionTitleError, setRevisionTitleError] = useState<string | null>(null);
+  const [reasonForChangeInput, setReasonForChangeInput] = useState('');
+  const [reasonForChangeError, setReasonForChangeError] = useState<string | null>(null);
+  const [reasonCategoryInput, setReasonCategoryInput] = useState('');
+  const [reasonCategoryError, setReasonCategoryError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editorDirty, setEditorDirty] = useState(false);
   const [submitStatusOverride, setSubmitStatusOverride] = useState<'under_review' | null>(null);
   const [artifactMetadata, setArtifactMetadata] = useState<ArtifactMetadata>({});
@@ -252,8 +268,10 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     setEditorDirty(true);
   }
 
-  async function submitForReview(revisionTitle?: string) {
+  async function submitForReview(body: SubmitDocumentRequest = {}) {
     if (session.state.phase !== 'writer' || !doc) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       if (editorDirty) {
         const latestBuf = await editorRef.current?.saveNow();
@@ -268,13 +286,15 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
         }
         setEditorDirty(false);
       }
-      const trimmedRevisionTitle = revisionTitle?.trim();
       // If-Match is mandatory server-side (CON-01 OCC parity with canonical
       // /submit, DEC-01). Autosave commits advance the revision *id*, not
       // documents.revision_version (that only bumps on the draft->under_review
       // transition itself), so the cached doc.revision_version read here is
       // still the version the server expects to match.
-      await finalizeDocument(documentID, doc.revision_version, trimmedRevisionTitle ? { revision_title: trimmedRevisionTitle } : {});
+      await submitForReviewRequest(documentID, body, {
+        ifMatch: `"v${doc.revision_version}"`,
+        idempotencyKey: crypto.randomUUID(),
+      });
       setSubmitStatusOverride('under_review');
       queryClient.setQueryData(QK.documents.detail(documentID), (current: DocumentDetail | undefined) => {
         if (!current) return current;
@@ -311,36 +331,70 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       setRevisionTitleDialogOpen(false);
       setRevisionTitleInput('');
       setRevisionTitleError(null);
+      setReasonForChangeInput('');
+      setReasonForChangeError(null);
+      setReasonCategoryInput('');
+      setReasonCategoryError(null);
       onDone();
       if (rehydrationFailed) {
-        toast.error('Documento submetido para revisão. Recarregando dados atualizados do editor.');
+        toast.warning('Documento submetido. Recarregando dados atualizados do editor.');
+      } else {
+        toast.success('Documento submetido para revisão.');
       }
     } catch (err) {
       if (err instanceof ApiError) {
-        toast.error(resolveErrorMessage(err.code, err.message));
+        if (err.code === 'validation.revision_title_required') {
+          setRevisionTitleError(resolveErrorMessage(err.code, err.message));
+        } else if (err.code === 'validation.reason_for_change_required') {
+          setReasonForChangeError(resolveErrorMessage(err.code, err.message));
+        } else if (err.code === 'validation.reason_category_invalid') {
+          setReasonCategoryError(resolveErrorMessage(err.code, err.message));
+        } else {
+          toast.error(resolveErrorMessage(err.code, err.message));
+        }
       } else {
-        toast.error('Erro ao finalizar documento.');
+        toast.error('Erro ao submeter documento.');
       }
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  function handleFinalize() {
+  function handleSubmitForReview() {
+    if (isSubmitting) return;
     if ((doc?.revision_number ?? 0) === 0) {
-      void submitForReview();
+      void submitForReview({});
       return;
     }
     setRevisionTitleInput(doc?.revision_title ?? '');
     setRevisionTitleError(null);
+    setReasonForChangeInput('');
+    setReasonForChangeError(null);
+    setReasonCategoryInput('');
+    setReasonCategoryError(null);
     setRevisionTitleDialogOpen(true);
   }
 
-  function handleConfirmFinalize() {
-    const trimmed = revisionTitleInput.trim();
-    if (!trimmed) {
+  function handleConfirmSubmitForReview() {
+    if (isSubmitting) return;
+    const trimmedTitle = revisionTitleInput.trim();
+    const trimmedReason = reasonForChangeInput.trim();
+    let hasError = false;
+    if (!trimmedTitle) {
       setRevisionTitleError('Informe o título da revisão para submeter.');
-      return;
+      hasError = true;
     }
-    void submitForReview(trimmed);
+    if (!trimmedReason) {
+      setReasonForChangeError('Informe o motivo da alteração para submeter.');
+      hasError = true;
+    }
+    if (hasError) return;
+    const body: SubmitDocumentRequest = {
+      revision_title: trimmedTitle,
+      reason_for_change: trimmedReason,
+      ...(reasonCategoryInput ? { reason_category: reasonCategoryInput as ReasonCategory } : {}),
+    };
+    void submitForReview(body);
   }
 
   const approvalInstanceQuery = useQuery({
@@ -438,8 +492,8 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                   <button
                     type="button"
                     className={editorChromeStyles.primaryBtn}
-                    onClick={handleFinalize}
-                    disabled={!canEditContent}
+                    onClick={handleSubmitForReview}
+                    disabled={!canEditContent || isSubmitting}
                   >
                   Submeter para revisão
                 </button>
@@ -557,11 +611,44 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 />
               </label>
               {revisionTitleError ? <p role="alert" className={styles.dialogError}>{revisionTitleError}</p> : null}
+              <label className={styles.dialogField}>
+                <span>Motivo da alteração</span>
+                <textarea
+                  value={reasonForChangeInput}
+                  onChange={(event) => {
+                    setReasonForChangeInput(event.target.value);
+                    if (reasonForChangeError) setReasonForChangeError(null);
+                  }}
+                  placeholder="Descreva o motivo desta alteração governada"
+                />
+              </label>
+              {reasonForChangeError ? <p role="alert" className={styles.dialogError}>{reasonForChangeError}</p> : null}
+              <label className={styles.dialogField}>
+                <span>Categoria</span>
+                <select
+                  value={reasonCategoryInput}
+                  onChange={(event) => {
+                    setReasonCategoryInput(event.target.value);
+                    if (reasonCategoryError) setReasonCategoryError(null);
+                  }}
+                >
+                  <option value="">— Selecionar —</option>
+                  {REASON_CATEGORY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              {reasonCategoryError ? <p role="alert" className={styles.dialogError}>{reasonCategoryError}</p> : null}
               <div className={styles.dialogActions}>
                 <button type="button" className={styles.dialogSecondaryBtn} onClick={() => setRevisionTitleDialogOpen(false)}>
                   Cancelar
                 </button>
-                <button type="button" className={styles.dialogPrimaryBtn} onClick={handleConfirmFinalize}>
+                <button
+                  type="button"
+                  className={styles.dialogPrimaryBtn}
+                  onClick={handleConfirmSubmitForReview}
+                  disabled={isSubmitting}
+                >
                   Confirmar submissão
                 </button>
               </div>

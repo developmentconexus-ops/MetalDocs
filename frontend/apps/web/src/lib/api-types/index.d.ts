@@ -144,6 +144,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Provisiona novo tenant com usuario administrador inicial */
+        post: operations["onboardTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Solicita exportacao completa dos dados de um tenant (assincrono) */
+        post: operations["exportTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant_id}/erase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Solicita apagamento (crypto-shred) irreversivel dos dados de um tenant (assincrono) */
+        post: operations["eraseTenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/iam/users/{user_id}": {
         parameters: {
             query?: never;
@@ -1238,27 +1289,6 @@ export interface paths {
         patch: operations["renameDocument"];
         trace?: never;
     };
-    "/documents/{id}/finalize": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Finalize document
-         * @deprecated
-         * @description Deprecated convenience wrapper around the same draft→under_review transition as POST /documents/{id}/submit (CON-01). Resolves route_id and content_hash server-side instead of taking them from the caller. New integrations must call /documents/{id}/submit directly, which is canonical (DEC-01). If-Match is required for OCC parity with submit; a stale (or missing) revision version now yields the same 409/428 precondition semantics as submit.
-         */
-        post: operations["finalizeDocument"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/documents/{id}/archive": {
         parameters: {
             query?: never;
@@ -1664,7 +1694,7 @@ export interface paths {
         put?: never;
         /**
          * Submit document for approval
-         * @description Canonical draft→under_review submission endpoint (DEC-01). Callers supply route_id and content_hash explicitly; contrast with the deprecated POST /documents/{id}/finalize, which resolves both server-side as a convenience wrapper over this same operation.
+         * @description Canonical draft→under_review submission endpoint (DEC-01, ADR 0073). The sole submit entrypoint: the deprecated /documents/{id}/finalize wrapper was removed. route_id and content_hash are optional — when omitted the server resolves the active route for the document's profile and the head revision's content hash inside the same transaction (closing the wrapper-era TOCTOU between prereq read and submit).
          */
         post: operations["submitDocumentForApproval"];
         delete?: never;
@@ -2391,6 +2421,28 @@ export interface components {
         CreateManagedUserResponse: {
             user_id: string;
         };
+        OnboardTenantRequest: {
+            /** @description Nome de exibicao do tenant */
+            name: string;
+            /** @description Slug unico, URL-safe, do tenant */
+            slug: string;
+            /** @description Identificador do usuario administrador inicial */
+            admin_user_id: string;
+            admin_display_name: string;
+            admin_password: string;
+        };
+        OnboardTenantResponse: {
+            /** Format: uuid */
+            tenant_id: string;
+            admin_user_id: string;
+        };
+        TenantLifecycleJobResponse: {
+            /**
+             * Format: uuid
+             * @description Identificador do job assincrono de export/erase enfileirado
+             */
+            job_id: string;
+        };
         /**
          * @description Atomic metadata + tenant role update. All fields optional;
          *     server applies only the supplied subset in a single transaction.
@@ -2464,10 +2516,6 @@ export interface components {
         };
         RevisionUrlResponse: {
             url: string;
-        };
-        DocumentFinalizeResult: {
-            /** Format: uuid */
-            instance_id: string;
         };
         DocumentSessionWriterResponse: {
             /** @enum {string} */
@@ -3251,18 +3299,16 @@ export interface components {
             /** Format: date-time */
             signed_at: string;
         };
-        FinalizeDocumentRequest: {
-            /** @description Required for governed revisions after REV00. Omit for REV00 to use the canonical initial title. */
-            revision_title?: string;
-        };
         SubmitDocumentRequest: {
             /**
              * Format: uuid
-             * @description Active approval route to submit against.
+             * @description Active approval route to submit against. Optional: when omitted the server resolves the single active route for the document's controlled-document profile in the same transaction (ADR 0073).
              */
-            route_id: string;
-            /** @description SHA-256 hex digest of the content being submitted (autosave-computed). */
-            content_hash: string;
+            route_id?: string;
+            /** @description SHA-256 hex digest of the content being submitted (autosave-computed). Optional: when omitted the server binds the head revision's stored content hash in the same transaction (ADR 0073). */
+            content_hash?: string;
+            /** @description Governed revision title. Required for revision >= 1 (enforced by the service against the in-tx governed revision number); omit at revision 0 to use the canonical initial title. */
+            revision_title?: string;
             /** @description Structured reason-for-change (21 CFR Part 11 attributable change reason). Distinct from revision_title (the title of the revision). Optional in the schema; the handler requires it for revision >= 1 (rejected 422 problem+json when missing), and it is optional at initial creation (revision 0). */
             reason_for_change?: string;
             /**
@@ -3880,6 +3926,89 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    onboardTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description Tenant provisionado */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardTenantResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    exportTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exportacao enfileirada */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantLifecycleJobResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    eraseTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Apagamento enfileirado */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantLifecycleJobResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             500: components["responses"]["InternalServerError"];
         };
@@ -6090,45 +6219,6 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
-    finalizeDocument: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": string;
-                /** @description Expected revision version ETag in the form "v<N>" */
-                "If-Match": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FinalizeDocumentRequest"];
-            };
-        };
-        responses: {
-            /** @description created */
-            201: {
-                headers: {
-                    /** @description Present with value `true` when an idempotent replay response is returned. */
-                    "Idempotent-Replay"?: string;
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DocumentFinalizeResult"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            428: components["responses"]["PreconditionRequired"];
-            500: components["responses"]["InternalServerError"];
-        };
-    };
     archiveDocument: {
         parameters: {
             query?: never;
@@ -6933,7 +7023,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
-                /** @description Expected revision version ETag in the form "v<N>" */
+                /** @description Expected revision version ETag in the form "v<N>" (N >= 0; a fresh draft is v0) or "*" */
                 "If-Match": string;
             };
             path: {
