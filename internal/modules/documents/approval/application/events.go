@@ -20,6 +20,13 @@ const (
 	EventTypeSignoffRecorded           EventType = "signoff_recorded"
 	EventTypeDocumentReviewed          EventType = "document_reviewed"
 
+	// EventTypeReviewVerdictRecorded / EventTypeReviewChangesRequested (F4):
+	// review-stage runtime verdicts. Ready mirrors EventTypeSignoffRecorded's
+	// role (a non-terminal, quorum-counted vote); ChangesRequested mirrors
+	// EventTypeSignoffRejected's role (an instance-collapsing verdict).
+	EventTypeReviewVerdictRecorded  EventType = "review_verdict.recorded"
+	EventTypeReviewChangesRequested EventType = "review_verdict.changes_requested"
+
 	EventTypeRouteConfigCreated     EventType = "route.config.created"
 	EventTypeRouteConfigUpdated     EventType = "route.config.updated"
 	EventTypeRouteConfigDeactivated EventType = "route.config.deactivated"

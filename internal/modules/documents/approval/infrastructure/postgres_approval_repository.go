@@ -1084,6 +1084,179 @@ func (r *postgresApprovalRepository) UpdateInstanceStatus(ctx context.Context, t
 	return nil
 }
 
+// UpdateInstanceStatusWithReason is UpdateInstanceStatus plus a cancel_reason
+// write (F4): shared by CancelInstance and the request_changes verdict path.
+func (r *postgresApprovalRepository) UpdateInstanceStatusWithReason(ctx context.Context, tx db.Tx, tenantID, instID string, newStatus domain.InstanceStatus, expectedStatus domain.InstanceStatus, completedAt *time.Time, reason string) error {
+	res, err := tx.ExecContext(ctx, `
+		UPDATE approval_instances
+		SET status = $1, completed_at = $2, cancel_reason = $3
+		WHERE id = $4
+		  AND tenant_id = $5
+		  AND status = $6`,
+		string(newStatus), completedAt, reason, instID, tenantID, string(expectedStatus),
+	)
+	if err != nil {
+		return MapPgError(err, MapHints{})
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("approval: update instance status with reason rows affected: %w", err)
+	}
+	if n == 0 {
+		return ErrInstanceCompleted
+	}
+	return nil
+}
+
+// InsertVerdict inserts a review-stage runtime verdict with ON CONFLICT DO
+// NOTHING (F4), mirroring InsertSignoff exactly. If the row already exists it
+// loads the existing verdict to compare fields: matching → WasReplay=true,
+// mismatching → ErrActorAlreadySigned (reused sentinel — same SoD-class
+// conflict, "actor already recorded a verdict on this stage").
+func (r *postgresApprovalRepository) InsertVerdict(ctx context.Context, tx db.Tx, v domain.ReviewVerdict) (VerdictInsertResult, error) {
+	var actorDisplayNameSnapshot sql.NullString
+	if name := v.ActorDisplayNameSnapshot(); name != "" {
+		actorDisplayNameSnapshot = sql.NullString{String: name, Valid: true}
+	}
+
+	var returnedID string
+	err := tx.QueryRowContext(ctx, `
+		INSERT INTO approval_review_verdicts
+		  (id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id,
+		   verdict, comment, verdict_at, actor_display_name_snapshot)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (stage_instance_id, actor_user_id) DO NOTHING
+		RETURNING id`,
+		v.ID(),
+		v.ApprovalInstanceID(),
+		v.StageInstanceID(),
+		v.ActorUserID(),
+		v.ActorTenantID(),
+		string(v.Verdict()),
+		v.Comment(),
+		v.VerdictAt(),
+		actorDisplayNameSnapshot,
+	).Scan(&returnedID)
+
+	if err == nil {
+		return VerdictInsertResult{ID: returnedID, WasReplay: false}, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return VerdictInsertResult{}, MapPgError(err, MapHints{})
+	}
+
+	existing, loadErr := r.loadVerdictByStageActor(ctx, tx, v.ActorTenantID(), v.StageInstanceID(), v.ActorUserID())
+	if loadErr != nil {
+		return VerdictInsertResult{}, fmt.Errorf("load existing verdict for replay check: %w", loadErr)
+	}
+	if existing.StageInstanceID() == v.StageInstanceID() &&
+		existing.Verdict() == v.Verdict() &&
+		existing.Comment() == v.Comment() {
+		return VerdictInsertResult{ID: existing.ID(), WasReplay: true}, nil
+	}
+	return VerdictInsertResult{}, ErrActorAlreadySigned
+}
+
+func (r *postgresApprovalRepository) loadVerdictByStageActor(ctx context.Context, tx db.Tx, tenantID, stageInstanceID, actorUserID string) (*domain.ReviewVerdict, error) {
+	row := tx.QueryRowContext(ctx, `
+		SELECT v.id, v.approval_instance_id, v.stage_instance_id, v.actor_user_id,
+		       v.actor_tenant_id, v.verdict, coalesce(v.comment,''), v.verdict_at,
+		       coalesce(v.actor_display_name_snapshot,'')
+		FROM approval_review_verdicts v
+		JOIN approval_instances i ON i.id = v.approval_instance_id
+		WHERE v.stage_instance_id = $1
+		  AND v.actor_user_id = $2
+		  AND i.tenant_id = $3::uuid`,
+		stageInstanceID, actorUserID, tenantID,
+	)
+	return scanVerdict(row)
+}
+
+func scanVerdict(row rowScanner) (*domain.ReviewVerdict, error) {
+	var (
+		id, instanceID, stageID, actorUserID, actorTenantID string
+		verdict, comment, displayName                       string
+		verdictAt                                           time.Time
+	)
+	err := row.Scan(&id, &instanceID, &stageID, &actorUserID, &actorTenantID,
+		&verdict, &comment, &verdictAt, &displayName)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, sql.ErrNoRows
+	}
+	if err != nil {
+		return nil, err
+	}
+	// StageKind is not persisted on the verdict row (it's a property of the
+	// stage, not the vote); NewVerdict's stage-kind gate was already satisfied
+	// when this row was inserted, so re-validating here would need a snapshot
+	// value we don't store. Pass StageKindReview — the only kind this table's
+	// rows can legally carry (enforced by the service before insert).
+	return domain.NewVerdict(domain.VerdictParams{
+		ID:                       id,
+		ApprovalInstanceID:       instanceID,
+		StageInstanceID:          stageID,
+		StageKind:                domain.StageKindReview,
+		ActorUserID:              actorUserID,
+		ActorTenantID:            actorTenantID,
+		Verdict:                  domain.Verdict(verdict),
+		Comment:                  comment,
+		VerdictAt:                verdictAt,
+		ActorDisplayNameSnapshot: displayName,
+	})
+}
+
+// LoadStageVerdicts fetches all verdicts for a single stage instance, used to
+// evaluate quorum for the `ready` path exactly like LoadStageSignoffs.
+func (r *postgresApprovalRepository) LoadStageVerdicts(ctx context.Context, tx db.Tx, tenantID, stageInstanceID string) ([]domain.ReviewVerdict, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT v.id, v.approval_instance_id, v.stage_instance_id,
+		       v.actor_user_id, v.actor_tenant_id, v.verdict,
+		       coalesce(v.comment,''), v.verdict_at, coalesce(v.actor_display_name_snapshot,'')
+		  FROM approval_review_verdicts v
+		  JOIN approval_instances ai
+		    ON ai.id = v.approval_instance_id
+		 WHERE v.stage_instance_id = $1
+		   AND ai.tenant_id = $2::uuid
+		   AND v.actor_tenant_id = ai.tenant_id
+		 ORDER BY v.verdict_at ASC`,
+		stageInstanceID, tenantID,
+	)
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	defer rows.Close()
+
+	var verdicts []domain.ReviewVerdict
+	for rows.Next() {
+		var (
+			id, instanceID, stageID, actorUserID, actorTenantID string
+			verdict, comment, displayName                       string
+			verdictAt                                           time.Time
+		)
+		if err := rows.Scan(&id, &instanceID, &stageID, &actorUserID, &actorTenantID,
+			&verdict, &comment, &verdictAt, &displayName); err != nil {
+			return nil, err
+		}
+		v, err := domain.NewVerdict(domain.VerdictParams{
+			ID:                       id,
+			ApprovalInstanceID:       instanceID,
+			StageInstanceID:          stageID,
+			StageKind:                domain.StageKindReview,
+			ActorUserID:              actorUserID,
+			ActorTenantID:            actorTenantID,
+			Verdict:                  domain.Verdict(verdict),
+			Comment:                  comment,
+			VerdictAt:                verdictAt,
+			ActorDisplayNameSnapshot: displayName,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("scan verdict %s: %w", id, err)
+		}
+		verdicts = append(verdicts, *v)
+	}
+	return verdicts, rows.Err()
+}
+
 // ── H-5.1 relocated read helpers ─────────────────────────────────────────────
 
 // LoadPriorSignoffs fetches all signoffs for the instance EXCEPT the active stage,

@@ -33,17 +33,18 @@ func (RealClock) Now() time.Time { return time.Now().UTC() }
 // subsystem. Each field is a focused service; all share the same repo,
 // emitter, and clock.
 type Services struct {
-	Submit       *SubmitService
-	Decision     *DecisionService
-	Publish      *PublishService
-	Scheduler    *SchedulerService
-	Supersede    *SupersedeService
-	Obsolete     *ObsoleteService
-	Cancel       *CancelService
-	Read         *ReadService
-	RouteAdmin   *RouteAdminService
-	MarkReviewed *MarkReviewedService
-	clock        Clock
+	Submit        *SubmitService
+	Decision      *DecisionService
+	Publish       *PublishService
+	Scheduler     *SchedulerService
+	Supersede     *SupersedeService
+	Obsolete      *ObsoleteService
+	Cancel        *CancelService
+	Read          *ReadService
+	RouteAdmin    *RouteAdminService
+	MarkReviewed  *MarkReviewedService
+	ReviewVerdict *ReviewVerdictService
+	clock         Clock
 }
 
 // ScheduledPublishJobInput carries the parameters needed to enqueue a scheduled-publish job.
@@ -76,17 +77,18 @@ func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, c
 	// the omitted-route path to ErrApprovalRouteMissing.
 	resolver, _ := repo.(SubmitDefaultsResolver)
 	return &Services{
-		Submit:     &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead, resolver: resolver},
-		Decision:   &DecisionService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
-		Publish:    &PublishService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
-		Scheduler:  &SchedulerService{repo: repo, emitter: emitter, clock: clock},
-		Supersede:  &SupersedeService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
-		Obsolete:   &ObsoleteService{repo: repo, emitter: emitter, clock: clock},
-		Cancel:     newCancelService(repo, emitter, clock),
-		Read:       newReadService(repo, cdRead),
-		RouteAdmin: &RouteAdminService{repo: repo, emitter: emitter, clock: clock},
-		MarkReviewed: NewMarkReviewedService(emitter, clock),
-		clock:      clock,
+		Submit:        &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead, resolver: resolver},
+		Decision:      &DecisionService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		Publish:       &PublishService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		Scheduler:     &SchedulerService{repo: repo, emitter: emitter, clock: clock},
+		Supersede:     &SupersedeService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		Obsolete:      &ObsoleteService{repo: repo, emitter: emitter, clock: clock},
+		Cancel:        newCancelService(repo, emitter, clock),
+		Read:          newReadService(repo, cdRead),
+		RouteAdmin:    &RouteAdminService{repo: repo, emitter: emitter, clock: clock},
+		MarkReviewed:  NewMarkReviewedService(emitter, clock),
+		ReviewVerdict: &ReviewVerdictService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		clock:         clock,
 	}
 }
 
@@ -116,6 +118,9 @@ func (s *Services) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *S
 	}
 	if s.Decision != nil {
 		s.Decision = s.Decision.WithLifecycleEnqueuer(e)
+	}
+	if s.ReviewVerdict != nil {
+		s.ReviewVerdict = s.ReviewVerdict.WithLifecycleEnqueuer(e)
 	}
 	return s
 }

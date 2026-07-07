@@ -253,6 +253,10 @@ var routeRules = []routeRule{
 	// Every runtime verb under this prefix now has its own explicit row matching
 	// its tier-2 authz.Require call.
 	{method: http.MethodPost, pathPrefix: "/api/v1/approval/instances/", pathSuffix: "/signoffs", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// Review-stage runtime verdicts (M2b F4): tier-2 gates on approval.review
+	// (LoadDocumentAreaCode-resolved area), not document.signoff — verdicts are
+	// a distinct capability class from binding e-signature approvals.
+	{method: http.MethodPost, pathPrefix: "/api/v1/approval/instances/", pathSuffix: "/review-verdict", capability: iamdomain.CapApprovalReview, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/approval/instances/", pathSuffix: "/cancel", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathPrefix: "/api/v1/approval/instances/", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/approval/inbox", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},

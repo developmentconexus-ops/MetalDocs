@@ -43,6 +43,13 @@ func (h *Handler) CancelApprovalInstance(w http.ResponseWriter, r *http.Request,
 	h.CancelHandler(w, r)
 }
 
+// RecordApprovalReviewVerdict is the spec-generated adapter for the F4
+// review-stage runtime-verdict operation (M2b): records a ready/request_changes
+// verdict against a review-kind stage.
+func (h *Handler) RecordApprovalReviewVerdict(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params approvalapi.RecordApprovalReviewVerdictParams) {
+	h.ReviewVerdictHandler(w, r)
+}
+
 func (h *Handler) GetApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID) {
 	h.GetInstanceHandler(w, r)
 }

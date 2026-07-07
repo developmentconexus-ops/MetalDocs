@@ -8,8 +8,6 @@ import (
 var (
 	// ErrNoActiveStage is returned by stage-transition methods when the instance has no stage in StageActive status.
 	ErrNoActiveStage = errors.New("no active stage in instance")
-	// ErrCannotSkipLastStage is returned by SkipStage when the active stage has no pending successor.
-	ErrCannotSkipLastStage = errors.New("cannot skip last stage: no successor exists")
 	// ErrRevisionRegression is returned by BumpRevisionVersion when next is lower than the current RevisionVersion.
 	ErrRevisionRegression = errors.New("revision_version cannot decrease")
 	// ErrInstanceTerminal is returned by Cancel when the instance Status is already approved, rejected, or cancelled.
@@ -19,13 +17,19 @@ var (
 // InstanceStatus represents the top-level lifecycle of an approval instance.
 type InstanceStatus string
 
-// InstanceStatus values. InstanceInProgress is the only non-terminal status;
-// the other three are terminal and reject further stage transitions.
+// InstanceStatus values. InstanceInProgress and InstanceChangesRequested are
+// the only non-terminal statuses; the other three are terminal and reject
+// further stage transitions.
 const (
 	InstanceInProgress InstanceStatus = "in_progress"
 	InstanceApproved   InstanceStatus = "approved"
 	InstanceRejected   InstanceStatus = "rejected"
 	InstanceCancelled  InstanceStatus = "cancelled"
+	// InstanceChangesRequested (F4, design spec §2) is reached when a
+	// review-kind stage records a request_changes verdict: the author must
+	// revise the document (which reverts to draft) and resubmit. Non-terminal
+	// — Cancel remains callable from this status, same as InstanceInProgress.
+	InstanceChangesRequested InstanceStatus = "changes_requested"
 )
 
 // StageStatus represents per-stage lifecycle.
@@ -147,48 +151,6 @@ func (inst *Instance) RejectHere(reason string) error {
 	return nil
 }
 
-// SkipStage marks the active stage as skipped and activates the next pending stage.
-// Returns ErrCannotSkipLastStage if no successor exists.
-func (inst *Instance) SkipStage(reason string) error {
-	activeIdx := -1
-	for i, s := range inst.Stages {
-		if s.Status == StageActive {
-			activeIdx = i
-			break
-		}
-	}
-	if activeIdx == -1 {
-		return ErrNoActiveStage
-	}
-
-	// Check successor exists.
-	hasSuccessor := false
-	for i := activeIdx + 1; i < len(inst.Stages); i++ {
-		if inst.Stages[i].Status == StagePending {
-			hasSuccessor = true
-			break
-		}
-	}
-	if !hasSuccessor {
-		return ErrCannotSkipLastStage
-	}
-
-	now := time.Now().UTC()
-	inst.Stages[activeIdx].Status = StageSkipped
-	inst.Stages[activeIdx].SkipReason = reason
-	inst.Stages[activeIdx].CompletedAt = &now
-
-	// Activate next pending.
-	for i := activeIdx + 1; i < len(inst.Stages); i++ {
-		if inst.Stages[i].Status == StagePending {
-			inst.Stages[i].Status = StageActive
-			inst.Stages[i].OpenedAt = &now
-			return nil
-		}
-	}
-	return nil
-}
-
 // BumpRevisionVersion enforces monotonic revision_version — mirrors DB trigger.
 func (inst *Instance) BumpRevisionVersion(next int) error {
 	if next < inst.RevisionVersion {
@@ -198,7 +160,9 @@ func (inst *Instance) BumpRevisionVersion(next int) error {
 	return nil
 }
 
-// Cancel sets Status=InstanceCancelled. Errors if already terminal.
+// Cancel sets Status=InstanceCancelled and stores reason on CancelReason for
+// the caller to persist to approval_instances.cancel_reason. Errors if
+// already terminal.
 func (inst *Instance) Cancel(reason string) error {
 	switch inst.Status {
 	case InstanceApproved, InstanceRejected, InstanceCancelled:
@@ -207,6 +171,6 @@ func (inst *Instance) Cancel(reason string) error {
 	now := time.Now().UTC()
 	inst.Status = InstanceCancelled
 	inst.CompletedAt = &now
-	_ = reason // persisted by caller in governance_events
+	inst.CancelReason = &reason
 	return nil
 }

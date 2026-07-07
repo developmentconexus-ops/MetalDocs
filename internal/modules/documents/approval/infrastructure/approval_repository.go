@@ -20,6 +20,13 @@ type SignoffInsertResult struct {
 	WasReplay bool // true if ON CONFLICT detected existing matching signoff
 }
 
+// VerdictInsertResult returned by InsertVerdict. Mirrors SignoffInsertResult
+// (F4): idempotent replay detection via the same stage+actor unique-key shape.
+type VerdictInsertResult struct {
+	ID        string
+	WasReplay bool // true if ON CONFLICT detected an existing matching verdict
+}
+
 // ErrScheduledSupersedeConflict is returned when a scheduled-publish cutover's
 // recorded supersede target no longer matches the document currently published,
 // meaning another write raced ahead of the schedule; the job should no-op.
@@ -94,6 +101,22 @@ type ApprovalRepository interface {
 	MarkSuperseded(ctx context.Context, tx db.Tx, tenantID, documentID string) error
 	UpdateStageStatus(ctx context.Context, tx db.Tx, tenantID, stageID string, newStatus, expectedOldStatus domain.StageStatus) error
 	UpdateInstanceStatus(ctx context.Context, tx db.Tx, tenantID, instID string, newStatus domain.InstanceStatus, expectedStatus domain.InstanceStatus, completedAt *time.Time) error
+	// UpdateInstanceStatusWithReason is UpdateInstanceStatus plus a
+	// cancel_reason write (F4): used by CancelInstance (reason from the
+	// caller) and the request_changes verdict path (reason = the verdict
+	// comment) — both transition an in_progress instance away and want the
+	// human-readable reason persisted on approval_instances.cancel_reason
+	// rather than only reaching the governance event.
+	UpdateInstanceStatusWithReason(ctx context.Context, tx db.Tx, tenantID, instID string, newStatus domain.InstanceStatus, expectedStatus domain.InstanceStatus, completedAt *time.Time, reason string) error
+
+	// InsertVerdict inserts a review-stage runtime verdict (F4), idempotent-replay
+	// aware exactly like InsertSignoff: ON CONFLICT on (stage_instance_id,
+	// actor_user_id) — matching fields → WasReplay=true, mismatching → error.
+	InsertVerdict(ctx context.Context, tx db.Tx, v domain.ReviewVerdict) (VerdictInsertResult, error)
+	// LoadStageVerdicts fetches all verdicts recorded for a single stage
+	// instance, used to evaluate quorum for the `ready` path exactly like
+	// LoadStageSignoffs.
+	LoadStageVerdicts(ctx context.Context, tx db.Tx, tenantID, stageInstanceID string) ([]domain.ReviewVerdict, error)
 
 	// Read helpers relocated from application layer (H-5.1).
 	// All run inside the caller's transaction so the atomic boundary is preserved.

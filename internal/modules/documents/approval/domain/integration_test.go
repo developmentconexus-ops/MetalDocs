@@ -4,27 +4,6 @@ import (
 	"testing"
 )
 
-// R2-1: SkipStage during signing — skipped stage outcome never re-evaluated.
-func TestSkipStageDuringSigning(t *testing.T) {
-	inst := threeStageInstance()
-
-	// Stage 1 is active. Skip it before any signoff evaluation.
-	if err := inst.SkipStage("exempted"); err != nil {
-		t.Fatalf("SkipStage: %v", err)
-	}
-	if inst.Stages[0].Status != StageSkipped {
-		t.Error("stage 1 should be skipped")
-	}
-	// Stage 2 should now be active — quorum for stage 1 irrelevant.
-	if inst.Stages[1].Status != StageActive {
-		t.Errorf("stage 2 should be active; got %s", inst.Stages[1].Status)
-	}
-	// Instance still in progress.
-	if inst.Status != InstanceInProgress {
-		t.Errorf("instance should still be in_progress; got %s", inst.Status)
-	}
-}
-
 // R2-2: Drift→Quorum call-order — fail_stage short-circuits quorum.
 func TestDriftThenQuorumOrdering(t *testing.T) {
 	st := StageInstance{

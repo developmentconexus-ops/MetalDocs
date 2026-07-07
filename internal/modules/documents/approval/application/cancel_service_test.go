@@ -25,9 +25,10 @@ import (
 
 type cancelFakeRepo struct {
 	infrastructure.ApprovalRepository
-	instance      *domain.Instance
-	loadErr       error
-	updateInstErr error
+	instance       *domain.Instance
+	loadErr        error
+	updateInstErr  error
+	receivedReason string // F4: captures the reason passed to UpdateInstanceStatusWithReason
 }
 
 func (r *cancelFakeRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
@@ -35,6 +36,13 @@ func (r *cancelFakeRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (
 }
 
 func (r *cancelFakeRepo) UpdateInstanceStatus(_ context.Context, _ db.Tx, _, _ string, _, _ domain.InstanceStatus, _ *time.Time) error {
+	return r.updateInstErr
+}
+
+// UpdateInstanceStatusWithReason (F4): CancelInstance now calls this instead of
+// UpdateInstanceStatus so the cancel reason reaches approval_instances.cancel_reason.
+func (r *cancelFakeRepo) UpdateInstanceStatusWithReason(_ context.Context, _ db.Tx, _, _ string, _, _ domain.InstanceStatus, _ *time.Time, reason string) error {
+	r.receivedReason = reason
 	return r.updateInstErr
 }
 
@@ -274,6 +282,10 @@ func TestCancelInstance_HappyPath(t *testing.T) {
 	}
 	if len(emitter.Events) != 1 || emitter.Events[0].EventType != "approval.instance_cancelled" {
 		t.Errorf("expected 1 approval.instance_cancelled event; got %v", emitter.Events)
+	}
+	// F4: cancel_reason must reach the repository call, not just the governance event.
+	if repo.receivedReason != "stakeholder withdrew" {
+		t.Errorf("receivedReason = %q; want %q", repo.receivedReason, "stakeholder withdrew")
 	}
 }
 

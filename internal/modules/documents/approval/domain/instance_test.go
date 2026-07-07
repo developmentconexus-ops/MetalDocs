@@ -88,28 +88,6 @@ func TestInstanceRejectHere(t *testing.T) {
 	}
 }
 
-func TestInstanceSkipStage(t *testing.T) {
-	inst := threeStageInstance()
-	if err := inst.SkipStage("exempted"); err != nil {
-		t.Fatalf("SkipStage: %v", err)
-	}
-	if inst.Stages[0].Status != StageSkipped {
-		t.Error("stage 1 should be skipped")
-	}
-	if inst.Stages[1].Status != StageActive {
-		t.Error("stage 2 should be active after skip")
-	}
-}
-
-func TestInstanceSkipLastStage(t *testing.T) {
-	inst := Instance{Status: InstanceInProgress, Stages: []StageInstance{
-		{Status: StageActive},
-	}}
-	if err := inst.SkipStage("skip"); !errors.Is(err, ErrCannotSkipLastStage) {
-		t.Errorf("want ErrCannotSkipLastStage; got %v", err)
-	}
-}
-
 func TestInstanceBumpRevisionVersion(t *testing.T) {
 	inst := threeStageInstance()
 
@@ -156,5 +134,31 @@ func TestInstanceCancelAfterApproved(t *testing.T) {
 	inst := Instance{Status: InstanceApproved}
 	if err := inst.Cancel("oops"); !errors.Is(err, ErrInstanceTerminal) {
 		t.Errorf("want ErrInstanceTerminal; got %v", err)
+	}
+}
+
+// F4: Cancel must surface the reason on the instance so the caller can
+// persist it to approval_instances.cancel_reason — previously discarded.
+func TestInstanceCancelStoresReason(t *testing.T) {
+	inst := threeStageInstance()
+	if err := inst.Cancel("budget cut"); err != nil {
+		t.Fatalf("Cancel: %v", err)
+	}
+	if inst.CancelReason == nil || *inst.CancelReason != "budget cut" {
+		t.Errorf("want CancelReason = %q; got %v", "budget cut", inst.CancelReason)
+	}
+}
+
+// F4 (W11): InstanceChangesRequested is the 5th, non-terminal InstanceStatus
+// value, used by the request_changes verdict path.
+func TestInstanceChangesRequestedIsNonTerminal(t *testing.T) {
+	if InstanceChangesRequested != "changes_requested" {
+		t.Errorf("want %q; got %q", "changes_requested", InstanceChangesRequested)
+	}
+	inst := Instance{Status: InstanceChangesRequested}
+	// Cancel must still be callable from changes_requested (non-terminal) —
+	// mirrors the InstanceInProgress case, unlike the three terminal statuses.
+	if err := inst.Cancel("withdraw"); err != nil {
+		t.Errorf("Cancel from changes_requested should succeed (non-terminal); got %v", err)
 	}
 }

@@ -94,6 +94,15 @@ func (stubApprovalRepo) LoadActorDisplayName(_ context.Context, _, _ string) (st
 func (stubApprovalRepo) LoadRoute(_ context.Context, _ platformdb.Tx, _, _ string) (domain.Route, error) {
 	return domain.Route{}, nil
 }
+func (stubApprovalRepo) UpdateInstanceStatusWithReason(_ context.Context, _ platformdb.Tx, _, _ string, _ domain.InstanceStatus, _ domain.InstanceStatus, _ *time.Time, _ string) error {
+	return nil
+}
+func (stubApprovalRepo) InsertVerdict(_ context.Context, _ platformdb.Tx, _ domain.ReviewVerdict) (infrastructure.VerdictInsertResult, error) {
+	return infrastructure.VerdictInsertResult{}, nil
+}
+func (stubApprovalRepo) LoadStageVerdicts(_ context.Context, _ platformdb.Tx, _, _ string) ([]domain.ReviewVerdict, error) {
+	return nil, nil
+}
 
 // stubDecisionTxRunner calls fn(ctx) so the flow enters the tx func and hits the repo.
 type stubDecisionTxRunner struct{}

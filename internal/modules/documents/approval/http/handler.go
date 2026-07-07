@@ -42,6 +42,10 @@ type cancelService interface {
 	CancelInstance(ctx context.Context, runner db.TxRunner, req application.CancelInput) (application.CancelResult, error)
 }
 
+type reviewVerdictService interface {
+	RecordVerdict(ctx context.Context, runner db.TxRunner, req application.ReviewVerdictRequest) (application.ReviewVerdictResult, error)
+}
+
 type obsoleteService interface {
 	MarkObsolete(ctx context.Context, runner db.TxRunner, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error)
 }
@@ -83,6 +87,7 @@ type Handler struct {
 	decisionSvc       decisionService
 	readSvc           readService
 	cancelSvc         cancelService
+	reviewVerdictSvc  reviewVerdictService
 	obsoleteSvc       obsoleteService
 	supersedeSvc      supersedeService
 	routeAdmin        routeAdminService
@@ -108,6 +113,7 @@ func NewHandler(services *application.Services, database *sql.DB, idempStore sig
 		h.decisionSvc = services.Decision
 		h.readSvc = services.Read
 		h.cancelSvc = services.Cancel
+		h.reviewVerdictSvc = services.ReviewVerdict
 		h.obsoleteSvc = services.Obsolete
 		h.supersedeSvc = services.Supersede
 		h.routeAdmin = services.RouteAdmin

@@ -45,6 +45,7 @@ internal/modules/controlleddocuments/infrastructure/repository.go|ensureCounterV
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|InsertInstance
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|MarkSuperseded
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateInstanceStatus
+internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateInstanceStatusWithReason
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateStageStatus
 internal/modules/documents/infrastructure/repository.go|SeedDictionaryValuesTx
 internal/modules/documents/infrastructure/repository.go|DeleteComment

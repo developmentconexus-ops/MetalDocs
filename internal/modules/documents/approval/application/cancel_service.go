@@ -97,10 +97,12 @@ func (s *CancelService) CancelInstance(ctx context.Context, runner db.TxRunner, 
 			return fmt.Errorf("cancel: set cancel GUC: %w", err)
 		}
 
-		// Cancel approval instance.
+		// Cancel approval instance. F4: persist the reason to
+		// approval_instances.cancel_reason — previously only reached the
+		// governance event below, never the row itself.
 		now := s.clock.Now()
-		if err := s.repo.UpdateInstanceStatus(ctx, tx, in.TenantID, in.InstanceID,
-			domain.InstanceCancelled, domain.InstanceInProgress, &now); err != nil {
+		if err := s.repo.UpdateInstanceStatusWithReason(ctx, tx, in.TenantID, in.InstanceID,
+			domain.InstanceCancelled, domain.InstanceInProgress, &now, in.Reason); err != nil {
 			return fmt.Errorf("cancel: update instance status: %w", err)
 		}
 

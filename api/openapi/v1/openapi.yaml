@@ -3491,6 +3491,59 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /approval/instances/{instance_id}/stages/{stage_id}/review-verdict:
+    post:
+      summary: Record review-stage runtime verdict
+      description: >-
+        Records a `ready`/`request_changes` verdict against a review-kind
+        stage (StageKind=review). `ready` is quorum-counted exactly like a
+        signoff approval; `request_changes` immediately collapses the
+        instance to changes_requested and reverts the document to draft
+        (no quorum needed) — requires a non-empty comment (M2b F4).
+      tags: [approval]
+      operationId: recordApprovalReviewVerdict
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Area-scoped cap (approval.review) enforced at tier-2 in the
+          tx-layer service via authz.Require with the area resolved from
+          the document row (LoadDocumentAreaCode); never from a request
+          field. Postgres tripwire is the backstop.
+      parameters:
+        - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: stage_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewVerdictRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewVerdictResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /documents/{id}/publish:
     post:
       summary: Publish document
@@ -6463,6 +6516,26 @@ components:
           minLength: 64
           maxLength: 64
           description: SHA-256 hex digest of the content being signed off.
+    ReviewVerdictRequest:
+      type: object
+      required: [verdict]
+      properties:
+        verdict:
+          type: string
+          enum: [ready, request_changes]
+        comment:
+          type: string
+          description: Required when verdict is request_changes.
+    ReviewVerdictResponse:
+      type: object
+      required: [verdict_id, was_replay, outcome]
+      properties:
+        verdict_id:
+          type: string
+        was_replay:
+          type: boolean
+        outcome:
+          type: string
     ApprovalInboxItem:
       type: object
       required: [instance_id, document_id, controlled_document_id, document_title, area_code, submitted_by, submitted_at, stage_label, quorum_progress]
