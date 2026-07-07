@@ -14,6 +14,7 @@ const items: InboxItem[] = [
     submitted_at: new Date().toISOString(),
     stage_label: 'Revisão',
     quorum_progress: '0/1',
+    due_at: '2026-07-01T00:00:00Z',
   },
 ];
 

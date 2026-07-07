@@ -40,6 +40,7 @@ function makeItem(overrides: Partial<InboxItem> = {}): InboxItem {
     submitted_at: '2026-04-14T10:00:00.000Z',
     stage_label: 'Revisão L2',
     quorum_progress: '1/2',
+    due_at: '2026-04-21T10:00:00.000Z',
     ...overrides,
   };
 }

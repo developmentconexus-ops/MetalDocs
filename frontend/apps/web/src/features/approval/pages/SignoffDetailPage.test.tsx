@@ -71,6 +71,7 @@ describe('SignoffDetailPage', () => {
       completed_at: null,
       stages: [],
       etag: '"v3"',
+      frozen_content_hash: 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90',
     } as Awaited<ReturnType<typeof approvalApi.getInstance>>);
     vi.spyOn(documentsApi, 'listComments').mockResolvedValue([]);
   });

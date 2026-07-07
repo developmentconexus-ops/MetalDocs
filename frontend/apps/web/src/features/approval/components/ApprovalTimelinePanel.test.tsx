@@ -27,12 +27,15 @@ function makeInstance(): ApprovalInstance {
             signature_method: 'password_reauth',
             signed_at: '2026-04-15T11:00:00.000Z',
             reason: 'Tudo certo',
+            signature_meaning: 'approval',
           },
         ],
         actors: [{ user_id: 'joao', display_name: 'joao', status: 'approved', decision: 'approve' }],
+        due_at: '2026-04-16T10:00:00.000Z',
       },
     ],
     etag: 'v1',
+    frozen_content_hash: 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90',
   };
 }
 
