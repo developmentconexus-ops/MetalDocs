@@ -56,6 +56,16 @@ func TestMapPgError(t *testing.T) {
 			wantTarget: ErrActorAlreadySigned,
 		},
 		{
+			name:       "unique_duplicate_route_profile_legacy",
+			err:        makePgErr("23505", "approval_routes_tenant_profile_key", ""),
+			wantTarget: ErrDuplicateRouteProfile,
+		},
+		{
+			name:       "unique_duplicate_route_profile_active_partial",
+			err:        makePgErr("23505", "approval_routes_active_profile_uq", ""),
+			wantTarget: ErrDuplicateRouteProfile,
+		},
+		{
 			name:       "unique_unknown_with_hint_match",
 			err:        makePgErr("23505", "my_special_constraint", ""),
 			hints:      MapHints{UniqueConstraint: "my_special_constraint"},

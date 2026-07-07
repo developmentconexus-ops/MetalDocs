@@ -87,7 +87,8 @@ func MapPgError(err error, hints MapHints) error {
 			return ErrDuplicateSubmission
 		case "approval_signoffs_stage_instance_id_actor_user_id_key":
 			return ErrActorAlreadySigned
-		case "approval_routes_tenant_profile_key":
+		case "approval_routes_tenant_profile_key", // pre-F2 single-active-route constraint (dropped by migration 0287, kept here for old-row/rollback safety)
+			"approval_routes_active_profile_uq": // F2/ADR 0074 partial-unique active-per-profile constraint (migration 0287)
 			return ErrDuplicateRouteProfile
 		default:
 			if hints.UniqueConstraint != "" && pgErr.ConstraintName == hints.UniqueConstraint {

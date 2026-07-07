@@ -353,6 +353,19 @@ func (s *RouteAdminService) updateTx(ctx context.Context, runner db.TxRunner, in
 // inserted carrying the incremented version and the new definition. Both
 // branches run inside the caller's single transaction.
 func (s *RouteAdminService) updateInPlaceOrSupersede(ctx context.Context, tx *sql.Tx, in UpdateRouteInput, locked lockedRouteState, stagesChanged bool) (routeID string, newVersion int, err error) {
+	// The in-place UPDATE below is speculative: enforce_route_immutable() may
+	// reject it with ErrRouteInUse (P0001), which — per Postgres transaction
+	// semantics — aborts the entire enclosing transaction, not just the failed
+	// statement. Without a SAVEPOINT here, every subsequent statement in this
+	// tx (including the supersede fallback three lines below) fails closed
+	// with SQLSTATE 25P02 ("current transaction is aborted"), masking the real
+	// ErrRouteInUse behind an opaque 500. F10 live-QA caught this: a fresh
+	// in-use route's first-ever versioned update 500'd instead of superseding.
+	const savepoint = "route_update_attempt"
+	if _, spErr := tx.ExecContext(ctx, "SAVEPOINT "+savepoint); spErr != nil {
+		return "", 0, fmt.Errorf("savepoint before speculative update: %w", spErr)
+	}
+
 	err = tx.QueryRowContext(ctx, `
 		UPDATE approval_routes
 		   SET name = $1,
@@ -363,6 +376,9 @@ func (s *RouteAdminService) updateInPlaceOrSupersede(ctx context.Context, tx *sq
 		in.Name, in.RouteID, in.TenantID,
 	).Scan(&newVersion)
 	if err == nil {
+		if _, relErr := tx.ExecContext(ctx, "RELEASE SAVEPOINT "+savepoint); relErr != nil {
+			return "", 0, fmt.Errorf("release savepoint after in-place update: %w", relErr)
+		}
 		if stagesChanged {
 			if _, err := tx.ExecContext(ctx, `DELETE FROM approval_route_stages WHERE route_id = $1`, in.RouteID); err != nil {
 				return "", 0, fmt.Errorf("delete stages: %w", err)
@@ -377,6 +393,13 @@ func (s *RouteAdminService) updateInPlaceOrSupersede(ctx context.Context, tx *sq
 	mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
 	if !errors.Is(mapped, infrastructure.ErrRouteInUse) {
 		return "", 0, fmt.Errorf("update route: %w", mapped)
+	}
+
+	// Roll back to the savepoint to un-abort the transaction before issuing
+	// any further statements — the failed in-place UPDATE must not poison the
+	// supersede fallback that follows.
+	if _, rbErr := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT "+savepoint); rbErr != nil {
+		return "", 0, fmt.Errorf("rollback to savepoint after ErrRouteInUse: %w", rbErr)
 	}
 
 	// In use: retire the old row (trigger permits an active/superseded_at-only

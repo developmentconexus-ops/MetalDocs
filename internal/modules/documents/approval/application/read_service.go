@@ -426,10 +426,18 @@ func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tena
 		// eligibilityPredicate is switched off entirely for scope=oversee (list
 		// every in-progress instance in the tenant), rather than passed a
 		// wildcard actor value, so the SQL shape itself documents the two
-		// distinct listing modes.
+		// distinct listing modes. $2::jsonb IS NOT NULL is a tautology (actorJSON
+		// is always a valid non-nil marshaled array) kept ONLY so $2 still
+		// appears in the query text with an inferable type in the oversee
+		// branch — Postgres's parameter-type inference (SQLSTATE 42P18) fails
+		// if a placeholder is bound but never referenced anywhere in the SQL,
+		// which happened when this branch was the bare literal TRUE. F10
+		// live-QA caught this: scope=oversee 500'd on every call against real
+		// Postgres (never caught by sqlmock-based unit tests, which don't
+		// model Postgres's parameter-type inference at all).
 		eligibilityPredicate := "asi.eligible_actor_ids @> $2::jsonb"
 		if filter.Oversee {
-			eligibilityPredicate = "TRUE"
+			eligibilityPredicate = "($2::jsonb IS NOT NULL)"
 		}
 
 		stageKindPredicate := "$6 = '' OR asi.stage_kind = $6"
@@ -557,9 +565,12 @@ func (s *ReadService) countWorklist(ctx context.Context, runner db.TxRunner, ten
 			}
 		}
 
+		// See ListWorklist's identical comment: $2 must stay referenced (with
+		// an inferable type) in both branches or Postgres's parameter-type
+		// inference fails closed with SQLSTATE 42P18 on the oversee branch.
 		eligibilityPredicate := "asi.eligible_actor_ids @> $2::jsonb"
 		if filter.Oversee {
-			eligibilityPredicate = "TRUE"
+			eligibilityPredicate = "($2::jsonb IS NOT NULL)"
 		}
 		stageKindArg := string(filter.StageKind)
 		var dueBeforeArg *time.Time

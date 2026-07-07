@@ -428,8 +428,14 @@ func TestListWorklist_Oversee_QueryShapeDropsEligibilityPredicate(t *testing.T) 
 		t.Fatalf("read read_service.go: %v", err)
 	}
 	text := string(source)
-	if !strings.Contains(text, `eligibilityPredicate = "TRUE"`) {
-		t.Fatalf("ListWorklist must switch off the eligibility predicate entirely for scope=oversee (list every in-progress instance), not pass a wildcard actor value")
+	// The oversee-scope predicate must be a tautology that does NOT filter by
+	// eligible_actor_ids (list every in-progress instance), but it must still
+	// reference $2 with an inferable type — a bare "TRUE" literal leaves $2
+	// completely unreferenced in the query text, which Postgres's real
+	// parameter-type inference rejects with SQLSTATE 42P18 (F10 live-QA
+	// finding; sqlmock cannot catch this class of bug).
+	if !strings.Contains(text, `eligibilityPredicate = "($2::jsonb IS NOT NULL)"`) {
+		t.Fatalf("ListWorklist must switch off the eligibility predicate entirely for scope=oversee (list every in-progress instance), not pass a wildcard actor value, while keeping $2 referenced with an inferable type (see SQLSTATE 42P18)")
 	}
 }
 
