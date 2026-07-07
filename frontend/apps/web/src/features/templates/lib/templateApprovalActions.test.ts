@@ -38,12 +38,10 @@ function makeActor(overrides: Partial<ActorContext> = {}): ActorContext {
 }
 
 function makeHandlers(): TemplateApprovalHandlers & {
-  runSubmit: ReturnType<typeof vi.fn>;
   runReview: ReturnType<typeof vi.fn>;
   runApprove: ReturnType<typeof vi.fn>;
 } {
   return {
-    runSubmit: vi.fn(),
     runReview: vi.fn(),
     runApprove: vi.fn(),
   };
@@ -51,25 +49,12 @@ function makeHandlers(): TemplateApprovalHandlers & {
 
 describe('buildTemplateApprovalActions', () => {
   describe('draft status', () => {
-    it('emits exactly one action with key "submit" and correct label', () => {
+    // R1: the template editor is the sole author submit surface — the cockpit
+    // yields no actions for draft versions (finding 14: no second submit trigger).
+    it('emits no actions (no "submit" key survives in the cockpit)', () => {
       const actions = buildTemplateApprovalActions(makeVersion(), makeActor(), makeHandlers());
-      expect(actions).toHaveLength(1);
-      expect(actions[0].key).toBe('submit');
-      expect(actions[0].label).toBe('Submeter para revisão');
-      expect(actions[0].variant).toBe('primary');
-    });
-
-    it('submit action is available when actor has template.submit', () => {
-      const actions = buildTemplateApprovalActions(makeVersion(), makeActor(), makeHandlers());
-      expect(actions[0].available).toBe(true);
-      expect(actions[0].reason).toBeUndefined();
-    });
-
-    it('submit action is unavailable when actor lacks template.submit, with a non-empty reason', () => {
-      const actor = makeActor({ capabilities: ['template.review', 'template.approve'] });
-      const actions = buildTemplateApprovalActions(makeVersion(), actor, makeHandlers());
-      expect(actions[0].available).toBe(false);
-      expect(actions[0].reason).toBeTruthy();
+      expect(actions).toEqual([]);
+      expect(actions.find((a) => a.key === 'submit')).toBeUndefined();
     });
   });
 

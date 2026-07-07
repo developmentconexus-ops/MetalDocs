@@ -16,7 +16,6 @@ vi.mock("../components/TemplateReviewCanvas", () => ({
 }));
 
 vi.mock("../api/templates", () => ({
-  submitForReview: vi.fn(),
   reviewVersion: vi.fn(),
   approveVersion: vi.fn(),
 }));

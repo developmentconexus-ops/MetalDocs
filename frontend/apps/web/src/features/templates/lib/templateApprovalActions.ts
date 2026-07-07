@@ -1,26 +1,25 @@
 import type { VersionDTO } from '../api/templates';
 import type { ActorContext } from './canActOnVersion';
-import { canApprove, canPublish, canReview, canSubmit } from './canActOnVersion';
+import { canApprove, canPublish, canReview } from './canActOnVersion';
 import type { ArtifactAction } from '../../shared/controlled-artifact/types';
 
 /**
  * Route-supplied runners bound to each emitted action's `run`. The route owns the
- * reason textarea state + the API calls (reviewVersion / approveVersion /
- * submitForReview) + idempotency keys + refetch; this module only decides WHICH
- * actions are allowed in the current version state and wires their `run` to these.
+ * reason textarea state + the API calls (reviewVersion / approveVersion) +
+ * idempotency keys + refetch; this module only decides WHICH actions are allowed
+ * in the current version state and wires their `run` to these.
  *
  * `runReview(accept)` → reviewer flow (reviewVersion). `runApprove(accept)` →
- * approver/publish flow (approveVersion). `runSubmit()` → submitForReview.
+ * approver/publish flow (approveVersion).
  */
 export interface TemplateApprovalHandlers {
-  runSubmit: () => void;
   runReview: (accept: boolean) => void;
   runApprove: (accept: boolean) => void;
 }
 
 /**
  * Ordered, gated approval actions for a template version. Covers:
- *   - draft            → Submeter para revisão            (canSubmit → runSubmit)
+ *   - draft            → no cockpit actions (submit lives solely in the template editor — R1)
  *   - under_review + reviewer → Aprovar revisão / Rejeitar (canReview → runReview)
  *   - under_review, no reviewer → Publicar / Rejeitar     (canPublish → runApprove)
  *   - approved         → Publicar / Rejeitar              (canApprove → runApprove)
@@ -34,18 +33,6 @@ export function buildTemplateApprovalActions(
 ): ArtifactAction[] {
   const actions: ArtifactAction[] = [];
   switch (version.status) {
-    case 'draft': {
-      const gate = canSubmit(version, actor);
-      actions.push({
-        key: 'submit',
-        label: 'Submeter para revisão',
-        variant: 'primary',
-        available: gate.allowed,
-        reason: gate.allowed ? undefined : gate.reason,
-        run: handlers.runSubmit,
-      });
-      break;
-    }
     case 'under_review': {
       const hasReviewer = version.pending_reviewer_role != null;
       const gate = hasReviewer ? canReview(version, actor) : canPublish(version, actor);

@@ -8,7 +8,6 @@ import {
 } from "../adapters/useTemplateApprovalArtifact";
 import { useTemplateDetailQuery } from "../queries/useTemplateDetailQuery";
 import {
-  submitForReview,
   reviewVersion,
   approveVersion,
   type VersionDTO,
@@ -24,9 +23,9 @@ import styles from "./TemplateApprovalRoute.module.css";
 /**
  * Template-specific route wrapper for the shared ArtifactApprovalScreen. Composes
  * the shared DecisionModel for the review/approve states (accept/reject radio + an
- * inline motivo, no password/legal — templates carry no legal e-signature) and
- * feeds the plain fallback actions (draft submit) for every other state. Reads the
- * working version_number from the detail query.
+ * inline motivo, no password/legal — templates carry no legal e-signature).
+ * Draft submission lives solely in the template editor (R1) — this cockpit yields
+ * no actions for draft versions. Reads the working version_number from the detail query.
  *
  * The main slot renders the template content read-only (TemplateReviewCanvas). When
  * a decision is offered the DecisionPanel owns accept/reject + the motivo; otherwise
@@ -43,7 +42,7 @@ export function TemplateApprovalRoute() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
-  // Fire-and-forget runner for the plain fallback actions (draft submit) — surfaces
+  // Fire-and-forget runner for the plain fallback actions (review/approve) — surfaces
   // its outcome as a sidebar message.
   const runAction = async (fn: () => Promise<VersionDTO>, successText: string) => {
     if (busy) return;
@@ -74,10 +73,6 @@ export function TemplateApprovalRoute() {
   };
 
   const handlers: TemplateApprovalHandlers = {
-    runSubmit: () => {
-      if (versionNum == null) return;
-      void runAction(() => submitForReview(templateId, versionNum, crypto.randomUUID()), "Enviado para revisão.");
-    },
     runReview: (accept) => {
       if (versionNum == null) return;
       void runAction(

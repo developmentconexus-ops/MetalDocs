@@ -77,7 +77,6 @@ function makeVersion(overrides: Record<string, unknown> = {}) {
 
 function makeHandlers(): TemplateApprovalHandlers {
   return {
-    runSubmit: vi.fn(),
     runReview: vi.fn(),
     runApprove: vi.fn(),
   };
