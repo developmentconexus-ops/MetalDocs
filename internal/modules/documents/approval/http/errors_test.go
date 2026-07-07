@@ -121,6 +121,36 @@ func TestMapErrorToResponse(t *testing.T) {
 			wantTitle:  application.ErrReasonCategoryInvalid.Error(),
 		},
 		{
+			// ADR 0073: the four sentinels the canonical /submit path now surfaces
+			// (previously finalize-only) must map to typed problem+json, never 500.
+			name:       "ADR0073 revision title required",
+			err:        application.ErrRevisionTitleRequired,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   "validation.revision_title_required",
+			wantTitle:  application.ErrRevisionTitleRequired.Error(),
+		},
+		{
+			name:       "ADR0073 document not draft",
+			err:        v2dom.ErrDocumentNotDraft,
+			wantStatus: http.StatusConflict,
+			wantCode:   "state.document_not_draft",
+			wantTitle:  v2dom.ErrDocumentNotDraft.Error(),
+		},
+		{
+			name:       "ADR0073 profile not configured",
+			err:        v2dom.ErrProfileNotConfigured,
+			wantStatus: http.StatusBadRequest,
+			wantCode:   "validation.profile_not_configured",
+			wantTitle:  v2dom.ErrProfileNotConfigured.Error(),
+		},
+		{
+			name:       "ADR0073 approval route missing",
+			err:        v2dom.ErrApprovalRouteMissing,
+			wantStatus: http.StatusConflict,
+			wantCode:   "state.approval_route_missing",
+			wantTitle:  v2dom.ErrApprovalRouteMissing.Error(),
+		},
+		{
 			name:       "repository insufficient privilege",
 			err:        infrastructure.ErrInsufficientPrivilege,
 			wantStatus: http.StatusInternalServerError,
