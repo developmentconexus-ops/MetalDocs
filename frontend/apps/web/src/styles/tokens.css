@@ -47,7 +47,7 @@
 
   /* Approval-slate — a pre-existing, non-brand Tailwind-derived palette used
      by the approval feature's status/severity chips and dialogs (StateBadge,
-     ApprovalTimelinePanel, RouteAdmin, DocumentApprovalExtras, Cancel/Supersede
+     ApprovalTimeline, RouteAdmin, Cancel/Supersede
      dialogs, DocumentEditorPage, the Dialog primitive, and the template-approval
      screens: TemplateReviewCanvas, TemplateApprovalExtras, TemplateApprovalRoute).
      Not part of the Wine brand palette above — named/tokenized (FE-18) so

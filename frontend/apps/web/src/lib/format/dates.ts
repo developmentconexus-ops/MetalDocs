@@ -47,3 +47,39 @@ export function formatPublishedAt(input: string | null | undefined): string {
   const d = parseDate(input);
   return d ? longDateFmt.format(d) : EM_DASH;
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// F4 (M2c): relative due-date chip for the approval sidebar's StageContextHeader.
+// null/invalid -> em-dash; future same calendar day -> "vence hoje"; future ->
+// "vence em N dia(s)" (ceil of the day diff); past -> "atrasado há N dia(s)",
+// overdue: true. `now` is injectable so tests are deterministic.
+export function formatDueRelative(
+  dueAt: string | null | undefined,
+  now: number = Date.now(),
+): { label: string; overdue: boolean } {
+  const d = parseDate(dueAt);
+  if (!d) {
+    return { label: EM_DASH, overdue: false };
+  }
+
+  const diffMs = d.getTime() - now;
+
+  if (diffMs <= 0) {
+    const days = Math.max(1, Math.ceil(-diffMs / DAY_MS));
+    return { label: `atrasado há ${days} dia${days === 1 ? '' : 's'}`, overdue: true };
+  }
+
+  const nowDate = new Date(now);
+  const sameDay =
+    d.getFullYear() === nowDate.getFullYear() &&
+    d.getMonth() === nowDate.getMonth() &&
+    d.getDate() === nowDate.getDate();
+
+  if (sameDay) {
+    return { label: 'vence hoje', overdue: false };
+  }
+
+  const days = Math.ceil(diffMs / DAY_MS);
+  return { label: `vence em ${days} dia${days === 1 ? '' : 's'}`, overdue: false };
+}

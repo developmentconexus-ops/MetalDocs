@@ -1,8 +1,8 @@
-import type { ApprovalInstance, Signoff, StageInstance } from '../api/approvalTypes';
-import { formatDateTime as formatDateTimeValue } from '../../../lib/formatDate';
-import styles from './ApprovalTimelinePanel.module.css';
+import type { ApprovalInstance, Signoff, StageInstance } from '../../api/approvalTypes';
+import { formatDateTime as formatDateTimeValue } from '../../../../lib/formatDate';
+import styles from './ApprovalTimeline.module.css';
 
-interface ApprovalTimelinePanelProps {
+interface ApprovalTimelineProps {
   instance: ApprovalInstance | null;
   loading: boolean;
   error?: string | null;
@@ -20,6 +20,14 @@ const STAGE_STATUS_LABEL: Record<StageInstance['status'], string> = {
 const DECISION_LABEL: Record<Signoff['decision'], string> = {
   approve: 'Aprovou',
   reject: 'Rejeitou',
+};
+
+// F4: the label for what this signature legally attests (spec §1.2). Distinct
+// from DECISION_LABEL — signature_meaning is the derived, server-controlled
+// legal attestation (never client-writable), rendered alongside the decision.
+const SIGNATURE_MEANING_LABEL: Record<Signoff['signature_meaning'], string> = {
+  approval: 'Aprovação',
+  rejection: 'Rejeição',
 };
 
 // Runtime instance status is `in_progress | approved | rejected | cancelled`
@@ -47,7 +55,14 @@ function formatSignatureMethod(signatureMethod: Signoff['signature_method']): st
   return 'ICP-Brasil';
 }
 
-export function ApprovalTimelinePanel({ instance, loading, error, onRetry }: ApprovalTimelinePanelProps) {
+/**
+ * The SINGLE approval timeline rendered in the cockpit sidebar (spec §1.2).
+ * Forked from the former `ApprovalTimelinePanel` (deleted — its only consumer,
+ * the former sidebar-extras component, was deleted too) with one addition:
+ * each signoff now shows its `signature_meaning` label ("Aprovação"/"Rejeição")
+ * — the derived, server-controlled legal attestation distinct from the decision.
+ */
+export function ApprovalTimeline({ instance, loading, error, onRetry }: ApprovalTimelineProps) {
   if (loading) {
     return <div className={styles.state}>Carregando timeline...</div>;
   }
@@ -101,6 +116,10 @@ export function ApprovalTimelinePanel({ instance, loading, error, onRetry }: App
                       <li className={styles.signoff} key={signoff.id}>
                         <p>
                           <strong>{signoff.actor_user_id}</strong> - {DECISION_LABEL[signoff.decision]}
+                          {' · '}
+                          <span className={styles.meaning}>
+                            {SIGNATURE_MEANING_LABEL[signoff.signature_meaning]}
+                          </span>
                         </p>
                         <p className={styles.meta}>
                           Assinatura: {formatSignatureMethod(signoff.signature_method)} | Em:{' '}

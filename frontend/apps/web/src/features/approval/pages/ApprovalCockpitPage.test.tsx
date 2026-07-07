@@ -312,13 +312,29 @@ describe('ApprovalCockpitPage', () => {
     });
   });
 
-  it('renders the integrity panel (content hash + copy) in the decision sidebar', async () => {
+  it('renders the integrity disclosure (collapsed) in the sidebar, revealing the hash + copy button on expand', async () => {
     renderAt();
     await waitFor(() => {
-      expect(screen.getByText('Integridade')).toBeTruthy();
+      expect(screen.getByText(/Conteúdo verificado/)).toBeTruthy();
     });
-    expect(screen.getByText('hash-abc')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Copiar' })).toBeTruthy();
+    // Collapsed: the frozen content hash is NOT in the DOM.
+    const frozenHash = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90';
+    expect(screen.queryByText(frozenHash)).toBeNull();
+
+    fireEvent.click(screen.getByText(/Conteúdo verificado/));
+    await waitFor(() => {
+      expect(screen.getByText(frozenHash)).toBeTruthy();
+    });
+    expect(screen.getAllByRole('button', { name: 'Copiar' }).length).toBeGreaterThan(0);
+  });
+
+  it('does not render the stale-data banner (F2/signoff invalidation replaces polling)', async () => {
+    renderAt();
+    await waitFor(() => {
+      expect(screen.getAllByText('POP Limpeza de Linha').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/dados podem estar desatualizados/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Atualizar' })).toBeNull();
   });
 
   it('preselects the reject decision inline when ?decision=reject is present', async () => {

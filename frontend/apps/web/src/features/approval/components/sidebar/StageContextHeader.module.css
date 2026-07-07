@@ -1,0 +1,48 @@
+.header {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.stageMeta {
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.stageIndex {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.stageLabel {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1-5);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: var(--font-size-xs);
+  color: var(--text-soft);
+}
+
+.chipOverdue {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+}

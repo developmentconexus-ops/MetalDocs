@@ -1,15 +1,15 @@
 .panel {
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
   background: var(--surface);
-  padding: 16px;
+  padding: var(--sp-4);
 }
 
 .timeline {
   list-style: none;
   margin: 0;
   padding: 0 0 0 18px;
-  border-left: 2px solid #dbe3ee;
+  border-left: 2px solid var(--border-strong);
 }
 
 .node {
@@ -28,9 +28,9 @@
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #2563eb;
+  background: var(--brand);
   border: 2px solid var(--surface);
-  box-shadow: 0 0 0 2px #dbe3ee;
+  box-shadow: 0 0 0 2px var(--border-strong);
 }
 
 .content {
@@ -40,14 +40,19 @@
 
 .title {
   margin: 0;
-  font-size: 0.95rem;
-  color: var(--slate-text);
+  font-size: var(--font-size-md);
+  color: var(--text);
 }
 
 .meta {
   margin: 0;
-  font-size: 0.875rem;
-  color: var(--slate-text-muted);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.meaning {
+  font-weight: 600;
+  color: var(--text-soft);
 }
 
 .stageHeader {
@@ -58,7 +63,7 @@
 }
 
 .stageStatus {
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
   padding: 4px 8px;
   border-radius: 999px;
@@ -66,33 +71,33 @@
 }
 
 .stage_pending {
-  background: #f8fafc;
-  color: var(--slate-text-muted);
-  border-color: var(--slate-border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-color: var(--border);
 }
 
 .stage_active {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border-color: #93c5fd;
+  background: var(--info-bg);
+  color: var(--info);
+  border-color: var(--info);
 }
 
 .stage_passed {
-  background: #ecfdf5;
-  color: #047857;
-  border-color: var(--slate-success-border);
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: var(--success);
 }
 
 .stage_failed {
-  background: var(--slate-danger-bg-2);
-  color: #b91c1c;
-  border-color: var(--slate-danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .stage_cancelled {
-  background: #fff7ed;
-  color: #c2410c;
-  border-color: #fdba74;
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: var(--warning);
 }
 
 .signoffs {
@@ -111,10 +116,10 @@
 }
 
 .state {
-  border: 1px dashed var(--slate-border);
-  border-radius: 12px;
-  padding: 16px;
-  color: #334155;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-3);
+  padding: var(--sp-4);
+  color: var(--text-soft);
   display: grid;
   gap: 10px;
 }

@@ -1,6 +1,6 @@
 // Approval-workflow policy shared by the document approval adapter
-// (useDocumentApprovalArtifact) and the document approval extras component
-// (DocumentApprovalExtras). Single source of truth for the per-state transition
+// (useDocumentApprovalArtifact) and the approval cockpit sidebar. Single
+// source of truth for the per-state transition
 // policy (which workflow actions appear, the disabled-edit reason, and the
 // read-only flag) and the status→ApprovalState coercion. No React import — pure
 // data + functions only.

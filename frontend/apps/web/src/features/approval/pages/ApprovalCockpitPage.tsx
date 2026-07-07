@@ -12,10 +12,9 @@ import {
   type DocumentApprovalHandlers,
 } from '../../documents/adapters/useDocumentApprovalArtifact';
 import type { StageInstance } from '../api/approvalTypes';
-import { toApprovalState } from '../../documents/lib/approvalWorkflow';
 import { ArtifactApprovalScreen } from '../../shared/controlled-artifact/ArtifactApprovalScreen';
+import { ApprovalSidebar } from '../components/sidebar/ApprovalSidebar';
 import { CancelInstanceDialog } from '../components/CancelInstanceDialog';
-import { DocumentApprovalExtras } from '../components/DocumentApprovalExtras';
 import { DocumentShell } from '../../documents/components/DocumentShell';
 import { SupersedePublishDialog } from '../components/SupersedePublishDialog';
 import { useSignoffMutation } from '../hooks/useSignoffMutation';
@@ -137,15 +136,12 @@ export function ApprovalCockpitPage() {
   const {
     model,
     instance,
-    approvalState,
     lockedByInstanceId,
     publishedDocumentId,
-    policy,
     error,
     contextError,
     noActiveContext,
     refetchInstance,
-    isStale,
   } = useDocumentApprovalArtifact(documentId, handlers, {
     defaultOptionKey: initialSignoffDecision ?? null,
     submit: decisionSubmit,
@@ -171,10 +167,33 @@ export function ApprovalCockpitPage() {
     );
   }
 
-  // The sidebar (decisionExtras) renders the real approval panel ONLY when the
+  // The sidebar (decisionExtras) renders the real ApprovalSidebar ONLY when the
   // active context is confirmed; loading / error / no-context / instance-error
   // states render here and suppress the action buttons (empty actions).
   const sidebarReady = !contextLoading && !contextError && !noActiveContext && !error && contentHash != null;
+
+  // The document sign-off decision model (password re-auth + legal-effect
+  // confirmation) is now constructed by the adapter via `buildDocumentSignoffDecision`
+  // (FE-02) — this route only supplied the `submit` sequencing above (signOff →
+  // refetchInstance) since that depends on route-owned state (the lifted signoff
+  // mutation).
+  const decision = model.decision ?? null;
+
+  // Suppress the action buttons until the sidebar is ready. Signing is not among
+  // model.actions (it routes through the DecisionPanel), so no filtering is needed.
+  const baseActions = sidebarReady ? model.actions : [];
+
+  const activeStage = instance?.stages.find((s) => s.status === 'active');
+  const editorMode = resolveEditorMode(activeStage, currentUser?.userId ?? null);
+  const isApprovalStage = activeStage?.stage_kind === 'approval';
+
+  // F4 (M2c): neutralize ArtifactApprovalScreen's own decision head / flow band /
+  // ArtifactDecisionPanel / actions band for the document cockpit WITHOUT editing
+  // the shared component (it is also used by the template approval screen). With
+  // decision/approvalChain/actions null/empty, its `aside` renders ONLY the
+  // ApprovalSidebar passed below as `decisionExtras` — ApprovalSidebar now owns
+  // rendering the real decision/actions itself.
+  const screenModel: ArtifactViewModel = { ...model, decision: undefined, approvalChain: null, actions: [] };
 
   let decisionExtras: React.ReactNode;
   if (contextLoading) {
@@ -198,36 +217,28 @@ export function ApprovalCockpitPage() {
     decisionExtras = (
       <div className={styles.state}>Este documento não está em um fluxo de aprovação ativo.</div>
     );
-  } else {
+  } else if (instance != null) {
     decisionExtras = (
-      <DocumentApprovalExtras
-        documentId={documentId}
-        status={toApprovalState(approvalState)}
-        policy={policy}
-        contentHash={contentHash}
-        revisionVersion={revisionVersion}
-        lockedByInstanceId={lockedByInstanceId}
+      <ApprovalSidebar
+        editorMode={editorMode}
+        isApprovalStage={isApprovalStage}
         instance={instance}
-        isStale={isStale}
+        activeStage={activeStage}
+        documentId={documentId}
+        contentHash={contentHash}
+        frozenContentHash={instance.frozen_content_hash ?? null}
+        decision={decision}
+        actions={baseActions}
+        trackedChanges={trackedChanges}
+        lockedByInstanceId={lockedByInstanceId}
         onRefetchInstance={refetchInstance}
       />
     );
+  } else {
+    decisionExtras = (
+      <div className={styles.state}>Este documento não está em um fluxo de aprovação ativo.</div>
+    );
   }
-
-  // The document sign-off decision model (password re-auth + legal-effect
-  // confirmation) is now constructed by the adapter via `buildDocumentSignoffDecision`
-  // (FE-02) — this route only supplied the `submit` sequencing above (signOff →
-  // refetchInstance) since that depends on route-owned state (the lifted signoff
-  // mutation).
-  const decision = model.decision;
-
-  // Suppress the action buttons until the sidebar is ready. Signing is not among
-  // model.actions (it routes through the DecisionPanel), so no filtering is needed.
-  const baseActions = sidebarReady ? model.actions : [];
-  const screenModel: ArtifactViewModel = { ...model, actions: baseActions, decision };
-
-  const activeStage = instance?.stages.find((s) => s.status === 'active');
-  const editorMode = resolveEditorMode(activeStage, currentUser?.userId ?? null);
 
   const main = (
     <div className={styles.main}>
