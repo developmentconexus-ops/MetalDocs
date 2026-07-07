@@ -67,12 +67,13 @@ func (h *Handler) mapInstanceResponse(ctx context.Context, tenantID string, inst
 				name = sig.ActorUserID()
 			}
 			recs = append(recs, contracts.SignoffRecord{
-				ID:              sig.ID(),
-				ActorUserID:     name,
-				Decision:        contracts.SignoffDecision(sig.Decision()),
-				Reason:          sig.Comment(),
-				SignatureMethod: contracts.SignatureMethod(sig.SignatureMethod()),
-				SignedAt:        sig.SignedAt().UTC().Format(time.RFC3339),
+				ID:               sig.ID(),
+				ActorUserID:      name,
+				Decision:         contracts.SignoffDecision(sig.Decision()),
+				Reason:           sig.Comment(),
+				SignatureMethod:  contracts.SignatureMethod(sig.SignatureMethod()),
+				SignedAt:         sig.SignedAt().UTC().Format(time.RFC3339),
+				SignatureMeaning: sig.SignatureMeaning(),
 			})
 		}
 		stages[i] = contracts.StageInstance{

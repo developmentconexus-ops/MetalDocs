@@ -668,6 +668,52 @@ func TestRecordSignoff_ContentHashEchoesInstanceSubmitHash(t *testing.T) {
 	}
 }
 
+// TestRecordSignoff_ApproveSetsSignatureMeaningApproval asserts an approve
+// decision persists signature_meaning = "approval" (F7, W8, 21 CFR
+// 11.50(a)(3) — the signed record must state the meaning of the signature).
+func TestRecordSignoff_ApproveSetsSignatureMeaningApproval(t *testing.T) {
+	const (
+		instanceID = "inst-sigmeaning-approve"
+		stageID    = "stage-sigmeaning-approve"
+		actorID    = "approver-sigmeaning-approve"
+		authorID   = "author-sigmeaning-approve"
+	)
+
+	inst := buildTwoApproverInstance(instanceID, stageID, authorID, []string{actorID, "approver-2"})
+	conn := &decisionTestConn{
+		authzGranted: true,
+		areaCode:     "QA",
+		actorID:      actorID,
+	}
+	repo := &fakeDecisionRepo{instance: inst}
+	svc := &DecisionService{
+		repo:       repo,
+		emitter:    &MemoryEmitter{},
+		clock:      fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		pinInvoker: &fakePinInvoker{},
+	}
+	db := newDecisionTestDB(t, conn)
+
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		SignaturePayload: map[string]any{},
+		ContentFormData:  map[string]any{"_content_hash": inst.ContentHashAtSubmit},
+	})
+	if err != nil {
+		t.Fatalf("RecordSignoff: unexpected error: %v", err)
+	}
+	if repo.insertedSignoff == nil {
+		t.Fatal("expected inserted signoff")
+	}
+	if got := repo.insertedSignoff.SignatureMeaning(); got != "approval" {
+		t.Errorf("SignatureMeaning() = %q; want %q", got, "approval")
+	}
+}
+
 func TestRecordSignoff_ThreadsActorDisplayNameFromRepo(t *testing.T) {
 	const (
 		instanceID = "inst-dn"
@@ -920,6 +966,56 @@ func TestRecordSignoff_RejectPath(t *testing.T) {
 	}
 	if repo.instanceStatusFrom != domain.InstanceInProgress {
 		t.Errorf("approval instance previous status = %q; want %q", repo.instanceStatusFrom, domain.InstanceInProgress)
+	}
+}
+
+// TestRecordSignoff_RejectSetsSignatureMeaningRejection asserts a reject
+// decision persists signature_meaning = "rejection", NOT the domain default
+// "approval" (F7, W8, 21 CFR 11.50(a)(3) — the pre-F7 defect: RecordSignoff
+// never set SignatureMeaning, so NewSignoff's empty-field default silently
+// stamped every reject signoff with "approval", a false attestation).
+func TestRecordSignoff_RejectSetsSignatureMeaningRejection(t *testing.T) {
+	const (
+		instanceID = "inst-sigmeaning-reject"
+		stageID    = "stage-sigmeaning-reject"
+		actorID    = "approver-sigmeaning-reject"
+		authorID   = "author-sigmeaning-reject"
+	)
+
+	inst := buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID})
+
+	signedAt := time.Date(2026, 4, 22, 14, 0, 0, 0, time.UTC)
+	conn := &decisionTestConn{
+		authzGranted: true,
+		areaCode:     "QA",
+		actorID:      actorID,
+	}
+	repo := &fakeDecisionRepo{
+		instance:         inst,
+		insertSignoffRes: infrastructure.SignoffInsertResult{ID: "signoff-sigmeaning-reject", WasReplay: false},
+	}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: signedAt}, pinInvoker: &fakePinInvoker{}}
+	db := newDecisionTestDB(t, conn)
+
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "reject",
+		Comment:          "Not acceptable",
+		SignatureMethod:  "password",
+		SignaturePayload: map[string]any{"hash": "def"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
+	})
+	if err != nil {
+		t.Fatalf("RecordSignoff: unexpected error: %v", err)
+	}
+	if repo.insertedSignoff == nil {
+		t.Fatal("expected inserted signoff")
+	}
+	if got := repo.insertedSignoff.SignatureMeaning(); got != "rejection" {
+		t.Errorf("SignatureMeaning() = %q; want %q (must not default to approval on reject)", got, "rejection")
 	}
 }
 

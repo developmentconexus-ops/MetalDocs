@@ -6411,7 +6411,7 @@ components:
           enum: [approve, reject]
     ApprovalSignoffRecordResponse:
       type: object
-      required: [id, actor_user_id, decision, signature_method, signed_at]
+      required: [id, actor_user_id, decision, signature_method, signed_at, signature_meaning]
       properties:
         id: { type: string, format: uuid }
         actor_user_id: { type: string }
@@ -6421,6 +6421,12 @@ components:
         reason: { type: string }
         signature_method: { type: string }
         signed_at: { type: string, format: date-time }
+        signature_meaning:
+          type: string
+          enum: [approval, rejection]
+          description: >-
+            What this signature legally attests (21 CFR 11.50(a)(3)) — derived
+            from the actor's decision at signoff time, never client-writable.
     SubmitDocumentRequest:
       type: object
       properties:

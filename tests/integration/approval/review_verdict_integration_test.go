@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 
 	"metaldocs/internal/modules/documents/approval/application"
@@ -256,6 +257,32 @@ func TestReviewVerdict_SoDBlocksSelfVerdict(t *testing.T) {
 	})
 	if !errors.Is(err, domain.ErrAuthorCannotSign) {
 		t.Fatalf("err = %v; want domain.ErrAuthorCannotSign", err)
+	}
+}
+
+// TestReviewVerdictSoDTrigger_RejectsAuthorSelfInsert asserts the F7
+// DB-tripwire-last-line SoD trigger (migration 0290, trg_review_verdict_sod /
+// enforce_approval_sod) rejects a raw INSERT into approval_review_verdicts
+// where actor_user_id equals the document's author — the same rule
+// domain.CheckSoD already enforces at the app layer (defense in depth: a
+// direct-SQL bypass of RecordVerdict must still be blocked at the DB).
+// Mirrors the existing (undocumented-in-Go, DB-only) enforce_signoff_sod
+// trigger's behavior for approval_signoffs, now symmetric for review verdicts.
+func TestReviewVerdictSoDTrigger_RejectsAuthorSelfInsert(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedReviewVerdictFixture(t, database, domain.StageKindReview)
+
+	_, err := database.ExecContext(context.Background(), `
+		INSERT INTO public.approval_review_verdicts
+		  (approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id, verdict, comment)
+		VALUES ($1::uuid, $2::uuid, $3, $4::uuid, 'ready', NULL)`,
+		fx.instanceID, fx.stageID, fx.authorID, fx.tenantID,
+	)
+	if err == nil {
+		t.Fatal("direct SQL insert with actor_user_id = document author should be rejected by trg_review_verdict_sod; got no error")
+	}
+	if !strings.Contains(err.Error(), "SoD: author cannot sign own revision") {
+		t.Errorf("err = %v; want SoD trigger rejection message", err)
 	}
 }
 

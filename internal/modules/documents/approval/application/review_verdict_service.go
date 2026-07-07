@@ -144,12 +144,14 @@ func (s *ReviewVerdictService) RecordVerdict(ctx context.Context, runner db.TxRu
 		}
 
 		// SoD: author cannot verdict their own submission (spec.md: "SoD blocks
-		// self-verdict"). Actor-already-recorded-a-verdict-on-this-stage is
-		// handled by InsertVerdict's idempotent-replay/conflict distinction
-		// below (mirrors InsertSignoff — a second table-shape-specific
-		// duplicate helper here would be redundant, not more correct).
-		if instance.SubmittedBy == req.ActorUserID {
-			return domain.ErrAuthorCannotSign
+		// self-verdict"). This calls the SAME domain.CheckSoD predicate
+		// RecordSignoff calls (F7 unification) — priorSignoffs is nil because
+		// the cross-stage-reuse clause needs a []Signoff-shaped prior-record
+		// source that doesn't apply to review verdicts; InsertVerdict's
+		// idempotent-replay/conflict distinction below already handles
+		// actor-already-recorded-a-verdict-on-this-stage (mirrors InsertSignoff).
+		if err := domain.CheckSoD(instance.SubmittedBy, req.ActorUserID, nil); err != nil {
+			return err
 		}
 
 		now := s.clock.Now()

@@ -63,12 +63,13 @@ type StageActor struct {
 
 // SignoffRecord is the wire representation of a recorded signoff.
 type SignoffRecord struct {
-	ID              string          `json:"id"`
-	ActorUserID     string          `json:"actor_user_id"`
-	Decision        SignoffDecision `json:"decision"`
-	Reason          string          `json:"reason,omitempty"`
-	SignatureMethod SignatureMethod `json:"signature_method"`
-	SignedAt        string          `json:"signed_at"`
+	ID               string          `json:"id"`
+	ActorUserID      string          `json:"actor_user_id"`
+	Decision         SignoffDecision `json:"decision"`
+	Reason           string          `json:"reason,omitempty"`
+	SignatureMethod  SignatureMethod `json:"signature_method"`
+	SignedAt         string          `json:"signed_at"`
+	SignatureMeaning string          `json:"signature_meaning"`
 }
 
 // InboxItem is one row of an approver's inbox listing.

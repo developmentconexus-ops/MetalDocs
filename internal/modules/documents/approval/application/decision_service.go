@@ -304,6 +304,16 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 
 		// Step 7: build the domain Signoff value object. sigPayload was resolved
 		// (and the actor re-authenticated) above.
+		//
+		// SignatureMeaning (F7, W8, 21 CFR 11.50(a)(3)): the signed record must
+		// state what the signature means. Derived deterministically from the
+		// decision the actor already submitted — never client-writable, never
+		// left to NewSignoff's empty-field default (which would silently stamp
+		// every reject signoff as "approval").
+		signatureMeaning := "approval"
+		if req.Decision == domain.DecisionReject {
+			signatureMeaning = "rejection"
+		}
 		now := s.clock.Now()
 		signoff, err := domain.NewSignoff(domain.SignoffParams{
 			ID:                       uuid.New().String(),
@@ -318,6 +328,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 			SignaturePayload:         sigPayload,
 			ContentHash:              contentHash,
 			ActorDisplayNameSnapshot: actorDisplayName,
+			SignatureMeaning:         signatureMeaning,
 		})
 		if err != nil {
 			return fmt.Errorf("recordSignoff: build signoff: %w", err)
