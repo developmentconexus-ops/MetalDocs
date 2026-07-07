@@ -283,10 +283,6 @@ func (f *fakeRepo) DeleteComment(_ context.Context, _, _ string, _ int) error {
 	return nil
 }
 
-func (f *fakeRepo) GetFinalizePrereqs(_ context.Context, _, _ string) (*domain.FinalizePrereqs, error) {
-	return nil, domain.ErrDocumentNotDraft
-}
-
 func (f *fakeRepo) MarkArchived(_ context.Context, _, _, _ string) error { return nil }
 
 func (f *fakeRepo) MarkArchivedTx(_ context.Context, _ db.Tx, _, _, _ string) error { return nil }

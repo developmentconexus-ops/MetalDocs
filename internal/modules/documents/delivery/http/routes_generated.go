@@ -139,11 +139,6 @@ func (h *Handler) GetDocumentFillInSchema(w http.ResponseWriter, r *http.Request
 	h.fillIn.GetFillInSchema(w, r)
 }
 
-func (h *Handler) FinalizeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params documentsapi.FinalizeDocumentParams) {
-	r.SetPathValue("id", id.String())
-	h.finalizeDocument(w, r)
-}
-
 func (h *Handler) GetDocumentPlaceholderOptions(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string) {
 	r.SetPathValue("id", id.String())
 	r.SetPathValue("pid", pid)

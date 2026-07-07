@@ -69,8 +69,14 @@ var ErrContentHashMismatch = errors.New("approval: content hash mismatch")
 // controlleddocuments read-port (M2/F2.1) used by the area-grade authz checks in
 // Submit/Publish/Supersede/Decision; a nil reader fail-closes the CD area to "".
 func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, clock Clock, cdRead controlleddocumentsdomain.CDFieldReader) *Services {
+	// The concrete Postgres repository also satisfies SubmitDefaultsResolver
+	// (in-tx route/hash resolution, ADR 0073). Wire it via assertion so the
+	// broad ApprovalRepository interface stays untouched (ISP); a repo that does
+	// not implement it leaves submit resolution disabled (nil), which fail-closes
+	// the omitted-route path to ErrApprovalRouteMissing.
+	resolver, _ := repo.(SubmitDefaultsResolver)
 	return &Services{
-		Submit:     &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		Submit:     &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead, resolver: resolver},
 		Decision:   &DecisionService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
 		Publish:    &PublishService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
 		Scheduler:  &SchedulerService{repo: repo, emitter: emitter, clock: clock},

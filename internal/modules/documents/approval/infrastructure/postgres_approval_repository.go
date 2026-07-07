@@ -1193,6 +1193,78 @@ func (r *postgresApprovalRepository) ResolveEligibleActors(ctx context.Context, 
 	return ids, nil
 }
 
+// LoadControlledDocumentID returns documents.controlled_document_id for
+// (tenantID, documentID) inside the caller's transaction. ok is false when the
+// document row is absent or the controlled-document link is NULL. Plain
+// non-recording SELECT (HS-PRE-1); part of the ADR 0073 SubmitDefaultsResolver.
+func (r *postgresApprovalRepository) LoadControlledDocumentID(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, bool, error) {
+	var cdID sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT controlled_document_id::text
+		  FROM documents
+		 WHERE id = $1 AND tenant_id = $2`,
+		documentID, tenantID,
+	).Scan(&cdID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	if !cdID.Valid || cdID.String == "" {
+		return "", false, nil
+	}
+	return cdID.String, true, nil
+}
+
+// LoadActiveRouteIDByProfile returns the id of the single active approval route
+// for (tenantID, profileCode), newest route version first — the in-tx form of
+// the wrapper's GetFinalizePrereqs route query (repository.go:1801-1817).
+// Returns ErrNoActiveApprovalRoute when none is active. Column is `active`
+// (migration 0146). Plain non-recording SELECT (HS-PRE-1).
+func (r *postgresApprovalRepository) LoadActiveRouteIDByProfile(ctx context.Context, tx db.Tx, tenantID, profileCode string) (string, error) {
+	var routeID string
+	err := tx.QueryRowContext(ctx, `
+		SELECT id
+		  FROM approval_routes
+		 WHERE tenant_id    = $1
+		   AND profile_code = $2
+		   AND active       = true
+		 ORDER BY version DESC
+		 LIMIT 1`,
+		tenantID, profileCode,
+	).Scan(&routeID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNoActiveApprovalRoute
+	}
+	if err != nil {
+		return "", err
+	}
+	return routeID, nil
+}
+
+// LoadHeadContentHash returns the most recent autosaved revision's content_hash
+// for the document, or "" when none exists — the in-tx form of the wrapper's
+// head-hash query (repository.go:1819-1828), COALESCE / no-rows tolerant. Plain
+// non-recording SELECT (HS-PRE-1).
+func (r *postgresApprovalRepository) LoadHeadContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
+	var contentHash string
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(dr.content_hash, '')
+		  FROM document_revisions dr
+		  JOIN documents d ON d.id = dr.document_id
+		 WHERE dr.document_id = $1
+		   AND d.tenant_id    = $2
+		 ORDER BY dr.created_at DESC, dr.id DESC
+		 LIMIT 1`,
+		documentID, tenantID,
+	).Scan(&contentHash)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	return contentHash, nil
+}
+
 // LoadRoute fetches an approval route and its stages from the database within
 // the caller's transaction.
 func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID string) (domain.Route, error) {

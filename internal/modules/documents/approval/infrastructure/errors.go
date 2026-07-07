@@ -42,6 +42,11 @@ var (
 	// the document has no content hash (missing document or null hash). The
 	// application layer maps this to ErrContentHashMismatch.
 	ErrNoActiveContentHash = errors.New("approval: no active document content hash")
+	// ErrNoActiveApprovalRoute is returned by LoadActiveRouteIDByProfile when no
+	// active approval route exists for the (tenant, profile). The submit service
+	// maps this to documents/domain.ErrApprovalRouteMissing (ADR 0073 in-tx
+	// route resolution).
+	ErrNoActiveApprovalRoute = errors.New("approval: no active approval route for profile")
 )
 
 // MapHints carries constraint-name hints for SQLSTATE 23505 disambiguation.

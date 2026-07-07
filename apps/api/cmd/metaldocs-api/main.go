@@ -631,8 +631,6 @@ func main() {
 		)
 	}
 
-	// Approval services must be constructed before docMod so that
-	// SubmitSvc can be wired into the finalize→submit flow.
 	approvalRepo := approvalrepo.NewPostgresApprovalRepository(deps.SQLDB, displayNameRepo)
 	approvalEmitter := approvalapp.NewSQLEmitter()
 	approvalServices := approvalapp.NewServices(approvalRepo, approvalEmitter, approvalapp.RealClock{}, cdReader)
@@ -728,7 +726,6 @@ func main() {
 	).WithPDFOutbox(pdfDispatchEnqueuer).WithPinInvoker(fanoutCfg.freezeService).
 		WithSignatureRegistry(newSignoffReauthRegistry(deps.AuthRepo, deps.SQLDB)).
 		WithCDFieldReader(cdReader)
-	docDeps.SubmitSvc = approvalServices.Submit
 
 	docMod := documents.New(docDeps)
 	// SP-2: pin tenant dictionary values at document creation. tokensModule was

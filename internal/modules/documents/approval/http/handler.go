@@ -142,7 +142,27 @@ func (h *Handler) idempotentHandler(routeTemplate string, next http.Handler) htt
 	})(next)
 }
 
+// parseIfMatch parses the If-Match OCC precondition for handlers acting on an
+// already-governed document — signoff, cancel, decision. Those documents have
+// been through submit, which transitions draft→under_review and bumps
+// revision_version to >= 1, so an explicit "v0" precondition is always stale and
+// is rejected as malformed. The "*" wildcard (match-any) maps to 0.
 func parseIfMatch(header string) (int, error) {
+	return parseIfMatchMin(header, 1)
+}
+
+// parseSubmitIfMatch parses the If-Match header for the canonical /submit
+// handler (ADR 0073), whose target is a fresh draft at revision_version = 0.
+// It therefore accepts an explicit "v0" precondition that parseIfMatch rejects;
+// the two valid-version domains must stay separate (submit: v>=0, everything
+// else: v>=1).
+func parseSubmitIfMatch(header string) (int, error) {
+	return parseIfMatchMin(header, 0)
+}
+
+// parseIfMatchMin is the shared If-Match parser; minVersion is the lowest
+// explicit "v<N>" the caller accepts (1 for governed transitions, 0 for submit).
+func parseIfMatchMin(header string, minVersion int) (int, error) {
 	value := strings.TrimSpace(header)
 	if value == "" {
 		return -1, ErrIfMatchRequired
@@ -157,7 +177,7 @@ func parseIfMatch(header string) (int, error) {
 	}
 
 	version, err := strconv.Atoi(strings.TrimPrefix(value, "v"))
-	if err != nil || version <= 0 {
+	if err != nil || version < minVersion {
 		return -1, ErrIfMatchMalformed
 	}
 	return version, nil

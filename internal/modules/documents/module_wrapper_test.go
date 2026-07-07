@@ -71,8 +71,7 @@ func (s *moduleTestService) ListRevisionHistory(context.Context, string, string)
 func (s *moduleTestService) RestoreCheckpoint(context.Context, string, string, string, int) (*application.RestoreResult, error) {
 	return &application.RestoreResult{NewRevisionID: "rev_3", NewRevisionNum: 3}, nil
 }
-func (s *moduleTestService) Finalize(context.Context, string, string, string) error { return nil }
-func (s *moduleTestService) Archive(context.Context, string, string, string) error  { return nil }
+func (s *moduleTestService) Archive(context.Context, string, string, string) error { return nil }
 func (s *moduleTestService) SignedRevisionURL(context.Context, string, string, string) (string, error) {
 	return "https://example/rev", nil
 }
@@ -87,10 +86,6 @@ func (s *moduleTestService) UpdateDocumentComment(context.Context, string, strin
 }
 func (s *moduleTestService) DeleteDocumentComment(context.Context, string, string, string, int) error {
 	return nil
-}
-
-func (s *moduleTestService) GetFinalizePrereqs(context.Context, string, string) (*domain.FinalizePrereqs, error) {
-	return nil, domain.ErrDocumentNotDraft
 }
 
 type moduleFillInService struct{}

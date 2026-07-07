@@ -7,7 +7,6 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
-	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	dhttp "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -16,10 +15,6 @@ import (
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/ratelimit"
 )
-
-type approvalSubmitter interface {
-	SubmitRevisionForReview(ctx context.Context, runner db.TxRunner, req approvalapp.SubmitRequest) (approvalapp.SubmitResult, error)
-}
 
 type Module struct {
 	Handler                   *dhttp.Handler
@@ -48,7 +43,6 @@ type Dependencies struct {
 	DocgenVer                    string
 	GrammarVer                   string
 	ReconstructRunner            application.ReconstructionRunner
-	SubmitSvc                    approvalSubmitter
 	IAMUserOptions               application.IAMUserOptionsReader
 	// DisplayNameReader is the iam-owned port for reading display_name off
 	// metaldocs.iam_users without crossing module boundaries (M4/F4.1).
@@ -98,7 +92,7 @@ func New(deps Dependencies) *Module {
 	svc.WithRunner(db.NewTxRunner(deps.DB))
 	svc.WithEligibility(repo)
 	svc.WithControlledDocumentDuplicator(deps.ControlledDocumentDuplicator)
-	h := dhttp.NewHandlerWithSubmit(svc, deps.DB, deps.SubmitSvc).WithCaps(deps.Caps)
+	h := dhttp.NewHandler(svc).WithCaps(deps.Caps)
 
 	var exportHandler *dhttp.ExportHandler
 	if deps.ExportPresign != nil && deps.ExportDocgen != nil {

@@ -69,6 +69,10 @@ const (
 	approvalCodeValidationProfileUnknown          problem.Code = "validation.profile_unknown"
 	approvalCodeValidationReasonForChangeRequired problem.Code = "validation.reason_for_change_required"
 	approvalCodeValidationReasonCategoryInvalid   problem.Code = "validation.reason_category_invalid"
+	approvalCodeValidationRevisionTitleRequired   problem.Code = "validation.revision_title_required"
+	approvalCodeStateDocumentNotDraft             problem.Code = "state.document_not_draft"
+	approvalCodeValidationProfileNotConfigured    problem.Code = "validation.profile_not_configured"
+	approvalCodeStateApprovalRouteMissing         problem.Code = "state.approval_route_missing"
 	approvalCodeNotFoundDocument                  problem.Code = "not_found.document"
 	approvalCodeStateDocumentNotPublished          problem.Code = "state.document_not_published"
 	approvalCodeConflictMarkReviewedStaleRevision  problem.Code = "conflict.mark_reviewed_stale_revision"
@@ -146,6 +150,26 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, application.ErrReasonCategoryInvalid):
 		statusCode = http.StatusUnprocessableEntity
 		code = approvalCodeValidationReasonCategoryInvalid
+	case errors.Is(err, application.ErrRevisionTitleRequired):
+		// ADR 0073: canonical /submit now returns this (was finalize-only). REV>=1
+		// submit without a revision title is a friendly business-rule rejection —
+		// 422, mirroring the reason-for-change case above.
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationRevisionTitleRequired
+	case errors.Is(err, v2dom.ErrDocumentNotDraft):
+		// In-tx submit resolution surfaces the finalize-era sentinels (ADR 0073).
+		// Document not in draft = illegal state for the submit write → 409.
+		statusCode = http.StatusConflict
+		code = approvalCodeStateDocumentNotDraft
+	case errors.Is(err, v2dom.ErrProfileNotConfigured):
+		// Controlled document has no profile → the server cannot resolve a route.
+		// Actionable request problem (finalize mapped it 400 ValidationError).
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationProfileNotConfigured
+	case errors.Is(err, v2dom.ErrApprovalRouteMissing):
+		// No active approval route for the profile (finalize mapped it 409).
+		statusCode = http.StatusConflict
+		code = approvalCodeStateApprovalRouteMissing
 	case errors.Is(err, ErrIfMatchRequired):
 		statusCode = http.StatusPreconditionRequired
 		code = approvalCodePreconditionIfMatch

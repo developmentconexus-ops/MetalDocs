@@ -2640,58 +2640,6 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /documents/{id}/finalize:
-    post:
-      summary: Finalize document
-      deprecated: true
-      description: >-
-        Deprecated convenience wrapper around the same draft→under_review
-        transition as POST /documents/{id}/submit (CON-01). Resolves route_id
-        and content_hash server-side instead of taking them from the caller.
-        New integrations must call /documents/{id}/submit directly, which is
-        canonical (DEC-01). If-Match is required for OCC parity with submit;
-        a stale (or missing) revision version now yields the same 409/428
-        precondition semantics as submit.
-      tags: [documents]
-      operationId: finalizeDocument
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - name: Idempotency-Key
-          in: header
-          required: true
-          schema: { type: string, format: uuid }
-        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/FinalizeDocumentRequest'
-      responses:
-        '201':
-          description: created
-          headers:
-            Idempotent-Replay:
-              schema: { type: string }
-              description: Present with value `true` when an idempotent replay response is returned.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentFinalizeResult'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '428':
-          $ref: '#/components/responses/PreconditionRequired'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
   /documents/{id}/archive:
     post:
       summary: Archive document
@@ -3442,10 +3390,13 @@ paths:
     post:
       summary: Submit document for approval
       description: >-
-        Canonical draft→under_review submission endpoint (DEC-01). Callers
-        supply route_id and content_hash explicitly; contrast with the
-        deprecated POST /documents/{id}/finalize, which resolves both
-        server-side as a convenience wrapper over this same operation.
+        Canonical draft→under_review submission endpoint (DEC-01, ADR 0073).
+        The sole submit entrypoint: the deprecated /documents/{id}/finalize
+        wrapper was removed. route_id and content_hash are optional — when
+        omitted the server resolves the active route for the document's
+        profile and the head revision's content hash inside the same
+        transaction (closing the wrapper-era TOCTOU between prereq read and
+        submit).
       tags: [approval]
       operationId: submitDocumentForApproval
       x-authz-area:
@@ -3459,7 +3410,7 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
-        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>" (N >= 0; a fresh draft is v0) or "*"' }
       requestBody:
         required: true
         content:
@@ -5166,13 +5117,6 @@ components:
       properties:
         url:
           type: string
-    DocumentFinalizeResult:
-      type: object
-      required: [instance_id]
-      properties:
-        instance_id:
-          type: string
-          format: uuid
     DocumentSessionWriterResponse:
       type: object
       required: [mode, session_id, expires_at, last_ack_revision_id]
@@ -6413,26 +6357,31 @@ components:
         reason: { type: string }
         signature_method: { type: string }
         signed_at: { type: string, format: date-time }
-    FinalizeDocumentRequest:
-      type: object
-      properties:
-        revision_title:
-          type: string
-          minLength: 1
-          description: Required for governed revisions after REV00. Omit for REV00 to use the canonical initial title.
     SubmitDocumentRequest:
       type: object
-      required: [route_id, content_hash]
       properties:
         route_id:
           type: string
           format: uuid
-          description: Active approval route to submit against.
+          description: >-
+            Active approval route to submit against. Optional: when omitted the
+            server resolves the single active route for the document's
+            controlled-document profile in the same transaction (ADR 0073).
         content_hash:
           type: string
           minLength: 64
           maxLength: 64
-          description: SHA-256 hex digest of the content being submitted (autosave-computed).
+          description: >-
+            SHA-256 hex digest of the content being submitted (autosave-computed).
+            Optional: when omitted the server binds the head revision's stored
+            content hash in the same transaction (ADR 0073).
+        revision_title:
+          type: string
+          minLength: 1
+          description: >-
+            Governed revision title. Required for revision >= 1 (enforced by the
+            service against the in-tx governed revision number); omit at revision 0
+            to use the canonical initial title.
         reason_for_change:
           type: string
           description: >-

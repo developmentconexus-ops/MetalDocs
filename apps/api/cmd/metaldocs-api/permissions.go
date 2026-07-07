@@ -155,11 +155,6 @@ var routeRules = []routeRule{
 
 	// Documents — order preserves the original switch semantics (more specific suffixes/contains first).
 	{method: http.MethodGet, pathPrefix: "/api/v1/documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
-	// CON-01 (grade-A simplification, DEC-01): finalize is a deprecated convenience
-	// wrapper over the same draft->under_review transition as /submit — it must gate
-	// on the same tier-1 capability as submit, not signoff (finalize never records a
-	// signoff; the prior CapDocumentSignoff gate contradicted capability semantics).
-	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/finalize", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/archive", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/duplicate", capability: iamdomain.CapDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/comments", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},

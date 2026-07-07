@@ -62,9 +62,6 @@ type Repository interface {
 	ListComments(ctx context.Context, tenantID, documentID string) ([]domain.Comment, error)
 	UpdateComment(ctx context.Context, tenantID, documentID string, libraryID int, userID string, in domain.CommentUpdateInput) (*domain.Comment, error)
 	DeleteComment(ctx context.Context, tenantID, documentID string, libraryID int) error
-	// GetFinalizePrereqs loads the data required by finalizeDocument in one
-	// coordinated set of queries so the delivery layer stays SQL-free.
-	GetFinalizePrereqs(ctx context.Context, tenantID, docID string) (*domain.FinalizePrereqs, error)
 }
 
 const (
@@ -854,10 +851,4 @@ func (s *Service) SignedRevisionURL(ctx context.Context, tenantID, docID, revID 
 		return "", err
 	}
 	return s.presigner.PresignGet(ctx, rev.StorageKey, objectDownloadTTL)
-}
-
-// GetFinalizePrereqs delegates to the repository for the data required by
-// finalizeDocument before it can call SubmitRevisionForReview.
-func (s *Service) GetFinalizePrereqs(ctx context.Context, tenantID, docID string) (*domain.FinalizePrereqs, error) {
-	return s.repo.GetFinalizePrereqs(ctx, tenantID, docID)
 }

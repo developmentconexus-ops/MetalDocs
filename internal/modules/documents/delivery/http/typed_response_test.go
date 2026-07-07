@@ -148,15 +148,6 @@ func TestRevisionUrlResponse_WireContract(t *testing.T) {
 	}
 }
 
-// TestDocumentFinalizeResult_WireContract locks the finalizeDocument body (F9.4
-// consequence), formerly map[string]string, to {instance_id}.
-func TestDocumentFinalizeResult_WireContract(t *testing.T) {
-	resp := documentsapi.DocumentFinalizeResult{InstanceId: uuid.MustParse("22222222-2222-4222-8222-222222222222")}
-	if got, want := jsonTopKeys(t, resp), "instance_id"; got != want {
-		t.Fatalf("finalize keys = %q, want %q", got, want)
-	}
-}
-
 // TestDocumentCommentResponse_WireContract locks the comment body (F9.2),
 // formerly a hand-rolled map, to the OpenAPI key set. resolved_at and
 // parent_library_id are spec-required+nullable, so oapi-codegen omits

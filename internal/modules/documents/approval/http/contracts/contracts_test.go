@@ -56,11 +56,21 @@ func TestSubmitRequestValidate(t *testing.T) {
 		t.Fatalf("expected valid request, got error: %v", err)
 	}
 
-	missingRoute := SubmitRequest{ContentHash: strings.Repeat("a", 64)}
-	if err := missingRoute.Validate(); err == nil {
-		t.Fatalf("expected error for missing route_id")
+	// ADR 0073: route_id and content_hash are optional on the wire — the canonical
+	// /submit handler resolves them in-tx when the client omits them. Validate is
+	// format-only: an omitted route_id (and omitted content_hash) must pass.
+	omittedGovernance := SubmitRequest{}
+	if err := omittedGovernance.Validate(); err != nil {
+		t.Fatalf("expected valid request with route_id/content_hash omitted (ADR 0073 in-tx resolution), got error: %v", err)
 	}
 
+	// When present, route_id must still be a well-formed UUID.
+	badRoute := SubmitRequest{RouteID: "not-a-uuid", ContentHash: strings.Repeat("a", 64)}
+	if err := badRoute.Validate(); err == nil {
+		t.Fatalf("expected error for malformed route_id")
+	}
+
+	// When present, content_hash must still be 64-hex.
 	badHash := SubmitRequest{RouteID: "3fa85f64-5717-4562-b3fc-2c963f66afa6", ContentHash: "abc"}
 	if err := badHash.Validate(); err == nil {
 		t.Fatalf("expected error for invalid content_hash")

@@ -35,7 +35,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
+	expectedRevisionVersion, err := parseSubmitIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
 		WriteError(w, err)
 		return
@@ -73,6 +73,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		DocumentID:      documentID,
 		RouteID:         req.RouteID,
 		SubmittedBy:     actorID,
+		RevisionTitle:   req.RevisionTitle,
 		ReasonForChange: reasonForChange,
 		ReasonCategory:  reasonCategory,
 		ContentFormData: map[string]any{"_content_hash": req.ContentHash},

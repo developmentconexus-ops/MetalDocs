@@ -83,10 +83,12 @@ func TestSubmitHandler(t *testing.T) {
 			wantStatus:     http.StatusBadRequest,
 		},
 		{
+			// ADR 0073: an omitted route_id is valid (in-tx resolution), so the
+			// validate-failure case must use a PRESENT-but-malformed route_id.
 			name:           "validate fails",
 			ifMatch:        "\"v1\"",
 			idempotencyKey: "22222222-2222-2222-2222-222222222222",
-			body:           `{"route_id":"","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+			body:           `{"route_id":"not-a-uuid","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
 			wantStatus:     http.StatusBadRequest,
 		},
 		{

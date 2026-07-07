@@ -592,15 +592,14 @@ func mapRoleToIAM(role string) string {
 	case "reviewer", "approver":
 		return "approver"
 	case "author":
-		// The finalize route is tier-1-gated on document.signoff (permissions.go:
-		// POST /documents/{id}/finalize -> CapDocumentSignoff). Among the valid IAM
-		// role_codes only approver/system_admin grant document.signoff in
-		// role_capabilities; 'author'/'editor' do not. The seed author must finalize
-		// its own draft, so it carries the approver IAM role at tier-1 (system_admin
-		// is avoided — it would short-circuit both the owner check and the tier-2
-		// Require, defeating the real-path proof). Its tier-2 area membership stays
-		// 'author' (grants document.submit/edit), so the submit_service Require calls
-		// still exercise the genuine author-area grant.
+		// The seed author must submit its own draft via POST /documents/{id}/submit
+		// (ADR 0073 removed the /finalize wrapper). The submit path also drives the
+		// approver-only surfaces in later e2e steps, so the seed author carries the
+		// approver IAM role at tier-1 (system_admin is avoided — it would
+		// short-circuit both the owner check and the tier-2 Require, defeating the
+		// real-path proof). Its tier-2 area membership stays 'author' (grants
+		// document.submit/edit), so the submit_service Require calls still exercise
+		// the genuine author-area grant.
 		return "approver"
 	default:
 		return "editor"
@@ -611,7 +610,7 @@ func mapRoleToMembership(role string) string {
 	switch role {
 	case "author":
 		// 'author' area role grants document.submit (role_capabilities) — required
-		// to finalize/submit. 'editor' does NOT grant submit, so it would 403.
+		// to submit. 'editor' does NOT grant submit, so it would 403.
 		return "author"
 	default:
 		// 'reviewer' was a non-functional legacy area role (decommissioned,
@@ -729,10 +728,11 @@ VALUES
 }
 
 // ensureControlledDocument creates (or reuses) the controlled_document the draft
-// links to via documents.controlled_document_id. GetFinalizePrereqs Step 2 reads
-// profile_code from THIS row (not the draft's profile_code_snapshot); without the
-// link finalize fails with ErrProfileNotConfigured. code is a constant — the row is
-// uniquely keyed (tenant_id, profile_code, code), both of which are tenant-scoped.
+// links to via documents.controlled_document_id. The submit path's in-tx profile
+// resolution (ADR 0073) reads profile_code from THIS row (not the draft's
+// profile_code_snapshot); without the link submit fails with ErrProfileNotConfigured.
+// code is a constant — the row is uniquely keyed (tenant_id, profile_code, code),
+// both of which are tenant-scoped.
 func ensureControlledDocument(ctx context.Context, tx *sql.Tx, tenantID, profileCode, areaCode, ownerID string) (string, error) {
 	var cdID string
 	if err := tx.QueryRowContext(ctx, `
@@ -755,12 +755,12 @@ func upsertDraftDocument(ctx context.Context, tx *sql.Tx, tenantID, docID, templ
 	// cap checks resolve against (LoadDocumentAreaCode); a NULL snapshot resolves to
 	// "" and fail-closes the cap. Seed it (and the profile snapshot) to the document's
 	// own area/profile so the author/approver area memberships authorize the flow.
-	// controlled_document_id links the draft to its profile (finalize Step 2);
-	// content_hash_at_submit seeds the signoff's active content hash.
+	// controlled_document_id links the draft to its profile (submit in-tx resolution,
+	// ADR 0073); content_hash_at_submit seeds the signoff's active content hash.
 	//
 	// The enforce_snapshot_on_submit trigger requires the six placeholder/composition/
 	// body-docx snapshot columns to be non-NULL on any transition into under_review
-	// (which finalize/submit performs). The UPDATE in submit_service only touches
+	// (which submit performs). The UPDATE in submit_service only touches
 	// status/title/version, so these must already be populated on the draft row —
 	// seed them with constant placeholders (hashes are bytea, snapshots jsonb).
 	if _, err := tx.ExecContext(ctx, `

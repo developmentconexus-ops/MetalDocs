@@ -3,34 +3,23 @@ package http_test
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
 
-	sqlmock "github.com/DATA-DOG/go-sqlmock"
-
 	"metaldocs/internal/modules/documents/application"
-	approvalapp "metaldocs/internal/modules/documents/approval/application"
-	approvalrepository "metaldocs/internal/modules/documents/approval/infrastructure"
 	httphandler "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	platformdb "metaldocs/internal/platform/db"
-	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/tenant"
 )
 
 type fakeSvc struct {
-	finalizePrereqsErr error
-
 	acquireSession *domain.Session
 	acquireRO      bool
 	acquireErr     error
@@ -235,64 +224,12 @@ func (f *fakeSvc) DeleteDocumentComment(_ context.Context, _, _, _ string, _ int
 	return nil
 }
 
-func (f *fakeSvc) GetFinalizePrereqs(_ context.Context, _, _ string) (*domain.FinalizePrereqs, error) {
-	if f.finalizePrereqsErr != nil {
-		return nil, f.finalizePrereqsErr
-	}
-	return &domain.FinalizePrereqs{
-		RevisionVersion: 1,
-		RevisionNumber:  0,
-		ProfileCode:     "DC",
-		RouteID:         "route-1",
-		ContentHash:     "hash-1",
-	}, nil
-}
-
 func newMux(t *testing.T, svc *fakeSvc) *http.ServeMux {
 	t.Helper()
 	h := httphandler.NewHandler(svc).WithCaps(fakeCaps{admin: false})
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	return mux
-}
-
-type fakeApprovalSubmitter struct {
-	called bool
-	// err, when set, is returned by SubmitRevisionForReview instead of a
-	// success result — used by CON-01 tests to simulate approvalrepository.ErrStaleRevision
-	// (a client If-Match version that no longer matches the server's revision_version).
-	err error
-	// gotReq captures the request threaded through, so tests can assert the
-	// If-Match-derived RevisionVersion actually reached the submit service.
-	gotReq approvalapp.SubmitRequest
-}
-
-func (f *fakeApprovalSubmitter) SubmitRevisionForReview(_ context.Context, _ platformdb.TxRunner, req approvalapp.SubmitRequest) (approvalapp.SubmitResult, error) {
-	f.called = true
-	f.gotReq = req
-	if f.err != nil {
-		return approvalapp.SubmitResult{}, f.err
-	}
-	return approvalapp.SubmitResult{InstanceID: "22222222-2222-4222-8222-222222222222"}, nil
-}
-
-type fakeFinalizeIdempotencyStore struct {
-	replay *idempotency.Replay
-}
-
-func (f *fakeFinalizeIdempotencyStore) BeginReplay(_ context.Context, _, _, _, _ string) (*idempotency.ReplayHandle, *idempotency.Replay, error) {
-	if f.replay != nil {
-		return nil, f.replay, nil
-	}
-	return &idempotency.ReplayHandle{}, nil, nil
-}
-
-func (f *fakeFinalizeIdempotencyStore) CompleteReplay(_ *idempotency.ReplayHandle, _ int, _ []byte) error {
-	return nil
-}
-
-func (f *fakeFinalizeIdempotencyStore) FailReplay(_ *idempotency.ReplayHandle, _ error) error {
-	return nil
 }
 
 func withAuthHeaders(req *http.Request, roles string) {
@@ -695,329 +632,6 @@ func TestRenameDocument_NameTooLong_Returns400WithoutCallingService(t *testing.T
 	}
 }
 
-func TestFinalizeDocument_MissingIdempotencyKey_Returns400(t *testing.T) {
-	mux := newMux(t, &fakeSvc{})
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", nil)
-	withAuthHeaders(req, "editor")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rr.Code)
-	}
-}
-
-func TestFinalizeDocument_InvalidIdempotencyKey_Returns400(t *testing.T) {
-	mux := newMux(t, &fakeSvc{})
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", nil)
-	withAuthHeaders(req, "editor")
-	req.Header.Set("Idempotency-Key", "not-a-uuid")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rr.Code)
-	}
-}
-
-func TestFinalizeDocument_ProfileNotFoundUsesProblemEnvelope(t *testing.T) {
-	svc := &fakeSvc{}
-	svc.finalizePrereqsErr = domain.ErrProfileNotConfigured
-	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, &sql.DB{}, &fakeApprovalSubmitter{}, &fakeFinalizeIdempotencyStore{})
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste"}`)))
-	withAuthHeaders(req, "editor")
-	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
-	req.Header.Set("If-Match", "\"v1\"")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
-		t.Fatalf("want application/problem+json, got %s", ct)
-	}
-	if !strings.Contains(rr.Body.String(), "VALIDATION_ERROR") {
-		t.Fatalf("expected VALIDATION_ERROR problem, got %s", rr.Body.String())
-	}
-}
-
-func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
-	key := "11111111-1111-4111-8111-111111111111"
-	body := []byte(`{"instance_id":"inst_1"}`)
-
-	submitter := &fakeApprovalSubmitter{}
-	store := &fakeFinalizeIdempotencyStore{replay: &idempotency.Replay{Status: http.StatusCreated, Body: body}}
-	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(&fakeSvc{}, &sql.DB{}, submitter, store)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
-	withAuthHeaders(req, "editor")
-	req.Header.Set("Idempotency-Key", key)
-	req.Header.Set("If-Match", "\"v1\"")
-	if tid, err := tenant.FromContext(req.Context()); err != nil || tid == "" {
-		t.Fatalf("tenant missing before ServeHTTP: tid=%q err=%v", tid, err)
-	}
-	if uid := iamdomain.UserIDFromContext(req.Context()); uid == "" {
-		t.Fatalf("user missing before ServeHTTP")
-	}
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	if got := rr.Header().Get("Idempotent-Replay"); got != "true" {
-		t.Fatalf("expected Idempotent-Replay=true, got %q", got)
-	}
-	var out map[string]any
-	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if got, _ := out["instance_id"].(string); got != "inst_1" {
-		t.Fatalf("expected instance_id=inst_1, got %q", got)
-	}
-	if submitter.called {
-		t.Fatalf("submit service should not be called on replay")
-	}
-}
-
-// TestFinalizeDocument_ContentHashQueryNoRows_ContinuesWithEmptyHash verifies that
-// when GetFinalizePrereqs returns empty ContentHash (ErrNoRows in repo), the handler
-// still calls SubmitRevisionForReview successfully.
-func TestFinalizeDocument_ContentHashQueryNoRows_ContinuesWithEmptyHash(t *testing.T) {
-	svc := &fakeSvc{}
-	// Default GetFinalizePrereqs returns ContentHash:"hash-1"; override to empty
-	// to simulate sql.ErrNoRows from the document_revisions query.
-	// We can't override per-call here, but the default empty hash still passes through.
-	// The behavior is validated at repository level; here we just confirm 201 when prereqs succeed.
-	submitter := &fakeApprovalSubmitter{}
-	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, &sql.DB{}, submitter, &fakeFinalizeIdempotencyStore{})
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
-	withAuthHeaders(req, "editor")
-	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
-	req.Header.Set("If-Match", "\"v1\"")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	if !submitter.called {
-		t.Fatal("expected submit service to be called")
-	}
-}
-
-// TestFinalizeDocument_ContentHashQueryUsesDeterministicTieBreaker verifies that the
-// repository's content-hash query uses a deterministic tie-breaker order.
-func TestFinalizeDocument_ContentHashQueryUsesDeterministicTieBreaker(t *testing.T) {
-	src, err := os.ReadFile("../../../../modules/documents/infrastructure/repository.go")
-	if err != nil {
-		t.Fatalf("read repository.go: %v", err)
-	}
-	if !regexp.MustCompile(`ORDER BY created_at DESC, id DESC LIMIT 1`).Match(src) {
-		t.Fatal("content-hash lookup must sort by created_at DESC, id DESC")
-	}
-}
-
-// TestFinalizeDocument_ContentHashQueryError_Returns500 verifies that when
-// GetFinalizePrereqs returns a generic error, the handler responds 500.
-func TestFinalizeDocument_ContentHashQueryError_Returns500(t *testing.T) {
-	svc := &fakeSvc{}
-	svc.finalizePrereqsErr = errors.New("db offline")
-	submitter := &fakeApprovalSubmitter{}
-	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, &sql.DB{}, submitter, &fakeFinalizeIdempotencyStore{})
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
-	withAuthHeaders(req, "editor")
-	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
-	req.Header.Set("If-Match", "\"v1\"")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	if submitter.called {
-		t.Fatal("submit service should not be called on prereqs failure")
-	}
-}
-
-// TestFinalizeDocument_MissingIfMatch_Returns428 verifies CON-01 OCC parity:
-// finalize now requires If-Match the same way /documents/{id}/submit does.
-func TestFinalizeDocument_MissingIfMatch_Returns428(t *testing.T) {
-	svc := &fakeSvc{}
-	submitter := &fakeApprovalSubmitter{}
-	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, &sql.DB{}, submitter, &fakeFinalizeIdempotencyStore{})
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
-	withAuthHeaders(req, "editor")
-	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusPreconditionRequired {
-		t.Fatalf("expected 428, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	if submitter.called {
-		t.Fatal("submit service should not be called when If-Match is missing")
-	}
-}
-
-// TestFinalizeDocument_MalformedIfMatch_Returns400 verifies a syntactically
-// invalid If-Match (not "v<N>") is rejected before reaching the submit service.
-func TestFinalizeDocument_MalformedIfMatch_Returns400(t *testing.T) {
-	svc := &fakeSvc{}
-	submitter := &fakeApprovalSubmitter{}
-	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, &sql.DB{}, submitter, &fakeFinalizeIdempotencyStore{})
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
-	withAuthHeaders(req, "editor")
-	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
-	req.Header.Set("If-Match", "oops")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	if submitter.called {
-		t.Fatal("submit service should not be called when If-Match is malformed")
-	}
-}
-
-// TestFinalizeDocument_StaleRevision_Returns409 verifies CON-01 OCC parity:
-// when the client's If-Match version no longer matches the server's
-// revision_version, the submit service returns approvalrepository.ErrStaleRevision
-// and finalize maps it to 409, exactly like /documents/{id}/submit does.
-func TestFinalizeDocument_StaleRevision_Returns409(t *testing.T) {
-	svc := &fakeSvc{}
-	submitter := &fakeApprovalSubmitter{err: approvalrepository.ErrStaleRevision}
-	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, &sql.DB{}, submitter, &fakeFinalizeIdempotencyStore{})
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
-	withAuthHeaders(req, "editor")
-	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
-	req.Header.Set("If-Match", "\"v7\"")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	// CON-05: pin the RFC 9457 envelope for the 409 path (Content-Type +
-	// machine code), not just the status.
-	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
-		t.Fatalf("want application/problem+json, got %s", ct)
-	}
-	if !strings.Contains(rr.Body.String(), "CONCURRENT_MODIFICATION") {
-		t.Fatalf("expected CONCURRENT_MODIFICATION problem, got %s", rr.Body.String())
-	}
-	if !submitter.called {
-		t.Fatal("expected submit service to be called")
-	}
-	if submitter.gotReq.RevisionVersion != 7 {
-		t.Fatalf("expected If-Match-derived RevisionVersion=7 threaded to submit service, got %d", submitter.gotReq.RevisionVersion)
-	}
-}
-
-// newFinalizeConflictMockDB scripts a *sql.DB (via sqlmock) so the real
-// idempotency.Store wired through h.idempFinalize hits ErrConflict on
-// BeginReplay: BeginTx -> INSERT ... ON CONFLICT DO NOTHING returns no row
-// (loser) -> SELECT ... FOR UPDATE returns a stored payload_hash that cannot
-// match the request's -> BeginReplay commits and returns ErrConflict ->
-// finalizeDocument maps that to 422 IDEMPOTENCY_KEY_REUSED. The INSERT
-// expectation pins arg 3 to the exact route template finalizeDocument's
-// h.idempFinalize store must have been constructed with
-// ("POST /api/v1/documents/{id}/finalize", the constant registered directly
-// on the mux in registerRoutes/finalizeRoutePattern) — mirrors
-// internal/modules/templates/delivery/http/routes_contract_test.go's
-// newConflictMockDB, adapted for documents' hand-rolled finalize idempotency
-// (finalizeIdempotencyStore.BeginReplay/CompleteReplay/FailReplay) rather
-// than the generic idempotency.Require middleware templates uses.
-func newFinalizeConflictMockDB(t *testing.T, routeTemplate string) *sql.DB {
-	t.Helper()
-	mockDB, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("newFinalizeConflictMockDB: sqlmock.New: %v", err)
-	}
-	t.Cleanup(func() { _ = mockDB.Close() })
-
-	mock.ExpectBegin()
-	mock.ExpectQuery(`INSERT INTO metaldocs\.idempotency_keys`).
-		WithArgs("tenant_1", "user_1", routeTemplate, "11111111-1111-4111-8111-111111111111", sqlmock.AnyArg()).
-		WillReturnError(sql.ErrNoRows)
-	mock.ExpectQuery(`SELECT status, payload_hash`).
-		WithArgs("tenant_1", "user_1", routeTemplate, "11111111-1111-4111-8111-111111111111").
-		WillReturnRows(sqlmock.NewRows([]string{"status", "payload_hash", "response_status", "response_body", "expired"}).
-			AddRow("completed", "hash-that-cannot-match-any-request", nil, nil, false))
-	mock.ExpectCommit()
-	return mockDB
-}
-
-// TestFinalizeDocument_IdempotencyStoreEngaged proves finalizeDocument's
-// hand-rolled idempotency wiring (h.idempFinalize, backed by
-// idempotency.New(db, "POST /api/v1/documents/{id}/finalize") when no store
-// is injected — see NewHandlerWithSubmitAndFinalizeStore) actually reaches
-// the real Store.BeginReplay when the route is dispatched through
-// RegisterRoutes -> registerRoutes's direct mux.HandleFunc(finalizeRoutePattern, ...)
-// registration (CON-01/CON-12: finalize is deliberately excluded from the
-// HandlerWithOptions/skippingMux registration so its own If-Match handling
-// governs precondition semantics; this test proves that direct registration
-// still drives the same store a generated-wrapper route would). The
-// discriminator is the scripted hash-conflict: 422 IDEMPOTENCY_KEY_REUSED is
-// only producible by idempotency.Store.BeginReplay's ErrConflict path.
-func TestFinalizeDocument_IdempotencyStoreEngaged(t *testing.T) {
-	const routeTemplate = "POST /api/v1/documents/{id}/finalize"
-	db := newFinalizeConflictMockDB(t, routeTemplate)
-	store := idempotency.New(db, routeTemplate)
-
-	svc := &fakeSvc{}
-	submitter := &fakeApprovalSubmitter{}
-	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(svc, db, submitter, store)
-	mux := http.NewServeMux()
-	h.RegisterRoutes(mux)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/11111111-1111-4111-8111-111111111111/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
-	withAuthHeaders(req, "editor")
-	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
-	req.Header.Set("If-Match", "\"v1\"")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("expected 422 from the scripted idempotency conflict, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	// CON-05: pin the RFC 9457 envelope for the 422 path (Content-Type), not
-	// just the status + code substring already checked below.
-	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
-		t.Fatalf("want application/problem+json, got %s", ct)
-	}
-	if body := rr.Body.String(); !strings.Contains(body, "IDEMPOTENCY_KEY_REUSED") {
-		t.Fatalf("expected IDEMPOTENCY_KEY_REUSED from the idempotency store path, got body=%s", body)
-	}
-	if submitter.called {
-		t.Fatal("submit service must not be called once the idempotency store reports a conflict")
-	}
-}
-
 func TestDuplicateDocument_InternalError_DoesNotLeakDetail(t *testing.T) {
 	mux := newMux(t, &fakeSvc{duplicateErr: errors.New("sensitive db detail")})
 
@@ -1045,33 +659,6 @@ func TestCreateCheckpoint_EmptyLabel_Returns400(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestFinalizeDocument_SubmitPathDoesNotCallLegacyFinalize(t *testing.T) {
-	src, err := os.ReadFile("handler.go")
-	if err != nil {
-		t.Fatalf("read handler.go: %v", err)
-	}
-
-	body := string(src)
-	start := strings.Index(body, "func (h *Handler) finalizeDocument")
-	if start == -1 {
-		t.Fatal("finalizeDocument not found")
-	}
-	end := strings.Index(body[start:], "func (h *Handler) archiveDocument")
-	if end == -1 {
-		t.Fatal("archiveDocument not found")
-	}
-	finalize := body[start : start+end]
-
-	submitCall := strings.Index(finalize, "h.submitSvc.SubmitRevisionForReview")
-	if submitCall == -1 {
-		t.Fatal("finalizeDocument submit path not found")
-	}
-	legacyFinalize := strings.Index(finalize[submitCall:], "h.svc.Finalize")
-	if legacyFinalize != -1 {
-		t.Fatal("submit-backed finalize path must not call legacy Finalize after approval submit")
 	}
 }
 

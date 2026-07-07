@@ -23,10 +23,11 @@ import (
 
 // SubmitService handles document submission for approval.
 type SubmitService struct {
-	repo    infrastructure.ApprovalRepository
-	emitter EventEmitter
-	clock   Clock
-	cdRead  controlleddocumentsdomain.CDFieldReader
+	repo     infrastructure.ApprovalRepository
+	emitter  EventEmitter
+	clock    Clock
+	cdRead   controlleddocumentsdomain.CDFieldReader
+	resolver SubmitDefaultsResolver // in-tx route/hash resolution when the client omits them (ADR 0073); nil in unit tests that always supply route_id
 }
 
 // SubmitRequest carries all inputs for SubmitRevisionForReview.
@@ -100,8 +101,25 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return fmt.Errorf("submit: load governed revision number: %w", err)
 		}
 
+		// Step 4c: resolve the approval route in-tx when the client omits route_id
+		// (ADR 0073 §2). An author cannot supply route_id (route listing needs an
+		// admin read the author lacks); the server resolves the single active route
+		// for the document's controlled-document profile inside the SAME
+		// transaction, closing the wrapper-era off-tx TOCTOU. Explicit client
+		// route_id keeps its exact prior semantics. Resolution runs only when the
+		// resolver is wired (production + F1 integration); unit tests that always
+		// pass an explicit route_id leave it nil and are unaffected.
+		routeID := req.RouteID
+		if strings.TrimSpace(routeID) == "" {
+			resolvedRouteID, rerr := s.resolveActiveRoute(ctx, tx, req.TenantID, req.DocumentID)
+			if rerr != nil {
+				return rerr
+			}
+			routeID = resolvedRouteID
+		}
+
 		// Step 5: load route with stages.
-		route, err := s.repo.LoadRoute(ctx, tx, req.TenantID, req.RouteID)
+		route, err := s.repo.LoadRoute(ctx, tx, req.TenantID, routeID)
 		if err != nil {
 			return fmt.Errorf("submit: load route: %w", err)
 		}
@@ -125,11 +143,23 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 		// revision_number (HS-2: this changes the hash for REV>=1 submits versus
 		// the prior always-0 behavior — see submit_service.go package docs /
 		// T8b handoff notes for the governed-semantics consequence).
+		// Step 6b-pre: resolve the head content hash in-tx when the client omits it
+		// (ADR 0073 §2). The HTTP submit boundary conveys the client hash through the
+		// reserved `_content_hash` form-data key; an empty value there means "author
+		// did not supply one" — bind the head autosaved revision's stored hash,
+		// exactly as the finalize wrapper did (prereqs.ContentHash → `_content_hash`),
+		// so content_hash_at_submit semantics are unchanged (HS-2). No `_content_hash`
+		// key at all (service-level callers passing real form data) → no resolution.
+		formData, err := s.resolveContentFormData(ctx, tx, req.TenantID, req.DocumentID, req.ContentFormData)
+		if err != nil {
+			return err
+		}
+
 		contentHash, err := ComputeContentHash(ContentHashInput{
 			TenantID:       req.TenantID,
 			DocumentID:     req.DocumentID,
 			RevisionNumber: revisionNumber,
-			FormData:       req.ContentFormData,
+			FormData:       formData,
 		})
 		if err != nil {
 			return fmt.Errorf("submit: content hash: %w", err)
@@ -143,7 +173,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			ID:                   instanceID,
 			TenantID:             req.TenantID,
 			DocumentID:           req.DocumentID,
-			RouteID:              req.RouteID,
+			RouteID:              routeID,
 			RouteVersionSnapshot: route.Version,
 			Status:               domain.InstanceInProgress,
 			SubmittedBy:          req.SubmittedBy,
@@ -233,7 +263,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 		// serialized as "".
 		payloadMap := map[string]any{
 			"instance_id":  instanceID,
-			"route_id":     req.RouteID,
+			"route_id":     routeID,
 			"content_hash": contentHash,
 		}
 		if reasonForChange != "" {
@@ -268,6 +298,71 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 
 	// Step 5: return result.
 	return SubmitResult{InstanceID: instanceID}, nil
+}
+
+// resolveActiveRoute resolves the single active approval route for the document's
+// controlled-document profile entirely inside the caller's transaction (ADR 0073
+// §2). It surfaces the same domain sentinels the finalize wrapper returned:
+// docsdomain.ErrProfileNotConfigured when the document has no linked profile,
+// docsdomain.ErrApprovalRouteMissing when no active route exists for the profile.
+// All reads are plain non-recording SELECTs (HS-PRE-1).
+func (s *SubmitService) resolveActiveRoute(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error) {
+	if s.resolver == nil {
+		// route_id omitted but no resolver wired: production always wires one, so
+		// this means a misconfigured composition root. Fail closed rather than
+		// LoadRoute("") — surface the missing-route sentinel.
+		return "", docsdomain.ErrApprovalRouteMissing
+	}
+	cdID, ok, err := s.resolver.LoadControlledDocumentID(ctx, tx, tenantID, documentID)
+	if err != nil {
+		return "", fmt.Errorf("submit: resolve controlled document: %w", err)
+	}
+	var profileCode string
+	if ok && cdID != "" {
+		// CDFieldReader is the only cross-module read surface (ADR 0072); *sql.Tx
+		// satisfies db.DB so the resolution shares this transaction's GUC/RLS scope.
+		profileCode, err = s.cdRead.ProfileCode(ctx, tx, tenantID, cdID)
+		if err != nil {
+			return "", fmt.Errorf("submit: resolve profile code: %w", err)
+		}
+	}
+	if strings.TrimSpace(profileCode) == "" {
+		return "", docsdomain.ErrProfileNotConfigured
+	}
+	routeID, err := s.resolver.LoadActiveRouteIDByProfile(ctx, tx, tenantID, profileCode)
+	if err != nil {
+		if errors.Is(err, infrastructure.ErrNoActiveApprovalRoute) {
+			return "", docsdomain.ErrApprovalRouteMissing
+		}
+		return "", fmt.Errorf("submit: resolve active route: %w", err)
+	}
+	return routeID, nil
+}
+
+// resolveContentFormData binds the head content hash in-tx when the client omits
+// it (ADR 0073 §2). The HTTP submit boundary conveys the client hash through the
+// reserved `_content_hash` key; a present-but-empty value means "author supplied
+// none" — substitute the head autosaved revision's stored hash. No `_content_hash`
+// key (service-level callers passing real form data) or a non-empty value → the
+// map is returned unchanged. The caller's map is never mutated.
+func (s *SubmitService) resolveContentFormData(ctx context.Context, tx *sql.Tx, tenantID, documentID string, in map[string]any) (map[string]any, error) {
+	raw, present := in["_content_hash"]
+	if !present || s.resolver == nil {
+		return in, nil
+	}
+	if current, _ := raw.(string); strings.TrimSpace(current) != "" {
+		return in, nil
+	}
+	headHash, err := s.resolver.LoadHeadContentHash(ctx, tx, tenantID, documentID)
+	if err != nil {
+		return nil, fmt.Errorf("submit: resolve head content hash: %w", err)
+	}
+	out := make(map[string]any, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	out["_content_hash"] = headHash
+	return out, nil
 }
 
 const defaultInitialRevisionTitle = "Criacao do documento"

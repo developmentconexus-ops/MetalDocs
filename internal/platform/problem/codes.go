@@ -54,10 +54,9 @@ const (
 	CodeSystemTemplateImmutable Code = "SYSTEM_TEMPLATE_IMMUTABLE"
 	// CodePreconditionRequired is the canonical-catalog counterpart of the
 	// approval/http package's local approvalCodePreconditionIfMatch
-	// ("precondition.if_match_required") — that package is excluded from the
-	// guarded-package catalog check (dotted taxonomy predates this catalog), but
-	// documents/delivery/http is guarded, so CON-01's finalize handler (mandatory
-	// If-Match, OCC parity with /documents/{id}/submit) uses this typed constant.
+	// ("precondition.if_match_required"). Reserved wire-contract code: the
+	// finalize handler that consumed it was removed (ADR 0073); retained for the
+	// FE error-code catalog and any future If-Match/OCC precondition surface.
 	CodePreconditionRequired Code = "PRECONDITION_REQUIRED"
 )
 

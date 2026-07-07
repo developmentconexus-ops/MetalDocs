@@ -12,10 +12,22 @@ var (
 )
 
 // SubmitRequest is the decoded body plus header-sourced fields for the submit-for-review endpoint.
+//
+// ADR 0073: route_id and content_hash are OPTIONAL. When omitted the submit
+// service resolves both server-side, in-tx (active route by profile, head
+// content hash) — an author cannot supply either (route listing needs an admin
+// read the author lacks; the hash is server-authoritative). Explicit values,
+// when present, keep their exact prior semantics (integration callers).
 type SubmitRequest struct {
 	RouteID        string `json:"route_id"`
 	IdempotencyKey string
 	ContentHash    string `json:"content_hash"`
+
+	// RevisionTitle is the human revision label (was finalize-only, ADR 0073).
+	// Optional at REV 0 (service defaults it); required for REV>=1 — enforced
+	// downstream by application.SubmitRevisionForReview against the governed
+	// revision number, not here.
+	RevisionTitle string `json:"revision_title"`
 
 	// ReasonForChange (+ optional ReasonCategory) is the F6.3 structured
 	// 21 CFR Part 11 change reason. Distinct from any revision title; required
@@ -26,16 +38,21 @@ type SubmitRequest struct {
 	ReasonCategory  *string `json:"reason_category,omitempty"`
 }
 
-// Validate enforces RouteID is a valid UUID and ContentHash is 64 hex characters.
-// reason_for_change/reason_category REV>=1-requiredness is enforced downstream
-// (the service knows the governed revision number; this contract-level Validate
-// does not).
+// Validate is format-only and optionality-aware (ADR 0073): route_id and
+// content_hash are validated ONLY when non-empty (a valid UUID / 64 hex chars);
+// an empty value is legal and signals server-side in-tx resolution. The REV>=1
+// requiredness of revision_title / reason_for_change is enforced downstream (the
+// service knows the governed revision number; this contract-level Validate does not).
 func (r SubmitRequest) Validate() error {
-	if err := validateUUID("route_id", r.RouteID); err != nil {
-		return wrapValidation(err)
+	if strings.TrimSpace(r.RouteID) != "" {
+		if err := validateUUID("route_id", r.RouteID); err != nil {
+			return wrapValidation(err)
+		}
 	}
-	if err := validateSHA256Hex("content_hash", r.ContentHash); err != nil {
-		return wrapValidation(err)
+	if strings.TrimSpace(r.ContentHash) != "" {
+		if err := validateSHA256Hex("content_hash", r.ContentHash); err != nil {
+			return wrapValidation(err)
+		}
 	}
 	return nil
 }
