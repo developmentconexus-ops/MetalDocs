@@ -49,10 +49,25 @@ export type InboxItem = components['schemas']['ApprovalInboxItem'];
 // SchedulePublishDocumentRequest/SupersedeDocument*/ObsoleteDocument*/
 // CancelDocumentApproval* schemas. Publish is bodyless on the wire.
 
+// F8/M2c: stage_kind/due_before/scope are already accepted by the
+// listApprovalInbox operation (W4/P2/P3/P8) — this mirrors the generated
+// operations['listApprovalInbox'].parameters.query subset the FE forwards.
 export interface ListInboxParams {
   area_code?: string;
   limit?: number;
   offset?: number;
+  stage_kind?: 'review' | 'approval';
+  due_before?: string;
+  scope?: 'oversee';
 }
 
 export type ListInboxResponse = components['schemas']['ApprovalInboxResponse'];
+
+// F2 (M2c): review-verdict + delegation request/response bodies are the codegen
+// schemas from api/openapi — never hand-rolled (ADR 0035). reviewVerdict posts a
+// verdict/comment pair; delegations create/revoke the eligibility grant.
+export type ReviewVerdictRequest = components['schemas']['ReviewVerdictRequest'];
+export type ReviewVerdictResponse = components['schemas']['ReviewVerdictResponse'];
+export type CreateApprovalDelegationRequest =
+  components['schemas']['CreateApprovalDelegationRequest'];
+export type ApprovalDelegation = components['schemas']['ApprovalDelegation'];

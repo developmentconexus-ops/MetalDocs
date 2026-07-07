@@ -3,10 +3,24 @@ import { mutate, type MutateOptions } from './mutationClient';
 import { apiFetch, requestRaw } from '../../../lib/api';
 import type { components } from '../../../lib/api-types';
 import type {
+  ApprovalDelegation,
   ApprovalInstance,
+  CreateApprovalDelegationRequest,
   ListInboxParams,
   ListInboxResponse,
+  ReviewVerdictRequest,
+  ReviewVerdictResponse,
 } from './approvalTypes';
+
+// Local argument wrapper for reviewVerdict — the URL is instance/stage-scoped
+// but the If-Match version is the instance's, passed explicitly by the caller
+// (the instance etag cached by getInstance). The body/response stay generated.
+interface ReviewVerdictArgs {
+  instanceId: string;
+  stageId: string;
+  etag: string;
+  body: ReviewVerdictRequest;
+}
 
 // Contract-first: every approval mutation's request/response body is the codegen
 // type from api/openapi/v1/openapi.yaml. The six document-mutation contracts
@@ -56,8 +70,53 @@ export async function listInbox(params: ListInboxParams = {}): Promise<ListInbox
   if (params.offset != null) {
     qs.set('offset', String(params.offset));
   }
+  // F8/M2c filters (W4/P2/P3/P8): only forwarded when defined so the query key
+  // (which includes the full params object) caches distinct filter sets apart.
+  if (params.stage_kind) {
+    qs.set('stage_kind', params.stage_kind);
+  }
+  if (params.due_before) {
+    qs.set('due_before', params.due_before);
+  }
+  if (params.scope) {
+    qs.set('scope', params.scope);
+  }
   const url = `${BASE}/approval/inbox${qs.toString() ? `?${qs}` : ''}`;
   return apiFetch<ListInboxResponse>(url);
+}
+
+// F2 (M2c): the review sidebar (F4) posts a ready/request-changes verdict. The
+// endpoint requires If-Match (optimistic concurrency on the instance version)
+// and an Idempotency-Key — both supplied by `mutate`: the caller passes the
+// cached instance etag as `ifMatch`, the key is auto-generated. Error mapping is
+// the shared problem+json path (same as signoff).
+export function reviewVerdict({
+  instanceId,
+  stageId,
+  etag,
+  body,
+}: ReviewVerdictArgs): Promise<ReviewVerdictResponse> {
+  return mutate(
+    'POST',
+    `${BASE}/approval/instances/${instanceId}/stages/${stageId}/review-verdict`,
+    body,
+    { ifMatch: etag },
+  );
+}
+
+// F2 (M2c): delegation of eligibility. delegator_id is session-derived
+// server-side — never sent in the body. Create carries an auto Idempotency-Key.
+export function createDelegation(
+  body: CreateApprovalDelegationRequest,
+): Promise<ApprovalDelegation> {
+  return mutate('POST', `${BASE}/approval/delegations`, body, {});
+}
+
+// Revoke returns 204 No Content. `mutate` short-circuits a 204 to `undefined`
+// (mutationClient.ts:55 — `if (res.status === 204) return undefined`) BEFORE any
+// res.json(), so an empty body does not throw; no requestRaw detour is needed.
+export function revokeDelegation(id: string): Promise<void> {
+  return mutate('DELETE', `${BASE}/approval/delegations/${id}`, undefined, {});
 }
 
 export function submit(
