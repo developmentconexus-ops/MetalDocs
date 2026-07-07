@@ -158,6 +158,22 @@ func (r *fakeSubmitRepo) HasUnresolvedComments(_ context.Context, _ db.Tx, _, _ 
 	panic("fakeSubmitRepo.HasUnresolvedComments: not expected to be called in submit tests")
 }
 
+// HasUnresolvedInstanceComments (F5) IS called by SubmitRevisionForReview for
+// approval-only routes (executeFreeze at submit time) — unlike the
+// document-wide HasUnresolvedComments above, this one is a real, expected
+// call site. Always reports clean so existing submit tests exercise the
+// freeze happy path without needing to set up comment fixtures.
+func (r *fakeSubmitRepo) HasUnresolvedInstanceComments(_ context.Context, _ db.Tx, _, _ string, _ time.Time) (bool, error) {
+	return false, nil
+}
+
+// PinFrozenHash (F5) is the freeze CAS write; always reports a won pin for
+// these submit-path unit tests (no concurrent-freeze scenario in this file —
+// see freeze_test.go for that unit coverage).
+func (r *fakeSubmitRepo) PinFrozenHash(_ context.Context, _ db.Tx, _, _, _ string) (bool, error) {
+	return true, nil
+}
+
 func (r *fakeSubmitRepo) LoadActiveDocumentContentHash(_ context.Context, _ db.Tx, _, _ string) (string, error) {
 	panic("fakeSubmitRepo.LoadActiveDocumentContentHash: not expected to be called in submit tests")
 }

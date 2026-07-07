@@ -379,13 +379,15 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 			}
 
 			if instance.Status == domain.InstanceApproved {
-				blocked, err := s.repo.HasUnresolvedComments(ctx, tx, req.TenantID, instance.DocumentID)
-				if err != nil {
-					return fmt.Errorf("recordSignoff: check unresolved comments: %w", err)
-				}
-				if blocked {
-					return ErrApprovalBlockedByUnresolvedComments
-				}
+				// Note (F5, W10): the unresolved-comments gate that used to run
+				// here was removed. By construction (plan.md "no new call site"
+				// finding) an approval-kind stage only ever activates after freeze
+				// has already fired — from ReviewVerdictService.RecordVerdict's
+				// stage-advance path (review->approval transitions) or from
+				// SubmitService.SubmitRevisionForReview (approval-only routes).
+				// Freeze's own instance-scoped comment check
+				// (ErrFreezeBlockedByUnresolvedComments) is now the sole gate for
+				// this concern; decision_service.go never needs its own copy.
 
 				// All stages done — complete instance.
 				if err := s.repo.UpdateInstanceStatus(ctx, tx, req.TenantID, req.InstanceID,

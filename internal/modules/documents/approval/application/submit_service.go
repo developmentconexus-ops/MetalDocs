@@ -232,6 +232,25 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return fmt.Errorf("submit: %w", err)
 		}
 
+		// Freeze boundary (F5, design spec.md §2.2): approval-only routes (no
+		// review-kind stage anywhere) have no review→approval transition for
+		// ReviewVerdictService to hook into, so this is the ONLY point content
+		// becomes immutable for them — at submit time, using the hash already
+		// computed above. Routes containing a review stage freeze later, from
+		// ReviewVerdictService.RecordVerdict's stage-advance path.
+		hasReviewStage := false
+		for _, stage := range route.Stages {
+			if stage.Kind == domain.StageKindReview {
+				hasReviewStage = true
+				break
+			}
+		}
+		if !hasReviewStage {
+			if err := executeFreeze(ctx, tx, s.repo, req.TenantID, &inst); err != nil {
+				return fmt.Errorf("submit: freeze: %w", err)
+			}
+		}
+
 		// Step 8b: transition document draft → under_review. Friendly first-line
 		// legality check (M4/F4.1) mirrors the DB trigger; the OCC WHERE below
 		// remains the atomic CAS + optimistic-lock enforcement.

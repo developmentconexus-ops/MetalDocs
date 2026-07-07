@@ -82,6 +82,12 @@ func (stubApprovalRepo) LoadStageSignoffs(_ context.Context, _ platformdb.Tx, _,
 func (stubApprovalRepo) HasUnresolvedComments(_ context.Context, _ platformdb.Tx, _, _ string) (bool, error) {
 	return false, nil
 }
+func (stubApprovalRepo) HasUnresolvedInstanceComments(_ context.Context, _ platformdb.Tx, _, _ string, _ time.Time) (bool, error) {
+	return false, nil
+}
+func (stubApprovalRepo) PinFrozenHash(_ context.Context, _ platformdb.Tx, _, _, _ string) (bool, error) {
+	return true, nil
+}
 func (stubApprovalRepo) LoadActiveDocumentContentHash(_ context.Context, _ platformdb.Tx, _, _ string) (string, error) {
 	return "", nil
 }

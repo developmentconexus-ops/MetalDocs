@@ -44,6 +44,7 @@ internal/modules/controlleddocuments/infrastructure/repository.go|createVisibili
 internal/modules/controlleddocuments/infrastructure/repository.go|ensureCounterViaExec
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|InsertInstance
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|MarkSuperseded
+internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|PinFrozenHash
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateInstanceStatus
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateInstanceStatusWithReason
 internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateStageStatus

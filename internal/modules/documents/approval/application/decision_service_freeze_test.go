@@ -300,7 +300,12 @@ func TestRecordSignoff_WasReplay_DoesNotPin(t *testing.T) {
 	}
 }
 
-func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
+// TestRecordSignoff_UnresolvedComments_NoLongerBlocksApprove is F5's
+// regression test mirroring decision_service_test.go's: the
+// s.repo.HasUnresolvedComments gate that used to roll back final-approve here
+// is removed (W10). freezeDecisionConn.unresolvedComments > 0 no longer
+// blocks — decision_service.go doesn't consult it at all anymore.
+func TestRecordSignoff_UnresolvedComments_NoLongerBlocksApprove(t *testing.T) {
 	const (
 		instanceID = "inst-freeze-comments"
 		stageID    = "stage-freeze-comments"
@@ -346,20 +351,20 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 		SignaturePayload: map[string]any{"hash": "abc"},
 		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
-	if !errors.Is(err, ErrApprovalBlockedByUnresolvedComments) {
-		t.Fatalf("expected ErrApprovalBlockedByUnresolvedComments, got %v", err)
+	if err != nil {
+		t.Fatalf("RecordSignoff() error = %v, want nil (comments gate removed from decision_service.go)", err)
 	}
-	if conn.committed {
-		t.Fatal("transaction should not commit when unresolved comments block approval")
+	if !conn.committed {
+		t.Fatal("transaction should commit — comments no longer block approval")
 	}
-	if !conn.rolledBack {
-		t.Fatal("transaction should roll back when unresolved comments block approval")
+	if conn.rolledBack {
+		t.Fatal("transaction should not roll back")
 	}
-	if conn.documentStatus != "under_review" {
-		t.Fatalf("document status should stay under_review, got %q", conn.documentStatus)
+	if conn.documentStatus != "approved" {
+		t.Fatalf("document status should be approved, got %q", conn.documentStatus)
 	}
-	if pin.calls != 0 {
-		t.Fatalf("pin must not run when unresolved comments block approval, got %d calls", pin.calls)
+	if pin.calls != 1 {
+		t.Fatalf("pin should run once approval completes, got %d calls", pin.calls)
 	}
 }
 

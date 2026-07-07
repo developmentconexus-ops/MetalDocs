@@ -234,6 +234,34 @@ func (r *phase5Repo) HasUnresolvedComments(ctx context.Context, tx db.Tx, tenant
 	return count > 0, nil
 }
 
+// HasUnresolvedInstanceComments (F5) mirrors HasUnresolvedComments above —
+// this fake's document_comments table has no created_at scoping, so the
+// `since` scoping just isn't exercised by the fake driver; the query still
+// runs the same shape so tests targeting the freeze call sites can drive it.
+func (r *phase5Repo) HasUnresolvedInstanceComments(ctx context.Context, tx db.Tx, tenantID, documentID string, since time.Time) (bool, error) {
+	var count int
+	err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		  FROM document_comments
+		 WHERE tenant_id = $1
+		   AND document_id = $2
+		   AND resolved_at IS NULL`,
+		tenantID, documentID,
+	).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// PinFrozenHash (F5) is a no-op success for this cross-service wiring test —
+// the freeze boundary firing successfully (not its persisted row shape) is
+// what these scenarios need to prove Submit/Decision/Publish still wire
+// together end-to-end.
+func (r *phase5Repo) PinFrozenHash(_ context.Context, _ db.Tx, _, _, _ string) (bool, error) {
+	return true, nil
+}
+
 func (r *phase5Repo) LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
 	var hash sql.NullString
 	err := tx.QueryRowContext(ctx, `

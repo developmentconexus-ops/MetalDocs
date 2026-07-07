@@ -1019,7 +1019,17 @@ func TestRecordSignoff_CapabilityDenied(t *testing.T) {
 	}
 }
 
-func TestRecordSignoff_FinalApprovalBlockedByUnresolvedComments(t *testing.T) {
+// TestRecordSignoff_FinalApprove_NoLongerGatedByUnresolvedComments is F5's
+// regression test for the W10 removal: decision_service.go used to block
+// final-approve on ANY unresolved document-wide comment
+// (ErrApprovalBlockedByUnresolvedComments). That gate is now gone —
+// freeze (fired earlier via ReviewVerdictService's stage-advance path, or at
+// submit for approval-only routes) is the sole enforcement of this concern,
+// scoped to the instance's own review window rather than the whole document's
+// history. This test proves RecordSignoff completes the instance even with
+// unresolvedComments > 0 on the fake conn — the old test asserted the
+// opposite (blocked) behavior; that assertion is gone along with the gate.
+func TestRecordSignoff_FinalApprove_NoLongerGatedByUnresolvedComments(t *testing.T) {
 	const (
 		instanceID = "inst-comments-1"
 		stageID    = "stage-comments-1"
@@ -1065,7 +1075,7 @@ func TestRecordSignoff_FinalApprovalBlockedByUnresolvedComments(t *testing.T) {
 	}
 	db := newDecisionTestDB(t, conn)
 
-	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
+	result, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
 		StageInstanceID:  stageID,
@@ -1075,19 +1085,16 @@ func TestRecordSignoff_FinalApprovalBlockedByUnresolvedComments(t *testing.T) {
 		SignaturePayload: map[string]any{"hash": "abc"},
 		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
-	if err == nil {
-		t.Fatal("expected unresolved comments error")
+	if err != nil {
+		t.Fatalf("RecordSignoff() error = %v, want nil (comments gate removed from decision_service.go)", err)
 	}
-	if !errors.Is(err, ErrApprovalBlockedByUnresolvedComments) {
-		t.Fatalf("expected ErrApprovalBlockedByUnresolvedComments, got %v", err)
+	if !result.InstanceApproved {
+		t.Fatalf("expected instance approved, got %+v", result)
 	}
-	if pin.calls != 0 {
-		t.Fatalf("pin must not run when unresolved comments block approval, got %d calls", pin.calls)
+	if pin.calls != 1 {
+		t.Fatalf("pin should still run once approval completes, got %d calls", pin.calls)
 	}
-	if repo.instanceStatusTo != "" {
-		t.Fatalf("instance status should not advance when blocked, got %q", repo.instanceStatusTo)
-	}
-	if len(emitter.Events) != 0 {
-		t.Fatalf("no governance event should be emitted when approval is blocked, got %d", len(emitter.Events))
+	if len(emitter.Events) != 1 {
+		t.Fatalf("expected 1 governance event on successful approval, got %d", len(emitter.Events))
 	}
 }

@@ -1373,6 +1373,48 @@ func (r *postgresApprovalRepository) HasUnresolvedComments(ctx context.Context, 
 	return unresolvedCount > 0, nil
 }
 
+// HasUnresolvedInstanceComments is HasUnresolvedComments scoped to comments
+// created at or after `since` (F5, spec.md §2.2 "Comment-resolution scope").
+func (r *postgresApprovalRepository) HasUnresolvedInstanceComments(ctx context.Context, tx db.Tx, tenantID, documentID string, since time.Time) (bool, error) {
+	var unresolvedCount int
+	err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		  FROM document_comments
+		 WHERE tenant_id = $1
+		   AND document_id = $2
+		   AND resolved_at IS NULL
+		   AND created_at >= $3`,
+		tenantID, documentID, since,
+	).Scan(&unresolvedCount)
+	if err != nil {
+		return false, err
+	}
+	return unresolvedCount > 0, nil
+}
+
+// PinFrozenHash CAS-writes the frozen content hash the first time an instance
+// reaches the freeze boundary (F5). Only succeeds while the column is NULL;
+// won=false (0 rows affected) means the instance was already frozen —
+// idempotent no-op, never an error.
+func (r *postgresApprovalRepository) PinFrozenHash(ctx context.Context, tx db.Tx, tenantID, instanceID, hash string) (bool, error) {
+	res, err := tx.ExecContext(ctx, `
+		UPDATE approval_instances
+		   SET frozen_content_hash = $1
+		 WHERE id = $2
+		   AND tenant_id = $3
+		   AND frozen_content_hash IS NULL`,
+		hash, instanceID, tenantID,
+	)
+	if err != nil {
+		return false, MapPgError(err, MapHints{})
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("approval: pin frozen hash rows affected: %w", err)
+	}
+	return n == 1, nil
+}
+
 // LoadActiveDocumentContentHash mirrors the COALESCE used by the
 // /api/v1/controlled-documents/{cd}/active-document endpoint so the value
 // compared on signoff matches what the FE received when it loaded the doc.

@@ -123,6 +123,24 @@ type ApprovalRepository interface {
 	LoadPriorSignoffs(ctx context.Context, tx db.Tx, tenantID, instanceID, activeStageID string) ([]domain.Signoff, error)
 	LoadStageSignoffs(ctx context.Context, tx db.Tx, tenantID, stageInstanceID string) ([]domain.Signoff, error)
 	HasUnresolvedComments(ctx context.Context, tx db.Tx, tenantID, documentID string) (bool, error)
+	// HasUnresolvedInstanceComments is HasUnresolvedComments scoped to comments
+	// created at or after `since` (the instance's SubmittedAt) — F5, spec.md
+	// §2.2 "Comment-resolution scope": the freeze gate must not block on stale
+	// historical comments from a prior revision. HasUnresolvedComments itself
+	// stays document-wide and unmodified (kept for now — bounded defer,
+	// spec.md F5 Interview #8 — no remaining production call site after F5,
+	// but not deleted in this feature).
+	HasUnresolvedInstanceComments(ctx context.Context, tx db.Tx, tenantID, documentID string, since time.Time) (bool, error)
+	// PinFrozenHash CAS-writes approval_instances.frozen_content_hash the first
+	// time an instance reaches the freeze boundary (F5, spec.md §2.2). The
+	// write only succeeds when the column is currently NULL: won=true means
+	// this call performed the freeze; won=false means the instance was
+	// already frozen (idempotent no-op, never an error — freeze idempotency
+	// is a first-class outcome). The enclosing stage-transition tx already
+	// holds the instance row FOR UPDATE (via LoadInstance), so this CAS is
+	// defense-in-depth, not the actual race-resolution mechanism — see F5
+	// spec.md's Consumer contract disambiguation note.
+	PinFrozenHash(ctx context.Context, tx db.Tx, tenantID, instanceID, hash string) (won bool, err error)
 	// LoadActiveDocumentContentHash returns ErrNoActiveContentHash when the
 	// document is missing or has no content hash. The application layer maps
 	// this to ErrContentHashMismatch.

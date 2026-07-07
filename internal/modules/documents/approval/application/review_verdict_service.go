@@ -207,6 +207,11 @@ func (s *ReviewVerdictService) RecordVerdict(ctx context.Context, runner db.TxRu
 			}
 
 			if outcome == domain.QuorumApprovedStage {
+				// Capture the completing stage's kind BEFORE AdvanceStage mutates
+				// the in-memory stage slice (F5, plan.md task 5) — needed below to
+				// decide whether this transition crosses the freeze boundary.
+				completingStageKind := activeStage.Kind
+
 				if err := s.repo.UpdateStageStatus(ctx, tx, req.TenantID, activeStage.ID, domain.StageCompleted, domain.StageActive); err != nil {
 					return fmt.Errorf("recordVerdict: complete stage: %w", err)
 				}
@@ -216,15 +221,23 @@ func (s *ReviewVerdictService) RecordVerdict(ctx context.Context, runner db.TxRu
 					return fmt.Errorf("recordVerdict: advance stage: %w", err)
 				}
 
-				if instance.Status == domain.InstanceApproved {
-					blocked, err := s.repo.HasUnresolvedComments(ctx, tx, req.TenantID, instance.DocumentID)
-					if err != nil {
-						return fmt.Errorf("recordVerdict: check unresolved comments: %w", err)
+				// Freeze boundary (F5, design spec.md §2.2 "W2 core"): the last
+				// review-kind stage completing — whether the instance is now fully
+				// approved (no more stages) or has advanced into an approval-kind
+				// stage — crosses the point past which the document content is
+				// immutable. This must run BEFORE the (now-removed, W10)
+				// unresolved-comments gate below, since freeze is the sole
+				// remaining enforcement of that concern.
+				nextActive := instance.Active()
+				crossesFreezeBoundary := completingStageKind == domain.StageKindReview &&
+					(nextActive == nil || nextActive.Kind == domain.StageKindApproval)
+				if crossesFreezeBoundary {
+					if err := executeFreeze(ctx, tx, s.repo, req.TenantID, instance); err != nil {
+						return fmt.Errorf("recordVerdict: freeze: %w", err)
 					}
-					if blocked {
-						return ErrApprovalBlockedByUnresolvedComments
-					}
+				}
 
+				if instance.Status == domain.InstanceApproved {
 					if err := s.repo.UpdateInstanceStatus(ctx, tx, req.TenantID, req.InstanceID,
 						domain.InstanceApproved, domain.InstanceInProgress, &now); err != nil {
 						return fmt.Errorf("recordVerdict: complete instance: %w", err)
