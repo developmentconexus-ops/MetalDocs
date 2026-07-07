@@ -55,10 +55,15 @@ Transition **last review stage → first approval stage** is the freeze point:
 
 1. Gate: all tracked changes resolved (accepted/rejected) AND all `document_comments` on the instance resolved. **W10's unresolved-comments gate moves here** (today it fires at final approve — too late).
 2. Comment marks stripped from the buffer (`removeCommentMark` per mark) → clean OOXML, no markup in the signed artifact.
-3. Canonical content hash computed over the clean buffer and **pinned** on the instance (W9): `content_hash_at_submit` gets a real writer at freeze; the `COALESCE`-to-head float in `postgres_approval_repository.go:1132-1154` is deleted. One canonical hash chain: pin at freeze → echo at signoff → verify at publish.
+3. Canonical content hash computed over the clean buffer and **pinned** on the instance (W9). Precise defect statement: `content_hash_at_submit` IS written at submit today (`submit_service.go`); the `COALESCE` fallback in `postgres_approval_repository.go:1132-1154` is a legitimate NULL-fallback for pre-submit drafts, not an unguarded float. The actual gap is that the document remains editable during `under_review` (review stages), so the submit-time pin can diverge from signed content. Fix: freeze re-pins the hash over the clean post-review buffer; from freeze onward the pin is authoritative and drift-impossible. One canonical hash chain: pin at freeze → echo at signoff → verify at publish.
 4. From freeze onward the document version is immutable for the instance; any content change requires reject/withdraw → new revision.
 
 Routes with no review stage (approval-only): freeze fires at submit (today's behavior, now explicit).
+
+**Concurrency at the choke point (design commitment, detailed in ADR 2):**
+- **Freeze race:** freeze executes atomically inside the stage-transition tx with OCC on the instance row (status CAS); concurrent transition attempts lose the CAS and get 409. Freeze is idempotent — re-entry on an already-frozen instance is a no-op. H-PRE-1 respected: no authz-recording read inside the lock-holding tx.
+- **Concurrent verdicts:** review-verdict endpoint uses the same per-instance OCC/CAS pattern as signoff today; quorum evaluation happens in-tx after the verdict insert, so two simultaneous verdicts serialize and the second sees the first.
+- **Comment-resolution scope:** the existing `HasUnresolvedComments` predicate (`postgres_approval_repository.go:1110-1126`) is document-wide; the freeze gate scopes it to comments created during the instance's review stages (instance-scoped predicate) so stale historical comments on prior revisions cannot block freeze.
 
 ### 2.3 Return-to-author and rejection
 
@@ -83,7 +88,7 @@ Route definitions become **versioned and immutable**: editing a route creates `a
 ## 4. SLA / escalation (W4) and delegation (W5)
 
 - **SLA:** stage gains optional `due_in_days`; instance stage tracks `due_at`. The existing `document-review-surfacer` periodic job (jobs module, River `maintenance` queue) also surfaces overdue approval stages → notifications fanout. Alert-only; no auto-action (consistent with ADR 0068 watchdog philosophy).
-- **Delegation:** explicit `approval_delegations` (tenant, delegator, delegate, window, reason, audit). Delegate acts *as themselves on behalf of* — signoff records both identities. No credential sharing, no role impersonation. New ADR (see §9).
+- **Delegation:** explicit `approval_delegations` (tenant, delegator, delegate, window, reason, audit). Delegate acts *as themselves on behalf of* — signoff records both identities. No credential sharing, no role impersonation. Overlapping windows for the same delegator are allowed (union semantics — any active delegation makes the delegate eligible); self-delegation rejected. New ADR (see §9). **Sequencing:** delegation is separable from the freeze/versioning core — at plan time, slice it as a late M2b feature (or its own follow-up milestone) so it cannot destabilize the choke-point work.
 
 ## 5. SoD unification (W7)
 
@@ -99,14 +104,14 @@ Two new capabilities, wired through the full 10-touchpoint checklist (`developin
 
 | Capability | Grants |
 |---|---|
-| `document.review` | act on a **review** stage where actor is in the stage pool (verdicts, suggesting-mode session) |
+| `approval.review` | act on a **review** stage where actor is in the stage pool (verdicts, suggesting-mode session). Named `approval.review` — NOT `document.review`, which already exists (`CapDocumentReview`, ADR 0069 periodic mark-reviewed workflow, `internal/modules/iam/domain/model.go:89`) with a different production meaning |
 | `approval.oversee` | read-only oversight of ANY instance in tenant (worklist "all", cockpit observer mode, cancel with reason). Replaces the "admin wandered into approval URL" hole — oversight is a capability, never a role (ADR 0022) |
 
 Existing signoff capability continues to gate approval-stage verdicts.
 
 ### 6.2 Tier-1 fix (P1)
 
-Generic `/approval/` prefix fallback in `permissions.go:250-253` deleted. Every approval route gets an explicit route→capability entry; tier-2 `authz.Require` in-tx per handler; DB tripwire arms regenerated (M2-generation pipeline).
+Generic `/approval/` prefix fallback in `permissions.go:250-253` deleted. Every approval route gets an explicit route→capability entry; tier-2 `authz.Require` in-tx per handler; DB tripwire arms regenerated (M2-generation pipeline). **Scope note:** this targets the *runtime* verbs (submit/signoff/verdict/cancel/publish) still falling through the generic block — the route-admin tier-1/tier-2 gap was already closed as BE-9 (2026-07-02, ADR 0018 §6); do not redo it.
 
 ### 6.3 Visibility (P2/P3/P8) — ratified model
 
@@ -148,7 +153,7 @@ Eigenpal risk closed during brainstorm: track-changes + comments are first-class
 ## 9. ADRs (written during M2b implementation)
 
 1. Route definition versioning + pinned instances (supersedes ADR 0018 §1/§3).
-2. Content freeze boundary + review layer (stage kinds, markup stripping, canonical hash chain).
+2. Content freeze boundary + review layer (stage kinds, markup stripping, canonical hash chain, choke-point concurrency: freeze OCC/CAS + verdict serialization per §2.2).
 3. `approval.oversee` + revision visibility model.
 4. Approval delegation.
 
