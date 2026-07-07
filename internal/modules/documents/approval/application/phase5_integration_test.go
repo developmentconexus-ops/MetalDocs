@@ -262,28 +262,16 @@ func (r *phase5Repo) PinFrozenHash(_ context.Context, _ db.Tx, _, _, _ string) (
 	return true, nil
 }
 
-func (r *phase5Repo) LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
-	var hash sql.NullString
-	err := tx.QueryRowContext(ctx, `
-		SELECT COALESCE(d.content_hash_at_submit,
-		                (SELECT rev.content_hash FROM document_revisions rev
-		                  WHERE rev.document_id = d.id
-		                  ORDER BY rev.created_at DESC LIMIT 1))
-		  FROM documents d
-		 WHERE d.id = $1
-		   AND d.tenant_id = $2`,
-		documentID, tenantID,
-	).Scan(&hash)
-	if errors.Is(err, sql.ErrNoRows) {
+// LoadFrozenContentHash (F6) reads directly from the passed-in instance's
+// FrozenContentHash field, mirroring fakeDecisionRepo's approach — this
+// cross-service wiring test cares about Submit/Decision/Publish wiring
+// together, not repository query shapes. No-fallback: nil FrozenContentHash
+// always returns ErrNoActiveContentHash.
+func (r *phase5Repo) LoadFrozenContentHash(_ context.Context, _ db.Tx, _, _ string) (string, error) {
+	if r.instance == nil || r.instance.FrozenContentHash == nil {
 		return "", infrastructure.ErrNoActiveContentHash
 	}
-	if err != nil {
-		return "", err
-	}
-	if !hash.Valid {
-		return "", infrastructure.ErrNoActiveContentHash
-	}
-	return hash.String, nil
+	return *r.instance.FrozenContentHash, nil
 }
 
 func (r *phase5Repo) LoadActorDisplayName(_ context.Context, _, _ string) (string, error) {
@@ -502,6 +490,9 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 
 	// --- Step 2: RecordSignoff (approve, quorum met) ---
 	// Instance must be InProgress for RecordSignoff to accept it.
+	// FrozenContentHash set (F5/F6): by the time signoff is possible the
+	// instance must already be frozen — RecordSignoff now reads only this pin.
+	p5FrozenHash1 := validContentHash
 	inProgressInstance := &domain.Instance{
 		ID:                  instanceID,
 		TenantID:            tenantID,
@@ -512,6 +503,7 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 		SubmittedAt:         now,
 		RevisionVersion:     1,
 		ContentHashAtSubmit: validContentHash,
+		FrozenContentHash:   &p5FrozenHash1,
 		Stages: []domain.StageInstance{
 			{
 				ID:                         stageID,
@@ -582,12 +574,15 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 
 	// --- Step 3: PublishApproved ---
 	// LoadInstance must now return an Approved instance (post-signoff DB state).
+	// FrozenContentHash set (F5/F6): publish reads ONLY the frozen pin.
+	publishFrozenHash := validContentHash
 	approvedInstance := &domain.Instance{
-		ID:              instanceID,
-		TenantID:        tenantID,
-		DocumentID:      documentID,
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 1,
+		ID:                instanceID,
+		TenantID:          tenantID,
+		DocumentID:        documentID,
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   1,
+		FrozenContentHash: &publishFrozenHash,
 	}
 	publishRepo := &phase5Repo{instance: approvedInstance}
 	// UPDATE documents returns rowsAffected=1.
@@ -648,6 +643,9 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 	)
 
 	// Instance in in-progress state for the signoff.
+	// FrozenContentHash set (F5/F6): by the time signoff is possible the
+	// instance must already be frozen — RecordSignoff now reads only this pin.
+	p5FrozenHash2 := validContentHash
 	inProgressInstance := &domain.Instance{
 		ID:                  instanceID,
 		TenantID:            tenantID,
@@ -658,6 +656,7 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 		SubmittedAt:         clockAtSubmit1.t,
 		RevisionVersion:     1,
 		ContentHashAtSubmit: validContentHash,
+		FrozenContentHash:   &p5FrozenHash2,
 		Stages: []domain.StageInstance{
 			{
 				ID:                         stageID,

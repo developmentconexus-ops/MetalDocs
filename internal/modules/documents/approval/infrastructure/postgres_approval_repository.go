@@ -1415,21 +1415,22 @@ func (r *postgresApprovalRepository) PinFrozenHash(ctx context.Context, tx db.Tx
 	return n == 1, nil
 }
 
-// LoadActiveDocumentContentHash mirrors the COALESCE used by the
-// /api/v1/controlled-documents/{cd}/active-document endpoint so the value
-// compared on signoff matches what the FE received when it loaded the doc.
-// Returns ErrNoActiveContentHash on sql.ErrNoRows or null hash.
-func (r *postgresApprovalRepository) LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
+// LoadFrozenContentHash reads ONLY approval_instances.frozen_content_hash by
+// instance id (F6, spec §11 no-fallback principle). This deliberately
+// replaces the former LoadActiveDocumentContentHash, which COALESCEd
+// documents.content_hash_at_submit against the latest document_revisions
+// hash — a silent-fallback that could validate a signature against floating
+// head content instead of the frozen pin the signer actually reviewed. There
+// is no fallback here: a NULL frozen_content_hash or a missing instance row
+// both return ErrNoActiveContentHash and the caller must fail closed.
+func (r *postgresApprovalRepository) LoadFrozenContentHash(ctx context.Context, tx db.Tx, tenantID, instanceID string) (string, error) {
 	var hash sql.NullString
 	err := tx.QueryRowContext(ctx, `
-		SELECT COALESCE(d.content_hash_at_submit,
-		                (SELECT r.content_hash FROM document_revisions r
-		                  WHERE r.document_id = d.id
-		                  ORDER BY r.created_at DESC LIMIT 1))
-		  FROM documents d
-		 WHERE d.id = $1
-		   AND d.tenant_id = $2`,
-		documentID, tenantID,
+		SELECT frozen_content_hash
+		  FROM approval_instances
+		 WHERE id = $1
+		   AND tenant_id = $2`,
+		instanceID, tenantID,
 	).Scan(&hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNoActiveContentHash

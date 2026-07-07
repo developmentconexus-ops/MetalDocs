@@ -141,10 +141,17 @@ type ApprovalRepository interface {
 	// defense-in-depth, not the actual race-resolution mechanism — see F5
 	// spec.md's Consumer contract disambiguation note.
 	PinFrozenHash(ctx context.Context, tx db.Tx, tenantID, instanceID, hash string) (won bool, err error)
-	// LoadActiveDocumentContentHash returns ErrNoActiveContentHash when the
-	// document is missing or has no content hash. The application layer maps
-	// this to ErrContentHashMismatch.
-	LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error)
+	// LoadFrozenContentHash returns the instance's frozen_content_hash (F1/F5's
+	// freeze-boundary pin) by instance id. No-fallback (F6, spec §11): returns
+	// ErrNoActiveContentHash when the instance row is missing or its
+	// frozen_content_hash is NULL — NEVER substitutes a head document_revisions
+	// hash or any other value. By the time any signoff/publish call site reads
+	// this, the instance must already be frozen (F5: freeze always precedes
+	// activation of an approval-kind stage); a NULL pin at that point indicates
+	// an impossible state that must fail closed, not a legitimate "not yet
+	// computed" case to paper over. The application layer maps
+	// ErrNoActiveContentHash to ErrContentHashMismatch.
+	LoadFrozenContentHash(ctx context.Context, tx db.Tx, tenantID, instanceID string) (string, error)
 	ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error)
 	// LoadActorDisplayName returns metaldocs.iam_users.display_name for (tenantID,
 	// userID), or "" when the user row is absent. It runs OFF the caller's

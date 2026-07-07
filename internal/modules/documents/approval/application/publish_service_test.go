@@ -298,11 +298,12 @@ func (f *fakeScheduledPublishEnqueuer) EnqueueScheduledPublishTx(_ context.Conte
 func TestPublishApproved_HappyPath(t *testing.T) {
 	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
 	inst := &domain.Instance{
-		ID:              "inst-uuid-1",
-		TenantID:        "tenant-uuid-1",
-		DocumentID:      "doc-uuid-1",
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 3,
+		ID:                "inst-uuid-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-uuid-1",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   3,
+		FrozenContentHash: &validContentHashPtr,
 	}
 
 	repo := &fakePublishRepo{
@@ -395,6 +396,80 @@ func TestPublishApproved_NotApprovedInstance(t *testing.T) {
 	}
 }
 
+// TestPublishApproved_NullFrozenHash_FailsClosed proves the F6 no-fallback
+// guard: an InstanceApproved instance whose frozen_content_hash pin was never
+// set (nil) must fail closed with ErrContentHashMismatch rather than publish
+// on a substitute/derived hash. This is a defect-class regression guard for
+// the exact bug F6 removes (COALESCE to a head document_revisions hash).
+func TestPublishApproved_NullFrozenHash_FailsClosed(t *testing.T) {
+	inst := &domain.Instance{
+		ID:                "inst-null-frozen-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-null-frozen-1",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   3,
+		FrozenContentHash: nil,
+	}
+
+	repo := &fakePublishRepo{instance: inst}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &PublishService{repo: repo, emitter: emitter, clock: clock}
+	// rowsAffected irrelevant — should never reach UPDATE.
+	db := newPublishTestDB(t, 0, true)
+
+	req := PublishRequest{
+		TenantID:    "tenant-uuid-1",
+		InstanceID:  "inst-null-frozen-1",
+		PublishedBy: "user-1",
+	}
+
+	_, err := svc.PublishApproved(context.Background(), newTxRunner(db), req)
+	if !errors.Is(err, ErrContentHashMismatch) {
+		t.Fatalf("expected ErrContentHashMismatch (fail-closed on nil FrozenContentHash); got %v", err)
+	}
+	if len(emitter.Events) != 0 {
+		t.Errorf("no governance event should be emitted; got %d", len(emitter.Events))
+	}
+}
+
+// TestSchedulePublish_NullFrozenHash_FailsClosed mirrors the PublishApproved
+// guard for the scheduled-publish path (same InstanceApproved precondition,
+// same fail-closed pin check).
+func TestSchedulePublish_NullFrozenHash_FailsClosed(t *testing.T) {
+	inst := &domain.Instance{
+		ID:                "inst-null-frozen-sched-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-null-frozen-sched-1",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   3,
+		FrozenContentHash: nil,
+	}
+
+	repo := &fakePublishRepo{instance: inst}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &PublishService{repo: repo, emitter: emitter, clock: clock}
+	db := newPublishTestDB(t, 0, true)
+
+	req := SchedulePublishRequest{
+		TenantID:      "tenant-uuid-1",
+		InstanceID:    "inst-null-frozen-sched-1",
+		ScheduledBy:   "user-1",
+		EffectiveDate: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+	}
+
+	_, err := svc.SchedulePublish(context.Background(), newTxRunner(db), req)
+	if !errors.Is(err, ErrContentHashMismatch) {
+		t.Fatalf("expected ErrContentHashMismatch (fail-closed on nil FrozenContentHash); got %v", err)
+	}
+	if len(emitter.Events) != 0 {
+		t.Errorf("no governance event should be emitted; got %d", len(emitter.Events))
+	}
+}
+
 // ---------------------------------------------------------------------------
 // SchedulePublish tests
 // ---------------------------------------------------------------------------
@@ -404,11 +479,12 @@ func TestSchedulePublish_HappyPath(t *testing.T) {
 	future := now.Add(24 * time.Hour) // strictly after now
 
 	inst := &domain.Instance{
-		ID:              "inst-sched-1",
-		TenantID:        "tenant-uuid-1",
-		DocumentID:      "doc-sched-1",
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 5,
+		ID:                "inst-sched-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-sched-1",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   5,
+		FrozenContentHash: &validContentHashPtr,
 	}
 
 	repo := &fakePublishRepo{
@@ -475,11 +551,12 @@ func TestSchedulePublish_PersistsSupersededDocumentID(t *testing.T) {
 	future := now.Add(24 * time.Hour)
 
 	inst := &domain.Instance{
-		ID:              "inst-sched-supersede-1",
-		TenantID:        "tenant-uuid-1",
-		DocumentID:      "doc-sched-supersede-1",
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 2,
+		ID:                "inst-sched-supersede-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-sched-supersede-1",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   2,
+		FrozenContentHash: &validContentHashPtr,
 	}
 
 	repo := &fakePublishRepo{
@@ -522,11 +599,12 @@ func TestSchedulePublish_RejectsSelfSupersede(t *testing.T) {
 	future := now.Add(24 * time.Hour)
 
 	inst := &domain.Instance{
-		ID:              "inst-sched-self-1",
-		TenantID:        "tenant-uuid-1",
-		DocumentID:      "doc-sched-self-1",
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 2,
+		ID:                "inst-sched-self-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-sched-self-1",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   2,
+		FrozenContentHash: &validContentHashPtr,
 	}
 
 	repo := &fakePublishRepo{instance: inst}
@@ -561,11 +639,12 @@ func TestSchedulePublish_ValidatesSupersedeTarget(t *testing.T) {
 	expectedErr := infrastructure.ErrInvalidScheduledSupersedeTarget
 
 	inst := &domain.Instance{
-		ID:              "inst-sched-validate-1",
-		TenantID:        "tenant-uuid-1",
-		DocumentID:      "doc-sched-validate-1",
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 2,
+		ID:                "inst-sched-validate-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-sched-validate-1",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   2,
+		FrozenContentHash: &validContentHashPtr,
 	}
 
 	repo := &fakePublishRepo{
@@ -636,11 +715,12 @@ func TestSchedulePublish_RejectsMismatchedRevisionVersion(t *testing.T) {
 	future := now.Add(24 * time.Hour)
 
 	inst := &domain.Instance{
-		ID:              "inst-sched-mismatch-1",
-		TenantID:        "tenant-uuid-1",
-		DocumentID:      "doc-sched-mismatch-1",
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 7,
+		ID:                "inst-sched-mismatch-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-sched-mismatch-1",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   7,
+		FrozenContentHash: &validContentHashPtr,
 	}
 
 	repo := &fakePublishRepo{instance: inst}
@@ -676,11 +756,12 @@ func TestSchedulePublish_AllowsMissingExpectedRevision(t *testing.T) {
 	future := now.Add(24 * time.Hour)
 
 	inst := &domain.Instance{
-		ID:              "inst-sched-no-precondition-1",
-		TenantID:        "tenant-uuid-1",
-		DocumentID:      "doc-sched-no-precondition-1",
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 4,
+		ID:                "inst-sched-no-precondition-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-sched-no-precondition-1",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   4,
+		FrozenContentHash: &validContentHashPtr,
 	}
 
 	repo := &fakePublishRepo{instance: inst}
@@ -712,11 +793,12 @@ func TestSchedulePublish_AllowsMissingExpectedRevision(t *testing.T) {
 func TestSchedulePublish_AutoPersistsCurrentPublishedHeadWhenClientOmitsTarget(t *testing.T) {
 	now := time.Date(2026, 5, 20, 15, 0, 0, 0, time.UTC)
 	inst := &domain.Instance{
-		ID:              "inst-uuid-1",
-		TenantID:        "tenant-uuid-1",
-		DocumentID:      "doc-uuid-target",
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 9,
+		ID:                "inst-uuid-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-uuid-target",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   9,
+		FrozenContentHash: &validContentHashPtr,
 	}
 
 	repo := &fakePublishRepo{
@@ -748,11 +830,12 @@ func TestSchedulePublish_AutoPersistsCurrentPublishedHeadWhenClientOmitsTarget(t
 func TestPublishApproved_CapabilityDenied(t *testing.T) {
 	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
 	inst := &domain.Instance{
-		ID:              "inst-authz-1",
-		TenantID:        "tenant-uuid-1",
-		DocumentID:      "doc-authz-1",
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 3,
+		ID:                "inst-authz-1",
+		TenantID:          "tenant-uuid-1",
+		DocumentID:        "doc-authz-1",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   3,
+		FrozenContentHash: &validContentHashPtr,
 	}
 
 	repo := &fakePublishRepo{instance: inst}

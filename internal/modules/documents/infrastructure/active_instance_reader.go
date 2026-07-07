@@ -42,23 +42,24 @@ var activeInstanceStatuses = []any{
 func (r *ActiveInstanceReaderPG) ActiveInstanceForControlledDocument(ctx context.Context, tenantID, controlledDocumentID string) (*documentsdomain.ActiveInstanceView, error) {
 	var (
 		docID          sql.NullString
-		contentHash    sql.NullString
 		revisionVer    sql.NullInt64
 		status         sql.NullString
 		publishedDocID sql.NullString
 	)
 	args := append([]any{tenantID, controlledDocumentID}, activeInstanceStatuses...)
 	args = append(args, string(documentsdomain.DocStatusPublished))
+	// No-fallback (F6, spec §11): this projection no longer selects or
+	// resolves any content hash itself. content_hash_at_submit COALESCE over
+	// a live document_revisions hash silently substituted a value that could
+	// be captured AFTER an in-progress instance froze — floating content the
+	// signer never reviewed. The hash is now resolved by two explicit,
+	// status-scoped follow-up queries below (frozen pin, else head revision).
 	err := r.db.QueryRowContext(ctx, `
 SELECT active.id,
-       COALESCE(active.content_hash_at_submit,
-                (SELECT r.content_hash FROM document_revisions r
-                  WHERE r.document_id = active.id
-                  ORDER BY r.created_at DESC LIMIT 1)),
        active.revision_version,
        active.status,
        pub.id::text
-  FROM (SELECT id, content_hash_at_submit, revision_version, status
+  FROM (SELECT id, revision_version, status
           FROM documents
          WHERE tenant_id = $1::uuid
            AND controlled_document_id = $2::uuid
@@ -72,7 +73,7 @@ SELECT active.id,
          ORDER BY revision_number DESC
          LIMIT 1) pub ON TRUE`,
 		args...,
-	).Scan(&docID, &contentHash, &revisionVer, &status, &publishedDocID)
+	).Scan(&docID, &revisionVer, &status, &publishedDocID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -90,10 +91,6 @@ SELECT active.id,
 		v := docID.String
 		view.DocumentID = &v
 	}
-	if contentHash.Valid {
-		v := contentHash.String
-		view.ContentHash = &v
-	}
 	if revisionVer.Valid {
 		v := int(revisionVer.Int64)
 		view.RevisionVersion = &v
@@ -107,12 +104,18 @@ SELECT active.id,
 		view.PublishedDocumentID = &v
 	}
 
+	// frozenContentHash carries the pin when an under-review document has an
+	// in-progress approval instance that has already frozen (F1/F5 freeze
+	// boundary). Folded into the SAME query already fetching the in-progress
+	// instance id below (identical WHERE predicate) rather than a third round-trip.
+	var frozenContentHash sql.NullString
+
 	// When the active document is under review, fetch the in-progress approval
 	// instance id (B4). approval_instances is documents-owned (approval sub-context).
 	if view.DocumentID != nil && view.Status != nil && *view.Status == string(documentsdomain.DocStatusUnderReview) {
 		var approvalInstanceID sql.NullString
 		err := r.db.QueryRowContext(ctx, `
-SELECT id::text
+SELECT id::text, frozen_content_hash
   FROM approval_instances
  WHERE document_id = $1::uuid
    AND tenant_id = $2::uuid
@@ -120,13 +123,42 @@ SELECT id::text
  ORDER BY submitted_at DESC
  LIMIT 1`,
 			*view.DocumentID, tenantID, string(approvaldomain.InstanceInProgress),
-		).Scan(&approvalInstanceID)
+		).Scan(&approvalInstanceID, &frozenContentHash)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("active approval instance: %w", err)
 		}
 		if approvalInstanceID.Valid {
 			v := approvalInstanceID.String
 			view.ApprovalInstanceID = &v
+		}
+	}
+
+	// No-fallback (F6): explicit two-step hash resolution, never a COALESCE.
+	// Step 1 — an already-frozen in-progress instance's pin is authoritative
+	// (it is the SAME value signoff will compare against). Step 2 — otherwise
+	// (no instance, or an in-progress instance that has not yet frozen, or the
+	// document isn't under_review at all) fall through to the head
+	// document_revisions hash, the only meaningful "current content" answer
+	// while nothing is pinned yet.
+	if frozenContentHash.Valid {
+		v := frozenContentHash.String
+		view.ContentHash = &v
+	} else if view.DocumentID != nil {
+		var headHash sql.NullString
+		err := r.db.QueryRowContext(ctx, `
+SELECT content_hash
+  FROM document_revisions
+ WHERE document_id = $1::uuid
+ ORDER BY created_at DESC
+ LIMIT 1`,
+			*view.DocumentID,
+		).Scan(&headHash)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("active document head revision hash: %w", err)
+		}
+		if headHash.Valid {
+			v := headHash.String
+			view.ContentHash = &v
 		}
 	}
 

@@ -174,8 +174,8 @@ func (r *fakeSubmitRepo) PinFrozenHash(_ context.Context, _ db.Tx, _, _, _ strin
 	return true, nil
 }
 
-func (r *fakeSubmitRepo) LoadActiveDocumentContentHash(_ context.Context, _ db.Tx, _, _ string) (string, error) {
-	panic("fakeSubmitRepo.LoadActiveDocumentContentHash: not expected to be called in submit tests")
+func (r *fakeSubmitRepo) LoadFrozenContentHash(_ context.Context, _ db.Tx, _, _ string) (string, error) {
+	panic("fakeSubmitRepo.LoadFrozenContentHash: not expected to be called in submit tests")
 }
 
 // ---------------------------------------------------------------------------

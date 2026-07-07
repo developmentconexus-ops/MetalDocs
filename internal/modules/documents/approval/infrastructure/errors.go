@@ -38,9 +38,11 @@ var (
 	ErrRouteInUse = errors.New("approval: route is referenced by one or more instances and cannot be modified")
 	// ErrDuplicateRouteProfile is returned when a route already exists for the tenant+profile_code combination.
 	ErrDuplicateRouteProfile = errors.New("approval: a route already exists for this tenant+profile combination")
-	// ErrNoActiveContentHash is returned by LoadActiveDocumentContentHash when
-	// the document has no content hash (missing document or null hash). The
-	// application layer maps this to ErrContentHashMismatch.
+	// ErrNoActiveContentHash is returned by LoadFrozenContentHash when the
+	// approval instance is missing or its frozen_content_hash is NULL (F6,
+	// spec §11 no-fallback principle: never substitutes a head-revision hash
+	// or any other value). The application layer maps this to
+	// ErrContentHashMismatch.
 	ErrNoActiveContentHash = errors.New("approval: no active document content hash")
 	// ErrNoActiveApprovalRoute is returned by LoadActiveRouteIDByProfile when no
 	// active approval route exists for the (tenant, profile). The submit service

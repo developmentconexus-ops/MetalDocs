@@ -15,6 +15,7 @@ import (
 
 	cddomain "metaldocs/internal/modules/controlleddocuments/domain"
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
+	domain "metaldocs/internal/modules/documents/approval/domain"
 )
 
 // factory.go — unified integration-test fixture builders, built ON the testdb
@@ -82,11 +83,12 @@ type ApprovalRoute struct {
 }
 
 type ApprovalInstance struct {
-	ID         string
-	TenantID   string
-	DocumentID string
-	RouteID    string
-	Status     string
+	ID                string
+	TenantID          string
+	DocumentID        string
+	RouteID           string
+	Status            string
+	FrozenContentHash *string
 }
 
 type Notification struct {
@@ -131,6 +133,8 @@ type Spec struct {
 	ScheduleGeneration int64
 	EffectiveFrom      time.Time
 
+	FrozenContentHash *string
+
 	hasRevisionVersion    bool
 	hasScheduleGeneration bool
 	hasEffectiveFrom      bool
@@ -151,6 +155,16 @@ func WithOwner(userID string) Opt         { return func(s *Spec) { s.OwnerUserID
 func WithTemplateVersionID(id string) Opt { return func(s *Spec) { s.TemplateVersionID = id } }
 func WithName(name string) Opt            { return func(s *Spec) { s.Name = name } }
 func WithStatus(status string) Opt        { return func(s *Spec) { s.Status = status } }
+
+// WithFrozenContentHash sets approval_instances.frozen_content_hash explicitly
+// (F6 no-fallback hash chain: signoff/publish read ONLY this pin, never a
+// COALESCE fallback). Pass "" to force NULL (the not-yet-frozen fixture case);
+// any other value seeds that literal hash. When this option is omitted,
+// NewApprovalInstance seeds a default frozen hash for any status at or beyond
+// InstanceApproved, since a real approved instance always has a pin by then.
+func WithFrozenContentHash(hash string) Opt {
+	return func(s *Spec) { s.FrozenContentHash = &hash }
+}
 func WithCode(code string) Opt            { return func(s *Spec) { s.Code = code } }
 func WithProfile(code string) Opt         { return func(s *Spec) { s.ProfileCode = code } }
 func WithRevisionNumber(n int) Opt        { return func(s *Spec) { s.RevisionNumber = n } }
@@ -533,18 +547,39 @@ func NewApprovalInstance(t *testing.T, db *sql.DB, opts ...Opt) ApprovalInstance
 	id := uuid.NewString()
 	idemKey := "idem-" + randomSuffix(t)
 
+	// frozen_content_hash (F6 no-fallback hash chain): signoff/publish read
+	// ONLY this pin, never a fallback. A real "approved" instance always has
+	// one set (F1/F5 freeze boundary), so default-seed it here unless the
+	// caller explicitly overrides via WithFrozenContentHash (including
+	// forcing NULL with WithFrozenContentHash("") for not-yet-frozen fixtures).
+	var frozenHash sql.NullString
+	switch {
+	case s.FrozenContentHash != nil && *s.FrozenContentHash != "":
+		frozenHash = sql.NullString{String: *s.FrozenContentHash, Valid: true}
+	case s.FrozenContentHash != nil:
+		frozenHash = sql.NullString{Valid: false}
+	case status == string(domain.InstanceApproved):
+		frozenHash = sql.NullString{String: strings.Repeat("a", 64), Valid: true}
+	}
+
 	seedWithCaps(t, db, `[{"cap":"document.submit"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(context.Background(),
 			`INSERT INTO public.approval_instances
 			   (id, tenant_id, document_id, route_id, route_version_snapshot, status,
-			    submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
-			 VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, $5, $6, now(), repeat('a', 64), $7)`,
-			id, doc.TenantID, doc.ID, route.ID, status, submitter, idemKey,
+			    submitted_by, submitted_at, content_hash_at_submit, idempotency_key,
+			    frozen_content_hash)
+			 VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, $5, $6, now(), repeat('a', 64), $7, $8)`,
+			id, doc.TenantID, doc.ID, route.ID, status, submitter, idemKey, frozenHash,
 		)
 		return err
 	})
 
-	return ApprovalInstance{ID: id, TenantID: doc.TenantID, DocumentID: doc.ID, RouteID: route.ID, Status: status}
+	var frozenHashOut *string
+	if frozenHash.Valid {
+		v := frozenHash.String
+		frozenHashOut = &v
+	}
+	return ApprovalInstance{ID: id, TenantID: doc.TenantID, DocumentID: doc.ID, RouteID: route.ID, Status: status, FrozenContentHash: frozenHashOut}
 }
 
 // NewNotification seeds a metaldocs.notifications row (no tripwire). Auto-wires a

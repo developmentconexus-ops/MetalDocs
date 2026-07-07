@@ -270,15 +270,21 @@ func TestRecordSignoff_RequiresStageInstanceID(t *testing.T) {
 
 func buildAllCompletedInstance(instanceID, stageID string) *domain.Instance {
 	now := time.Now().UTC()
+	// F6 no-fallback: RecordSignoff reads ONLY the frozen pin, so any
+	// signoff-path fixture needs a non-nil FrozenContentHash even when the
+	// test's real assertion is about a different invariant (here, no active
+	// stage).
+	frozenHash := validContentHash
 	return &domain.Instance{
-		ID:              instanceID,
-		TenantID:        "tenant-1",
-		DocumentID:      "doc-1",
-		RouteID:         "route-1",
-		Status:          domain.InstanceInProgress,
-		SubmittedBy:     "author",
-		SubmittedAt:     now,
-		RevisionVersion: 1,
+		ID:                instanceID,
+		TenantID:          "tenant-1",
+		DocumentID:        "doc-1",
+		RouteID:           "route-1",
+		Status:            domain.InstanceInProgress,
+		SubmittedBy:       "author",
+		SubmittedAt:       now,
+		RevisionVersion:   1,
+		FrozenContentHash: &frozenHash,
 		Stages: []domain.StageInstance{
 			{
 				ID:         stageID,
@@ -377,6 +383,8 @@ func TestRecordSignoff_IdempotentReplay(t *testing.T) {
 // Two-stage instance: advancing stage activates next stage.
 func buildTwoStageInstance(instanceID, stage1ID, stage2ID, authorUserID string, eligible []string) *domain.Instance {
 	now := time.Now().UTC()
+	// F6 no-fallback: signoff reads ONLY the frozen pin.
+	frozenHash := validContentHash
 	return &domain.Instance{
 		ID:                  instanceID,
 		TenantID:            "tenant-1",
@@ -387,6 +395,7 @@ func buildTwoStageInstance(instanceID, stage1ID, stage2ID, authorUserID string, 
 		SubmittedAt:         now,
 		RevisionVersion:     1,
 		ContentHashAtSubmit: validContentHash,
+		FrozenContentHash:   &frozenHash,
 		Stages: []domain.StageInstance{
 			{
 				ID:                         stage1ID,
@@ -485,12 +494,17 @@ func TestPublishApproved_LoadInstanceNotFound(t *testing.T) {
 }
 
 func TestPublishApproved_OCC_StaleRevision(t *testing.T) {
+	// F6 no-fallback: publish reads ONLY the frozen pin, so any
+	// InstanceApproved fixture needs a non-nil FrozenContentHash even when
+	// the assertion under test is a different invariant (here, OCC staleness).
+	frozenHash := validContentHash
 	inst := &domain.Instance{
-		ID:              "inst-stale-pub",
-		TenantID:        "t",
-		DocumentID:      "doc-stale-pub",
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 3,
+		ID:                "inst-stale-pub",
+		TenantID:          "t",
+		DocumentID:        "doc-stale-pub",
+		Status:            domain.InstanceApproved,
+		RevisionVersion:   3,
+		FrozenContentHash: &frozenHash,
 	}
 	repo := &fakePublishRepo{instance: inst}
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
@@ -535,11 +549,14 @@ func TestSchedulePublish_OCC_StaleRevision(t *testing.T) {
 	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
 	future := now.Add(24 * time.Hour)
 
+	// F6 no-fallback: publish reads ONLY the frozen pin.
+	frozenHash := validContentHash
 	inst := &domain.Instance{
-		ID:         "inst-sched-stale",
-		TenantID:   "t",
-		DocumentID: "doc-sched-stale",
-		Status:     domain.InstanceApproved,
+		ID:                "inst-sched-stale",
+		TenantID:          "t",
+		DocumentID:        "doc-sched-stale",
+		Status:            domain.InstanceApproved,
+		FrozenContentHash: &frozenHash,
 	}
 	repo := &fakePublishRepo{instance: inst}
 	svc := &PublishService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}

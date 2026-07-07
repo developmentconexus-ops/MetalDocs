@@ -244,17 +244,18 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, runner db.TxRunner,
 
 		// Content pin: client echoes back the content hash from the active-document
 		// endpoint to confirm the instance content has not drifted since they loaded it.
-		// Resolve the same value here (documents.content_hash_at_submit, falling back
-		// to the latest document_revisions.content_hash) so client and server agree on
-		// the canonicalization. The approval_instance's content_hash_at_submit is not
-		// the right source — submit canonicalizes over the client-provided hash, which
-		// is irreproducible at signoff time.
-		contentHash, err := s.repo.LoadActiveDocumentContentHash(ctx, tx, req.TenantID, instance.DocumentID)
+		// No-fallback (F6, spec §11): the ONLY authoritative source is the instance's
+		// frozen_content_hash, pinned once at the freeze boundary (F5). By the time an
+		// approval-kind stage is active and signoff is possible, the instance must
+		// already be frozen — a NULL pin here is an impossible state, not a legitimate
+		// "not yet computed" case, so it fails closed via ErrNoActiveContentHash rather
+		// than falling back to any document-table or revision-history hash.
+		contentHash, err := s.repo.LoadFrozenContentHash(ctx, tx, req.TenantID, instance.ID)
 		if err != nil {
 			if errors.Is(err, infrastructure.ErrNoActiveContentHash) {
 				return ErrContentHashMismatch
 			}
-			return fmt.Errorf("recordSignoff: load active document content hash: %w", err)
+			return fmt.Errorf("recordSignoff: load frozen content hash: %w", err)
 		}
 		// Content pin is mandatory: an unauthenticated or programmatic caller must not
 		// be able to skip the check by omitting `_content_hash`. The HTTP boundary

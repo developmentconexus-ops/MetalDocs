@@ -88,7 +88,7 @@ func (stubApprovalRepo) HasUnresolvedInstanceComments(_ context.Context, _ platf
 func (stubApprovalRepo) PinFrozenHash(_ context.Context, _ platformdb.Tx, _, _, _ string) (bool, error) {
 	return true, nil
 }
-func (stubApprovalRepo) LoadActiveDocumentContentHash(_ context.Context, _ platformdb.Tx, _, _ string) (string, error) {
+func (stubApprovalRepo) LoadFrozenContentHash(_ context.Context, _ platformdb.Tx, _, _ string) (string, error) {
 	return "", nil
 }
 func (stubApprovalRepo) ResolveEligibleActors(_ context.Context, _ platformdb.Tx, _, _, _ string) ([]string, error) {

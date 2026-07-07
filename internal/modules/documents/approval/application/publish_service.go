@@ -77,6 +77,18 @@ func (s *PublishService) PublishApproved(ctx context.Context, runner db.TxRunner
 			return ErrInstanceNotApproved
 		}
 
+		// No-fallback (F6, spec §11): publish is the final link in the canonical
+		// hash chain (pin at freeze → echo at signoff → verify at publish). An
+		// approved instance must already carry a frozen_content_hash pinned at
+		// the freeze boundary (F5) — this is structurally guaranteed by F4/F5's
+		// stage-kind gating, but the whole point of the no-fallback principle is
+		// to make an impossible state loudly fail rather than silently proceed.
+		// This is an additive fail-closed guard, not a client-echo comparison —
+		// publish has no client-supplied hash to verify against.
+		if instance.FrozenContentHash == nil {
+			return ErrContentHashMismatch
+		}
+
 		// document.publish is area-grade: pass the resolved area as-is ("" fail-closes).
 		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, instance.DocumentID)
 		if err != nil {
@@ -245,6 +257,13 @@ func (s *PublishService) SchedulePublish(ctx context.Context, runner db.TxRunner
 		// Verify instance is in approved state.
 		if instance.Status != domain.InstanceApproved {
 			return ErrInstanceNotApproved
+		}
+
+		// No-fallback (F6, spec §11): scheduling is also a publish-family
+		// transition off the same approved instance; same fail-closed pin guard
+		// as PublishApproved (see its comment for full rationale).
+		if instance.FrozenContentHash == nil {
+			return ErrContentHashMismatch
 		}
 
 		// document.publish is area-grade: pass the resolved area as-is ("" fail-closes).

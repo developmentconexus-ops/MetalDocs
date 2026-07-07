@@ -31,29 +31,36 @@ import (
 // lives here as a black-box _test package alongside the other module-scoped
 // testdb-driven integration suites.
 
-// rawGetActiveInstance replays the pre-port inline reads (the documents FULL
-// OUTER JOIN projection + the derived in_progress approval_instances lookup)
+// rawGetActiveInstance replays the ported adapter's inline reads (the
+// documents FULL OUTER JOIN projection + the derived in_progress
+// approval_instances lookup + the F6 no-fallback two-step hash resolution)
 // directly against the test pool. This is the parity baseline.
+//
+// F6 (no-fallback-hash-chain): the pre-F6 baseline here replayed a COALESCE
+// over documents.content_hash_at_submit / a live document_revisions hash —
+// that COALESCE was the defect (it could silently return a HEAD revision
+// hash captured after an in-progress instance had already frozen, i.e.
+// content the signer never reviewed). The baseline is updated to mirror the
+// corrected two-step, status-scoped resolution: an already-frozen in-progress
+// instance's pin is authoritative; otherwise fall through to the head
+// document_revisions hash. Both steps are explicit typed reads, never a
+// COALESCE expression — this keeps the test's actual purpose (adapter/raw-SQL
+// parity) intact against the corrected logic, not the old defect.
 func rawGetActiveInstance(t *testing.T, db *sql.DB, tenantID, controlledDocumentID string) *controlleddocumentsdomain.ActiveDocumentInstance {
 	t.Helper()
 	ctx := context.Background()
 	var (
 		docID          sql.NullString
-		contentHash    sql.NullString
 		revisionVer    sql.NullInt64
 		approvalState  sql.NullString
 		publishedDocID sql.NullString
 	)
 	err := db.QueryRowContext(ctx, `
 SELECT active.id,
-       COALESCE(active.content_hash_at_submit,
-                (SELECT r.content_hash FROM document_revisions r
-                  WHERE r.document_id = active.id
-                  ORDER BY r.created_at DESC LIMIT 1)),
        active.revision_version,
        active.status,
        pub.id::text
-  FROM (SELECT id, content_hash_at_submit, revision_version, status
+  FROM (SELECT id, revision_version, status
           FROM public.documents
          WHERE tenant_id = $1::uuid
            AND controlled_document_id = $2::uuid
@@ -67,7 +74,7 @@ SELECT active.id,
          ORDER BY revision_number DESC
          LIMIT 1) pub ON TRUE`,
 		tenantID, controlledDocumentID,
-	).Scan(&docID, &contentHash, &revisionVer, &approvalState, &publishedDocID)
+	).Scan(&docID, &revisionVer, &approvalState, &publishedDocID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
@@ -83,10 +90,6 @@ SELECT active.id,
 		v := docID.String
 		inst.DocumentID = &v
 	}
-	if contentHash.Valid {
-		v := contentHash.String
-		inst.ContentHash = &v
-	}
 	if revisionVer.Valid {
 		v := int(revisionVer.Int64)
 		inst.RevisionVersion = &v
@@ -100,10 +103,11 @@ SELECT active.id,
 		inst.PublishedDocumentID = &v
 	}
 
+	var frozenContentHash sql.NullString
 	if inst.DocumentID != nil && inst.ApprovalState != nil && *inst.ApprovalState == "under_review" {
 		var approvalInstanceID sql.NullString
 		err := db.QueryRowContext(ctx, `
-SELECT id::text
+SELECT id::text, frozen_content_hash
   FROM approval_instances
  WHERE document_id = $1::uuid
    AND tenant_id = $2::uuid
@@ -111,13 +115,35 @@ SELECT id::text
  ORDER BY submitted_at DESC
  LIMIT 1`,
 			*inst.DocumentID, tenantID,
-		).Scan(&approvalInstanceID)
+		).Scan(&approvalInstanceID, &frozenContentHash)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			t.Fatalf("raw approval instance: %v", err)
 		}
 		if approvalInstanceID.Valid {
 			v := approvalInstanceID.String
 			inst.ApprovalInstanceID = &v
+		}
+	}
+
+	if frozenContentHash.Valid {
+		v := frozenContentHash.String
+		inst.ContentHash = &v
+	} else if inst.DocumentID != nil {
+		var headHash sql.NullString
+		err := db.QueryRowContext(ctx, `
+SELECT content_hash
+  FROM document_revisions
+ WHERE document_id = $1::uuid
+ ORDER BY created_at DESC
+ LIMIT 1`,
+			*inst.DocumentID,
+		).Scan(&headHash)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			t.Fatalf("raw head revision hash: %v", err)
+		}
+		if headHash.Valid {
+			v := headHash.String
+			inst.ContentHash = &v
 		}
 	}
 	return inst
@@ -208,6 +234,63 @@ func TestActiveInstanceReader_ParityWithRawGetActiveInstance(t *testing.T) {
 		assertActiveInstanceParity(t, "under_review_with_in_progress_approval", want, got)
 		if got == nil || got.ApprovalInstanceID == nil || *got.ApprovalInstanceID != ai.ID {
 			t.Fatalf("under_review: expected approval instance %s; got %+v", ai.ID, got)
+		}
+	})
+
+	t.Run("under_review_with_frozen_instance", func(t *testing.T) {
+		// F6: an in-progress instance whose frozen_content_hash pin is already
+		// set must have its ContentHash echo the PIN, not the head revision hash
+		// — proves the fallthrough branch does NOT fire once frozen.
+		cd := testdb.NewControlledDoc(t, db)
+		doc := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd), testdb.WithStatus("under_review"))
+		ai := testdb.NewApprovalInstance(t, db,
+			testdb.WithDocument(doc),
+			testdb.WithStatus("in_progress"),
+			testdb.WithFrozenContentHash(fmt.Sprintf("%064d", 7)),
+		)
+		want := rawGetActiveInstance(t, db, doc.TenantID, doc.ControlledDocumentID)
+		got, err := repo.GetActiveInstance(ctx, doc.TenantID, doc.ControlledDocumentID)
+		if err != nil {
+			t.Fatalf("port GetActiveInstance: %v", err)
+		}
+		assertActiveInstanceParity(t, "under_review_with_frozen_instance", want, got)
+		if got == nil || got.ApprovalInstanceID == nil || *got.ApprovalInstanceID != ai.ID {
+			t.Fatalf("under_review_with_frozen_instance: expected approval instance %s; got %+v", ai.ID, got)
+		}
+		if got.ContentHash == nil || *got.ContentHash != fmt.Sprintf("%064d", 7) {
+			t.Fatalf("under_review_with_frozen_instance: ContentHash must echo the frozen pin; got %+v", got)
+		}
+	})
+
+	t.Run("under_review_not_yet_frozen_falls_through_to_head_revision", func(t *testing.T) {
+		// F6: an in-progress instance with a NULL frozen_content_hash pin
+		// (not yet frozen) must fall through to the head document_revisions
+		// hash — this is the correct, non-defect fallthrough, distinct from
+		// the deleted COALESCE which could also fire for an ALREADY-frozen
+		// instance.
+		cd := testdb.NewControlledDoc(t, db)
+		doc := testdb.NewDocument(t, db, testdb.WithControlledDoc(cd), testdb.WithStatus("under_review"))
+		ai := testdb.NewApprovalInstance(t, db,
+			testdb.WithDocument(doc),
+			testdb.WithStatus("in_progress"),
+			testdb.WithFrozenContentHash(""), // forces NULL — not yet frozen
+		)
+		want := rawGetActiveInstance(t, db, doc.TenantID, doc.ControlledDocumentID)
+		got, err := repo.GetActiveInstance(ctx, doc.TenantID, doc.ControlledDocumentID)
+		if err != nil {
+			t.Fatalf("port GetActiveInstance: %v", err)
+		}
+		assertActiveInstanceParity(t, "under_review_not_yet_frozen_falls_through_to_head_revision", want, got)
+		if got == nil || got.ApprovalInstanceID == nil || *got.ApprovalInstanceID != ai.ID {
+			t.Fatalf("expected approval instance %s; got %+v", ai.ID, got)
+		}
+		// No document_revisions row is seeded by the factory for this fixture,
+		// so the fallthrough correctly yields nil (there is no head revision to
+		// report) — the important proof is assertActiveInstanceParity above:
+		// port and raw SQL AGREE on nil, i.e. neither silently substitutes the
+		// (non-existent, not-yet-frozen) pin.
+		if got.ContentHash != nil {
+			t.Fatalf("expected nil ContentHash (no revision seeded, not frozen); got %+v", got)
 		}
 	})
 

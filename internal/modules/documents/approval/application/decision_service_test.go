@@ -160,28 +160,16 @@ func (r *fakeDecisionRepo) HasUnresolvedComments(ctx context.Context, tx db.Tx, 
 	return unresolvedCount > 0, nil
 }
 
-func (r *fakeDecisionRepo) LoadActiveDocumentContentHash(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error) {
-	var hash sql.NullString
-	err := tx.QueryRowContext(ctx, `
-		SELECT COALESCE(d.content_hash_at_submit,
-		                (SELECT r.content_hash FROM document_revisions r
-		                  WHERE r.document_id = d.id
-		                  ORDER BY r.created_at DESC LIMIT 1))
-		  FROM documents d
-		 WHERE d.id = $1
-		   AND d.tenant_id = $2`,
-		documentID, tenantID,
-	).Scan(&hash)
-	if errors.Is(err, sql.ErrNoRows) {
+// LoadFrozenContentHash (F6) reads directly from the already-loaded in-memory
+// instance's FrozenContentHash field — the fake has no separate approval_instances
+// table to query, and the instance passed to RecordSignoff IS the row this method
+// would read in production. No-fallback: NULL FrozenContentHash always returns
+// ErrNoActiveContentHash, never a substitute value.
+func (r *fakeDecisionRepo) LoadFrozenContentHash(_ context.Context, _ db.Tx, _, _ string) (string, error) {
+	if r.instance == nil || r.instance.FrozenContentHash == nil {
 		return "", infrastructure.ErrNoActiveContentHash
 	}
-	if err != nil {
-		return "", err
-	}
-	if !hash.Valid {
-		return "", infrastructure.ErrNoActiveContentHash
-	}
-	return hash.String, nil
+	return *r.instance.FrozenContentHash, nil
 }
 
 func (r *fakeDecisionRepo) LoadActorDisplayName(_ context.Context, tenantID, userID string) (string, error) {
@@ -434,9 +422,14 @@ func newDecisionTestDB(t *testing.T, conn *decisionTestConn) *sql.DB {
 // ---------------------------------------------------------------------------
 
 // buildSingleStageInstance returns an Instance with one active stage using
-// any_1_of quorum and the given eligible actors.
+// any_1_of quorum and the given eligible actors. FrozenContentHash is set to
+// validContentHash (F5/F6): by the time an approval-kind stage is active and
+// signoff is possible, the instance must already be frozen, so every fixture
+// that exercises a real signoff path needs a non-nil pin — tests that
+// specifically want the fail-closed NULL-pin path override this field.
 func buildSingleStageInstance(instanceID, stageID, authorUserID string, eligible []string) *domain.Instance {
 	now := time.Now().UTC()
+	frozenHash := validContentHash
 	return &domain.Instance{
 		ID:              instanceID,
 		TenantID:        "tenant-1",
@@ -447,6 +440,7 @@ func buildSingleStageInstance(instanceID, stageID, authorUserID string, eligible
 		SubmittedAt:         now,
 		RevisionVersion:     1,
 		ContentHashAtSubmit: validContentHash,
+		FrozenContentHash:   &frozenHash,
 		Stages: []domain.StageInstance{
 			{
 				ID:                         stageID,
@@ -477,6 +471,11 @@ func buildTwoApproverInstance(instanceID, stageID, authorUserID string, eligible
 
 // validContentHash is a 64-char lowercase hex string used in test signoff rows.
 const validContentHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+// validContentHashPtr is an addressable copy of validContentHash (F6): several
+// fixtures across this package need a *string for domain.Instance.FrozenContentHash,
+// and Go cannot take the address of a string constant directly.
+var validContentHashPtr = validContentHash
 
 // TestRecordSignoff_ApprovePath_QuorumMet: single approver quorum (any_1_of).
 // Expect StageCompleted=true, InstanceApproved=true (only 1 stage).
@@ -760,6 +759,58 @@ func TestRecordSignoff_ContentHashMismatchFailsBeforePersisting(t *testing.T) {
 	}
 	if repo.insertedSignoff != nil {
 		t.Fatal("signoff must not be persisted on client/server content hash mismatch")
+	}
+}
+
+// TestRecordSignoff_NullFrozenHash_FailsClosed (F6, spec §11 no-fallback
+// principle): an instance whose FrozenContentHash is nil (structurally
+// impossible via the normal API path per F5 stage-kind gating, but
+// constructible directly for this test) must fail closed with
+// ErrContentHashMismatch — it must NEVER fall through to any other hash
+// source (e.g. ContentHashAtSubmit or a head document_revisions hash), even
+// though ContentHashAtSubmit is set and the client echoes a hash that would
+// have matched it under the old (now-deleted) COALESCE behavior.
+func TestRecordSignoff_NullFrozenHash_FailsClosed(t *testing.T) {
+	const (
+		instanceID = "inst-null-frozen-hash"
+		stageID    = "stage-null-frozen-hash"
+		actorID    = "approver-null-frozen-hash"
+		authorID   = "author-null-frozen-hash"
+	)
+
+	inst := buildTwoApproverInstance(instanceID, stageID, authorID, []string{actorID, "approver-2"})
+	inst.FrozenContentHash = nil // never frozen — the fail-closed case under test.
+
+	conn := &decisionTestConn{
+		authzGranted: true,
+		areaCode:     "QA",
+		actorID:      actorID,
+	}
+	repo := &fakeDecisionRepo{instance: inst}
+	svc := &DecisionService{
+		repo:       repo,
+		emitter:    &MemoryEmitter{},
+		clock:      fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		pinInvoker: &fakePinInvoker{},
+	}
+	db := newDecisionTestDB(t, conn)
+
+	// Client echoes exactly ContentHashAtSubmit — which would have matched the
+	// OLD (deleted) COALESCE-over-documents-table behavior. It must NOT match now.
+	_, err := svc.RecordSignoff(context.Background(), newTxRunner(db), SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		SignaturePayload: map[string]any{},
+		ContentFormData:  map[string]any{"_content_hash": inst.ContentHashAtSubmit},
+	})
+	if !errors.Is(err, ErrContentHashMismatch) {
+		t.Fatalf("expected ErrContentHashMismatch (fail-closed on nil FrozenContentHash), got %v", err)
+	}
+	if repo.insertedSignoff != nil {
+		t.Fatal("signoff must not be persisted when the frozen pin is absent")
 	}
 }
 

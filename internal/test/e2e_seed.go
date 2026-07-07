@@ -85,9 +85,15 @@ type seedResponse struct {
 		Admin    seededUser `json:"admin"`
 	} `json:"users"`
 	Cookies map[string]string `json:"cookies"`
-	// ContentHash is the document's content_hash_at_submit, seeded deterministically
-	// so the HTTP signoff proof can echo it back (LoadActiveDocumentContentHash =
-	// COALESCE(documents.content_hash_at_submit, latest revision)).
+	// ContentHash is the document's content_hash_at_submit, seeded deterministically.
+	// F6 (no-fallback hash chain): a real HTTP signoff proof driven through the
+	// actual submit→freeze pipeline must echo the approval instance's
+	// frozen_content_hash (fetched from the active-document endpoint after
+	// submit/freeze), NOT this static seed value — signoff no longer reads
+	// documents.content_hash_at_submit at all. This field remains useful only
+	// for proofs that seed a document directly into a pre-submit/draft state
+	// and inspect the active-document endpoint's head-revision-hash branch
+	// before any approval instance exists.
 	ContentHash string `json:"content_hash"`
 }
 
@@ -203,9 +209,12 @@ func (h *seedHandler) seed(w http.ResponseWriter, r *http.Request) {
 
 	// Deterministic, docID-derived content hash. The finalize/submit path computes
 	// its own hash for approval_instances; this value seeds documents.content_hash_at_submit
-	// so the downstream HTTP signoff's LoadActiveDocumentContentHash resolves to a
-	// known 64-hex the proof script can echo back. Format-only (signoff validates
-	// 64-hex + equality, not recomputation from content).
+	// as a pre-submit/draft-state fixture value only. F6 (no-fallback hash chain):
+	// once a real instance is submitted and frozen, signoff/publish read ONLY
+	// approval_instances.frozen_content_hash — a proof script driving the real
+	// submit→freeze→signoff flow must fetch that pin from the active-document
+	// endpoint after submit, not echo this seed value. Format-only (signoff
+	// validates 64-hex + equality, not recomputation from content).
 	sum := sha256.Sum256([]byte("metaldocs-e2e-content:" + docID))
 	contentHash := hex.EncodeToString(sum[:])
 
