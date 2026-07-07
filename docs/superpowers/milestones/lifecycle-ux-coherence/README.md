@@ -9,7 +9,7 @@
 | # | Milestone | Objective | Status |
 |---|---|---|---|
 | M1 | `milestone-1-canonical-submit-backend` | Author submit (REV0 + REV≥1) succeeds on canonical /submit with in-tx server resolution; finalize chain deleted; idempotency map complete (findings 1–5, 16–17) | **PASSED** (HS-1 approved 2026-07-06) |
-| M2 | `milestone-2-fe-surface-ownership` | One submit implementation per artifact kind, author surfaces only; cockpit approver-only (findings 6–8, 13–14) | planned |
+| M2 | `milestone-2-fe-surface-ownership` | One submit implementation per artifact kind, author surfaces only; cockpit approver-only (findings 6–8, 13–14) | **in progress** (2026-07-06) |
 | M3 | `milestone-3-journey-closure` | Deep links close every journey (cockpit↔detail, notifications, fanout CTA); dead FE affordances deleted (findings 9–12, 20) | planned |
 | M4 | `milestone-4-template-inbox` | Template reviews visible in the single approver worklist, contract-first (finding 15) | planned |
 
