@@ -34,6 +34,13 @@ Today this knowledge is split across `wiki/modules/approval.md` §12 (terms only
 
 ### 1. Route lifecycle is a two-state, terminal-on-deactivate machine
 
+> **SUPERSEDED by ADR 0074, 2026-07-07.** "Update is in-place only while `active=true`" (the claim
+> that an in-use route is permanently frozen with no path to ever edit it again) is no longer true.
+> `PUT` on an in-use route now transparently creates a new versioned row and marks the old row
+> superseded, rather than rejecting the edit. The **deactivate** guard below in §3 is unaffected —
+> Deactivate's own UPDATE also bumps `version`, so it never qualifies for ADR 0074's narrow
+> column-scoped trigger exception and remains blocked while any instance references the route.
+
 ```
                   ┌────────────┐                    ┌──────────────┐
    create  ───►   │ active=true│  ── deactivate ──► │ active=false │  (terminal)

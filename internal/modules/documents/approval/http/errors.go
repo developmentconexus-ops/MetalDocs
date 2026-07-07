@@ -78,6 +78,7 @@ const (
 	approvalCodeConflictMarkReviewedStaleRevision  problem.Code = "conflict.mark_reviewed_stale_revision"
 	approvalCodeValidationReviewDueBeforeEffective problem.Code = "validation.review_due_before_effective"
 	approvalCodeValidationEffectiveToNotAfterFrom  problem.Code = "validation.effective_to_not_after_effective_from"
+	approvalCodeValidationEmptyEligiblePool        problem.Code = "validation.empty_eligible_pool"
 )
 
 // ValidationError is a generic request-validation failure mapped to HTTP 400
@@ -232,6 +233,13 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, application.ErrEffectiveToNotAfterEffectiveFrom):
 		statusCode = http.StatusUnprocessableEntity
 		code = approvalCodeValidationEffectiveToNotAfterFrom
+	case errors.Is(err, domain.ErrEmptyEligiblePool):
+		// F2 (W6): a stage whose eligibility resolution yields zero actors is a
+		// business-rule rejection at submit time (422), not a 500 — and this
+		// mapping also closes a pre-existing gap for decision_service.go's
+		// quorum-evaluation path, which returned this sentinel unmapped before.
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeValidationEmptyEligiblePool
 	default:
 		var capabilityDenied authz.ErrCapDenied
 		var syntaxErr *json.SyntaxError

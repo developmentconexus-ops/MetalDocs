@@ -360,6 +360,12 @@ func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "approval_route_stages") {
 		return &stageRows{}, nil // reuse submit_service_test.go's stageRows
 	}
+	// Submit (W6): eligible-actor pool resolution must be non-empty for these
+	// pre-existing fixtures, which never seeded eligibility rows because it
+	// was unenforced before F2.
+	if strings.Contains(q, "user_process_areas") {
+		return &submitSingleValueRows{value: "user-eligible-1"}, nil
+	}
 	// Decision: approval_signoffs SELECT
 	if strings.Contains(q, "approval_signoffs") {
 		if isStageQuery(s.query) {

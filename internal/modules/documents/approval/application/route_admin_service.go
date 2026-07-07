@@ -285,7 +285,8 @@ func (s *RouteAdminService) updateTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
-		if _, err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID); err != nil {
+		locked, err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID)
+		if err != nil {
 			return err
 		}
 
@@ -304,46 +305,20 @@ func (s *RouteAdminService) updateTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
-		var newVersion int
-		err = tx.QueryRowContext(ctx, `
-			UPDATE approval_routes
-			   SET name = $1,
-			       version = version + 1
-			 WHERE id = $2
-			   AND tenant_id = $3
-			   AND ($4 = 0 OR version = $4)
-			RETURNING version`,
-			in.Name, in.RouteID, in.TenantID, in.ExpectedVersion,
-		).Scan(&newVersion)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return infrastructure.ErrStaleRevision
-			}
-			mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
-			if errors.Is(mapped, infrastructure.ErrRouteInUse) {
-				return mapped
-			}
-			return fmt.Errorf("update route: %w", mapped)
+		if in.ExpectedVersion != 0 && locked.Version != in.ExpectedVersion {
+			return infrastructure.ErrStaleRevision
 		}
 
-		if stagesChanged {
-			if _, err := tx.ExecContext(ctx, `
-				DELETE FROM approval_route_stages
-				WHERE route_id = $1`,
-				in.RouteID,
-			); err != nil {
-				return fmt.Errorf("delete stages: %w", err)
-			}
-
-			if err := insertRouteStages(ctx, tx, in.RouteID, in.Stages); err != nil {
-				return err
-			}
+		newRouteID, newVersion, err := s.updateInPlaceOrSupersede(ctx, tx, in, locked, stagesChanged)
+		if err != nil {
+			return err
 		}
 
 		payload, err := json.Marshal(map[string]any{
-			"route_id":    in.RouteID,
+			"route_id":    newRouteID,
 			"new_version": newVersion,
 			"stage_count": len(in.Stages),
+			"superseded":  newRouteID != in.RouteID,
 		})
 		if err != nil {
 			return fmt.Errorf("marshal event payload: %w", err)
@@ -353,20 +328,92 @@ func (s *RouteAdminService) updateTx(ctx context.Context, runner db.TxRunner, in
 			EventType:    EventTypeRouteConfigUpdated,
 			ActorUserID:  in.ActorUserID,
 			ResourceType: "approval_route",
-			ResourceID:   in.RouteID,
+			ResourceID:   newRouteID,
 			PayloadJSON:  payload,
 			OccurredAt:   s.clock.Now(),
 		}); err != nil {
 			return fmt.Errorf("emit event: %w", err)
 		}
 
-		result = UpdateRouteResult{RouteID: in.RouteID, NewVersion: newVersion}
+		result = UpdateRouteResult{RouteID: newRouteID, NewVersion: newVersion}
 		return nil
 	})
 	if err != nil {
 		return UpdateRouteResult{}, err
 	}
 	return result, nil
+}
+
+// updateInPlaceOrSupersede tries the cheap in-place mutation first (matches
+// pre-F2 behavior for a route never referenced by any instance). If the
+// enforce_route_immutable trigger (migration 0287) rejects it with
+// ErrRouteInUse, it falls back to the versioned-supersede path: the current
+// row is retired (active=false, superseded_at=now() — the ONLY columns the
+// trigger still allows to change on an in-use row) and a brand-new row is
+// inserted carrying the incremented version and the new definition. Both
+// branches run inside the caller's single transaction.
+func (s *RouteAdminService) updateInPlaceOrSupersede(ctx context.Context, tx *sql.Tx, in UpdateRouteInput, locked lockedRouteState, stagesChanged bool) (routeID string, newVersion int, err error) {
+	err = tx.QueryRowContext(ctx, `
+		UPDATE approval_routes
+		   SET name = $1,
+		       version = version + 1
+		 WHERE id = $2
+		   AND tenant_id = $3
+		RETURNING version`,
+		in.Name, in.RouteID, in.TenantID,
+	).Scan(&newVersion)
+	if err == nil {
+		if stagesChanged {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM approval_route_stages WHERE route_id = $1`, in.RouteID); err != nil {
+				return "", 0, fmt.Errorf("delete stages: %w", err)
+			}
+			if err := insertRouteStages(ctx, tx, in.RouteID, in.Stages); err != nil {
+				return "", 0, err
+			}
+		}
+		return in.RouteID, newVersion, nil
+	}
+
+	mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
+	if !errors.Is(mapped, infrastructure.ErrRouteInUse) {
+		return "", 0, fmt.Errorf("update route: %w", mapped)
+	}
+
+	// In use: retire the old row (trigger permits an active/superseded_at-only
+	// UPDATE on an in-use row), then insert the new version as a new row. Order
+	// matters — the partial unique index on (tenant_id, profile_code) WHERE
+	// active would reject the new row's INSERT if the old row were still
+	// active at that point.
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE approval_routes
+		   SET active = FALSE,
+		       superseded_at = $1
+		 WHERE id = $2
+		   AND tenant_id = $3`,
+		s.clock.Now(), in.RouteID, in.TenantID,
+	); err != nil {
+		return "", 0, fmt.Errorf("supersede route: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
+	}
+
+	newVersion = locked.Version + 1
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO approval_routes
+			(tenant_id, profile_code, name, version, created_by, active)
+		SELECT tenant_id, profile_code, $1, $2, $3, TRUE
+		  FROM approval_routes
+		 WHERE id = $4
+		RETURNING id`,
+		in.Name, newVersion, in.ActorUserID, in.RouteID,
+	).Scan(&routeID)
+	if err != nil {
+		return "", 0, fmt.Errorf("insert superseding route version: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
+	}
+
+	if err := insertRouteStages(ctx, tx, routeID, in.Stages); err != nil {
+		return "", 0, err
+	}
+
+	return routeID, newVersion, nil
 }
 
 // Deactivate marks a route inactive.
@@ -587,15 +634,21 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages [
 	if len(stages) == 0 {
 		return nil
 	}
-	const colsPerRow = 9
+	const colsPerRow = 11
 	placeholders := make([]string, 0, len(stages))
 	args := make([]any, 0, len(stages)*colsPerRow)
 	for i, st := range stages {
 		base := i*colsPerRow + 1
 		placeholders = append(placeholders, fmt.Sprintf(
-			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
-			base, base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8,
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			base, base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9, base+10,
 		))
+		// stage_kind is NOT NULL DEFAULT 'approval'; an empty domain zero-value
+		// must not clobber the DB default with an empty string (F1 migration 0286).
+		kind := st.Kind
+		if kind == "" {
+			kind = domain.StageKindApproval
+		}
 		args = append(args,
 			routeID,
 			st.Order,
@@ -606,11 +659,13 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages [
 			st.Quorum,
 			st.QuorumM,
 			st.OnEligibilityDrift,
+			string(kind),
+			st.DueInDays,
 		)
 	}
 	query := `
 		INSERT INTO approval_route_stages
-			(route_id, stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift)
+			(route_id, stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift, stage_kind, due_in_days)
 		VALUES ` + strings.Join(placeholders, ",")
 	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 		return fmt.Errorf("route_admin: insert stages: %w", infrastructure.MapPgError(err, infrastructure.MapHints{}))
@@ -620,7 +675,7 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages [
 
 func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domain.Stage, error) {
 	rows, err := tx.QueryContext(ctx, `
-		SELECT stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift
+		SELECT stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift, stage_kind, due_in_days
 		  FROM approval_route_stages
 		 WHERE route_id = $1
 		 ORDER BY stage_order ASC`,
@@ -634,15 +689,22 @@ func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domai
 	var out []domain.Stage
 	for rows.Next() {
 		var (
-			st      domain.Stage
-			quorumM sql.NullInt64
+			st        domain.Stage
+			quorumM   sql.NullInt64
+			kindStr   string
+			dueInDays sql.NullInt64
 		)
-		if err := rows.Scan(&st.Order, &st.Name, &st.RequiredRole, &st.RequiredCapability, &st.AreaCode, &st.Quorum, &quorumM, &st.OnEligibilityDrift); err != nil {
+		if err := rows.Scan(&st.Order, &st.Name, &st.RequiredRole, &st.RequiredCapability, &st.AreaCode, &st.Quorum, &quorumM, &st.OnEligibilityDrift, &kindStr, &dueInDays); err != nil {
 			return nil, fmt.Errorf("route_admin: scan stage: %w", err)
 		}
 		if quorumM.Valid {
 			m := int(quorumM.Int64)
 			st.QuorumM = &m
+		}
+		st.Kind = domain.StageKind(kindStr)
+		if dueInDays.Valid {
+			d := int(dueInDays.Int64)
+			st.DueInDays = &d
 		}
 		out = append(out, st)
 	}
@@ -652,6 +714,22 @@ func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domai
 	return out, nil
 }
 
+// stagesEqual compares stage sets for the update-diff decision. Kind is
+// normalized to its DB default (StageKindApproval) before comparing so a
+// caller that omits Kind (its Go zero value, "") is never spuriously
+// considered "changed" against a stage loaded back from the DB, which always
+// reads a concrete value thanks to the NOT NULL DEFAULT (migration 0286). No
+// other field changed shape, so DeepEqual remains the comparison for those.
 func stagesEqual(a, b []domain.Stage) bool {
-	return reflect.DeepEqual(a, b)
+	norm := func(in []domain.Stage) []domain.Stage {
+		out := make([]domain.Stage, len(in))
+		copy(out, in)
+		for i := range out {
+			if out[i].Kind == "" {
+				out[i].Kind = domain.StageKindApproval
+			}
+		}
+		return out
+	}
+	return reflect.DeepEqual(norm(a), norm(b))
 }

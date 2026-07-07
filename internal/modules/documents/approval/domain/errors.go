@@ -8,3 +8,7 @@ import "errors"
 
 // ErrEmptyEligiblePool is returned when a stage has no eligible actors to evaluate quorum against.
 var ErrEmptyEligiblePool = errors.New("approval: empty eligible pool")
+
+// ErrInvalidStageKind is returned by StageKind.Validate for any value other
+// than StageKindReview or StageKindApproval.
+var ErrInvalidStageKind = errors.New("approval: invalid stage kind")

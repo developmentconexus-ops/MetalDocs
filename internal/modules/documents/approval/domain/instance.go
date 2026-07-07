@@ -52,12 +52,14 @@ type StageInstance struct {
 	QuorumSnapshot             QuorumPolicy
 	QuorumMSnapshot            *int
 	OnEligibilityDriftSnapshot DriftPolicy
+	Kind                       StageKind
 	EligibleActorIDs           []string
 	EffectiveDenominator       *int
 	Status                     StageStatus
 	OpenedAt                   *time.Time
 	CompletedAt                *time.Time
 	SkipReason                 string
+	DueAt                      *time.Time
 	Signoffs                   []*Signoff
 }
 
@@ -75,6 +77,8 @@ type Instance struct {
 	ContentHashAtSubmit  string
 	IdempotencyKey       string
 	RevisionVersion      int
+	FrozenContentHash    *string
+	CancelReason         *string
 	Stages               []StageInstance
 }
 

@@ -335,6 +335,12 @@ func (s *submitTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "approval_route_stages") {
 		return &stageRows{}, nil
 	}
+	if strings.Contains(q, "user_process_areas") {
+		// W6 (F2): submit-time eligible-pool check requires a non-empty
+		// resolution for these pre-existing fixtures, which never seeded
+		// eligibility rows because it was unenforced before this feature.
+		return &submitSingleValueRows{value: "user-eligible-1"}, nil
+	}
 	return submitEmptyRows{}, nil
 }
 

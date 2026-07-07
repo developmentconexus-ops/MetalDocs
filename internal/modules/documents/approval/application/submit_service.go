@@ -205,6 +205,12 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			if err != nil {
 				return fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
 			}
+			if len(eligibleIDs) == 0 {
+				// W6: a stage pool that resolves to zero eligible actors can never be
+				// signed off — fail closed at submit rather than creating a stuck
+				// instance. Shared sentinel with decision_service.go's quorum-eval gap.
+				return domain.ErrEmptyEligiblePool
+			}
 			stageInstances[i] = domain.StageInstance{
 				ID:                         uuid.New().String(),
 				ApprovalInstanceID:         instanceID,

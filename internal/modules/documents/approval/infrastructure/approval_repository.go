@@ -61,6 +61,8 @@ type RouteStage struct {
 	Quorum             string
 	QuorumM            *int
 	DriftPolicy        string
+	Kind               string
+	DueInDays          *int
 }
 
 // ApprovalRepository defines all persistence operations for the approval subsystem.

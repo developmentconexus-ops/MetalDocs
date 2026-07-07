@@ -3438,6 +3438,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '500':
@@ -3959,6 +3961,15 @@ paths:
   /approval/routes/{id}:
     put:
       summary: Update an approval route (new version)
+      description: >-
+        If the target route has never been referenced by an approval instance, the
+        update mutates the same row in place: the response `route_id` equals the path
+        `id` and `new_version` is the incremented version. If the route IS referenced
+        by at least one approval instance (routes are otherwise immutable once used —
+        F2/W1), the update instead creates a new route version as a new row and marks
+        the prior row superseded; the response `route_id` is the NEW row's id, which
+        differs from the path `id`. In-flight instances keep resolving stages from
+        their original (now-superseded) route row, unaffected.
       tags: [approval]
       operationId: updateApprovalRoute
       security:

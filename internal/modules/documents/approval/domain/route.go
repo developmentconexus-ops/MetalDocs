@@ -25,6 +25,30 @@ const (
 	DriftKeepSnapshot DriftPolicy = "keep_snapshot"
 )
 
+// StageKind distinguishes a review stage (comment/feedback, no approve/reject
+// authority) from an approval stage (binding sign-off). F1 (milestone 2b)
+// substrate only — no service wiring; every existing route/instance defaults
+// to StageKindApproval so current behavior is unchanged.
+type StageKind string
+
+// StageKind values understood by Validate. These mirror the DB CHECK
+// constraint added by migration 0286 exactly.
+const (
+	StageKindReview   StageKind = "review"
+	StageKindApproval StageKind = "approval"
+)
+
+// Validate returns ErrInvalidStageKind unless k is exactly StageKindReview or
+// StageKindApproval.
+func (k StageKind) Validate() error {
+	switch k {
+	case StageKindReview, StageKindApproval:
+		return nil
+	default:
+		return ErrInvalidStageKind
+	}
+}
+
 // Stage is a single step in an approval route.
 type Stage struct {
 	Order              int
@@ -35,6 +59,8 @@ type Stage struct {
 	Quorum             QuorumPolicy
 	QuorumM            *int
 	OnEligibilityDrift DriftPolicy
+	Kind               StageKind
+	DueInDays          *int
 }
 
 // Route is the per-profile approval route configuration.

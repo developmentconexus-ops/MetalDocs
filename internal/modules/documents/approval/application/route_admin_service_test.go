@@ -179,7 +179,7 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 	if strings.Contains(lower, "from approval_route_stages") && strings.Contains(lower, "select") {
 		stages := s.conn.stageLoadStages
 		rows := &routeAdminMultiRows{
-			cols:   []string{"stage_order", "name", "required_role", "required_capability", "area_code", "quorum", "quorum_m", "on_eligibility_drift"},
+			cols:   []string{"stage_order", "name", "required_role", "required_capability", "area_code", "quorum", "quorum_m", "on_eligibility_drift", "stage_kind", "due_in_days"},
 			values: make([][]driver.Value, 0, len(stages)),
 		}
 		for _, st := range stages {
@@ -189,7 +189,17 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 			} else {
 				qm = nil
 			}
-			rows.values = append(rows.values, []driver.Value{int64(st.Order), st.Name, st.RequiredRole, st.RequiredCapability, st.AreaCode, string(st.Quorum), qm, string(st.OnEligibilityDrift)})
+			var dueInDays driver.Value
+			if st.DueInDays != nil {
+				dueInDays = int64(*st.DueInDays)
+			} else {
+				dueInDays = nil
+			}
+			kind := st.Kind
+			if kind == "" {
+				kind = domain.StageKindApproval
+			}
+			rows.values = append(rows.values, []driver.Value{int64(st.Order), st.Name, st.RequiredRole, st.RequiredCapability, st.AreaCode, string(st.Quorum), qm, string(st.OnEligibilityDrift), string(kind), dueInDays})
 		}
 		return rows, nil
 	}
@@ -427,9 +437,10 @@ func TestRouteAdminCreate_OtherFKViolation(t *testing.T) {
 
 func TestRouteAdminUpdate_HappyPath(t *testing.T) {
 	conn := &routeAdminConn{
-		authzGranted: true,
-		routeExists:  true,
-		newVersion:   4,
+		authzGranted:       true,
+		routeExists:        true,
+		newVersion:         4,
+		lockedRouteVersion: 3,
 	}
 	db := newRouteAdminTestDB(t, conn)
 
@@ -461,10 +472,15 @@ func TestRouteAdminUpdate_HappyPath(t *testing.T) {
 	}
 }
 
+// TestRouteAdminUpdate_RouteInUse verifies F2's transparent supersede: an
+// in-use route's Update() no longer surfaces ErrRouteInUse to the caller —
+// it creates a new versioned row and supersedes the old one in the same tx.
 func TestRouteAdminUpdate_RouteInUse(t *testing.T) {
 	conn := &routeAdminConn{
-		authzGranted: true,
-		routeExists:  true,
+		authzGranted:       true,
+		routeExists:        true,
+		lockedRouteVersion: 3,
+		createdRouteID:     "route-2",
 		updateErr: &pgconn.PgError{
 			Code:    "P0001",
 			Message: "ErrRouteInUse: route xyz is referenced by one or more approval instances and cannot be modified",
@@ -472,12 +488,13 @@ func TestRouteAdminUpdate_RouteInUse(t *testing.T) {
 	}
 	db := newRouteAdminTestDB(t, conn)
 
+	emitter := &MemoryEmitter{}
 	svc := &RouteAdminService{
-		emitter: &MemoryEmitter{},
+		emitter: emitter,
 		clock:   fixedClock{t: time.Now()},
 	}
 
-	_, err := svc.Update(context.Background(), newTxRunner(db), UpdateRouteInput{
+	out, err := svc.Update(context.Background(), newTxRunner(db), UpdateRouteInput{
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		Name:            "PO Route v2",
@@ -485,8 +502,17 @@ func TestRouteAdminUpdate_RouteInUse(t *testing.T) {
 		ExpectedVersion: 3,
 		Stages:          validRouteStages(),
 	})
-	if !errors.Is(err, infrastructure.ErrRouteInUse) {
-		t.Fatalf("expected ErrRouteInUse; got %v", err)
+	if err != nil {
+		t.Fatalf("Update: unexpected error on in-use supersede: %v", err)
+	}
+	if out.RouteID != "route-2" {
+		t.Errorf("RouteID = %q; want new superseding row id %q", out.RouteID, "route-2")
+	}
+	if out.NewVersion != 4 {
+		t.Errorf("NewVersion = %d; want %d", out.NewVersion, 4)
+	}
+	if len(emitter.Events) != 1 || emitter.Events[0].EventType != "route.config.updated" {
+		t.Errorf("expected 1 route.config.updated event; got %v", emitter.Events)
 	}
 }
 
@@ -883,8 +909,8 @@ func TestRouteAdminCreate_BatchesStageInsert(t *testing.T) {
 	if conn.stageInsertExecCount != 1 {
 		t.Fatalf("stage insert exec count = %d; want 1 (batched)", conn.stageInsertExecCount)
 	}
-	if conn.stageInsertArgCount != 27 {
-		t.Fatalf("stage insert arg count = %d; want 27 (3 stages * 9 cols)", conn.stageInsertArgCount)
+	if conn.stageInsertArgCount != 33 {
+		t.Fatalf("stage insert arg count = %d; want 33 (3 stages * 11 cols)", conn.stageInsertArgCount)
 	}
 }
 

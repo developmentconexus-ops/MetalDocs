@@ -33,6 +33,7 @@ type Signoff struct {
 	signaturePayload         json.RawMessage
 	contentHash              string // always lowercase hex sha-256
 	actorDisplayNameSnapshot string
+	signatureMeaning         string
 }
 
 // Getters — no setters exist; immutable after construction.
@@ -73,6 +74,9 @@ func (s *Signoff) ContentHash() string { return s.contentHash }
 // ActorDisplayNameSnapshot returns the signer's display name as captured at signing time.
 func (s *Signoff) ActorDisplayNameSnapshot() string { return s.actorDisplayNameSnapshot }
 
+// SignatureMeaning returns the meaning of this signature: "approval" or "rejection".
+func (s *Signoff) SignatureMeaning() string { return s.signatureMeaning }
+
 // SignoffParams holds constructor inputs.
 type SignoffParams struct {
 	ID                       string
@@ -87,6 +91,7 @@ type SignoffParams struct {
 	SignaturePayload         json.RawMessage
 	ContentHash              string
 	ActorDisplayNameSnapshot string
+	SignatureMeaning         string
 }
 
 // NewSignoff constructs an immutable Signoff value object.
@@ -120,6 +125,15 @@ func NewSignoff(p SignoffParams) (*Signoff, error) {
 		return nil, errors.New("signoff: ContentHash must be 64 lowercase hex chars (sha-256)")
 	}
 
+	// SignatureMeaning defaults to "approval" (matches the DB column default)
+	// so existing callers that don't set this field keep working unchanged.
+	signatureMeaning := p.SignatureMeaning
+	if signatureMeaning == "" {
+		signatureMeaning = "approval"
+	} else if signatureMeaning != "approval" && signatureMeaning != "rejection" {
+		return nil, errors.New("signoff: SignatureMeaning must be 'approval' or 'rejection'")
+	}
+
 	return &Signoff{
 		id:                       p.ID,
 		approvalInstanceID:       p.ApprovalInstanceID,
@@ -133,6 +147,7 @@ func NewSignoff(p SignoffParams) (*Signoff, error) {
 		signaturePayload:         p.SignaturePayload,
 		contentHash:              hash,
 		actorDisplayNameSnapshot: p.ActorDisplayNameSnapshot,
+		signatureMeaning:         signatureMeaning,
 	}, nil
 }
 
@@ -150,5 +165,6 @@ func (s *Signoff) MarshalJSON() ([]byte, error) {
 		"signature_method":            s.signatureMethod,
 		"content_hash":                s.contentHash,
 		"actor_display_name_snapshot": s.actorDisplayNameSnapshot,
+		"signature_meaning":           s.signatureMeaning,
 	})
 }
