@@ -1,0 +1,137 @@
+.root {
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-5) var(--sp-5) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.count {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.section {
+  padding: var(--sp-4) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  background: var(--surface-2);
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: 0.72rem;
+}
+
+.cardAuthor {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cardType {
+  color: var(--text-muted);
+}
+
+.cardExcerpt {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.cardActions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.actionBtn {
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-2);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.actionBtn:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+.actionBtn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.acceptBtn {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.rejectBtn {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.emptyState {
+  padding: var(--sp-4) var(--sp-5);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.gateNote {
+  padding: var(--sp-3) var(--sp-5);
+  font-size: 0.72rem;
+  color: var(--warning);
+  border-top: 1px solid var(--border);
+}

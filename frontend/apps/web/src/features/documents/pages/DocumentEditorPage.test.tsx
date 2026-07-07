@@ -15,6 +15,12 @@ const mockState = vi.hoisted(() => ({
   autosaveStatus: 'idle',
   commentsLoadError: null as string | null,
   retryCommentsSpy: vi.fn(),
+  acceptChangeSpy: vi.fn(),
+  rejectChangeSpy: vi.fn(),
+  removeCommentMarkSpy: vi.fn(),
+  resolveCommentSpy: vi.fn(),
+  commentsForTest: [] as Array<{ id: number; author: string; body: unknown; resolved: boolean }>,
+  callOrder: [] as string[],
 }));
 
 // ── Mock heavy dependencies ────────────────────────────────────────────────
@@ -23,6 +29,7 @@ vi.mock('@metaldocs/editor-ui', () => ({
   MetalDocsEditor: React.forwardRef((props: Record<string, unknown>, ref) => {
     React.useImperativeHandle(ref, () => ({
       async saveNow() {
+        mockState.callOrder.push('saveNow');
         return mockState.editorSaveNowSpy();
       },
       async getDocumentBuffer() {
@@ -32,6 +39,16 @@ vi.mock('@metaldocs/editor-ui', () => ({
         return 3;
       },
       focus() {},
+      acceptChange(revisionId: string) {
+        mockState.acceptChangeSpy(revisionId);
+      },
+      rejectChange(revisionId: string) {
+        mockState.rejectChangeSpy(revisionId);
+      },
+      removeCommentMark(libraryCommentId: string) {
+        mockState.callOrder.push(`removeCommentMark:${libraryCommentId}`);
+        mockState.removeCommentMarkSpy(libraryCommentId);
+      },
     }));
     return (
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,17 +85,26 @@ vi.mock('../hooks/editor/useDocumentSession', () => ({
 vi.mock('../hooks/editor/useDocumentAutosave', () => ({
   useDocumentAutosave: () => ({
     status: mockState.autosaveStatus,
-    queue: mockState.autosaveQueueSpy,
-    flush: mockState.autosaveFlushSpy,
+    queue: async (...args: unknown[]) => {
+      mockState.callOrder.push('queue');
+      return mockState.autosaveQueueSpy(...args);
+    },
+    flush: async () => {
+      mockState.callOrder.push('flush');
+      return mockState.autosaveFlushSpy();
+    },
   }),
 }));
 
 vi.mock('../hooks/editor/useDocumentComments', () => ({
   useDocumentComments: () => ({
-    comments: [],
+    comments: mockState.commentsForTest,
     setComments: mockState.setCommentsSpy,
     add: mockState.addCommentSpy,
-    resolve: vi.fn().mockResolvedValue(undefined),
+    resolve: async (c: unknown) => {
+      mockState.resolveCommentSpy(c);
+      return undefined;
+    },
     reopen: vi.fn().mockResolvedValue(undefined),
     remove: vi.fn().mockResolvedValue(undefined),
     reply: vi.fn().mockResolvedValue(undefined),
@@ -214,6 +240,12 @@ beforeEach(() => {
   mockState.autosaveStatus = 'idle';
   mockState.commentsLoadError = null;
   mockState.retryCommentsSpy.mockReset();
+  mockState.acceptChangeSpy.mockReset();
+  mockState.rejectChangeSpy.mockReset();
+  mockState.removeCommentMarkSpy.mockReset();
+  mockState.resolveCommentSpy.mockReset();
+  mockState.commentsForTest = [];
+  mockState.callOrder = [];
 });
 
 afterEach(() => {
@@ -734,6 +766,171 @@ describe('DocumentEditorPage load failure state', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
     expect(mockState.retryCommentsSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DocumentEditorPage F6 requested-changes panel (C5)', () => {
+  it('does NOT render the panel for a plain draft (no instance / not changes_requested)', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
+    vi.mocked(api.getApprovalInstance).mockResolvedValue({ status: 'in_progress', stages: [] } as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    expect(screen.queryByText('Mudanças solicitadas')).toBeNull();
+  });
+
+  it('does NOT render the panel for under_review (instance not changes_requested)', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('under_review') as never);
+    vi.mocked(api.getApprovalInstance).mockResolvedValue({ status: 'in_progress', stages: [] } as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
+    );
+
+    expect(screen.queryByText('Mudanças solicitadas')).toBeNull();
+  });
+
+  it('enables the instance query for a draft document (broadened detection gate)', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
+    vi.mocked(api.getApprovalInstance).mockResolvedValue({ status: 'changes_requested', stages: [] } as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(vi.mocked(api.getApprovalInstance)).toHaveBeenCalledWith('d1'),
+    );
+  });
+
+  it('renders the panel when instance.status === changes_requested for a draft', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
+    vi.mocked(api.getApprovalInstance).mockResolvedValue({ status: 'changes_requested', stages: [] } as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Mudanças solicitadas')).toBeTruthy(),
+    );
+  });
+
+  it('disables re-submit while tracked changes remain, and enables it when clean', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      revision_number: 1,
+      revision_version: 1,
+    }) as never);
+    vi.mocked(api.getApprovalInstance).mockResolvedValue({ status: 'changes_requested', stages: [] } as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Mudanças solicitadas')).toBeTruthy(),
+    );
+
+    const props = mockState.editorProps.at(-1) as {
+      onTrackedChangesChange?: (changes: Array<{ revisionId: string; author: string; type: string; excerpt: string }>) => void;
+    };
+
+    act(() => {
+      props.onTrackedChangesChange?.([
+        { revisionId: 'rev-1', author: 'Autor', type: 'insertion', excerpt: 'texto' },
+      ]);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Submeter para revis/i }).hasAttribute('disabled')).toBe(true),
+    );
+
+    act(() => {
+      props.onTrackedChangesChange?.([]);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Submeter para revis/i }).hasAttribute('disabled')).toBe(false),
+    );
+  });
+
+  it('disables re-submit while unresolved comments remain', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      revision_number: 1,
+      revision_version: 1,
+    }) as never);
+    vi.mocked(api.getApprovalInstance).mockResolvedValue({ status: 'changes_requested', stages: [] } as never);
+    mockState.commentsForTest = [{ id: 1, author: 'Rev', body: [], resolved: false }];
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Mudanças solicitadas')).toBeTruthy(),
+    );
+
+    expect(screen.getByRole('button', { name: /Submeter para revis/i }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('calls removeCommentMark per resolved comment, then flush, then submitForReviewRequest in order', async () => {
+    const onDone = vi.fn();
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      revision_number: 0,
+      revision_version: 1,
+    }) as never);
+    vi.mocked(api.getApprovalInstance).mockResolvedValue({ status: 'changes_requested', stages: [] } as never);
+    mockState.commentsForTest = [
+      { id: 11, author: 'Rev', body: [], resolved: true },
+      { id: 12, author: 'Rev2', body: [], resolved: true },
+    ];
+    vi.mocked(approvalApi.submit).mockImplementation(async () => {
+      mockState.callOrder.push('submit');
+      return undefined as never;
+    });
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={onDone} />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Mudanças solicitadas')).toBeTruthy(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
+
+    await waitFor(() => expect(vi.mocked(approvalApi.submit)).toHaveBeenCalled());
+
+    expect(mockState.removeCommentMarkSpy).toHaveBeenCalledWith('11');
+    expect(mockState.removeCommentMarkSpy).toHaveBeenCalledWith('12');
+
+    const removeIdx1 = mockState.callOrder.indexOf('removeCommentMark:11');
+    const removeIdx2 = mockState.callOrder.indexOf('removeCommentMark:12');
+    const flushIdx = mockState.callOrder.indexOf('flush');
+    const submitIdx = mockState.callOrder.indexOf('submit');
+
+    expect(removeIdx1).toBeGreaterThanOrEqual(0);
+    expect(removeIdx2).toBeGreaterThanOrEqual(0);
+    expect(flushIdx).toBeGreaterThan(removeIdx1);
+    expect(flushIdx).toBeGreaterThan(removeIdx2);
+    expect(submitIdx).toBeGreaterThan(flushIdx);
+  });
+
+  it('a plain draft whose instance lookup 404s shows no panel and no error surface', async () => {
+    // The broadened detection gate fires getApprovalInstance for any draft. A
+    // never-submitted draft has no instance -> the lookup rejects. It must fail
+    // closed: no panel, no error banner/alert, editor still editable.
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
+    vi.mocked(api.getApprovalInstance).mockRejectedValue({ code: 'not_found.instance_not_visible' } as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    expect(vi.mocked(api.getApprovalInstance)).toHaveBeenCalledWith('d1');
+    expect(screen.queryByText('Mudanças solicitadas')).toBeNull();
+    // No approval-instance error must leak into the page as an alert.
+    expect(
+      screen.queryByText(/permiss|indispon|erro ao carregar aprova/i),
+    ).toBeNull();
   });
 });
 

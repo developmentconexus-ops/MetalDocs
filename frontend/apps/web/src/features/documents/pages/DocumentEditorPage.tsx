@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MetalDocsEditorRef } from '@metaldocs/editor-ui';
-import type { EditorComment } from '@metaldocs/editor-ui';
+import type { EditorComment, TrackedChange } from '@metaldocs/editor-ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ApiError, resolveErrorMessage } from '../../../lib/api';
@@ -28,6 +28,7 @@ import {
   type AutosaveState,
 } from '../../shared/components/editor-chrome';
 import { DocumentShell } from '../components/DocumentShell';
+import { RequestedChangesPanel } from '../components/RequestedChangesPanel';
 import { CodeChip, StatusPill } from '../../../components/ui';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { useAreasQuery } from '../queries/useAreasQuery';
@@ -69,6 +70,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const [editorDirty, setEditorDirty] = useState(false);
   const [submitStatusOverride, setSubmitStatusOverride] = useState<'under_review' | null>(null);
   const [artifactMetadata, setArtifactMetadata] = useState<ArtifactMetadata>({});
+  const [trackedChanges, setTrackedChanges] = useState<TrackedChange[]>([]);
   const editorRef = useRef<MetalDocsEditorRef>(null);
   const skipInitialEditorChangeRef = useRef(false);
   const baseDoc = (docQuery.data as EditorDocumentDetail | undefined) ?? null;
@@ -236,7 +238,23 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      if (editorDirty) {
+      // Clean-buffer re-submit sequence (F6/C5): strip the visual marks of
+      // already-resolved comments BEFORE the flush below persists the buffer,
+      // so the re-submitted revision doesn't carry stale comment marks. Order
+      // matters: removeCommentMark (per resolved comment) -> saveNow/queue/
+      // flush -> submitForReviewRequest. removeCommentMark mutates the buffer
+      // without flipping editorDirty, so force the flush path whenever
+      // changesRequested even if editorDirty is otherwise false.
+      let resolvedAnyMark = false;
+      if (changesRequested) {
+        for (const comment of commentsHook.comments) {
+          if (comment.resolved) {
+            editorRef.current?.removeCommentMark(String(comment.id));
+            resolvedAnyMark = true;
+          }
+        }
+      }
+      if (editorDirty || resolvedAnyMark) {
         const latestBuf = await editorRef.current?.saveNow();
         if (latestBuf) {
           const pageCount = editorRef.current?.getPageCount() ?? null;
@@ -360,11 +378,19 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     void submitForReview(body);
   }
 
+  // Broadened detection gate (F6/C5): a `request_changes` verdict reverts the
+  // document to `draft` in-tx (review_verdict_service.go:340-347), so the
+  // instance query must also fire for `draft` — otherwise the author never
+  // sees the `changes_requested` instance that prompted the reopen. A plain
+  // never-submitted draft has no instance; the query resolves to undefined
+  // gracefully (no panel, no error) rather than throwing.
   const approvalInstanceQuery = useQuery({
     queryKey: QK.approval.instance(documentID),
     queryFn: () => getApprovalInstance(documentID),
-    enabled: documentID.length > 0 && docStatus === 'under_review',
+    enabled: documentID.length > 0 && (docStatus === 'under_review' || docStatus === 'draft'),
+    retry: false,
   });
+  const changesRequested = approvalInstanceQuery.data?.status === 'changes_requested';
   const canEditContent = session.state.phase === 'writer' && docStatus === 'draft';
   const canComment = Boolean(doc) && (docStatus === 'draft' || docStatus === 'under_review');
   const docCode = doc?.code ?? '';
@@ -374,6 +400,11 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const authorDisplay = String(userID);
   const commentsHook = useDocumentComments(documentID, authorDisplay);
   const canUseComments = canComment && !commentsHook.loadError;
+  const unresolvedComments = commentsHook.comments.filter((c) => !c.resolved);
+  const hasUnresolvedTrackedChanges = trackedChanges.length > 0;
+  const hasUnresolvedComments = unresolvedComments.length > 0;
+  const requestedChangesBlocksSubmit = changesRequested
+    && (hasUnresolvedTrackedChanges || hasUnresolvedComments);
   const canMountEditor = !!doc
     && (docStatus === 'draft'
       ? session.state.phase !== 'idle' && session.state.phase !== 'acquiring'
@@ -454,6 +485,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
               onAutoSave={handleSave}
               onChange={handleEditorChange}
               onDocumentNameChange={handleRename}
+              onTrackedChangesChange={setTrackedChanges}
               chrome={{
                 center: (
                   <>
@@ -470,7 +502,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                       type="button"
                       className={editorChromeStyles.primaryBtn}
                       onClick={handleSubmitForReview}
-                      disabled={!canEditContent || isSubmitting}
+                      disabled={!canEditContent || isSubmitting || requestedChangesBlocksSubmit}
                     >
                       Submeter para revisão
                     </button>
@@ -548,6 +580,15 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
             lineage={lineage}
             ariaLabel="Identificação do documento"
             loadingLabel="Carregando metadados do documento"
+          />
+        ) : null}
+        {!pageLoadError && changesRequested ? (
+          <RequestedChangesPanel
+            trackedChanges={trackedChanges}
+            comments={commentsHook.comments}
+            onAcceptChange={(revisionId) => editorRef.current?.acceptChange(revisionId)}
+            onRejectChange={(revisionId) => editorRef.current?.rejectChange(revisionId)}
+            onResolveComment={(comment) => void commentsHook.resolve(comment)}
           />
         ) : null}
         {revisionTitleDialogOpen ? (
