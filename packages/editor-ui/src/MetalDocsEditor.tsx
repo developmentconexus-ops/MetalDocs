@@ -2,7 +2,18 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'rea
 import { DocxEditor, createEmptyDocument, type DocxEditorRef } from '@eigenpal/docx-editor-react';
 import { PluginHost, templatePlugin, type EditorPlugin } from '@eigenpal/docx-editor-react/plugin-api';
 import '@eigenpal/docx-editor-react/styles.css';
-import type { MetalDocsEditorProps, MetalDocsEditorRef } from './types';
+// Track-change resolution lives in the core PM layer, not the react shell. These
+// imports stay INTERNAL to the adapter — the ACL wall is the public surface
+// (types.ts / index.ts), which never re-exports a vendor or prosemirror type.
+import { extractTrackedChanges } from '@eigenpal/docx-editor-core/prosemirror/utils/extractTrackedChanges';
+import {
+  acceptChangeById,
+  rejectChangeById,
+  acceptAllChanges as vendorAcceptAllChanges,
+  rejectAllChanges as vendorRejectAllChanges,
+  removeCommentMark as vendorRemoveCommentMark,
+} from '@eigenpal/docx-editor-core/prosemirror/commands';
+import type { MetalDocsEditorProps, MetalDocsEditorRef, TrackedChange } from './types';
 import { filterTransactionGuard } from './plugins/filter-transaction-guard';
 import { toEigenpalComment, fromEigenpalComment } from './comment-mapping';
 import { detectTokens, type DetectedToken } from '@metaldocs/shared-tokens';
@@ -39,6 +50,7 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
   function MetalDocsEditor(props, ref) {
     const inner = useRef<DocxEditorRef>(null);
     const onAutoSaveRef = useRef(props.onAutoSave);
+    const onTrackedChangesChangeRef = useRef(props.onTrackedChangesChange);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const inFlightRef = useRef(false);
     const rootRef = useRef<HTMLDivElement>(null);
@@ -49,6 +61,45 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
     const lastFocusedPmRef = useRef<HTMLElement | null>(null);
 
     onAutoSaveRef.current = props.onAutoSave;
+    onTrackedChangesChangeRef.current = props.onTrackedChangesChange;
+
+    // Body view only — header/footer bands are out of scope for tracked changes.
+    const getBodyView = () => inner.current?.getEditorRef()?.getView() ?? null;
+
+    const readTrackedChanges = (): TrackedChange[] => {
+      const view = getBodyView();
+      if (!view) return [];
+      return extractTrackedChanges(view.state).entries.map((e) => ({
+        revisionId: String(e.revisionId),
+        author: e.author,
+        type: e.type,
+        excerpt: e.text,
+      }));
+    };
+
+    // A replacement is two vendor ids (deletion half `revisionId` + insertion
+    // half `insertionRevisionId`) plus any coalesced sites sharing the same
+    // conceptual change. Resolving only the id passed in would leave the other
+    // half dangling — an integrity violation — so every site is resolved together.
+    // Invariant: the id passed here is always a primary entry-level `revisionId`
+    // (that is the only id `readTrackedChanges` ever surfaces to callers), so the
+    // lookup matches on `entry.revisionId`; it never needs to match a sub-id.
+    const resolveIds = (revisionId: string): number[] => {
+      const view = getBodyView();
+      const numericId = Number(revisionId);
+      const entry = view
+        ? extractTrackedChanges(view.state).entries.find((e) => e.revisionId === numericId)
+        : undefined;
+      if (!entry) return [numericId];
+      const ids = [entry.revisionId, entry.insertionRevisionId, ...(entry.coalescedRevisionIds ?? [])].filter(
+        (id): id is number => typeof id === 'number',
+      );
+      return Array.from(new Set(ids));
+    };
+
+    const notifyTrackedChanges = () => {
+      onTrackedChangesChangeRef.current?.(readTrackedChanges());
+    };
 
     useImperativeHandle(ref, () => {
       // getDocumentBuffer and saveNow are the same operation under two names the
@@ -107,6 +158,41 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
             .filter((d) => d.valid)
             .map((d) => d.name);
         },
+        getTrackedChanges: () => readTrackedChanges(),
+        acceptChange(revisionId: string) {
+          const view = getBodyView();
+          if (!view) return;
+          for (const id of resolveIds(revisionId)) {
+            acceptChangeById(id)(view.state, view.dispatch);
+          }
+          notifyTrackedChanges();
+        },
+        rejectChange(revisionId: string) {
+          const view = getBodyView();
+          if (!view) return;
+          for (const id of resolveIds(revisionId)) {
+            rejectChangeById(id)(view.state, view.dispatch);
+          }
+          notifyTrackedChanges();
+        },
+        acceptAllChanges() {
+          const view = getBodyView();
+          if (!view) return;
+          vendorAcceptAllChanges()(view.state, view.dispatch);
+          notifyTrackedChanges();
+        },
+        rejectAllChanges() {
+          const view = getBodyView();
+          if (!view) return;
+          vendorRejectAllChanges()(view.state, view.dispatch);
+          notifyTrackedChanges();
+        },
+        removeCommentMark(libraryCommentId: string) {
+          const view = getBodyView();
+          if (!view) return;
+          vendorRemoveCommentMark(Number(libraryCommentId))(view.state, view.dispatch);
+          notifyTrackedChanges();
+        },
       };
     }, []);
 
@@ -131,6 +217,7 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
       // refresh derived state (e.g. token usage) and must not be silently coupled
       // to an onAutoSave callback being present.
       props.onChange?.();
+      notifyTrackedChanges();
       if (!onAutoSaveRef.current) return;
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(async () => {

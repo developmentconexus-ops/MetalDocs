@@ -296,6 +296,10 @@ The vendor `onChange` fires for the **body view only** — header/footer ProseMi
 
 Token substitution at publish covers native header/footer tokens, not just body tokens: `apps/docx-renderer/src/render/fanout.ts` runs docxtemplater over the whole package, so header/footer `{name}` strings substitute at freeze. Proven by `apps/docx-renderer/src/render/__tests__/fanout.headerfooter.test.ts`.
 
+#### Tracked-change + comment-mark ref API (review UX)
+
+`MetalDocsEditorRef` exposes a neutral tracked-change surface for the approval review screen: `getTrackedChanges(): TrackedChange[]`, `acceptChange(revisionId)`, `rejectChange(revisionId)`, `acceptAllChanges()`, `rejectAllChanges()`, `removeCommentMark(libraryCommentId)`, plus the `onTrackedChangesChange` prop (fires on edit/accept/reject). `TrackedChange` (`revisionId: string`, `author`, `type: TrackedChangeType`, `excerpt`) is a MetalDocs-owned shape; `TrackedChangeType` is a locally-declared literal union (NOT imported from `@eigenpal`) so the ACL barrel stays vendor-sealed (§12.1). Internally `MetalDocsEditor.tsx` maps the vendor `TrackedChangeEntry` and dispatches `@eigenpal/docx-editor-core/prosemirror/commands`. **Body view only** — header/footer bands are out of scope for tracked changes (same body-only scoping precedent as the `templatePlugin` coloring in §12.5; approval review content is body content). A `replacement`/coalesced change is resolved by ALL its vendor ids at once (`revisionId` + `insertionRevisionId` + `coalescedRevisionIds`) so one accept/reject never leaves a half-resolved change — asserted by `src/trackChanges.test.tsx`.
+
 ### 8.5 Logging & Observability
 
 The wrapper emits no logs and no metrics. Eigenpal handles its own console output. Parent pages own status surfacing through `AutosaveStatus` in the `EditorChrome` right slot.
