@@ -454,7 +454,7 @@ func TestNoRoleStringInDelivery_IgnoresNonDelivery(t *testing.T) {
 // drop, or a multi-row VALUES rewrite that the single-row regex cannot parse all
 // change this count and fail loudly — protecting seed-registry-parity, which
 // silently under-counts if the regex stops matching a row.
-const expectedRoleCapabilityRows = 108 // +3: system_admin → tenant.onboard/tenant.export/tenant.erase (M7 F7.2/F7.3, ADR 0070)
+const expectedRoleCapabilityRows = 115 // +7: M2b F3 approval.review (approver/area_admin/qms_admin/signer/system_admin) + approval.oversee (qms_admin/system_admin)
 
 func TestSeedRowCount_GoldenMatchesParser(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)

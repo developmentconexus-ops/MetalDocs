@@ -114,6 +114,8 @@ var capabilityDescriptions = map[Capability]string{
 	CapDocumentObsolete:            "Tornar documento obsoleto",
 	CapDocumentSupersede:           "Tornar documento obsoleto/sucessor",
 	CapDocumentReview:              "Registrar revisão periódica de documento publicado",
+	CapApprovalReview:              "Atuar em etapa de revisão de aprovação (sugestões/parecer)",
+	CapApprovalOversee:             "Supervisionar qualquer instância de aprovação no tenant",
 	CapTemplateView:                "Visualizar templates",
 	CapTemplateCreate:              "Criar templates",
 	CapTemplateEdit:                "Editar templates",

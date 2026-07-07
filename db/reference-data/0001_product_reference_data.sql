@@ -213,6 +213,18 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 -- system_admin accesses via tier-2 bypass (not seeded explicitly).
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.manage', 'Edit approval config of published templates') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
+-- M2b F3 (approval-kernel-backend): approval.review mirrors the existing
+-- document.signoff pool (same real actors who act on an approval stage);
+-- approval.oversee (tenant-grade read oversight) goes to qms_admin, the
+-- closest existing role to the design's "quality-manager profile".
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'approval.review', 'Act on a review-kind approval stage (suggestions/parecer)') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'approval.review', 'Act on a review-kind approval stage (suggestions/parecer)') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'approval.review', 'Act on a review-kind approval stage (suggestions/parecer)') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('signer', 'approval.review', 'Act on a review-kind approval stage (suggestions/parecer)') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'approval.review', 'Act on a review-kind approval stage (suggestions/parecer)') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'approval.oversee', 'Oversee any approval instance in the tenant (worklist, cockpit observer mode)') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'approval.oversee', 'Oversee any approval instance in the tenant (worklist, cockpit observer mode)') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+
 -- ADR 0022 Phase 10 (F2): the four redundant phantom caps Phase 8 seeded here
 -- (doc.edit_draft / doc.reconstruct / workflow.instance.cancel / doc.view_published)
 -- were merged into the canonical document.edit / document.view caps — identical

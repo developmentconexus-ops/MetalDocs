@@ -61,9 +61,13 @@ func (s *ReadService) LoadInstance(ctx context.Context, runner db.TxRunner, tena
 		ctx := authz.WithCapCache(ctx)
 		// CapDocumentView is tenant-grade (iam/domain/capability_scope.go:51); pass the
 		// "tenant" sentinel so the area filter is intentionally OFF — mirrors the
-		// canonical documents/application/view_service.go:71.
-		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
-			return err
+		// canonical documents/application/view_service.go:71. CapApprovalOversee
+		// (M2b F3) is an explicit alternative — oversight is its own capability,
+		// never a role check (ADR 0022).
+		if viewErr := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); viewErr != nil {
+			if overseeErr := authz.Require(ctx, tx, string(iamdomain.CapApprovalOversee), "tenant"); overseeErr != nil {
+				return viewErr
+			}
 		}
 
 		loaded, err := s.repo.LoadInstance(ctx, tx, tenantID, instanceID)
@@ -94,9 +98,13 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, runner d
 		// CapDocumentView is tenant-grade (iam/domain/capability_scope.go:51); pass the
 		// "tenant" sentinel so the area filter is intentionally OFF — mirrors the
 		// canonical documents/application/view_service.go:71. A missing instance is
-		// surfaced as ErrNoActiveInstance by the repo lookup below.
-		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
-			return err
+		// surfaced as ErrNoActiveInstance by the repo lookup below. CapApprovalOversee
+		// (M2b F3) is an explicit alternative — oversight is its own capability, never
+		// a role check (ADR 0022).
+		if viewErr := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); viewErr != nil {
+			if overseeErr := authz.Require(ctx, tx, string(iamdomain.CapApprovalOversee), "tenant"); overseeErr != nil {
+				return viewErr
+			}
 		}
 
 		loaded, err := s.repo.LoadActiveInstanceByDocument(ctx, tx, tenantID, documentID)

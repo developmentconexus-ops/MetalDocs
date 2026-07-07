@@ -122,8 +122,13 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "iam area memberships create", method: http.MethodPost, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam area memberships delete", method: http.MethodDelete, path: "/api/v1/iam/area-memberships/u-1/quality", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "signed download", method: http.MethodGet, path: "/api/v1/signed", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "approval get", method: http.MethodGet, path: "/api/v1/approval/instances/a-1", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "approval post", method: http.MethodPost, path: "/api/v1/approval/instances/a-1/decisions", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "approval get instance", method: http.MethodGet, path: "/api/v1/approval/instances/a-1", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		// M2b F3 (P1): generic /api/v1/approval/ prefix fallback deleted; these are
+		// the real runtime routes (verified against internal/modules/documents/approval/http/router.go),
+		// each now explicit and matching its real tier-2 capability.
+		{name: "approval signoff", method: http.MethodPost, path: "/api/v1/approval/instances/a-1/stages/s-1/signoffs", wantCap: iamdomain.CapDocumentSignoff, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "approval cancel", method: http.MethodPost, path: "/api/v1/approval/instances/a-1/cancel", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "approval inbox", method: http.MethodGet, path: "/api/v1/approval/inbox", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		// ADR 0022 Phase 11 (F4): approval-route CRUD gates on CapRouteManage at
 		// tier-1, matching its tier-2 authz.Require(CapRouteManage). These rows MUST
 		// precede the generic /api/v1/approval/ block, so they resolve to route.manage
@@ -300,11 +305,15 @@ func TestRouteCoverage(t *testing.T) {
 		{"templates", http.MethodPost, "/api/v1/templates/t1/archive"},
 		{"templates", http.MethodGet, "/api/v1/signed"},
 
-		// approvalHandler.RegisterRoutes (main.go:396)
+		// approvalHandler.RegisterRoutes (main.go:753) — verified against the real
+		// router at internal/modules/documents/approval/http/router.go (M2b F3): no
+		// PUT/DELETE on /instances/{id} and no /decisions path exist; the prior
+		// entries here were stale, only ever exercised via the now-deleted generic
+		// /api/v1/approval/ prefix fallback.
 		{"approval", http.MethodGet, "/api/v1/approval/instances/a-1"},
-		{"approval", http.MethodPost, "/api/v1/approval/instances/a-1/decisions"},
-		{"approval", http.MethodPut, "/api/v1/approval/instances/a-1"},
-		{"approval", http.MethodDelete, "/api/v1/approval/instances/a-1"},
+		{"approval", http.MethodPost, "/api/v1/approval/instances/a-1/stages/s-1/signoffs"},
+		{"approval", http.MethodPost, "/api/v1/approval/instances/a-1/cancel"},
+		{"approval", http.MethodGet, "/api/v1/approval/inbox"},
 
 		// mux.Handle (main.go:447)
 		{"metrics", http.MethodGet, "/api/v1/metrics"},

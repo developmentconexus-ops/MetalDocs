@@ -88,6 +88,17 @@ const (
 	// tripwire arm. ADR 0069.
 	CapDocumentReview Capability = "document.review"
 
+	// CapApprovalReview gates acting on a review-kind approval stage where the
+	// actor is in the stage pool (verdicts, suggesting-mode session; M2b F3/F4).
+	// NOT CapDocumentReview — that gates the unrelated eQMS periodic-review
+	// mark-reviewed workflow (ADR 0069). Area-grade.
+	CapApprovalReview Capability = "approval.review"
+	// CapApprovalOversee gates read-only oversight of ANY approval instance in
+	// the tenant (worklist "all", cockpit observer mode, cancel with reason;
+	// M2b F3/F8). Tenant-grade — oversight is a capability, never a role
+	// (ADR 0022).
+	CapApprovalOversee Capability = "approval.oversee"
+
 	CapTemplateView    Capability = "template.view"
 	CapTemplateCreate  Capability = "template.create"
 	CapTemplateEdit    Capability = "template.edit"
@@ -158,6 +169,8 @@ var validCapabilities = map[Capability]struct{}{
 	CapDocumentObsolete:            {},
 	CapDocumentSupersede:           {},
 	CapDocumentReview:              {},
+	CapApprovalReview:              {},
+	CapApprovalOversee:             {},
 	CapTemplateView:                {},
 	CapTemplateCreate:              {},
 	CapTemplateEdit:                {},

@@ -246,11 +246,16 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathPrefix: "/api/v1/approval/routes", capability: iamdomain.CapRouteManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/approval/routes", capability: iamdomain.CapRouteManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// Approval (legacy mount).
-	{method: http.MethodGet, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPost, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPut, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodDelete, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// Approval runtime verbs (M2b F3, P1): the generic /api/v1/approval/ prefix
+	// fallback is deleted (it silently mapped stage-signoff and instance-cancel
+	// to CapDocumentSubmit, diverging from their real tier-2 capability — a
+	// cross-tier mismatch of the same class BE-9 already fixed for route-admin).
+	// Every runtime verb under this prefix now has its own explicit row matching
+	// its tier-2 authz.Require call.
+	{method: http.MethodPost, pathPrefix: "/api/v1/approval/instances/", pathSuffix: "/signoffs", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/approval/instances/", pathSuffix: "/cancel", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/approval/instances/", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/approval/inbox", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Notifications — self-scoped read surface (M3/F3.2, F3.4). CapNotificationRead at tier-1
 	// (mirrors CapAuditRead). Most specific first: read-all (exact) and unread-count (exact)

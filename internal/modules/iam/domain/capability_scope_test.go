@@ -45,6 +45,8 @@ func TestAreaGradeCapabilitySet(t *testing.T) {
 		// ADR 0022 Phase 10 (F2): the phantom area-grade caps doc.edit_draft /
 		// doc.reconstruct / workflow.instance.cancel were merged into the canonical
 		// CapDocumentEdit (already in this set) — area-grade set 14 → 11.
+		// M2b F3: approval.review acts on a stage in a specific process area — 11 → 12.
+		CapApprovalReview: {},
 	}
 	for cap := range validCapabilities {
 		_, want := wantArea[cap]
