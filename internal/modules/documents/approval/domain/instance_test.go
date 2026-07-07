@@ -18,6 +18,22 @@ func threeStageInstance() Instance {
 	}
 }
 
+// TestStageInstanceDueInDaysSnapshotRoundTrip pins the struct-level contract
+// for F8's new field before any repository/service wiring exists (TDD
+// formality per plan.md Task 2 — no behavior yet, just the field shape).
+func TestStageInstanceDueInDaysSnapshotRoundTrip(t *testing.T) {
+	three := 3
+	s := StageInstance{ID: "s1", DueInDaysSnapshot: &three}
+	if s.DueInDaysSnapshot == nil || *s.DueInDaysSnapshot != 3 {
+		t.Fatalf("DueInDaysSnapshot = %v, want pointer to 3", s.DueInDaysSnapshot)
+	}
+
+	var nilSnap StageInstance
+	if nilSnap.DueInDaysSnapshot != nil {
+		t.Fatalf("zero-value StageInstance.DueInDaysSnapshot = %v, want nil", nilSnap.DueInDaysSnapshot)
+	}
+}
+
 func TestInstanceActive(t *testing.T) {
 	inst := threeStageInstance()
 	a := inst.Active()

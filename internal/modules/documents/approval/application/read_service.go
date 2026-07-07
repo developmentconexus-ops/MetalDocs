@@ -28,6 +28,34 @@ type InboxView struct {
 	SubmittedAt          time.Time
 	StageLabel           string
 	QuorumProgress       string // e.g. "1/2"
+	// StageKind (F8, spec.md §4/W4) is the pending/active stage's kind
+	// (review or approval), sourced from the stage's own snapshot column —
+	// never re-derived from route config, so an in-flight instance's worklist
+	// row stays pinned to what the stage started with (mirrors every other
+	// *_snapshot field, e.g. NameSnapshot/AreaCodeSnapshot).
+	StageKind domain.StageKind
+	// DueAt (F8, spec.md §4/W4) is the stage's SLA due date, NULL when no SLA
+	// is configured for the stage (no-fallback principle, spec §11) — never
+	// substituted with a computed/default value.
+	DueAt *time.Time
+}
+
+// InboxFilter (F8, spec.md §4/W4, §6.3 P2/P3/P8) narrows the worklist beyond
+// the base tenant+actor+area scope already on ListInboxItemsWithTotal.
+// Zero value = no additional filtering (every field optional).
+type InboxFilter struct {
+	// StageKind, when non-empty, restricts to stages of this kind only.
+	StageKind domain.StageKind
+	// DueBefore, when non-nil, restricts to stages whose due_at is non-null
+	// AND <= this timestamp. A stage with a NULL due_at (no SLA configured)
+	// never matches a DueBefore filter — no-fallback principle, spec §11.
+	DueBefore *time.Time
+	// Oversee, when true, lists ALL in-progress instances in the tenant (not
+	// just the actor's own eligible-pool items) and REQUIRES the caller
+	// already hold CapApprovalOversee — enforced by the caller (ListWorklist)
+	// via authz.Require before this filter is applied, never trusted as a
+	// client-asserted bypass.
+	Oversee bool
 }
 
 // ReadService exposes read-only operations for approval HTTP handlers.
@@ -50,7 +78,7 @@ func newReadService(repo infrastructure.ApprovalRepository, cdRead controlleddoc
 func (s *ReadService) LoadInstance(ctx context.Context, runner db.TxRunner, tenantID, instanceID string) (*domain.Instance, error) {
 	var inst *domain.Instance
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
-		_, found, err := loadInstanceAreaCode(ctx, tx, s.cdRead, tenantID, instanceID)
+		areaCode, found, err := loadInstanceAreaCode(ctx, tx, s.cdRead, tenantID, instanceID)
 		if err != nil {
 			return fmt.Errorf("read load instance: load area: %w", err)
 		}
@@ -79,6 +107,10 @@ func (s *ReadService) LoadInstance(ctx context.Context, runner db.TxRunner, tena
 		}
 		if loaded == nil {
 			return infrastructure.ErrNoActiveInstance
+		}
+
+		if err := requireInstanceVisible(ctx, tx, loaded, areaCode); err != nil {
+			return err
 		}
 
 		inst = loaded
@@ -116,6 +148,18 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, runner d
 		}
 		if loaded == nil {
 			return infrastructure.ErrNoActiveInstance
+		}
+
+		areaCode, found, err := loadInstanceAreaCode(ctx, tx, s.cdRead, tenantID, loaded.ID)
+		if err != nil {
+			return fmt.Errorf("read load active instance by document: load area: %w", err)
+		}
+		if !found {
+			return infrastructure.ErrNoActiveInstance
+		}
+
+		if err := requireInstanceVisible(ctx, tx, loaded, areaCode); err != nil {
+			return err
 		}
 
 		inst = loaded
@@ -345,6 +389,210 @@ func (s *ReadService) listInboxItems(ctx context.Context, runner db.TxRunner, te
 	return items, total, nil
 }
 
+// ListWorklist (F8, spec.md §4/W4, §6.3 P2/P3/P8) is the filtered worklist
+// listing: adds stage_kind / due_before / scope=oversee on top of the base
+// ListInboxItemsWithTotal contract, in its own method (rather than widening
+// ListInboxItemsWithTotal's positional signature) to avoid breaking the 5
+// existing call sites/fakes pinned to that signature. Like the other read
+// paths, filtering is enforced at THIS query/repository layer — never
+// client-side — so a caller cannot see oversight-scope rows without actually
+// holding CapApprovalOversee, and a stage without an SLA never satisfies a
+// DueBefore filter (no-fallback principle, spec §11).
+func (s *ReadService) ListWorklist(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, filter InboxFilter, limit, offset int) ([]InboxView, int, error) {
+	limit = pagination.ClampLimit(limit)
+	if offset < 0 {
+		offset = 0
+	}
+
+	actorJSON, err := json.Marshal([]string{actorID})
+	if err != nil {
+		return nil, 0, fmt.Errorf("list worklist: marshal actor: %w", err)
+	}
+
+	var items []InboxView
+	var total int
+	err = runner.Do(ctx, func(tx *sql.Tx) error {
+		ctx := authz.WithCapCache(ctx)
+		if filter.Oversee {
+			// scope=oversee REQUIRES CapApprovalOversee — never trusted from the
+			// request alone (P2/P3/P8, spec.md §6.3). Denial surfaces as the
+			// standard authz.ErrCapDenied -> 403 (tier-2 gate, same shape as every
+			// other capability check in this package).
+			if err := authz.Require(ctx, tx, string(iamdomain.CapApprovalOversee), "tenant"); err != nil {
+				return err
+			}
+		}
+
+		// eligibilityPredicate is switched off entirely for scope=oversee (list
+		// every in-progress instance in the tenant), rather than passed a
+		// wildcard actor value, so the SQL shape itself documents the two
+		// distinct listing modes.
+		eligibilityPredicate := "asi.eligible_actor_ids @> $2::jsonb"
+		if filter.Oversee {
+			eligibilityPredicate = "TRUE"
+		}
+
+		stageKindPredicate := "$6 = '' OR asi.stage_kind = $6"
+		stageKindArg := string(filter.StageKind)
+
+		dueBeforePredicate := "$7::timestamptz IS NULL OR (asi.due_at IS NOT NULL AND asi.due_at <= $7::timestamptz)"
+		var dueBeforeArg *time.Time
+		if filter.DueBefore != nil {
+			v := filter.DueBefore.UTC()
+			dueBeforeArg = &v
+		}
+
+		totalSelect := "COUNT(*) OVER() AS total_count"
+
+		rows, err := tx.QueryContext(ctx, `
+			SELECT
+				ai.id,
+				ai.document_id,
+				COALESCE(d.controlled_document_id::text, '') AS controlled_document_id,
+				COALESCE(d.name, '') AS doc_title,
+				COALESCE(asi.area_code_snapshot, '') AS area_code,
+				ai.submitted_by,
+				ai.submitted_at,
+				COALESCE(asi.name_snapshot, '') AS stage_label,
+				COALESCE(
+					CASE asi.quorum_snapshot
+						WHEN 'all_of'  THEN COALESCE(jsonb_array_length(asi.eligible_actor_ids), 0)
+						WHEN 'm_of_n'  THEN COALESCE(asi.quorum_m_snapshot, 1)
+						ELSE 1
+					END, 1) AS required,
+				COALESCE((
+					SELECT count(*)
+					FROM approval_signoffs s
+					WHERE s.approval_instance_id = ai.id
+					  AND s.stage_instance_id = asi.id
+					  AND s.actor_tenant_id = ai.tenant_id
+					  AND s.decision = 'approve'
+				), 0) AS signed,
+				asi.stage_kind,
+				asi.due_at,
+				`+totalSelect+`
+			FROM approval_instances ai
+			JOIN approval_stage_instances asi
+			  ON asi.approval_instance_id = ai.id
+			 AND asi.status = 'active'
+			LEFT JOIN documents d
+			  ON d.id = ai.document_id AND d.tenant_id = ai.tenant_id
+			WHERE ai.tenant_id = $1::uuid
+			  AND ai.status = 'in_progress'
+			  AND (`+eligibilityPredicate+`)
+			  AND ($3 = '' OR asi.area_code_snapshot = $3)
+			  AND (`+stageKindPredicate+`)
+			  AND (`+dueBeforePredicate+`)
+			ORDER BY ai.submitted_at DESC, ai.id DESC
+			LIMIT $4 OFFSET $5`,
+			tenantID, actorJSON, areaCode, limit, offset, stageKindArg, dueBeforeArg,
+		)
+		if err != nil {
+			return fmt.Errorf("list worklist: query: %w", err)
+		}
+
+		for rows.Next() {
+			var v InboxView
+			var signed, required, rowTotal int
+			var stageKind string
+			var dueAt sql.NullTime
+			if err := rows.Scan(
+				&v.InstanceID, &v.DocumentID, &v.ControlledDocumentID, &v.DocumentTitle,
+				&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
+				&v.StageLabel, &required, &signed, &stageKind, &dueAt, &rowTotal,
+			); err != nil {
+				rows.Close()
+				return fmt.Errorf("list worklist: scan: %w", err)
+			}
+			v.QuorumProgress = fmt.Sprintf("%d/%d", signed, required)
+			v.StageKind = domain.StageKind(stageKind)
+			if dueAt.Valid {
+				t := dueAt.Time
+				v.DueAt = &t
+			}
+			items = append(items, v)
+			total = rowTotal
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("list worklist: rows: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(items) == 0 {
+		// Empty page (offset past end, or genuinely zero matches): COUNT(*)
+		// OVER() only appears on returned rows, mirroring the
+		// ListInboxItemsWithTotal empty-page fallback. A second, filter-aware
+		// count query — CountPendingForActor's WHERE shape does not know about
+		// stage_kind/due_before/oversee, so it cannot be reused here.
+		count, err := s.countWorklist(ctx, runner, tenantID, actorID, areaCode, filter)
+		if err != nil {
+			return nil, 0, err
+		}
+		total = count
+	}
+	return items, total, nil
+}
+
+// countWorklist mirrors ListWorklist's WHERE clause (minus LIMIT/OFFSET) for
+// the empty-page total fallback. Kept in lockstep with ListWorklist's
+// predicates deliberately — any new filter added to one must be added to
+// both.
+func (s *ReadService) countWorklist(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, filter InboxFilter) (int, error) {
+	actorJSON, err := json.Marshal([]string{actorID})
+	if err != nil {
+		return 0, fmt.Errorf("count worklist: marshal actor: %w", err)
+	}
+
+	var total int
+	err = runner.Do(ctx, func(tx *sql.Tx) error {
+		ctx := authz.WithCapCache(ctx)
+		if filter.Oversee {
+			if err := authz.Require(ctx, tx, string(iamdomain.CapApprovalOversee), "tenant"); err != nil {
+				return err
+			}
+		}
+
+		eligibilityPredicate := "asi.eligible_actor_ids @> $2::jsonb"
+		if filter.Oversee {
+			eligibilityPredicate = "TRUE"
+		}
+		stageKindArg := string(filter.StageKind)
+		var dueBeforeArg *time.Time
+		if filter.DueBefore != nil {
+			v := filter.DueBefore.UTC()
+			dueBeforeArg = &v
+		}
+
+		err := tx.QueryRowContext(ctx, `
+			SELECT COUNT(DISTINCT ai.id)
+			FROM approval_instances ai
+			JOIN approval_stage_instances asi
+			  ON asi.approval_instance_id = ai.id
+			 AND asi.status = 'active'
+			WHERE ai.tenant_id = $1::uuid
+			  AND ai.status = 'in_progress'
+			  AND (`+eligibilityPredicate+`)
+			  AND ($3 = '' OR asi.area_code_snapshot = $3)
+			  AND ($4 = '' OR asi.stage_kind = $4)
+			  AND ($5::timestamptz IS NULL OR (asi.due_at IS NOT NULL AND asi.due_at <= $5::timestamptz))`,
+			tenantID, actorJSON, areaCode, stageKindArg, dueBeforeArg,
+		).Scan(&total)
+		if err != nil {
+			return fmt.Errorf("count worklist: query: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
 // CountPendingForActor returns the total number of pending approval instances
 // for the given tenant + actor (no LIMIT/OFFSET) so the UI can paginate.
 func (s *ReadService) CountPendingForActor(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string) (int, error) {
@@ -376,6 +624,68 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, runner db.TxRunn
 		return 0, err
 	}
 	return total, nil
+}
+
+// requireInstanceVisible enforces the F8 visibility-gating model (spec.md
+// §6.3) on a single already-loaded in-flight instance: a bare tenant-grade
+// CapDocumentView holder (or CapApprovalOversee holder without a more
+// specific relationship) is NOT automatically entitled to see every in-flight
+// instance in the tenant — visibility is scoped to {the submitting author,
+// any current-or-past stage pool member (eligible_actor_ids on ANY stage,
+// not just the active one — a completed stage's reviewers keep visibility
+// into the instance they acted on), a CapApprovalOversee holder, or a
+// CapDocumentEdit holder}. Returns infrastructure.ErrInstanceNotVisible
+// (mapped to 404, "cross-boundary = not-found") when none of these hold.
+//
+// This tightens the pre-F8 behavior documented in
+// read_service_tenant_grade_view_integration_test.go (a bare tenant-grade
+// viewer could load ANY in-flight instance) — the ratified spec §6.3
+// explicitly frames that prior breadth as the exact remediation gap M2b
+// exists to close, not a contradiction to preserve.
+//
+// Deliberately query/predicate-layer enforcement (reads the actor id off the
+// tx's own seeded GUC via authz.MustActorID, checks eligible_actor_ids
+// already loaded onto the domain aggregate, and re-runs authz.Require for
+// the two capability alternatives) — NEVER a client-side filter. A caller
+// cannot bypass this by requesting the same instance_id twice or by any
+// client-controlled parameter.
+//
+// areaCode is the instance's OWN resolved area (from loadInstanceAreaCode),
+// NOT the "tenant" sentinel: CapApprovalOversee is tenant-grade
+// (capability_scope.go) so it intentionally passes "tenant" to skip the area
+// filter, but CapDocumentEdit is area-grade — passing "tenant" for it would
+// wrongly grant edit-anywhere-in-tenant semantics. An empty areaCode (no area
+// resolvable anywhere in the chain) fails closed for CapDocumentEdit for
+// non-system actors, mirroring documents/application/fillin_authz.go's
+// requireDocEditDraft.
+func requireInstanceVisible(ctx context.Context, tx *sql.Tx, inst *domain.Instance, areaCode string) error {
+	actorID, err := authz.MustActorID(ctx, tx)
+	if err != nil {
+		return err
+	}
+
+	if inst.SubmittedBy == actorID {
+		return nil
+	}
+	for i := range inst.Stages {
+		for _, eligible := range inst.Stages[i].EligibleActorIDs {
+			if eligible == actorID {
+				return nil
+			}
+		}
+	}
+
+	// Not the author, not a pool member on any stage: fall back to the two
+	// oversight/edit capabilities. Either satisfies visibility; system_admin
+	// already short-circuits inside authz.Require itself.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapApprovalOversee), "tenant"); err == nil {
+		return nil
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err == nil {
+		return nil
+	}
+
+	return infrastructure.ErrInstanceNotVisible
 }
 
 // loadInstanceAreaCode resolves an approval instance's area, preferring the active

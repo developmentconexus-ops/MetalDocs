@@ -41,6 +41,10 @@ type InstanceResponse struct {
 	CompletedAt *string         `json:"completed_at,omitempty"`
 	Stages      []StageInstance `json:"stages"`
 	ETag        string          `json:"etag"`
+	// FrozenContentHash (F6/F8): the SHA-256 hex digest pinned at freeze time
+	// (no-fallback principle, spec §11). Required-and-nullable on the wire
+	// (present as explicit null, never omitted) — nil before the freeze boundary.
+	FrozenContentHash *string `json:"frozen_content_hash"`
 }
 
 // StageInstance is the wire representation of one stage's runtime state within an InstanceResponse.
@@ -51,6 +55,12 @@ type StageInstance struct {
 	Status     string          `json:"status"`
 	Signoffs   []SignoffRecord `json:"signoffs"`
 	Actors     []StageActor    `json:"actors"`
+	// StageKind (F8, spec.md §4/W4): review or approval.
+	StageKind string `json:"stage_kind,omitempty"`
+	// DueAt (F8, spec.md §4/W4): RFC3339 UTC SLA due date. Required-and-nullable
+	// on the wire (present as explicit null, never omitted) — nil while pending
+	// or when no SLA is configured (no-fallback principle, spec §11).
+	DueAt *string `json:"due_at"`
 }
 
 // StageActor is one eligible actor's status within a StageInstance.
@@ -83,6 +93,13 @@ type InboxItem struct {
 	SubmittedAt          string `json:"submitted_at"`
 	StageLabel           string `json:"stage_label"`
 	QuorumProgress       string `json:"quorum_progress"`
+	// StageKind (F8, spec.md §4/W4): review or approval, omitted when unknown
+	// (defensive; the service always populates it from the stage snapshot).
+	StageKind string `json:"stage_kind,omitempty"`
+	// DueAt (F8, spec.md §4/W4): RFC3339 UTC SLA due date. Required-and-nullable
+	// on the wire (present as explicit null, never omitted) — nil when no SLA is
+	// configured for the stage (no-fallback principle, spec §11).
+	DueAt *string `json:"due_at"`
 }
 
 // InboxResponse is the response body for the approver inbox listing endpoint.

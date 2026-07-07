@@ -1,6 +1,7 @@
 // Package maintenance holds the shared River periodic-job definitions for the
 // maintenance-queue jobs (stuck-instance watchdog, idempotency janitor, audit
-// integrity validator, and the M6 F6.2 document review-due surfacer). Both
+// integrity validator, the M6 F6.2 document review-due surfacer, and the F8
+// approval SLA surfacer). Both
 // metaldocs-api and metaldocs-jobs define these periodic jobs on their River
 // client config so that whichever process wins leader election is the one
 // that enqueues them (River only enqueues periodic jobs from the elected
@@ -14,6 +15,7 @@ import (
 
 	"github.com/riverqueue/river"
 
+	"metaldocs/internal/modules/jobs/approval_sla_surfacer"
 	"metaldocs/internal/modules/jobs/audit_integrity_validator"
 	"metaldocs/internal/modules/jobs/document_review_surfacer"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
@@ -21,7 +23,8 @@ import (
 )
 
 // PeriodicJobs returns the River periodic-job definitions for the 3 janitors
-// plus the M6 F6.2 document review-due surfacer. It must be included in the
+// plus the M6 F6.2 document review-due surfacer and the F8 approval SLA
+// surfacer. It must be included in the
 // Config.PeriodicJobs of every River client that
 // participates in leader election for these jobs (currently metaldocs-api and
 // metaldocs-jobs), regardless of whether that client subscribes the
@@ -55,6 +58,13 @@ func PeriodicJobs() []*river.PeriodicJob {
 				return document_review_surfacer.DocumentReviewSurfacerArgs{}, &river.InsertOpts{Queue: "maintenance"}
 			},
 			&river.PeriodicJobOpts{ID: "document-review-surfacer", RunOnStart: false},
+		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return approval_sla_surfacer.ApprovalSLASurfacerArgs{}, &river.InsertOpts{Queue: "maintenance"}
+			},
+			&river.PeriodicJobOpts{ID: "approval-sla-surfacer", RunOnStart: false},
 		),
 	}
 }

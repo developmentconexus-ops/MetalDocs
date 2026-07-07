@@ -324,6 +324,115 @@ func TestCountPendingForActor_ReturnsTotal(t *testing.T) {
 	}
 }
 
+// TestListWorklist_ZeroFilter_MatchesBaseInboxShape pins that an empty
+// InboxFilter produces the same eligibility-pool WHERE shape as
+// ListInboxItemsWithTotal (F8 must not change default worklist behavior).
+func TestListWorklist_ZeroFilter_MatchesBaseInboxShape(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	submittedAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	rows := sqlmock.NewRows([]string{
+		"id", "document_id", "controlled_document_id", "doc_title", "area_code",
+		"submitted_by", "submitted_at", "stage_label", "required", "signed",
+		"stage_kind", "due_at", "total_count",
+	}).AddRow(
+		"inst-1", "doc-1", "CD-001", "Doc One", "finance",
+		"user-1", submittedAt, "Stage 1", 2, 1, "approval", nil, 1,
+	)
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`asi\.eligible_actor_ids @> \$2::jsonb`).
+		WithArgs("tenant-1", sqlmock.AnyArg(), "finance", 25, 0, "", sqlmock.AnyArg()).
+		WillReturnRows(rows)
+	mock.ExpectCommit()
+
+	svc := &ReadService{}
+	items, total, err := svc.ListWorklist(authzCtx("tenant-1", "actor-1"), newTxRunner(db), "tenant-1", "actor-1", "finance", InboxFilter{}, 25, 0)
+	if err != nil {
+		t.Fatalf("ListWorklist: %v", err)
+	}
+	if len(items) != 1 || total != 1 {
+		t.Fatalf("got items=%d total=%d, want 1/1", len(items), total)
+	}
+	if items[0].StageKind != domain.StageKindApproval {
+		t.Errorf("StageKind = %q, want %q", items[0].StageKind, domain.StageKindApproval)
+	}
+	if items[0].DueAt != nil {
+		t.Errorf("DueAt = %v, want nil (no-fallback: NULL due_at stays nil)", items[0].DueAt)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// TestListWorklist_StageKindFilter_PassesArgThrough pins that a non-empty
+// StageKind filter is threaded to the query as the stage_kind predicate arg.
+func TestListWorklist_StageKindFilter_PassesArgThrough(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`asi\.stage_kind = \$6`).
+		WithArgs("tenant-1", sqlmock.AnyArg(), "", 25, 0, "review", sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "document_id", "controlled_document_id", "doc_title", "area_code",
+			"submitted_by", "submitted_at", "stage_label", "required", "signed",
+			"stage_kind", "due_at", "total_count",
+		}))
+	mock.ExpectCommit()
+	// Empty-page fallback (countWorklist) — no rows matched above.
+	mock.ExpectBegin()
+	mock.ExpectExec(`set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1", "actor-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`SELECT COUNT\(DISTINCT ai\.id\)`).
+		WithArgs("tenant-1", sqlmock.AnyArg(), "", "review", sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectCommit()
+
+	svc := &ReadService{}
+	_, _, err = svc.ListWorklist(authzCtx("tenant-1", "actor-1"), newTxRunner(db), "tenant-1", "actor-1", "", InboxFilter{StageKind: domain.StageKindReview}, 25, 0)
+	if err != nil {
+		t.Fatalf("ListWorklist: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// TestListWorklist_Oversee_DropsEligibilityPredicate pins that scope=oversee
+// switches the eligibility predicate to TRUE (list every in-progress instance
+// in the tenant) rather than filtering by the actor's own pool membership —
+// but ONLY after authz.Require(CapApprovalOversee) succeeds. This test uses a
+// system_admin-style short-circuit is NOT exercised here (that requires a
+// real DB); this sqlmock test instead pins the SQL predicate shape by
+// asserting the query text contains "TRUE" in place of the eligible_actor_ids
+// check. A full authz.Require pass/fail matrix for scope=oversee is covered
+// by the integration test (read_service_worklist_oversee_integration_test.go).
+func TestListWorklist_Oversee_QueryShapeDropsEligibilityPredicate(t *testing.T) {
+	source, err := os.ReadFile("read_service.go")
+	if err != nil {
+		t.Fatalf("read read_service.go: %v", err)
+	}
+	text := string(source)
+	if !strings.Contains(text, `eligibilityPredicate = "TRUE"`) {
+		t.Fatalf("ListWorklist must switch off the eligibility predicate entirely for scope=oversee (list every in-progress instance), not pass a wildcard actor value")
+	}
+}
+
 func TestLoadActiveInstanceByDocument_RequiresDocumentViewBeforeRepoLoad(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

@@ -29,6 +29,14 @@ const (
 	approvalCodeInternalUnknown                   problem.Code = "internal.unknown"
 	approvalCodeConflictStaleRevision             problem.Code = "conflict.stale_revision"
 	approvalCodeNotFoundInstance                  problem.Code = "not_found.instance"
+	// approvalCodeNotFoundInstanceNotVisible (F8, spec.md §6.3) is the
+	// DISTINCT 404 code for infrastructure.ErrInstanceNotVisible —
+	// deliberately its own code (not approvalCodeNotFoundInstance) so
+	// monitoring/logs can tell "instance genuinely does not exist" apart from
+	// "instance exists but is outside this actor's visibility boundary",
+	// even though both return the same 404 status to the client (the client
+	// response body must not leak which case it is).
+	approvalCodeNotFoundInstanceNotVisible        problem.Code = "not_found.instance_not_visible"
 	approvalCodeConflictDuplicate                 problem.Code = "conflict.duplicate_submission"
 	approvalCodeSignoffDuplicate                  problem.Code = "signoff.duplicate"
 	approvalCodePublishInvalidSupersede           problem.Code = "publish.invalid_supersede_target"
@@ -112,6 +120,13 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, infrastructure.ErrNoActiveInstance):
 		statusCode = http.StatusNotFound
 		code = approvalCodeNotFoundInstance
+	case errors.Is(err, infrastructure.ErrInstanceNotVisible):
+		// F8, spec.md §6.3: cross-boundary = not-found. Same 404 status as
+		// ErrNoActiveInstance but a distinct problem.Code (see the constant's
+		// doc comment) so server-side logs/monitoring can distinguish the two
+		// cases without the client-visible response revealing which one fired.
+		statusCode = http.StatusNotFound
+		code = approvalCodeNotFoundInstanceNotVisible
 	case errors.Is(err, infrastructure.ErrDuplicateSubmission):
 		statusCode = http.StatusConflict
 		code = approvalCodeConflictDuplicate

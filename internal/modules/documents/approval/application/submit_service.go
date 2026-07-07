@@ -222,9 +222,18 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 				QuorumSnapshot:             stage.Quorum,
 				QuorumMSnapshot:            stage.QuorumM,
 				OnEligibilityDriftSnapshot: stage.OnEligibilityDrift,
+				Kind:                       stage.Kind,
 				EligibleActorIDs:           eligibleIDs,
 				Status:                     status,
 				OpenedAt:                   openedAt,
+				// DueInDaysSnapshot (F8, spec.md §4/W4): captured for EVERY
+				// stage at submit time, not just the first — a stage that
+				// activates later (via AdvanceStage) still needs its own SLA
+				// config pinned to what the route looked like at submit,
+				// consistent with every other *Snapshot field on this struct
+				// (F2 route-version pinning: in-flight instances stay pinned
+				// to the version they started on).
+				DueInDaysSnapshot: stage.DueInDays,
 			}
 		}
 

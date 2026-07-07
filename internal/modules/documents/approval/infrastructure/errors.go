@@ -49,6 +49,21 @@ var (
 	// maps this to documents/domain.ErrApprovalRouteMissing (ADR 0073 in-tx
 	// route resolution).
 	ErrNoActiveApprovalRoute = errors.New("approval: no active approval route for profile")
+	// ErrInstanceNotVisible is returned by ReadService.LoadInstance /
+	// LoadActiveInstanceByDocument (F8, spec.md §6.3) when the actor holds
+	// SOME view-adjacent capability (passed the tier-2 authz.Require gate)
+	// but is not in the instance's visibility set — not the submitting
+	// author, not a current-or-past stage pool member (eligible_actor_ids on
+	// any stage), and does not hold CapApprovalOversee (tenant-wide) or
+	// CapDocumentEdit (area-grade, checked against the instance's own
+	// resolved area — never a "tenant" skip-the-area-filter sentinel).
+	// Distinct from authz.ErrCapDenied (zero capability at all,
+	// mapped to 403): this is "authenticated, has a view-shaped capability,
+	// but this specific in-flight instance is outside their eligibility
+	// boundary" — mapped to 404 ("cross-boundary = not-found", spec.md §6.3),
+	// never 403, so an ineligible viewer cannot distinguish "instance exists
+	// but I can't see it" from "instance doesn't exist".
+	ErrInstanceNotVisible = errors.New("approval: instance not visible to this actor")
 )
 
 // MapHints carries constraint-name hints for SQLSTATE 23505 disambiguation.

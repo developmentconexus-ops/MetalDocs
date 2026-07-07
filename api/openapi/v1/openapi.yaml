@@ -3853,6 +3853,18 @@ paths:
         - { name: area_code, in: query, required: false, schema: { type: string }, description: 'Filter to a single process area.' }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
         - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: stage_kind, in: query, required: false, schema: { type: string, enum: [review, approval] }, description: 'F8 (spec.md §4/W4): filter to stages of this kind only.' }
+        - { name: due_before, in: query, required: false, schema: { type: string, format: date-time }, description: 'F8 (spec.md §4/W4): filter to stages whose due_at is non-null and <= this RFC3339 UTC timestamp.' }
+        - name: scope
+          in: query
+          required: false
+          schema: { type: string, enum: [oversee] }
+          description: >-
+            F8 (spec.md §6.3, P2/P3/P8): when set to "oversee", lists ALL
+            in-progress instances in the tenant (not just the actor's own
+            eligible-pool items) and REQUIRES the actor hold CapApprovalOversee
+            — a 403 if the capability is missing. Omitted (default) preserves
+            the existing eligibility-based inbox (actor's own pending stages).
       responses:
         '200':
           description: ok
@@ -6358,7 +6370,7 @@ components:
         approval_instance_id: { type: string, format: uuid }
     ApprovalInstanceByDocumentResponse:
       type: object
-      required: [id, document_id, route_id, tenant_id, status, submitted_by, submitted_at, stages, etag, completed_at]
+      required: [id, document_id, route_id, tenant_id, status, submitted_by, submitted_at, stages, etag, completed_at, frozen_content_hash]
       properties:
         id: { type: string, format: uuid }
         document_id: { type: string, format: uuid }
@@ -6378,9 +6390,16 @@ components:
           items:
             $ref: '#/components/schemas/ApprovalStageInstanceResponse'
         etag: { type: string }
+        frozen_content_hash:
+          type: string
+          nullable: true
+          description: >-
+            F6/F8 — the SHA-256 hex digest pinned at freeze time (no-fallback
+            principle, spec §11). null when the instance has not yet reached
+            the freeze boundary.
     ApprovalStageInstanceResponse:
       type: object
-      required: [id, stage_index, label, status, signoffs, actors]
+      required: [id, stage_index, label, status, signoffs, actors, due_at]
       properties:
         id: { type: string, format: uuid }
         stage_index: { type: integer, minimum: 1 }
@@ -6396,6 +6415,18 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ApprovalStageActorResponse'
+        stage_kind:
+          type: string
+          enum: [review, approval]
+          description: F8 (spec.md §4/W4) — distinguishes a review (comment/feedback) stage from an approval (signoff) stage.
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            F8 (spec.md §4/W4) — this stage's SLA due date, set on activation
+            from due_in_days_snapshot. null while pending, or when no SLA is
+            configured (no-fallback principle, spec §11).
     ApprovalStageActorResponse:
       type: object
       required: [user_id, display_name, status, decision]
@@ -6544,7 +6575,7 @@ components:
           type: string
     ApprovalInboxItem:
       type: object
-      required: [instance_id, document_id, controlled_document_id, document_title, area_code, submitted_by, submitted_at, stage_label, quorum_progress]
+      required: [instance_id, document_id, controlled_document_id, document_title, area_code, submitted_by, submitted_at, stage_label, quorum_progress, due_at]
       properties:
         instance_id: { type: string, format: uuid }
         document_id: { type: string, format: uuid }
@@ -6557,6 +6588,19 @@ components:
         quorum_progress:
           type: string
           description: Human-readable quorum progress for the actor's pending stage, e.g. "1/2".
+        stage_kind:
+          type: string
+          enum: [review, approval]
+          description: F8 (spec.md §4/W4) — the actor's pending stage's kind.
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            F8 (spec.md §4/W4) — the actor's pending stage's SLA due date, if
+            configured (due_in_days_snapshot non-null). null when no SLA is
+            configured for the stage (no-fallback principle, spec §11: never a
+            substitute default).
     ApprovalInboxResponse:
       type: object
       required: [items, total]

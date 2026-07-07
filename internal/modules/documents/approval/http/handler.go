@@ -35,6 +35,9 @@ type readService interface {
 	ListPendingForActor(ctx context.Context, runner db.TxRunner, tenantID, actorID string, areaCode string, limit, offset int) ([]domain.Instance, error)
 	ListInboxItems(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, error)
 	ListInboxItemsWithTotal(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, int, error)
+	// ListWorklist (F8, spec.md §4/W4, §6.3 P2/P3/P8) extends the inbox listing
+	// with stage_kind/due_before/scope=oversee filters.
+	ListWorklist(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, filter application.InboxFilter, limit, offset int) ([]application.InboxView, int, error)
 	CountPendingForActor(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string) (int, error)
 }
 

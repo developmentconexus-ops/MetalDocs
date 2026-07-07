@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"metaldocs/internal/modules/documents/approval/application"
+	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
@@ -36,6 +38,12 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	filter, err := parseInboxFilter(r.URL.Query())
+	if err != nil {
+		WriteError(w, NewValidationError(err.Error()))
+		return
+	}
+
 	if h.readSvc == nil {
 		WriteError(w, errors.New("read service not configured"))
 		return
@@ -44,8 +52,10 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 	// Single query/tx computes the page and the total together (T-005): the
 	// prior two independent queries (ListInboxItems then CountPendingForActor)
 	// could observe different snapshots if a signoff committed in between,
-	// producing total < len(items) or vice versa on the wire.
-	views, total, err := h.readSvc.ListInboxItemsWithTotal(r.Context(), h.runner, tenantID, actorID, areaCode, limit, offset)
+	// producing total < len(items) or vice versa on the wire. ListWorklist
+	// (F8, spec.md §4/W4, §6.3 P2/P3/P8) is a superset of the pre-F8
+	// ListInboxItemsWithTotal contract — an empty filter behaves identically.
+	views, total, err := h.readSvc.ListWorklist(r.Context(), h.runner, tenantID, actorID, areaCode, filter, limit, offset)
 	if err != nil {
 		WriteError(w, err)
 		return
@@ -54,6 +64,11 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 	respItems := make([]contracts.InboxItem, 0, len(views))
 	for i := range views {
 		v := views[i]
+		var dueAt *string
+		if v.DueAt != nil {
+			s := v.DueAt.UTC().Format(time.RFC3339)
+			dueAt = &s
+		}
 		respItems = append(respItems, contracts.InboxItem{
 			InstanceID:           v.InstanceID,
 			DocumentID:           v.DocumentID,
@@ -64,6 +79,8 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 			SubmittedAt:          v.SubmittedAt.UTC().Format(time.RFC3339),
 			StageLabel:           v.StageLabel,
 			QuorumProgress:       v.QuorumProgress,
+			StageKind:            string(v.StageKind),
+			DueAt:                dueAt,
 		})
 	}
 
@@ -71,6 +88,49 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 		Items: respItems,
 		Total: total,
 	})
+}
+
+// parseInboxFilter (F8, spec.md §4/W4, §6.3 P2/P3/P8) parses the worklist
+// query params into an application.InboxFilter. Validation mirrors the
+// openapi enum constraints (stage_kind, scope) so a malformed value is
+// rejected with 400 before reaching the service/repository layer, rather than
+// silently matching zero rows.
+func parseInboxFilter(q map[string][]string) (application.InboxFilter, error) {
+	var filter application.InboxFilter
+
+	if raw := strings.TrimSpace(firstQueryValue(q, "stage_kind")); raw != "" {
+		kind := domain.StageKind(raw)
+		if kind != domain.StageKindReview && kind != domain.StageKindApproval {
+			return filter, fmt.Errorf("stage_kind must be one of: review, approval")
+		}
+		filter.StageKind = kind
+	}
+
+	if raw := strings.TrimSpace(firstQueryValue(q, "due_before")); raw != "" {
+		t, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return filter, fmt.Errorf("due_before must be an RFC3339 timestamp")
+		}
+		t = t.UTC()
+		filter.DueBefore = &t
+	}
+
+	if raw := strings.TrimSpace(firstQueryValue(q, "scope")); raw != "" {
+		if raw != "oversee" {
+			return filter, fmt.Errorf("scope must be: oversee")
+		}
+		filter.Oversee = true
+	}
+
+	return filter, nil
+}
+
+func firstQueryValue(q map[string][]string, key string) string {
+	vals := q[key]
+	if len(vals) == 0 {
+		return ""
+	}
+	return vals[0]
 }
 
 func parseInboxLimit(raw string) (int, error) {

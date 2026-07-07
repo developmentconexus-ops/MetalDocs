@@ -309,6 +309,10 @@ func (f *fakeReadService) ListInboxItemsWithTotal(_ context.Context, _ db.TxRunn
 	return nil, 0, nil
 }
 
+func (f *fakeReadService) ListWorklist(_ context.Context, _ db.TxRunner, _, _, _ string, _ application.InboxFilter, _, _ int) ([]application.InboxView, int, error) {
+	return nil, 0, nil
+}
+
 func (f *fakeReadService) CountPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string) (int, error) {
 	return 0, nil
 }

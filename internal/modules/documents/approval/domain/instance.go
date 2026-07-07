@@ -64,7 +64,14 @@ type StageInstance struct {
 	CompletedAt                *time.Time
 	SkipReason                 string
 	DueAt                      *time.Time
-	Signoffs                   []*Signoff
+	// DueInDaysSnapshot (F8, spec.md §4/W4) snapshots the route stage's
+	// due_in_days config at submit time, mirroring every other *Snapshot
+	// field on this struct. The repository's activation UPDATE reads this
+	// column (not approval_route_stages) to compute DueAt, so a due date
+	// stays pinned to the config the instance started with even if the
+	// route is later re-versioned (F2) before this stage activates.
+	DueInDaysSnapshot *int
+	Signoffs          []*Signoff
 }
 
 // Instance is the approval instance aggregate.

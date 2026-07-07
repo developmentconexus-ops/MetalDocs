@@ -25,6 +25,7 @@ type fakeReadServiceInbox struct {
 	gotTenantID string
 	gotActorID  string
 	gotAreaCode string
+	gotFilter   application.InboxFilter
 	gotLimit    int
 	gotOffset   int
 }
@@ -59,6 +60,20 @@ func (f *fakeReadServiceInbox) ListInboxItemsWithTotal(_ context.Context, _ db.T
 	f.gotTenantID = tenantID
 	f.gotActorID = actorID
 	f.gotAreaCode = areaCode
+	f.gotLimit = limit
+	f.gotOffset = offset
+	if f.err != nil {
+		return nil, 0, f.err
+	}
+	return f.views, f.total, nil
+}
+
+func (f *fakeReadServiceInbox) ListWorklist(_ context.Context, _ db.TxRunner, tenantID, actorID, areaCode string, filter application.InboxFilter, limit, offset int) ([]application.InboxView, int, error) {
+	f.called = true
+	f.gotTenantID = tenantID
+	f.gotActorID = actorID
+	f.gotAreaCode = areaCode
+	f.gotFilter = filter
 	f.gotLimit = limit
 	f.gotOffset = offset
 	if f.err != nil {

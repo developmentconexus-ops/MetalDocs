@@ -76,6 +76,11 @@ func (h *Handler) mapInstanceResponse(ctx context.Context, tenantID string, inst
 				SignatureMeaning: sig.SignatureMeaning(),
 			})
 		}
+		var dueAt *string
+		if s.DueAt != nil {
+			v := s.DueAt.UTC().Format(time.RFC3339)
+			dueAt = &v
+		}
 		stages[i] = contracts.StageInstance{
 			ID:         s.ID,
 			StageIndex: s.StageOrder,
@@ -83,20 +88,23 @@ func (h *Handler) mapInstanceResponse(ctx context.Context, tenantID string, inst
 			Status:     mapStageStatus(s.Status),
 			Signoffs:   recs,
 			Actors:     buildStageActors(s, eligibleNames),
+			StageKind:  string(s.Kind),
+			DueAt:      dueAt,
 		}
 	}
 
 	return contracts.InstanceResponse{
-		ID:          inst.ID,
-		DocumentID:  inst.DocumentID,
-		RouteID:     inst.RouteID,
-		TenantID:    inst.TenantID,
-		Status:      contracts.InstanceStatus(inst.Status),
-		SubmittedBy: inst.SubmittedBy,
-		SubmittedAt: inst.SubmittedAt.UTC().Format(time.RFC3339),
-		CompletedAt: completedAt,
-		Stages:      stages,
-		ETag:        instanceETag(inst.RevisionVersion),
+		ID:                inst.ID,
+		DocumentID:        inst.DocumentID,
+		RouteID:           inst.RouteID,
+		TenantID:          inst.TenantID,
+		Status:            contracts.InstanceStatus(inst.Status),
+		SubmittedBy:       inst.SubmittedBy,
+		SubmittedAt:       inst.SubmittedAt.UTC().Format(time.RFC3339),
+		CompletedAt:       completedAt,
+		Stages:            stages,
+		ETag:              instanceETag(inst.RevisionVersion),
+		FrozenContentHash: inst.FrozenContentHash,
 	}, nil
 }
 

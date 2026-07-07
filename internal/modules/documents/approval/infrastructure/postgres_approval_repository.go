@@ -71,17 +71,27 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 	}
 
 	// Build multi-row VALUES clause.
-	const colCount = 14
+	const colCount = 16
 	placeholders := make([]string, 0, len(stages))
 	args := make([]any, 0, len(stages)*colCount)
 
 	for i, s := range stages {
 		base := i * colCount
 		placeholders = append(placeholders, fmt.Sprintf(
-			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,%s)",
 			base+1, base+2, base+3, base+4, base+5,
 			base+6, base+7, base+8, base+9, base+10,
-			base+11, base+12, base+13, base+14,
+			base+11, base+12, base+13, base+14, base+15,
+			// due_at (F8, spec.md §4/W4): computed here, not passed as a bind
+			// param, so the DB's own clock is authoritative for the SLA start
+			// point — mirrors UpdateStageStatus's activation CASE, which uses
+			// the identical now()+interval expression for stages that become
+			// active later via AdvanceStage rather than at initial insert.
+			// Only the stage inserted as already-active (stage 0, submit path)
+			// needs a due_at computed at INSERT time; pending stages have no
+			// opened_at yet, so due_at stays NULL until their own activation
+			// UPDATE runs.
+			fmt.Sprintf("CASE WHEN $%d = 'active' AND $%d IS NOT NULL THEN now() + ($%d || ' days')::interval ELSE NULL END", base+13, base+16, base+16),
 		))
 
 		eligibleJSON, err := json.Marshal(s.EligibleActorIDs)
@@ -111,6 +121,8 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 			s.EffectiveDenominator,
 			string(s.Status),
 			string(kind),
+			s.DueInDaysSnapshot,
+			s.DueInDaysSnapshot,
 		)
 	}
 
@@ -118,7 +130,8 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 		(id, approval_instance_id, stage_order, name_snapshot,
 		 required_role_snapshot, required_capability_snapshot, area_code_snapshot,
 		 quorum_snapshot, quorum_m_snapshot, on_eligibility_drift_snapshot,
-		 eligible_actor_ids, effective_denominator, status, stage_kind)
+		 eligible_actor_ids, effective_denominator, status, stage_kind,
+		 due_in_days_snapshot, due_at)
 		VALUES ` + strings.Join(placeholders, ",")
 
 	_, err := tx.ExecContext(ctx, query, args...)
@@ -640,7 +653,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		       on_eligibility_drift_snapshot,
 		       eligible_actor_ids, effective_denominator,
 		       status, opened_at, completed_at, skip_reason,
-		       stage_kind, due_at
+		       stage_kind, due_at, due_in_days_snapshot
 		FROM approval_stage_instances
 		WHERE approval_instance_id = $1
 		  AND EXISTS (
@@ -668,6 +681,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		var eligibleJSON []byte
 		var skipReason sql.NullString
 		var kindStr string
+		var dueInDaysSnapshot sql.NullInt32
 
 		err := rows.Scan(
 			&s.ID, &s.ApprovalInstanceID, &s.StageOrder, &s.NameSnapshot,
@@ -676,7 +690,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 			&s.OnEligibilityDriftSnapshot,
 			&eligibleJSON, &effectiveDenominator,
 			&s.Status, &openedAt, &completedAt, &skipReason,
-			&kindStr, &dueAt,
+			&kindStr, &dueAt, &dueInDaysSnapshot,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan stage instance for approval instance %s: %w", instanceID, err)
@@ -702,6 +716,10 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		s.Kind = domain.StageKind(kindStr)
 		if dueAt.Valid {
 			s.DueAt = &dueAt.Time
+		}
+		if dueInDaysSnapshot.Valid {
+			v := int(dueInDaysSnapshot.Int32)
+			s.DueInDaysSnapshot = &v
 		}
 
 		if len(eligibleJSON) > 0 {
@@ -881,7 +899,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		       on_eligibility_drift_snapshot,
 		       eligible_actor_ids, effective_denominator,
 		       status, opened_at, completed_at, skip_reason,
-		       stage_kind, due_at
+		       stage_kind, due_at, due_in_days_snapshot
 		FROM approval_stage_instances
 		WHERE approval_instance_id = ANY($1)
 		  AND EXISTS (
@@ -908,6 +926,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		var eligibleJSON []byte
 		var skipReason sql.NullString
 		var kindStr string
+		var dueInDaysSnapshot sql.NullInt32
 		if err := stageRows.Scan(
 			&s.ID, &s.ApprovalInstanceID, &s.StageOrder, &s.NameSnapshot,
 			&s.RequiredRoleSnapshot, &s.RequiredCapabilitySnapshot, &s.AreaCodeSnapshot,
@@ -915,7 +934,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 			&s.OnEligibilityDriftSnapshot,
 			&eligibleJSON, &effectiveDenominator,
 			&s.Status, &openedAt, &completedAt, &skipReason,
-			&kindStr, &dueAt,
+			&kindStr, &dueAt, &dueInDaysSnapshot,
 		); err != nil {
 			return nil, fmt.Errorf("scan stage instance in batch load: %w", err)
 		}
@@ -939,6 +958,10 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		s.Kind = domain.StageKind(kindStr)
 		if dueAt.Valid {
 			s.DueAt = &dueAt.Time
+		}
+		if dueInDaysSnapshot.Valid {
+			v := int(dueInDaysSnapshot.Int32)
+			s.DueInDaysSnapshot = &v
 		}
 		if len(eligibleJSON) > 0 {
 			if err := json.Unmarshal(eligibleJSON, &s.EligibleActorIDs); err != nil {
@@ -1039,7 +1062,17 @@ func (r *postgresApprovalRepository) UpdateStageStatus(ctx context.Context, tx d
 		UPDATE approval_stage_instances asi
 		SET status = $1,
 		    opened_at    = CASE WHEN $1 = 'active'    THEN now() ELSE asi.opened_at    END,
-		    completed_at = CASE WHEN $1 IN ('completed','skipped','rejected_here') THEN now() ELSE asi.completed_at END
+		    completed_at = CASE WHEN $1 IN ('completed','skipped','rejected_here') THEN now() ELSE asi.completed_at END,
+		    -- due_at (F8, spec.md §4/W4): computed from this row's own
+		    -- due_in_days_snapshot at the moment it activates, using the DB's
+		    -- own now() so the SLA clock's start point never depends on app
+		    -- clock skew. Mirrors InsertStageInstances' identical CASE for
+		    -- the stage that starts already-active at submit time. A stage
+		    -- with no due_in_days_snapshot (nil — no SLA configured) stays
+		    -- NULL, never defaulted to a substitute value.
+		    due_at = CASE WHEN $1 = 'active' AND asi.due_in_days_snapshot IS NOT NULL
+		                  THEN now() + (asi.due_in_days_snapshot || ' days')::interval
+		                  ELSE asi.due_at END
 		FROM approval_instances ai
 		WHERE asi.id = $2
 		  AND asi.status = $3

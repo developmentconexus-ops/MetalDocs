@@ -22,6 +22,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	iamjobs "metaldocs/internal/modules/iam/jobs"
+	"metaldocs/internal/modules/jobs/approval_sla_surfacer"
 	"metaldocs/internal/modules/jobs/audit_integrity_validator"
 	"metaldocs/internal/modules/jobs/document_review_surfacer"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
@@ -115,6 +116,13 @@ func run(ctx context.Context) error {
 		river.AddWorker(workers, document_review_surfacer.NewWorker(db,
 			documentsrepo.NewReviewDueReaderPG(db),
 			documentsrepo.NewReviewSurfaceWriterPG(db)))
+		// F8 (approval-kernel-backend): approval stage SLA surfacer — a
+		// genuine sibling to document_review_surfacer, not an extension of
+		// it (distinct per-stage due_at clock vs per-document
+		// review_due_at cadence; see approval_sla_surfacer package docs).
+		river.AddWorker(workers, approval_sla_surfacer.NewWorker(db,
+			approvalrepo.NewSLAOverdueReaderPG(db),
+			approvalrepo.NewSLASurfaceWriterPG(db)))
 
 		// Staging pdf/materialize dispatch workers (M5 F5.3 T3): consume the
 		// River jobs the api/worker Enqueuers insert and run on the already-
