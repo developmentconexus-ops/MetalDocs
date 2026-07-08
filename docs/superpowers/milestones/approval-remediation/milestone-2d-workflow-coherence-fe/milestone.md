@@ -46,17 +46,40 @@ changes, no route/stage schema changes. 8 features cap.
 
 | Feature id | Slug / folder | What to implement | What to validate (acceptance) |
 |------------|---------------|-------------------|-------------------------------|
-| F2d.1 | `f1-viewer-contract` | Instance view DTO gains server-derived `viewer` block (`is_author`, `eligible_for_active_stage` = snapshot ∪ active delegation − SoD exclusion, `via_delegation_from`, `has_signed_active_stage`), computed in the view-read path. OpenAPI edit + `oapi-codegen` regen. ADR: viewer-facts contract. Consumer: `deriveWorkspaceMode` (F2d.3). | Real-DB tests per scenario: author, snapshot actor, delegate, already-signed, observer, SoD-excluded author-who-is-also-approver. Regen produces no hand-written DTO consumer. Contract lint/build clean. |
-| F2d.2 | `f2-verdicts-display-names` | Instance view DTO gains `verdicts[]` (actor id + display name, verdict, reason, timestamp) and display names on stage actors; display-name joins off-tx (H-PRE-1). Verify at spec time whether verdict history is already persisted; if not, an **additive** migration is in-scope for this feature. Consumer: sidebar timeline (F2d.5). | Real-DB test: verdict history shape after `ready` and `request_changes` verdicts; display names resolve for seeded users; no in-tx display lookups (review gate). |
-| F2d.3 | `f3-workspace-mode-machine` | ONE pure FE selector `deriveWorkspaceMode(doc, instance, viewer)` → `author-editing \| author-waiting \| author-changes-requested \| reviewing \| approving \| observing \| lifecycle`. `TRANSITION_POLICY` shrinks to document-lifecycle actions only (publish/cancel); stage actions (signoff/verdict) leave it. Consumer: single screen (F2d.5) + `DecisionFooter`. | Unit tests: every mode branch incl. delegation, SoD-excluded author, no-instance draft, no-instance non-author. Grep gate: no remaining FE eligibility derivation (`signoffOffered`-style status-only gates) outside the selector. |
-| F2d.4 | `f4-instance-react-query` | Approval instance state moves to `useApprovalInstanceQuery` under `QK.approval` (ETag seeding preserved in the fetcher). Delete imperative useState/useEffect fetch, 1s staleness `setInterval`, dead `isStale`, `refetchInstanceRef` ordering hack, manual `onRefetchInstance` threading. Consumer: single screen (F2d.5). | Test: `QK.approval` invalidation refetches the instance and the mode re-derives. Grep gate: `setInterval`/`isStale`/`refetchInstanceRef` gone from the approval/document adapters. |
-| F2d.5 | `f5-single-screen-shell` | `DocumentEditorPage` becomes the mode-adaptive single screen per the design brief: constant DocumentShell, unified right sidebar in ALL modes (incl. `author-editing` — `ArtifactMetaSidebar` composition retired), header mode chip, contextual panels per mode, `DecisionFooter` variant = `stage_kind` + `viewer.eligible_for_active_stage` (F4 contract honored), frozen-content + delegation disclosure in `approving`, changes-requested banner + F6 panel. Consumer: end users (all roles); worklist deep links. | Component tests per mode from the brief's §2 matrix. Explicit test: review-kind active stage renders verdict CTAs and NEVER the signature panel; approval-kind renders signature panel only when `viewer.eligible_for_active_stage`. Brief §6 states covered (loading skeleton, instance error, empty). |
-| F2d.6 | `f6-author-comment-replies` | Author replies to / resolves instance comments in `author-waiting` (never edits content) — brief §9.1. Verify the authz surface for author comment writes against the existing instance-comments capability model; if a capability gap exists it is a contract item in this feature (tier-1 + tier-2 per ADR 0022), not a client workaround. | Real-DB authz test: author can reply/resolve on own document under review; non-participant cannot. UI test: reply composer visible in `author-waiting`, content editing not. |
+| F2d.1 | `f1-viewer-contract` | Instance view DTO gains server-derived `viewer` block (`is_author`, `eligible_for_active_stage` = snapshot ∪ active delegation − SoD exclusion, `via_delegation_from`, `has_signed_active_stage`), computed in the view-read path (`read_service.go:LoadInstanceByDocumentForView`; delegation via `LoadActiveDelegationsFor` plain SELECT — H-PRE-1 safe; SoD via `CheckSoD` on `instance.SubmittedBy`). OpenAPI edit + `oapi-codegen` regen. ADR: viewer-facts contract. Consumer: `deriveWorkspaceMode` (F2d.3). **SoD accuracy:** enforced SoD is author-exclusion + cross-stage double-sign for signoffs only — there is NO reviewer≠approver rule (`sod.go:38-51`); the `viewer` block reflects exactly that, not more. | Real-DB tests per scenario: author, snapshot actor, delegate, already-signed, observer, and author-who-is-also-an-approver (excluded by author-rule). Regen produces no hand-written DTO consumer. Contract lint/build clean. |
+| F2d.2 | `f2-verdicts-display-names` | Instance view DTO gains `verdicts[]` (actor id + display name, verdict, reason, timestamp) and display names on stage actors; display-name joins off-tx (H-PRE-1). Verdict history is ALREADY persisted — table `approval_review_verdicts` (migration 0288) carries id/actor/verdict/comment/verdict_at/actor_display_name_snapshot. **No migration.** Scope = a by-instance read (today `LoadStageVerdicts` is by-stage, `postgres_approval_repository.go:1326`) + DTO projection. Consumer: sidebar timeline (F2d.5). | Real-DB test: verdict history shape after `ready` and `request_changes` verdicts; display names resolve for seeded users; no in-tx display lookups (review gate). |
+| F2d.3 | `f3-workspace-mode-machine` | ONE pure FE selector `deriveWorkspaceMode(doc, instance, viewer)` → `author-editing \| author-waiting \| author-changes-requested \| reviewing \| approving \| observing \| lifecycle`. **Factor the stage-mode sub-derivation (reviewing/approving/observing, from `stage_kind` + `viewer.eligible_for_active_stage`) as a SUBJECT-AGNOSTIC helper** (survives M3 kernel extraction / templates reuse); the lifecycle sub-derivation (author-editing/-waiting/-changes-requested/lifecycle, keyed on document status) stays subject-specific. `TRANSITION_POLICY` shrinks to document-lifecycle actions only (publish/cancel); stage actions (signoff/verdict) leave it. Replaces the correct-but-duplicated `resolveEditorMode` (`ApprovalCockpitPage.tsx:41-55`) and the broken `signoffOffered` (`useDocumentApprovalArtifact.ts:205-206`). Consumer: single screen (F2d.5) + `DecisionFooter`. | Unit tests: every mode branch incl. delegation, SoD-excluded author, no-instance draft, no-instance non-author. Grep gate: no remaining FE eligibility derivation (`signoffOffered`-style status-only gates) outside the selector. |
+| F2d.4 | `f4-instance-react-query` | Approval instance state moves to `useApprovalInstanceQuery` under `QK.approval`. ETag seeding is preserved trivially: `etagCache` is a module-level Map keyed by documentId (`approvalApi.ts:56-58`, consumed `mutationClient.ts:29`), decoupled from React state — the `queryFn` keeps the `etagCache.set` side effect and the If-Match write path is unchanged. Delete imperative useState/useEffect fetch, 1s staleness `setInterval`, dead `isStale`, `refetchInstanceRef` ordering hack, manual `onRefetchInstance` threading. Consumer: single screen (F2d.5). | Test: `QK.approval` invalidation refetches the instance and the mode re-derives; signoff/publish If-Match still resolves from `etagCache`. Grep gate: `setInterval`/`isStale`/`refetchInstanceRef` gone from the approval/document adapters. |
+| F2d.5 | `f5-single-screen-shell` | The mode-adaptive single working screen per the design brief: constant DocumentShell, unified right sidebar in ALL modes (incl. `author-editing` — `ArtifactMetaSidebar` composition retired), header mode chip, contextual panels per mode, `DecisionFooter` variant = `stage_kind` + `viewer.eligible_for_active_stage` (F4 contract honored), frozen-content + delegation disclosure in `approving`, changes-requested banner + F6 panel. **Destination:** resolved by the Destination Decision below (§ Destination) — F2d.5 does NOT start until that decision is pinned. Consumer: end users (all roles); worklist deep links. | Component tests per mode from the brief's §2 matrix. Explicit test: review-kind active stage renders verdict CTAs and NEVER the signature panel; approval-kind renders signature panel only when `viewer.eligible_for_active_stage`. Brief §6 states covered (loading skeleton, instance error, empty). Route test matches the pinned destination decision. |
+| F2d.6 | `f6-author-comment-replies` | Surface the author's reply-to / resolve on instance comments in `author-waiting` (never edits content) — brief §9.1. **No authz work:** comment writes (`createComment`/`updateComment`→resolve, `handler.go:1083,1116`) gate only on `CapDocumentView` tenant-grade (`handler.go:1201-1206`); the author already holds it on their own document. This is FE-only surfacing of an existing capability — HS-2 not in play. | Real-DB authz test (confirming existing behavior): author can reply/resolve on own document under review; a non-`CapDocumentView` actor cannot. UI test: reply composer visible in `author-waiting`, content editing not. |
 | F2d.7 | `f7-cockpit-retirement` | `/approvals/:documentId` becomes a redirect to `/documents/:id`; `ApprovalCockpitPage`, the hollowed-shell composition (`screenModel` override), and `useDocumentApprovalArtifact`'s cockpit-only reduced model are deleted; worklist deep links target `/documents/:id`. ADR: single artifact destination. Consumer: worklist navigation + bookmarks. | Route test: old URL redirects (params preserved). Grep gate: no `ApprovalCockpitPage` references. Worklist link test targets `/documents/:id`. Build clean after deletion. |
 | F2d.8 | `f8-close-live-qa` | Milestone close: **UI-driven** live QA on the real stack (browser preview tools; curl only as corroborating backend evidence) covering BOTH route shapes: review+approval route AND approval-only route, full lifecycle draft→submit→verdict(s)→signoff→publish, plus `changes_requested` round-trip, delegation signoff, observer view. Records closure of the M2c deviation. | `qa/live-qa-log.md` with per-step UI evidence (DOM/a11y snapshots). A review-stage screen showing a signature panel = FAIL. Curl-only walkthrough = FAIL (validator forbidden-list). |
 
 Order is binding: F2d.1/F2d.2 (contract) → F2d.3/F2d.4 (FE substrate) → F2d.5 (screen)
 → F2d.6/F2d.7 (completions) → F2d.8 (close). F2d.8's evidence closes the quality-bar claim.
+
+## Destination (P0 — pin before F2d.5; F2d.1–F2d.4 may start now)
+
+Runtime truth (`frontend/apps/web/src/features/documents/routes.tsx`): a document has THREE
+surfaces today, not one — `/documents/:id` = `DocumentDetailLayout` (index `DocumentDetailRoute`
+record view + `distribution` child); `/documents/:id/edit` = `DocumentEditorRoutePage` (the
+DocumentShell working canvas); `/approvals/:documentId` = `ApprovalCockpitPage`. The single-screen
+vision collapses the two **DocumentShell working surfaces** (editor + cockpit). The record view
+(revisions/distribution/lineage/metadata) is a different altitude.
+
+**DECISION PENDING OPERATOR** (see chat 2026-07-08). One of:
+- **(1) Working screen at `/documents/:id/edit`** — unify editor+cockpit there; `/approvals/:documentId`
+  redirects to `/edit`; the record page `/documents/:id` stays and deep-links into `/edit`. Bounded,
+  defect-focused, YAGNI on the record surface.
+- **(2) Working screen at `/documents/:id`** — the true single destination; record concerns
+  (revisions/distribution/lineage) fold into the working screen's sidebar panels + `lifecycle` mode
+  (the brief already places meta/lineage/timeline in the sidebar); `distribution` becomes a sidebar
+  panel or a child of the new screen; `/edit` and `/approvals/:documentId` both redirect to
+  `/documents/:id`; `DocumentDetailRoute`/`DocumentDetailLayout` retired. Bigger scope (+1 feature to
+  absorb the record surface); the strongest read of "the document is the protagonist / one destination".
+
+Once pinned, update governing-spec §1.2-B blast radius (today it counts only DocumentEditorPage +
+ApprovalCockpitPage) and the design brief §1/§5 destination language accordingly.
 
 ## Milestone validation definition
 
@@ -94,17 +117,20 @@ enforces for this milestone:
     display joins off-tx or in the plain read tx of the view path.
   - No kernel write-path changes (freeze/signoff/verdict/submit services untouched), EXCEPT a
     capability addition for F2d.6 if the authz verification finds a gap (ADR 0022 two-tier).
-  - No route/stage schema changes; F2d.2 may add an **additive** verdict-history persistence
-    migration only if history is not already persisted (verified at spec time).
+  - No route/stage schema changes. F2d.2 needs NO migration — verdict history already persists in
+    `approval_review_verdicts` (migration 0288); scope is a by-instance read + DTO projection.
   - All server state via react-query under existing `QK` conventions; no new imperative fetch state.
   - Wine tokens only (`src/styles/tokens.css`); slate palette not extended; PT-BR copy; WCAG AA.
 - Risks (owner: this milestone):
-  - Verdict-history persistence unknown → verified at F2d.2 spec time; additive migration
-    in-scope; anything non-additive → HS-2.
+  - **Destination decision (P0)** open until pinned by operator → blocks F2d.5 only; F2d.1–F2d.4
+    proceed. If option (2) is chosen, scope grows by one feature (absorb the record surface) — that
+    addition is recorded here, not silent scope creep.
   - `DocumentEditorPage` (661 lines) restructure regression risk → mitigated by F2d.5 per-mode
     component tests + F2d.8 dual-route live QA + M2c regression line.
-  - F2d.6 authz gap could cross the module boundary → HS-2 stop, surface, prerequisite plan.
   - Editor suggest-mode reuse assumption (review canvas) breaks → HS-3 prerequisite repair.
+  - (Retired risks from validation 2026-07-08: verdict-history migration — history already persists,
+    no migration; F2d.6 authz gap — comment writes already gated on `CapDocumentView` the author
+    holds, FE-only; ETag seam — module-level Map, trivially preserved in the queryFn.)
 
 ## Applicable hard-stops
 

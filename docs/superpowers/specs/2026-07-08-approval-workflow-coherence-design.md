@@ -28,8 +28,13 @@ dead code on any route with a review stage. Works only on approval-only routes.
 - **A — split-brain state:** 4 parallel derivations of "what can the viewer do":
   `TRANSITION_POLICY` (status-only), `resolveEditorMode` (`ApprovalCockpitPage.tsx:41-55`,
   correct), `signoffOffered` (`useDocumentApprovalArtifact.ts:205`), `DecisionFooter` branch.
-- **B — two destinations:** `DocumentEditorPage` (661 lines) + `ApprovalCockpitPage` (348 lines)
-  both mount `DocumentShell` for the same artifact.
+- **B — multiple destinations:** the two `DocumentShell` **working** surfaces —
+  `DocumentEditorPage` (661 lines, `/documents/:id/edit`) + `ApprovalCockpitPage` (348 lines,
+  `/approvals/:documentId`) — both mount `DocumentShell` for the same artifact. Separately, the
+  document **record** surface `DocumentDetailLayout`/`DocumentDetailRoute` + `distribution` child
+  lives at `/documents/:id` (a different altitude — revisions/distribution/lineage/metadata). The
+  single-screen work collapses the two working surfaces; whether the record surface folds in is the
+  M2d Destination Decision (see milestone-2d `## Destination`).
 - **C — hollowed shell:** cockpit renders `ArtifactApprovalScreen` with
   `decision: undefined, approvalChain: null, actions: []` just to reuse its grid
   (`ApprovalCockpitPage.tsx:196`).
