@@ -104,6 +104,9 @@ reason, timestamp; signature legal-effect copy unchanged (M2b); no UUID/hash lea
    domains modular (approval components compose in from `features/approval`); signature =
    ceremony within the screen. Reopen trigger: external-signer persona → standalone ceremony
    page. Approver/observer modes lazy-load editing chunks (bundle discipline — F2d.5 spec item).
+   Working screen's sidebar meta panel carries a discoverable link to the record view
+   (`/documents/:id/details`); worklist `?decision=` preselect deep-link survives on the new
+   destination (`/documents/:id?decision=...`).
 
 ## 10. Implementation references
 
