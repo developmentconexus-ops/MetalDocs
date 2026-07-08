@@ -114,7 +114,11 @@ export function DocumentShell({
       </div>
     );
   } else if (buffer === undefined) {
-    body = null;
+    body = (
+      <div role="status" aria-live="polite" className={styles.loading}>
+        Carregando documento…
+      </div>
+    );
   } else {
     body = (
       <MetalDocsEditor

@@ -56,6 +56,10 @@ export function InboxPage() {
     if (filters.oversee && isError && error instanceof ApiError && error.status === 403) {
       setOverseeDenied(true);
       setFilters((prev) => ({ ...prev, oversee: false }));
+    } else if (filters.oversee && !isError) {
+      // F7 / F5 Minor #1: a stale denial note must not persist once oversee
+      // succeeds again — clear it on the next successful oversee fetch.
+      setOverseeDenied(false);
     }
   }, [filters.oversee, isError, error]);
 

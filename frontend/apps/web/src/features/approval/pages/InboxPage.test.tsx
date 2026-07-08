@@ -440,5 +440,56 @@ describe('InboxPage', () => {
       expect(screen.getByLabelText(/Supervisão/i)).not.toBeChecked();
     });
   });
+
+  it('clears the overseeDenied note when the user re-enables oversee', async () => {
+    const { ApiError } = await import('../../../lib/api/errors');
+    let overseeShouldFail = true;
+    vi.mocked(useInboxQuery).mockImplementation((params) => {
+      if (params?.scope === 'oversee') {
+        if (overseeShouldFail) {
+          return {
+            data: undefined,
+            isLoading: false,
+            isError: true,
+            error: new ApiError('forbidden', 403, 'Forbidden'),
+            refetch: vi.fn(),
+          } as unknown as ReturnType<typeof useInboxQuery>;
+        }
+        return {
+          data: { items: [], total: 0 },
+          isLoading: false,
+          isError: false,
+          refetch: vi.fn(),
+        } as unknown as ReturnType<typeof useInboxQuery>;
+      }
+      return {
+        data: { items: [], total: 0 },
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      } as unknown as ReturnType<typeof useInboxQuery>;
+    });
+
+    renderPage();
+
+    // First toggle: oversee query 403s, note shows, checkbox reverts.
+    fireEvent.click(screen.getByLabelText(/Supervisão/i));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Você não tem permissão de supervisão.');
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Supervisão/i)).not.toBeChecked();
+    });
+
+    // Re-enable oversee — this time the fetch succeeds. The stale denial note
+    // must clear (F5 Minor #1 / F7): no permanent one-way ratchet.
+    overseeShouldFail = false;
+    fireEvent.click(screen.getByLabelText(/Supervisão/i));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Você não tem permissão de supervisão.')).toBeNull();
+    });
+  });
 });
 

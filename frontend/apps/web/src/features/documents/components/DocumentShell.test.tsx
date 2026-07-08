@@ -53,6 +53,22 @@ describe('DocumentShell', () => {
     expect(screen.queryByTestId('editor')).toBeNull();
   });
 
+  it('renders a designed status/aria-live loading indicator (not blank) while the buffer is undefined', () => {
+    global.fetch = vi.fn().mockImplementation(() => new Promise(() => {}));
+    render(
+      <DocumentShell
+        documentId="doc-1"
+        currentRevisionId="rev-1"
+        editorMode="readonly"
+        author="Ana"
+      />,
+    );
+    const status = screen.getByRole('status');
+    expect(status).toBeTruthy();
+    expect(status.getAttribute('aria-live')).toBe('polite');
+    expect(status.textContent).toContain('Carregando documento');
+  });
+
   it('mounts the editor once the buffer resolves (ready state)', async () => {
     render(
       <DocumentShell

@@ -44,7 +44,7 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: var(--slate-text-muted-2);
+  color: var(--text-muted);
 }
 
 .field {
@@ -60,19 +60,19 @@
 
 .input {
   width: 100%;
-  border: 1px solid var(--slate-border-2);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 14px;
 }
 
 .input:focus {
-  outline: 2px solid var(--slate-accent);
+  outline: 2px solid var(--accent);
   border-color: transparent;
 }
 
 .inlineError {
-  color: var(--slate-danger-text);
+  color: var(--danger);
   font-size: 13px;
   margin: 6px 0 0;
 }
@@ -93,7 +93,7 @@
 }
 
 .btnPrimary {
-  background: var(--slate-accent);
+  background: var(--accent);
   color: var(--surface);
 }
 
@@ -103,23 +103,23 @@
 }
 
 .btnSecondary {
-  background: var(--slate-surface-muted);
-  color: var(--slate-text-muted-2);
+  background: var(--surface-2);
+  color: var(--text-muted);
 }
 
 .errorBox {
-  background: var(--slate-danger-bg);
-  border: 1px solid var(--slate-danger-border);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
   border-radius: 8px;
   padding: 10px 14px;
-  color: var(--slate-danger-text);
+  color: var(--danger);
   font-size: 13px;
   margin-bottom: 16px;
 }
 
 .success {
   text-align: center;
-  color: #166534;
+  color: var(--success);
   font-size: 16px;
   font-weight: 600;
   padding: 12px 0;

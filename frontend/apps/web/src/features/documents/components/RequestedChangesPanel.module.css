@@ -135,3 +135,9 @@
   color: var(--warning);
   border-top: 1px solid var(--border);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .actionBtn {
+    transition: none;
+  }
+}

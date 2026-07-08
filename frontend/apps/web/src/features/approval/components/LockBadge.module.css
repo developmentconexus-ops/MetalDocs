@@ -4,17 +4,22 @@
   gap: 8px;
   width: 100%;
   padding: 10px 16px;
-  background: #fef9c3;
-  border: 1px solid #fde047;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning);
   border-radius: 8px;
-  color: #713f12;
+  color: var(--text-soft);
   font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
 
 .banner:hover {
-  background: #fef08a;
+  background: var(--warning-bg);
+}
+
+.banner:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 .icon {
