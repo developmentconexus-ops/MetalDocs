@@ -145,6 +145,11 @@ backend. Kernel untouched.
 - `ApprovalCockpitPage` + hollowed-shell composition deleted; `DocumentEditorPage` adapts
   by workspace mode; `DecisionFooter` variant = `stage_kind` (F4 contract honored).
 - Worklist (`/approvals`) stays; its deep links target `/documents/:id`.
+- Visual/UX contract: `2026-07-08-single-screen-design-brief.md` (ratified 2026-07-08),
+  including two operator decisions: (1) author may reply to / resolve instance comments in
+  `author-waiting` (authz surface verified at feature-spec time; a gap is a contract item,
+  not a client workaround); (2) `author-editing` adopts the unified right-sidebar shell —
+  `ArtifactMetaSidebar` composition retired.
 
 ### A4 — Instance state → react-query
 - `useApprovalInstanceQuery` under `QK.approval`; invalidations propagate; delete imperative
@@ -258,8 +263,8 @@ Validate: ≥1 selector per stage; quorum consistent with minimum resolvable poo
 - Each milestone: `milestone` skill lifecycle — milestone.md spec up front, per-feature
   consumer-contract-first specs, TDD, evidence, independent `milestone-validator`, HS-1
   operator gate. No push without explicit permission.
-- After A's design is ratified, operator runs `/impeccable` for the single-screen visual
-  design (feeds A3's feature specs).
+- Single-screen visual design ratified via `/impeccable shape` →
+  `2026-07-08-single-screen-design-brief.md` (feeds A3's feature specs).
 
 ## 10. Risks
 
