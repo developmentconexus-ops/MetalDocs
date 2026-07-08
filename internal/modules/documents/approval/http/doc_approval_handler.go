@@ -55,7 +55,7 @@ func (h *Handler) GetInstanceByDocumentHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.runner, tenantID, docID)
+	inst, err := h.readSvc.LoadInstanceByDocumentForView(r.Context(), h.runner, tenantID, docID)
 	if err != nil {
 		if errors.Is(err, infrastructure.ErrNoActiveInstance) {
 			WriteError(w, infrastructure.ErrNoActiveInstance)

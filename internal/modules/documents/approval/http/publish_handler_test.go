@@ -32,6 +32,10 @@ func (f *fakeReadServicePublish) LoadActiveInstanceByDocument(_ context.Context,
 	return f.inst, f.err
 }
 
+func (f *fakeReadServicePublish) LoadInstanceByDocumentForView(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
+	return f.inst, f.err
+}
+
 func (f *fakeReadServicePublish) ListPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string, _, _ int) ([]domain.Instance, error) {
 	return nil, nil
 }

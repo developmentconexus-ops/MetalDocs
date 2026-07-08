@@ -38,6 +38,10 @@ func (f *fakeReadServiceInbox) LoadActiveInstanceByDocument(_ context.Context, _
 	return nil, nil
 }
 
+func (f *fakeReadServiceInbox) LoadInstanceByDocumentForView(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
+	return nil, nil
+}
+
 func (f *fakeReadServiceInbox) ListPendingForActor(_ context.Context, _ db.TxRunner, _, _, _ string, _, _ int) ([]domain.Instance, error) {
 	return nil, nil
 }

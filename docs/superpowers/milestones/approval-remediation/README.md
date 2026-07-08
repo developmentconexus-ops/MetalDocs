@@ -2,7 +2,7 @@
 
 > **Governing spec:** `docs/superpowers/specs/2026-07-07-approval-remediation-design.md` (ratified, commits e4a0717a, 046f0633, 68a0b3b8)
 > **System-impact analysis:** `docs/superpowers/analysis/2026-07-07-approval-remediation-m2b-system-impact.md` (🟡 Yellow, no open hard-stop)
-> **Status:** Milestone 2b passed (validator PASS + operator HS-1 approved 2026-07-07); M2c next
+> **Status:** M2b passed (HS-1 approved 2026-07-07); M2c validator PASS 2026-07-07 — pending operator HS-1 (program-terminal gate)
 > **Owner / operator:** MetalDocs operator (Leandro)
 
 Remediate the approval workflow system to professional eQMS grade: separate review
@@ -20,7 +20,7 @@ gated by the operator (HS-1) at each boundary.
 | # | Milestone | Objective (one line) | Status | Gate result |
 |---|-----------|----------------------|--------|-------------|
 | 2b | `milestone-2b-approval-kernel-backend` | Backend workflow/permission/contract remediation (W1-W13, P1-P8) inside `documents/approval` + `iam` | passed (operator HS-1 approved 2026-07-07) | [PASS](milestone-2b-approval-kernel-backend/qa/milestone-qa.md) |
-| 2c | `milestone-2c-approval-screen-fe` | Cockpit → editor-shell + sidebar reuse, worklist single destination, suggestion UX | in-progress | — |
+| 2c | `milestone-2c-approval-screen-fe` | Cockpit → editor-shell + sidebar reuse, worklist single destination, suggestion UX | validator PASS — pending operator HS-1 | [PASS](milestone-2c-approval-screen-fe/qa/milestone-qa.md) |
 
 Status vocabulary: `planned` → `in-progress` → `passed` (operator-approved) /
 `blocked` (hard-stop open). The **Gate result** column links the milestone-validator's

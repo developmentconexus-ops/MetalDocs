@@ -91,7 +91,16 @@ func (r *postgresApprovalRepository) InsertStageInstances(ctx context.Context, t
 			// needs a due_at computed at INSERT time; pending stages have no
 			// opened_at yet, so due_at stays NULL until their own activation
 			// UPDATE runs.
-			fmt.Sprintf("CASE WHEN $%d = 'active' AND $%d IS NOT NULL THEN now() + ($%d || ' days')::interval ELSE NULL END", base+13, base+16, base+16),
+			// $base+16::int casts: DueInDaysSnapshot is only ever referenced
+			// inside this CASE expression, never bound to a typed column, so
+			// when a stage has no SLA configured (*int is nil -> untyped
+			// NULL), Postgres cannot infer the param's type and the whole
+			// multi-row INSERT fails with "could not determine data type of
+			// parameter" (SQLSTATE 42P08). The explicit ::int annotation
+			// gives Postgres a type for the NULL case; (n || ' days')::interval
+			// semantics are unaffected since int concatenated with text still
+			// yields the same text before the interval cast.
+			fmt.Sprintf("CASE WHEN $%d = 'active' AND $%d::int IS NOT NULL THEN now() + ($%d::int || ' days')::interval ELSE NULL END", base+13, base+16, base+16),
 		))
 
 		eligibleJSON, err := json.Marshal(s.EligibleActorIDs)
@@ -356,6 +365,61 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 		WHERE ai.document_id = $1
 		  AND ai.tenant_id = $2
 		  AND ai.status IN ('in_progress', 'approved')
+			ORDER BY ai.submitted_at DESC, ai.id DESC
+			LIMIT 1`,
+		docID, tenantID,
+	).Scan(
+		&inst.ID, &inst.TenantID, &inst.DocumentID, &inst.RouteID, &inst.RouteVersionSnapshot,
+		&inst.RevisionVersion,
+		&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
+		&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
+		&frozenContentHash, &cancelReason,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNoActiveInstance
+	}
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	if completedAt.Valid {
+		inst.CompletedAt = &completedAt.Time
+	}
+	if frozenContentHash.Valid {
+		inst.FrozenContentHash = &frozenContentHash.String
+	}
+	if cancelReason.Valid {
+		inst.CancelReason = &cancelReason.String
+	}
+
+	stages, err := r.loadStageInstances(ctx, tx, tenantID, inst.ID)
+	if err != nil {
+		return nil, err
+	}
+	inst.Stages = stages
+	return &inst, nil
+}
+
+// LoadInstanceByDocumentForView is LoadActiveInstanceByDocument's view-only
+// sibling (see the interface doc comment in approval_repository.go): identical
+// in every respect except the status filter also admits changes_requested.
+func (r *postgresApprovalRepository) LoadInstanceByDocumentForView(ctx context.Context, tx db.Tx, tenantID, docID string) (*domain.Instance, error) {
+	var inst domain.Instance
+	var completedAt sql.NullTime
+	var frozenContentHash, cancelReason sql.NullString
+
+	err := tx.QueryRowContext(ctx, `
+		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
+		       d.revision_version,
+		       ai.status, ai.submitted_by, ai.submitted_at, ai.completed_at,
+		       ai.content_hash_at_submit, ai.idempotency_key,
+		       ai.frozen_content_hash, ai.cancel_reason
+		FROM approval_instances ai
+		JOIN documents d
+		  ON d.id = ai.document_id
+		 AND d.tenant_id = ai.tenant_id
+		WHERE ai.document_id = $1
+		  AND ai.tenant_id = $2
+		  AND ai.status IN ('in_progress', 'approved', 'changes_requested')
 			ORDER BY ai.submitted_at DESC, ai.id DESC
 			LIMIT 1`,
 		docID, tenantID,

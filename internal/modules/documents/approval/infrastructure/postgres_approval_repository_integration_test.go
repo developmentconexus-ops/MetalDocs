@@ -19,6 +19,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
+	"metaldocs/internal/modules/documents/approval/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/tests/integration/testdb"
 )
@@ -112,6 +115,50 @@ func TestLoadActiveInstanceByDocument_LoadsDocumentRevisionVersion(t *testing.T)
 	}
 }
 
+// TestLoadInstanceByDocumentForView_SeesChangesRequested pins the contract
+// fix behind the FE "requested changes" panel (C5): the view-read path must
+// return an instance whose status is changes_requested (a non-terminal state
+// reached via a request_changes verdict), while the narrow
+// LoadActiveInstanceByDocument path used by publish/mutation must continue to
+// treat it as invisible (ErrNoActiveInstance) so submit re-entry can create a
+// fresh instance.
+func TestLoadInstanceByDocumentForView_SeesChangesRequested(t *testing.T) {
+	db, _ := testdb.Open(t)
+	repo := NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
+	ctx := context.Background()
+
+	cd := testdb.NewControlledDoc(t, db)
+	doc := testdb.NewDocument(t, db,
+		testdb.WithControlledDoc(cd),
+		testdb.WithStatus("draft"),
+		testdb.WithRevisionNumber(2),
+		testdb.WithRevisionVersion(5),
+	)
+	inst := testdb.NewApprovalInstance(t, db, testdb.WithDocument(doc), testdb.WithStatus("changes_requested"))
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	got, err := repo.LoadInstanceByDocumentForView(ctx, tx, cd.TenantID, doc.ID)
+	if err != nil {
+		t.Fatalf("LoadInstanceByDocumentForView: %v", err)
+	}
+	if got.ID != inst.ID {
+		t.Fatalf("instance id = %q, want %q", got.ID, inst.ID)
+	}
+	if got.Status != domain.InstanceChangesRequested {
+		t.Fatalf("status = %q, want changes_requested", got.Status)
+	}
+
+	_, err = repo.LoadActiveInstanceByDocument(ctx, tx, cd.TenantID, doc.ID)
+	if !errors.Is(err, ErrNoActiveInstance) {
+		t.Fatalf("LoadActiveInstanceByDocument err = %v, want ErrNoActiveInstance (narrow path must stay unchanged)", err)
+	}
+}
+
 func TestLoadInstance_LoadsDocumentRevisionVersion(t *testing.T) {
 	db, _ := testdb.Open(t)
 	repo := NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
@@ -197,5 +244,121 @@ func TestScheduleGenerationIncrementsOnScheduledWritePath(t *testing.T) {
 	}
 	if gotGeneration != 10 {
 		t.Fatalf("schedule_generation = %d, want 10", gotGeneration)
+	}
+}
+
+// TestInsertStageInstances_ActiveStageWithNilDueInDays_NoTypeInferenceError is
+// the RED/GREEN regression test for the 42P08 defect: when a stage is
+// inserted as already-active (submit path, stage 0) and its route stage has
+// no due_in_days SLA configured, DueInDaysSnapshot is nil. Because the bind
+// param feeding the due_at CASE expression is referenced ONLY inside that
+// CASE (never bound to a typed column), an untyped NULL made Postgres unable
+// to infer $16's type ("could not determine data type of parameter $16").
+// This must succeed for both the nil-SLA stage and a sibling active stage
+// that DOES have an SLA (non-null path stays correct).
+func TestInsertStageInstances_ActiveStageWithNilDueInDays_NoTypeInferenceError(t *testing.T) {
+	db, _ := testdb.Open(t)
+	repo := NewPostgresApprovalRepository(db, iamdomain.NoopUserDisplayNameReader{})
+	ctx := context.Background()
+
+	inst := testdb.NewApprovalInstance(t, db, testdb.WithStatus("in_progress"))
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	dueDays := 5
+	stages := []domain.StageInstance{
+		{
+			ID:                         uuid.NewString(),
+			ApprovalInstanceID:         inst.ID,
+			StageOrder:                 0,
+			NameSnapshot:               "Review",
+			RequiredRoleSnapshot:       "reviewer",
+			RequiredCapabilitySnapshot: "document.review",
+			AreaCodeSnapshot:           "eng",
+			QuorumSnapshot:             domain.QuorumAllOf,
+			QuorumMSnapshot:            nil,
+			OnEligibilityDriftSnapshot: domain.DriftKeepSnapshot,
+			Kind:                       domain.StageKindApproval,
+			EligibleActorIDs:           []string{inst.DocumentID},
+			EffectiveDenominator:       nil,
+			Status:                     domain.StageActive,
+			DueInDaysSnapshot:          nil, // no SLA configured — the defect trigger
+		},
+		{
+			ID:                         uuid.NewString(),
+			ApprovalInstanceID:         inst.ID,
+			StageOrder:                 1,
+			NameSnapshot:               "Approve",
+			RequiredRoleSnapshot:       "approver",
+			RequiredCapabilitySnapshot: "document.signoff",
+			AreaCodeSnapshot:           "eng",
+			QuorumSnapshot:             domain.QuorumAllOf,
+			QuorumMSnapshot:            nil,
+			OnEligibilityDriftSnapshot: domain.DriftKeepSnapshot,
+			Kind:                       domain.StageKindApproval,
+			EligibleActorIDs:           []string{inst.DocumentID},
+			EffectiveDenominator:       nil,
+			Status:                     domain.StageActive,
+			DueInDaysSnapshot:          &dueDays, // has an SLA — proves non-null path unaffected
+		},
+	}
+
+	if err := repo.InsertStageInstances(ctx, tx, stages); err != nil {
+		t.Fatalf("InsertStageInstances: unexpected error: %v", err)
+	}
+
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, due_in_days_snapshot, due_at
+		  FROM public.approval_stage_instances
+		 WHERE approval_instance_id = $1::uuid
+		 ORDER BY stage_order`,
+		inst.ID,
+	)
+	if err != nil {
+		t.Fatalf("select stage instances: %v", err)
+	}
+	defer rows.Close()
+
+	type row struct {
+		id      string
+		dueDays sql.NullInt64
+		dueAt   sql.NullTime
+	}
+	var got []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id, &r.dueDays, &r.dueAt); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		got = append(got, r)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("rows err: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("stage instance rows = %d, want 2", len(got))
+	}
+
+	// Stage 0: no SLA — due_at must stay NULL.
+	if got[0].dueDays.Valid {
+		t.Fatalf("stage 0 due_in_days_snapshot = %v, want NULL", got[0].dueDays)
+	}
+	if got[0].dueAt.Valid {
+		t.Fatalf("stage 0 due_at = %v, want NULL (no SLA configured)", got[0].dueAt)
+	}
+
+	// Stage 1: has an SLA — due_at must be set (now() + 5 days).
+	if !got[1].dueDays.Valid || got[1].dueDays.Int64 != 5 {
+		t.Fatalf("stage 1 due_in_days_snapshot = %v, want 5", got[1].dueDays)
+	}
+	if !got[1].dueAt.Valid {
+		t.Fatalf("stage 1 due_at = NULL, want set (SLA configured)")
+	}
+	if diff := got[1].dueAt.Time.Sub(time.Now().UTC()); diff < 4*24*time.Hour || diff > 6*24*time.Hour {
+		t.Fatalf("stage 1 due_at = %v, want ~now()+5 days", got[1].dueAt.Time)
 	}
 }

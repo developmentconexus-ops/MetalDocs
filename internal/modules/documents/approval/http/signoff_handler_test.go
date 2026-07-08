@@ -289,6 +289,10 @@ func (f *fakeReadService) LoadActiveInstanceByDocument(_ context.Context, _ db.T
 	return f.inst, f.err
 }
 
+func (f *fakeReadService) LoadInstanceByDocumentForView(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
+	return f.inst, f.err
+}
+
 func (f *fakeReadService) LoadActiveInstanceByDocumentForMutation(_ context.Context, _ db.TxRunner, _, _ string) (*domain.Instance, error) {
 	f.loadActiveByDocumentForMutationCalled = true
 	if f.mutationInst != nil || f.mutationErr != nil {

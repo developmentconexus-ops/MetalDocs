@@ -85,6 +85,17 @@ type ApprovalRepository interface {
 	// mismatch or not found) are silently omitted.
 	LoadInstancesByIDs(ctx context.Context, tx db.Tx, tenantID string, ids []string) ([]domain.Instance, error)
 	LoadActiveInstanceByDocument(ctx context.Context, tx db.Tx, tenantID, docID string) (*domain.Instance, error)
+	// LoadInstanceByDocumentForView is LoadActiveInstanceByDocument's view-only
+	// sibling: identical query except its status filter also includes
+	// changes_requested, so the FE author-facing GET
+	// /documents/{id}/approval-instance can read back a non-terminal
+	// changes_requested instance (a request_changes verdict reverts the
+	// document to draft and leaves the instance changes_requested — the
+	// author must be able to see the reason). Never call this from
+	// publish/mutation flows: those rely on a changes_requested instance
+	// being invisible via LoadActiveInstanceByDocument so a fresh submit can
+	// create a new instance.
+	LoadInstanceByDocumentForView(ctx context.Context, tx db.Tx, tenantID, docID string) (*domain.Instance, error)
 	ValidateScheduledSupersedeTarget(ctx context.Context, tx db.Tx, tenantID, documentID, supersededDocumentID string) error
 	LoadCurrentPublishedHeadForDocument(ctx context.Context, tx db.Tx, tenantID, documentID string) (string, error)
 	LoadCurrentPublishedHead(ctx context.Context, tx db.Tx, tenantID, controlledDocumentID string) (string, error)

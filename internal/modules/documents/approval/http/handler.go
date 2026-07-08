@@ -32,6 +32,10 @@ type decisionService interface {
 type readService interface {
 	LoadInstance(ctx context.Context, runner db.TxRunner, tenantID, instanceID string) (*domain.Instance, error)
 	LoadActiveInstanceByDocument(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, error)
+	// LoadInstanceByDocumentForView is the view-only sibling used by the FE
+	// GET handler: its status filter also admits changes_requested (unlike
+	// LoadActiveInstanceByDocument, which stays narrow for publish/mutation).
+	LoadInstanceByDocumentForView(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, error)
 	ListPendingForActor(ctx context.Context, runner db.TxRunner, tenantID, actorID string, areaCode string, limit, offset int) ([]domain.Instance, error)
 	ListInboxItems(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, error)
 	ListInboxItemsWithTotal(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, int, error)

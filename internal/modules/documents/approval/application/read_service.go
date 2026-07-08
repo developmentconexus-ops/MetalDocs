@@ -171,6 +171,63 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, runner d
 	return inst, nil
 }
 
+// LoadInstanceByDocumentForView is LoadActiveInstanceByDocument's view-only
+// sibling: it calls the repo's LoadInstanceByDocumentForView (whose status
+// filter also admits changes_requested) instead of LoadActiveInstanceByDocument,
+// but otherwise enforces the identical view-authz gate (CapDocumentView with
+// the CapApprovalOversee fallback, area-scoped visibility). This is what lets
+// the FE author-facing GET /documents/{id}/approval-instance read back a
+// non-terminal changes_requested instance after a request_changes verdict.
+// Publish and mutation flows must keep using LoadActiveInstanceByDocument /
+// LoadActiveInstanceByDocumentForMutation, not this method.
+func (s *ReadService) LoadInstanceByDocumentForView(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, error) {
+	var inst *domain.Instance
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		ctx := authz.WithCapCache(ctx)
+		// CapDocumentView is tenant-grade (iam/domain/capability_scope.go:51); pass the
+		// "tenant" sentinel so the area filter is intentionally OFF — mirrors the
+		// canonical documents/application/view_service.go:71. A missing instance is
+		// surfaced as ErrNoActiveInstance by the repo lookup below. CapApprovalOversee
+		// (M2b F3) is an explicit alternative — oversight is its own capability, never
+		// a role check (ADR 0022).
+		if viewErr := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); viewErr != nil {
+			if overseeErr := authz.Require(ctx, tx, string(iamdomain.CapApprovalOversee), "tenant"); overseeErr != nil {
+				return viewErr
+			}
+		}
+
+		loaded, err := s.repo.LoadInstanceByDocumentForView(ctx, tx, tenantID, documentID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return infrastructure.ErrNoActiveInstance
+			}
+			return err
+		}
+		if loaded == nil {
+			return infrastructure.ErrNoActiveInstance
+		}
+
+		areaCode, found, err := loadInstanceAreaCode(ctx, tx, s.cdRead, tenantID, loaded.ID)
+		if err != nil {
+			return fmt.Errorf("read load instance by document for view: load area: %w", err)
+		}
+		if !found {
+			return infrastructure.ErrNoActiveInstance
+		}
+
+		if err := requireInstanceVisible(ctx, tx, loaded, areaCode); err != nil {
+			return err
+		}
+
+		inst = loaded
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return inst, nil
+}
+
 // LoadActiveInstanceByDocumentForMutation finds the current active approval
 // instance for a document without enforcing read-capability checks.
 // Mutation services enforce their own capability gates (e.g. signoff/cancel).

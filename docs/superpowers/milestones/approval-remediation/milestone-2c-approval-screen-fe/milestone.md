@@ -1,7 +1,7 @@
 # Milestone 2c — Approval Screen FE
 
 > **Program:** approval-remediation  ·  **Governing spec:** `docs/superpowers/specs/2026-07-07-approval-remediation-design.md` §8 (C1–C5)
-> **Status:** Spec approved
+> **Status:** Validator PASS (2026-07-07, `qa/milestone-qa.md`) — pending operator HS-1
 > **Authored:** 2026-07-07 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** M2c is, **which features**

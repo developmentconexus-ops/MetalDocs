@@ -43,6 +43,9 @@ func (stubApprovalRepo) LoadInstancesByIDs(_ context.Context, _ platformdb.Tx, _
 func (stubApprovalRepo) LoadActiveInstanceByDocument(_ context.Context, _ platformdb.Tx, _, _ string) (*domain.Instance, error) {
 	return nil, nil
 }
+func (stubApprovalRepo) LoadInstanceByDocumentForView(_ context.Context, _ platformdb.Tx, _, _ string) (*domain.Instance, error) {
+	return nil, nil
+}
 func (stubApprovalRepo) ValidateScheduledSupersedeTarget(_ context.Context, _ platformdb.Tx, _, _, _ string) error {
 	return nil
 }
