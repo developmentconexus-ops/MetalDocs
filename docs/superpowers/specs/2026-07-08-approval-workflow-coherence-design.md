@@ -32,9 +32,12 @@ dead code on any route with a review stage. Works only on approval-only routes.
   `DocumentEditorPage` (661 lines, `/documents/:id/edit`) + `ApprovalCockpitPage` (348 lines,
   `/approvals/:documentId`) — both mount `DocumentShell` for the same artifact. Separately, the
   document **record** surface `DocumentDetailLayout`/`DocumentDetailRoute` + `distribution` child
-  lives at `/documents/:id` (a different altitude — revisions/distribution/lineage/metadata). The
-  single-screen work collapses the two working surfaces; whether the record surface folds in is the
-  M2d Destination Decision (see milestone-2d `## Destination`).
+  lives at `/documents/:id` (a different altitude — revisions/distribution/lineage/metadata).
+  **Destination pinned (operator, 2026-07-08):** the working screen takes the canonical URL
+  `/documents/:id`; the record surface survives unchanged at `/documents/:id/details`
+  (+ `distribution` child); `/edit` and `/approvals/:documentId` redirect. See milestone-2d
+  `## Destination` for the full rationale (canonical-artifact-URL evidence + surface-vs-domain
+  ratification).
 - **C — hollowed shell:** cockpit renders `ArtifactApprovalScreen` with
   `decision: undefined, approvalChain: null, actions: []` just to reuse its grid
   (`ApprovalCockpitPage.tsx:196`).
@@ -146,7 +149,10 @@ backend. Kernel untouched.
   stage actions leave it entirely.
 
 ### A3 — Single screen
-- `/documents/:id` is the only destination; `/approvals/:documentId` becomes a redirect.
+- `/documents/:id` is the only working destination (canonical artifact URL — pinned by operator
+  2026-07-08); `/approvals/:documentId` AND `/documents/:id/edit` become redirects to it.
+- The record surface (`DocumentDetailRoute`/`DocumentDetailLayout` + `distribution`) moves
+  unchanged to `/documents/:id/details` — different altitude, kept, not absorbed.
 - `ApprovalCockpitPage` + hollowed-shell composition deleted; `DocumentEditorPage` adapts
   by workspace mode; `DecisionFooter` variant = `stage_kind` (F4 contract honored).
 - Worklist (`/approvals`) stays; its deep links target `/documents/:id`.

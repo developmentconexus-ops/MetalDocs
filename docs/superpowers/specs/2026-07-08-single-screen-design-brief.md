@@ -12,8 +12,12 @@
 One screen (`/documents/:id`) that adapts by derived workspace mode (`deriveWorkspaceMode`)
 — the Google Docs editing/suggesting/viewing model. Author, reviewer, approver, and
 observer see the SAME shell; what changes is the canvas mode, the sidebar footer, and the
-contextual panels. `ApprovalCockpitPage` is deleted; `/approvals/:documentId` becomes a
-redirect.
+contextual panels. `ApprovalCockpitPage` is deleted; `/approvals/:documentId` and
+`/documents/:id/edit` become redirects to `/documents/:id` (destination pinned by operator
+2026-07-08 — canonical artifact URL). The record surface (revisions/distribution/lineage)
+survives unchanged at `/documents/:id/details`. One surface, modular domains: approval
+components (`features/approval`) compose into the document screen per mode; the signature
+ceremony stays a re-auth panel WITHIN the screen, never a separate URL.
 
 ## 2. Primary action per mode
 
@@ -94,6 +98,12 @@ reason, timestamp; signature legal-effect copy unchanged (M2b); no UUID/hash lea
    `ArtifactMetaSidebar` composition is replaced by the same right-sidebar architecture as
    every other mode (meta + route preview as sidebar panels). More refactor inside M2d,
    accepted — it IS the single-screen point.
+3. **Destination — `/documents/:id` canonical (Option 1.5) — YES.** Working screen owns the
+   artifact's canonical URL; record surface moves unchanged to `/documents/:id/details`
+   (+ `distribution` child); `/edit` and `/approvals/:documentId` redirect. Surface unified,
+   domains modular (approval components compose in from `features/approval`); signature =
+   ceremony within the screen. Reopen trigger: external-signer persona → standalone ceremony
+   page. Approver/observer modes lazy-load editing chunks (bundle discipline — F2d.5 spec item).
 
 ## 10. Implementation references
 

@@ -67,19 +67,24 @@ DocumentShell working canvas); `/approvals/:documentId` = `ApprovalCockpitPage`.
 vision collapses the two **DocumentShell working surfaces** (editor + cockpit). The record view
 (revisions/distribution/lineage/metadata) is a different altitude.
 
-**DECISION PENDING OPERATOR** (see chat 2026-07-08). One of:
-- **(1) Working screen at `/documents/:id/edit`** — unify editor+cockpit there; `/approvals/:documentId`
-  redirects to `/edit`; the record page `/documents/:id` stays and deep-links into `/edit`. Bounded,
-  defect-focused, YAGNI on the record surface.
-- **(2) Working screen at `/documents/:id`** — the true single destination; record concerns
-  (revisions/distribution/lineage) fold into the working screen's sidebar panels + `lifecycle` mode
-  (the brief already places meta/lineage/timeline in the sidebar); `distribution` becomes a sidebar
-  panel or a child of the new screen; `/edit` and `/approvals/:documentId` both redirect to
-  `/documents/:id`; `DocumentDetailRoute`/`DocumentDetailLayout` retired. Bigger scope (+1 feature to
-  absorb the record surface); the strongest read of "the document is the protagonist / one destination".
+**DECISION PINNED — operator, 2026-07-08 (Option 1.5, "canonical artifact URL"):**
+- **`/documents/:id` = the mode-adaptive working screen** (canonical URL of the artifact —
+  clicking the artifact opens the artifact; evidence: Google Docs one-URL modes, GitHub PR
+  review-where-you-read, Figma capability-driven surface, Veeva Doc Info hosting workflow tasks).
+- **`/documents/:id/details` = the record surface** — `DocumentDetailRoute`/`DocumentDetailLayout`
+  survive unchanged, they *move down* one segment; `distribution` stays a child of `details`.
+  Record is a different altitude, not absorbed (YAGNI).
+- **Redirects:** `/documents/:id/edit` → `/documents/:id`; `/approvals/:documentId` → `/documents/:id`.
+  Params preserved; worklist deep links target `/documents/:id`.
+- **Surface vs domain (adversarial ratification, chat 2026-07-08):** ONE surface, domains stay
+  modular — canvas/autosave own `features/documents`; timeline/DecisionFooter/signature panel own
+  `features/approval` and COMPOSE into the screen per mode. Signature = ceremony WITHIN the screen
+  (re-auth modal, Qualio/Veeva pattern), never a separate URL. Reopen trigger: an EXTERNAL signer
+  persona (no app account) would justify a DocuSign-style standalone ceremony page — not before.
+- **F2d.5 addendum:** approver/observer modes must not pay the editor bundle — lazy-load editing
+  chunks by mode (goes into the F2d.5 feature spec).
 
-Once pinned, update governing-spec §1.2-B blast radius (today it counts only DocumentEditorPage +
-ApprovalCockpitPage) and the design brief §1/§5 destination language accordingly.
+Governing-spec §1.2-B and design brief §1/§5 updated with this pin (2026-07-08).
 
 ## Milestone validation definition
 
