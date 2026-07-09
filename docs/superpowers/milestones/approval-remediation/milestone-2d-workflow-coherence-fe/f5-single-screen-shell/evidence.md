@@ -71,4 +71,37 @@
   decision seed approving-only, submit reuse intact, EditorCanvas handlers identical, approving canvas
   read-only (PDF → F2d.5b), Wine tokens only, no `any`.
 
-## S3 — pending (route flip + deep-links + breadcrumb + ADR)
+## S3 — Route flip + deep-links + breadcrumb + ADR · CLOSED
+- `documents/routes.tsx`: `/documents/:id` → `DocumentWorkspacePage` (the new screen goes LIVE);
+  `DocumentDetailLayout` subtree (index `DocumentDetailRoute` + `distribution` child) moved to
+  `/documents/:id/details`; `/documents/:id/edit` → `RedirectEditToWorkspace` (reads `useParams`,
+  preserves `:id`). `documents/new` + `RedirectToLibrary` statics still win over `:documentId`.
+- `approval/routes.tsx`: `/approvals/:documentId` → `RedirectApprovalToWorkspace` (reads `useParams` +
+  `useLocation`, forwards `location.search` so `?decision=` survives) → `/documents/:id`. Does NOT import
+  or delete `ApprovalCockpitPage` (F2d.7 owns deletion — file confirmed still present).
+- Deep-links: `InboxPage.tsx` both navigations retargeted `/approvals/` → `/documents/` (grep gate:
+  no `/approvals/` left in InboxPage); `DocumentDistributionPage.tsx:95` breadcrumb href →
+  `/documents/${id}/details`.
+- ADR: `wiki/decisions/0080-single-artifact-destination.md` (+ index.md row) — canonical `/documents/:id`,
+  record at `/details`, `/edit` + `/approvals/:id` redirect (query preserved), reopen trigger =
+  external-signer persona, notes the F2d.5b PDF-read-canvas amendment.
+- TDD: `routes.test.tsx` rewritten — 4 assertions (RED first): `/documents/:id/details`→layout,
+  `/documents/:id`→workspace, `/documents/:id/edit`→redirect (pathname+param), `/approvals/:id?decision=approve`
+  →redirect (pathname AND search preserved). `InboxPage.test.tsx` assertions updated to the intentional
+  retarget.
+- Gates (self-verified): routes 4/4 + Inbox 20/20 + Distribution 7/7 = **31 PASS**; `tsc --noEmit` **0**.
+  Full suite 866 pass / 1 fail = `ApprovalCockpitPage ?decision=reject preselect` — **provably not a
+  regression**: S3 modifies no cockpit file/component (git status confirms), so the failure is independent
+  of this slice (owned by cockpit which F2d.7 retires anyway).
+- Independent review (cavecrew-reviewer): **no findings** — route priority correct, redirects preserve
+  param+query, cockpit/editor files intact, deep-links retargeted, tests real, ADR format matches 0079.
+- Deferred (flagged, out of S3 scope → F2d.7 mechanical cleanup per milestone.md): 4 residual
+  `/documents/${id}/edit` navigation constructors (`documentWorkflow.ts:30`, `NewDocumentWizardPage.tsx:179`,
+  `DocumentDetailRoute.tsx:101,145`) — functional today (bounce one hop through the `/edit` redirect).
+
+---
+## F2d.5 — FEATURE COMPLETE
+All slices closed: S1 (66cfb02c) · S2a (d2de8e97) · S2b (9e516725) · S3 (this commit). The mode-adaptive
+single working screen is live at `/documents/:id`. Lazy editor split relocated to **F2d.5b** (PDF read
+canvas — operator-ratified 2026-07-09). Non-goals held: no comment replies (F2d.6), no cockpit deletion
+(F2d.7), no DTO/mutation change.

@@ -96,7 +96,7 @@ export function InboxPage() {
   // killed at the cockpit).
   function openDocument(item: InboxItem) {
     setActionError(null);
-    navigate(`/approvals/${item.document_id}`);
+    navigate(`/documents/${item.document_id}`);
   }
 
   async function openDecisionFlow(item: InboxItem, decision: 'approve' | 'reject') {
@@ -107,7 +107,7 @@ export function InboxPage() {
         setActionError('Fluxo de aprovação indisponível para este documento no momento.');
         return;
       }
-      navigate(`/approvals/${active.document_id}?decision=${decision}`);
+      navigate(`/documents/${active.document_id}?decision=${decision}`);
     } catch {
       setActionError('Fluxo de aprovação indisponível para este documento no momento.');
     }

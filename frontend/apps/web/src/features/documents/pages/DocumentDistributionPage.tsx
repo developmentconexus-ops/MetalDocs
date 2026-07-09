@@ -92,7 +92,7 @@ export function DocumentDistributionPage() {
         breadcrumb={[
           { label: 'Biblioteca', href: '/documents' },
           { label: EM_DASH },
-          { label: code, href: `/documents/${documentId}` },
+          { label: code, href: `/documents/${documentId}/details` },
           { label: 'Distribuição' },
         ]}
         docCard={

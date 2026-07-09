@@ -1,6 +1,15 @@
-import { Navigate, type RouteObject } from "react-router-dom";
+import { Navigate, useParams, type RouteObject } from "react-router-dom";
 
 const RedirectToLibrary = () => <Navigate to="/documents" replace />;
+
+// F2d.5 S3 — the cockpit/editor split is retired (ADR 0080); `/edit` now
+// forwards into the mode-adaptive workspace at the canonical artifact path.
+// `<Navigate to="...">` does not interpolate `:documentId` itself, so the
+// param is read and interpolated here.
+function RedirectEditToWorkspace() {
+  const { documentId } = useParams<{ documentId: string }>();
+  return <Navigate to={`/documents/${documentId}`} replace />;
+}
 
 export const documentsRoutes: RouteObject[] = [
   {
@@ -18,11 +27,15 @@ export const documentsRoutes: RouteObject[] = [
   { path: "documents/recent/*", element: <RedirectToLibrary /> },
   {
     path: "documents/:documentId/edit",
-    handle: { workspaceView: "document-editor" },
-    lazy: () => import("./pages/DocumentEditorRoutePage"),
+    element: <RedirectEditToWorkspace />,
   },
   {
     path: 'documents/:documentId',
+    handle: { workspaceView: 'document-editor' },
+    lazy: () => import('./pages/DocumentWorkspacePage').then((m) => ({ Component: m.DocumentWorkspacePage })),
+  },
+  {
+    path: 'documents/:documentId/details',
     handle: { workspaceView: 'library' },
     lazy: () => import('./pages/DocumentDetailLayout').then(m => ({ Component: m.DocumentDetailLayout })),
     children: [

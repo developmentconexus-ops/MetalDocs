@@ -239,7 +239,7 @@ describe('InboxPage', () => {
 
     await waitFor(() => {
       expect(fetchActiveDocumentInstance).toHaveBeenCalledWith('cd-123');
-      expect(navigateMock).toHaveBeenCalledWith('/approvals/doc-1?decision=approve');
+      expect(navigateMock).toHaveBeenCalledWith('/documents/doc-1?decision=approve');
     });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -281,14 +281,16 @@ describe('InboxPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Devolver/i }));
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith('/approvals/doc-9?decision=reject');
+      expect(navigateMock).toHaveBeenCalledWith('/documents/doc-9?decision=reject');
     });
   });
 
   // F5 (M2c C3): single-destination — primary item open must land on the
-  // cockpit, never the author editor. This replaces the old
-  // fetchActiveDocumentInstance -> /documents/:id/edit vector.
-  it('primary open (Abrir documento) navigates to the approval cockpit, not the editor', async () => {
+  // mode-adaptive workspace, never the author editor. This replaces the old
+  // fetchActiveDocumentInstance -> /documents/:id/edit vector. F2d.5 S3
+  // retired the standalone approval cockpit route in favor of the single
+  // canonical artifact path (`/documents/:id`, ADR 0080).
+  it('primary open (Abrir documento) navigates to the document workspace, not the editor', async () => {
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ document_id: 'doc-cockpit', controlled_document_id: 'cd-cockpit' })], total: 1 },
       isLoading: false,
@@ -300,7 +302,7 @@ describe('InboxPage', () => {
     fireEvent.click(screen.getByText('Abrir documento'));
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith('/approvals/doc-cockpit');
+      expect(navigateMock).toHaveBeenCalledWith('/documents/doc-cockpit');
     });
     expect(fetchActiveDocumentInstance).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalledWith(expect.stringContaining('/edit'));
