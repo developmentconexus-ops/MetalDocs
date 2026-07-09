@@ -3,6 +3,11 @@ services:
     image: postgres:16
     container_name: metaldocs-postgres
     restart: unless-stopped
+    # After an unclean shutdown, PG16's default crash-recovery pre-sync walks EVERY file
+    # in the data dir with fsync — with the testdb-factory's hundreds of test databases
+    # on WSL2 that took 40+ min. syncfs syncs each filesystem in one call instead
+    # (same durability guarantee, Linux-only, which the container always is).
+    command: ["postgres", "-c", "recovery_init_sync_method=syncfs"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -30,7 +35,11 @@ services:
       # initdb.d BEFORE the server accepts connections; that can take 1-2 min. Failures
       # during start_period do NOT count toward retries, so give initdb generous room —
       # otherwise the api/worker service_healthy gate aborts before the schema is loaded.
-      start_period: 180s
+      # After an unclean shutdown (Docker/WSL VM kill), PG16 additionally fsyncs the
+      # whole data directory before accepting connections — observed >6 min on WSL2.
+      # start_period must cover the worst of both paths or compose up aborts on
+      # "dependency postgres failed to start ... is unhealthy" mid-recovery.
+      start_period: 600s
 
   redis:
     image: redis:7
