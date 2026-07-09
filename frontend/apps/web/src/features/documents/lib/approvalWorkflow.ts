@@ -33,7 +33,8 @@ export interface TransitionPolicy {
   disabledReason?: string;
   readOnly?: boolean;
   actions: {
-    signoff: boolean;
+    // F2d.3: `signoff` (a stage action) left this policy — stage eligibility is now
+    // derived from the workspace-mode selector (viewer truth), not document status.
     cancelInstance: boolean;
     publishOrSchedule: boolean;
   };
@@ -41,41 +42,41 @@ export interface TransitionPolicy {
 
 export const TRANSITION_POLICY: Record<ApprovalState, TransitionPolicy> = {
   draft: {
-    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { cancelInstance: false, publishOrSchedule: false },
   },
   under_review: {
     disabledReason: 'Documento em revisão — edição bloqueada',
-    actions: { signoff: true, cancelInstance: true, publishOrSchedule: false },
+    actions: { cancelInstance: true, publishOrSchedule: false },
   },
   approved: {
-    actions: { signoff: false, cancelInstance: false, publishOrSchedule: true },
+    actions: { cancelInstance: false, publishOrSchedule: true },
   },
   scheduled: {
     disabledReason: 'Aguardando data de vigência agendada',
     readOnly: true,
-    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { cancelInstance: false, publishOrSchedule: false },
   },
   published: {
-    actions: { signoff: false, cancelInstance: false, publishOrSchedule: true },
+    actions: { cancelInstance: false, publishOrSchedule: true },
   },
   superseded: {
     disabledReason: 'Versão substituída — somente leitura',
     readOnly: true,
-    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { cancelInstance: false, publishOrSchedule: false },
   },
   rejected: {
     disabledReason: 'Documento rejeitado — edite e submeta novamente',
-    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { cancelInstance: false, publishOrSchedule: false },
   },
   obsolete: {
     disabledReason: 'Documento obsoleto — somente leitura',
     readOnly: true,
-    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { cancelInstance: false, publishOrSchedule: false },
   },
   cancelled: {
     disabledReason: 'Aprovação cancelada',
     readOnly: true,
-    actions: { signoff: false, cancelInstance: false, publishOrSchedule: false },
+    actions: { cancelInstance: false, publishOrSchedule: false },
   },
 };
 

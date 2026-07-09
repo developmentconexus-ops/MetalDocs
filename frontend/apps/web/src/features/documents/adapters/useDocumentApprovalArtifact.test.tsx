@@ -39,8 +39,20 @@ const BASE_DOC = {
   created_by: 'admin-user',
 };
 
-function makeInstance(): ApprovalInstance {
+// F2d.1/F2d.2 made viewer + verdicts required on the response type. Default viewer:
+// a non-author, not eligible on the active stage (the read-only observer baseline).
+function makeViewer(over: Partial<ApprovalInstance['viewer']> = {}): ApprovalInstance['viewer'] {
   return {
+    is_author: false,
+    eligible_for_active_stage: false,
+    has_signed_active_stage: false,
+    via_delegation_from: null,
+    ...over,
+  };
+}
+
+function makeInstance(over: Partial<ApprovalInstance> = {}): ApprovalInstance {
+  const base: ApprovalInstance = {
     id: 'inst-1',
     document_id: 'doc-1',
     route_id: 'route-1',
@@ -70,10 +82,34 @@ function makeInstance(): ApprovalInstance {
         ],
         due_at: '2026-04-16T10:00:00.000Z',
       },
-    ],
+    ] as ApprovalInstance['stages'],
     etag: 'v1',
     frozen_content_hash: 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90',
+    viewer: makeViewer(),
+    verdicts: [],
   };
+  return { ...base, ...over };
+}
+
+// F2d.3: the signature panel is offered only on an ACTIVE APPROVAL stage the viewer
+// is eligible for (mode === 'approving') — not merely because the document is
+// under_review. This models that scenario for the offered-decision tests.
+function makeApprovingInstance(): ApprovalInstance {
+  return makeInstance({
+    stages: [
+      {
+        id: 'stage-appr',
+        stage_index: 0,
+        label: 'Aprovação',
+        status: 'active',
+        stage_kind: 'approval',
+        signoffs: [],
+        actors: [{ user_id: 'approver-1', display_name: 'approver-1', status: 'active' }],
+        due_at: '2026-04-16T10:00:00.000Z',
+      },
+    ] as unknown as ApprovalInstance['stages'],
+    viewer: makeViewer({ eligible_for_active_stage: true }),
+  });
 }
 
 const handlers: DocumentApprovalHandlers = {
@@ -233,8 +269,9 @@ describe('useDocumentApprovalArtifact', () => {
   // ── FE-02: model.decision is the single ArtifactDecisionModel construction path
   // (previously built inline in SignoffDetailPage) ──────────────────────────────
 
-  it('under_review with a resolved context + locked instance → model.decision offers approve/reject with password+legal+signer', async () => {
+  it('active approval stage + eligible viewer + locked instance → model.decision offers approve/reject with password+legal+signer', async () => {
     mockContext('under_review');
+    vi.mocked(getInstance).mockResolvedValue(makeApprovingInstance());
     const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
@@ -274,6 +311,7 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('decision.submit delegates to the injected decisionInputs.submit with (optionKey, reason, password)', async () => {
     mockContext('under_review');
+    vi.mocked(getInstance).mockResolvedValue(makeApprovingInstance());
     const decisionInputs = makeDecisionInputs();
     const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, decisionInputs));
 
@@ -285,6 +323,7 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('passes defaultOptionKey through from decisionInputs (e.g. from a ?decision= deep-link)', async () => {
     mockContext('under_review');
+    vi.mocked(getInstance).mockResolvedValue(makeApprovingInstance());
     const { result } = renderHook(() =>
       useDocumentApprovalArtifact('doc-1', handlers, { defaultOptionKey: 'reject', submit: vi.fn() }),
     );

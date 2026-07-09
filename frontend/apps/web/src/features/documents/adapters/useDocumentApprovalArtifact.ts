@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { getInstance } from '../../approval/api/approvalApi';
 import type { ApprovalInstance } from '../../approval/api/approvalTypes';
+import { deriveWorkspaceMode } from '../../approval/lib/workspaceMode';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import { useAuthStore } from '../../../store/auth.store';
 import type {
@@ -81,8 +82,9 @@ export interface DocumentApprovalArtifact {
  * wrapper owns dialog state and passes the openers in via `handlers`.
  *
  * The plain actions appear per state (cancel → publish); signing routes through
- * the shared DecisionPanel instead of a button (gated on `policy.actions.signoff`
- * in the route). The cockpit is approver-only: submitting a document for review
+ * the shared DecisionPanel instead of a button (offered when the workspace mode
+ * is `approving` — server-derived viewer truth, not document status). The cockpit
+ * is approver-only: submitting a document for review
  * happens exclusively on the document editor, so there is no cold-submit path or
  * ETag seed here — when there is no active instance the document is in draft and
  * no cockpit write is possible.
@@ -166,8 +168,8 @@ export function useDocumentApprovalArtifact(
   // Ordered, gated actions — emit ONLY the allowed actions, in display order
   // (cancel → publish), matching the old "button appears only when allowed"
   // behavior. Signing is NOT a plain action: it routes exclusively through the
-  // shared DecisionPanel, gated on `policy.actions.signoff` in the route
-  // (SignoffDetailPage), so no 'signoff' button is emitted here. The cockpit is
+  // shared DecisionPanel, offered via the workspace-mode selector (mode
+  // 'approving'), so no 'signoff' button is emitted here. The cockpit is
   // approver-only, so there is no 'submit' action either — submitting for review
   // lives exclusively on the document editor.
   const actions: ArtifactAction[] = [];
@@ -202,8 +204,17 @@ export function useDocumentApprovalArtifact(
   // legal-effect confirmation. Offered only when the active context is confirmed and
   // policy allows signing on a locked instance (FE-02: single decision construction
   // path, owned by `buildDocumentSignoffDecision` — was inline in SignoffDetailPage).
+  // Stage eligibility is server-derived (viewer truth), NOT document status: the
+  // signature panel is offered only when the workspace mode is `approving` (an
+  // approval-kind active stage the caller is eligible for). This is the F2d.3 fix
+  // for the M2c defect where the old status-based `policy.actions.signoff` gate
+  // offered signoff on a review stage → 412 content_hash_mismatch.
   const signoffOffered =
-    sidebarReady && policy.actions.signoff && lockedByInstanceId != null && instance != null && contentHash != null;
+    sidebarReady &&
+    deriveWorkspaceMode(doc, instance, instance?.viewer ?? null) === 'approving' &&
+    lockedByInstanceId != null &&
+    instance != null &&
+    contentHash != null;
 
   const decision: ArtifactDecisionModel | undefined = buildDocumentSignoffDecision({
     offered: signoffOffered,
