@@ -159,10 +159,10 @@ func (r *postgresApprovalRepository) InsertSignoff(ctx context.Context, tx db.Tx
 		payload = json.RawMessage("{}")
 	}
 
-	var actorDisplayNameSnapshot sql.NullString
-	if v := s.ActorDisplayNameSnapshot(); v != "" {
-		actorDisplayNameSnapshot = sql.NullString{String: v, Valid: true}
-	}
+	// actor_display_name_snapshot is a DB-enforced invariant (NOT NULL + CHECK
+	// (<> ''), migration 0294 / ADR 0079). Bind it UNCONDITIONALLY — an empty
+	// snapshot fails closed at the DB (eQMS audit-truth), never silently NULL.
+	actorDisplayNameSnapshot := s.ActorDisplayNameSnapshot()
 
 	var onBehalfOf sql.NullString
 	if v := s.OnBehalfOf(); v != "" {
@@ -829,7 +829,7 @@ func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context
 		SELECT id, approval_instance_id, stage_instance_id, actor_user_id,
 		       actor_tenant_id, decision, coalesce(comment,''), signed_at,
 		       signature_method, signature_payload, content_hash,
-		       coalesce(actor_display_name_snapshot,''), signature_meaning
+		       actor_display_name_snapshot, signature_meaning
 		FROM approval_signoffs
 		WHERE approval_instance_id = $1
 		  AND EXISTS (
@@ -1054,7 +1054,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		SELECT id, approval_instance_id, stage_instance_id, actor_user_id,
 		       actor_tenant_id, decision, coalesce(comment,''), signed_at,
 		       signature_method, signature_payload, content_hash,
-		       coalesce(actor_display_name_snapshot,''), signature_meaning
+		       actor_display_name_snapshot, signature_meaning
 		FROM approval_signoffs
 		WHERE approval_instance_id = ANY($1)
 		  AND EXISTS (
@@ -1222,10 +1222,11 @@ func (r *postgresApprovalRepository) UpdateInstanceStatusWithReason(ctx context.
 // mismatching → ErrActorAlreadySigned (reused sentinel — same SoD-class
 // conflict, "actor already recorded a verdict on this stage").
 func (r *postgresApprovalRepository) InsertVerdict(ctx context.Context, tx db.Tx, v domain.ReviewVerdict) (VerdictInsertResult, error) {
-	var actorDisplayNameSnapshot sql.NullString
-	if name := v.ActorDisplayNameSnapshot(); name != "" {
-		actorDisplayNameSnapshot = sql.NullString{String: name, Valid: true}
-	}
+	// actor_display_name_snapshot is a DB-enforced invariant (NOT NULL + CHECK
+	// (<> ''), migration 0294 / ADR 0079). Bind it UNCONDITIONALLY — an empty
+	// snapshot now fails closed at the DB (the eQMS audit-truth guarantee) rather
+	// than being silently written as NULL. No read fallback exists to mask it.
+	actorDisplayNameSnapshot := v.ActorDisplayNameSnapshot()
 
 	var onBehalfOf sql.NullString
 	if val := v.OnBehalfOf(); val != "" {
@@ -1275,7 +1276,7 @@ func (r *postgresApprovalRepository) loadVerdictByStageActor(ctx context.Context
 	row := tx.QueryRowContext(ctx, `
 		SELECT v.id, v.approval_instance_id, v.stage_instance_id, v.actor_user_id,
 		       v.actor_tenant_id, v.verdict, coalesce(v.comment,''), v.verdict_at,
-		       coalesce(v.actor_display_name_snapshot,''), coalesce(v.on_behalf_of_user_id,'')
+		       v.actor_display_name_snapshot, coalesce(v.on_behalf_of_user_id,'')
 		FROM approval_review_verdicts v
 		JOIN approval_instances i ON i.id = v.approval_instance_id
 		WHERE v.stage_instance_id = $1
@@ -1327,7 +1328,7 @@ func (r *postgresApprovalRepository) LoadStageVerdicts(ctx context.Context, tx d
 	rows, err := tx.QueryContext(ctx, `
 		SELECT v.id, v.approval_instance_id, v.stage_instance_id,
 		       v.actor_user_id, v.actor_tenant_id, v.verdict,
-		       coalesce(v.comment,''), v.verdict_at, coalesce(v.actor_display_name_snapshot,''),
+		       coalesce(v.comment,''), v.verdict_at, v.actor_display_name_snapshot,
 		       coalesce(v.on_behalf_of_user_id,'')
 		  FROM approval_review_verdicts v
 		  JOIN approval_instances ai
@@ -1343,6 +1344,42 @@ func (r *postgresApprovalRepository) LoadStageVerdicts(ctx context.Context, tx d
 	}
 	defer rows.Close()
 
+	return scanVerdicts(rows)
+}
+
+// LoadInstanceVerdicts fetches ALL verdicts for an approval instance across
+// every stage, ordered chronologically (verdict_at ASC), for the by-document
+// view's verdict-history projection (F2d.2, ADR 0079). Unlike LoadStageVerdicts
+// (single-stage, quorum counting), this spans the whole instance. The actor
+// display name is selected DIRECTLY — no coalesce — because migration 0294 made
+// actor_display_name_snapshot NOT NULL + non-empty; the name is the immutable
+// value cast at the moment of the verdict (no read fallback, no live lookup).
+func (r *postgresApprovalRepository) LoadInstanceVerdicts(ctx context.Context, tx db.Tx, tenantID, instanceID string) ([]domain.ReviewVerdict, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT v.id, v.approval_instance_id, v.stage_instance_id,
+		       v.actor_user_id, v.actor_tenant_id, v.verdict,
+		       coalesce(v.comment,''), v.verdict_at, v.actor_display_name_snapshot,
+		       coalesce(v.on_behalf_of_user_id,'')
+		  FROM approval_review_verdicts v
+		  JOIN approval_instances ai
+		    ON ai.id = v.approval_instance_id
+		 WHERE v.approval_instance_id = $1
+		   AND ai.tenant_id = $2::uuid
+		   AND v.actor_tenant_id = ai.tenant_id
+		 ORDER BY v.verdict_at ASC`,
+		instanceID, tenantID,
+	)
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	defer rows.Close()
+
+	return scanVerdicts(rows)
+}
+
+// scanVerdicts materializes a verdict row set shared by LoadStageVerdicts and
+// LoadInstanceVerdicts (identical column projection and order).
+func scanVerdicts(rows *sql.Rows) ([]domain.ReviewVerdict, error) {
 	var verdicts []domain.ReviewVerdict
 	for rows.Next() {
 		var (

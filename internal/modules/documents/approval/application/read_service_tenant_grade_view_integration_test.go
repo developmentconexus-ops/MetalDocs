@@ -94,6 +94,14 @@ func newReadServiceForIntegration(t *testing.T, db *sql.DB) *ReadService {
 
 func ctxWithIdentity(tenantID, actorID string) context.Context {
 	ctx := tenant.WithTenantID(context.Background(), tenantID)
+	// Seed the PLATFORM actor key: the TxRunner chokepoint
+	// (seedTxIdentityFromContext) reads tenant.ActorFromContext to set the
+	// tx-local metaldocs.actor_id GUC that authz.Require / MustActorID read.
+	// iamdomain.WithAuthContext sets a DISTINCT request-scoped key (iam.user_id)
+	// and does NOT feed that chokepoint — without this line the actor_id GUC is
+	// never seeded and every authz.Require in these tests fails with
+	// ErrActorContextMissing.
+	ctx = tenant.WithActorID(ctx, actorID)
 	return iamdomain.WithAuthContext(ctx, actorID, nil)
 }
 

@@ -128,6 +128,11 @@ type ApprovalRepository interface {
 	// instance, used to evaluate quorum for the `ready` path exactly like
 	// LoadStageSignoffs.
 	LoadStageVerdicts(ctx context.Context, tx db.Tx, tenantID, stageInstanceID string) ([]domain.ReviewVerdict, error)
+	// LoadInstanceVerdicts fetches ALL verdicts for an approval instance across
+	// every stage, chronologically ordered — the by-document view's verdict-
+	// history projection (F2d.2, ADR 0079). Actor display name is the immutable
+	// snapshot (NOT NULL, migration 0294); no read fallback.
+	LoadInstanceVerdicts(ctx context.Context, tx db.Tx, tenantID, instanceID string) ([]domain.ReviewVerdict, error)
 
 	// Read helpers relocated from application layer (H-5.1).
 	// All run inside the caller's transaction so the atomic boundary is preserved.

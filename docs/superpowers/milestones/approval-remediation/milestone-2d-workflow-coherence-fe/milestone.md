@@ -153,3 +153,32 @@ enforces for this milestone:
 | HS-3 | Prerequisite failure: API not runnable, auth/session broken, contract/generated drift, review-canvas suggest mode broken |
 | HS-4 | Validator FAIL → named fix feature, re-run lifecycle, re-dispatch validator |
 | HS-6 | Scope drift beyond the Features table / rabbit-hole list — stop and replan |
+
+## Amendments
+
+### 2026-07-09 — HS-2 cleared: F2d.2 scope grows to the display-name invariant (operator "A", global maximum)
+
+The milestone body says "F2d.2 needs NO migration" (lines 132-133, 143-144). During F2d.2 speccing the
+`actor_display_name_snapshot` name-source question surfaced a **no-fallback** design fork. Operator answer
+(verbatim principle): *"A professional System … with no redundancies, does not need a fallback (unless
+needs a fail-safe) … analyse … the root cause … we don't care about refactoring."* Presented the A/B
+boundary decision (A = global-maximum root-cause fix now; B = read-only, defer); operator chose **A**.
+
+This is a **conscious HS-2 clearance** ("any non-additive persistence need in F2d.2"): the persistence
+change below is authorized, overriding the "NO migration" rows for F2d.2 only.
+
+- **In scope now (F2d.2):**
+  - **D1 — DB-enforces-invariants migration.** Backfill any NULL/`''` `actor_display_name_snapshot`
+    from `iam_users.display_name`, then `SET NOT NULL` + `CHECK (<> '')` on the snapshot column of
+    **both** `approval_review_verdicts` and `approval_signoffs`. Insert bindings bind the snapshot
+    unconditionally (remove the `if name != ""` omission). No decision-logic change to the write path.
+  - **D2 — remove the read fallbacks.** Drop the `coalesce(…, '')` in verdict/signoff loads; collapse
+    the signoff mapper's snapshot-else-live branch to **snapshot-only**. Name in history is the value
+    cast at the moment of the signed action, immutable (eQMS audit truth).
+- **Still deferred:** D3 (`on_behalf_of` delegator display name in verdict history) — needs a new
+  snapshot column; bounded to a later feature.
+- **Governing ADR:** `wiki/decisions/0079-verdict-history-contract.md` (verdict-history contract +
+  immutable actor-name snapshot, no read fallback, DB-enforced).
+
+All other milestone rows stand. The "NO migration" statement remains true for every feature **except
+F2d.2**.

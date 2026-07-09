@@ -106,7 +106,7 @@ func TestMapInstanceResponse_RendersSignatureMeaning(t *testing.T) {
 		},
 	}
 
-	resp, err := h.mapInstanceResponse(t.Context(), "tenant-1", inst)
+	resp, err := h.mapInstanceResponse(t.Context(), "tenant-1", inst, nil, nil)
 	if err != nil {
 		t.Fatalf("map response: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestMapInstanceResponse_UsesRevisionVersionETag(t *testing.T) {
 		RevisionVersion: 8,
 	}
 
-	resp, err := h.mapInstanceResponse(t.Context(), "tenant-1", inst)
+	resp, err := h.mapInstanceResponse(t.Context(), "tenant-1", inst, nil, nil)
 	if err != nil {
 		t.Fatalf("map response: %v", err)
 	}

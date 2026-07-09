@@ -3877,7 +3877,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApprovalInstanceByDocumentResponse'
+                $ref: '#/components/schemas/ApprovalInstanceResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -6433,7 +6433,7 @@ components:
         revision_version: { type: integer, minimum: 1 }
         published_document_id: { type: string, format: uuid }
         approval_instance_id: { type: string, format: uuid }
-    ApprovalInstanceByDocumentResponse:
+    ApprovalInstanceResponse:
       type: object
       required: [id, document_id, route_id, tenant_id, status, submitted_by, submitted_at, stages, etag, completed_at, frozen_content_hash]
       properties:
@@ -6462,6 +6462,87 @@ components:
             F6/F8 — the SHA-256 hex digest pinned at freeze time (no-fallback
             principle, spec §11). null when the instance has not yet reached
             the freeze boundary.
+    ApprovalInstanceByDocumentResponse:
+      type: object
+      required: [id, document_id, route_id, tenant_id, status, submitted_by, submitted_at, stages, etag, completed_at, frozen_content_hash, viewer, verdicts]
+      properties:
+        id: { type: string, format: uuid }
+        document_id: { type: string, format: uuid }
+        route_id: { type: string, format: uuid }
+        tenant_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [in_progress, approved, rejected, cancelled, changes_requested]
+        submitted_by: { type: string }
+        submitted_at: { type: string, format: date-time }
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalStageInstanceResponse'
+        etag: { type: string }
+        frozen_content_hash:
+          type: string
+          nullable: true
+          description: >-
+            F6/F8 — the SHA-256 hex digest pinned at freeze time (no-fallback
+            principle, spec §11). null when the instance has not yet reached
+            the freeze boundary.
+        viewer:
+          type: object
+          description: >-
+            F2d.1 (ADR 0078) — server-derived eligibility truth for the
+            authenticated caller, always present when the instance is
+            returned. Display facts only: the frontend must never derive
+            eligibility client-side; enforcement stays at tier-2
+            authz.Require plus the write-path CheckEligibility/CheckSoD.
+          required: [is_author, eligible_for_active_stage, has_signed_active_stage, via_delegation_from]
+          properties:
+            is_author: { type: boolean }
+            eligible_for_active_stage: { type: boolean }
+            has_signed_active_stage: { type: boolean }
+            via_delegation_from:
+              nullable: true
+              type: object
+              required: [user_id, display_name]
+              properties:
+                user_id: { type: string }
+                display_name: { type: string }
+        verdicts:
+          type: array
+          description: >-
+            F2d.2 (ADR 0079) — the instance's review-verdict history across ALL
+            stages, ordered chronologically (verdict_at ascending). Empty array
+            when no verdict has been recorded. actor_display_name is the
+            immutable snapshot cast at the moment of the verdict (audit truth —
+            never re-resolved from the live directory, no fallback).
+          items:
+            $ref: '#/components/schemas/ApprovalVerdictRecordResponse'
+    ApprovalVerdictRecordResponse:
+      type: object
+      required: [id, stage_instance_id, actor_user_id, actor_display_name, verdict, reason, verdict_at]
+      properties:
+        id: { type: string, format: uuid }
+        stage_instance_id: { type: string, format: uuid }
+        actor_user_id: { type: string }
+        actor_display_name:
+          type: string
+          description: >-
+            Immutable snapshot of the actor's display name at verdict time
+            (DB-enforced non-empty, migration 0294). Never re-resolved live.
+        verdict:
+          type: string
+          enum: [ready, request_changes]
+        reason:
+          type: string
+          nullable: true
+          description: >-
+            The verdict comment. Required and non-empty for request_changes,
+            optional for ready; null when absent.
+        verdict_at: { type: string, format: date-time }
     ApprovalStageInstanceResponse:
       type: object
       required: [id, stage_index, label, status, signoffs, actors, due_at]

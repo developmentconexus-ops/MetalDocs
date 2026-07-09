@@ -36,6 +36,11 @@ type readService interface {
 	// GET handler: its status filter also admits changes_requested (unlike
 	// LoadActiveInstanceByDocument, which stays narrow for publish/mutation).
 	LoadInstanceByDocumentForView(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, error)
+	// LoadInstanceByDocumentForViewWithViewer (F2d.1, ADR 0078) is
+	// LoadInstanceByDocumentForView's viewer-facts sibling: same load +
+	// visibility gate, plus the server-derived domain.ViewerFacts for the
+	// caller, computed in-tx via the shared write-path eligibility primitives.
+	LoadInstanceByDocumentForViewWithViewer(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, domain.ViewerFacts, []domain.ReviewVerdict, error)
 	ListPendingForActor(ctx context.Context, runner db.TxRunner, tenantID, actorID string, areaCode string, limit, offset int) ([]domain.Instance, error)
 	ListInboxItems(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, error)
 	ListInboxItemsWithTotal(ctx context.Context, runner db.TxRunner, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, int, error)

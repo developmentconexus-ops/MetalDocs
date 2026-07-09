@@ -3314,6 +3314,27 @@ export interface components {
             /** Format: uuid */
             approval_instance_id?: string;
         };
+        ApprovalInstanceResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            document_id: string;
+            /** Format: uuid */
+            route_id: string;
+            /** Format: uuid */
+            tenant_id: string;
+            /** @enum {string} */
+            status: "in_progress" | "approved" | "rejected" | "cancelled" | "changes_requested";
+            submitted_by: string;
+            /** Format: date-time */
+            submitted_at: string;
+            /** Format: date-time */
+            completed_at: string | null;
+            stages: components["schemas"]["ApprovalStageInstanceResponse"][];
+            etag: string;
+            /** @description F6/F8 — the SHA-256 hex digest pinned at freeze time (no-fallback principle, spec §11). null when the instance has not yet reached the freeze boundary. */
+            frozen_content_hash: string | null;
+        };
         ApprovalInstanceByDocumentResponse: {
             /** Format: uuid */
             id: string;
@@ -3334,6 +3355,33 @@ export interface components {
             etag: string;
             /** @description F6/F8 — the SHA-256 hex digest pinned at freeze time (no-fallback principle, spec §11). null when the instance has not yet reached the freeze boundary. */
             frozen_content_hash: string | null;
+            /** @description F2d.1 (ADR 0078) — server-derived eligibility truth for the authenticated caller, always present when the instance is returned. Display facts only: the frontend must never derive eligibility client-side; enforcement stays at tier-2 authz.Require plus the write-path CheckEligibility/CheckSoD. */
+            viewer: {
+                is_author: boolean;
+                eligible_for_active_stage: boolean;
+                has_signed_active_stage: boolean;
+                via_delegation_from: {
+                    user_id: string;
+                    display_name: string;
+                } | null;
+            };
+            /** @description F2d.2 (ADR 0079) — the instance's review-verdict history across ALL stages, ordered chronologically (verdict_at ascending). Empty array when no verdict has been recorded. actor_display_name is the immutable snapshot cast at the moment of the verdict (audit truth — never re-resolved from the live directory, no fallback). */
+            verdicts: components["schemas"]["ApprovalVerdictRecordResponse"][];
+        };
+        ApprovalVerdictRecordResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            stage_instance_id: string;
+            actor_user_id: string;
+            /** @description Immutable snapshot of the actor's display name at verdict time (DB-enforced non-empty, migration 0294). Never re-resolved live. */
+            actor_display_name: string;
+            /** @enum {string} */
+            verdict: "ready" | "request_changes";
+            /** @description The verdict comment. Required and non-empty for request_changes, optional for ready; null when absent. */
+            reason: string | null;
+            /** Format: date-time */
+            verdict_at: string;
         };
         ApprovalStageInstanceResponse: {
             /** Format: uuid */
@@ -7562,7 +7610,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApprovalInstanceByDocumentResponse"];
+                    "application/json": components["schemas"]["ApprovalInstanceResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];

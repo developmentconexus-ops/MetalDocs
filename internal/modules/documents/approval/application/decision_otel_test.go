@@ -112,6 +112,9 @@ func (stubApprovalRepo) InsertVerdict(_ context.Context, _ platformdb.Tx, _ doma
 func (stubApprovalRepo) LoadStageVerdicts(_ context.Context, _ platformdb.Tx, _, _ string) ([]domain.ReviewVerdict, error) {
 	return nil, nil
 }
+func (stubApprovalRepo) LoadInstanceVerdicts(_ context.Context, _ platformdb.Tx, _, _ string) ([]domain.ReviewVerdict, error) {
+	return nil, nil
+}
 func (stubApprovalRepo) InsertDelegation(_ context.Context, _ platformdb.Tx, _ domain.Delegation) error {
 	return nil
 }

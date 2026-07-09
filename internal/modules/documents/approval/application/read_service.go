@@ -109,7 +109,7 @@ func (s *ReadService) LoadInstance(ctx context.Context, runner db.TxRunner, tena
 			return infrastructure.ErrNoActiveInstance
 		}
 
-		if err := requireInstanceVisible(ctx, tx, loaded, areaCode); err != nil {
+		if err := s.requireInstanceVisible(ctx, tx, tenantID, loaded, areaCode); err != nil {
 			return err
 		}
 
@@ -158,7 +158,7 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, runner d
 			return infrastructure.ErrNoActiveInstance
 		}
 
-		if err := requireInstanceVisible(ctx, tx, loaded, areaCode); err != nil {
+		if err := s.requireInstanceVisible(ctx, tx, tenantID, loaded, areaCode); err != nil {
 			return err
 		}
 
@@ -183,42 +183,10 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, runner d
 func (s *ReadService) LoadInstanceByDocumentForView(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, error) {
 	var inst *domain.Instance
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
-		ctx := authz.WithCapCache(ctx)
-		// CapDocumentView is tenant-grade (iam/domain/capability_scope.go:51); pass the
-		// "tenant" sentinel so the area filter is intentionally OFF — mirrors the
-		// canonical documents/application/view_service.go:71. A missing instance is
-		// surfaced as ErrNoActiveInstance by the repo lookup below. CapApprovalOversee
-		// (M2b F3) is an explicit alternative — oversight is its own capability, never
-		// a role check (ADR 0022).
-		if viewErr := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); viewErr != nil {
-			if overseeErr := authz.Require(ctx, tx, string(iamdomain.CapApprovalOversee), "tenant"); overseeErr != nil {
-				return viewErr
-			}
-		}
-
-		loaded, err := s.repo.LoadInstanceByDocumentForView(ctx, tx, tenantID, documentID)
+		loaded, err := s.loadInstanceByDocumentForViewTx(ctx, tx, tenantID, documentID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return infrastructure.ErrNoActiveInstance
-			}
 			return err
 		}
-		if loaded == nil {
-			return infrastructure.ErrNoActiveInstance
-		}
-
-		areaCode, found, err := loadInstanceAreaCode(ctx, tx, s.cdRead, tenantID, loaded.ID)
-		if err != nil {
-			return fmt.Errorf("read load instance by document for view: load area: %w", err)
-		}
-		if !found {
-			return infrastructure.ErrNoActiveInstance
-		}
-
-		if err := requireInstanceVisible(ctx, tx, loaded, areaCode); err != nil {
-			return err
-		}
-
 		inst = loaded
 		return nil
 	})
@@ -226,6 +194,97 @@ func (s *ReadService) LoadInstanceByDocumentForView(ctx context.Context, runner 
 		return nil, err
 	}
 	return inst, nil
+}
+
+// LoadInstanceByDocumentForViewWithViewer is LoadInstanceByDocumentForView's
+// viewer-facts sibling (F2d.1, ADR 0078): same load + visibility gate, inside
+// the SAME view tx it additionally loads the caller's active delegations
+// (plain SELECT, H-PRE-1 safe) and computes domain.ViewerFacts via the
+// SHARED write-path eligibility primitives (domain.ViewerEligibility, which
+// composes ResolveEligibleIdentity + CheckSoD) — never a second membership or
+// SoD rule.
+func (s *ReadService) LoadInstanceByDocumentForViewWithViewer(ctx context.Context, runner db.TxRunner, tenantID, documentID string) (*domain.Instance, domain.ViewerFacts, []domain.ReviewVerdict, error) {
+	var inst *domain.Instance
+	var vf domain.ViewerFacts
+	var verdicts []domain.ReviewVerdict
+	err := runner.Do(ctx, func(tx *sql.Tx) error {
+		loaded, err := s.loadInstanceByDocumentForViewTx(ctx, tx, tenantID, documentID)
+		if err != nil {
+			return err
+		}
+
+		viewerID, err := authz.MustActorID(ctx, tx)
+		if err != nil {
+			return err
+		}
+
+		delegations, err := s.repo.LoadActiveDelegationsFor(ctx, tx, tenantID, viewerID, time.Now().UTC())
+		if err != nil {
+			return fmt.Errorf("read load instance by document with viewer: load delegations: %w", err)
+		}
+
+		// Verdict history (F2d.2, ADR 0079): all stages, chronological. Plain
+		// SELECT in the same view tx (H-PRE-1 safe — no lock held on this path).
+		loadedVerdicts, err := s.repo.LoadInstanceVerdicts(ctx, tx, tenantID, loaded.ID)
+		if err != nil {
+			return fmt.Errorf("read load instance by document with viewer: load verdicts: %w", err)
+		}
+
+		inst = loaded
+		vf = domain.ViewerEligibility(viewerID, loaded.SubmittedBy, loaded.Active(), delegations, loaded.Stages)
+		verdicts = loadedVerdicts
+		return nil
+	})
+	if err != nil {
+		return nil, domain.ViewerFacts{}, nil, err
+	}
+	return inst, vf, verdicts, nil
+}
+
+// loadInstanceByDocumentForViewTx is the shared body of
+// LoadInstanceByDocumentForView and LoadInstanceByDocumentForViewWithViewer:
+// load-by-document, resolve area, enforce the view-authz gate (CapDocumentView
+// with the CapApprovalOversee fallback), then requireInstanceVisible. Callers
+// run this inside their own runner.Do so a viewer-facts caller can extend the
+// SAME tx with additional in-tx reads (e.g. delegations) after this returns.
+func (s *ReadService) loadInstanceByDocumentForViewTx(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (*domain.Instance, error) {
+	ctx = authz.WithCapCache(ctx)
+	// CapDocumentView is tenant-grade (iam/domain/capability_scope.go:51); pass the
+	// "tenant" sentinel so the area filter is intentionally OFF — mirrors the
+	// canonical documents/application/view_service.go:71. A missing instance is
+	// surfaced as ErrNoActiveInstance by the repo lookup below. CapApprovalOversee
+	// (M2b F3) is an explicit alternative — oversight is its own capability, never
+	// a role check (ADR 0022).
+	if viewErr := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); viewErr != nil {
+		if overseeErr := authz.Require(ctx, tx, string(iamdomain.CapApprovalOversee), "tenant"); overseeErr != nil {
+			return nil, viewErr
+		}
+	}
+
+	loaded, err := s.repo.LoadInstanceByDocumentForView(ctx, tx, tenantID, documentID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, infrastructure.ErrNoActiveInstance
+		}
+		return nil, err
+	}
+	if loaded == nil {
+		return nil, infrastructure.ErrNoActiveInstance
+	}
+
+	areaCode, found, err := loadInstanceAreaCode(ctx, tx, s.cdRead, tenantID, loaded.ID)
+	if err != nil {
+		return nil, fmt.Errorf("read load instance by document for view: load area: %w", err)
+	}
+	if !found {
+		return nil, infrastructure.ErrNoActiveInstance
+	}
+
+	if err := s.requireInstanceVisible(ctx, tx, tenantID, loaded, areaCode); err != nil {
+		return nil, err
+	}
+
+	return loaded, nil
 }
 
 // LoadActiveInstanceByDocumentForMutation finds the current active approval
@@ -701,9 +760,22 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, runner db.TxRunn
 // instance in the tenant — visibility is scoped to {the submitting author,
 // any current-or-past stage pool member (eligible_actor_ids on ANY stage,
 // not just the active one — a completed stage's reviewers keep visibility
-// into the instance they acted on), a CapApprovalOversee holder, or a
-// CapDocumentEdit holder}. Returns infrastructure.ErrInstanceNotVisible
-// (mapped to 404, "cross-boundary = not-found") when none of these hold.
+// into the instance they acted on) OR an active DELEGATE of such a member,
+// a CapApprovalOversee holder, or a CapDocumentEdit holder}. Returns
+// infrastructure.ErrInstanceNotVisible (mapped to 404, "cross-boundary =
+// not-found") when none of these hold.
+//
+// Delegation-awareness (F2d.1, ADR 0078 completing ADR 0075 × ADR 0077): the
+// pool-membership branch composes on the SAME single eligibility primitive the
+// write path uses — domain.CheckEligibility for the direct fast path, then
+// domain.ResolveEligibleIdentity over the actor's active delegations on the
+// fallback. Read-visibility is therefore a projection of act-eligibility and
+// cannot diverge from it (the split-brain M2d exists to kill): a delegate who
+// can sign a stage (decision_service.go / review_verdict_service.go, delegation
+// -aware) can now also LOAD the instance, instead of a prior 404. The delegation
+// SELECT runs only after the direct check misses, so the common non-delegated
+// read pays no extra round-trip (mirrors ADR 0077's fallback-query-only
+// discipline on the write path).
 //
 // This tightens the pre-F8 behavior documented in
 // read_service_tenant_grade_view_integration_test.go (a bare tenant-grade
@@ -726,7 +798,7 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, runner db.TxRunn
 // resolvable anywhere in the chain) fails closed for CapDocumentEdit for
 // non-system actors, mirroring documents/application/fillin_authz.go's
 // requireDocEditDraft.
-func requireInstanceVisible(ctx context.Context, tx *sql.Tx, inst *domain.Instance, areaCode string) error {
+func (s *ReadService) requireInstanceVisible(ctx context.Context, tx *sql.Tx, tenantID string, inst *domain.Instance, areaCode string) error {
 	actorID, err := authz.MustActorID(ctx, tx)
 	if err != nil {
 		return err
@@ -735,17 +807,33 @@ func requireInstanceVisible(ctx context.Context, tx *sql.Tx, inst *domain.Instan
 	if inst.SubmittedBy == actorID {
 		return nil
 	}
+
+	// Pool membership across ALL stages (current-or-past — a completed stage's
+	// reviewers keep visibility, per ADR 0075). Evaluated through the SAME
+	// eligibility primitive the write path uses so visibility cannot diverge
+	// from act-eligibility.
+	var pool []string
 	for i := range inst.Stages {
-		for _, eligible := range inst.Stages[i].EligibleActorIDs {
-			if eligible == actorID {
-				return nil
-			}
-		}
+		pool = append(pool, inst.Stages[i].EligibleActorIDs...)
+	}
+	// Direct fast path: no delegation load for the common non-delegated read.
+	if domain.CheckEligibility(actorID, pool) == nil {
+		return nil
+	}
+	// Delegation fallback (ADR 0077): an active delegate of any pool member is
+	// visible exactly as they are eligible to act. In-tx plain SELECT, H-PRE-1
+	// safe; runs only after the direct check misses.
+	delegations, err := s.repo.LoadActiveDelegationsFor(ctx, tx, tenantID, actorID, time.Now().UTC())
+	if err != nil {
+		return fmt.Errorf("require instance visible: load delegations: %w", err)
+	}
+	if _, err := domain.ResolveEligibleIdentity(actorID, pool, delegations); err == nil {
+		return nil
 	}
 
-	// Not the author, not a pool member on any stage: fall back to the two
-	// oversight/edit capabilities. Either satisfies visibility; system_admin
-	// already short-circuits inside authz.Require itself.
+	// Not the author, not a (possibly delegated) pool member on any stage: fall
+	// back to the two oversight/edit capabilities. Either satisfies visibility;
+	// system_admin already short-circuits inside authz.Require itself.
 	if err := authz.Require(ctx, tx, string(iamdomain.CapApprovalOversee), "tenant"); err == nil {
 		return nil
 	}

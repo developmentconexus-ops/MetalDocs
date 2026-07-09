@@ -61,6 +61,48 @@ type InstanceResponse struct {
 	// (no-fallback principle, spec §11). Required-and-nullable on the wire
 	// (present as explicit null, never omitted) — nil before the freeze boundary.
 	FrozenContentHash *string `json:"frozen_content_hash"`
+	// Viewer (F2d.1, ADR 0078) is the server-derived eligibility-truth block
+	// for the authenticated caller. Present only on the by-document view
+	// (GetInstanceByDocumentHandler); omitted on the by-id read
+	// (GetInstanceHandler), which is not scoped to a single viewer's workspace.
+	Viewer *ViewerFacts `json:"viewer,omitempty"`
+	// Verdicts (F2d.2, ADR 0079) is the instance's review-verdict history across
+	// ALL stages, chronological (verdict_at asc), empty ⇒ []. A pointer so the
+	// by-document view emits it as a present (possibly empty) array while the
+	// by-id read omits it entirely (nil pointer) — mirroring the Viewer split.
+	// actor_display_name is the immutable snapshot at action time.
+	Verdicts *[]VerdictRecord `json:"verdicts,omitempty"`
+}
+
+// VerdictRecord is the wire representation of one recorded review verdict
+// (F2d.2, ADR 0079). Reason carries the verdict comment (required and non-empty
+// for request_changes, optional for ready).
+type VerdictRecord struct {
+	ID               string  `json:"id"`
+	StageInstanceID  string  `json:"stage_instance_id"`
+	ActorUserID      string  `json:"actor_user_id"`
+	ActorDisplayName string  `json:"actor_display_name"`
+	Verdict          string  `json:"verdict"`
+	Reason           *string `json:"reason"`
+	VerdictAt        string  `json:"verdict_at"`
+}
+
+// ViewerFacts (F2d.1, ADR 0078) is the server-derived eligibility truth for
+// the authenticated caller against the instance's active stage. Display
+// facts only — the DTO never gates the server; enforcement stays at
+// authz.Require (tier-2) plus the write-path CheckEligibility/CheckSoD.
+type ViewerFacts struct {
+	IsAuthor               bool                  `json:"is_author"`
+	EligibleForActiveStage bool                  `json:"eligible_for_active_stage"`
+	HasSignedActiveStage   bool                  `json:"has_signed_active_stage"`
+	ViaDelegationFrom      *ViewerDelegationFrom `json:"via_delegation_from"`
+}
+
+// ViewerDelegationFrom identifies the delegator granting the viewer
+// eligibility, when eligibility is satisfied purely via delegation.
+type ViewerDelegationFrom struct {
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
 }
 
 // StageInstance is the wire representation of one stage's runtime state within an InstanceResponse.
