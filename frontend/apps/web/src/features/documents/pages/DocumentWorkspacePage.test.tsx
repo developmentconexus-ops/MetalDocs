@@ -8,6 +8,7 @@ import { DocumentWorkspacePage } from './DocumentWorkspacePage';
 import * as documentsApi from '../api/documents';
 import type { DocumentDetail } from '../api/documents';
 import type { ApprovalInstance, StageInstance } from '../../approval/api/approvalTypes';
+import * as controlledDocumentsApi from '../../controlled-documents/api/controlledDocuments';
 
 vi.mock('@metaldocs/editor-ui', () => ({
   MetalDocsEditor: React.forwardRef((props: Record<string, unknown>, ref) => {
@@ -22,8 +23,45 @@ vi.mock('@metaldocs/editor-ui', () => ({
 }));
 
 vi.mock('../../../store/auth.store', () => ({
-  useAuthStore: (selector: (s: { user: { displayName: string; userId: string } }) => unknown) =>
-    selector({ user: { displayName: 'Ana Revisora', userId: 'user-reviewer-1' } }),
+  useAuthStore: (selector: (s: { user: { displayName: string; userId: string; email: string; username: string } }) => unknown) =>
+    selector({ user: { displayName: 'Ana Revisora', userId: 'user-reviewer-1', email: 'ana@example.com', username: 'ana' } }),
+}));
+
+// EditorCanvas is a normal (non-lazy) import in the owner page — mounting the
+// writable canvas needs a writer session; every existing S2a case renders the
+// read-only DocumentShell canvas and never touches these three hooks, so a
+// 'writer' default here is a no-op for those tests while unlocking
+// author-editing/author-changes-requested test cases below.
+vi.mock('../hooks/editor/useDocumentSession', () => ({
+  useDocumentSession: () => ({
+    state: { phase: 'writer', sessionID: 'session-1', lastAckRevisionID: 'rev-1' },
+    acquire: vi.fn(),
+    release: vi.fn(),
+    setLastAck: vi.fn(),
+  }),
+}));
+
+vi.mock('../hooks/editor/useDocumentAutosave', () => ({
+  useDocumentAutosave: () => ({
+    status: 'idle',
+    queue: vi.fn().mockResolvedValue(undefined),
+    flush: vi.fn().mockResolvedValue(true),
+  }),
+}));
+
+vi.mock('../hooks/editor/useDocumentComments', () => ({
+  useDocumentComments: () => ({
+    comments: [],
+    loading: false,
+    loadError: null,
+    add: vi.fn(),
+    resolve: vi.fn(),
+    reopen: vi.fn(),
+    remove: vi.fn(),
+    reply: vi.fn(),
+    retry: vi.fn(),
+    setComments: vi.fn(),
+  }),
 }));
 
 function makeDoc(overrides: Partial<DocumentDetail> = {}): DocumentDetail {
@@ -106,6 +144,11 @@ describe('DocumentWorkspacePage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.spyOn(documentsApi, 'signedRevisionURL').mockReturnValue('/revisions/rev-1/signed-url');
+    vi.spyOn(controlledDocumentsApi, 'fetchActiveDocumentInstance').mockResolvedValue({
+      content_hash: 'hash-abc',
+      revision_version: 3,
+      approval_instance_id: 'inst-1',
+    } as Awaited<ReturnType<typeof controlledDocumentsApi.fetchActiveDocumentInstance>>);
     mockFileFetch();
   });
 
@@ -219,5 +262,115 @@ describe('DocumentWorkspacePage', () => {
     await waitFor(() =>
       expect(screen.getByText('Não foi possível localizar este documento.')).toBeInTheDocument(),
     );
+  });
+
+  // ---------- S2b ----------
+
+  it('author-editing: writable EditorCanvas, no verdict CTAs, no signature panel', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'draft' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        status: 'in_progress',
+        viewer: {
+          is_author: true,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    const { container } = renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.getByTestId('editor')).toHaveAttribute('data-mode', 'document-edit');
+    expect(screen.getByText('Editando')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Pronto para aprovação' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Solicitar mudanças' })).not.toBeInTheDocument();
+    expect(container.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it('author-changes-requested: EditorCanvas + teaching-copy banner + RequestedChangesPanel', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'draft' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        status: 'changes_requested',
+        viewer: {
+          is_author: true,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.getByTestId('editor')).toHaveAttribute('data-mode', 'document-edit');
+    expect(screen.getByText(/Mudanças foram solicitadas nesta etapa/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Mudanças solicitadas')).toBeInTheDocument();
+  });
+
+  it('approving (eligible): frozen read canvas + ApprovingDisclosure + signature panel, delegation badge when applicable', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'under_review' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        stages: [makeStage({ stage_kind: 'approval' })],
+        viewer: {
+          is_author: false,
+          eligible_for_active_stage: true,
+          has_signed_active_stage: false,
+          via_delegation_from: { user_id: 'user-delegator-1', display_name: 'Bruno Said' },
+        },
+      }),
+    );
+    const { container } = renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.getByTestId('editor')).toHaveAttribute('data-mode', 'readonly');
+    expect(screen.getByText('Aprovando')).toBeInTheDocument();
+    expect(screen.getByText('Conteúdo verificado ✓ · detalhes')).toBeInTheDocument();
+    expect(container.querySelector('input[type="password"]')).not.toBeNull();
+    expect(screen.getByTestId('delegation-badge')).toHaveTextContent('Assinando por delegação de Bruno Said');
+  });
+
+  it('approving + ?decision=approve: preselects the approve option (M2c regression precedent)', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'under_review' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        stages: [makeStage({ stage_kind: 'approval' })],
+        viewer: {
+          is_author: false,
+          eligible_for_active_stage: true,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt('/documents/doc-1/workspace?decision=approve');
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/declara aprovação/)).toBeInTheDocument());
+  });
+
+  it('approving, NOT eligible (SoD): no signature panel even on an approval-kind active stage', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'under_review' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        stages: [makeStage({ stage_kind: 'approval' })],
+        viewer: {
+          is_author: false,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    const { container } = renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.getByText('Visualizando')).toBeInTheDocument();
+    expect(container.querySelector('input[type="password"]')).toBeNull();
+    expect(screen.queryByText('Conteúdo verificado ✓ · detalhes')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('delegation-badge')).not.toBeInTheDocument();
   });
 });

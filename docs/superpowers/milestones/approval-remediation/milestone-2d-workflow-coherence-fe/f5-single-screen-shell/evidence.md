@@ -42,5 +42,33 @@
   surface (Veeva modal, GitHub review flow); separate ceremony URL only for external signers
   (DocuSign/Adobe) = existing reopen trigger; PDF read = Veeva viewable-rendition pattern.
 
-## S2b — pending
+## S2b — Editing + approving modes · CLOSED
+- Scope: `EditorCanvas` extracted from `DocumentEditorPage` body (normal import, NOT lazy — lazy → F2d.5b);
+  `DocumentWorkspacePage` canvas now branches on `mode` — author-editing/author-changes-requested →
+  writable `EditorCanvas`; approving → read-only frozen DocumentShell + `ApprovingDisclosure`
+  (reused `IntegrityDisclosure` + "assinando por delegação de X" badge from `viewer.via_delegation_from`);
+  other modes unchanged (S2a read canvas). `author-changes-requested` gets a wine-token warning banner atop
+  the canvas + `RequestedChangesPanel` (F6) threaded as `WorkspaceSidebar.contextualPanel` (between timeline
+  and footer).
+- `?decision=` seed: `useSearchParams().get('decision')` → `buildDocumentSignoffDecision.defaultOptionKey`,
+  built ONLY in approving mode; non-approving decision stays null. Signature panel gates on
+  `viewer.eligible_for_active_stage` via the S1 DecisionFooter (decision!=null path).
+- Submit: reused `useSignoffMutation` verbatim (same If-Match/content_hash contract), mirroring
+  ApprovalCockpitPage's `decisionSubmit` (signOff → refetch). `contentHash`/`revisionVersion` from
+  `useControlledDocumentActiveDocumentQuery`, gated `enabled` unless approving. No new mutation, no
+  If-Match/DTO change (F2d.4 owns instance state).
+- Files (new): `components/workspace/EditorCanvas.{tsx,test.tsx}`,
+  `components/workspace/ApprovingDisclosure.{tsx,module.css,test.tsx}`. (changed) `DocumentEditorPage.tsx`
+  (body → EditorCanvas), `DocumentWorkspacePage.{tsx,module.css,test.tsx}`, `WorkspaceSidebar.tsx`
+  (decision?/contextualPanel? props). Hooks hoisted above early returns in the owner (reviewer-verified
+  stable order, no conditional hooks).
+- TDD: failing per-mode tests first (author-editing, author-changes-requested banner+F6, approving eligible
+  → signature+disclosure, approving+`?decision=approve` preselect, approving NOT eligible → no panel with
+  explicit `viewer.eligible_for_active_stage=false` fixture), then implementation to green.
+- Gates (self-verified, not subagent-claimed): `vitest run` 6 files / **63 tests PASS** incl.
+  `DocumentEditorPage.test.tsx` 30/30 (extraction fidelity); `tsc --noEmit` **0 errors**.
+- Independent review (cavecrew-reviewer): **no findings** — hooks-order correct, mode source sole,
+  decision seed approving-only, submit reuse intact, EditorCanvas handlers identical, approving canvas
+  read-only (PDF → F2d.5b), Wine tokens only, no `any`.
+
 ## S3 — pending (route flip + deep-links + breadcrumb + ADR)

@@ -27,7 +27,7 @@ import {
   AutosaveStatus,
   type AutosaveState,
 } from '../../shared/components/editor-chrome';
-import { DocumentShell } from '../components/DocumentShell';
+import { EditorCanvas } from '../components/workspace/EditorCanvas';
 import { RequestedChangesPanel } from '../components/RequestedChangesPanel';
 import { CodeChip, StatusPill } from '../../../components/ui';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
@@ -469,8 +469,9 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
             <div role="alert" className={styles.error}>
               {pageLoadError}
             </div>
-          ) : canMountEditor ? (
-            <DocumentShell
+          ) : (
+            <EditorCanvas
+              canMountEditor={canMountEditor}
               documentId={documentID}
               currentRevisionId={doc?.current_revision_id ?? null}
               editorMode={canEditContent ? 'document-edit' : 'readonly'}
@@ -524,7 +525,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 ) : null
               }
             />
-          ) : null}
+          )}
         </main>
         {!pageLoadError ? (
           <ArtifactMetaSidebar

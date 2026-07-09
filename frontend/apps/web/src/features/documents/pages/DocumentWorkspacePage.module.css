@@ -84,6 +84,16 @@
   font-size: 13px;
 }
 
+/* ---------- author-changes-requested banner (S2b) ---------- */
+.changesBanner {
+  margin: var(--sp-3, 12px) var(--sp-4, 16px) 0;
+  flex: 0 0 auto;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning);
+  color: var(--text);
+  font-size: 13px;
+}
+
 /* ---------- Loading skeleton (§6) ---------- */
 .skeletonBlock {
   width: 220px;

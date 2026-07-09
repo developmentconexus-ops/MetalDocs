@@ -1,34 +1,46 @@
-import { Link, useParams } from 'react-router-dom';
+import { useMemo, useRef, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import type { MetalDocsEditorRef, EditorComment, TrackedChange } from '@metaldocs/editor-ui';
 
-import { CodeChip, StatusPill } from '../../../components/ui';
+import { CodeChip, InlineAlert, StatusPill } from '../../../components/ui';
 import { useAuthStore } from '../../../store/auth.store';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import { deriveWorkspaceMode } from '../../approval/lib/workspaceMode';
+import { useSignoffMutation } from '../../approval/hooks/useSignoffMutation';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
+import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
+import { useDocumentSession } from '../hooks/editor/useDocumentSession';
+import { useDocumentAutosave } from '../hooks/editor/useDocumentAutosave';
+import { useDocumentComments } from '../hooks/editor/useDocumentComments';
+import { buildDocumentSignoffDecision } from '../lib/documentSignoffDecision';
 import { DocumentShell } from '../components/DocumentShell';
+import { EditorCanvas } from '../components/workspace/EditorCanvas';
+import { ApprovingDisclosure } from '../components/workspace/ApprovingDisclosure';
+import { RequestedChangesPanel } from '../components/RequestedChangesPanel';
 import { ModeChip } from '../components/workspace/ModeChip';
 import { WorkspaceSidebar } from '../components/workspace/WorkspaceSidebar';
 import { parseDocumentStatus } from '../lib/parseDocumentStatus';
 import styles from './DocumentWorkspacePage.module.css';
 
 /**
- * F2d.5 S2a — the mode-adaptive single working screen owner.
+ * F2d.5 S2b — the mode-adaptive single working screen owner.
  *
  * Constant shell (header + ModeChip + canvas + WorkspaceSidebar) across every
- * `WorkspaceMode` (F2d.3, `deriveWorkspaceMode`) — only the canvas content and
- * the sidebar's decision footer vary by mode. This slice covers the READ
- * modes only: every mode renders the same read-only DocumentShell canvas
- * (mirrors the ApprovalCockpitPage "documento" tab pattern — no writer
- * session, no autosave).
- *
- * S2b: swaps the canvas for the lazy editor on author-editing /
- * author-changes-requested and for the disclosure/signature seed on
- * approving. Marked inline with `// S2b:` — do not build those here.
+ * `WorkspaceMode` (F2d.3, `deriveWorkspaceMode`); the canvas content and the
+ * sidebar's decision footer vary by mode:
+ *  - author-editing / author-changes-requested: the writable EditorCanvas
+ *    (autosave-backed), with a teaching-copy banner for changes-requested
+ *    plus the RequestedChangesPanel (F6) as a sidebar contextual panel.
+ *  - approving: the frozen read canvas + ApprovingDisclosure (hash/ETag +
+ *    delegation badge) + a signature decision seeded from `?decision=`.
+ *  - reviewing / observing / author-waiting / lifecycle: unchanged S2a read
+ *    canvas.
  */
 export function DocumentWorkspacePage() {
   const { documentId = '' } = useParams<{ documentId: string }>();
   const currentUser = useAuthStore((s) => s.user);
+  const [searchParams] = useSearchParams();
 
   const docQuery = useDocumentDetailQuery(documentId);
   const instanceQuery = useApprovalInstanceQuery(documentId);
@@ -36,6 +48,64 @@ export function DocumentWorkspacePage() {
   const doc = docQuery.data ?? null;
   const instance = instanceQuery.data ?? null;
   const viewer = instance?.viewer ?? null;
+
+  // Mode is computed up-front (deriveWorkspaceMode accepts a possibly-null
+  // doc) so every hook below can gate on it without violating the rules of
+  // hooks — the loading/doc-not-found early returns further down must stay
+  // the LAST thing before render, no hooks after them.
+  const mode = deriveWorkspaceMode(doc, instance, viewer);
+  const docStatus = doc?.status ?? '';
+
+  const session = useDocumentSession(documentId, { enabled: docStatus === 'draft' });
+  const editorRef = useRef<MetalDocsEditorRef>(null);
+  const [trackedChanges, setTrackedChanges] = useState<TrackedChange[]>([]);
+
+  const sessionPhase = session.state.phase;
+  const sessionID = sessionPhase === 'writer' ? session.state.sessionID : '';
+  const lastAckRevisionID = sessionPhase === 'writer' ? session.state.lastAckRevisionID : '';
+  const { setLastAck } = session;
+
+  const autosaveArgs = useMemo(() => {
+    if (sessionPhase === 'writer') {
+      return {
+        documentID: documentId,
+        sessionID,
+        baseRevisionID: lastAckRevisionID,
+        onAdvanceBase: (newRevisionID: string) => setLastAck(newRevisionID),
+        onSessionLost: () => {},
+      };
+    }
+    return {
+      documentID: documentId,
+      sessionID: '',
+      baseRevisionID: '',
+      onAdvanceBase: () => {},
+      onSessionLost: () => {},
+    };
+  }, [documentId, sessionPhase, sessionID, lastAckRevisionID, setLastAck]);
+
+  const autosave = useDocumentAutosave(autosaveArgs);
+
+  // Mirrors DocumentEditorPage's authorDisplay: the document's creator id,
+  // not the current viewer — comment attribution stays keyed to the
+  // document's own author, not whoever happens to be looking at it.
+  const authorDisplay = String(doc?.created_by ?? '');
+  const commentsHook = useDocumentComments(documentId, authorDisplay);
+
+  // Only fetch the active-document context (content_hash/revision_version)
+  // while approving — every other mode passes undefined, which the query
+  // hook's own `enabled: Boolean(controlledDocumentId)` gate turns into a
+  // no-op.
+  const controlledDocumentId = mode === 'approving' ? doc?.controlled_document_id ?? undefined : undefined;
+  const contextQuery = useControlledDocumentActiveDocumentQuery(controlledDocumentId);
+  const contentHash = contextQuery.data?.content_hash ?? null;
+  const revisionVersion = contextQuery.data?.revision_version ?? doc?.revision_version ?? 0;
+
+  const { signOff } = useSignoffMutation({
+    documentId,
+    contentHash: contentHash ?? '',
+    revisionVersion,
+  });
 
   // §6 loading — shell skeleton, no central spinner.
   if (docQuery.isLoading) {
@@ -73,7 +143,6 @@ export function DocumentWorkspacePage() {
     );
   }
 
-  const mode = deriveWorkspaceMode(doc, instance, viewer);
   const activeStage = instance?.stages?.find((s) => s.status === 'active');
   // isFetching (not isLoading): mirrors useDocumentApprovalArtifact — a
   // manual retry after an error should still surface as "loading", which v5
@@ -83,6 +152,63 @@ export function DocumentWorkspacePage() {
   // surfaces the error (instance is optional context, not a blocking read).
   const instanceError = instanceQuery.isError ? 'Não foi possível carregar os dados de aprovação.' : null;
   const statusForPill = parseDocumentStatus(doc.status);
+
+  const canEditContent = session.state.phase === 'writer' && docStatus === 'draft';
+  const canMountEditor = docStatus === 'draft'
+    ? session.state.phase !== 'idle' && session.state.phase !== 'acquiring'
+    : true;
+
+  const formDataJson = doc.form_data_json ?? null;
+  async function handleSave(buf: ArrayBuffer) {
+    const pageCount = editorRef.current?.getPageCount() ?? null;
+    await autosave.queue(buf, formDataJson, pageCount);
+  }
+
+  const decisionParam = searchParams.get('decision');
+  const defaultOptionKey: 'approve' | 'reject' | null =
+    decisionParam === 'approve' || decisionParam === 'reject' ? decisionParam : null;
+
+  // Reuses the cockpit's exact signoff sequencing (ApprovalCockpitPage.tsx) —
+  // signOff (the shared useSignoffMutation, If-Match/content_hash unchanged)
+  // then refetch the instance so the mode/decision recompute post-signature.
+  const decisionSubmit = async (input: { optionKey: string; reason: string; password: string }) => {
+    await signOff({
+      decision: input.optionKey === 'approve' ? 'approve' : 'reject',
+      reason: input.reason || undefined,
+      password: input.password,
+    });
+    await instanceQuery.refetch();
+  };
+
+  const signer = currentUser
+    ? { displayName: currentUser.displayName, email: currentUser.email ?? null, username: currentUser.username }
+    : null;
+
+  const decision = mode === 'approving'
+    ? buildDocumentSignoffDecision({
+        offered: instance != null && contentHash != null,
+        signer,
+        defaultOptionKey,
+        submit: decisionSubmit,
+      }) ?? null
+    : null;
+
+  const delegatedFrom = viewer?.via_delegation_from?.display_name ?? null;
+  const frozenContentHash = instance?.frozen_content_hash ?? null;
+
+  const contextualPanel = mode === 'author-changes-requested'
+    ? (
+        <RequestedChangesPanel
+          trackedChanges={trackedChanges}
+          comments={commentsHook.comments}
+          onAcceptChange={(revisionId) => editorRef.current?.acceptChange(revisionId)}
+          onRejectChange={(revisionId) => editorRef.current?.rejectChange(revisionId)}
+          onResolveComment={(comment) => void commentsHook.resolve(comment)}
+        />
+      )
+    : null;
+
+  const canUseComments = docStatus === 'draft' || docStatus === 'under_review';
 
   return (
     <div className={styles.page} data-testid="workspace-page">
@@ -107,13 +233,56 @@ export function DocumentWorkspacePage() {
           </header>
 
           <main className={styles.canvas} data-testid="workspace-canvas">
-            {
-              // S2a: every mode renders this read-only canvas.
-              // S2b: author-editing / author-changes-requested mount the lazy
-              // writable editor here instead; approving mounts the
-              // disclosure/signature seed. Do not branch on `mode` yet.
-            }
-            {doc.current_revision_id ? (
+            {mode === 'approving' ? (
+              <>
+                <ApprovingDisclosure
+                  documentId={documentId}
+                  contentHash={contentHash}
+                  frozenContentHash={frozenContentHash}
+                  delegatedFrom={delegatedFrom}
+                />
+                {doc.current_revision_id ? (
+                  <DocumentShell
+                    documentId={documentId}
+                    currentRevisionId={doc.current_revision_id}
+                    editorMode="readonly"
+                    author={currentUser?.displayName ?? ''}
+                  />
+                ) : (
+                  <div className={styles.canvasEmpty}>Este documento ainda não possui conteúdo para exibir.</div>
+                )}
+              </>
+            ) : mode === 'author-editing' || mode === 'author-changes-requested' ? (
+              <>
+                {mode === 'author-changes-requested' ? (
+                  <InlineAlert
+                    tone="warning"
+                    className={styles.changesBanner}
+                    message="Mudanças foram solicitadas nesta etapa. Revise os comentários e marcações ao lado e responda antes de reenviar para revisão."
+                  />
+                ) : null}
+                {doc.current_revision_id ? (
+                  <EditorCanvas
+                    canMountEditor={canMountEditor}
+                    documentId={documentId}
+                    currentRevisionId={doc.current_revision_id}
+                    editorMode={canEditContent ? 'document-edit' : 'readonly'}
+                    editorRef={editorRef}
+                    author={authorDisplay}
+                    comments={commentsHook.comments}
+                    onCommentsChange={commentsHook.setComments}
+                    onCommentAdd={(c: EditorComment) => { if (canUseComments) void commentsHook.add(c); }}
+                    onCommentResolve={(c: EditorComment) => { if (canUseComments) void (c.resolved ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
+                    onCommentDelete={(c: EditorComment) => { if (canUseComments) void commentsHook.remove(c); }}
+                    onCommentReply={(reply: EditorComment, parent: EditorComment) => { if (canUseComments) void commentsHook.reply(reply, parent); }}
+                    onAutoSave={handleSave}
+                    onTrackedChangesChange={setTrackedChanges}
+                  />
+                ) : (
+                  <div className={styles.canvasEmpty}>Este documento ainda não possui conteúdo para exibir.</div>
+                )}
+              </>
+            ) : doc.current_revision_id ? (
               <DocumentShell
                 documentId={documentId}
                 currentRevisionId={doc.current_revision_id}
@@ -137,6 +306,8 @@ export function DocumentWorkspacePage() {
           onRefetchInstance={async () => {
             await instanceQuery.refetch();
           }}
+          decision={decision}
+          contextualPanel={contextualPanel}
         />
       </div>
     </div>

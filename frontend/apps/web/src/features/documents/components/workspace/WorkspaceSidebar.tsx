@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import type { ReactNode } from 'react';
 import { ArtifactMetaSidebar } from '../../../shared/controlled-artifact/ArtifactMetaSidebar';
-import type { ArtifactAction, ArtifactMetaModel, VersionHistoryItem } from '../../../shared/controlled-artifact/types';
+import type { ArtifactAction, ArtifactDecisionModel, ArtifactMetaModel, VersionHistoryItem } from '../../../shared/controlled-artifact/types';
 import { ApprovalTimeline } from '../../../approval/components/sidebar/ApprovalTimeline';
 import { DecisionFooter } from '../../../approval/components/sidebar/DecisionFooter';
 import type { ApprovalInstance, StageInstance } from '../../../approval/api/approvalTypes';
@@ -21,6 +22,19 @@ export interface WorkspaceSidebarProps {
   onRetryInstance?: () => void;
   activeStage: StageInstance | undefined;
   onRefetchInstance: () => Promise<void> | void;
+  /**
+   * S2b — the approving-mode signature decision (built by
+   * `buildDocumentSignoffDecision`, owner-page-computed). Null in every other
+   * mode: DecisionFooter then falls back to its own stage-mode-derived
+   * verdict/observing behavior (S2a — unchanged).
+   */
+  decision?: ArtifactDecisionModel | null;
+  /**
+   * S2b — a mode-specific contextual panel (currently: RequestedChangesPanel
+   * for author-changes-requested) rendered in the scroll stack between the
+   * approval timeline and the decision footer.
+   */
+  contextualPanel?: ReactNode;
 }
 
 // S2a: no cancel/publish dialog state lives on this screen yet (those own
@@ -47,6 +61,8 @@ export function WorkspaceSidebar({
   onRetryInstance,
   activeStage,
   onRefetchInstance,
+  decision = null,
+  contextualPanel = null,
 }: WorkspaceSidebarProps) {
   const [metaOpen, setMetaOpen] = useState(true);
 
@@ -103,11 +119,12 @@ export function WorkspaceSidebar({
           error={instanceError}
           onRetry={onRetryInstance}
         />
+        {contextualPanel}
       </div>
 
       {instance ? (
         <DecisionFooter
-          decision={null}
+          decision={decision}
           actions={NO_ACTIONS}
           instance={instance}
           activeStage={activeStage}
