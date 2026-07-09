@@ -11,6 +11,16 @@ vi.mock('../../../queries/useReviewVerdictMutation', () => ({
   useReviewVerdictMutation: () => ({ mutateAsync: mutateAsyncMock }),
 }));
 
+function makeViewer(overrides: Record<string, unknown> = {}) {
+  return {
+    is_author: false,
+    eligible_for_active_stage: false,
+    has_signed_active_stage: false,
+    via_delegation_from: null,
+    ...overrides,
+  };
+}
+
 function makeInstance(overrides: Partial<ApprovalInstance> = {}): ApprovalInstance {
   return {
     id: 'inst-1',
@@ -24,6 +34,7 @@ function makeInstance(overrides: Partial<ApprovalInstance> = {}): ApprovalInstan
     stages: [],
     etag: '"v3"',
     frozen_content_hash: null,
+    viewer: makeViewer(),
     ...overrides,
   } as ApprovalInstance;
 }
@@ -88,7 +99,7 @@ describe('DecisionFooter', () => {
         <DecisionFooter
           decision={null}
           actions={[]}
-          instance={makeInstance()}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
           activeStage={makeStage()}
           onRefetchInstance={vi.fn()}
         />,
@@ -102,7 +113,7 @@ describe('DecisionFooter', () => {
         <DecisionFooter
           decision={null}
           actions={[]}
-          instance={makeInstance()}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
           activeStage={makeStage()}
           onRefetchInstance={vi.fn()}
         />,
@@ -122,7 +133,7 @@ describe('DecisionFooter', () => {
         <DecisionFooter
           decision={null}
           actions={[]}
-          instance={makeInstance({ etag: '"v9"' })}
+          instance={makeInstance({ etag: '"v9"', viewer: makeViewer({ eligible_for_active_stage: true }) })}
           activeStage={makeStage({ id: 'stage-9' })}
           onRefetchInstance={onRefetchInstance}
         />,
@@ -144,7 +155,7 @@ describe('DecisionFooter', () => {
         <DecisionFooter
           decision={null}
           actions={[]}
-          instance={makeInstance()}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
           activeStage={makeStage()}
           onRefetchInstance={onRefetchInstance}
         />,
@@ -168,7 +179,7 @@ describe('DecisionFooter', () => {
         <DecisionFooter
           decision={null}
           actions={[]}
-          instance={makeInstance()}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
           activeStage={makeStage()}
           onRefetchInstance={vi.fn()}
         />,
@@ -241,6 +252,58 @@ describe('DecisionFooter', () => {
       );
       expect(screen.getByText('Outras ações')).toBeTruthy();
       expect(screen.getByRole('button', { name: 'Publicar / Agendar' })).toBeTruthy();
+    });
+  });
+
+  describe('observer / ineligible', () => {
+    it('renders no verdict CTAs for an ineligible viewer on an active review stage', () => {
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: false }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={vi.fn()}
+        />,
+      );
+      expect(screen.queryByRole('button', { name: 'Pronto para aprovação' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Solicitar mudanças' })).toBeNull();
+    });
+
+    it('renders lifecycle actions but no verdict CTAs for an ineligible viewer with actions present', () => {
+      const action: ArtifactAction = {
+        key: 'publish',
+        label: 'Publicar / Agendar',
+        variant: 'primary',
+        available: true,
+        run: vi.fn(),
+      };
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[action]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: false }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Outras ações')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Publicar / Agendar' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Pronto para aprovação' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Solicitar mudanças' })).toBeNull();
+    });
+
+    it('renders nothing when there is no active stage and no lifecycle actions', () => {
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: false }) })}
+          activeStage={undefined}
+          onRefetchInstance={vi.fn()}
+        />,
+      );
+      expect(screen.queryByTestId('approval-sidebar-footer')).toBeNull();
     });
   });
 });

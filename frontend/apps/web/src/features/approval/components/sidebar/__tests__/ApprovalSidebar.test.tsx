@@ -47,6 +47,14 @@ function makeInstance(overrides: Partial<ApprovalInstance> = {}): ApprovalInstan
     stages: [makeStage()],
     etag: '"v3"',
     frozen_content_hash: 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90',
+    // The sidebar is rendered to someone ACTING on the stage; the default fixture is an
+    // eligible reviewer (F2d.5 S1: the footer's verdict CTAs now require server-viewer eligibility).
+    viewer: {
+      is_author: false,
+      eligible_for_active_stage: true,
+      has_signed_active_stage: false,
+      via_delegation_from: null,
+    },
     ...overrides,
   } as ApprovalInstance;
 }

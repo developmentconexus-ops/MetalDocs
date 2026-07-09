@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ArtifactDecisionPanel } from '../../../shared/controlled-artifact/ArtifactDecisionPanel';
 import type { ArtifactAction, ArtifactDecisionModel } from '../../../shared/controlled-artifact/types';
 import type { ApprovalInstance, StageInstance } from '../../api/approvalTypes';
+import { deriveStageMode } from '../../lib/workspaceMode';
 import { useReviewVerdictMutation } from '../../queries/useReviewVerdictMutation';
 import styles from './DecisionFooter.module.css';
 
@@ -201,18 +202,21 @@ function ReviewModeFooter({
 }
 
 /**
- * Mode-aware sticky footer (spec §1.5). Review mode renders the verdict CTAs
- * (no signoff button, no password); approval mode reuses `ArtifactDecisionPanel`
- * verbatim (the tested password re-auth + legal + options flow). Both variants
- * render `actions` (publish/cancel) as a secondary "Outras ações" group.
+ * Mode-aware sticky footer (spec §1.5, F2d.5 S1 three-way gate). Three variants:
+ *  1. approving — `decision != null` (the adapter's actual signal that a signoff
+ *     is currently offered; `policy.actions.signoff` is document-status-based,
+ *     not stage_kind-based). Reuses `ArtifactDecisionPanel` verbatim (the tested
+ *     password re-auth + legal + options flow).
+ *  2. reviewing — `decision == null` and `deriveStageMode` (subject-agnostic,
+ *     stage_kind × `instance.viewer.eligible_for_active_stage`) resolves to
+ *     'reviewing' with an active stage present. Renders the verdict CTAs (no
+ *     signoff button, no password).
+ *  3. observing/lifecycle — everything else (no active stage, or an ineligible
+ *     viewer on an active stage): no decision surface at all. Only `actions`
+ *     (publish/cancel) render, in the "Outras ações" group; if there are none,
+ *     the footer renders nothing.
  *
- * The branch is keyed off `decision != null` — the adapter's actual signal
- * that a signoff is currently offered (`useDocumentApprovalArtifact`'s
- * `policy.actions.signoff` gate is document-status-based, not stage_kind-based;
- * `isApprovalStage` labels the stage but is not itself the offer condition).
- * When decision is present the cockpit is in the legal e-signature flow
- * regardless of `isApprovalStage`; otherwise it falls back to the review-verdict
- * CTAs (which require an active stage to submit against).
+ * All variants that do render surface `actions` as a secondary group.
  */
 export function DecisionFooter({
   decision,
@@ -225,12 +229,28 @@ export function DecisionFooter({
     return <ApprovalModeFooter decision={decision} actions={actions} />;
   }
 
+  const stageMode = deriveStageMode(
+    activeStage?.stage_kind as 'review' | 'approval' | undefined,
+    instance.viewer?.eligible_for_active_stage ?? false,
+  );
+
+  if (stageMode === 'reviewing' && activeStage != null) {
+    return (
+      <ReviewModeFooter
+        instance={instance}
+        activeStage={activeStage}
+        actions={actions}
+        onRefetchInstance={onRefetchInstance}
+      />
+    );
+  }
+
+  // observing / lifecycle / ineligible: no decision surface — only lifecycle
+  // actions if any.
+  if (actions.length === 0) return null;
   return (
-    <ReviewModeFooter
-      instance={instance}
-      activeStage={activeStage}
-      actions={actions}
-      onRefetchInstance={onRefetchInstance}
-    />
+    <div className={styles.footer} data-testid="approval-sidebar-footer" style={{ position: 'sticky', bottom: 0 }}>
+      <OtherActions actions={actions} />
+    </div>
   );
 }
