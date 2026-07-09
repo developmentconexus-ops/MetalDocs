@@ -2,7 +2,7 @@
 
 > **Program:** approval-remediation  ·  **Governing spec:** `docs/superpowers/specs/2026-07-08-approval-workflow-coherence-design.md` (§4, Milestone A)
 > **Design brief (visual/UX contract):** `docs/superpowers/specs/2026-07-08-single-screen-design-brief.md` (ratified 2026-07-08)
-> **Status:** Spec (drafting)
+> **Status:** Approved — operator HS-1 gate passed 2026-07-08; executing in a dedicated session
 > **Authored:** 2026-07-08 — *before any feature in this milestone began.*
 
 > This file is a **spec**, authored up front. It says **what** this milestone is,

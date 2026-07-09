@@ -25,7 +25,7 @@ every milestone operator-approved (HS-1).
 |---|-----------|----------------------|--------|-------------|
 | 2b | `milestone-2b-approval-kernel-backend` | Backend workflow/permission/contract remediation (W1-W13, P1-P8) inside `documents/approval` + `iam` | passed (operator HS-1 approved 2026-07-07) | [PASS](milestone-2b-approval-kernel-backend/qa/milestone-qa.md) |
 | 2c | `milestone-2c-approval-screen-fe` | Cockpit → editor-shell + sidebar reuse, worklist single destination, suggestion UX | validator PASS — deviation recorded (F4 contract violation), closes at M2d gate | [PASS](milestone-2c-approval-screen-fe/qa/milestone-qa.md) |
-| 2d | `milestone-2d-workflow-coherence-fe` | Server `viewer` facts + one workspace-mode selector + single mode-adaptive screen (`/documents/:id`); closes the M2c deviation at the root | spec drafted — pending operator approval | — |
+| 2d | `milestone-2d-workflow-coherence-fe` | Server `viewer` facts + one workspace-mode selector + single mode-adaptive screen (`/documents/:id`); closes the M2c deviation at the root | in-progress (operator-approved 2026-07-08; executing in dedicated session) | — |
 | 3 | `milestone-3-approval-kernel-extraction` | Approval kernel → top-level `approval` module (subject-generalized routes); templates unified onto it; supersedes ADR 0072 | planned (requires `developing-new-work` gate first) | — |
 | 4 | `milestone-4-actor-selectors` | Stage assignment generalizes to ActorSelector union (named_user / role_in_fixed_area / role_in_document_area / submit_choice) in the extracted kernel + route-builder UI + submit picker | planned | — |
 
