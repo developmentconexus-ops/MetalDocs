@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 
-import { getInstance } from '../../approval/api/approvalApi';
 import type { ApprovalInstance } from '../../approval/api/approvalTypes';
 import { deriveWorkspaceMode } from '../../approval/lib/workspaceMode';
+import { useApprovalInstanceQuery } from '../../approval/queries/useApprovalInstanceQuery';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import { useAuthStore } from '../../../store/auth.store';
 import type {
@@ -68,8 +68,6 @@ export interface DocumentApprovalArtifact {
   noActiveContext: boolean;
   /** Imperative instance refetch — seeds etagCache via getInstance. */
   refetchInstance: () => Promise<void>;
-  /** True when the last instance fetch is older than 30s (staleness banner). */
-  isStale: boolean;
 }
 
 /**
@@ -102,12 +100,6 @@ export function useDocumentApprovalArtifact(
   const contextQuery = useControlledDocumentActiveDocumentQuery(controlledDocumentId);
   const context = contextQuery.data ?? null;
 
-  const [instance, setInstance] = useState<ApprovalInstance | null>(null);
-  const [instanceLoading, setInstanceLoading] = useState(false);
-  const [instanceError, setInstanceError] = useState<string | null>(null);
-  const [lastFetchedAt, setLastFetchedAt] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
-
   // Resolve the approval-context fields (with document-detail fallbacks) exactly
   // as the old page did before constructing the panel.
   const hasActiveContext = Boolean(context && context.content_hash != null);
@@ -117,46 +109,17 @@ export function useDocumentApprovalArtifact(
   const lockedByInstanceId = context?.approval_instance_id ?? undefined;
   const publishedDocumentId = context?.published_document_id ?? undefined;
 
+  const instanceQuery = useApprovalInstanceQuery(documentId, hasActiveContext);
+  const instance = instanceQuery.data ?? null;
+  // isFetching (not isLoading): the old imperative adapter set loading on EVERY
+  // fetch incl. manual refetch; v5 isLoading is first-fetch-only, so a post-404
+  // manual refetch would not surface the spinner. isFetching preserves the old
+  // semantics (still masked by `instance == null` once a fetch has resolved data).
+  const instanceLoading = instanceQuery.isFetching;
+  const instanceError = instanceQuery.isError ? 'Erro ao carregar dados de aprovação.' : null;
   const refetchInstance = useCallback(async () => {
-    if (!documentId) {
-      return;
-    }
-    setInstanceLoading(true);
-    setInstanceError(null);
-    try {
-      const next = await getInstance(documentId);
-      setInstance(next);
-      setLastFetchedAt(Date.now());
-    } catch (err) {
-      if ((err as { status?: number }).status === 404) {
-        setInstance(null);
-        setLastFetchedAt(Date.now());
-      } else {
-        setInstanceError('Erro ao carregar dados de aprovação.');
-        setInstance(null);
-      }
-    } finally {
-      setInstanceLoading(false);
-    }
-  }, [documentId]);
-
-  // Fetch the instance once the active context is confirmed (parity: the panel
-  // only mounted — and thus only fetched — when content_hash was present).
-  useEffect(() => {
-    if (hasActiveContext) {
-      void refetchInstance();
-    }
-  }, [hasActiveContext, refetchInstance]);
-
-  // 30s staleness clock (1s tick).
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const isStale = lastFetchedAt != null && now - lastFetchedAt > 30_000;
+    await instanceQuery.refetch();
+  }, [instanceQuery]);
 
   const status = toApprovalState(approvalState);
   const policy = TRANSITION_POLICY[status];
@@ -288,6 +251,5 @@ export function useDocumentApprovalArtifact(
     contextError: contextQuery.isError,
     noActiveContext,
     refetchInstance,
-    isStale,
   };
 }

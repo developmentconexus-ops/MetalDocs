@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -121,6 +123,13 @@ function makeDecisionInputs() {
   return { defaultOptionKey: null, submit: vi.fn().mockResolvedValue(undefined) };
 }
 
+function makeWrapper() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+}
+
 function mockContext(approvalState: string, overrides: Record<string, unknown> = {}) {
   vi.mocked(useControlledDocumentActiveDocumentQuery).mockReturnValue({
     data: {
@@ -150,7 +159,9 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('emits NO actions in draft state (cockpit is approver-only; submit lives on the editor)', async () => {
     mockContext('draft', { approval_instance_id: undefined });
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -161,7 +172,9 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('emits ONLY the cancel action in under_review (signing routes through the decision panel)', async () => {
     mockContext('under_review');
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -173,7 +186,9 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('emits ONLY the publish action in approved state', async () => {
     mockContext('approved');
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -182,7 +197,9 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('emits ONLY the publish action in published state', async () => {
     mockContext('published');
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -193,7 +210,9 @@ describe('useDocumentApprovalArtifact', () => {
     'emits NO actions in read-only / terminal state %s',
     async (state) => {
       mockContext(state);
-      const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+      const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
 
       await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -203,7 +222,9 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('binds each action run to the supplied route handlers', async () => {
     mockContext('under_review');
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -214,7 +235,9 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('maps the approval instance stages/signoffs into approvalChain', async () => {
     mockContext('under_review');
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -239,7 +262,9 @@ describe('useDocumentApprovalArtifact', () => {
       isError: true,
     } as never);
 
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
     expect(result.current.contextError).toBe(true);
   });
 
@@ -250,7 +275,9 @@ describe('useDocumentApprovalArtifact', () => {
       isError: false,
     } as never);
 
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
     expect(result.current.noActiveContext).toBe(true);
   });
 
@@ -259,7 +286,9 @@ describe('useDocumentApprovalArtifact', () => {
     mockContext('draft', { approval_instance_id: undefined });
     vi.mocked(getInstance).mockRejectedValue({ status: 404 });
 
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => expect(result.current.instance).toBeNull());
 
@@ -272,7 +301,9 @@ describe('useDocumentApprovalArtifact', () => {
   it('active approval stage + eligible viewer + locked instance → model.decision offers approve/reject with password+legal+signer', async () => {
     mockContext('under_review');
     vi.mocked(getInstance).mockResolvedValue(makeApprovingInstance());
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -291,7 +322,9 @@ describe('useDocumentApprovalArtifact', () => {
 
   it('draft state (signoff not allowed by policy) → model.decision is undefined', async () => {
     mockContext('draft', { approval_instance_id: undefined });
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -305,7 +338,9 @@ describe('useDocumentApprovalArtifact', () => {
       isError: false,
     } as never);
 
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, makeDecisionInputs()), {
+      wrapper: makeWrapper(),
+    });
     expect(result.current.model?.decision).toBeUndefined();
   });
 
@@ -313,7 +348,9 @@ describe('useDocumentApprovalArtifact', () => {
     mockContext('under_review');
     vi.mocked(getInstance).mockResolvedValue(makeApprovingInstance());
     const decisionInputs = makeDecisionInputs();
-    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, decisionInputs));
+    const { result } = renderHook(() => useDocumentApprovalArtifact('doc-1', handlers, decisionInputs), {
+      wrapper: makeWrapper(),
+    });
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
 
@@ -324,8 +361,9 @@ describe('useDocumentApprovalArtifact', () => {
   it('passes defaultOptionKey through from decisionInputs (e.g. from a ?decision= deep-link)', async () => {
     mockContext('under_review');
     vi.mocked(getInstance).mockResolvedValue(makeApprovingInstance());
-    const { result } = renderHook(() =>
-      useDocumentApprovalArtifact('doc-1', handlers, { defaultOptionKey: 'reject', submit: vi.fn() }),
+    const { result } = renderHook(
+      () => useDocumentApprovalArtifact('doc-1', handlers, { defaultOptionKey: 'reject', submit: vi.fn() }),
+      { wrapper: makeWrapper() },
     );
 
     await waitFor(() => expect(result.current.instance).not.toBeNull());
