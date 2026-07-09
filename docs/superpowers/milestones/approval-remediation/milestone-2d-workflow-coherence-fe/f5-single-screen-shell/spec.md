@@ -43,8 +43,11 @@ Structural requirements (§5/§6/§9):
   (c) new screen mounts at `documents/:id` (leaf); (d) `DocumentDistributionPage.tsx:95` breadcrumb href →
   `/documents/${id}/details`; (e) sidebar meta panel carries a discoverable link to `/documents/:id/details`;
   (f) `?decision=` survives — `InboxPage.openDecisionFlow` (`:110`) targets `/documents/:id?decision=…`, and
-  the `/approvals/:documentId` route becomes a redirect forwarding `location.search`; (g) approver/observer
-  (read-only) modes **lazy-load** the editing chunk (no editor payload for read-only modes).
+  the `/approvals/:documentId` route becomes a redirect forwarding `location.search`; (g) **moved to F2d.5b (2026-07-09 amendment):** lazy-loading the editing chunk inside F2d.5 is
+  ineffective — `DocumentShell.tsx:2` statically imports `MetalDocsEditor` (TipTap) and the read canvas
+  renders DocumentShell, so read-only modes pull the editor chunk regardless. Real split lands with the
+  PDF read canvas (F2d.5b, operator-ratified PDF-driven viewing). `EditorCanvas` extraction stays here
+  (decomposition), via normal import.
 
 ## Composition structure (senior decision — Global-Maximum rule)
 
@@ -95,7 +98,7 @@ Executed as ordered sub-slices (see plan.md). Aggregate acceptance:
 | `/documents/:id/details` renders `DocumentDetailLayout`; `/documents/:id` renders the workspace | route test | `vitest run …/routes*.test.tsx` |
 | `/documents/:id/edit` redirects to `/documents/:id` preserving `:id` | route test | same |
 | `/approvals/:documentId` redirects to `/documents/:id` preserving `location.search` | route test | same |
-| Lazy: editing chunk dynamically imported, absent in `observing`/`approving` initial load | lazy-load assertion | same |
+| ~~Lazy: editing chunk dynamically imported~~ moved to F2d.5b (see route item (g) amendment) | — | — |
 | Breadcrumb + deep-link retargeted (`DocumentDistributionPage`, `InboxPage`) | grep + route test | grep + vitest |
 | build/types clean | `npx tsc --noEmit` | 0 errors |
 

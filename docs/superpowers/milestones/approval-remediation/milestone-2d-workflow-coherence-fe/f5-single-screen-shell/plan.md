@@ -22,19 +22,21 @@ S1 (footer variant) is isolated + unblocks the screen's footer. S2 (the screen) 
 - Gate: `vitest run …/sidebar/__tests__/DecisionFooter.test.tsx`; `tsc --noEmit`.
 
 ### S2 — `DocumentWorkspacePage` (the mode-adaptive screen) — the bulk
-**Target:** new `features/documents/pages/DocumentWorkspacePage.tsx` (thin owner) + lazy `EditorCanvas`
+**Target:** new `features/documents/pages/DocumentWorkspacePage.tsx` (thin owner) + `EditorCanvas`
 extraction from `DocumentEditorPage`'s body. Composes: constant `DocumentShell`, unified right sidebar
 (meta + route-preview panels [ArtifactMetaSidebar composition retired] + accountability timeline +
 `DecisionFooter`), header mode chip, per-mode canvas/footer/panel per §2, `changes_requested` banner + F6
-panel, frozen-content + delegation disclosure in `approving`, `?decision=` seed, `React.lazy`+`Suspense`
-for the editor chunk in editing modes only.
+panel, frozen-content + delegation disclosure in `approving`, `?decision=` seed. ~~`React.lazy` editor chunk~~
+**moved to F2d.5b (2026-07-09 amendment):** lazy here is ineffective — read canvas renders `DocumentShell`, which
+statically imports `MetalDocsEditor` (`DocumentShell.tsx:2`), so read modes pull the TipTap chunk regardless.
+`EditorCanvas` extraction stays (decomposition), normal import; real split lands with F2d.5b's PDF read canvas.
 - Derivation: `useDocumentDetailQuery` + `useApprovalInstanceQuery` (F2d.4) + `deriveWorkspaceMode` (F2d.3).
   Reuse `buildDocumentSignoffDecision` for the approving decision (F2d.4 adapter already models it).
 - **TDD:** `DocumentWorkspacePage.test.tsx` — one test per §2 mode (correct canvas + footer variant +
   contextual panel), §6 states (loading skeleton, instance error keeps canvas, empty/edge), `changes_requested`
-  banner, `?decision=` preselect regression, and a lazy-load assertion (editor chunk dynamically imported;
-  absent in `observing`/`approving` initial render). Write failing tests first per branch, implement to green.
-- **Sub-structure (keep units small):** `EditorCanvas` (lazy, editing modes), `WorkspaceSidebar` (panel
+  banner, `?decision=` preselect regression. ~~Lazy-load assertion~~ → F2d.5b. Write failing tests first per
+  branch, implement to green.
+- **Sub-structure (keep units small):** `EditorCanvas` (editing modes), `WorkspaceSidebar` (panel
   stack: meta / route-preview / timeline / footer), `ModeChip` (header), `ApprovingDisclosure` (frozen +
   delegation). Each independently testable.
 - Files (new): `DocumentWorkspacePage.tsx`, `EditorCanvas.tsx` (extracted), `WorkspaceSidebar.tsx`,
@@ -42,7 +44,7 @@ for the editor chunk in editing modes only.
   `EditorCanvas`), `ArtifactMetaSidebar` consumers.
 - Gate: `vitest run …/DocumentWorkspacePage.test.tsx` + sub-component suites; `tsc --noEmit`.
 - **Note:** this slice is large — may sub-decompose S2 into S2a (shell + sidebar + mode chip + read modes)
-  and S2b (editing modes via lazy EditorCanvas + changes_requested/F6 + approving disclosure/decision) if the
+  and S2b (editing modes via EditorCanvas + changes_requested/F6 + approving disclosure/decision) if the
   single-slice diff exceeds reviewable size. Decide at execution.
 
 ### S3 — Route flip + deep-links + breadcrumb
