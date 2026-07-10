@@ -427,6 +427,7 @@ describe('DocumentWorkspacePage', () => {
     renderAt();
 
     await waitFor(() => expect(screen.getByTestId('pdf-canvas')).toBeInTheDocument());
+    expect(screen.queryByTestId('editor')).not.toBeInTheDocument();
   });
 
   it('superseded (lifecycle): keeps the docx read canvas — /view does not serve it', async () => {
