@@ -67,7 +67,7 @@ export function WorkspaceSidebar({
   const [metaOpen, setMetaOpen] = useState(true);
 
   const meta: ArtifactMetaModel = {
-    // Reduced surface (mirrors useDocumentApprovalArtifact's cockpit model):
+    // Reduced surface:
     // profile/area/visibility require the taxonomy queries the editor page
     // composes — out of scope for this thin owner. Honest omission (null),
     // never fabricated.

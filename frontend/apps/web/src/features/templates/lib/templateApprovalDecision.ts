@@ -3,7 +3,7 @@
 // Single construction path for the template `ArtifactDecisionModel` (FE-02) — was
 // previously built inline in `TemplateApprovalRoute`. Templates carry no legal
 // e-signature (no password/legal fields, unlike the document sign-off model built
-// in `useDocumentApprovalArtifact`), so this mirrors that adapter's shape minus
+// in `useDocumentArtifact`), so this mirrors that adapter's shape minus
 // those two fields.
 
 import type { ArtifactDecisionModel } from '../../shared/controlled-artifact/types';

@@ -6,7 +6,7 @@
 // FE-02: DocumentDetailRoute no longer runs its own document/approval/active-document/
 // distribution queries or re-derives gating — it consumes `useDocumentArtifact`'s
 // `doc` / `activeDocument` / `obligatedCount` / `gating` exports directly. This test
-// mocks only that one adapter hook (matching the useDocumentApprovalArtifact pattern).
+// mocks only that one adapter hook.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';

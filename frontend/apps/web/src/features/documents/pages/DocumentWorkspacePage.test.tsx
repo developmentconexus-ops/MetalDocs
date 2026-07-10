@@ -266,8 +266,8 @@ describe('DocumentWorkspacePage', () => {
   it('§6 instance error: canvas stays readable, sidebar shows the error + retry', async () => {
     // status !== 404 so the hook's own retry() would normally back off twice;
     // 404 makes the failure deterministic and fast in tests while still
-    // producing isError=true, the same signal the component reads for any
-    // instance-fetch failure (mirrors useDocumentApprovalArtifact's gate).
+    // producing isError=true, the same signal deriveWorkspaceMode reads for
+    // any instance-fetch failure.
     vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc());
     vi.spyOn(documentsApi, 'getApprovalInstance').mockRejectedValue(
       Object.assign(new Error('not_found'), { status: 404 }),

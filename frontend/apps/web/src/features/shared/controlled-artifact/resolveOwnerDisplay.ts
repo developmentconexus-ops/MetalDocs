@@ -4,7 +4,7 @@
  * displayName; otherwise echo the raw creator id. Returns null when there is no
  * creator — callers that want an em-dash coalesce the null themselves.
  *
- * Deduplicated from useDocumentArtifact / useTemplateArtifact / useDocumentApprovalArtifact.
+ * Deduplicated from useDocumentArtifact / useTemplateArtifact.
  */
 export function resolveOwnerDisplay(
   createdBy: string | null | undefined,

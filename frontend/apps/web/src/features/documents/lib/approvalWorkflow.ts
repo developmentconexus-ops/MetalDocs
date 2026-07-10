@@ -1,5 +1,5 @@
-// Approval-workflow policy shared by the document approval adapter
-// (useDocumentApprovalArtifact) and the approval cockpit sidebar. Single
+// Approval-workflow policy shared by the document workspace's artifact
+// adapter (useDocumentArtifact) and the WorkspaceSidebar. Single
 // source of truth for the per-state transition
 // policy (which workflow actions appear, the disabled-edit reason, and the
 // read-only flag) and the status→ApprovalState coercion. No React import — pure
@@ -102,9 +102,9 @@ export function toApprovalState(status: string): ApprovalState {
  * Map an ApprovalInstance's stages array to the kind-agnostic ApprovalChainItem[]
  * used by the shared controlled-artifact view layer.
  *
- * Deduplicated from useDocumentArtifact and useDocumentApprovalArtifact — both
- * adapters map the same StageInstance shape. Callers retain their own null-guards
- * so absence of an instance still yields null.
+ * Shared by useDocumentArtifact and DocumentEditorPage, which map the same
+ * StageInstance shape. Callers retain their own null-guards so absence of an
+ * instance still yields null.
  */
 export function mapApprovalChain(stages: MappableStage[]): ApprovalChainItem[] {
   return stages.map((stage) => {
