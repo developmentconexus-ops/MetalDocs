@@ -33,6 +33,11 @@ corrective chip with the findings. Shared-resource rule: one owner of the :80 st
 Note: chip sessions run in fresh worktrees — untracked runtime files (.env, .env.local) must be
 copied from the main checkout (never printed). Chip prompts must state this.
 
+**Chip prompt template MUST carry, verbatim-strength:** (a) the §4 subagent obligations 1–5 as
+numbered instructions, not a passing mention; (b) "read docs/superpowers/HARNESS.md §4–§5 before
+implementing"; (c) the evidence.md dispatch-ledger requirement — the hub rejects closures whose
+evidence lists no implementer/reviewer dispatches.
+
 ```
 ROADMAP.md → take topmost actionable unit → open ONLY its listed context files
   ↓
@@ -73,6 +78,21 @@ Budget ceiling hit = stop, flush state to evidence.md/ROADMAP, split the unit.
   revertable.
 
 ## 4. Implementation standards (P3) — the anti-slop contract
+
+**Subagent dispatch is MANDATORY, not advisory (amended 2026-07-10 — sessions were observed
+implementing everything inline).** Unit-session obligations, checkable:
+
+1. Code slices are implemented by a dispatched **sonnet** subagent (Agent tool / Task), one slice
+   per dispatch. The unit session (Opus) writes code inline ONLY for trivial glue (≤ ~10 lines,
+   no new behavior) — anything more inline is a harness violation to note in evidence.md.
+2. Every slice gets an **independent reviewer subagent** (sonnet — e.g. cavecrew-reviewer, or the
+   frontend reviewer agents for FE) BEFORE the next slice starts. The session may NEVER
+   self-review as substitute — implementer ≠ reviewer is the non-negotiable, regardless of cost.
+3. Mechanical work (renames, comment sweeps, format-only) → **haiku** subagent.
+4. Bulk reading/inventory → sonnet investigator subagent returning compressed report; the unit
+   session does not tree-crawl.
+5. evidence.md MUST list dispatches: per slice — implementer agent, reviewer agent(s), verdicts.
+   A closure with zero dispatches listed fails acceptance review at the hub.
 
 Every slice: **failing test first** (canonical framework — testdb for DB integration), implement to
 green, then two-stage review before the next slice starts:
