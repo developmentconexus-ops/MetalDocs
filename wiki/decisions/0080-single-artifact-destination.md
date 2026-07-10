@@ -77,11 +77,21 @@ control WITHIN the workspace sidebar (approving mode), never a separate URL — 
 Qualio/Veeva pattern this ADR follows. **Reopen trigger:** an external-signer persona (no app
 account) would justify a DocuSign-style standalone ceremony page; not before that need exists.
 
-**Amendment note (F2d.5b, 2026-07-09):** the S2 shell ships with `DocumentShell`'s static TipTap
-import, so approver/observer modes pay the editor bundle despite the workspace's `lazy` route
-entry — a real PDF read canvas (and the lazy boundary actually taking effect) is F2d.5b's scope,
-not this ADR's. This ADR governs routing/destination only; canvas bundle-weight is tracked
-separately.
+**Amendment (F2d.5b re-scope, 2026-07-09 — supersedes the earlier same-day note):** viewing
+policy for the single destination is settled as follows. **In-approval viewing (draft /
+under_review, all read modes) stays on the in-app source canvas** (read-only `DocumentShell`);
+**the PDF is the official post-approval artifact** — the workspace canvas renders it
+(`PdfCanvas` via `GET /documents/{id}/view`) only for `approved / scheduled / published`.
+Rationale: a pre-freeze PDF would be falsely official (computed tokens resolve only at freeze),
+and the Veeva-style continuous rendition solves an uploaded-binary-source gap MetalDocs (in-app
+editing) doesn't have. The signature binds the source `content_hash` (existing If-Match
+contract), consistent with 21 CFR Part 11 (signature binds the record; the rendition is its
+human-readable form). Bundle note: `DocumentShell`'s TipTap import becomes a lazy chunk in
+F2d.5b — docx read modes fetch it on canvas mount; the PDF canvas never fetches it.
+**Reopen trigger:** customer demand for print-fidelity preview *during* approval → Veeva-pattern
+continuous rendition (eager render at submit/resubmit via outbox, keyed by `content_hash`) —
+researched and shaped 2026-07-09, design record
+`docs/superpowers/specs/2026-07-09-f5b-pdf-official-view-design.md`.
 
 ## Consequences
 
