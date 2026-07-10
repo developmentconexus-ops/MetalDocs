@@ -52,9 +52,13 @@ worklist navigation stops bouncing through redirects.
      Global-max: delete the **entire hook + its test suite**, not a branch — leaving a half-hook is dead
      code, a defect.
   3. Beyond the milestone's cited constructor list: a **5th** `/edit` constructor at
-     `DocumentEditorRoutePage.tsx:16`, and that page is **not mounted in the router** (dead). Plus an
-     additional worklist deep-link surface — `DashboardPage.tsx:65,66,106` still target `/approvals`.
-     Both are captured for the plan (delete the dead page rather than retarget; retarget Dashboard).
+     `DocumentEditorRoutePage.tsx:16`, and that page is **referenced only by its own test** — mounted in
+     no router (dead). Captured for the plan: delete the dead page + test rather than retarget a dead path.
+  4. Milestone item (c) "worklist deep links target `/documents/:id`" is **already satisfied** — a grep
+     for `/approvals/${…}` per-document constructors returns **none** (the only one, `InboxPage.
+     openDecisionFlow`, was retargeted in F2d.5). `DashboardPage.tsx:65,66,106` navigate to **bare
+     `/approvals`** — the inbox LIST route (which survives), not a per-document cockpit URL — so they are
+     correct as-is and are NOT retargeted.
 
 ## 3. Invariant alignment
 
@@ -129,11 +133,14 @@ machinery, no hand-rolled navigation. Nothing reinvented — this feature only *
   4. **Do NOT touch shared/live survivors** — `ArtifactApprovalScreen` (templates use it),
      `TemplateApprovalRoute` `screenModel`, and `getActiveSiblingDestination` the *function* (retarget its
      returned literal only). Templates domain is out of scope.
-  5. **Retarget every LIVE `/edit` and `/approvals` path constructor** to `/documents/${id}`
-     (`documentWorkflow.ts:30`, `DocumentDetailRoute.tsx:101,145`, `NewDocumentWizardPage.tsx:179`,
-     `DashboardPage.tsx:65,66,106`) so navigation lands directly, not via a redirect bounce. Resolve the
-     dead `DocumentEditorRoutePage.tsx` (+ its `/edit` constructor at :16, + test) by **deletion** (it is
-     mounted in no route) rather than retargeting a dead path — confirm zero router reference in the plan.
+  5. **Retarget every LIVE `/edit` path constructor** to `/documents/${id}` (the 4 live ones:
+     `documentWorkflow.ts:30`, `DocumentDetailRoute.tsx:101,145`, `NewDocumentWizardPage.tsx:179`) so
+     navigation lands directly, not via a redirect bounce. `getActiveSiblingDestination` collapses to
+     returning `/documents/${id}` for all states (the `/documents/:id` workspace is mode-adaptive — it
+     renders the editor for draft/rejected by document status, so the caller no longer branches). Resolve
+     the dead `DocumentEditorRoutePage.tsx` (+ its `/edit` constructor at :16, + test) by **deletion**
+     (referenced only by its own test) rather than retargeting a dead path. **Do NOT touch `DashboardPage`
+     — its bare `/approvals` inbox links are correct (item c already satisfied, §2).**
   6. **Grep deletion gate is binding** — the delete does not land until no `ApprovalCockpitPage` /
      `useDocumentApprovalArtifact` reference and no stray `/edit` or `/approvals` constructor survives
      outside the redirect route files.
