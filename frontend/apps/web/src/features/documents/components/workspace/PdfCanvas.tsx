@@ -24,7 +24,8 @@ export function PdfCanvas({ documentId }: { documentId: string }) {
     );
   }
 
-  if (pdf.status === 'failed') {
+  const missingReadyUrl = pdf.status === 'ready' && !pdf.url;
+  if (pdf.status === 'failed' || missingReadyUrl) {
     return (
       <div role="alert" className={styles.state}>
         <p className={styles.stateTitle}>Não foi possível gerar o PDF oficial.</p>

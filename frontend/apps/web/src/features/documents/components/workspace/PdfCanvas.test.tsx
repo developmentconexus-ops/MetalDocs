@@ -37,4 +37,11 @@ describe('PdfCanvas', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
     expect(retry).toHaveBeenCalledTimes(1);
   });
+
+  it('ready but missing url: surfaces the error alert (fail closed, no infinite pending)', () => {
+    hookState.value = { status: 'ready', retry: vi.fn() };
+    render(<PdfCanvas documentId="doc-1" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível gerar o PDF');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
 });
