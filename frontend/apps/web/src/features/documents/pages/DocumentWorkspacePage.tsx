@@ -16,6 +16,7 @@ import { useDocumentComments } from '../hooks/editor/useDocumentComments';
 import { buildDocumentSignoffDecision } from '../lib/documentSignoffDecision';
 import { DocumentShell } from '../components/DocumentShell';
 import { EditorCanvas } from '../components/workspace/EditorCanvas';
+import { PdfCanvas } from '../components/workspace/PdfCanvas';
 import { ApprovingDisclosure } from '../components/workspace/ApprovingDisclosure';
 import { RequestedChangesPanel } from '../components/RequestedChangesPanel';
 import { ModeChip } from '../components/workspace/ModeChip';
@@ -37,6 +38,13 @@ import styles from './DocumentWorkspacePage.module.css';
  *  - reviewing / observing / author-waiting / lifecycle: unchanged S2a read
  *    canvas.
  */
+
+// F2d.5b D1 — statuses whose official PDF the backend serves via
+// GET /documents/:id/view (view_service.go viewableStatuses). Keyed on
+// status, NOT on mode: 'lifecycle' also covers superseded/obsolete, which
+// /view does not serve — those keep the docx read canvas.
+const OFFICIAL_PDF_STATUSES = new Set(['approved', 'scheduled', 'published']);
+
 export function DocumentWorkspacePage() {
   const { documentId = '' } = useParams<{ documentId: string }>();
   const currentUser = useAuthStore((s) => s.user);
@@ -282,6 +290,8 @@ export function DocumentWorkspacePage() {
                   <div className={styles.canvasEmpty}>Este documento ainda não possui conteúdo para exibir.</div>
                 )}
               </>
+            ) : OFFICIAL_PDF_STATUSES.has(docStatus) ? (
+              <PdfCanvas documentId={documentId} />
             ) : doc.current_revision_id ? (
               <DocumentShell
                 documentId={documentId}

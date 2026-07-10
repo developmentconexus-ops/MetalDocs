@@ -22,6 +22,13 @@ vi.mock('@metaldocs/editor-ui', () => ({
   }),
 }));
 
+// F2d.5b D1 — PdfCanvas is a leaf component owned by Task 1; stub it here so
+// the status-keyed branch assertions below are deterministic and don't need
+// to drive useDocumentPdfStatus's polling/apiFetch internals.
+vi.mock('../components/workspace/PdfCanvas', () => ({
+  PdfCanvas: () => <div data-testid="pdf-canvas" />,
+}));
+
 vi.mock('../../../store/auth.store', () => ({
   useAuthStore: (selector: (s: { user: { displayName: string; userId: string; email: string; username: string } }) => unknown) =>
     selector({ user: { displayName: 'Ana Revisora', userId: 'user-reviewer-1', email: 'ana@example.com', username: 'ana' } }),
@@ -208,7 +215,12 @@ describe('DocumentWorkspacePage', () => {
   });
 
   it('lifecycle: read canvas + timeline render, no verdict CTAs (publish is S2b)', async () => {
-    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'approved' }));
+    // status: 'superseded', not 'approved' — F2d.5b D1 keys 'approved' to the
+    // PdfCanvas branch (OFFICIAL_PDF_STATUSES); 'superseded' stays lifecycle
+    // mode but is not backend-viewable, so it keeps this docx read canvas,
+    // which is what this test is actually asserting (mode-level chrome, not
+    // the status-keyed canvas choice — see the F2d.5b D1 describe block below).
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'superseded' }));
     vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
       makeInstance({
         stages: [],
@@ -372,5 +384,86 @@ describe('DocumentWorkspacePage', () => {
     expect(container.querySelector('input[type="password"]')).toBeNull();
     expect(screen.queryByText('Conteúdo verificado ✓ · detalhes')).not.toBeInTheDocument();
     expect(screen.queryByTestId('delegation-badge')).not.toBeInTheDocument();
+  });
+
+  // ---------- F2d.5b D1 — official-PDF canvas is status-keyed ----------
+
+  it('published (lifecycle): renders PdfCanvas, not the docx read canvas', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'published' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        stages: [],
+        status: 'approved',
+        viewer: {
+          is_author: false,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('pdf-canvas')).toBeInTheDocument());
+    expect(screen.queryByTestId('editor')).not.toBeInTheDocument();
+  });
+
+  it('approved (lifecycle, author): renders PdfCanvas', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(
+      makeDoc({ status: 'approved', created_by: 'user-reviewer-1' }),
+    );
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        stages: [],
+        status: 'approved',
+        viewer: {
+          is_author: true,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('pdf-canvas')).toBeInTheDocument());
+  });
+
+  it('superseded (lifecycle): keeps the docx read canvas — /view does not serve it', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'superseded' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        stages: [],
+        status: 'approved',
+        viewer: {
+          is_author: false,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.queryByTestId('pdf-canvas')).not.toBeInTheDocument();
+  });
+
+  it('under_review (observing): still the docx read canvas, never PdfCanvas', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc());
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        viewer: {
+          is_author: false,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.queryByTestId('pdf-canvas')).not.toBeInTheDocument();
   });
 });
