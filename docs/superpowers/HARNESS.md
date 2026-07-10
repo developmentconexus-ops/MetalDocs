@@ -13,8 +13,9 @@ in WHAT order, with WHAT evidence.
 | Role | Model | Does | Never does |
 |---|---|---|---|
 | **Design/synthesis** | Fable (rare, expensive) | Architecture decisions, system-impact gates, spec ratification support, roadmap surgery | Implementation, bulk file reading, worker duty |
-| **Orchestrator** | One standing session (Fable or Opus — operator's session) | AUTO-DISPATCHES the unit loop via the Agent tool (MNFS topology, amended 2026-07-10): builds per-unit context pack → spawns background+worktree worker → acceptance-reviews returned evidence → integrates → next. Milestone-scale exceptions may still go to a separate Opus session via spawn_task chip | Writing large code diffs itself when a worker fits; reviewing its own dispatched work slice-by-slice |
-| **Implement worker** | Sonnet subagent (Agent tool, `isolation: worktree`, background; `mnfs-workflow:feature-implementer` agent type for feature-sized units — its contract enforces spec→plan→implement→quick-validate→evidence; opus for heavy units) | One feature/slice per dispatch, per context pack | Scope beyond its task card; touching files outside its slice |
+| **Orchestrator** | Standing dispatch session (operator's hub) | Builds per-unit context pack → creates spawn_task chip (self-contained prompt: files, constraints, done-criteria, budget) → operator clicks to launch → acceptance-reviews returned evidence → integrates → next chip. Chips ALWAYS (operator-ratified 2026-07-10): every unit runs as its own observable session the operator can open and follow | Writing large code diffs itself when a worker fits; reviewing its own dispatched work |
+| **Unit session** | **Opus** (operator selects at launch; medium effort default) | Runs one unit end-to-end per its chip prompt: spec→plan→TDD→verify→evidence→commit | Scope beyond its chip; pushing; flipping statuses past HS-1 |
+| **Implement worker** | Sonnet subagent (inside the unit session) | One TDD slice per dispatch, per written plan task | Scope beyond its task card; touching files outside its slice |
 | **Reviewer** | Sonnet subagent (independent — never the implementer) | Two-stage review per slice (see §4) | Generating new scope (anti-circle: reviews VERIFY, they don't renegotiate the plan) |
 | **Mechanical** | Haiku | Renames, comment sweeps, format-preserving tweaks | Anything requiring judgment |
 | **Browser QA persona** | Fresh session via `spawn_task` | §6 protocol — validates as a USER, from zero context | Reading implementation diffs first (would bias); fixing anything |
@@ -23,13 +24,14 @@ Concurrency ≤15 workers. Fable never a worker.
 
 ## 2. Unit execution loop (every ROADMAP unit)
 
-**Dispatch mechanics (amended 2026-07-10, MNFS-topology):** the orchestrator session dispatches
-units itself via the Agent tool — background + fresh worktree per worker, self-contained context
-pack (exact files, constraints, done-criteria, budget) in the dispatch prompt. Per-feature
-acceptance review happens in the orchestrator (accept / reject / block; 2× reject = redesign).
-Milestone close stays in-harness: milestone-validator agent + rendered browser QA run from the
-orchestrator session (it owns the browser pane + the :80 stack) + operator HS-1. spawn_task chips
-are reserved for units the operator wants in a separate standalone session.
+**Dispatch mechanics (operator-ratified 2026-07-10):** every unit dispatches as a spawn_task
+CHIP — a real standalone session the operator can open, watch turn-by-turn, and intervene in.
+The orchestrator hub authors the chip's self-contained context pack (exact files, constraints,
+done-criteria, budget); the operator launches it on Opus. On completion the hub runs per-unit
+acceptance review (accept / reject / block; 2× reject = redesign, new chip). Rejection = new
+corrective chip with the findings. Shared-resource rule: one owner of the :80 stack at a time.
+Note: chip sessions run in fresh worktrees — untracked runtime files (.env, .env.local) must be
+copied from the main checkout (never printed). Chip prompts must state this.
 
 ```
 ROADMAP.md → take topmost actionable unit → open ONLY its listed context files
