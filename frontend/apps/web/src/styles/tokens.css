@@ -125,4 +125,19 @@
      spacing scale, not a control-height scale). */
   --ctl-h-sm: 26px;
   --ctl-h-md: 28px;
+
+  /* Layout caps — max content column width for admin/list surfaces
+     (TaxonomyAdminPage, RouteAdmin). */
+  --content-max: 1100px;
+
+  /* Dialog / overlay — canonical modal scrim + panel sizing. The scrim is the
+     Wine text ink (--text = rgb(26,14,14)) at 0.4 alpha; before FE (chip 2)
+     dialogs used a mix of black rgba(0,0,0,.4/.5) and this wine tint, now
+     unified. --dialog-w is the standard fixed panel width (Cancel/Supersede/
+     TokenEdit); --dialog-min-w/--dialog-max-w are the compact-dialog range
+     (TaxonomyDialog). */
+  --overlay-scrim: rgba(26, 14, 14, 0.4);
+  --dialog-w: 480px;
+  --dialog-min-w: 400px;
+  --dialog-max-w: 520px;
 }

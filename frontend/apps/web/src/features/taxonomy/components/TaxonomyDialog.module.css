@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(26, 14, 14, 0.4);
+  background: var(--overlay-scrim);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -12,8 +12,8 @@
   background: var(--surface);
   border-radius: var(--r-3);
   padding: var(--sp-6);
-  min-width: 400px;
-  max-width: 520px;
+  min-width: var(--dialog-min-w);
+  max-width: var(--dialog-max-w);
   width: 100%;
   box-shadow: var(--shadow-2);
 }
