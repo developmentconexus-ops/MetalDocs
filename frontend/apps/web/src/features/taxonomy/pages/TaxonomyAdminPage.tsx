@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { TabBar, type TabBarItem } from "../../../components/ui/TabBar";
+import { WorkspaceHeroHeader } from "../../../components/ui/WorkspaceHeroHeader";
 import { useAdminAreasQuery } from "../queries/useAdminAreasQuery";
 import { useAdminProfilesQuery } from "../queries/useAdminProfilesQuery";
 import { useFamiliesQuery } from "../queries/useFamiliesQuery";
@@ -10,7 +12,7 @@ import styles from "./TaxonomyAdminPage.module.css";
 
 type Tab = "families" | "profiles" | "areas";
 
-const TABS: Array<{ key: Tab; label: string }> = [
+const TABS: TabBarItem[] = [
   { key: "families", label: "Famílias" },
   { key: "profiles", label: "Perfis" },
   { key: "areas", label: "Áreas" },
@@ -32,25 +34,20 @@ export function TaxonomyAdminPage() {
 
   return (
     <div className={styles.root}>
-      <div>
-        <p className={styles.headKicker}>Taxonomia</p>
-        <h1 className={styles.headTitle}>Tipos Documentais</h1>
-        <p className={styles.headDescription}>
-          Gerencie famílias documentais, perfis e áreas de processo.
-        </p>
-      </div>
+      <WorkspaceHeroHeader
+        tone="flat"
+        kicker="Taxonomia"
+        title="Tipos Documentais"
+        subtitle="Gerencie famílias documentais, perfis e áreas de processo."
+      />
 
-      <div className={styles.tabs}>
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={tab === t.key ? `${styles.tab} ${styles.tabActive}` : styles.tab}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className={styles.tabsRow}>
+        <TabBar
+          tabs={TABS}
+          activeKey={tab}
+          onTabChange={(key) => setTab(key as Tab)}
+          ariaLabel="Seções de taxonomia"
+        />
       </div>
 
       {isLoading && <p role="status">Carregando...</p>}

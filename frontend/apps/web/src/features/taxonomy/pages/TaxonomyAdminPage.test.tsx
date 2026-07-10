@@ -42,7 +42,7 @@ describe('TaxonomyAdminPage', () => {
     render(React.createElement(TaxonomyAdminPage), { wrapper: wrap() });
 
     await waitFor(() => expect(screen.getByText('Standard Operating Procedure')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: 'Perfis' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Perfis' }));
 
     await waitFor(() => expect(screen.getByText('Nenhum perfil encontrado.')).toBeTruthy());
   });
@@ -51,7 +51,7 @@ describe('TaxonomyAdminPage', () => {
     render(React.createElement(TaxonomyAdminPage), { wrapper: wrap() });
 
     await waitFor(() => expect(screen.getByText('Standard Operating Procedure')).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: 'Áreas' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Áreas' }));
 
     await waitFor(() => expect(screen.getByText('Nenhuma área encontrada.')).toBeTruthy());
   });
