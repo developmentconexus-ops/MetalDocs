@@ -1,7 +1,7 @@
 # Milestone 5 — Detalhe Signoff + Taxonomy Admin restyle (net-new / polish — last)
 
 > **Program:** frontend-screen-completion  ·  **Governing spec:** `../mission.md` (§7 M5, §5 inventory rows 13–14, §8 terminal acceptance)
-> **Status:** PLANNED — authored 2026-06-23, *before any feature in this milestone began.* Awaiting feature execution.
+> **Status:** FEATURES CLOSED — awaiting milestone-validator + HS-1 (2026-07-10). Spec authored 2026-06-23. **F5.1** closed with both-reviewer APPROVE (`f5.1-signoff-detail/evidence.md`). **F5.2** closed **verify-only** (`f5.2-taxonomy-restyle/evidence.md`): the restyle was already delivered by `2a371d60 (FE-14, 2026-07-02)` — this milestone's "11 inline `style=`" premise predated FE-14; current page is fully tokenized (grep=0), tsc clean, vitest 23/23, rendered GREEN, both reviewers APPROVE. No new F5.2 diff written (fabricating one would invent scope on an already-correct base).
 > **Sequencing:** the **last** milestone (D5). Net-new screen + styling polish run last so they cannot regress M0–M4.
 
 > This file is a **spec**, authored up front. It says **what** this milestone is, **which
