@@ -19,6 +19,7 @@ import { EditorCanvas } from '../components/workspace/EditorCanvas';
 import { PdfCanvas } from '../components/workspace/PdfCanvas';
 import { ApprovingDisclosure } from '../components/workspace/ApprovingDisclosure';
 import { RequestedChangesPanel } from '../components/RequestedChangesPanel';
+import { AuthorCommentsPanel } from '../components/workspace/AuthorCommentsPanel';
 import { ModeChip } from '../components/workspace/ModeChip';
 import { WorkspaceSidebar } from '../components/workspace/WorkspaceSidebar';
 import { parseDocumentStatus } from '../lib/parseDocumentStatus';
@@ -204,6 +205,20 @@ export function DocumentWorkspacePage() {
   const delegatedFrom = viewer?.via_delegation_from?.display_name ?? null;
   const frozenContentHash = instance?.frozen_content_hash ?? null;
 
+  // F2d.6 — build a reply EditorComment from composer text (fresh monotonic id;
+  // single text paragraph body) and delegate to the existing reply mutation.
+  const handleAuthorReply = (text: string, parent: EditorComment) => {
+    const nextId = commentsHook.comments.reduce((max, c) => Math.max(max, Number(c.id) || 0), 0) + 1;
+    const reply: EditorComment = {
+      id: nextId,
+      parentId: Number(parent.id),
+      author: currentUser?.displayName ?? '',
+      body: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+      resolved: false,
+    };
+    void commentsHook.reply(reply, parent);
+  };
+
   const contextualPanel = mode === 'author-changes-requested'
     ? (
         <RequestedChangesPanel
@@ -212,6 +227,15 @@ export function DocumentWorkspacePage() {
           onAcceptChange={(revisionId) => editorRef.current?.acceptChange(revisionId)}
           onRejectChange={(revisionId) => editorRef.current?.rejectChange(revisionId)}
           onResolveComment={(comment) => void commentsHook.resolve(comment)}
+        />
+      )
+    : mode === 'author-waiting'
+    ? (
+        <AuthorCommentsPanel
+          comments={commentsHook.comments}
+          onReply={handleAuthorReply}
+          onResolve={(c) => void commentsHook.resolve(c)}
+          onReopen={(c) => void commentsHook.reopen(c)}
         />
       )
     : null;

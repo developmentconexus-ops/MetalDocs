@@ -71,6 +71,19 @@ vi.mock('../hooks/editor/useDocumentComments', () => ({
   }),
 }));
 
+// F2d.6 — stub the panel so the wiring assertions below are deterministic:
+// which mode mounts it, what it's fed, and that onReply is delegated through
+// to the real commentsHook.reply without asserting the panel's own internals
+// (those are AuthorCommentsPanel.test.tsx's job).
+vi.mock('../components/workspace/AuthorCommentsPanel', () => ({
+  AuthorCommentsPanel: ({ comments, onReply }: { comments: unknown[]; onReply: (t: string, p: unknown) => void }) => (
+    <div data-testid="author-comments-panel">
+      <span>threads:{comments.length}</span>
+      <button onClick={() => onReply('resposta', { id: 1 })}>reply-probe</button>
+    </div>
+  ),
+}));
+
 function makeDoc(overrides: Partial<DocumentDetail> = {}): DocumentDetail {
   return {
     id: 'doc-1',
@@ -466,5 +479,85 @@ describe('DocumentWorkspacePage', () => {
 
     await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
     expect(screen.queryByTestId('pdf-canvas')).not.toBeInTheDocument();
+  });
+
+  // ---------- F2d.6 — AuthorCommentsPanel wiring ----------
+
+  it('author-waiting: renders the AuthorCommentsPanel in the sidebar', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(
+      makeDoc({ status: 'under_review', created_by: 'user-reviewer-1' }),
+    );
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        viewer: {
+          is_author: true,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.getByTestId('author-comments-panel')).toBeInTheDocument();
+  });
+
+  it('author-waiting: canvas stays the read-only docx shell, no editing canvas', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(
+      makeDoc({ status: 'under_review', created_by: 'user-reviewer-1' }),
+    );
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        viewer: {
+          is_author: true,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.getByTestId('editor')).toHaveAttribute('data-mode', 'readonly');
+  });
+
+  it('observing (non-author under_review): no AuthorCommentsPanel', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc());
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        viewer: {
+          is_author: false,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.queryByTestId('author-comments-panel')).not.toBeInTheDocument();
+  });
+
+  it('author-changes-requested: keeps its own panel, not AuthorCommentsPanel', async () => {
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'draft' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        status: 'changes_requested',
+        viewer: {
+          is_author: true,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.getByLabelText('Mudanças solicitadas')).toBeInTheDocument();
+    expect(screen.queryByTestId('author-comments-panel')).not.toBeInTheDocument();
   });
 });
