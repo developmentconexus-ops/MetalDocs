@@ -102,7 +102,7 @@ export function toApprovalState(status: string): ApprovalState {
  * Map an ApprovalInstance's stages array to the kind-agnostic ApprovalChainItem[]
  * used by the shared controlled-artifact view layer.
  *
- * Shared by useDocumentArtifact and DocumentEditorPage, which map the same
+ * Shared by useDocumentArtifact and WorkspaceSidebar, which map the same
  * StageInstance shape. Callers retain their own null-guards so absence of an
  * instance still yields null.
  */
