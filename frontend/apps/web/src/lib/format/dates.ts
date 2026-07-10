@@ -50,7 +50,7 @@ export function formatPublishedAt(input: string | null | undefined): string {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// F4 (M2c): relative due-date chip for the approval sidebar's StageContextHeader.
+// F4 (M2c): relative due-date chip for approval worklist/inbox surfaces.
 // null/invalid -> em-dash; future same calendar day -> "vence hoje"; future ->
 // "vence em N dia(s)" (ceil of the day diff); past -> "atrasado há N dia(s)",
 // overdue: true. `now` is injectable so tests are deterministic.
