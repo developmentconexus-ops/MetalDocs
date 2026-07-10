@@ -35,8 +35,8 @@ export interface ApprovalSidebarProps {
  * (StageContextHeader → ApprovalTimeline → IntegrityDisclosure →
  * SuggestionList in review mode) with the mode-aware DecisionFooter pinned at
  * the bottom via `position: sticky`. Rendered as `ArtifactApprovalScreen`'s
- * `decisionExtras` — the cockpit neutralizes the shared screen's own
- * decision/flow bands via null model fields (see ApprovalCockpitPage).
+ * `decisionExtras` — the caller neutralizes the shared screen's own
+ * decision/flow bands via null model fields (see DocumentWorkspacePage).
  */
 export function ApprovalSidebar({
   editorMode,
