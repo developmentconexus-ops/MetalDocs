@@ -176,7 +176,7 @@ export function NewDocumentWizardPage(): JSX.Element {
         });
       }
       dispatch({ type: 'submitSuccess' });
-      navigate(`/documents/${result.document.id}/edit`);
+      navigate(`/documents/${result.document.id}`);
     },
     onError: (err) => {
       const message = resolveQueryError(err, 'Falha ao criar o documento.');

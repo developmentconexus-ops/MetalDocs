@@ -25,9 +25,6 @@ export function getActiveSiblingCtaLabel(state: ActiveSiblingState): string {
   return 'Retomar revisão rejeitada';
 }
 
-export function getActiveSiblingDestination(documentId: string, state: ActiveSiblingState): string {
-  if (state === 'draft' || state === 'rejected') {
-    return `/documents/${documentId}/edit`;
-  }
+export function getActiveSiblingDestination(documentId: string): string {
   return `/documents/${documentId}`;
 }

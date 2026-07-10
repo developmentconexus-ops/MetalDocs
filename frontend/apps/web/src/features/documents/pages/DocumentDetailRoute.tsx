@@ -98,7 +98,7 @@ export function DocumentDetailRoute() {
     }
   };
 
-  const handleView = () => navigate(`/documents/${documentId}/edit`);
+  const handleView = () => navigate(`/documents/${documentId}`);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href)
@@ -142,7 +142,7 @@ export function DocumentDetailRoute() {
         { name: revisionName.trim(), form_data: {}, template_version_id: doc.template_version_id },
         crypto.randomUUID(),
       );
-      navigate(`/documents/${response.document.id}/edit`);
+      navigate(`/documents/${response.document.id}`);
     } catch (err) {
       setRevisionError(resolveQueryError(err, 'Falha ao iniciar nova revisão.'));
     } finally {

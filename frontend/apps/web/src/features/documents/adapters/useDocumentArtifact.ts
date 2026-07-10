@@ -204,7 +204,7 @@ export function useDocumentArtifact(documentId: string): DocumentArtifact {
   const activeSiblingCtaLabel = activeSiblingState ? getActiveSiblingCtaLabel(activeSiblingState) : 'Iniciar revisão';
   const activeSiblingDestination =
     activeSiblingDocumentId && activeSiblingState
-      ? getActiveSiblingDestination(activeSiblingDocumentId, activeSiblingState)
+      ? getActiveSiblingDestination(activeSiblingDocumentId)
       : null;
   const canCreateRevision =
     canInitiateRevision && isPublished && Boolean(doc?.controlled_document_id) && activeSiblingDocumentId == null;

@@ -290,7 +290,7 @@ describe('NewDocumentWizardPage — submit guard via UI', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/documents/doc-xyz/edit');
+      expect(mockNavigate).toHaveBeenCalledWith('/documents/doc-xyz');
     });
   });
 
