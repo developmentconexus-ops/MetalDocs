@@ -6,6 +6,14 @@
 **Author:** developing-new-work skill
 **Verdict:** 🔴 **Red** — AS-2 (the foundation the feature is premised on does not exist at the target lifecycle point). *(see §10)*
 
+> **RESOLVED 2026-07-09 (same day):** operator chose a refined **Option C** after evidence-backed
+> brainstorming — PDF = official post-approval artifact; in-approval viewing stays on the in-app
+> source canvas (Veeva's rendition pattern solves an uploaded-binary-source gap MetalDocs doesn't
+> have; a pre-freeze PDF would be falsely official since computed tokens resolve only at freeze).
+> F2d.5b re-scoped to FE-only (zero backend). Design record:
+> `docs/superpowers/specs/2026-07-09-f5b-pdf-official-view-design.md`. AS-2 closed by premise
+> removal; no re-run needed (no backend module or invariant touched).
+
 > Same ten sections for module and feature work. Module-only rows marked **N/A**.
 
 ---
