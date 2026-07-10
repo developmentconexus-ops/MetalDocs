@@ -153,9 +153,8 @@ export function DocumentWorkspacePage() {
   }
 
   const activeStage = instance?.stages?.find((s) => s.status === 'active');
-  // isFetching (not isLoading): mirrors useDocumentApprovalArtifact — a
-  // manual retry after an error should still surface as "loading", which v5
-  // isLoading (first-fetch-only) would miss.
+  // isFetching (not isLoading): a manual retry after an error should still
+  // surface as "loading", which v5 isLoading (first-fetch-only) would miss.
   const instanceLoading = instanceQuery.isFetching && instance == null;
   // §6 instance error — the canvas stays readable; only the sidebar
   // surfaces the error (instance is optional context, not a blocking read).
@@ -177,7 +176,6 @@ export function DocumentWorkspacePage() {
   const defaultOptionKey: 'approve' | 'reject' | null =
     decisionParam === 'approve' || decisionParam === 'reject' ? decisionParam : null;
 
-  // Reuses the cockpit's exact signoff sequencing (ApprovalCockpitPage.tsx) —
   // signOff (the shared useSignoffMutation, If-Match/content_hash unchanged)
   // then refetch the instance so the mode/decision recompute post-signature.
   const decisionSubmit = async (input: { optionKey: string; reason: string; password: string }) => {
