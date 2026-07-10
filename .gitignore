@@ -82,3 +82,10 @@ reviews/
 # Canonical wiki reviews (multi-session review tracker) are NOT ignored
 !wiki/reviews/
 !wiki/reviews/**
+
+# --- Local QA scratch captures (cookies, logins, responses) ---
+scratch_qa/
+
+# --- Local env overrides ---
+.env.local
+**/.env.local
