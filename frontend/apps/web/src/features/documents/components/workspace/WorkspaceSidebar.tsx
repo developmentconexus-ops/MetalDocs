@@ -107,6 +107,7 @@ export function WorkspaceSidebar({
     <aside className={styles.sidebar} aria-label="Painel do documento" data-testid="workspace-sidebar">
       <div className={styles.scroll}>
         <ArtifactMetaSidebar
+          embedded
           open={metaOpen}
           onToggle={() => setMetaOpen((open) => !open)}
           code={doc.code ?? null}

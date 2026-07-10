@@ -37,6 +37,14 @@ interface ArtifactMetaSidebarProps {
   ariaLabel?: string;
   /** Kind-specific loading copy; caller supplies "documento"/"modelo". */
   loadingLabel?: string;
+  /**
+   * Layout variant. Default (`false`) is the standalone editor drawer: a fixed
+   * 280px rail with its own border/background and a left pull-tab that collapses
+   * the whole rail. `true` is the embedded reuse (WorkspaceSidebar, spec §9.2) —
+   * the panel flexes to fill its host column instead of imposing a 300px width
+   * (tab + 280px), and drops the redundant rail chrome the host already draws.
+   */
+  embedded?: boolean;
 }
 
 export function ArtifactMetaSidebar({
@@ -49,6 +57,7 @@ export function ArtifactMetaSidebar({
   lineage = [],
   ariaLabel = "Identificação do artefato",
   loadingLabel = "Carregando metadados",
+  embedded = false,
 }: ArtifactMetaSidebarProps) {
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const pageSizeSummary = formatPageSizeSummary(meta.pageCount, meta.fileSizeBytes);
@@ -65,7 +74,7 @@ export function ArtifactMetaSidebar({
   const showApprovalChain = approvalChain != null && approvalChain.length > 0;
 
   return (
-    <div className={styles.sidebarOuter}>
+    <div className={`${styles.sidebarOuter} ${embedded ? styles.sidebarOuterEmbedded : ""}`}>
       <button
         type="button"
         className={styles.toggleTab}
@@ -80,7 +89,7 @@ export function ArtifactMetaSidebar({
         </svg>
       </button>
       {open && (
-        <aside className={styles.sidebar} aria-label={ariaLabel}>
+        <aside className={`${styles.sidebar} ${embedded ? styles.sidebarEmbedded : ""}`} aria-label={ariaLabel}>
           <div className={styles.panelFrame}>
             <section className={styles.section}>
               <div className={styles.sectionHeader}>Identificação</div>

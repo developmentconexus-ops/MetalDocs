@@ -278,3 +278,25 @@
   background: var(--danger-bg);
   color: var(--danger);
 }
+
+/*
+ * Embedded variant (WorkspaceSidebar, spec §9.2): the panel is reused inside a
+ * host sidebar column that already owns the rail width, border, and background.
+ * Fill that column instead of imposing the standalone drawer's 300px (20px tab
+ * + fixed 280px inner), which overflows a 280px host and double-draws chrome.
+ * Placed at end of file so these single-class overrides win over the base
+ * .sidebar rule by source order (equal specificity).
+ */
+.sidebarOuterEmbedded {
+  width: 100%;
+}
+
+.sidebarEmbedded {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  border-left: none;
+  overflow: visible;
+  background: transparent;
+}
