@@ -45,10 +45,10 @@ describe('AuthorCommentsPanel', () => {
     expect(onResolve).toHaveBeenCalledWith(root);
   });
 
-  it('resolved thread shows reopen, calls onReopen', () => {
+  it('resolved thread shows reopen, calls onReopen with the resolved comment', () => {
     const { onReopen } = renderPanel([{ ...root, resolved: true }]);
     fireEvent.click(screen.getByRole('button', { name: /reabrir/i }));
-    expect(onReopen).toHaveBeenCalled();
+    expect(onReopen).toHaveBeenCalledWith({ ...root, resolved: true });
   });
 
   it('renders an empty state when there are no comments', () => {
