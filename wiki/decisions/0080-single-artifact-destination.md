@@ -93,6 +93,19 @@ continuous rendition (eager render at submit/resubmit via outbox, keyed by `cont
 researched and shaped 2026-07-09, design record
 `docs/superpowers/specs/2026-07-09-f5b-pdf-official-view-design.md`.
 
+**Closure (F2d.7 cockpit retirement, 2026-07-09):** the migration is now physically complete. The
+retired `ApprovalCockpitPage`, its wholly-cockpit-only adapter `useDocumentApprovalArtifact`, the
+unmounted `DocumentEditorRoutePage`, and the cockpit-only sidebar stack (`ApprovalSidebar` +
+`StageContextHeader` + `SuggestionList`) were **deleted** — leaving zero dead cockpit code. The
+`/approvals/:documentId` and `/documents/:id/edit` **redirects are KEPT** as the bookmark/deep-link
+preservation surface (the `/approvals` one still forwards `location.search`, e.g. `?decision=`). All
+live navigation now targets `/documents/:id` directly instead of bouncing through a redirect
+(`getActiveSiblingDestination` collapsed to the canonical path; `DocumentDetailRoute` +
+`NewDocumentWizardPage` constructors retargeted). Deferred (not deleted): `CancelInstanceDialog`
+remains for the yet-to-be-wired single-screen "Cancelar instância" action (`WorkspaceSidebar.tsx`
+S2b note). No new ADR — this decision governs. Evidence:
+`docs/superpowers/milestones/approval-remediation/milestone-2d-workflow-coherence-fe/f7-cockpit-retirement/evidence.md`.
+
 ## Consequences
 
 - One screen, one mounted route, one accountability column (timeline + verdicts + signature) per
