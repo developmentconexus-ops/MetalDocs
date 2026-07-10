@@ -122,6 +122,55 @@ describe('WorkspaceSidebar', () => {
     expect(screen.getByText('Identificação')).toBeInTheDocument();
   });
 
+  it('renders a passed lifecycle action in the reviewing footer and fires run on click', () => {
+    const run = vi.fn();
+    renderSidebar({
+      lifecycleActions: [
+        { key: 'cancel', label: 'Cancelar instância', variant: 'secondary', available: true, run },
+      ],
+    });
+    // Verdict CTAs (reviewing) AND the lifecycle action both render.
+    expect(screen.getByRole('button', { name: 'Pronto para aprovação' })).toBeInTheDocument();
+    const cancelBtn = screen.getByRole('button', { name: 'Cancelar instância' });
+    expect(cancelBtn).toBeInTheDocument();
+    cancelBtn.click();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a lifecycle action in the observing footer even with no verdict CTAs', () => {
+    const instance = makeInstance({
+      viewer: {
+        is_author: false,
+        eligible_for_active_stage: false,
+        has_signed_active_stage: false,
+        via_delegation_from: null,
+      },
+    });
+    renderSidebar({
+      instance,
+      activeStage: instance.stages[0],
+      lifecycleActions: [
+        { key: 'cancel', label: 'Cancelar instância', variant: 'secondary', available: true, run: vi.fn() },
+      ],
+    });
+    expect(screen.queryByRole('button', { name: 'Pronto para aprovação' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('approval-sidebar-footer')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancelar instância' })).toBeInTheDocument();
+  });
+
+  it('renders no lifecycle footer when the action list is empty and the viewer is observing', () => {
+    const instance = makeInstance({
+      viewer: {
+        is_author: false,
+        eligible_for_active_stage: false,
+        has_signed_active_stage: false,
+        via_delegation_from: null,
+      },
+    });
+    renderSidebar({ instance, activeStage: instance.stages[0], lifecycleActions: [] });
+    expect(screen.queryByTestId('approval-sidebar-footer')).not.toBeInTheDocument();
+  });
+
   it('surfaces an instance error in the timeline panel and wires the retry callback', () => {
     const onRetryInstance = vi.fn();
     renderSidebar({

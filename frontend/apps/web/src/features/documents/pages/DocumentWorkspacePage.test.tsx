@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,9 +29,14 @@ vi.mock('../components/workspace/PdfCanvas', () => ({
   PdfCanvas: () => <div data-testid="pdf-canvas" />,
 }));
 
+// Mutable so individual tests can grant/withhold the document.edit capability
+// the cancel-instance affordance is gated on (ADR 0022). `mock`-prefixed per
+// Vitest's hoisting guard so the factory below may close over it. Reset in
+// beforeEach.
+let mockCapabilities: string[] = [];
 vi.mock('../../../store/auth.store', () => ({
-  useAuthStore: (selector: (s: { user: { displayName: string; userId: string; email: string; username: string } }) => unknown) =>
-    selector({ user: { displayName: 'Ana Revisora', userId: 'user-reviewer-1', email: 'ana@example.com', username: 'ana' } }),
+  useAuthStore: (selector: (s: { user: { displayName: string; userId: string; email: string; username: string; capabilities: string[] } }) => unknown) =>
+    selector({ user: { displayName: 'Ana Revisora', userId: 'user-reviewer-1', email: 'ana@example.com', username: 'ana', capabilities: mockCapabilities } }),
 }));
 
 // EditorCanvas is a normal (non-lazy) import in the owner page — mounting the
@@ -163,6 +168,7 @@ function mockFileFetch() {
 describe('DocumentWorkspacePage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    mockCapabilities = [];
     vi.spyOn(documentsApi, 'signedRevisionURL').mockReturnValue('/revisions/rev-1/signed-url');
     vi.spyOn(controlledDocumentsApi, 'fetchActiveDocumentInstance').mockResolvedValue({
       content_hash: 'hash-abc',
@@ -559,5 +565,127 @@ describe('DocumentWorkspacePage', () => {
     await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
     expect(screen.getByLabelText('Mudanças solicitadas')).toBeInTheDocument();
     expect(screen.queryByTestId('author-comments-panel')).not.toBeInTheDocument();
+  });
+
+  // ---------- S2b — cancel-instance lifecycle affordance (ADR 0022) ----------
+
+  const CANCEL = { name: 'Cancelar instância' } as const;
+
+  function reviewingInstance() {
+    return makeInstance(); // eligible reviewer on an active review stage, in_progress
+  }
+
+  function observingInstance() {
+    return makeInstance({
+      viewer: {
+        is_author: false,
+        eligible_for_active_stage: false,
+        has_signed_active_stage: false,
+        via_delegation_from: null,
+      },
+    });
+  }
+
+  function approvingInstance() {
+    return makeInstance({
+      stages: [makeStage({ stage_kind: 'approval' })],
+      viewer: {
+        is_author: false,
+        eligible_for_active_stage: true,
+        has_signed_active_stage: false,
+        via_delegation_from: null,
+      },
+    });
+  }
+
+  function authorWaitingInstance() {
+    return makeInstance({
+      viewer: {
+        is_author: true,
+        eligible_for_active_stage: false,
+        has_signed_active_stage: false,
+        via_delegation_from: null,
+      },
+    });
+  }
+
+  it('reviewing + document.edit: surfaces the cancel action; clicking opens the CancelInstanceDialog', async () => {
+    mockCapabilities = ['document.edit'];
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc());
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(reviewingInstance());
+    renderAt();
+
+    const cancelBtn = await screen.findByRole('button', CANCEL);
+    fireEvent.click(cancelBtn);
+    expect(screen.getByRole('dialog', { name: 'Cancelar instância de aprovação' })).toBeInTheDocument();
+  });
+
+  it('approving + document.edit: cancel action renders alongside the signature panel', async () => {
+    mockCapabilities = ['document.edit'];
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'under_review' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(approvingInstance());
+    const { container } = renderAt();
+
+    // The signature panel depends on the async active-document context query, so
+    // it settles AFTER the cancel button (which only needs the instance). Wait on
+    // the slower element, then assert both are present together.
+    await waitFor(() => expect(container.querySelector('input[type="password"]')).not.toBeNull());
+    expect(screen.getByRole('button', CANCEL)).toBeInTheDocument();
+  });
+
+  it('observing + document.edit: cancel action still renders (capability-scoped, not stage-scoped)', async () => {
+    mockCapabilities = ['document.edit'];
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc());
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(observingInstance());
+    renderAt();
+
+    await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
+    expect(screen.getByText('Visualizando')).toBeInTheDocument();
+    expect(screen.getByRole('button', CANCEL)).toBeInTheDocument();
+  });
+
+  it('author-waiting + document.edit: the author can cancel their own in-progress instance', async () => {
+    mockCapabilities = ['document.edit'];
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(
+      makeDoc({ status: 'under_review', created_by: 'user-reviewer-1' }),
+    );
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(authorWaitingInstance());
+    renderAt();
+
+    await waitFor(() => expect(screen.getByText('Aguardando revisão')).toBeInTheDocument());
+    expect(screen.getByRole('button', CANCEL)).toBeInTheDocument();
+  });
+
+  it('reviewing WITHOUT document.edit: no cancel affordance (capability gate)', async () => {
+    // mockCapabilities stays [] (beforeEach reset).
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc());
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(reviewingInstance());
+    renderAt();
+
+    // Wait for the reviewing footer so the assertion isn't racing the first paint.
+    await screen.findByRole('button', { name: 'Pronto para aprovação' });
+    expect(screen.queryByRole('button', CANCEL)).not.toBeInTheDocument();
+  });
+
+  it('terminal instance + document.edit: no cancel affordance (instance not in_progress)', async () => {
+    mockCapabilities = ['document.edit'];
+    vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'approved' }));
+    vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
+      makeInstance({
+        stages: [],
+        status: 'approved',
+        viewer: {
+          is_author: false,
+          eligible_for_active_stage: false,
+          has_signed_active_stage: false,
+          via_delegation_from: null,
+        },
+      }),
+    );
+    renderAt();
+
+    // 'approved' status → PdfCanvas branch renders; wait for it, then assert no cancel.
+    await waitFor(() => expect(screen.getByTestId('pdf-canvas')).toBeInTheDocument());
+    expect(screen.queryByRole('button', CANCEL)).not.toBeInTheDocument();
   });
 });

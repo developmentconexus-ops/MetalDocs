@@ -35,13 +35,15 @@ export interface WorkspaceSidebarProps {
    * approval timeline and the decision footer.
    */
   contextualPanel?: ReactNode;
+  /**
+   * S2b — lifecycle actions (currently: "Cancelar instância") surfaced in the
+   * DecisionFooter's "Outras ações" group across every footer variant. Owner-
+   * computed and capability-gated (document.edit, ADR 0022) — the sidebar
+   * renders them without re-deriving eligibility. Empty in modes/states where
+   * no lifecycle action applies. Replaces the former S2a NO_ACTIONS placeholder.
+   */
+  lifecycleActions?: ArtifactAction[];
 }
-
-// S2a: no cancel/publish dialog state lives on this screen yet (those own
-// route-level dialog state on the cockpit route — out of scope here). The
-// footer therefore renders with an empty lifecycle-actions group; wiring a
-// real "Cancelar instância" action is deferred to S2b.
-const NO_ACTIONS: ArtifactAction[] = [];
 
 /**
  * F2d.5 S2a — the workspace's right-hand panel stack: embedded
@@ -63,6 +65,7 @@ export function WorkspaceSidebar({
   onRefetchInstance,
   decision = null,
   contextualPanel = null,
+  lifecycleActions = [],
 }: WorkspaceSidebarProps) {
   const [metaOpen, setMetaOpen] = useState(true);
 
@@ -125,7 +128,7 @@ export function WorkspaceSidebar({
       {instance ? (
         <DecisionFooter
           decision={decision}
-          actions={NO_ACTIONS}
+          actions={lifecycleActions}
           instance={instance}
           activeStage={activeStage}
           onRefetchInstance={onRefetchInstance}

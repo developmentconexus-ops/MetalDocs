@@ -5,6 +5,9 @@ import type { MetalDocsEditorRef, EditorComment, TrackedChange } from '@metaldoc
 import { CodeChip, InlineAlert, StatusPill } from '../../../components/ui';
 import { useAuthStore } from '../../../store/auth.store';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
+import type { ArtifactAction } from '../../shared/controlled-artifact/types';
+import { useHasCapability } from '../../iam/hooks/useHasCapability';
+import { CancelInstanceDialog } from '../../approval/components/CancelInstanceDialog';
 import { deriveWorkspaceMode } from '../../approval/lib/workspaceMode';
 import { useSignoffMutation } from '../../approval/hooks/useSignoffMutation';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
@@ -115,6 +118,15 @@ export function DocumentWorkspacePage() {
     contentHash: contentHash ?? '',
     revisionVersion,
   });
+
+  // ADR 0022 — the cancel affordance is gated on the SAME capability the
+  // backend enforces at BOTH tiers (tier-1 permissions.go route→capability +
+  // tier-2 authz.Require in cancel_service.go): document.edit, area-scoped.
+  // Never role-reasoned. This is only the affordance gate; the server remains
+  // the authority (area scope it can't see from here, plus a fail-closed
+  // tripwire), so a false-positive here degrades to a 403, never a bypass.
+  const canCancelInstance = useHasCapability('document.edit');
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   // §6 loading — shell skeleton, no central spinner.
   if (docQuery.isLoading) {
@@ -240,6 +252,25 @@ export function DocumentWorkspacePage() {
 
   const canUseComments = docStatus === 'draft' || docStatus === 'under_review';
 
+  // Lifecycle actions surfaced in the sidebar footer's "Outras ações" group.
+  // Cancel requires an actively-in-progress instance (instance.status
+  // 'in_progress' ↔ document under_review); a terminal / changes_requested
+  // instance is not cancelable. This mirrors the retired cockpit's
+  // TRANSITION_POLICY.cancelInstance gate (under_review only), now keyed on
+  // instance truth rather than document status. Offered across every
+  // in_progress mode (reviewing / approving / observing / author-waiting) since
+  // cancel authority is capability-scoped, not stage-eligibility-scoped.
+  const lifecycleActions: ArtifactAction[] = [];
+  if (instance?.status === 'in_progress' && canCancelInstance) {
+    lifecycleActions.push({
+      key: 'cancel',
+      label: 'Cancelar instância',
+      variant: 'secondary',
+      available: true,
+      run: () => setShowCancelDialog(true),
+    });
+  }
+
   return (
     <div className={styles.page} data-testid="workspace-page">
       <div className={styles.body}>
@@ -340,8 +371,22 @@ export function DocumentWorkspacePage() {
           }}
           decision={decision}
           contextualPanel={contextualPanel}
+          lifecycleActions={lifecycleActions}
         />
       </div>
+
+      {showCancelDialog ? (
+        <CancelInstanceDialog
+          documentId={documentId}
+          onClose={() => setShowCancelDialog(false)}
+          onSuccess={() => {
+            // Cancel flips the instance → cancelled and the document → cancelled;
+            // refetch both so the mode/footer/canvas recompute off the new truth.
+            void instanceQuery.refetch();
+            void docQuery.refetch();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
