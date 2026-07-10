@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react';
-import { MetalDocsEditor, type MetalDocsEditorRef, type EditorComment, type TrackedChange } from '@metaldocs/editor-ui';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import type { MetalDocsEditorRef, EditorComment, TrackedChange } from '@metaldocs/editor-ui';
 import { apiFetch } from '../../../lib/api';
 import { signedRevisionURL } from '../api/documents';
 import { EditorChrome } from '../../shared/components/editor-chrome';
 import styles from './DocumentShell.module.css';
+
+// F2d.5b D2 — MetalDocsEditor pulls the heavy TipTap/ProseMirror bundle. Lazy
+// so only docx read/edit canvases fetch it on mount; the PDF/lifecycle canvas
+// (PdfCanvas) and the loading/error states never pull the chunk.
+const MetalDocsEditor = lazy(() =>
+  import('@metaldocs/editor-ui').then((m) => ({ default: m.MetalDocsEditor })),
+);
 
 export interface DocumentShellProps {
   documentId: string;
@@ -121,23 +128,31 @@ export function DocumentShell({
     );
   } else {
     body = (
-      <MetalDocsEditor
-        ref={editorRef}
-        mode={editorMode}
-        documentBuffer={buffer}
-        author={author}
-        comments={comments}
-        onCommentsChange={onCommentsChange}
-        onCommentAdd={onCommentAdd}
-        onCommentResolve={onCommentResolve}
-        onCommentDelete={onCommentDelete}
-        onCommentReply={onCommentReply}
-        onAutoSave={onAutoSave ? async (buf: ArrayBuffer) => { await onAutoSave(buf); } : undefined}
-        onChange={onChange}
-        onDocumentNameChange={onDocumentNameChange}
-        onTrackedChangesChange={onTrackedChangesChange}
-        showRuler={false}
-      />
+      <Suspense
+        fallback={
+          <div role="status" aria-live="polite" className={styles.loading}>
+            Carregando editor…
+          </div>
+        }
+      >
+        <MetalDocsEditor
+          ref={editorRef}
+          mode={editorMode}
+          documentBuffer={buffer}
+          author={author}
+          comments={comments}
+          onCommentsChange={onCommentsChange}
+          onCommentAdd={onCommentAdd}
+          onCommentResolve={onCommentResolve}
+          onCommentDelete={onCommentDelete}
+          onCommentReply={onCommentReply}
+          onAutoSave={onAutoSave ? async (buf: ArrayBuffer) => { await onAutoSave(buf); } : undefined}
+          onChange={onChange}
+          onDocumentNameChange={onDocumentNameChange}
+          onTrackedChangesChange={onTrackedChangesChange}
+          showRuler={false}
+        />
+      </Suspense>
     );
   }
 
