@@ -1,7 +1,10 @@
 # Milestone 5 — Detalhe Signoff + Taxonomy Admin restyle (net-new / polish — last)
 
 > **Program:** frontend-screen-completion  ·  **Governing spec:** `../mission.md` (§7 M5, §5 inventory rows 13–14, §8 terminal acceptance)
-> **Status:** FEATURES CLOSED — awaiting milestone-validator + HS-1 (2026-07-10). Spec authored 2026-06-23. **F5.1** closed with both-reviewer APPROVE (`f5.1-signoff-detail/evidence.md`). **F5.2** closed **verify-only** (`f5.2-taxonomy-restyle/evidence.md`): the restyle was already delivered by `2a371d60 (FE-14, 2026-07-02)` — this milestone's "11 inline `style=`" premise predated FE-14; current page is fully tokenized (grep=0), tsc clean, vitest 23/23, rendered GREEN, both reviewers APPROVE. No new F5.2 diff written (fabricating one would invent scope on an already-correct base).
+> **Status:** FEATURES CLOSED (F5.1 reconciled via F5.3) — awaiting milestone-validator re-run + HS-1 (2026-07-10). Spec authored 2026-06-23.
+> - **F5.1** original close (`f5.1-signoff-detail/evidence.md`) is **superseded by ADR 0080** — its standalone cockpit was retired 2026-07-07. Reconciled verify-only by **F5.3** below.
+> - **F5.2** closed **verify-only** (`f5.2-taxonomy-restyle/evidence.md`): restyle already delivered by `2a371d60 (FE-14, 2026-07-02)` — the "11 inline `style=`" premise predated FE-14; current page fully tokenized (grep=0), tsc clean, vitest 23/23, rendered GREEN, both reviewers APPROVE. No new F5.2 diff (fabricating one would invent scope on an already-correct base).
+> - **F5.3** (`f5.3-signoff-reconcile/evidence.md`) reconciles F5.1 to ADR-0080 truth: current signoff surface = `DocumentWorkspacePage` approving mode; re-proven by 81/81 current-surface tests (incl. new `useSignoffMutation.test.tsx` re-establishing the `POST /signoff` + If-Match guard), orphan `SignoffDetailPage.module.css` removed, tsc clean, both reviewers APPROVE the current surface. Zero behavior change.
 > **Sequencing:** the **last** milestone (D5). Net-new screen + styling polish run last so they cannot regress M0–M4.
 
 > This file is a **spec**, authored up front. It says **what** this milestone is, **which
@@ -15,14 +18,18 @@ After this milestone, the **two remaining unfinished screens** in the routed app
 production-complete to the mission §8 bar, and **no in-scope screen is left unbuilt or
 off-design-system**:
 
-- A reviewer opening an approval sign-off from the inbox reaches a real **Detalhe Signoff**
-  screen — the A4 document/diff view, the approval-flow timeline panel, and the decision
-  (approve / reject sign-off) form — rendering **live data** from the existing approval APIs
-  (`GET /documents/{id}/approval-instance` or `GET /approval/instances/{instance_id}`) and
-  recording a decision through the existing sign-off endpoint
-  (`POST /documents/{id}/signoff` / `POST /approval/instances/{instance_id}/stages/{stage_id}/signoffs`).
-  No mock data, no dead-end. Matches `design-source/detalhe-signoff/detalhe-signoff.html`
-  (the `SignoffDetail` reference in `priority-screens.jsx`).
+- A reviewer opening an approval sign-off from the inbox reaches a real decision screen rendering
+  **live data** from the existing approval APIs and recording a decision through the existing
+  sign-off endpoint (`POST /documents/{id}/signoff`, with `content_hash` + If-Match). No mock data,
+  no dead-end.
+  > **Reconciled 2026-07-10 (ADR 0080 supersession, see F5.3).** The original F5.1 realized this as a
+  > *standalone* Detalhe Signoff cockpit at `/approvals/:documentId`. **ADR 0080 (2026-07-07) retired
+  > the cockpit pattern**: `/approvals/:documentId` now redirects to `/documents/:id`, and the decision
+  > surface is the **mode-adaptive document workspace** (`DocumentWorkspacePage`, *approving* mode) —
+  > the frozen read canvas + `ApprovalTimeline` (forked from the deleted `ApprovalTimelinePanel`) +
+  > the shared `ArtifactDecisionPanel` re-auth footer, driving `useSignoffMutation`. The objective is
+  > met by that surface; the standalone-cockpit / `detalhe-signoff.html` / `ControlledDocumentDetailPanel`
+  > wording below is the **original, superseded** realization. Current-state proof: `f5.3-signoff-reconcile/`.
 - `TaxonomyAdminPage` renders identically in behavior but is styled **entirely through the
   redesign design-system tokens** — the 11 inline `style=` occurrences are gone, replaced by
   token-backed classes/components. No behavior change, no contract change.
@@ -40,6 +47,8 @@ returns **0**; a `detalhe-signoff` route renders the screen against the real app
 |------------|---------------|-------------------|-------------------------------|
 | F5.1 | `f5.1-signoff-detail` | **Assemble** the **Detalhe Signoff** screen at a new route from **existing tested parts** (recon-corrected — see README HS-6 2026-06-23; the decision surface already exists, it is not built from scratch), wired to the **already-shipped** approval/sign-off APIs (no new backend). **Approach α:** a new route `/approvals/:documentId` reached from the approval inbox (`InboxStack` approve/reject **navigates here, replacing the in-inbox `SignoffDialog` modal**). Two columns per `design-source/detalhe-signoff/detalhe-signoff.html`: (1) **left — A4 document body**: embed the rendered PDF from `GET /documents/{id}/view` (`pdf_url`/`signed_url`; honest loading when `pdf_status` pending) + tab strip (Documento; **Comentários live** ← `GET /documents/{id}/comments`; **Mudanças vs vX diff = deferred-with-trigger** — no diff backend, honest absent state + backlog row, no faked diff); (2) **right — decision surface**: **mount the orphan `ControlledDocumentDetailPanel`** (already exported + unit-tested, mounted nowhere today) which itself reuses `ApprovalTimelinePanel` + `SignoffDialog` and carries the per-state policy / integrity / Assinar-Cancelar-Publicar actions. **Data in:** `getActiveDocumentContext(cd_id)` (→ documentId, instanceId, content_hash, revision) + `getInstance(documentId)` → `ApprovalInstance`. **Decision out:** `signoff(documentId, …)` with `If-Match` via the reused panel. Generated FE types consumed directly — no hand-written mapper. | The `/approvals/:documentId` route renders the A4 PDF embed + Comentários (live) + the mounted `ControlledDocumentDetailPanel` populated from a **real** approval-instance query (no `MOCK_`/illustrative literal); inbox approve/reject **navigates to the route** (modal path removed for that flow); recording a decision issues the real `signoff` mutation and reflects the outcome; **reuses `ControlledDocumentDetailPanel` (hence `ApprovalTimelinePanel` + `SignoffDialog`)** — asserted: no forked timeline/decision/sign-off component, no second decision form; the diff tab has no faked data (deferred-with-trigger backlog row); visual parity with `detalhe-signoff.html` confirmed by `frontend-screen-reviewer`; vitest covers the load + decision-submit branches; `tsc` clean; both `frontend-screen-reviewer` + `frontend-code-reviewer` APPROVE. |
 | F5.2 | `f5.2-taxonomy-restyle` | Convert `frontend/apps/web/src/features/taxonomy/TaxonomyAdminPage.tsx` from inline `style=` to **redesign design-system tokens** (token-backed classes / existing primitives), with **zero behavior change** and **zero contract change**. **Consumer:** the existing taxonomy admin route (`TaxonomyAdminRoutePage`) renders the restyled page identically. | `grep -nE "style=\{\{\|style=\""` over `TaxonomyAdminPage.tsx` = **0** (all 11 current inline-style sites removed); styling uses redesign tokens/primitives only (no raw hex/px literals introduced outside tokens); the existing taxonomy test(s) still pass unchanged (no behavior regression); the taxonomy API contract (`taxonomy/api/taxonomy.ts`) is untouched; `tsc` clean; both reviewers APPROVE. |
+
+| F5.3 | `f5.3-signoff-reconcile` | **Verify-only reconciliation** (added 2026-07-10, HS-4 remediation of the milestone-validator FAIL): F5.1's cockpit deliverable was retired by **ADR 0080** (`0c96dfb2`, 2026-07-07) — its evidence proved against deleted files (`SignoffDetailPage.tsx`, `ControlledDocumentDetailPanel.tsx` + tests). Reconcile the docs to the current surface (workspace *approving* mode) without rebuilding: annotate F5.1 evidence as superseded (history kept), re-point milestone objective, re-prove the current signoff surface with runnable tests, remove the orphan `SignoffDetailPage.module.css`. **No behavior change** — any real defect found → separate chip. | Current signoff surface proven by runnable tests: `DocumentWorkspacePage.test.tsx` (approving-mode panel renders/gates/preselect/SoD) + `useSignoffMutation.test.tsx` (new — `POST /documents/{id}/signoff` body `content_hash` + If-Match `"v{rev}"`, 412→stale) + `DecisionFooter`/`WorkspaceSidebar`/`signoffErrors`/`InboxPage` = **81/81**; `tsc` clean; orphan cockpit CSS removed; F5.1 evidence carries a superseded banner pointing here; both reviewers APPROVE the **current** surface. |
 
 For each feature, "what to validate" is **objectively checkable** — a rendered value sourced from a
 named endpoint, a mutation fired, a `grep` that returns 0, a reuse assertion, a passing test, a

@@ -1,3 +1,21 @@
+> ⚠️ **SUPERSEDED BY ADR 0080 (2026-07-07, commit `0c96dfb2`) — history preserved, proof relocated.**
+> The standalone Detalhe Signoff **cockpit** this document closes (`SignoffDetailPage.tsx` mounting
+> `ControlledDocumentDetailPanel`, reusing `ApprovalTimelinePanel` + `SignoffDialog`, at route
+> `/approvals/:documentId`) **no longer exists.** ADR 0080 ("single artifact destination") retired
+> the cockpit pattern: `/approvals/:documentId` now redirects to `/documents/:id`, and the sign-off
+> decision surface was **relocated into the mode-adaptive document workspace** (`DocumentWorkspacePage`,
+> *approving* mode). The files this evidence proves against — `SignoffDetailPage.tsx`,
+> `ControlledDocumentDetailPanel.tsx`, `SignoffDialog`, `ApprovalTimelinePanel`, and their tests — were
+> deleted/forked by ADR 0080 + F2d.7.
+>
+> **F5.1's *objective* still holds** (a reviewer from the inbox reaches a real screen rendering live
+> approval data and records a decision through the real sign-off endpoint — no mock, no dead-end); only
+> its *implementation* changed. This record is **kept for history, not re-run.** The current-state proof
+> lives in **`../f5.3-signoff-reconcile/evidence.md`** (reconciled 2026-07-10). Do not cite the gates
+> below as current — they reference deleted files.
+>
+> ---
+
 # F5.1 — Detalhe Signoff · Close-Out Evidence
 
 > Feature: `f5.1-signoff-detail` · Milestone 5 (Detalhe Signoff + Taxonomy Admin restyle)
