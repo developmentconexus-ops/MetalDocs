@@ -7,6 +7,7 @@
 
 ## 0. Standing constraints (apply to every unit)
 
+- **Execution harness is binding:** `docs/superpowers/HARNESS.md` — model matrix, unit loop P0–P7, verification ladder L0–L4, fresh-session browser-QA protocol.
 - Gates: `developing-new-work` before any new feature/module design; milestone-validator at milestone end; operator HS-1 before status flips; evidence.md before closure.
 - Contract-first (`api/openapi` + oapi-codegen), capabilities-not-roles (ADR 0022), testdb factory, outbox, DB-enforces-invariants, H-PRE-1.
 - Commit after verified work; NEVER push without operator permission. Many sealed programs are local-only — push consolidation is an operator decision (see §5).
