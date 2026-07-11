@@ -45,12 +45,22 @@ const STAGE_KIND_DESCRIPTIONS: Record<StageKind, string> = {
   approval: 'Aprovadores assinam (e podem conversar).',
 };
 
+export const STAGE_KIND_OPTIONS: ReadonlyArray<StageKind> = ['review', 'approval'];
+
 export function labelForStageKind(k: StageKind): string {
   return STAGE_KIND_LABELS[k];
 }
 
 export function describeStageKind(k: StageKind): string {
   return STAGE_KIND_DESCRIPTIONS[k];
+}
+
+export function flowPreviewEmptyLabel(): string {
+  return 'Adicione etapas para ver o fluxo.';
+}
+
+export function stageActorSlotDefaultHeading(): string {
+  return 'Quem atua nesta etapa';
 }
 
 export function livreBlockedMessage(): string {

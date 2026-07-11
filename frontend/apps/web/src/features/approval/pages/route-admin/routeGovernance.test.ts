@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   describeStageKind,
+  flowPreviewEmptyLabel,
   labelForStageKind,
   livreBlockedMessage,
   routePolicyFor,
+  STAGE_KIND_OPTIONS,
+  stageActorSlotDefaultHeading,
   validateSignaturePolicy,
   type GovernanceClass,
   type StageKind,
@@ -59,6 +62,24 @@ describe('describeStageKind', () => {
     expect(describeStageKind('approval')).toBe(
       'Aprovadores assinam (e podem conversar).',
     );
+  });
+});
+
+describe('STAGE_KIND_OPTIONS', () => {
+  it('lists review then approval', () => {
+    expect(STAGE_KIND_OPTIONS).toEqual(['review', 'approval']);
+  });
+});
+
+describe('flowPreviewEmptyLabel', () => {
+  it('returns the empty-state copy', () => {
+    expect(flowPreviewEmptyLabel()).toBe('Adicione etapas para ver o fluxo.');
+  });
+});
+
+describe('stageActorSlotDefaultHeading', () => {
+  it('returns the default heading copy', () => {
+    expect(stageActorSlotDefaultHeading()).toBe('Quem atua nesta etapa');
   });
 });
 
