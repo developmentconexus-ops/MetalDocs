@@ -16,6 +16,11 @@ bin/
 logs/
 docx-renderer.*.log
 docgen-v2.*.log
+# Exception: vendored packages may legitimately contain a `logs/` subtree
+# (e.g. go.opentelemetry.io/proto/otlp/logs, redis maintnotifications/logs).
+# The broad `logs/` rule above must not strip them from the committed vendor tree.
+!vendor/**/logs/
+!vendor/**/logs/**
 
 # --- Local QA scratch (cookie jars, request/response captures) ---
 cookies.txt
