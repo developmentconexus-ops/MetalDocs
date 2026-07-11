@@ -138,7 +138,7 @@ the operator queue; it does not grow the slice.
 | Level | What | Gate |
 |---|---|---|
 | L0 | `go build ./...` · `tsc/typecheck` · lints incl. api-lint, module-boundaries.yml, check-test-discipline, capability-coherence | zero findings |
-| L1 | `go test ./...` + `go test -tags=integration ./...` vs docker postgres · FE vitest | green; flaky = fix or delete per legacy-test rule |
+| L1 | `go test ./...` + integration suite via `.\scripts\test-integration.ps1` (NEVER hand-set `DATABASE_URL` — the script derives it from `.env` `POSTGRES_*`, probes postgres, and fails loud; `testdb.Open` silently SKIPS when the var is missing or the DB is down, which reads as false green) · FE vitest | green; flaky = fix or delete per legacy-test rule |
 | L2 | Full container stack via gateway :80 (coded compose path, [[docker-deploy-methodology]]) · gateway smoke: logins, target routes, RFC 9457 shapes | green, evidence captured |
 | L3 | Browser QA persona (§6) | GREEN verdict artifact |
 | L4 | milestone validation gate (mnfs-workflow:milestone-validate; legacy in-flight milestones may close on the old milestone-validator) | PASS verdict written to the milestone's qa/ artifact |

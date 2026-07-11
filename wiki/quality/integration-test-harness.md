@@ -1,6 +1,6 @@
 # Integration Test Harness
 
-> Last verified: 2026-07-06 — F9.4 doc-truth pass: fixed import path `internal/modules/documents/repository` → `internal/modules/documents/infrastructure` (F9.5 rename) in the code sample. | prior: 2026-07-05 — M7 F7.4 added `testdb.OpenAsCIRole` (§"Other helpers"); rest of `factory.go`
+> Last verified: 2026-07-11 — added canonical local runner `scripts/test-integration.ps1` (derives `DATABASE_URL` from `.env`, fails loud on unreachable DB) + silent-skip warning. | prior: 2026-07-06 — F9.4 doc-truth pass: fixed import path `internal/modules/documents/repository` → `internal/modules/documents/infrastructure` (F9.5 rename) in the code sample. | prior: 2026-07-05 — M7 F7.4 added `testdb.OpenAsCIRole` (§"Other helpers"); rest of `factory.go`
 > API unchanged since F4c.5.
 > See also: [test-discipline.md](test-discipline.md) (CI guard rules R1–R4), [ADR 0034](../decisions/0034-integration-test-fixture-framework.md), [ADR 0027 Amendment 2026-07-05](../decisions/0027-rls-adoption-sequencing.md) (why a second DB role exists for isolation proofs).
 
@@ -53,7 +53,32 @@ func TestSomething(t *testing.T) {
 ```
 
 `testdb.Open` skips the test if `DATABASE_URL` or `METALDOCS_DATABASE_URL` is not set — safe on
-machines without a local Postgres.
+machines without a local Postgres. **This skip is silent and reads as a green run.** Never verify
+integration behavior with a bare `go test -tags=integration` unless you have confirmed the DSN is
+set and the DB is reachable.
+
+### Running integration tests locally (canonical)
+
+```powershell
+.\scripts\test-integration.ps1                                  # whole repo
+.\scripts\test-integration.ps1 -Package ./tests/integration/approval/...
+.\scripts\test-integration.ps1 -Run TestGovernancePolicy -Package ./tests/integration/approval/...
+```
+
+The script is the single chokepoint for DB access in tests:
+
+1. If `DATABASE_URL`/`METALDOCS_DATABASE_URL` is already set, it uses it.
+2. Otherwise it derives `DATABASE_URL` from the `POSTGRES_USER` / `POSTGRES_PASSWORD` /
+   `POSTGRES_DB` / `POSTGRES_HOST_PORT` keys in `.env` (host `127.0.0.1`, default port `5433`,
+   `sslmode=disable`) — without ever printing the value.
+3. It probes the compose `metaldocs-postgres` container with `pg_isready` and **fails loud** if
+   Postgres is not accepting connections (pre-empting the second silent-skip path at
+   `tests/integration/testdb/db.go:73`).
+4. Only then does it run `go test -tags=integration`.
+
+Do NOT hand-craft a DSN or export `DATABASE_URL` manually in a session — that is exactly the
+non-canonical drift this script exists to prevent. `.env.example` intentionally ships the
+`DATABASE_URL` line commented out; the script derivation is the source of truth.
 
 **When the system-under-test takes `*sql.DB` directly** and must honour session-wide caps:
 
