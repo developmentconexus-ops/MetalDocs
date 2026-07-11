@@ -6732,7 +6732,7 @@ components:
           description: Required when verdict is request_changes.
     ReviewVerdictResponse:
       type: object
-      required: [verdict_id, was_replay, outcome]
+      required: [verdict_id, was_replay, outcome, fast_forward_eligible]
       properties:
         verdict_id:
           type: string
@@ -6740,6 +6740,18 @@ components:
           type: boolean
         outcome:
           type: string
+        fast_forward_eligible:
+          type: boolean
+          description: >-
+            R5 (unit 2.3 G3) — true iff this verdict completed the review
+            stage (quorum satisfied) AND the actor is eligible on the
+            now-active approval-kind stage.
+        next_stage_id:
+          type: string
+          format: uuid
+          description: >-
+            R5 — the now-active stage's id, present only when
+            fast_forward_eligible is true.
     ApprovalInboxItem:
       type: object
       required: [instance_id, document_id, controlled_document_id, document_title, area_code, submitted_by, submitted_at, stage_label, quorum_progress, due_at]

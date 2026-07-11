@@ -69,6 +69,13 @@ type ReviewVerdictResult struct {
 	StageCompleted   bool
 	InstanceApproved bool // true when all stages complete (ready path only)
 	ChangesRequested bool // true when the instance collapsed to changes_requested
+	// FastForwardEligible (R5, unit 2.3 G3) is true iff this verdict completed
+	// the review stage (quorum satisfied) AND the actor is eligible on the
+	// now-active approval-kind stage. A hint only — never an error path.
+	FastForwardEligible bool
+	// NextStageID is the now-active stage's id, set only when
+	// FastForwardEligible is true.
+	NextStageID *string
 }
 
 // RecordVerdict records a ready/request_changes verdict for the given
@@ -310,6 +317,19 @@ func (s *ReviewVerdictService) RecordVerdict(ctx context.Context, runner db.TxRu
 					if nextStage != nil {
 						if err := s.repo.UpdateStageStatus(ctx, tx, req.TenantID, nextStage.ID, domain.StageActive, domain.StagePending); err != nil {
 							return fmt.Errorf("recordVerdict: activate next stage: %w", err)
+						}
+
+						// R5 (unit 2.3 G3) fast-forward eligibility probe: only
+						// offered when the now-active stage is approval-kind and
+						// the actor is eligible on it. A failed eligibility
+						// resolve here is a hint miss, not an error — the
+						// verdict itself already succeeded above.
+						if nextStage.Kind == domain.StageKindApproval {
+							if _, err := domain.ResolveEligibleIdentity(req.ActorUserID, nextStage.EligibleActorIDs, delegations); err == nil {
+								result.FastForwardEligible = true
+								nextStageID := nextStage.ID
+								result.NextStageID = &nextStageID
+							}
 						}
 					}
 				}

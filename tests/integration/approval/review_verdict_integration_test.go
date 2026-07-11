@@ -189,6 +189,215 @@ func seedReviewVerdictFixture(t *testing.T, database *sql.DB, stageKind domain.S
 	}
 }
 
+// reviewThenApprovalFixture bundles the seeded rows for R5 (unit 2.3 G3)
+// fast-forward eligibility tests: a review-kind stage (active, any_1_of)
+// followed by a pending approval-kind stage whose eligible_actor_ids is
+// caller-configurable, so the same reviewer can be seeded either in or out
+// of the approval pool.
+type reviewThenApprovalFixture struct {
+	tenantID        string
+	authorID        string
+	reviewerID      string
+	documentID      string
+	instanceID      string
+	reviewStageID   string
+	approvalStageID string
+	runner          db.TxRunner
+	svc             *application.ReviewVerdictService
+}
+
+func (fx reviewThenApprovalFixture) ctxFor(actorID string) context.Context {
+	return testdb.AuthzCtx(fx.tenantID, actorID)
+}
+
+// seedReviewThenApprovalFixture mirrors seedReviewVerdictFixture's seeding
+// but inserts TWO stage_instances: stage 1 (review-kind, active, any_1_of,
+// eligible = author+reviewer per the same SoD-pool-widening rationale) and
+// stage 2 (approval-kind, pending, all_of, eligible = approvalEligible —
+// the caller decides whether the reviewer is in this pool).
+func seedReviewThenApprovalFixture(t *testing.T, database *sql.DB, approvalEligible []string) reviewThenApprovalFixture {
+	t.Helper()
+	ctx := context.Background()
+
+	tenant := testdb.NewTenant(t, database)
+	author := testdb.NewUser(t, database, testdb.WithTenant(tenant.ID), testdb.WithDisplayName("Author"))
+	reviewer := testdb.NewUser(t, database, testdb.WithTenant(tenant.ID), testdb.WithDisplayName("Reviewer"))
+
+	doc := testdb.NewDocument(t, database,
+		testdb.WithTenant(tenant.ID),
+		testdb.WithOwner(author.ID),
+		testdb.WithStatus("under_review"),
+		testdb.WithSubmitReadySnapshots(),
+	)
+
+	testdb.SeedWithCaps(t, database, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`UPDATE public.documents SET process_area_code_snapshot = 'qa' WHERE id = $1::uuid`,
+			doc.ID)
+		return err
+	})
+
+	route := testdb.NewApprovalRoute(t, database, testdb.WithTenant(tenant.ID))
+
+	instance := testdb.NewApprovalInstance(t, database,
+		testdb.WithDocument(doc),
+		testdb.WithRoute(route),
+		testdb.WithOwner(author.ID),
+		testdb.WithStatus("in_progress"),
+	)
+
+	testdb.SeedWithCaps(t, database, `[{"cap":"membership.manage"},{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.document_process_areas (code, tenant_id, name)
+			 VALUES ('qa', $1::uuid, 'QA') ON CONFLICT (tenant_id, code) DO NOTHING`,
+			tenant.ID,
+		); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO metaldocs.user_process_areas
+			(user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by)
+			VALUES ($1,$2,$3,$4,now(),NULL,$1)`, author.ID, tenant.ID, "qa", "area_admin")
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO metaldocs.user_process_areas
+			(user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by)
+			VALUES ($1,$2,$3,$4,now(),NULL,$1)`, reviewer.ID, tenant.ID, "qa", "approver")
+		return err
+	})
+
+	reviewEligible := `["` + author.ID + `","` + reviewer.ID + `"]`
+	var reviewStageID string
+	if err := database.QueryRowContext(ctx, `
+		INSERT INTO public.approval_stage_instances
+		  (approval_instance_id, stage_order, name_snapshot, required_role_snapshot,
+		   required_capability_snapshot, area_code_snapshot, quorum_snapshot,
+		   on_eligibility_drift_snapshot, eligible_actor_ids, status, stage_kind)
+		VALUES ($1::uuid, 1, 'Review Stage', 'reviewer', 'approval.review', 'qa',
+		        'any_1_of', 'keep_snapshot', $2::jsonb, 'active', 'review')
+		RETURNING id::text`,
+		instance.ID, reviewEligible,
+	).Scan(&reviewStageID); err != nil {
+		t.Fatalf("seed review stage_instance: %v", err)
+	}
+
+	approvalEligibleJSON := "["
+	for i, id := range approvalEligible {
+		if i > 0 {
+			approvalEligibleJSON += ","
+		}
+		approvalEligibleJSON += `"` + id + `"`
+	}
+	approvalEligibleJSON += "]"
+	var approvalStageID string
+	if err := database.QueryRowContext(ctx, `
+		INSERT INTO public.approval_stage_instances
+		  (approval_instance_id, stage_order, name_snapshot, required_role_snapshot,
+		   required_capability_snapshot, area_code_snapshot, quorum_snapshot,
+		   on_eligibility_drift_snapshot, eligible_actor_ids, status, stage_kind)
+		VALUES ($1::uuid, 2, 'Approval Stage', 'approver', 'document.signoff', 'qa',
+		        'all_of', 'keep_snapshot', $2::jsonb, 'pending', 'approval')
+		RETURNING id::text`,
+		instance.ID, approvalEligibleJSON,
+	).Scan(&approvalStageID); err != nil {
+		t.Fatalf("seed approval stage_instance: %v", err)
+	}
+
+	repo := infrastructure.NewPostgresApprovalRepository(database, iampostgres.NewUserDisplayNameRepository(database))
+	runner := db.NewTxRunner(database)
+	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil)
+
+	return reviewThenApprovalFixture{
+		tenantID:        tenant.ID,
+		authorID:        author.ID,
+		reviewerID:      reviewer.ID,
+		documentID:      doc.ID,
+		instanceID:      instance.ID,
+		reviewStageID:   reviewStageID,
+		approvalStageID: approvalStageID,
+		runner:          runner,
+		svc:             services.ReviewVerdict,
+	}
+}
+
+// TestReviewVerdict_FastForwardEligible_ReviewerAlsoInApprovalPool (R5, unit
+// 2.3 G3): the reviewer's `ready` verdict completes the (only-reviewer,
+// any_1_of) review stage; the reviewer is ALSO in the now-active approval
+// stage's eligible pool, so RecordVerdict reports FastForwardEligible=true
+// with NextStageID pointing at the approval stage.
+func TestReviewVerdict_FastForwardEligible_ReviewerAlsoInApprovalPool(t *testing.T) {
+	database, _ := testdb.Open(t)
+	// Fixture seeds the reviewer first; use a placeholder pool then widen once
+	// the reviewer's id is known — mirrors the two-step user-then-grant
+	// pattern used elsewhere in this fixture file.
+	fx := seedReviewThenApprovalFixture(t, database, nil)
+	if _, err := database.ExecContext(context.Background(),
+		`UPDATE public.approval_stage_instances SET eligible_actor_ids = $1::jsonb WHERE id = $2::uuid`,
+		`["`+fx.reviewerID+`"]`, fx.approvalStageID,
+	); err != nil {
+		t.Fatalf("widen approval stage eligible pool: %v", err)
+	}
+
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
+		TenantID:        fx.tenantID,
+		InstanceID:      fx.instanceID,
+		StageInstanceID: fx.reviewStageID,
+		ActorUserID:     fx.reviewerID,
+		Verdict:         domain.VerdictReady,
+	})
+	if err != nil {
+		t.Fatalf("RecordVerdict(ready): %v", err)
+	}
+	if !result.StageCompleted {
+		t.Errorf("StageCompleted = false; want true")
+	}
+	if result.InstanceApproved {
+		t.Errorf("InstanceApproved = true; want false (a pending approval stage remains)")
+	}
+	if !result.FastForwardEligible {
+		t.Errorf("FastForwardEligible = false; want true (reviewer is also eligible on the now-active approval stage)")
+	}
+	if result.NextStageID == nil || *result.NextStageID != fx.approvalStageID {
+		t.Errorf("NextStageID = %v; want %q", result.NextStageID, fx.approvalStageID)
+	}
+}
+
+// TestReviewVerdict_FastForwardIneligible_ReviewerNotInApprovalPool (R5,
+// unit 2.3 G3): same setup, but the reviewer is NOT in the approval stage's
+// eligible pool — RecordVerdict still completes the review stage but reports
+// FastForwardEligible=false.
+func TestReviewVerdict_FastForwardIneligible_ReviewerNotInApprovalPool(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedReviewThenApprovalFixture(t, database, nil)
+	otherApprover := testdb.NewUser(t, database, testdb.WithTenant(fx.tenantID), testdb.WithDisplayName("Other Approver"))
+	if _, err := database.ExecContext(context.Background(),
+		`UPDATE public.approval_stage_instances SET eligible_actor_ids = $1::jsonb WHERE id = $2::uuid`,
+		`["`+otherApprover.ID+`"]`, fx.approvalStageID,
+	); err != nil {
+		t.Fatalf("set approval stage eligible pool: %v", err)
+	}
+
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
+		TenantID:        fx.tenantID,
+		InstanceID:      fx.instanceID,
+		StageInstanceID: fx.reviewStageID,
+		ActorUserID:     fx.reviewerID,
+		Verdict:         domain.VerdictReady,
+	})
+	if err != nil {
+		t.Fatalf("RecordVerdict(ready): %v", err)
+	}
+	if !result.StageCompleted {
+		t.Errorf("StageCompleted = false; want true")
+	}
+	if result.FastForwardEligible {
+		t.Errorf("FastForwardEligible = true; want false (reviewer is not eligible on the now-active approval stage)")
+	}
+	if result.NextStageID != nil {
+		t.Errorf("NextStageID = %v; want nil", result.NextStageID)
+	}
+}
+
 func documentStatus(t *testing.T, database *sql.DB, docID string) string {
 	t.Helper()
 	var status string
