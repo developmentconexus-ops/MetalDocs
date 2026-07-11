@@ -10,7 +10,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"metaldocs/internal/modules/templates/application"
-	"metaldocs/internal/modules/templates/repository"
+	"metaldocs/internal/modules/templates/infrastructure"
 )
 
 func TestTemplatesModule_CreateAndPublish_Integration(t *testing.T) {
@@ -23,7 +23,7 @@ func TestTemplatesModule_CreateAndPublish_Integration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	svc := application.New(repository.New(db), nil, nil, nil)
+	svc := application.New(infrastructure.New(db), nil, nil, nil)
 	_ = svc
 	// Real behaviour covered by repo + app tests; this file exists to satisfy
 	// governance rule (any internal/modules change requires a tests/ change).

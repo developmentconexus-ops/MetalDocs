@@ -57,7 +57,7 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/domain"
-	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/documents/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/tests/integration/testdb"
@@ -82,7 +82,7 @@ func isUniqueViolation(err error) bool {
 // raceCreateDocumentTx fires `workers` concurrent CreateDocumentTx calls at
 // the same controlled document, each on its own transaction, released
 // simultaneously past a start barrier. Returns one raceResult per worker.
-func raceCreateDocumentTx(t *testing.T, ctx context.Context, db *sql.DB, repo *repository.Repository, tenantID, actorID string, cd testdb.ControlledDoc, codePrefix string) []raceResult {
+func raceCreateDocumentTx(t *testing.T, ctx context.Context, db *sql.DB, repo *infrastructure.Repository, tenantID, actorID string, cd testdb.ControlledDoc, codePrefix string) []raceResult {
 	t.Helper()
 
 	start := make(chan struct{})
@@ -165,7 +165,7 @@ func TestCreateDocumentTx_ConcurrentRevisionAllocation_SingleWinnerNoCollision(t
 		testdb.WithOwner(actor.ID),
 	)
 
-	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
+	repo := infrastructure.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	results := raceCreateDocumentTx(t, ctx, db, repo, tnt.ID, actor.ID, cd, "C5-WAVE1")
 
@@ -232,7 +232,7 @@ func TestCreateDocumentTx_ConcurrentRevisionAllocation_SecondWaveNoGapNoDuplicat
 		testdb.WithOwner(actor.ID),
 	)
 
-	repo := repository.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
+	repo := infrastructure.New(db, iamdomain.NoopUserDisplayNameReader{}, controlleddocumentsdomain.NoopCDFieldReader{}, taxonomydomain.NoopAreaCatalogReader{})
 
 	// Seed revision 0 sequentially (not part of the race under test).
 	profileCode := cd.ProfileCode

@@ -29,7 +29,7 @@ import (
 
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
-	"metaldocs/internal/modules/templates/repository"
+	"metaldocs/internal/modules/templates/infrastructure"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -72,7 +72,7 @@ func TestTripwire_ReviewerStageWritesVersionRow(t *testing.T) {
 	testdb.SeedSystemAdmin(t, db, tenant.ID, author, "Tripwire Test Author")
 	testdb.SeedSystemAdmin(t, db, tenant.ID, reviewer, "Tripwire Test Reviewer")
 
-	repo := repository.New(db)
+	repo := infrastructure.New(db)
 	svc := application.New(repo, noopPresigner{}, testClock{}, testUUID{}).
 		WithRunner(platformdb.NewTxRunner(db))
 
@@ -134,7 +134,7 @@ func TestTripwire_ArchiveWritesTemplateRow(t *testing.T) {
 	ctx = platformtenant.WithActorID(
 		platformtenant.WithTenantID(ctx, tenant.ID), actor)
 
-	repo := repository.New(db)
+	repo := infrastructure.New(db)
 	svc := application.New(repo, noopPresigner{}, testClock{}, testUUID{}).
 		WithRunner(platformdb.NewTxRunner(db))
 

@@ -1,6 +1,6 @@
 //go:build integration
 
-package riverjobs
+package riverjobs_test
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"github.com/riverqueue/river/rivermigrate"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 
+	riverjobs "metaldocs/internal/platform/jobs/river"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -52,7 +53,7 @@ func TestRiverInsertTxCompatibilityBoundary(t *testing.T) {
 		t.Fatalf("migrate river schema up: %v", err)
 	}
 
-	bundle, err := NewClientBundle(db, Config{
+	bundle, err := riverjobs.NewClientBundle(db, riverjobs.Config{
 		Schema:              schema,
 		SkipUnknownJobCheck: true,
 	}, nil)

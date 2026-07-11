@@ -1,6 +1,6 @@
 //go:build integration
 
-package bootstrap
+package bootstrap_test
 
 import (
 	"context"
@@ -8,16 +8,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
 	"metaldocs/tests/integration/testdb"
 )
 
 // buildTestDeps is a helper that calls BuildAPIDependencies with a real postgres
 // test DB (skipped when DATABASE_URL is not set). Memory mode was removed in 2.13.
-func buildTestDeps(t *testing.T, attachmentsCfg config.AttachmentsConfig) APIDependencies {
+func buildTestDeps(t *testing.T, attachmentsCfg config.AttachmentsConfig) bootstrap.APIDependencies {
 	t.Helper()
 	testdb.DSN(t) // skip if no DB configured; BuildAPIDependencies reads its own env vars
-	deps, err := BuildAPIDependencies(context.Background(), config.RepositoryPostgres, attachmentsCfg)
+	deps, err := bootstrap.BuildAPIDependencies(context.Background(), config.RepositoryPostgres, attachmentsCfg)
 	if err != nil {
 		t.Fatalf("BuildAPIDependencies() error = %v", err)
 	}
@@ -106,7 +107,7 @@ func TestBuildAPIDependenciesMarksGotenbergDownWhenHealthCheckFails(t *testing.T
 }
 
 func TestBuildMinioClientsFailsWhenPublicEndpointIsInvalid(t *testing.T) {
-	_, _, _, err := buildMinioClients(config.AttachmentsConfig{
+	_, _, _, err := bootstrap.BuildMinioClients(config.AttachmentsConfig{
 		Provider:            config.StorageProviderMinIO,
 		MinIOEndpoint:       "localhost:9000",
 		MinIOPublicEndpoint: "://bad endpoint",
