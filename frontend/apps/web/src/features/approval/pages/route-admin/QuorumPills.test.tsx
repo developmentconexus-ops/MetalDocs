@@ -29,4 +29,19 @@ describe('QuorumPills', () => {
       screen.getByText('Aprovado quando qualquer aprovador da etapa assina.'),
     ).toBeInTheDocument();
   });
+
+  it('exposes an accessible name via ariaLabelledBy', () => {
+    render(
+      <>
+        <span id="quorum-1-label">Quórum da etapa 1</span>
+        <QuorumPills
+          id="quorum-1"
+          value="any_1_of"
+          onChange={vi.fn()}
+          ariaLabelledBy="quorum-1-label"
+        />
+      </>,
+    );
+    expect(screen.getByRole('radiogroup', { name: 'Quórum da etapa 1' })).toBeInTheDocument();
+  });
 });

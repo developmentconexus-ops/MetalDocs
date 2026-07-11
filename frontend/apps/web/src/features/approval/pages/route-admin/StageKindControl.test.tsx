@@ -27,4 +27,19 @@ describe('StageKindControl', () => {
     render(<StageKindControl id="stage-1" value="review" onChange={vi.fn()} />);
     expect(screen.getByText('Revisores comentam e conferem; não assinam.')).toBeInTheDocument();
   });
+
+  it('exposes an accessible name via ariaLabelledBy', () => {
+    render(
+      <>
+        <span id="stage-1-kind-label">Tipo da etapa 1</span>
+        <StageKindControl
+          id="stage-1"
+          value="review"
+          onChange={vi.fn()}
+          ariaLabelledBy="stage-1-kind-label"
+        />
+      </>,
+    );
+    expect(screen.getByRole('radiogroup', { name: 'Tipo da etapa 1' })).toBeInTheDocument();
+  });
 });

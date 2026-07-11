@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  approveNowOverlapNote,
+  authorExcludedNote,
   describeStageKind,
   flowPreviewEmptyLabel,
   labelForStageKind,
@@ -7,7 +9,9 @@ import {
   routePolicyFor,
   STAGE_KIND_OPTIONS,
   stageActorSlotDefaultHeading,
+  stageOrderViolationMessage,
   validateSignaturePolicy,
+  validateStageOrder,
   type GovernanceClass,
   type StageKind,
 } from './routeGovernance';
@@ -126,5 +130,39 @@ describe('validateSignaturePolicy', () => {
 
   it.each(cases)('$name', ({ gc, stageKinds, expected }) => {
     expect(validateSignaturePolicy(gc, stageKinds)).toBe(expected);
+  });
+});
+
+describe('validateStageOrder', () => {
+  it('allows review-only routes', () => {
+    expect(validateStageOrder(['review', 'review'])).toBeNull();
+  });
+
+  it('allows approval-only routes', () => {
+    expect(validateStageOrder(['approval', 'approval'])).toBeNull();
+  });
+
+  it('allows review followed by approval', () => {
+    expect(validateStageOrder(['review', 'review', 'approval'])).toBeNull();
+  });
+
+  it('rejects a review stage after an approval stage', () => {
+    expect(validateStageOrder(['approval', 'review'])).toBe(stageOrderViolationMessage());
+  });
+});
+
+describe('authorExcludedNote', () => {
+  it('returns a non-empty PT-BR message', () => {
+    const message = authorExcludedNote();
+    expect(typeof message).toBe('string');
+    expect(message.length).toBeGreaterThan(0);
+  });
+});
+
+describe('approveNowOverlapNote', () => {
+  it('returns a non-empty PT-BR message', () => {
+    const message = approveNowOverlapNote();
+    expect(typeof message).toBe('string');
+    expect(message.length).toBeGreaterThan(0);
   });
 });

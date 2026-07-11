@@ -80,3 +80,32 @@ export function validateSignaturePolicy(
   }
   return null;
 }
+
+/** R1: a route is `review* → approval*` — once an approval stage appears, no
+ * review stage may follow it. */
+export function stageOrderViolationMessage(): string {
+  return 'A rota deve seguir revisão(ões) antes de assinatura(s) — nenhuma etapa de revisão pode vir depois de uma etapa de assinatura.';
+}
+
+export function validateStageOrder(stageKinds: StageKind[]): string | null {
+  let sawApproval = false;
+  for (const kind of stageKinds) {
+    if (kind === 'approval') {
+      sawApproval = true;
+    } else if (sawApproval) {
+      return stageOrderViolationMessage();
+    }
+  }
+  return null;
+}
+
+/** R4: SoD — the document author is excluded from every stage automatically. */
+export function authorExcludedNote(): string {
+  return 'O autor do documento é automaticamente excluído de todas as etapas.';
+}
+
+/** R5: overlap between review and approval is expected; "Aprovar já" collapses
+ * both ceremonies into one gesture when eligible. */
+export function approveNowOverlapNote(): string {
+  return 'Quem revisa e também assina pode aprovar já — uma única cerimônia registra os dois eventos.';
+}

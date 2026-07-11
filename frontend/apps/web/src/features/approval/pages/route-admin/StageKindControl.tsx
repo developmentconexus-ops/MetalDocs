@@ -11,12 +11,26 @@ interface StageKindControlProps {
   value: StageKind;
   onChange: (kind: StageKind) => void;
   disabled?: boolean;
+  ariaLabelledBy?: string;
+  ariaLabel?: string;
 }
 
-export function StageKindControl({ id, value, onChange, disabled }: StageKindControlProps) {
+export function StageKindControl({
+  id,
+  value,
+  onChange,
+  disabled,
+  ariaLabelledBy,
+  ariaLabel,
+}: StageKindControlProps) {
   return (
     <div>
-      <div className={styles.pillGroup} role="radiogroup">
+      <div
+        className={styles.pillGroup}
+        role="radiogroup"
+        aria-labelledby={ariaLabelledBy}
+        aria-label={ariaLabelledBy ? undefined : ariaLabel}
+      >
         {STAGE_KIND_OPTIONS.map((kind) => {
           const optionId = `${id}-${kind}`;
           const isSelected = kind === value;

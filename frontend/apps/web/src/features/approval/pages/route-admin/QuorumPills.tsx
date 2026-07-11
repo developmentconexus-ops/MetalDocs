@@ -11,12 +11,26 @@ interface QuorumPillsProps {
   value: QuorumKind;
   onChange: (kind: QuorumKind) => void;
   disabled?: boolean;
+  ariaLabelledBy?: string;
+  ariaLabel?: string;
 }
 
-export function QuorumPills({ id, value, onChange, disabled }: QuorumPillsProps) {
+export function QuorumPills({
+  id,
+  value,
+  onChange,
+  disabled,
+  ariaLabelledBy,
+  ariaLabel,
+}: QuorumPillsProps) {
   return (
     <div>
-      <div className={styles.pillGroup} role="radiogroup">
+      <div
+        className={styles.pillGroup}
+        role="radiogroup"
+        aria-labelledby={ariaLabelledBy}
+        aria-label={ariaLabelledBy ? undefined : ariaLabel}
+      >
         {QUORUM_KIND_OPTIONS.map((kind) => {
           const optionId = `${id}-${kind}`;
           const isSelected = kind === value;

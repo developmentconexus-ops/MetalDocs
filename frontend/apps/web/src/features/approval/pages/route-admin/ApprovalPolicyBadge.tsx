@@ -13,7 +13,7 @@ const TONE_CLASS: Record<RoutePolicy['badgeTone'], string> = {
 
 export function ApprovalPolicyBadge({ policy }: ApprovalPolicyBadgeProps) {
   return (
-    <span className={`${styles.policyBadge} ${TONE_CLASS[policy.badgeTone]}`}>
+    <span className={`${styles.policyBadge} ${TONE_CLASS[policy.badgeTone]}`} aria-live="polite">
       {policy.badgeLabel}
     </span>
   );
