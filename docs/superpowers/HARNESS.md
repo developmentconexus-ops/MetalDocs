@@ -104,6 +104,34 @@ Budget ceiling hit = stop, flush state to evidence.md/ROADMAP, split the unit.
 - **Global maximum first.** Every plan names the foundation it builds on and judges it (sound vs
   patch). Optimizing inside a patch is a defect. If the right structure crosses the unit boundary —
   surface, don't absorb.
+
+### GM fork procedure (binding when ≥2 implementations compete)
+
+Trigger: at spec time OR mid-implementation, two viable shapes exist — typically A = improve
+in-place on the current base (local maximum) vs B = the right structure, but it changes the base.
+Never pick silently; run this:
+
+1. **Judge the base first.** Is the current implementation sound, or legacy/patch/workaround?
+   (Sound base → A and B are both legitimate candidates; judge on merit. Bad base → step 2 rules.)
+2. **Write the fork record** (in the unit spec or evidence.md — 5 lines, not an essay): the
+   options, which one is the global maximum and why, cost of each, and whether B crosses the unit
+   boundary (module ownership, contract, DB shape, budget).
+3. **Route:**
+   - B fits inside the unit boundary + budget → **B, always.** "A is faster" never beats
+     structure; speed is not a tiebreaker against the global maximum.
+   - B crosses the boundary → STOP (AS-1/AS-2 shape) and send `BLOCKED` to the hub with the fork
+     record. Operator/hub picks: (a) expand the unit to B; (b) file B as a named ROADMAP unit and
+     land a **bridge slice** on the current base under the no-deepening rule; (c) accept A as
+     named debt with an ADR-recorded reopen trigger (§ "Long-term over expedient").
+4. **No-deepening rule.** A bridge on a base marked-for-replacement must be minimal and
+   reversible: it may touch the bad base, it may NOT grow it — no new capabilities, abstractions,
+   or consumers added to the structure that B will delete.
+5. **Reversibility test (the veto).** If choosing A makes B materially more expensive later
+   (new callers of the wrong seam, data written in the wrong shape, contract surface that must be
+   broken), A is FORBIDDEN at chip discretion — operator sign-off only.
+6. **Named debt or it didn't happen.** Any accepted local maximum gets a debt entry (ROADMAP row
+   or evidence defers) naming the reopen trigger. An unnamed local max discovered at review =
+   reject.
 - **Whole-system orientation.** Plan states owning module(s), non-owning modules, cross-module
   edges (direction + published interface), and which of the 6 invariants are touched — before any
   task card is written. (This is the `developing-new-work` §1/§3 output carried into the plan.)
