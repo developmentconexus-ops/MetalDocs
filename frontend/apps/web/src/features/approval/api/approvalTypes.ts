@@ -71,3 +71,8 @@ export type ReviewVerdictResponse = components['schemas']['ReviewVerdictResponse
 export type CreateApprovalDelegationRequest =
   components['schemas']['CreateApprovalDelegationRequest'];
 export type ApprovalDelegation = components['schemas']['ApprovalDelegation'];
+
+// G3 (unit 2.3/2.4) — the fast-forward endpoint records the review verdict
+// leg + the next-stage approve-signoff leg in one tx. Never hand-rolled.
+export type FastForwardRequest = components['schemas']['FastForwardRequest'];
+export type FastForwardResponse = components['schemas']['FastForwardResponse'];

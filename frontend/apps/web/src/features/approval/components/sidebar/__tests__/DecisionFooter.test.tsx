@@ -2,13 +2,19 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ApprovalInstance, StageInstance } from '../../../api/approvalTypes';
+import type { FastForwardOffer } from '../../../lib/fastForwardOffer';
 import type { ArtifactAction, ArtifactDecisionModel } from '../../../../shared/controlled-artifact/types';
 import { DecisionFooter } from '../DecisionFooter';
 
 const mutateAsyncMock = vi.fn();
+const fastForwardMutateAsyncMock = vi.fn();
 
 vi.mock('../../../queries/useReviewVerdictMutation', () => ({
   useReviewVerdictMutation: () => ({ mutateAsync: mutateAsyncMock }),
+}));
+
+vi.mock('../../../queries/useFastForwardMutation', () => ({
+  useFastForwardMutation: () => ({ mutateAsync: fastForwardMutateAsyncMock }),
 }));
 
 function makeViewer(overrides: Record<string, unknown> = {}) {
@@ -82,6 +88,8 @@ describe('DecisionFooter', () => {
   beforeEach(() => {
     mutateAsyncMock.mockReset();
     mutateAsyncMock.mockResolvedValue({ verdict_id: 'v1', was_replay: false, outcome: 'ok' });
+    fastForwardMutateAsyncMock.mockReset();
+    fastForwardMutateAsyncMock.mockResolvedValue({ signoff_id: 'so-1', was_replay: false, outcome: 'ok' });
   });
 
   describe('review mode', () => {
@@ -177,6 +185,103 @@ describe('DecisionFooter', () => {
       );
       expect(screen.queryByLabelText(/senha/i)).toBeNull();
       expect(screen.queryByRole('button', { name: /Aprovar e assinar/i })).toBeNull();
+    });
+
+    const fastForwardOffer: FastForwardOffer = {
+      reviewStageId: 'stage-1',
+      nextApprovalStageId: 'stage-approval-1',
+    };
+
+    it('renders "Aprovar já" when a fastForwardOffer and contentHash are present', () => {
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={vi.fn()}
+          fastForwardOffer={fastForwardOffer}
+          contentHash="abc123"
+        />,
+      );
+      expect(screen.getByRole('button', { name: 'Aprovar já' })).toBeTruthy();
+    });
+
+    it('does not render "Aprovar já" without an offer', () => {
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={vi.fn()}
+          fastForwardOffer={null}
+          contentHash="abc123"
+        />,
+      );
+      expect(screen.queryByRole('button', { name: 'Aprovar já' })).toBeNull();
+    });
+
+    it('does not render "Aprovar já" without a contentHash', () => {
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={vi.fn()}
+          fastForwardOffer={fastForwardOffer}
+          contentHash={null}
+        />,
+      );
+      expect(screen.queryByRole('button', { name: 'Aprovar já' })).toBeNull();
+    });
+
+    it('clicking "Aprovar já" opens the signature dialog with a password field', () => {
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={vi.fn()}
+          fastForwardOffer={fastForwardOffer}
+          contentHash="abc123"
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Aprovar já' }));
+      expect(screen.getByRole('dialog', { name: 'Aprovar já' })).toBeTruthy();
+      expect(screen.getByLabelText('Senha')).toBeTruthy();
+    });
+
+    it('submitting the fast-forward dialog with a password calls the mutation with the exact args and refetches', async () => {
+      const onRefetchInstance = vi.fn();
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ etag: '"v9"', viewer: makeViewer({ eligible_for_active_stage: true }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={onRefetchInstance}
+          fastForwardOffer={fastForwardOffer}
+          contentHash="abc123"
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Aprovar já' }));
+      const dialog = screen.getByRole('dialog', { name: 'Aprovar já' });
+      fireEvent.change(within(dialog).getByLabelText('Senha'), { target: { value: 'hunter2' } });
+      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'Tudo certo' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Assinar e avançar' }));
+
+      await waitFor(() => {
+        expect(fastForwardMutateAsyncMock).toHaveBeenCalledWith({
+          instanceId: 'inst-1',
+          stageId: 'stage-1',
+          etag: '"v9"',
+          body: { password_token: 'hunter2', content_hash: 'abc123', comment: 'Tudo certo' },
+        });
+      });
+      await waitFor(() => expect(onRefetchInstance).toHaveBeenCalled());
     });
   });
 

@@ -14,6 +14,7 @@ import type { ArtifactAction } from '../../shared/controlled-artifact/types';
 import { useHasCapability } from '../../iam/hooks/useHasCapability';
 import { CancelInstanceDialog } from '../../approval/components/CancelInstanceDialog';
 import { deriveWorkspaceMode } from '../../approval/lib/workspaceMode';
+import { deriveFastForwardOffer } from '../../approval/lib/fastForwardOffer';
 import { useSignoffMutation } from '../../approval/hooks/useSignoffMutation';
 import { submit as submitForReviewRequest } from '../../approval/api/approvalApi';
 import type { DocumentDetail } from '../api/documents';
@@ -140,11 +141,21 @@ export function DocumentWorkspacePage() {
   const authorDisplay = String(doc?.created_by ?? '');
   const commentsHook = useDocumentComments(documentId, authorDisplay);
 
+  // G3 (unit 2.4) — the opportunistic "Aprovar já" offer, derived purely from
+  // the instance payload (display hint only; the backend stays the authority).
+  const fastForwardOffer = instance && currentUser
+    ? deriveFastForwardOffer(instance, currentUser.userId)
+    : null;
+
   // Only fetch the active-document context (content_hash/revision_version)
-  // while approving — every other mode passes undefined, which the query
+  // while approving, OR when a fast-forward offer applies — the normal
+  // approve signoff AND the fast-forward signature ceremony both need the
+  // SAME content_hash. Every other case passes undefined, which the query
   // hook's own `enabled: Boolean(controlledDocumentId)` gate turns into a
   // no-op.
-  const controlledDocumentId = mode === 'approving' ? doc?.controlled_document_id ?? undefined : undefined;
+  const controlledDocumentId = mode === 'approving' || fastForwardOffer != null
+    ? doc?.controlled_document_id ?? undefined
+    : undefined;
   const contextQuery = useControlledDocumentActiveDocumentQuery(controlledDocumentId);
   const contentHash = contextQuery.data?.content_hash ?? null;
   const revisionVersion = contextQuery.data?.revision_version ?? doc?.revision_version ?? 0;
@@ -575,6 +586,8 @@ export function DocumentWorkspacePage() {
           decision={decision}
           contextualPanel={contextualPanel}
           lifecycleActions={lifecycleActions}
+          fastForwardOffer={fastForwardOffer}
+          contentHash={contentHash}
         />
       </div>
 
