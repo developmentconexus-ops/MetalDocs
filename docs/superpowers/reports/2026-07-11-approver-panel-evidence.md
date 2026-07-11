@@ -67,16 +67,23 @@ honoured as a hint (never gates correctness — replay returns false). Backend i
 | A | orchestrator (generated file, contract-first codegen — no hand diff) | tsc + additive-diff check | PASS | (folded into B commit) |
 | B | sonnet general-purpose `a6bf24795b8ec1000` | independent sonnet `ad122f359dd0a76f3` | **PASS** (1 MINOR stale JSDoc → fixed inline) | 1c6db8dc |
 | C | sonnet general-purpose `a6baff83ebfeffc83` | independent sonnet `a44fa71294c654d2f` | **PASS** (1 MINOR: `MeaningOfSignatureLine` reject branch unreachable for current caller → **accepted-defensive**: `tone` flows from shared `ArtifactDecisionOption.tone` which templates emit as `reject`; narrowing would force a call-site cast, a worse smell) | 9418d091 |
-| D | sonnet general-purpose `a645293032f34bbd6` | independent sonnet `ab6c5203427fb3eeb` | **PASS** (0 findings; derivation + review-stage-id correctness core confirmed) | _pending_ |
+| D | sonnet general-purpose `a645293032f34bbd6` | independent sonnet `ab6c5203427fb3eeb` | **PASS** (0 findings; derivation + review-stage-id correctness core confirmed) | 6e71e127 |
 
 ## 7. Verification ladder
 
-- L0 tsc (`tsconfig.build.json`): baseline CLEAN (pre-change). _re-run per slice below._
-- L1 vitest: baseline 53/53 green on touched features (`DecisionFooter`, `controlled-artifact`). _re-run per slice._
-- L2/L3 UI QA on :80: _pending Slice E (REQUEST web rebuild → fresh browser QA)._
+- L0 tsc (`tsconfig.build.json`): **CLEAN** on the integrated A–D tree (post-Slice-D, HEAD `6e71e127`).
+- L1 vitest: **643/643 passed (96 files)** across `approval` + `documents` + `shared/controlled-artifact` + `templates` — templates untouched and green (no regression from the two-action / fast-forward changes).
+- L2/L3 UI QA on :80: **BLOCKED — operator/hub dependency.** The chip's `HUB_SESSION_ID` (`local_39f1f842-1a02-4275-a6c9-2023312cd979`) no longer exists (not in `list_sessions`; session ended before this resumed run), so the REQUEST for a web-container rebuild could not be delivered. The mandatory :80 QA also requires the operator to perform login (QA personas are forbidden from typing passwords). Both dependencies are the operator's to resolve. Code is complete + L0/L1 green; only the browser-evidenced :80 QA remains. See §8 HS-1 (c).
 
 ## 8. Defers / HS-1 items
 
 - HS-1 (a): fast-forward "opportunistic single-gesture" interpretation vs chip's "after recording a verdict" prose (see §4).
 - HS-1 (b): `?decision=` deep-link preselection removed (spec §5 mandate) — inbox→panel now lands unselected.
 - (carry) 21 CFR/MP jurisdiction of the meaning-of-signature copy (pre-existing, spec §6) — untouched.
+- HS-1 (c): **:80 UI QA not yet executed** — hub session stale/unreachable + operator login required. Operator must (1) rebuild+serve the web container off HEAD `6e71e127` on the gateway :80, and (2) perform the persona logins, then the browser QA can run. Two personas needed: (a) an **approval**-kind active stage to verify the two actions ("Assinar e aprovar" + "Solicitar mudanças"; no "Assinar e devolver"); (b) a reviewer who is **also the next-stage approver** to verify "Aprovar já". Until then, closure is code-complete + L0/L1-green but the mandatory browser evidence is outstanding.
+
+## 9. Commits (branch `claude/amazing-saha-589663`, NOT pushed)
+
+- `1c6db8dc` — S-A/B: regen G3 api-types + remove decision preselection.
+- `9418d091` — S-C: two-action approval footer (sign+approve or request_changes).
+- `6e71e127` — S-D: fast-forward "Aprovar já" one-gesture ceremony.
