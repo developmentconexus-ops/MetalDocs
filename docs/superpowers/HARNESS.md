@@ -33,10 +33,17 @@ corrective chip with the findings. Shared-resource rule: one owner of the :80 st
 Note: chip sessions run in fresh worktrees — untracked runtime files (.env, .env.local) must be
 copied from the main checkout (never printed). Chip prompts must state this.
 
-**Chip prompt template MUST carry, verbatim-strength:** (a) the §4 subagent obligations 1–5 as
+**Chip prompt template MUST carry, verbatim-strength:** (a) the §4 subagent obligations 1–6 as
 numbered instructions, not a passing mention; (b) "read docs/superpowers/HARNESS.md §4–§5 before
 implementing"; (c) the evidence.md dispatch-ledger requirement — the hub rejects closures whose
-evidence lists no implementer/reviewer dispatches.
+evidence lists no implementer/reviewer dispatches; (d) the task-board obligation — create the
+native task board from the plan before any dispatch, keep statuses live.
+
+**Hub instrumentation:** the hub mirrors the ROADMAP queue as its own native task board
+(one task per unit, blockedBy = the roadmap's ordering locks), may read a chip session's
+transcript mid-flight (`list_events`, operator-approved) for audit, may inject corrections into
+a running chip (`send_message`, operator-confirmed), and push-notifies the operator when a unit
+returns for acceptance or an HS-1 gate is waiting.
 
 ```
 ROADMAP.md → take topmost actionable unit → open ONLY its listed context files
@@ -93,6 +100,12 @@ implementing everything inline).** Unit-session obligations, checkable:
    session does not tree-crawl.
 5. evidence.md MUST list dispatches: per slice — implementer agent, reviewer agent(s), verdicts.
    A closure with zero dispatches listed fails acceptance review at the hub.
+6. **The unit session IS a milestone orchestrator** (amended 2026-07-10): its FIRST act after
+   reading the plan is to create a native task board (TaskCreate) — one task per feature/slice,
+   `blockedBy` edges for real dependencies — and keep it live: in_progress at dispatch,
+   completed only at reviewed-green. The board is the session's execution truth; evidence.md
+   snapshots its final state. The hub keeps its own board of UNITS (chips) the same way —
+   two levels, same discipline: hub tracks units, unit tracks slices.
 
 Every slice: **failing test first** (canonical framework — testdb for DB integration), implement to
 green, then two-stage review before the next slice starts:
