@@ -26,8 +26,14 @@ loop; never restate doctrine from memory, read it.
    (5/5 PASS expected). Bring-up/rebuild only via the coded compose path:
    `docker compose --env-file .env -f deploy/compose/docker-compose.yml build --progress plain <svc>`
    piped to a tee logfile, then `up -d`.
-6. **Own address**: your `HUB_SESSION_ID` = `local_` + this session's UUID (visible in the
-   scratchpad path). Every chip prompt embeds it (§2(e)).
+6. **Own address**: the scratchpad/transcript-dir UUID is NOT the session id — deriving
+   `HUB_SESSION_ID` from it shipped a dead address once (chips fell back to title-match).
+   Discover the real id from the `from="local_…"` attribute of a cross-session message this
+   session previously SENT: `mcp__ccd_session_mgmt__search_session_transcripts` for
+   `cross-session-message from="local_` and match this session's title in the snippet. A fresh
+   hub that never sent one: embed only the fallback (`list_sessions`, match cwd = repo root +
+   hub title) and capture the real id from the first chip exchange. Every chip prompt embeds
+   id + fallback (§2(e)).
 
 ## Operating loop
 

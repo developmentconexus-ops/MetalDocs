@@ -39,6 +39,10 @@ implementing"; (c) the evidence.md dispatch-ledger requirement — the hub rejec
 evidence lists no implementer/reviewer dispatches; (d) the task-board obligation — create the
 native task board from the plan before any dispatch, keep statuses live; (e) the hub comms
 contract below, including the hub's `HUB_SESSION_ID` so the chip can address it from turn one.
+The id must be the hub's REAL registry id — verified via the `from="local_…"` attribute of a
+cross-session message the hub previously sent (search chip transcripts), NEVER derived from the
+scratchpad/transcript-dir UUID (that is a different UUID; a dead address forces every chip onto
+the title-match fallback). Always embed the fallback alongside the id.
 
 **Hub–chip comms protocol (operator-ratified 2026-07-11).** Chips are not fire-and-forget: every
 chip session talks to the hub over `mcp__ccd_session_mgmt__send_message` (target =
