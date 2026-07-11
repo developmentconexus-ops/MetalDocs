@@ -106,11 +106,16 @@ func (h *Handler) ReviewVerdictHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	WriteJSON(w, http.StatusOK, contracts.ReviewVerdictResponse{
-		VerdictID: "",
-		WasReplay: false,
-		Outcome:   outcome,
-	})
+	resp := contracts.ReviewVerdictResponse{
+		VerdictID:           "",
+		WasReplay:           false,
+		Outcome:             outcome,
+		FastForwardEligible: result.FastForwardEligible,
+	}
+	if result.NextStageID != nil {
+		resp.NextStageID = *result.NextStageID
+	}
+	WriteJSON(w, http.StatusOK, resp)
 }
 
 func reviewVerdictOutcome(result application.ReviewVerdictResult) string {

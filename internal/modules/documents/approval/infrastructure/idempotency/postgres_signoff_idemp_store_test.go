@@ -19,4 +19,9 @@ func TestPostgresSignoffIdempStore_NilDB(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when db is nil, got nil")
 	}
+
+	_, _, err = store.BeginFastForwardReplay(context.Background(), "tenant", "actor", "key", "hash")
+	if err == nil {
+		t.Fatal("expected error when db is nil, got nil")
+	}
 }

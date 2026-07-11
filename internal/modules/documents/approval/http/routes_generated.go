@@ -85,3 +85,10 @@ func (h *Handler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request
 func (h *Handler) ListApprovalRoutes(w http.ResponseWriter, r *http.Request) {
 	h.ListRoutesHandler(w, r)
 }
+
+// RecordApprovalFastForward is the spec-generated adapter for the R5
+// "Aprovar já" contract path (unit 2.3 G3): records a `ready` review verdict
+// and an approve signoff as two ledger writes in one transaction.
+func (h *Handler) RecordApprovalFastForward(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params approvalapi.RecordApprovalFastForwardParams) {
+	h.FastForwardHandler(w, r)
+}

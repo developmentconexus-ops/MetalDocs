@@ -69,333 +69,30 @@ type ReviewVerdictResult struct {
 	StageCompleted   bool
 	InstanceApproved bool // true when all stages complete (ready path only)
 	ChangesRequested bool // true when the instance collapsed to changes_requested
+	// FastForwardEligible (R5, unit 2.3 G3) is true iff this verdict completed
+	// the review stage (quorum satisfied) AND the actor is eligible on the
+	// now-active approval-kind stage. A hint only — never an error path.
+	FastForwardEligible bool
+	// NextStageID is the now-active stage's id, set only when
+	// FastForwardEligible is true.
+	NextStageID *string
 }
 
 // RecordVerdict records a ready/request_changes verdict for the given
 // review-kind stage instance.
 func (s *ReviewVerdictService) RecordVerdict(ctx context.Context, runner db.TxRunner, req ReviewVerdictRequest) (ReviewVerdictResult, error) {
-	var result ReviewVerdictResult
-	var eligibilityEvent *GovernanceEvent
-
 	// H-PRE-1: resolve the actor display-name snapshot OFF the lock-holding tx.
 	actorDisplayName, err := s.repo.LoadActorDisplayName(ctx, req.TenantID, req.ActorUserID)
 	if err != nil {
 		return ReviewVerdictResult{}, fmt.Errorf("recordVerdict: lookup actor display name: %w", err)
 	}
 
+	var result ReviewVerdictResult
+	var eligibilityEvent *GovernanceEvent
 	err = runner.Do(ctx, func(tx *sql.Tx) error {
-		ctx := authz.WithCapCache(ctx)
-
-		instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("recordVerdict: %w", infrastructure.ErrNoActiveInstance)
-			}
-			return fmt.Errorf("recordVerdict: load instance: %w", err)
-		}
-		if instance == nil {
-			return infrastructure.ErrNoActiveInstance
-		}
-		if req.ExpectedRevisionVersion > 0 && req.ExpectedRevisionVersion != instance.RevisionVersion {
-			return infrastructure.ErrStaleRevision
-		}
-
-		// Only in_progress instances accept new verdicts (changes_requested and
-		// the three original terminal statuses all reject).
-		if instance.Status != domain.InstanceInProgress {
-			return infrastructure.ErrInstanceCompleted
-		}
-
-		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, instance.DocumentID)
-		if err != nil {
-			return fmt.Errorf("recordVerdict: load document area: %w", err)
-		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapApprovalReview), areaCode); err != nil {
-			return err
-		}
-
-		activeStage := instance.Active()
-		if activeStage == nil {
-			return domain.ErrNoActiveStage
-		}
-		if req.StageInstanceID == "" || activeStage.ID != req.StageInstanceID {
-			return infrastructure.ErrStageNotActive
-		}
-
-		// Verdicts are valid on review stages (both values) and on approval
-		// stages only as request_changes (R3/G2: approval powers include the
-		// power to converse/return without signing; `ready` on an approval stage
-		// would bypass the e-signature ceremony). Checked here first for a clean
-		// error before eligibility/SoD work; NewVerdict re-enforces authoritatively.
-		switch activeStage.Kind {
-		case domain.StageKindReview:
-		case domain.StageKindApproval:
-			if req.Verdict == domain.VerdictReady {
-				return domain.ErrVerdictReadyOnApprovalStage
-			}
-		default:
-			return domain.ErrVerdictWrongStageKind
-		}
-
-		// Eligibility, widened by any active delegation (F9/ADR 0077) — mirrors
-		// RecordSignoff's composition exactly: same domain.ResolveEligibleIdentity
-		// helper, same underlying domain.CheckEligibility predicate, no parallel
-		// rule.
-		delegations, err := s.repo.LoadActiveDelegationsFor(ctx, tx, req.TenantID, req.ActorUserID, s.clock.Now())
-		if err != nil {
-			return fmt.Errorf("recordVerdict: load active delegations: %w", err)
-		}
-		onBehalfOf, err := domain.ResolveEligibleIdentity(req.ActorUserID, activeStage.EligibleActorIDs, delegations)
-		if err != nil {
-			event := GovernanceEvent{
-				TenantID:     req.TenantID,
-				EventType:    EventTypeSignoffRejected,
-				ActorUserID:  req.ActorUserID,
-				ResourceType: "approval_instance",
-				ResourceID:   req.InstanceID,
-				Reason:       "not_eligible",
-				OccurredAt:   s.clock.Now(),
-			}
-			eligibilityEvent = &event
-			return err
-		}
-
-		// SoD: author cannot verdict their own submission (spec.md: "SoD blocks
-		// self-verdict"); a delegate cannot verdict on behalf of a delegator who
-		// is the author (F9/ADR 0077). This calls the SAME domain.CheckSoD
-		// predicate RecordSignoff calls (F7 unification) — priorSignoffs is nil
-		// because the cross-stage-reuse clause needs a []Signoff-shaped
-		// prior-record source that doesn't apply to review verdicts;
-		// InsertVerdict's idempotent-replay/conflict distinction below already
-		// handles actor-already-recorded-a-verdict-on-this-stage (mirrors
-		// InsertSignoff).
-		if err := domain.CheckSoD(instance.SubmittedBy, req.ActorUserID, onBehalfOf, nil); err != nil {
-			return err
-		}
-
-		now := s.clock.Now()
-		verdict, err := domain.NewVerdict(domain.VerdictParams{
-			ID:                       uuid.New().String(),
-			ApprovalInstanceID:       req.InstanceID,
-			StageInstanceID:          activeStage.ID,
-			StageKind:                activeStage.Kind,
-			ActorUserID:              req.ActorUserID,
-			ActorTenantID:            req.TenantID,
-			Verdict:                  req.Verdict,
-			Comment:                  req.Comment,
-			VerdictAt:                now,
-			ActorDisplayNameSnapshot: actorDisplayName,
-			OnBehalfOfUserID:         onBehalfOf,
-		})
-		if err != nil {
-			return fmt.Errorf("recordVerdict: build verdict: %w", err)
-		}
-
-		insertResult, err := s.repo.InsertVerdict(ctx, tx, *verdict)
-		if err != nil {
-			if errors.Is(err, infrastructure.ErrActorAlreadySigned) {
-				return err
-			}
-			return fmt.Errorf("recordVerdict: insert verdict: %w", err)
-		}
-		if insertResult.WasReplay {
-			result = ReviewVerdictResult{}
-			return nil
-		}
-
-		switch req.Verdict {
-		case domain.VerdictReady:
-			allStageVerdicts, err := s.repo.LoadStageVerdicts(ctx, tx, req.TenantID, activeStage.ID)
-			if err != nil {
-				return fmt.Errorf("recordVerdict: load stage verdicts: %w", err)
-			}
-			approvals := verdictsAsApprovals(allStageVerdicts)
-
-			currentEligible := activeStage.EligibleActorIDs
-			if activeStage.OnEligibilityDriftSnapshot != domain.DriftKeepSnapshot {
-				currentEligible, err = s.repo.ResolveEligibleActors(ctx, tx, req.TenantID, activeStage.AreaCodeSnapshot, activeStage.RequiredRoleSnapshot)
-				if err != nil {
-					return fmt.Errorf("recordVerdict: resolve current eligible actors: %w", err)
-				}
-			}
-			drift := domain.ApplyEligibilityDrift(*activeStage, currentEligible)
-			effectiveDenominator := drift.EffectiveDenominator
-			outcome := drift.ForcedOutcome
-			if outcome == domain.QuorumPending {
-				outcome = domain.EvaluateQuorum(*activeStage, approvals, nil, effectiveDenominator)
-				if outcome == domain.QuorumError {
-					return domain.ErrEmptyEligiblePool
-				}
-			}
-
-			if outcome == domain.QuorumApprovedStage {
-				// Capture the completing stage's kind BEFORE AdvanceStage mutates
-				// the in-memory stage slice (F5, plan.md task 5) — needed below to
-				// decide whether this transition crosses the freeze boundary.
-				completingStageKind := activeStage.Kind
-
-				if err := s.repo.UpdateStageStatus(ctx, tx, req.TenantID, activeStage.ID, domain.StageCompleted, domain.StageActive); err != nil {
-					return fmt.Errorf("recordVerdict: complete stage: %w", err)
-				}
-				result.StageCompleted = true
-
-				if err := instance.AdvanceStage(); err != nil {
-					return fmt.Errorf("recordVerdict: advance stage: %w", err)
-				}
-
-				// Freeze boundary (F5, design spec.md §2.2 "W2 core"): the last
-				// review-kind stage completing — whether the instance is now fully
-				// approved (no more stages) or has advanced into an approval-kind
-				// stage — crosses the point past which the document content is
-				// immutable. This must run BEFORE the (now-removed, W10)
-				// unresolved-comments gate below, since freeze is the sole
-				// remaining enforcement of that concern.
-				nextActive := instance.Active()
-				crossesFreezeBoundary := completingStageKind == domain.StageKindReview &&
-					(nextActive == nil || nextActive.Kind == domain.StageKindApproval)
-				if crossesFreezeBoundary {
-					if err := executeFreeze(ctx, tx, s.repo, req.TenantID, instance); err != nil {
-						return fmt.Errorf("recordVerdict: freeze: %w", err)
-					}
-				}
-
-				if instance.Status == domain.InstanceApproved {
-					if err := s.repo.UpdateInstanceStatus(ctx, tx, req.TenantID, req.InstanceID,
-						domain.InstanceApproved, domain.InstanceInProgress, &now); err != nil {
-						return fmt.Errorf("recordVerdict: complete instance: %w", err)
-					}
-					if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
-						return err
-					}
-					if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusApproved); err != nil {
-						return err
-					}
-					res, err := tx.ExecContext(ctx, `
-						UPDATE documents
-						   SET status           = 'approved',
-						       revision_version = revision_version + 1
-						 WHERE id        = $1
-						   AND tenant_id = $2
-						   AND status    = 'under_review'`,
-						instance.DocumentID, req.TenantID,
-					)
-					if err != nil {
-						return fmt.Errorf("recordVerdict: approve document: %w", err)
-					}
-					rows, err := res.RowsAffected()
-					if err != nil {
-						return fmt.Errorf("recordVerdict: approve document rows affected: %w", err)
-					}
-					if rows == 0 {
-						return infrastructure.ErrStaleRevision
-					}
-					result.InstanceApproved = true
-
-					if s.lifecycleEnqueuer != nil {
-						largs := docsdomain.LifecycleEventArgs{
-							EventID:      uuid.NewString(),
-							TenantID:     req.TenantID,
-							EventType:    docsdomain.EventTypeDocumentApproved,
-							ResourceType: "approval_instance",
-							ResourceID:   req.InstanceID,
-							SubmittedBy:  instance.SubmittedBy,
-							OccurredAt:   now,
-						}
-						if err := s.lifecycleEnqueuer.EnqueueLifecycleEventTx(ctx, tx, largs); err != nil {
-							return fmt.Errorf("recordVerdict: enqueue lifecycle event: %w", err)
-						}
-					}
-				} else {
-					nextStage := instance.Active()
-					if nextStage != nil {
-						if err := s.repo.UpdateStageStatus(ctx, tx, req.TenantID, nextStage.ID, domain.StageActive, domain.StagePending); err != nil {
-							return fmt.Errorf("recordVerdict: activate next stage: %w", err)
-						}
-					}
-				}
-			}
-
-		case domain.VerdictRequestChanges:
-			// No quorum needed — a single request_changes verdict collapses the
-			// instance immediately (spec.md §2 consumer contract). The reviewer's
-			// comment is already durably recorded on the approval_review_verdicts
-			// row inserted above; it is NOT also written to
-			// approval_instances.cancel_reason — that column is reserved for
-			// actual cancellations (CancelInstance), and reusing it here would
-			// silently overload an audit field's meaning with an unrelated
-			// concern (duplicate data, misleading field on a changes_requested
-			// instance).
-			if err := s.repo.UpdateInstanceStatus(ctx, tx, req.TenantID, req.InstanceID,
-				domain.InstanceChangesRequested, domain.InstanceInProgress, &now); err != nil {
-				return fmt.Errorf("recordVerdict: set changes_requested: %w", err)
-			}
-			result.ChangesRequested = true
-
-			// SET LOCAL cancel GUC authorises the under_review -> draft edge in
-			// the document-transition trigger (same gate used by reject/cancel).
-			if _, err := tx.ExecContext(ctx,
-				`SELECT set_config('metaldocs.cancel_in_progress', $1, true)`,
-				instance.ID,
-			); err != nil {
-				return fmt.Errorf("recordVerdict: set cancel GUC: %w", err)
-			}
-			if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
-				return err
-			}
-			if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusDraft); err != nil {
-				return err
-			}
-			res, err := tx.ExecContext(ctx, `
-				UPDATE documents
-				   SET status           = 'draft',
-				       revision_version = revision_version + 1
-				 WHERE id        = $1
-				   AND tenant_id = $2
-				   AND status    = 'under_review'`,
-				instance.DocumentID, req.TenantID,
-			)
-			if err != nil {
-				return fmt.Errorf("recordVerdict: revert document to draft: %w", err)
-			}
-			rows, err := res.RowsAffected()
-			if err != nil {
-				return fmt.Errorf("recordVerdict: revert document rows affected: %w", err)
-			}
-			if rows == 0 {
-				return infrastructure.ErrStaleRevision
-			}
-		}
-
-		// Emit governance event.
-		eventType := EventTypeReviewVerdictRecorded
-		if req.Verdict == domain.VerdictRequestChanges {
-			eventType = EventTypeReviewChangesRequested
-		}
-		payloadMap := map[string]any{
-			"instance_id":       req.InstanceID,
-			"stage_instance_id": activeStage.ID,
-			"verdict":           req.Verdict,
-			"on_behalf_of":      onBehalfOf,
-		}
-		payloadBytes, err := json.Marshal(payloadMap)
-		if err != nil {
-			return fmt.Errorf("recordVerdict: marshal event payload: %w", err)
-		}
-		event := GovernanceEvent{
-			TenantID:     req.TenantID,
-			EventType:    eventType,
-			ActorUserID:  req.ActorUserID,
-			ResourceType: "approval_instance",
-			ResourceID:   req.InstanceID,
-			Reason:       req.Comment,
-			PayloadJSON:  json.RawMessage(payloadBytes),
-			OccurredAt:   now,
-		}
-		if err := s.emitter.Emit(ctx, tx, event); err != nil {
-			return fmt.Errorf("recordVerdict: emit event: %w", err)
-		}
-
-		return nil
+		var txErr error
+		result, eligibilityEvent, txErr = s.recordVerdictInTx(ctx, tx, req, actorDisplayName)
+		return txErr
 	})
 
 	if eligibilityEvent != nil {
@@ -408,6 +105,340 @@ func (s *ReviewVerdictService) RecordVerdict(ctx context.Context, runner db.TxRu
 		return ReviewVerdictResult{}, err
 	}
 	return result, nil
+}
+
+// recordVerdictInTx is the tx-scoped core of RecordVerdict, extracted so a
+// fast-forward flow (unit 2.3 G3) can run it inside a transaction it shares
+// with DecisionService.recordSignoffInTx. It does not own commit/rollback and
+// must not call runner itself. actorDisplayName is the off-tx preload from
+// RecordVerdict. The eligibility-rejection event (when non-nil) must be
+// emitted by the caller AFTER the tx this ran in has closed — mirrors
+// RecordVerdict's original post-tx emitEligibilityRejection call.
+func (s *ReviewVerdictService) recordVerdictInTx(ctx context.Context, tx *sql.Tx, req ReviewVerdictRequest, actorDisplayName string) (ReviewVerdictResult, *GovernanceEvent, error) {
+	ctx = authz.WithCapCache(ctx)
+	var result ReviewVerdictResult
+
+	instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: %w", infrastructure.ErrNoActiveInstance)
+		}
+		return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: load instance: %w", err)
+	}
+	if instance == nil {
+		return ReviewVerdictResult{}, nil, infrastructure.ErrNoActiveInstance
+	}
+	if req.ExpectedRevisionVersion > 0 && req.ExpectedRevisionVersion != instance.RevisionVersion {
+		return ReviewVerdictResult{}, nil, infrastructure.ErrStaleRevision
+	}
+
+	// Only in_progress instances accept new verdicts (changes_requested and
+	// the three original terminal statuses all reject).
+	if instance.Status != domain.InstanceInProgress {
+		return ReviewVerdictResult{}, nil, infrastructure.ErrInstanceCompleted
+	}
+
+	areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, instance.DocumentID)
+	if err != nil {
+		return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: load document area: %w", err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapApprovalReview), areaCode); err != nil {
+		return ReviewVerdictResult{}, nil, err
+	}
+
+	activeStage := instance.Active()
+	if activeStage == nil {
+		return ReviewVerdictResult{}, nil, domain.ErrNoActiveStage
+	}
+	if req.StageInstanceID == "" || activeStage.ID != req.StageInstanceID {
+		return ReviewVerdictResult{}, nil, infrastructure.ErrStageNotActive
+	}
+
+	// Verdicts are valid on review stages (both values) and on approval
+	// stages only as request_changes (R3/G2: approval powers include the
+	// power to converse/return without signing; `ready` on an approval stage
+	// would bypass the e-signature ceremony). Checked here first for a clean
+	// error before eligibility/SoD work; NewVerdict re-enforces authoritatively.
+	switch activeStage.Kind {
+	case domain.StageKindReview:
+	case domain.StageKindApproval:
+		if req.Verdict == domain.VerdictReady {
+			return ReviewVerdictResult{}, nil, domain.ErrVerdictReadyOnApprovalStage
+		}
+	default:
+		return ReviewVerdictResult{}, nil, domain.ErrVerdictWrongStageKind
+	}
+
+	// Eligibility, widened by any active delegation (F9/ADR 0077) — mirrors
+	// RecordSignoff's composition exactly: same domain.ResolveEligibleIdentity
+	// helper, same underlying domain.CheckEligibility predicate, no parallel
+	// rule.
+	delegations, err := s.repo.LoadActiveDelegationsFor(ctx, tx, req.TenantID, req.ActorUserID, s.clock.Now())
+	if err != nil {
+		return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: load active delegations: %w", err)
+	}
+	onBehalfOf, err := domain.ResolveEligibleIdentity(req.ActorUserID, activeStage.EligibleActorIDs, delegations)
+	if err != nil {
+		event := GovernanceEvent{
+			TenantID:     req.TenantID,
+			EventType:    EventTypeSignoffRejected,
+			ActorUserID:  req.ActorUserID,
+			ResourceType: "approval_instance",
+			ResourceID:   req.InstanceID,
+			Reason:       "not_eligible",
+			OccurredAt:   s.clock.Now(),
+		}
+		return ReviewVerdictResult{}, &event, err
+	}
+
+	// SoD: author cannot verdict their own submission (spec.md: "SoD blocks
+	// self-verdict"); a delegate cannot verdict on behalf of a delegator who
+	// is the author (F9/ADR 0077). This calls the SAME domain.CheckSoD
+	// predicate RecordSignoff calls (F7 unification) — priorSignoffs is nil
+	// because the cross-stage-reuse clause needs a []Signoff-shaped
+	// prior-record source that doesn't apply to review verdicts;
+	// InsertVerdict's idempotent-replay/conflict distinction below already
+	// handles actor-already-recorded-a-verdict-on-this-stage (mirrors
+	// InsertSignoff).
+	if err := domain.CheckSoD(instance.SubmittedBy, req.ActorUserID, onBehalfOf, nil); err != nil {
+		return ReviewVerdictResult{}, nil, err
+	}
+
+	now := s.clock.Now()
+	verdict, err := domain.NewVerdict(domain.VerdictParams{
+		ID:                       uuid.New().String(),
+		ApprovalInstanceID:       req.InstanceID,
+		StageInstanceID:          activeStage.ID,
+		StageKind:                activeStage.Kind,
+		ActorUserID:              req.ActorUserID,
+		ActorTenantID:            req.TenantID,
+		Verdict:                  req.Verdict,
+		Comment:                  req.Comment,
+		VerdictAt:                now,
+		ActorDisplayNameSnapshot: actorDisplayName,
+		OnBehalfOfUserID:         onBehalfOf,
+	})
+	if err != nil {
+		return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: build verdict: %w", err)
+	}
+
+	insertResult, err := s.repo.InsertVerdict(ctx, tx, *verdict)
+	if err != nil {
+		if errors.Is(err, infrastructure.ErrActorAlreadySigned) {
+			return ReviewVerdictResult{}, nil, err
+		}
+		return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: insert verdict: %w", err)
+	}
+	if insertResult.WasReplay {
+		return ReviewVerdictResult{}, nil, nil
+	}
+
+	switch req.Verdict {
+	case domain.VerdictReady:
+		allStageVerdicts, err := s.repo.LoadStageVerdicts(ctx, tx, req.TenantID, activeStage.ID)
+		if err != nil {
+			return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: load stage verdicts: %w", err)
+		}
+		approvals := verdictsAsApprovals(allStageVerdicts)
+
+		currentEligible := activeStage.EligibleActorIDs
+		if activeStage.OnEligibilityDriftSnapshot != domain.DriftKeepSnapshot {
+			currentEligible, err = s.repo.ResolveEligibleActors(ctx, tx, req.TenantID, activeStage.AreaCodeSnapshot, activeStage.RequiredRoleSnapshot)
+			if err != nil {
+				return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: resolve current eligible actors: %w", err)
+			}
+		}
+		drift := domain.ApplyEligibilityDrift(*activeStage, currentEligible)
+		effectiveDenominator := drift.EffectiveDenominator
+		outcome := drift.ForcedOutcome
+		if outcome == domain.QuorumPending {
+			outcome = domain.EvaluateQuorum(*activeStage, approvals, nil, effectiveDenominator)
+			if outcome == domain.QuorumError {
+				return ReviewVerdictResult{}, nil, domain.ErrEmptyEligiblePool
+			}
+		}
+
+		if outcome == domain.QuorumApprovedStage {
+			// Capture the completing stage's kind BEFORE AdvanceStage mutates
+			// the in-memory stage slice (F5, plan.md task 5) — needed below to
+			// decide whether this transition crosses the freeze boundary.
+			completingStageKind := activeStage.Kind
+
+			if err := s.repo.UpdateStageStatus(ctx, tx, req.TenantID, activeStage.ID, domain.StageCompleted, domain.StageActive); err != nil {
+				return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: complete stage: %w", err)
+			}
+			result.StageCompleted = true
+
+			if err := instance.AdvanceStage(); err != nil {
+				return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: advance stage: %w", err)
+			}
+
+			// Freeze boundary (F5, design spec.md §2.2 "W2 core"): the last
+			// review-kind stage completing — whether the instance is now fully
+			// approved (no more stages) or has advanced into an approval-kind
+			// stage — crosses the point past which the document content is
+			// immutable. This must run BEFORE the (now-removed, W10)
+			// unresolved-comments gate below, since freeze is the sole
+			// remaining enforcement of that concern.
+			nextActive := instance.Active()
+			crossesFreezeBoundary := completingStageKind == domain.StageKindReview &&
+				(nextActive == nil || nextActive.Kind == domain.StageKindApproval)
+			if crossesFreezeBoundary {
+				if err := executeFreeze(ctx, tx, s.repo, req.TenantID, instance); err != nil {
+					return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: freeze: %w", err)
+				}
+			}
+
+			if instance.Status == domain.InstanceApproved {
+				if err := s.repo.UpdateInstanceStatus(ctx, tx, req.TenantID, req.InstanceID,
+					domain.InstanceApproved, domain.InstanceInProgress, &now); err != nil {
+					return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: complete instance: %w", err)
+				}
+				if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+					return ReviewVerdictResult{}, nil, err
+				}
+				if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusApproved); err != nil {
+					return ReviewVerdictResult{}, nil, err
+				}
+				res, err := tx.ExecContext(ctx, `
+					UPDATE documents
+					   SET status           = 'approved',
+					       revision_version = revision_version + 1
+					 WHERE id        = $1
+					   AND tenant_id = $2
+					   AND status    = 'under_review'`,
+					instance.DocumentID, req.TenantID,
+				)
+				if err != nil {
+					return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: approve document: %w", err)
+				}
+				rows, err := res.RowsAffected()
+				if err != nil {
+					return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: approve document rows affected: %w", err)
+				}
+				if rows == 0 {
+					return ReviewVerdictResult{}, nil, infrastructure.ErrStaleRevision
+				}
+				result.InstanceApproved = true
+
+				if s.lifecycleEnqueuer != nil {
+					largs := docsdomain.LifecycleEventArgs{
+						EventID:      uuid.NewString(),
+						TenantID:     req.TenantID,
+						EventType:    docsdomain.EventTypeDocumentApproved,
+						ResourceType: "approval_instance",
+						ResourceID:   req.InstanceID,
+						SubmittedBy:  instance.SubmittedBy,
+						OccurredAt:   now,
+					}
+					if err := s.lifecycleEnqueuer.EnqueueLifecycleEventTx(ctx, tx, largs); err != nil {
+						return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: enqueue lifecycle event: %w", err)
+					}
+				}
+			} else {
+				nextStage := instance.Active()
+				if nextStage != nil {
+					if err := s.repo.UpdateStageStatus(ctx, tx, req.TenantID, nextStage.ID, domain.StageActive, domain.StagePending); err != nil {
+						return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: activate next stage: %w", err)
+					}
+
+					// R5 (unit 2.3 G3) fast-forward eligibility probe: only
+					// offered when the now-active stage is approval-kind and
+					// the actor is eligible on it. A failed eligibility
+					// resolve here is a hint miss, not an error — the
+					// verdict itself already succeeded above.
+					if nextStage.Kind == domain.StageKindApproval {
+						if _, err := domain.ResolveEligibleIdentity(req.ActorUserID, nextStage.EligibleActorIDs, delegations); err == nil {
+							result.FastForwardEligible = true
+							nextStageID := nextStage.ID
+							result.NextStageID = &nextStageID
+						}
+					}
+				}
+			}
+		}
+
+	case domain.VerdictRequestChanges:
+		// No quorum needed — a single request_changes verdict collapses the
+		// instance immediately (spec.md §2 consumer contract). The reviewer's
+		// comment is already durably recorded on the approval_review_verdicts
+		// row inserted above; it is NOT also written to
+		// approval_instances.cancel_reason — that column is reserved for
+		// actual cancellations (CancelInstance), and reusing it here would
+		// silently overload an audit field's meaning with an unrelated
+		// concern (duplicate data, misleading field on a changes_requested
+		// instance).
+		if err := s.repo.UpdateInstanceStatus(ctx, tx, req.TenantID, req.InstanceID,
+			domain.InstanceChangesRequested, domain.InstanceInProgress, &now); err != nil {
+			return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: set changes_requested: %w", err)
+		}
+		result.ChangesRequested = true
+
+		// SET LOCAL cancel GUC authorises the under_review -> draft edge in
+		// the document-transition trigger (same gate used by reject/cancel).
+		if _, err := tx.ExecContext(ctx,
+			`SELECT set_config('metaldocs.cancel_in_progress', $1, true)`,
+			instance.ID,
+		); err != nil {
+			return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: set cancel GUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+			return ReviewVerdictResult{}, nil, err
+		}
+		if err := docsdomain.CanTransitionDocumentStatus(docsdomain.DocStatusUnderReview, docsdomain.DocStatusDraft); err != nil {
+			return ReviewVerdictResult{}, nil, err
+		}
+		res, err := tx.ExecContext(ctx, `
+			UPDATE documents
+			   SET status           = 'draft',
+			       revision_version = revision_version + 1
+			 WHERE id        = $1
+			   AND tenant_id = $2
+			   AND status    = 'under_review'`,
+			instance.DocumentID, req.TenantID,
+		)
+		if err != nil {
+			return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: revert document to draft: %w", err)
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: revert document rows affected: %w", err)
+		}
+		if rows == 0 {
+			return ReviewVerdictResult{}, nil, infrastructure.ErrStaleRevision
+		}
+	}
+
+	// Emit governance event.
+	eventType := EventTypeReviewVerdictRecorded
+	if req.Verdict == domain.VerdictRequestChanges {
+		eventType = EventTypeReviewChangesRequested
+	}
+	payloadMap := map[string]any{
+		"instance_id":       req.InstanceID,
+		"stage_instance_id": activeStage.ID,
+		"verdict":           req.Verdict,
+		"on_behalf_of":      onBehalfOf,
+	}
+	payloadBytes, err := json.Marshal(payloadMap)
+	if err != nil {
+		return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: marshal event payload: %w", err)
+	}
+	event := GovernanceEvent{
+		TenantID:     req.TenantID,
+		EventType:    eventType,
+		ActorUserID:  req.ActorUserID,
+		ResourceType: "approval_instance",
+		ResourceID:   req.InstanceID,
+		Reason:       req.Comment,
+		PayloadJSON:  json.RawMessage(payloadBytes),
+		OccurredAt:   now,
+	}
+	if err := s.emitter.Emit(ctx, tx, event); err != nil {
+		return ReviewVerdictResult{}, nil, fmt.Errorf("recordVerdict: emit event: %w", err)
+	}
+
+	return result, nil, nil
 }
 
 func (s *ReviewVerdictService) emitEligibilityRejection(ctx context.Context, runner db.TxRunner, tenantID, actorID string, event GovernanceEvent) error {

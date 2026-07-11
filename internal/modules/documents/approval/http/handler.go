@@ -15,6 +15,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
+	approvalidempinfra "metaldocs/internal/modules/documents/approval/infrastructure/idempotency"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
 	"metaldocs/internal/platform/idempotency"
@@ -58,6 +59,10 @@ type reviewVerdictService interface {
 	RecordVerdict(ctx context.Context, runner db.TxRunner, req application.ReviewVerdictRequest) (application.ReviewVerdictResult, error)
 }
 
+type fastForwardService interface {
+	RecordFastForward(ctx context.Context, runner db.TxRunner, req application.FastForwardRequest) (application.FastForwardResult, error)
+}
+
 type obsoleteService interface {
 	MarkObsolete(ctx context.Context, runner db.TxRunner, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error)
 }
@@ -88,23 +93,40 @@ type signoffIdempStore interface {
 	BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error)
 }
 
+// fastForwardIdempStore backs idempotent replay for the fast-forward handler.
+// It is kept distinct from signoffIdempStore (its own route template) rather
+// than reusing BeginStageReplay's stage-signoff template — see
+// fastForwardRouteTemplate's doc comment for why the two must not collide.
+type fastForwardIdempStore interface {
+	BeginFastForwardReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error)
+}
+
+// Compile-time guard: the production idempotency store must keep implementing
+// fastForwardIdempStore. NewHandler's type-assertion below is otherwise a
+// silent no-op if PostgresSignoffIdempStore's method set ever drifts (e.g. a
+// rename of BeginFastForwardReplay) — this assertion turns that into a build
+// failure instead of a latent fail-open on fast-forward replay protection.
+var _ fastForwardIdempStore = (*approvalidempinfra.PostgresSignoffIdempStore)(nil)
+
 // Handler implements the approval subsystem's HTTP endpoints (submit, decision,
 // read, cancel, obsolete, supersede, route admin). It wraps *application.Services
 // behind narrow per-endpoint interfaces so handlers can be tested against fakes.
 type Handler struct {
-	services          *application.Services
-	db                *sql.DB
-	runner            db.TxRunner
-	submitSvc         submitService
-	decisionSvc       decisionService
-	readSvc           readService
-	cancelSvc         cancelService
-	reviewVerdictSvc  reviewVerdictService
-	obsoleteSvc       obsoleteService
-	supersedeSvc      supersedeService
-	routeAdmin        routeAdminService
-	idempStore        signoffIdempStore
-	displayNameReader iamdomain.UserDisplayNameReader
+	services              *application.Services
+	db                    *sql.DB
+	runner                db.TxRunner
+	submitSvc             submitService
+	decisionSvc           decisionService
+	readSvc               readService
+	cancelSvc             cancelService
+	reviewVerdictSvc      reviewVerdictService
+	fastForwardSvc        fastForwardService
+	obsoleteSvc           obsoleteService
+	supersedeSvc          supersedeService
+	routeAdmin            routeAdminService
+	idempStore            signoffIdempStore
+	fastForwardIdempStore fastForwardIdempStore
+	displayNameReader     iamdomain.UserDisplayNameReader
 }
 
 // NewHandler constructs the approval HTTP handler. displayName is a required
@@ -117,6 +139,9 @@ func NewHandler(services *application.Services, database *sql.DB, idempStore sig
 		idempStore:        idempStore,
 		displayNameReader: displayName,
 	}
+	if store, ok := idempStore.(fastForwardIdempStore); ok {
+		h.fastForwardIdempStore = store
+	}
 	if database != nil {
 		h.runner = db.NewTxRunner(database)
 	}
@@ -126,6 +151,7 @@ func NewHandler(services *application.Services, database *sql.DB, idempStore sig
 		h.readSvc = services.Read
 		h.cancelSvc = services.Cancel
 		h.reviewVerdictSvc = services.ReviewVerdict
+		h.fastForwardSvc = services.FastForward
 		h.obsoleteSvc = services.Obsolete
 		h.supersedeSvc = services.Supersede
 		h.routeAdmin = services.RouteAdmin

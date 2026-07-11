@@ -30,19 +30,25 @@ type fakeDecisionRepo struct {
 	// Embed no-op to satisfy interface; listed methods are real overrides.
 	infrastructure.ApprovalRepository
 
-	instance           *domain.Instance
-	loadInstanceErr    error
-	insertSignoffRes   infrastructure.SignoffInsertResult
-	insertSignoffErr   error
-	insertedSignoff    *domain.Signoff
-	updateStageErr     error
-	updateInstanceErr  error
-	instanceStatusTo   domain.InstanceStatus
-	instanceStatusFrom domain.InstanceStatus
-	actorDisplayName             string
-	loadActorDisplayNameCalled   bool
-	loadActorDisplayNameTenant   string
-	loadActorDisplayNameUser     string
+	instance                   *domain.Instance
+	loadInstanceErr            error
+	insertSignoffRes           infrastructure.SignoffInsertResult
+	insertSignoffErr           error
+	insertedSignoff            *domain.Signoff
+	updateStageErr             error
+	updateInstanceErr          error
+	instanceStatusTo           domain.InstanceStatus
+	instanceStatusFrom         domain.InstanceStatus
+	actorDisplayName           string
+	loadActorDisplayNameCalled bool
+	loadActorDisplayNameTenant string
+	loadActorDisplayNameUser   string
+
+	insertedVerdict      *domain.ReviewVerdict
+	insertVerdictRes     infrastructure.VerdictInsertResult
+	insertVerdictErr     error
+	stageVerdicts        []domain.ReviewVerdict
+	loadStageVerdictsErr error
 }
 
 func (r *fakeDecisionRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string) (*domain.Instance, error) {
@@ -52,6 +58,15 @@ func (r *fakeDecisionRepo) LoadInstance(_ context.Context, _ db.Tx, _, _ string)
 func (r *fakeDecisionRepo) InsertSignoff(_ context.Context, _ db.Tx, s domain.Signoff) (infrastructure.SignoffInsertResult, error) {
 	r.insertedSignoff = &s
 	return r.insertSignoffRes, r.insertSignoffErr
+}
+
+func (r *fakeDecisionRepo) InsertVerdict(_ context.Context, _ db.Tx, v domain.ReviewVerdict) (infrastructure.VerdictInsertResult, error) {
+	r.insertedVerdict = &v
+	return r.insertVerdictRes, r.insertVerdictErr
+}
+
+func (r *fakeDecisionRepo) LoadStageVerdicts(_ context.Context, _ db.Tx, _, _ string) ([]domain.ReviewVerdict, error) {
+	return r.stageVerdicts, r.loadStageVerdictsErr
 }
 
 func (r *fakeDecisionRepo) UpdateStageStatus(_ context.Context, _ db.Tx, _, _ string, _, _ domain.StageStatus) error {
@@ -448,10 +463,10 @@ func buildSingleStageInstance(instanceID, stageID, authorUserID string, eligible
 	now := time.Now().UTC()
 	frozenHash := validContentHash
 	return &domain.Instance{
-		ID:              instanceID,
-		TenantID:        "tenant-1",
-		DocumentID:      "doc-1",
-		RouteID:         "route-1",
+		ID:                  instanceID,
+		TenantID:            "tenant-1",
+		DocumentID:          "doc-1",
+		RouteID:             "route-1",
 		Status:              domain.InstanceInProgress,
 		SubmittedBy:         authorUserID,
 		SubmittedAt:         now,
@@ -480,6 +495,53 @@ func buildTwoApproverInstance(instanceID, stageID, authorUserID string, eligible
 	inst := buildSingleStageInstance(instanceID, stageID, authorUserID, eligible)
 	inst.Stages[0].QuorumSnapshot = domain.QuorumAllOf
 	return inst
+}
+
+// buildReviewThenStageInstance returns a two-stage instance: an active
+// any_1_of review-kind stage (reviewStageID) followed by a pending stage of
+// the given kind (nextStageID). Used by S1's fast-forward eligibility tests
+// (R5, unit 2.3 G3) to exercise the QuorumApprovedStage -> AdvanceStage ->
+// next-active-stage eligibility probe.
+func buildReviewThenStageInstance(instanceID, reviewStageID, nextStageID, authorUserID string, reviewEligible, nextEligible []string, nextKind domain.StageKind) *domain.Instance {
+	now := time.Now().UTC()
+	frozenHash := validContentHash
+	return &domain.Instance{
+		ID:                  instanceID,
+		TenantID:            "tenant-1",
+		DocumentID:          "doc-1",
+		RouteID:             "route-1",
+		Status:              domain.InstanceInProgress,
+		SubmittedBy:         authorUserID,
+		SubmittedAt:         now,
+		RevisionVersion:     1,
+		ContentHashAtSubmit: validContentHash,
+		FrozenContentHash:   &frozenHash,
+		Stages: []domain.StageInstance{
+			{
+				ID:                         reviewStageID,
+				ApprovalInstanceID:         instanceID,
+				StageOrder:                 1,
+				NameSnapshot:               "Review",
+				QuorumSnapshot:             domain.QuorumAny1Of,
+				OnEligibilityDriftSnapshot: domain.DriftKeepSnapshot,
+				Kind:                       domain.StageKindReview,
+				EligibleActorIDs:           reviewEligible,
+				Status:                     domain.StageActive,
+				OpenedAt:                   &now,
+			},
+			{
+				ID:                         nextStageID,
+				ApprovalInstanceID:         instanceID,
+				StageOrder:                 2,
+				NameSnapshot:               "Next",
+				QuorumSnapshot:             domain.QuorumAllOf,
+				OnEligibilityDriftSnapshot: domain.DriftKeepSnapshot,
+				Kind:                       nextKind,
+				EligibleActorIDs:           nextEligible,
+				Status:                     domain.StagePending,
+			},
+		},
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -658,9 +720,9 @@ func TestRecordSignoff_ContentHashEchoesInstanceSubmitHash(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{instance: inst}
 	svc := &DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		repo:       repo,
+		emitter:    &MemoryEmitter{},
+		clock:      fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
 		pinInvoker: &fakePinInvoker{},
 	}
 	db := newDecisionTestDB(t, conn)
@@ -747,9 +809,9 @@ func TestRecordSignoff_ThreadsActorDisplayNameFromRepo(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{instance: inst, actorDisplayName: "Alice Approver"}
 	svc := &DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		repo:       repo,
+		emitter:    &MemoryEmitter{},
+		clock:      fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
 		pinInvoker: &fakePinInvoker{},
 	}
 	db := newDecisionTestDB(t, conn)
@@ -799,9 +861,9 @@ func TestRecordSignoff_ContentHashMismatchFailsBeforePersisting(t *testing.T) {
 	}
 	repo := &fakeDecisionRepo{instance: inst}
 	svc := &DecisionService{
-		repo:          repo,
-		emitter:       &MemoryEmitter{},
-		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		repo:       repo,
+		emitter:    &MemoryEmitter{},
+		clock:      fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
 		pinInvoker: &fakePinInvoker{},
 	}
 	db := newDecisionTestDB(t, conn)
