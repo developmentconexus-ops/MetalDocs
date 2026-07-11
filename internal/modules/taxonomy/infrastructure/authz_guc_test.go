@@ -55,10 +55,10 @@ func TestProfileRepository_Create_SetsAuthzGUCBeforeRequire(t *testing.T) {
 	expectTaxonomyManageAuthz(mock, "actor-1", "tenant-a")
 	mock.ExpectExec(regexp.QuoteMeta(`
 INSERT INTO metaldocs.document_profiles
-    (code, tenant_id, family_code, name, description, alias, review_interval_days, default_template_version_id, owner_user_id, editable_by_role, archived_at)
+    (code, tenant_id, family_code, name, description, alias, review_interval_days, default_template_version_id, owner_user_id, editable_by_role, governance_class, archived_at)
 VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`)).
-		WithArgs("pop", "tenant-a", "procedure", "Procedimento Operacional", "descricao", "pop", 365, nil, nil, "admin", nil).
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`)).
+		WithArgs("pop", "tenant-a", "procedure", "Procedimento Operacional", "descricao", "pop", 365, nil, nil, "admin", "controlado", nil).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -158,13 +158,13 @@ func TestProfileRepository_GetByCodeForUpdate_RequiresAuthzBeforeLock(t *testing
 	expectTaxonomyManageAuthz(mock, "actor-1", "tenant-a")
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT code, tenant_id, family_code, name, description, alias, review_interval_days,
-       default_template_version_id, owner_user_id, editable_by_role, archived_at, created_at
+       default_template_version_id, owner_user_id, editable_by_role, governance_class, archived_at, created_at
 FROM metaldocs.document_profiles
 WHERE tenant_id = $1 AND code = $2
 FOR UPDATE`)).
 		WithArgs("tenant-a", "pop").
-		WillReturnRows(sqlmock.NewRows([]string{"code", "tenant_id", "family_code", "name", "description", "alias", "review_interval_days", "default_template_version_id", "owner_user_id", "editable_by_role", "archived_at", "created_at"}).
-			AddRow("pop", "tenant-a", "procedure", "Procedimento Operacional", "descricao", "pop", 365, nil, nil, "admin", nil, time.Date(2026, 5, 26, 0, 0, 0, 0, time.UTC)))
+		WillReturnRows(sqlmock.NewRows([]string{"code", "tenant_id", "family_code", "name", "description", "alias", "review_interval_days", "default_template_version_id", "owner_user_id", "editable_by_role", "governance_class", "archived_at", "created_at"}).
+			AddRow("pop", "tenant-a", "procedure", "Procedimento Operacional", "descricao", "pop", 365, nil, nil, "admin", "controlado", nil, time.Date(2026, 5, 26, 0, 0, 0, 0, time.UTC)))
 	mock.ExpectRollback()
 
 	if _, err := repo.GetByCodeForUpdate(ctx, tx, "tenant-a", "pop"); err != nil {
@@ -268,6 +268,7 @@ func profile(tenantID string) *domain.DocumentProfile {
 		Alias:              "pop",
 		ReviewIntervalDays: 365,
 		EditableByRole:     "admin",
+		GovernanceClass:    domain.GovernanceControlado,
 	}
 }
 

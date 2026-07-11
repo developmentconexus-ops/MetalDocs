@@ -36,6 +36,10 @@ func (f fakeProfileServiceWithItems) Update(_ context.Context, _ *domain.Documen
 	return nil
 }
 
+func (f fakeProfileServiceWithItems) Reclassify(_ context.Context, _ string, _ domain.ProfileCode, _ domain.GovernanceClass, _ string) error {
+	return nil
+}
+
 func (f fakeProfileServiceWithItems) SetDefaultTemplate(_ context.Context, _ string, _ domain.ProfileCode, _, _ string) error {
 	return nil
 }

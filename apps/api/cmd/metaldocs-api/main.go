@@ -634,6 +634,11 @@ func main() {
 	approvalRepo := approvalrepo.NewPostgresApprovalRepository(deps.SQLDB, displayNameRepo)
 	approvalEmitter := approvalapp.NewSQLEmitter()
 	approvalServices := approvalapp.NewServices(approvalRepo, approvalEmitter, approvalapp.RealClock{}, cdReader)
+	// G1: wire the approval→taxonomy profile-policy reader so route-admin and
+	// submit enforce the per-profile route-signature policy friendly-first. The
+	// adapter reads through the taxonomy profileRepo (own short tx, CapTaxonomyView,
+	// H-PRE-1). The DB deferrable trigger remains the authoritative last line.
+	approvalServices = approvalServices.WithProfilePolicyReader(approvalrepo.NewProfilePolicyReader(profileRepo))
 	jobsCfg, err := config.LoadJobsConfig()
 	if err != nil {
 		slog.Error("invalid jobs config", "err", err)

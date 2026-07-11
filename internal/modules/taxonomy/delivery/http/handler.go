@@ -25,6 +25,7 @@ type profileService interface {
 	Get(ctx context.Context, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error)
 	Create(ctx context.Context, p *domain.DocumentProfile) error
 	Update(ctx context.Context, p *domain.DocumentProfile) error
+	Reclassify(ctx context.Context, tenantID string, profileCode domain.ProfileCode, newClass domain.GovernanceClass, actorID string) error
 	SetDefaultTemplate(ctx context.Context, tenantID string, profileCode domain.ProfileCode, templateVersionID, actorID string) error
 	Archive(ctx context.Context, tenantID string, profileCode domain.ProfileCode, actorID string) error
 }

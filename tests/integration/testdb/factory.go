@@ -122,6 +122,7 @@ type Spec struct {
 	Status            string
 	Code              string
 	ProfileCode       string
+	GovernanceClass   string
 
 	RecipientUserID string
 	EventType       string
@@ -167,6 +168,7 @@ func WithFrozenContentHash(hash string) Opt {
 }
 func WithCode(code string) Opt            { return func(s *Spec) { s.Code = code } }
 func WithProfile(code string) Opt         { return func(s *Spec) { s.ProfileCode = code } }
+func WithGovernanceClass(class string) Opt { return func(s *Spec) { s.GovernanceClass = class } }
 func WithRevisionNumber(n int) Opt        { return func(s *Spec) { s.RevisionNumber = n } }
 func WithRecipient(userID string) Opt     { return func(s *Spec) { s.RecipientUserID = userID } }
 func WithEventType(t string) Opt          { return func(s *Spec) { s.EventType = t } }
@@ -300,6 +302,16 @@ func NewTaxonomy(t *testing.T, db *sql.DB, opts ...Opt) Taxonomy {
 	processArea := "pa-" + suffix
 	profile := "prof-" + suffix
 
+	// G1 governance_class: fixtures default to 'simples' so a bare active route
+	// (NewApprovalRoute seeds one with no stages) satisfies the migration-0295
+	// route-shape trigger. Tests exercising controlado/livre enforcement opt in
+	// explicitly via WithGovernanceClass. 'simples' imposes no route-shape
+	// constraint, so it never rejects any fixture route.
+	class := s.GovernanceClass
+	if class == "" {
+		class = "simples"
+	}
+
 	seedWithCaps(t, db, `[{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
 		ctx := context.Background()
 		if _, err := tx.ExecContext(ctx,
@@ -315,9 +327,9 @@ func NewTaxonomy(t *testing.T, db *sql.DB, opts ...Opt) Taxonomy {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO metaldocs.document_profiles (code, tenant_id, family_code, name, review_interval_days, alias)
-			 VALUES ($1, $2::uuid, $3, $1, 365, $1) ON CONFLICT (tenant_id, code) DO NOTHING`,
-			profile, tenantID, family,
+			`INSERT INTO metaldocs.document_profiles (code, tenant_id, family_code, name, review_interval_days, alias, governance_class)
+			 VALUES ($1, $2::uuid, $3, $1, 365, $1, $4) ON CONFLICT (tenant_id, code) DO NOTHING`,
+			profile, tenantID, family, class,
 		); err != nil {
 			return err
 		}

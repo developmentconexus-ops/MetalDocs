@@ -15,6 +15,7 @@ func toDocumentProfileItem(p *domain.DocumentProfile) taxonomyapi.DocumentProfil
 		Name:               p.Name,
 		Description:        p.Description,
 		ReviewIntervalDays: p.ReviewIntervalDays,
+		GovernanceClass:    taxonomyapi.DocumentProfileItemGovernanceClass(p.GovernanceClass),
 		// Fields not yet in domain.DocumentProfile — zero-fill (D-1 bounded defer)
 		ActiveSchemaVersion: 0,
 		ApprovalRequired:    false,

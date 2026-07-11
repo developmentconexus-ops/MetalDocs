@@ -39,6 +39,10 @@ func (f fakeProfileService) Update(ctx context.Context, p *domain.DocumentProfil
 	return nil
 }
 
+func (f fakeProfileService) Reclassify(ctx context.Context, tenantID string, profileCode domain.ProfileCode, newClass domain.GovernanceClass, actorID string) error {
+	return nil
+}
+
 func (f fakeProfileService) SetDefaultTemplate(ctx context.Context, tenantID string, profileCode domain.ProfileCode, templateVersionID, actorID string) error {
 	return nil
 }

@@ -2,11 +2,15 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-12 (Wave 2.12 sync — DBGovernanceLogger + governance_logger.go DELETED; AuditGovernanceAdapter is the sole GovernanceLogger; FamilyTx embeds db.Tx (Unwrap chain gone); module.go panics fail-loud on nil AuditWriter; domain no longer imports database/sql; two new cilint guards: nosqltxindomain + nodualmode; prior Wave 2 sync: GovernanceLogger.LogTx/RecordTx in-tx governance writes; CreateTx on repos; AreaService.SetParent DELETED) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-07-10 (G1 per-profile signature policy — ROADMAP 2.1, ADR 0081: taxonomy now OWNS a `GovernanceClass` enum {controlado,simples,livre} on `document_profiles` + a pure `RoutePolicy()` derivation published to `documents/approval`; class writes go ONLY through the new `ProfileService.Reclassify` use-case — the generic `Update` path never touches `governance_class`; DB migration 0295 adds the column + a shared `assert_route_shape()` helper behind DEFERRABLE INITIALLY DEFERRED constraint triggers on `approval_route_stages`, `approval_routes`, and `document_profiles`; reclassify conflict surfaces as `ErrClassChangeRouteConflict` → HTTP 409. Prior: 2026-06-12 Wave 2.12 sync — DBGovernanceLogger + governance_logger.go DELETED; AuditGovernanceAdapter is the sole GovernanceLogger; FamilyTx embeds db.Tx (Unwrap chain gone); module.go panics fail-loud on nil AuditWriter; domain no longer imports database/sql; two new cilint guards: nosqltxindomain + nodualmode; prior Wave 2 sync: GovernanceLogger.LogTx/RecordTx in-tx governance writes; CreateTx on repos; AreaService.SetParent DELETED) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/taxonomy/domain/family.go:8` â€” `DocumentFamily` aggregate
-> - `internal/modules/taxonomy/domain/profile.go:8` â€” `DocumentProfile` aggregate
+> - `internal/modules/taxonomy/domain/profile.go:8` â€” `DocumentProfile` aggregate (carries `GovernanceClass` field; construction defaults empty → `controlado`)
+> - `internal/modules/taxonomy/domain/governance_class.go` â€” `GovernanceClass` enum {controlado,simples,livre} + `RoutePolicy()` derivation (G1, ADR 0081); domain-pure, no SQL
+> - `internal/modules/taxonomy/application/profile_service.go` â€” `Reclassify(ctx, tenantID, profileCode, newClass, actorID)` (SOLE class-write path; rejects archived; no-op if unchanged; audits in-tx; maps P0001 `ErrClassChangeRouteConflict`)
+> - `internal/modules/taxonomy/infrastructure/repository.go` â€” `SetGovernanceClassTx` (only `UPDATE … SET governance_class`; asserts `CapTaxonomyManage` before write); generic `Update`/`UpdateTx` deliberately omit the column
+> - `db/migrations/0295_profile_governance_class.sql` â€” column + CHECK + `assert_route_shape()` + `enforce_profile_route_policy()` bidirectional DEFERRABLE constraint triggers (last line)
 > - `internal/modules/taxonomy/domain/area.go:8` â€” `ProcessArea` aggregate
 > - `internal/modules/taxonomy/domain/port.go:1` â€” repository ports + `GovernanceEvent`
 > - `internal/modules/taxonomy/application/family_service.go:13-19` â€” `FamilyService` (struct has `govLogger domain.GovernanceLogger`; `NewFamilyService` takes `govLogger` param; Create/Update/Deactivate all call `s.govLogger.Log` â€” T-004 closed)

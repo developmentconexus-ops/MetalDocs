@@ -127,6 +127,24 @@ func (s *Services) WithLifecycleEnqueuer(e docsdomain.LifecycleEventEnqueuer) *S
 	return s
 }
 
+// WithProfilePolicyReader wires the G1 approval→taxonomy profile-policy reader
+// into the two route-shape enforcement sites (Submit and RouteAdmin). Call after
+// NewServices. A nil reader leaves the friendly route-shape check disabled; the
+// DB deferrable constraint trigger remains the authoritative last line, so a
+// misconfigured composition root degrades to DB-enforced, never to unenforced.
+func (s *Services) WithProfilePolicyReader(reader ProfilePolicyReader) *Services {
+	if s == nil {
+		return s
+	}
+	if s.Submit != nil {
+		s.Submit = s.Submit.WithPolicyReader(reader)
+	}
+	if s.RouteAdmin != nil {
+		s.RouteAdmin = s.RouteAdmin.WithPolicyReader(reader)
+	}
+	return s
+}
+
 // WithRouteAdminIdempStore returns the Services with route-admin idempotency
 // wired. The store is optional — unset leaves the no-store path in place
 // (acceptable in tests; production composition root MUST set it).

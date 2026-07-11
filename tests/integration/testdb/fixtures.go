@@ -243,8 +243,8 @@ func SeedGovernedTaxonomy(t *testing.T, db *sql.DB, tenantID, profileCode, proce
 		}
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO `+Qualified("", "document_profiles")+`
-			    (code, tenant_id, family_code, name, review_interval_days, alias)
-			 VALUES ($1, $2::uuid, $3, $1, 365, $1)
+			    (code, tenant_id, family_code, name, review_interval_days, alias, governance_class)
+			 VALUES ($1, $2::uuid, $3, $1, 365, $1, 'simples')
 			 ON CONFLICT (tenant_id, code) DO NOTHING`,
 			profileCode, tenantID, familyCode,
 		); err != nil {

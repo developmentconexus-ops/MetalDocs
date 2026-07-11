@@ -155,6 +155,77 @@ func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) 
 	return nil
 }
 
+// Reclassify changes a profile's governance_class (G1). It locks the profile
+// row (FOR UPDATE), rejects archived profiles, and is a no-op (no event) when
+// the class is unchanged. Otherwise it writes only the governance_class column
+// and logs a profile.governance_class_change governance event with the
+// from/to classes — all inside one transaction. A reclassification that would
+// leave an active approval route violating the new class is rejected by the DB
+// reclassify-guard trigger and surfaces at Commit as
+// domain.ErrClassChangeRouteConflict (mapped in the repository), rolling the
+// transaction (and its audit event) back.
+func (s *ProfileService) Reclassify(ctx context.Context, tenantID string, profileCode domain.ProfileCode, newClass domain.GovernanceClass, actorID string) error {
+	if err := newClass.Validate(); err != nil {
+		return fmt.Errorf("taxonomy: validate reclassify %q: %w", profileCode, err)
+	}
+	tx, err := s.profiles.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("taxonomy: begin reclassify tx: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	profile, err := s.profiles.GetByCodeForUpdate(ctx, tx, tenantID, profileCode)
+	if err != nil {
+		return fmt.Errorf("taxonomy: lock profile %q: %w", profileCode, err)
+	}
+	if !profile.IsActive() {
+		return domain.ErrProfileArchived
+	}
+
+	oldClass := profile.GovernanceClass
+	if oldClass == "" {
+		oldClass = domain.GovernanceControlado // normalize legacy rows to the column default
+	}
+	if oldClass == newClass {
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("taxonomy: commit reclassify no-op %q: %w", profileCode, err)
+		}
+		committed = true
+		return nil
+	}
+
+	if err := s.profiles.SetGovernanceClassTx(ctx, tx, tenantID, profileCode, newClass); err != nil {
+		return fmt.Errorf("taxonomy: set governance_class %q: %w", profileCode, err)
+	}
+	payload, err := marshalGovernancePayload(map[string]string{
+		"from": string(oldClass),
+		"to":   string(newClass),
+	})
+	if err != nil {
+		return fmt.Errorf("taxonomy: marshal reclassify governance payload: %w", err)
+	}
+	if err := s.govLogger.LogTx(ctx, tx, domain.GovernanceEvent{
+		TenantID:     tenantID,
+		EventType:    domain.GovernanceEventTypeProfileGovernanceClassChange,
+		ActorUserID:  actorID,
+		ResourceType: "document_profile",
+		ResourceID:   string(profileCode),
+		PayloadJSON:  payload,
+	}); err != nil {
+		return fmt.Errorf("taxonomy: log reclassify governance event: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("taxonomy: commit reclassify %q: %w", profileCode, err)
+	}
+	committed = true
+	return nil
+}
+
 // SetDefaultTemplate locks the profile row (FOR UPDATE), rejects archived
 // profiles with domain.ErrProfileArchived, validates the template version
 // via tplCheck (domain.ErrTemplateNotPublished if unpublished,

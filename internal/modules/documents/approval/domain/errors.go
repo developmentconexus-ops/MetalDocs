@@ -12,3 +12,13 @@ var ErrEmptyEligiblePool = errors.New("approval: empty eligible pool")
 // ErrInvalidStageKind is returned by StageKind.Validate for any value other
 // than StageKindReview or StageKindApproval.
 var ErrInvalidStageKind = errors.New("approval: invalid stage kind")
+
+// ErrRouteNotPermittedForProfile is returned by Route.Validate when the
+// profile's governance policy forbids any approval route (livre class →
+// RoutePolicyNoRoutePermitted). Friendly first line for the DB trigger.
+var ErrRouteNotPermittedForProfile = errors.New("approval: profile governance policy permits no approval route")
+
+// ErrApprovalStageRequired is returned by Route.Validate when the profile's
+// governance policy requires at least one approval-kind (signature) stage
+// (controlado class → RoutePolicyRequireApprovalStage) but the route has none.
+var ErrApprovalStageRequired = errors.New("approval: profile governance policy requires at least one approval stage")
