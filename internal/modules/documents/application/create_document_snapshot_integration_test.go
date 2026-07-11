@@ -50,6 +50,12 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 	// proof). iam_users is not tripwire-governed; the role write is user.manage tx-local.
 	testdb.SeedSystemAdmin(t, db, tenantID, actorID, wantDisplayName)
 
+	// SUT ctx must carry the seeded tenant + actor: CreateDocumentTx's tier-2
+	// authz.Require(document.create) reads identity off the tx-local GUCs, and
+	// downstream off-tx reads (UserDisplayNameReader, templates readers) seed
+	// their own GUCs from this ctx via TxRunner.
+	ctx = testdb.AuthzCtx(tenantID, actorID)
+
 	// Seed taxonomy parents required by the controlled_documents FK chain.
 	testdb.SeedGovernedTaxonomy(t, db, tenantID, "po", "quality")
 

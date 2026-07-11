@@ -71,7 +71,7 @@ func TestFreeze_ReviewToApprovalTransition_PinsHash(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindReview)
 
-	result, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -105,7 +105,7 @@ func TestFreeze_PreInstanceComment_DoesNotBlock(t *testing.T) {
 	staleTime := time.Now().Add(-24 * time.Hour)
 	insertUnresolvedComment(t, database, fx.tenantID, fx.documentID, fx.authorID, staleTime)
 
-	result, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -136,7 +136,7 @@ func TestFreeze_DuringInstanceComment_Blocks(t *testing.T) {
 	// well within its review window.
 	insertUnresolvedComment(t, database, fx.tenantID, fx.documentID, fx.reviewerID, time.Now())
 
-	_, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	_, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -243,7 +243,7 @@ func TestFreeze_Idempotent_ReentryIsNoop(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindReview)
 
-	result, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -263,8 +263,9 @@ func TestFreeze_Idempotent_ReentryIsNoop(t *testing.T) {
 	}
 
 	repo := infrastructure.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
-	err = fx.runner.Do(context.Background(), func(tx *sql.Tx) error {
-		won, perr := repo.PinFrozenHash(context.Background(), tx, fx.tenantID, fx.instanceID, "a-different-hash-should-never-win")
+	reentryCtx := fx.ctxFor(fx.reviewerID)
+	err = fx.runner.Do(reentryCtx, func(tx *sql.Tx) error {
+		won, perr := repo.PinFrozenHash(reentryCtx, tx, fx.tenantID, fx.instanceID, "a-different-hash-should-never-win")
 		if perr != nil {
 			return perr
 		}

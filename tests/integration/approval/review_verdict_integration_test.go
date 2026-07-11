@@ -31,6 +31,19 @@ import (
 	"metaldocs/tests/integration/testdb"
 )
 
+// ctxFor builds a context carrying the given actor's identity, tenant-scoped
+// to this fixture, for a SUT call. Every RecordVerdict/CancelInstance/
+// PinFrozenHash call in this package runs through a runner.Do (TxRunner),
+// which seeds the metaldocs.tenant_id/actor_id GUCs from ctx — an unseeded
+// context.Background() leaves them unset and authz.Require fails closed with
+// "actor_id GUC not set on transaction". Each call site must state which
+// actor it intends to act as (author vs reviewer) rather than collapsing to
+// one shared ctx — the SoD test specifically depends on the author acting as
+// both submitter and verdict-recorder.
+func (fx reviewVerdictFixture) ctxFor(actorID string) context.Context {
+	return testdb.AuthzCtx(fx.tenantID, actorID)
+}
+
 // reviewVerdictFixture bundles the seeded rows a RecordVerdict call needs.
 type reviewVerdictFixture struct {
 	tenantID   string
@@ -145,7 +158,7 @@ func TestReviewVerdict_ReadyAdvancesQuorum(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindReview)
 
-	result, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -177,7 +190,7 @@ func TestReviewVerdict_RequestChangesCollapsesInstanceAndDocument(t *testing.T) 
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindReview)
 
-	result, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -208,7 +221,7 @@ func TestReviewVerdict_RequestChangesRequiresComment(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindReview)
 
-	_, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	_, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -235,7 +248,7 @@ func TestReviewVerdict_ReadyOnApprovalStageRejected(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindApproval)
 
-	_, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	_, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -262,7 +275,7 @@ func TestReviewVerdict_RequestChangesOnApprovalStageThawsToDraft(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindApproval)
 
-	result, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -291,7 +304,7 @@ func TestReviewVerdict_SoDBlocksSelfVerdict(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindReview)
 
-	_, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	_, err := fx.svc.RecordVerdict(fx.ctxFor(fx.authorID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -341,7 +354,7 @@ func TestCancelInstance_ReasonPersists(t *testing.T) {
 	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil)
 
 	const reason = "stakeholder withdrew (integration)"
-	_, err := services.Cancel.CancelInstance(context.Background(), fx.runner, application.CancelInput{
+	_, err := services.Cancel.CancelInstance(fx.ctxFor(fx.authorID), fx.runner, application.CancelInput{
 		TenantID:    fx.tenantID,
 		InstanceID:  fx.instanceID,
 		ActorUserID: fx.authorID,
