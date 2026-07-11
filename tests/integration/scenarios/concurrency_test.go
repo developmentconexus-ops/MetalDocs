@@ -94,7 +94,17 @@ func runSingleOCCRace(t *testing.T, ctx context.Context, db *sql.DB, suffix stri
 		go func() {
 			defer wg.Done()
 			<-start
-			res, err := db.ExecContext(ctx, `
+
+			tx, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			defer tx.Rollback()
+
+			testdb.SetCapsOnTx(t, tx, `[{"cap":"document.edit"}]`)
+
+			res, err := tx.ExecContext(ctx, `
 				UPDATE public.documents
 				   SET revision_version = revision_version + 1
 				 WHERE id = $1::uuid
@@ -108,6 +118,10 @@ func runSingleOCCRace(t *testing.T, ctx context.Context, db *sql.DB, suffix stri
 			}
 			ra, err := res.RowsAffected()
 			if err != nil {
+				errs[i] = err
+				return
+			}
+			if err := tx.Commit(); err != nil {
 				errs[i] = err
 				return
 			}
@@ -302,10 +316,16 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 	instanceID := testdb.DeterministicID(t, "instance-signoff")
 	stageID := testdb.DeterministicID(t, "stage-signoff")
 
-	testdb.SeedUser(t, ctx, db, "metaldocs", authorID, "Doc Author")
-	testdb.SeedUser(t, ctx, db, "metaldocs", actorID, "Signer")
+	// approval_instances_submitted_by_tenant_fkey / approval_signoffs_actor_tenant_fkey
+	// both require (tenant_id, user_id) to match an iam_users row; plain
+	// SeedUser leaves iam_users.tenant_id at its default (dev tenant), which
+	// does not match this test's randomly-minted tenantID. SeedSystemAdmin
+	// seeds iam_users with the correct tenant_id (mirrors this test's own
+	// Cleanup, which already deletes iam_users by tenant_id=tenantID).
+	testdb.SeedSystemAdmin(t, db, tenantID, authorID, "Doc Author")
+	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "Signer")
 	testdb.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, authorID)
-	testdb.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "INT_SIGNOFF")
+	testdb.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "int_signoff")
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_signoffs WHERE approval_instance_id = $1::uuid`, instanceID)
@@ -376,9 +396,9 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 
 			_, err = tx.ExecContext(ctx, `
 				INSERT INTO public.approval_signoffs
-					(id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id, decision, comment, signed_at, signature_method, signature_payload, content_hash)
+					(id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id, actor_display_name_snapshot, decision, comment, signed_at, signature_method, signature_payload, content_hash)
 				VALUES
-					($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid, 'approve', 'integration race', now(), 'password', '{}'::jsonb, 'content-hash')`,
+					($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid, 'Signer', 'approve', 'integration race', now(), 'password', '{}'::jsonb, 'content-hash')`,
 				testdb.DeterministicID(t, fmt.Sprintf("signoff-%d", i)), instanceID, stageID, actorID, tenantID,
 			)
 			if err != nil {

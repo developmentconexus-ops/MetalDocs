@@ -21,9 +21,15 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 	routeID := testdb.DeterministicID(t, "route")
 	instanceID := testdb.DeterministicID(t, "instance")
 
-	testdb.SeedUser(t, ctx, db, "metaldocs", authorID, "Outbox Author")
+	// approval_instances_submitted_by_tenant_fkey requires (tenant_id,
+	// submitted_by) to match an iam_users(tenant_id, user_id) row; plain
+	// SeedUser leaves iam_users.tenant_id at its default (dev tenant), which
+	// does not match this test's randomly-minted tenantID. SeedSystemAdmin
+	// seeds iam_users with the correct tenant_id (mirrors this test's own
+	// Cleanup, which already deletes iam_users by tenant_id=tenantID).
+	testdb.SeedSystemAdmin(t, db, tenantID, authorID, "Outbox Author")
 	testdb.SeedDocument(t, ctx, db, "metaldocs", docID, tenantID, authorID)
-	testdb.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "OUTBOX_FLOW")
+	testdb.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "outbox_flow")
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_instances WHERE id = $1::uuid`, instanceID)

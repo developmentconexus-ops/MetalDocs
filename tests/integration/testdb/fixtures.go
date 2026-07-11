@@ -477,14 +477,20 @@ func SeedDocument(t *testing.T, ctx context.Context, db *sql.DB, schema, docID, 
 }
 
 // SeedRouteConfig inserts a minimal approval_routes row with a caller-supplied
-// route ID (no owner/taxonomy auto-wiring — use NewApprovalRoute when the test
-// needs a governed profile chain).
+// route ID. approval_routes carries FK approval_routes_document_profile_fk
+// (tenant_id, profile_code) -> document_profiles(tenant_id, code), so this
+// seeds the minimal governed profile the FK requires via SeedGovernedTaxonomy
+// (document_families + document_process_areas + document_profiles, asserting
+// taxonomy.manage) before inserting the route. profileCode must satisfy
+// document_profiles' CHECK constraint (lowercase, ^[a-z][a-z0-9_-]{1,63}$) —
+// callers passing an uppercase/mixed-case code will fail that CHECK.
 func SeedRouteConfig(t *testing.T, ctx context.Context, db *sql.DB, schema, routeID, tenantID, profileCode string) {
 	t.Helper()
+	SeedGovernedTaxonomy(t, db, tenantID, profileCode, profileCode)
 	seedTenantOnly(t, db, tenantID, "", func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, fmt.Sprintf(`
-			INSERT INTO %s (id, tenant_id, name, profile_code, active, created_at, updated_at)
-			VALUES ($1::uuid, $2::uuid, 'Test Route', $3, true, now(), now())
+			INSERT INTO %s (id, tenant_id, name, profile_code, created_by, active, created_at)
+			VALUES ($1::uuid, $2::uuid, 'Test Route', $3, 'system', true, now())
 			ON CONFLICT (id) DO NOTHING`,
 			Qualified(schema, "approval_routes")),
 			routeID, tenantID, profileCode,
