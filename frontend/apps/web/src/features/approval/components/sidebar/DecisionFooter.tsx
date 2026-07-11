@@ -64,10 +64,115 @@ function MeaningOfSignatureLine({ tone }: { tone: 'approve' | 'reject' }) {
   return <p className={styles.meaningLine}>{text}</p>;
 }
 
-/** Wraps ArtifactDecisionPanel to surface the selected option's tone for the
- *  meaning-of-signature line without altering the panel itself. */
-function ApprovalModeFooter({ decision, actions }: { decision: ArtifactDecisionModel; actions: ArtifactAction[] }) {
+/**
+ * Shared request-changes verdict unit (R3): the single place that submits a
+ * `request_changes` verdict on the active stage via `useReviewVerdictMutation`.
+ * Used by both `ReviewModeFooter` (review-kind stages) and `ApprovalModeFooter`
+ * (approval-kind stages, per G2 — the guard allows `request_changes`, never
+ * `ready`, on approval stages).
+ */
+function useRequestChangesVerdict({
+  instance,
+  activeStage,
+  onRefetchInstance,
+}: {
+  instance: ApprovalInstance;
+  activeStage: StageInstance | undefined;
+  onRefetchInstance: () => Promise<void> | void;
+}) {
+  const verdictMutation = useReviewVerdictMutation();
+  const [open, setOpen] = useState(false);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const canSubmit = activeStage != null;
+
+  async function submit() {
+    if (!activeStage) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await verdictMutation.mutateAsync({
+        instanceId: instance.id,
+        stageId: activeStage.id,
+        etag: instance.etag,
+        body: { verdict: 'request_changes', comment: comment.trim() },
+      });
+      setOpen(false);
+      setComment('');
+      await onRefetchInstance();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível registrar a decisão. Tente novamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function reset() {
+    setOpen(false);
+    setComment('');
+  }
+
+  return { open, setOpen, comment, setComment, submitting, error, canSubmit, submit, reset };
+}
+
+type RequestChangesUnit = ReturnType<typeof useRequestChangesVerdict>;
+
+/** Presentational comment dialog shared by both footer modes. */
+function RequestChangesDialog({ unit }: { unit: RequestChangesUnit }) {
+  return (
+    <div className={styles.requestChangesDialog} role="dialog" aria-label="Solicitar mudanças">
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Comentário · obrigatório</span>
+        <textarea
+          className={styles.textarea}
+          rows={3}
+          value={unit.comment}
+          onChange={(e) => unit.setComment(e.target.value)}
+          disabled={unit.submitting}
+        />
+      </label>
+      <div className={styles.dialogActions}>
+        <button
+          type="button"
+          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+          disabled={unit.submitting}
+          onClick={unit.reset}
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+          disabled={unit.comment.trim().length === 0 || unit.submitting}
+          onClick={() => void unit.submit()}
+        >
+          Enviar solicitação
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Wraps ArtifactDecisionPanel (approve-only signoff ceremony) to surface the
+ *  selected option's tone for the meaning-of-signature line, plus a secondary
+ *  "Solicitar mudanças" comment-only verdict (R3: exactly two actions). */
+function ApprovalModeFooter({
+  decision,
+  actions,
+  instance,
+  activeStage,
+  onRefetchInstance,
+}: {
+  decision: ArtifactDecisionModel;
+  actions: ArtifactAction[];
+  instance: ApprovalInstance;
+  activeStage: StageInstance | undefined;
+  onRefetchInstance: () => Promise<void> | void;
+}) {
   const [selectedTone, setSelectedTone] = useState<'approve' | 'reject' | null>(null);
+  const requestChanges = useRequestChangesVerdict({ instance, activeStage, onRefetchInstance });
 
   return (
     <div
@@ -86,6 +191,26 @@ function ApprovalModeFooter({ decision, actions }: { decision: ArtifactDecisionM
     >
       {selectedTone != null && <MeaningOfSignatureLine tone={selectedTone} />}
       <ArtifactDecisionPanel model={decision} />
+
+      {!requestChanges.open ? (
+        <button
+          type="button"
+          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+          disabled={!requestChanges.canSubmit}
+          onClick={() => requestChanges.setOpen(true)}
+        >
+          Solicitar mudanças
+        </button>
+      ) : (
+        <RequestChangesDialog unit={requestChanges} />
+      )}
+
+      {requestChanges.error != null && (
+        <div className={styles.error} role="alert">
+          {requestChanges.error}
+        </div>
+      )}
+
       <OtherActions actions={actions} />
     </div>
   );
@@ -103,43 +228,43 @@ function ReviewModeFooter({
   onRefetchInstance: () => Promise<void> | void;
 }) {
   const verdictMutation = useReviewVerdictMutation();
-  const [showRequestChanges, setShowRequestChanges] = useState(false);
-  const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const requestChanges = useRequestChangesVerdict({ instance, activeStage, onRefetchInstance });
+  const [submittingReady, setSubmittingReady] = useState(false);
+  const [readyError, setReadyError] = useState<string | null>(null);
 
   const canSubmitVerdict = activeStage != null;
 
-  async function submitVerdict(verdict: 'ready' | 'request_changes', commentValue?: string) {
+  async function submitReady() {
     if (!activeStage) return;
-    setSubmitting(true);
-    setError(null);
+    setSubmittingReady(true);
+    setReadyError(null);
     try {
       await verdictMutation.mutateAsync({
         instanceId: instance.id,
         stageId: activeStage.id,
         etag: instance.etag,
-        body: commentValue != null ? { verdict, comment: commentValue } : { verdict },
+        body: { verdict: 'ready' },
       });
-      setShowRequestChanges(false);
-      setComment('');
       await onRefetchInstance();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível registrar a decisão. Tente novamente.');
+      setReadyError(err instanceof Error ? err.message : 'Não foi possível registrar a decisão. Tente novamente.');
     } finally {
-      setSubmitting(false);
+      setSubmittingReady(false);
     }
   }
 
+  const submitting = submittingReady || requestChanges.submitting;
+  const error = readyError ?? requestChanges.error;
+
   return (
     <div className={styles.footer} data-testid="approval-sidebar-footer" style={{ position: 'sticky', bottom: 0 }}>
-      {!showRequestChanges ? (
+      {!requestChanges.open ? (
         <div className={styles.verdictActions}>
           <button
             type="button"
             className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
             disabled={!canSubmitVerdict || submitting}
-            onClick={() => void submitVerdict('ready')}
+            onClick={() => void submitReady()}
           >
             Pronto para aprovação
           </button>
@@ -147,45 +272,13 @@ function ReviewModeFooter({
             type="button"
             className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
             disabled={!canSubmitVerdict || submitting}
-            onClick={() => setShowRequestChanges(true)}
+            onClick={() => requestChanges.setOpen(true)}
           >
             Solicitar mudanças
           </button>
         </div>
       ) : (
-        <div className={styles.requestChangesDialog} role="dialog" aria-label="Solicitar mudanças">
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Comentário · obrigatório</span>
-            <textarea
-              className={styles.textarea}
-              rows={3}
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              disabled={submitting}
-            />
-          </label>
-          <div className={styles.dialogActions}>
-            <button
-              type="button"
-              className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
-              disabled={submitting}
-              onClick={() => {
-                setShowRequestChanges(false);
-                setComment('');
-              }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
-              disabled={comment.trim().length === 0 || submitting}
-              onClick={() => void submitVerdict('request_changes', comment.trim())}
-            >
-              Enviar solicitação
-            </button>
-          </div>
-        </div>
+        <RequestChangesDialog unit={requestChanges} />
       )}
 
       {error != null && (
@@ -224,7 +317,15 @@ export function DecisionFooter({
   onRefetchInstance,
 }: DecisionFooterProps) {
   if (decision != null) {
-    return <ApprovalModeFooter decision={decision} actions={actions} />;
+    return (
+      <ApprovalModeFooter
+        decision={decision}
+        actions={actions}
+        instance={instance}
+        activeStage={activeStage}
+        onRefetchInstance={onRefetchInstance}
+      />
+    );
   }
 
   const stageMode = deriveStageMode(

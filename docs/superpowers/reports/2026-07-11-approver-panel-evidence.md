@@ -65,8 +65,8 @@ honoured as a hint (never gates correctness — replay returns false). Backend i
 | Slice | Implementer (sonnet) | Reviewer (independent sonnet) | Verdict | Commit |
 |---|---|---|---|---|
 | A | orchestrator (generated file, contract-first codegen — no hand diff) | tsc + additive-diff check | PASS | (folded into B commit) |
-| B | sonnet general-purpose `a6bf24795b8ec1000` | independent sonnet `ad122f359dd0a76f3` | **PASS** (1 MINOR stale JSDoc → fixed inline) | (this commit) |
-| C | _pending_ | _pending_ | | |
+| B | sonnet general-purpose `a6bf24795b8ec1000` | independent sonnet `ad122f359dd0a76f3` | **PASS** (1 MINOR stale JSDoc → fixed inline) | 1c6db8dc |
+| C | sonnet general-purpose `a6baff83ebfeffc83` | independent sonnet `a44fa71294c654d2f` | **PASS** (1 MINOR: `MeaningOfSignatureLine` reject branch unreachable for current caller → **accepted-defensive**: `tone` flows from shared `ArtifactDecisionOption.tone` which templates emit as `reject`; narrowing would force a call-site cast, a worse smell) | _pending_ |
 | D | _pending_ | _pending_ | | |
 
 ## 7. Verification ladder

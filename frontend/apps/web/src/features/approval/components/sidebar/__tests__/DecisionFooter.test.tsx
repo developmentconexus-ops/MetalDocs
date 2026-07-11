@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ApprovalInstance, StageInstance } from '../../../api/approvalTypes';
@@ -66,14 +66,6 @@ function makeDecision(overrides: Partial<ArtifactDecisionModel> = {}): ArtifactD
         tone: 'approve',
         submitLabel: 'Assinar e aprovar',
         requiresReason: false,
-      },
-      {
-        key: 'reject',
-        label: 'Assinar e devolver',
-        description: 'Devolve o documento.',
-        tone: 'reject',
-        submitLabel: 'Assinar e devolver',
-        requiresReason: true,
       },
     ],
     reasonLabel: 'Justificativa',
@@ -189,7 +181,7 @@ describe('DecisionFooter', () => {
   });
 
   describe('approval mode', () => {
-    it('renders the decision panel with password field, no verdict CTAs', () => {
+    it('renders the decision panel with password field and a "Solicitar mudanças" button, no verdict CTAs', () => {
       render(
         <DecisionFooter
           decision={makeDecision()}
@@ -200,8 +192,21 @@ describe('DecisionFooter', () => {
         />,
       );
       expect(screen.getByLabelText('Senha')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Solicitar mudanças' })).toBeTruthy();
       expect(screen.queryByRole('button', { name: 'Pronto para aprovação' })).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Solicitar mudanças' })).toBeNull();
+    });
+
+    it('does not offer "Assinar e devolver" (signed rejection removed from the UI)', () => {
+      render(
+        <DecisionFooter
+          decision={makeDecision()}
+          actions={[]}
+          instance={makeInstance()}
+          activeStage={makeStage({ stage_kind: 'approval' })}
+          onRefetchInstance={vi.fn()}
+        />,
+      );
+      expect(screen.queryByText(/Assinar e devolver/)).toBeNull();
     });
 
     it('shows meaning-of-signature line "declara aprovação" for the approve option', () => {
@@ -218,18 +223,34 @@ describe('DecisionFooter', () => {
       expect(screen.getByText(/declara aprovação/)).toBeTruthy();
     });
 
-    it('shows meaning-of-signature line "declara rejeição" for the reject option', () => {
+    it('"Solicitar mudanças" opens a dialog and submits request_changes on the approval stage', async () => {
+      const onRefetchInstance = vi.fn();
       render(
         <DecisionFooter
           decision={makeDecision()}
           actions={[]}
-          instance={makeInstance()}
-          activeStage={makeStage({ stage_kind: 'approval' })}
-          onRefetchInstance={vi.fn()}
+          instance={makeInstance({ etag: '"v9"' })}
+          activeStage={makeStage({ id: 'stage-approval-1', stage_kind: 'approval' })}
+          onRefetchInstance={onRefetchInstance}
         />,
       );
-      fireEvent.click(screen.getByRole('radio', { name: /Assinar e devolver/ }));
-      expect(screen.getByText(/declara rejeição/)).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Solicitar mudanças' }));
+      const dialog = screen.getByRole('dialog', { name: 'Solicitar mudanças' });
+      const submitBtn = within(dialog).getByRole('button', { name: 'Enviar solicitação' });
+      expect(submitBtn).toBeDisabled();
+
+      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'Ajustar cláusula 4' } });
+      fireEvent.click(submitBtn);
+
+      await waitFor(() => {
+        expect(mutateAsyncMock).toHaveBeenCalledWith({
+          instanceId: 'inst-1',
+          stageId: 'stage-approval-1',
+          etag: '"v9"',
+          body: { verdict: 'request_changes', comment: 'Ajustar cláusula 4' },
+        });
+      });
+      await waitFor(() => expect(onRefetchInstance).toHaveBeenCalled());
     });
 
     it('renders "Outras ações" secondary group when actions are present', () => {

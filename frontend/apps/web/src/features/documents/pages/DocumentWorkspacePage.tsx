@@ -380,7 +380,7 @@ export function DocumentWorkspacePage() {
   // then refetch the instance so the mode/decision recompute post-signature.
   const decisionSubmit = async (input: { optionKey: string; reason: string; password: string }) => {
     await signOff({
-      decision: input.optionKey === 'approve' ? 'approve' : 'reject',
+      decision: 'approve',
       reason: input.reason || undefined,
       password: input.password,
     });
