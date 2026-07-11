@@ -5,6 +5,7 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	approvalapi "metaldocs/internal/modules/documents/approval/api"
+	"metaldocs/internal/platform/problem"
 )
 
 func (h *Handler) SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.SubmitDocumentForApprovalParams) {
@@ -84,4 +85,16 @@ func (h *Handler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request
 
 func (h *Handler) ListApprovalRoutes(w http.ResponseWriter, r *http.Request) {
 	h.ListRoutesHandler(w, r)
+}
+
+// RecordApprovalFastForward is a build-satisfying placeholder for the R5
+// "Aprovar já" contract path (unit 2.3 G3, slice S3). CON-03 mounts the
+// generated approvalapi.ServerInterface directly (router.go), so a route
+// added to the spec that lacks a Handler method fails to compile — this stub
+// exists only to keep that guarantee while the real handler (If-Match /
+// Idempotency-Key enforcement, application.Services.FastForward wiring,
+// response mapping) ships in slice S4. It intentionally fails closed with 501
+// rather than silently succeeding or 404ing.
+func (h *Handler) RecordApprovalFastForward(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params approvalapi.RecordApprovalFastForwardParams) {
+	problem.Write(w, problem.New(http.StatusNotImplemented, "approval.fast_forward_not_implemented", "fast-forward endpoint not yet wired"))
 }

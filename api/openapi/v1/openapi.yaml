@@ -3549,6 +3549,65 @@ paths:
           $ref: '#/components/responses/PreconditionRequired'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /approval/instances/{instance_id}/stages/{stage_id}/fast-forward:
+    post:
+      summary: Record "Aprovar já" fast-forward
+      description: >-
+        R5 (unit 2.3 G3): one gesture records a `ready` review verdict AND an
+        approve signoff on the now-active approval stage as two separate
+        ledger writes in one transaction. `stage_id` is the active review
+        stage receiving the verdict. Only offered when the review stage
+        completes onto a now-active approval-kind stage the acting actor is
+        eligible on (see ReviewVerdictResponse.fast_forward_eligible); a
+        verdict that does not complete the stage, or completes it without
+        actor eligibility on the next approval stage, is rejected.
+      tags: [approval]
+      operationId: recordApprovalFastForward
+      x-authz-area:
+        source: tx
+        derived_from: 'documents.process_area_code_snapshot (fallback controlled_documents.process_area_code)'
+        note: >-
+          Both legs are area-scoped caps enforced at tier-2 in the tx-layer
+          service via authz.Require with the area resolved from the document
+          row (LoadDocumentAreaCode); never from a request field. The
+          strictest leg is the signature (document.signoff), mirroring the
+          sibling signoffs route. Postgres tripwire is the backstop.
+      parameters:
+        - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: stage_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FastForwardRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FastForwardResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /documents/{id}/publish:
     post:
       summary: Publish document
@@ -6752,6 +6811,33 @@ components:
           description: >-
             R5 — the now-active stage's id, present only when
             fast_forward_eligible is true.
+    FastForwardRequest:
+      type: object
+      required: [password_token, content_hash]
+      properties:
+        comment:
+          type: string
+          description: Optional verdict comment recorded on the `ready` review-verdict leg.
+        password_token:
+          type: string
+          minLength: 1
+          description: Re-authentication password for the signature (password_reauth method).
+        content_hash:
+          type: string
+          minLength: 64
+          maxLength: 64
+          description: SHA-256 hex digest of the content being signed off.
+    FastForwardResponse:
+      type: object
+      required: [signoff_id, was_replay, outcome]
+      properties:
+        signoff_id:
+          type: string
+        was_replay:
+          type: boolean
+        outcome:
+          type: string
+          description: Final outcome of the signature leg (same vocabulary as signoff).
     ApprovalInboxItem:
       type: object
       required: [instance_id, document_id, controlled_document_id, document_title, area_code, submitted_by, submitted_at, stage_label, quorum_progress, due_at]

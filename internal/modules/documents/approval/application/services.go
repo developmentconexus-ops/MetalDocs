@@ -45,6 +45,7 @@ type Services struct {
 	MarkReviewed  *MarkReviewedService
 	ReviewVerdict *ReviewVerdictService
 	Delegation    *DelegationService
+	FastForward   *FastForwardService
 	clock         Clock
 }
 
@@ -77,9 +78,11 @@ func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, c
 	// not implement it leaves submit resolution disabled (nil), which fail-closes
 	// the omitted-route path to ErrApprovalRouteMissing.
 	resolver, _ := repo.(SubmitDefaultsResolver)
+	decision := &DecisionService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead}
+	reviewVerdict := &ReviewVerdictService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead}
 	return &Services{
 		Submit:        &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead, resolver: resolver},
-		Decision:      &DecisionService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		Decision:      decision,
 		Publish:       &PublishService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
 		Scheduler:     &SchedulerService{repo: repo, emitter: emitter, clock: clock},
 		Supersede:     &SupersedeService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
@@ -88,8 +91,9 @@ func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, c
 		Read:          newReadService(repo, cdRead),
 		RouteAdmin:    &RouteAdminService{repo: repo, emitter: emitter, clock: clock},
 		MarkReviewed:  NewMarkReviewedService(emitter, clock),
-		ReviewVerdict: &ReviewVerdictService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		ReviewVerdict: reviewVerdict,
 		Delegation:    newDelegationService(repo, emitter, clock),
+		FastForward:   newFastForwardService(reviewVerdict, decision),
 		clock:         clock,
 	}
 }
