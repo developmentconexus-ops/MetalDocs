@@ -20,23 +20,27 @@ func TestMigration0169_ProcessAreaRoleCapabilitiesSeeded(t *testing.T) {
 	ctx := context.Background()
 	db, schema := testdb.Open(t)
 
+	// doc.* was renamed to document.* (confirmed against
+	// db/reference-data/0001_product_reference_data.sql, the live
+	// role_capabilities seed source of truth: e.g. line 124-125 seeds
+	// ('signer', 'document.signoff') / ('signer', 'document.view'), not doc.*).
 	checks := []struct {
 		role       string
 		capability string
 	}{
-		{"signer", "doc.view"},
-		{"signer", "doc.signoff"},
-		{"area_admin", "doc.view"},
-		{"area_admin", "doc.create"},
-		{"area_admin", "doc.edit"},
-		{"area_admin", "doc.submit"},
-		{"area_admin", "doc.signoff"},
+		{"signer", "document.view"},
+		{"signer", "document.signoff"},
+		{"area_admin", "document.view"},
+		{"area_admin", "document.create"},
+		{"area_admin", "document.edit"},
+		{"area_admin", "document.submit"},
+		{"area_admin", "document.signoff"},
 		{"area_admin", "membership.manage"},
-		{"qms_admin", "doc.view"},
-		{"qms_admin", "doc.create"},
-		{"qms_admin", "doc.edit"},
-		{"qms_admin", "doc.submit"},
-		{"qms_admin", "doc.signoff"},
+		{"qms_admin", "document.view"},
+		{"qms_admin", "document.create"},
+		{"qms_admin", "document.edit"},
+		{"qms_admin", "document.submit"},
+		{"qms_admin", "document.signoff"},
 		{"qms_admin", "template.view"},
 		{"qms_admin", "template.approve"},
 		{"qms_admin", "template.publish"},

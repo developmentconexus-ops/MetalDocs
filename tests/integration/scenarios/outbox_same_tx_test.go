@@ -26,9 +26,9 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 	testdb.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "OUTBOX_FLOW")
 
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_instances WHERE id = $1::uuid`, instanceID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.governance_events WHERE tenant_id = $1::uuid AND event_type = 'doc.submitted' AND resource_id = $2`, tenantID, docID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_routes WHERE id = $1::uuid`, routeID)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_instances WHERE id = $1::uuid`, instanceID)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.governance_events WHERE tenant_id = $1::uuid AND event_type = 'doc.submitted' AND resource_id = $2`, tenantID, docID)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_routes WHERE id = $1::uuid`, routeID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.documents WHERE id = $1::uuid`, docID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE tenant_id = $1::uuid`, tenantID)
 	})
@@ -44,7 +44,7 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 	}
 
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO metaldocs.approval_instances
+		INSERT INTO public.approval_instances
 			(id, tenant_id, document_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
 		VALUES
 			($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'in_progress', $5, now(), 'outbox-hash', 'outbox-idem')`,
@@ -59,7 +59,7 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 		"document_id": docID,
 	})
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO metaldocs.governance_events
+		INSERT INTO public.governance_events
 			(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json)
 		VALUES
 			($1::uuid, 'doc.submitted', $2, 'document', $3, 'integration outbox pairing', $4::jsonb)`,
@@ -76,7 +76,7 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 	var instanceTenant string
 	if err := db.QueryRowContext(ctx, `
 		SELECT tenant_id::text
-		  FROM metaldocs.approval_instances
+		  FROM public.approval_instances
 		 WHERE id = $1::uuid`,
 		instanceID,
 	).Scan(&instanceTenant); err != nil {
@@ -86,7 +86,7 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 	var eventTenant string
 	if err := db.QueryRowContext(ctx, `
 		SELECT tenant_id::text
-		  FROM metaldocs.governance_events
+		  FROM public.governance_events
 		 WHERE tenant_id = $1::uuid
 		   AND event_type = 'doc.submitted'
 		   AND resource_type = 'document'
@@ -115,7 +115,7 @@ func TestOutbox_RollbackOmitsEvent(t *testing.T) {
 	}
 
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO metaldocs.governance_events
+		INSERT INTO public.governance_events
 			(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json)
 		VALUES
 			($1::uuid, 'doc.submitted', $2, 'document', $3, 'rollback-test', '{"rollback":true}'::jsonb)`,
@@ -132,7 +132,7 @@ func TestOutbox_RollbackOmitsEvent(t *testing.T) {
 	var count int
 	if err := db.QueryRowContext(ctx, `
 		SELECT count(*)
-		  FROM metaldocs.governance_events
+		  FROM public.governance_events
 		 WHERE tenant_id = $1::uuid
 		   AND event_type = 'doc.submitted'
 		   AND resource_id = $2`,
@@ -173,7 +173,7 @@ func TestOutbox_DedupeKey(t *testing.T) {
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), `
-			DELETE FROM metaldocs.governance_events
+			DELETE FROM public.governance_events
 			 WHERE tenant_id = $1::uuid
 			   AND event_type = $2
 			   AND dedupe_key = $3`,
@@ -182,7 +182,7 @@ func TestOutbox_DedupeKey(t *testing.T) {
 	})
 
 	if _, err := db.ExecContext(ctx, `
-		INSERT INTO metaldocs.governance_events
+		INSERT INTO public.governance_events
 			(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, dedupe_key)
 		VALUES
 			($1::uuid, $2, $3, 'document', $4, 'dedupe-1', '{}'::jsonb, $5)`,
@@ -192,7 +192,7 @@ func TestOutbox_DedupeKey(t *testing.T) {
 	}
 
 	if _, err := db.ExecContext(ctx, `
-		INSERT INTO metaldocs.governance_events
+		INSERT INTO public.governance_events
 			(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, dedupe_key)
 		VALUES
 			($1::uuid, $2, $3, 'document', $4, 'dedupe-2', '{}'::jsonb, $5)
@@ -205,7 +205,7 @@ func TestOutbox_DedupeKey(t *testing.T) {
 	var count int
 	if err := db.QueryRowContext(ctx, `
 		SELECT count(*)
-		  FROM metaldocs.governance_events
+		  FROM public.governance_events
 		 WHERE tenant_id = $1::uuid
 		   AND event_type = $2
 		   AND dedupe_key = $3`,

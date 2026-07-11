@@ -5,11 +5,32 @@ package scenarios_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
+
+	"metaldocs/tests/integration/testdb"
 )
+
+// seedIdempotencyTenant inserts the metaldocs.tenants row the
+// idempotency_keys FK (fk_idempotency_keys_tenant) requires, asserting the
+// tenant.onboard capability tx-locally (mirrors tests/integration/iam/
+// tenants_tripwire_test.go's SeedWithCaps idiom for the tenants tripwire
+// arm). Idempotent (ON CONFLICT DO NOTHING) so repeated calls are safe.
+func seedIdempotencyTenant(t *testing.T, db *sql.DB, tenantID string) {
+	t.Helper()
+	testdb.SeedWithCaps(t, db, `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(), `
+			INSERT INTO metaldocs.tenants (id, name, slug)
+			VALUES ($1::uuid, 'Idempotency Test Tenant', $1)
+			ON CONFLICT (id) DO NOTHING`,
+			tenantID,
+		)
+		return err
+	})
+}
 
 func TestIdempotency_SameKeyReplay(t *testing.T) {
 	ctx := context.Background()
@@ -19,6 +40,8 @@ func TestIdempotency_SameKeyReplay(t *testing.T) {
 	actorUserID := "idem-user-1"
 	routeTemplate := "POST /api/v1/documents/{id}/submit"
 	key := "idem-key-1"
+
+	seedIdempotencyTenant(t, db, tenantID)
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), `
@@ -86,6 +109,8 @@ func TestIdempotency_SameKeyDifferentPayload(t *testing.T) {
 	routeTemplate := "POST /api/v1/documents/{id}/submit"
 	key := "idem-key-2"
 
+	seedIdempotencyTenant(t, db, tenantID)
+
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), `
 			DELETE FROM metaldocs.idempotency_keys
@@ -143,6 +168,8 @@ func TestIdempotency_Expired_NewEntry(t *testing.T) {
 	actorUserID := "idem-user-3"
 	routeTemplate := "POST /api/v1/documents/{id}/submit"
 	key := "idem-key-3"
+
+	seedIdempotencyTenant(t, db, tenantID)
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), `
@@ -219,6 +246,8 @@ func TestIdempotency_Concurrent_OnlyOneWins(t *testing.T) {
 	actorUserID := "idem-user-4"
 	routeTemplate := "POST /api/v1/documents/{id}/submit"
 	key := "idem-key-4"
+
+	seedIdempotencyTenant(t, db, tenantID)
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), `

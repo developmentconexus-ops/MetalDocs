@@ -154,13 +154,15 @@ func testSkipLockedNoDuplicateProcessing(t *testing.T) {
 		)
 	})
 
+	seedIdempotencyTenant(t, db, tenantID)
+
 	for i := 0; i < 5; i++ {
 		key := fmt.Sprintf("k-%d", i)
 		_, err := db.ExecContext(ctx, `
 			INSERT INTO metaldocs.idempotency_keys
 				(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 			VALUES
-				($1::uuid, $2, $3, $4, $5, 200, '{}'::jsonb, 'completed', now() - interval '1 hour')`,
+				($1::uuid, $2, $3, $4, $5, 200, '\x7b7d'::bytea, 'completed', now() - interval '1 hour')`,
 			tenantID, actorID, routeTemplate, key, fmt.Sprintf("h-%d", i),
 		)
 		if err != nil {
@@ -306,10 +308,10 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 	testdb.SeedRouteConfig(t, ctx, db, "metaldocs", routeID, tenantID, "INT_SIGNOFF")
 
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_signoffs WHERE approval_instance_id = $1::uuid`, instanceID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_stage_instances WHERE id = $1::uuid`, stageID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_instances WHERE id = $1::uuid`, instanceID)
-		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.approval_routes WHERE id = $1::uuid`, routeID)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_signoffs WHERE approval_instance_id = $1::uuid`, instanceID)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_stage_instances WHERE id = $1::uuid`, stageID)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_instances WHERE id = $1::uuid`, instanceID)
+		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.approval_routes WHERE id = $1::uuid`, routeID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM public.documents WHERE id = $1::uuid`, docID)
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM metaldocs.iam_users WHERE tenant_id = $1::uuid`, tenantID)
 	})
@@ -325,7 +327,7 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 	}
 
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO metaldocs.approval_instances
+		INSERT INTO public.approval_instances
 			(id, tenant_id, document_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
 		VALUES
 			($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'in_progress', $5, now(), 'hash-signoff', 'idem-signoff')`,
@@ -336,7 +338,7 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 
 	eligible, _ := json.Marshal([]string{actorID})
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO metaldocs.approval_stage_instances
+		INSERT INTO public.approval_stage_instances
 			(id, approval_instance_id, stage_order, name_snapshot, required_role_snapshot, required_capability_snapshot, area_code_snapshot, quorum_snapshot, quorum_m_snapshot, on_eligibility_drift_snapshot, eligible_actor_ids, effective_denominator, status, opened_at)
 		VALUES
 			($1::uuid, $2::uuid, 1, 'Stage 1', 'reviewer', 'doc.signoff', 'AREA_INT', 'any_1_of', NULL, 'keep_snapshot', $3::jsonb, 1, 'active', now())`,
@@ -373,7 +375,7 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 			}
 
 			_, err = tx.ExecContext(ctx, `
-				INSERT INTO metaldocs.approval_signoffs
+				INSERT INTO public.approval_signoffs
 					(id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id, decision, comment, signed_at, signature_method, signature_payload, content_hash)
 				VALUES
 					($1::uuid, $2::uuid, $3::uuid, $4, $5::uuid, 'approve', 'integration race', now(), 'password', '{}'::jsonb, 'content-hash')`,
@@ -414,7 +416,7 @@ func testSignoffUniqueDuplicateBlocked(t *testing.T) {
 	var count int
 	if err := db.QueryRowContext(ctx, `
 		SELECT count(*)
-		  FROM metaldocs.approval_signoffs
+		  FROM public.approval_signoffs
 		 WHERE approval_instance_id = $1::uuid
 		   AND stage_instance_id = $2::uuid
 		   AND actor_user_id = $3`,

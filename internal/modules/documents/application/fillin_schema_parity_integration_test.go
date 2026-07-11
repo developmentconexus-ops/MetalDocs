@@ -9,9 +9,11 @@ import (
 	"errors"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"metaldocs/internal/modules/documents/application"
+	"metaldocs/internal/modules/iam/authz"
 	templatesinfra "metaldocs/internal/modules/templates/infrastructure"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/tests/integration/testdb"
@@ -62,25 +64,42 @@ func seedTemplateVersion(t *testing.T, db *sql.DB, tenantID, schemaJSON string) 
 	actorID := testdb.NewUser(t, db, testdb.WithTenant(tenantID)).ID
 	templateID := testdb.DeterministicID(t, "f24-template-"+schemaJSON)
 	versionID := testdb.DeterministicID(t, "f24-version-"+schemaJSON)
-	testdb.SeedWithCaps(t, db, `[{"cap":"template.create"}]`, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(context.Background(), `
-			INSERT INTO public.templates_template (
-				id, tenant_id, doc_type_code, key, name, latest_version, published_version_id, created_by
-			) VALUES ($1::uuid, $2::uuid, 'po', $3, 'F24 Template', 1, NULL, $4)`,
-			templateID, tenantID, "f24-key-"+versionID, actorID,
-		); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(context.Background(), `
-			INSERT INTO public.templates_template_version (
-				id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
-				metadata_schema, placeholder_schema, author_id, published_at
-			) VALUES ($1::uuid, $4::uuid, $2::uuid, 1, 0, 'published', 'templates/f24/body.docx', 'f24-hash',
-				'{}'::jsonb, `+schemaJSON+`::jsonb, $3, now())`,
-			versionID, templateID, actorID, tenantID,
-		)
-		return err
-	})
+	// templates_template_version carries trg_template_version_tenant_consistent,
+	// which requires metaldocs.tenant_id set tx-locally in addition to the
+	// template.create tripwire cap — so this seeds tenant identity
+	// (authz.SeedTxTenant) alongside caps (testdb.SetCapsOnTx) on a
+	// self-managed tx, per the sanctioned direct-tx pattern.
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin template seed tx: %v", err)
+	}
+	defer tx.Rollback()
+	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+		t.Fatalf("seed template tx tenant: %v", err)
+	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"template.create"}]`)
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO public.templates_template (
+			id, tenant_id, doc_type_code, key, name, latest_version, published_version_id, created_by
+		) VALUES ($1::uuid, $2::uuid, 'po', $3, 'F24 Template', 1, NULL, $4)`,
+		templateID, tenantID, "f24-key-"+versionID, actorID,
+	); err != nil {
+		t.Fatalf("seed templates_template: %v", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO public.templates_template_version (
+			id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
+			metadata_schema, placeholder_schema, author_id, published_at
+		) VALUES ($1::uuid, $4::uuid, $2::uuid, 1, 0, 'published', $6, $5,
+			'{}'::jsonb, `+schemaJSON+`::jsonb, $3, now())`,
+		versionID, templateID, actorID, tenantID, strings.Repeat("a", 64), "templates/f24/"+versionID+"/body.docx",
+	); err != nil {
+		t.Fatalf("seed templates_template_version: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit template seed tx: %v", err)
+	}
 	return versionID
 }
 

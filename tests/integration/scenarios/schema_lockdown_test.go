@@ -56,7 +56,7 @@ func TestWriterCanReadApprovalTables(t *testing.T) {
 	ctx := context.Background()
 	db := openDirectDB(t)
 
-	if _, err := db.ExecContext(ctx, `SELECT 1 FROM metaldocs.approval_instances LIMIT 0`); err != nil {
+	if _, err := db.ExecContext(ctx, `SELECT 1 FROM public.approval_instances LIMIT 0`); err != nil {
 		t.Fatalf("read approval_instances should succeed: %v", err)
 	}
 }
