@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { MetalDocsEditorRef, EditorComment, TrackedChange } from '@metaldocs/editor-ui';
@@ -46,7 +46,8 @@ import styles from './DocumentWorkspacePage.module.css';
  *    (autosave-backed), with a teaching-copy banner for changes-requested
  *    plus the RequestedChangesPanel (F6) as a sidebar contextual panel.
  *  - approving: the frozen read canvas + ApprovingDisclosure (hash/ETag +
- *    delegation badge) + a signature decision seeded from `?decision=`.
+ *    delegation badge) + a signature decision (unselected on mount — no
+ *    preselection, spec §5).
  *  - reviewing / observing / author-waiting / lifecycle: unchanged S2a read
  *    canvas.
  */
@@ -75,7 +76,6 @@ const REASON_CATEGORY_OPTIONS: Array<{ value: ReasonCategory; label: string }> =
 export function DocumentWorkspacePage() {
   const { documentId = '' } = useParams<{ documentId: string }>();
   const currentUser = useAuthStore((s) => s.user);
-  const [searchParams] = useSearchParams();
 
   const docQuery = useDocumentDetailQuery(documentId);
   const instanceQuery = useApprovalInstanceQuery(documentId);
@@ -376,10 +376,6 @@ export function DocumentWorkspacePage() {
     void submitForReview(body);
   }
 
-  const decisionParam = searchParams.get('decision');
-  const defaultOptionKey: 'approve' | 'reject' | null =
-    decisionParam === 'approve' || decisionParam === 'reject' ? decisionParam : null;
-
   // signOff (the shared useSignoffMutation, If-Match/content_hash unchanged)
   // then refetch the instance so the mode/decision recompute post-signature.
   const decisionSubmit = async (input: { optionKey: string; reason: string; password: string }) => {
@@ -399,7 +395,6 @@ export function DocumentWorkspacePage() {
     ? buildDocumentSignoffDecision({
         offered: instance != null && contentHash != null,
         signer,
-        defaultOptionKey,
         submit: decisionSubmit,
       }) ?? null
     : null;

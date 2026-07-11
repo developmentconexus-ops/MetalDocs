@@ -334,8 +334,6 @@ export interface ArtifactDecisionModel {
   legal: { text: string } | null;
   /** Signer identity block. Null to omit. */
   signer: ArtifactDecisionSigner | null;
-  /** Option preselected on mount (e.g. from a `?decision=` deep-link). Null = none. */
-  defaultOptionKey?: string | null;
   /**
    * Perform the decision. Resolves on success (the panel then relies on query
    * invalidation to re-render the next lifecycle state); rejects with an Error

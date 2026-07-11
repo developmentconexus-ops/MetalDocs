@@ -67,9 +67,7 @@ function MeaningOfSignatureLine({ tone }: { tone: 'approve' | 'reject' }) {
 /** Wraps ArtifactDecisionPanel to surface the selected option's tone for the
  *  meaning-of-signature line without altering the panel itself. */
 function ApprovalModeFooter({ decision, actions }: { decision: ArtifactDecisionModel; actions: ArtifactAction[] }) {
-  const [selectedTone, setSelectedTone] = useState<'approve' | 'reject' | null>(
-    decision.options.find((o) => o.key === decision.defaultOptionKey)?.tone ?? null,
-  );
+  const [selectedTone, setSelectedTone] = useState<'approve' | 'reject' | null>(null);
 
   return (
     <div

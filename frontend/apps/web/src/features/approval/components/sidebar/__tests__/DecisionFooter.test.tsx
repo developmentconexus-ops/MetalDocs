@@ -81,7 +81,6 @@ function makeDecision(overrides: Partial<ArtifactDecisionModel> = {}): ArtifactD
     password: { label: 'Senha' },
     legal: { text: 'Confirmo que revisei o conteúdo integralmente e que esta decisão tem efeito de assinatura eletrônica conforme a MP 2.200-2/2001.' },
     signer: { name: 'Ana Revisora', detail: 'ana@example.com', note: 'Assinatura digital gerada no ato da confirmação.' },
-    defaultOptionKey: null,
     submit: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -208,7 +207,7 @@ describe('DecisionFooter', () => {
     it('shows meaning-of-signature line "declara aprovação" for the approve option', () => {
       render(
         <DecisionFooter
-          decision={makeDecision({ defaultOptionKey: 'approve' })}
+          decision={makeDecision()}
           actions={[]}
           instance={makeInstance()}
           activeStage={makeStage({ stage_kind: 'approval' })}

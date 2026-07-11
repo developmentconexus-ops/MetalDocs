@@ -19,8 +19,6 @@ export interface BuildDocumentSignoffDecisionArgs {
    *  the instance is locked + content hash resolved. */
   offered: boolean;
   signer: DocumentSignoffSigner | null;
-  /** Preselects a decision option from the `?decision=` query param. */
-  defaultOptionKey: 'approve' | 'reject' | null;
   /** Route-owned: flush the canvas' pending edits, call the signoff mutation, then
    *  refetch the instance. The adapter only decides WHETHER to offer the decision;
    *  the actual signing sequence stays route-owned (canvas ref, signoff mutation). */
@@ -36,7 +34,6 @@ export interface BuildDocumentSignoffDecisionArgs {
 export function buildDocumentSignoffDecision({
   offered,
   signer,
-  defaultOptionKey,
   submit,
 }: BuildDocumentSignoffDecisionArgs): ArtifactDecisionModel | undefined {
   if (!offered) {
@@ -79,7 +76,6 @@ export function buildDocumentSignoffDecision({
           note: 'Assinatura digital gerada no ato da confirmação.',
         }
       : null,
-    defaultOptionKey: defaultOptionKey ?? null,
     submit,
   };
 }
