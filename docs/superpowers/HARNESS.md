@@ -3,7 +3,7 @@
 **Ratified:** 2026-07-10 (operator-designed with Fable; binding for all ROADMAP.md units).
 **Purpose:** one repeatable execution machine per roadmap unit — senior-level output, no AI slop,
 no context loss, no unverified closure. The harness does not replace the skills/gates that exist
-(`developing-new-work`, `milestone`, milestone-validator, TDD superpowers); it fixes WHO runs them,
+(`developing-new-work`, MNFS workflow validation, TDD superpowers); it fixes WHO runs them,
 in WHAT order, with WHAT evidence.
 
 ---
@@ -56,7 +56,10 @@ P3 IMPLEMENT subagent-driven TDD per slice (§4) — commit per green slice
 P4 VERIFY    ladder L0→L2 (§5) run by orchestrator from clean state
 P5 QA        fresh-session browser QA persona (§6) — milestone-close units only... 
              feature units: targeted UI walk of the changed surface
-P6 JUDGE     milestone-validator (milestone end only) — separation of powers
+P6 JUDGE     milestone validation gate (milestone end only) — separation of powers. Cold,
+             independent judge: `mnfs-workflow:milestone-validate` skill (dispatches the
+             read-only milestone-reviewer crew). Legacy programs mid-flight (M2d, M5) whose
+             worktrees still carry the old milestone-validator agent may finish on it.
 P7 CLOSE     evidence.md (commands+outcomes+review disposition+bounded defers+REQ IDs)
              → commit → HS-1 operator gate where the program requires it → update ROADMAP row
 ```
@@ -138,7 +141,7 @@ the operator queue; it does not grow the slice.
 | L1 | `go test ./...` + `go test -tags=integration ./...` vs docker postgres · FE vitest | green; flaky = fix or delete per legacy-test rule |
 | L2 | Full container stack via gateway :80 (coded compose path, [[docker-deploy-methodology]]) · gateway smoke: logins, target routes, RFC 9457 shapes | green, evidence captured |
 | L3 | Browser QA persona (§6) | GREEN verdict artifact |
-| L4 | milestone-validator (milestone end) | PASS written to qa/milestone-qa.md |
+| L4 | milestone validation gate (mnfs-workflow:milestone-validate; legacy in-flight milestones may close on the old milestone-validator) | PASS verdict written to the milestone's qa/ artifact |
 
 **Backend non-negotiables re-checked at L0–L2 for every touched endpoint** (the miss-nothing list):
 tier-1 route→capability wired · tier-2 `authz.Require` in-tx after `SeedTxIdentity` · tripwire arm
