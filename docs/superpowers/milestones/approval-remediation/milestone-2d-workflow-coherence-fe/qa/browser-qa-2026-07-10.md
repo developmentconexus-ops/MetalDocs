@@ -222,3 +222,55 @@ signal to the current verdict. Flagged as a bounded, explicit gap.
 **Gate outcome:** because J2 is **RED**, F2d.8 does **not** pass and the milestone is **not**
 all-green. Per separation of powers, **no fixes were attempted** and **milestone-validator was NOT
 run** (its precondition is all features closed / all-green). QA artifacts committed; **not pushed**.
+
+---
+
+## RED-1 Resolution (2026-07-10, implementation session) — **CLOSED / GREEN**
+
+The RED-1 blocker was fixed by re-homing the draft submit affordance into the single-screen
+workspace (`DocumentWorkspacePage.tsx`), reusing the canonical `approvalApi.submit` contract, and
+deleting the dead unrouted `DocumentEditorPage.tsx` + its two test files + its CSS module.
+
+**Fix summary**
+- **Submit control re-homed** into the workspace header for the author-editing / author-changes-
+  requested modes. It ports the retired page's submit flow verbatim: strip resolved-comment marks
+  on a changes-requested resubmit, flush the editor buffer (`saveNow`/`queue`/`flush`), then
+  `submitForReviewRequest(documentId, body, { ifMatch: '"v${revision_version}"', idempotencyKey:
+  crypto.randomUUID() })` (Origin auto-added by the shared apiFetch transport). A first submit of a
+  never-revised draft (`revision_number === 0`) posts `{}` directly; a resubmit opens the
+  revision-title/reason/category dialog (`SubmitDocumentRequest`).
+- **Mode-plumbing defect fixed (blocked the fix).** `deriveWorkspaceMode` reaches the author lens
+  only via `viewer.is_author`, but a never-submitted draft has no instance (404) → no viewer → mode
+  fell to `observing` ("Visualizando"), so author-editing was unreachable. Resolved by synthesizing
+  `effectiveViewer = { is_author: true, ... }` from document **ownership** (`doc.created_by ===
+  currentUser.userId`) when no instance viewer exists. ADR-0078-consistent: ownership ≠ eligibility;
+  the server remains the sole submit enforcer (tier-2 authz + OCC). This also closes the practical
+  half of **F-2** — the fresh draft now resolves to author-editing, not an error-observing state.
+- **Dead code deleted:** `DocumentEditorPage.tsx`, `pages/DocumentEditorPage.test.tsx`,
+  `__tests__/DocumentEditorPage.test.tsx`, `pages/styles/DocumentEditorPage.module.css`. Confirmed
+  unrouted (route wrapper removed in F2d.7 `a90275e7`; only the two test files imported the
+  component).
+
+**Typecheck gate:** Docker web build (`tsc --noEmit -p tsconfig.build.json && vite build`) — BUILD
+EXIT 0, tsc clean.
+
+**E2E verification — rendered UI via gateway :80** (served build `DocumentWorkspacePage-CG9MO7HQ.js`,
+byte-verified to contain the fix):
+
+| Step | Evidence |
+|---|---|
+| Fresh draft `PO-RH-002` (`6090f332-c491-442f-b054-a33554f71a4e`, `created_by=author-test`), workspace mode | **"Editando"** (author-editing) — was "Visualizando" pre-fix |
+| Submit control | **"Submeter para revisão"** present + **enabled** in header (`disabled:false`) |
+| Submit driven by real UI click | `POST /api/v1/documents/6090f332…/submit` → **201 Created** |
+| 412 count | **ZERO** |
+| Doc status after submit | **`under_review`** (verified via `GET /documents/{id}`) |
+| Workspace mode after submit | flipped to **"Aguardando revisão"** (author-waiting); submit control gone |
+
+→ **`draft → submit → under_review` completes end-to-end through the rendered UI, zero 412.**
+RED-1 is **CLOSED**. J2's start-of-lifecycle blocker is resolved. (Downstream review→approval advance
+was already GREEN via real UI click in the original QA above; the mid-stream and terminal signoff
+steps remain as previously dispositioned — signoff requires an operator password entry, a safety
+boundary not crossed by the agent.)
+
+> Screenshot capture still times out in this environment (unchanged evidence-tooling gap); rendered
+> proof is live-DOM + network reads against the :80 SPA, per the evidence-method note above.

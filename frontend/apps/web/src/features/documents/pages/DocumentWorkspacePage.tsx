@@ -1,15 +1,23 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import type { MetalDocsEditorRef, EditorComment, TrackedChange } from '@metaldocs/editor-ui';
 
 import { CodeChip, InlineAlert, StatusPill } from '../../../components/ui';
 import { useAuthStore } from '../../../store/auth.store';
 import { formatRevisionCode } from '../../../lib/labels/revisionCode';
+import { QK } from '../../../lib/queryKeys';
+import { ApiError, resolveErrorMessage } from '../../../lib/api';
+import type { components } from '../../../lib/api-types';
 import type { ArtifactAction } from '../../shared/controlled-artifact/types';
 import { useHasCapability } from '../../iam/hooks/useHasCapability';
 import { CancelInstanceDialog } from '../../approval/components/CancelInstanceDialog';
 import { deriveWorkspaceMode } from '../../approval/lib/workspaceMode';
 import { useSignoffMutation } from '../../approval/hooks/useSignoffMutation';
+import { submit as submitForReviewRequest } from '../../approval/api/approvalApi';
+import type { DocumentDetail } from '../api/documents';
+import { AutosaveStatus, editorChromeStyles, type AutosaveState } from '../../shared/components/editor-chrome';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
 import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
@@ -49,6 +57,21 @@ import styles from './DocumentWorkspacePage.module.css';
 // /view does not serve — those keep the docx read canvas.
 const OFFICIAL_PDF_STATUSES = new Set(['approved', 'scheduled', 'published']);
 
+// F2d.8 RED-1 — the draft submit-for-approval affordance, re-homed from the
+// retired (unrouted) DocumentEditorPage into the single-screen workspace. The
+// submit contract (If-Match "v{revision_version}", UUID Idempotency-Key, Origin
+// via the shared transport) is unchanged; only its host screen moved.
+type SubmitDocumentRequest = components['schemas']['SubmitDocumentRequest'];
+type ReasonCategory = NonNullable<SubmitDocumentRequest['reason_category']>;
+
+const REASON_CATEGORY_OPTIONS: Array<{ value: ReasonCategory; label: string }> = [
+  { value: 'content', label: 'Conteúdo' },
+  { value: 'corrective', label: 'Corretiva' },
+  { value: 'regulatory', label: 'Regulatória' },
+  { value: 'periodic_review', label: 'Revisão periódica' },
+  { value: 'administrative', label: 'Administrativa' },
+];
+
 export function DocumentWorkspacePage() {
   const { documentId = '' } = useParams<{ documentId: string }>();
   const currentUser = useAuthStore((s) => s.user);
@@ -61,11 +84,24 @@ export function DocumentWorkspacePage() {
   const instance = instanceQuery.data ?? null;
   const viewer = instance?.viewer ?? null;
 
+  // Design brief §"No instance + draft = author-editing": a never-submitted
+  // draft has no approval instance (GET .../approval-instance 404s), so there is
+  // no server `viewer` to carry is_author — and deriveWorkspaceMode reaches the
+  // author lens only through viewer.is_author. Authorship for that pre-submission
+  // case is document OWNERSHIP (created_by), not stage eligibility, so deriving
+  // it here is consistent with ADR 0078 (which governs eligibility, still
+  // server-only). The server stays the authority on submit (writer lease +
+  // authz.Require). Once an instance exists its real viewer takes precedence.
+  const effectiveViewer = viewer
+    ?? (currentUser && doc?.created_by === currentUser.userId
+      ? { is_author: true, eligible_for_active_stage: false, has_signed_active_stage: false, via_delegation_from: null }
+      : null);
+
   // Mode is computed up-front (deriveWorkspaceMode accepts a possibly-null
   // doc) so every hook below can gate on it without violating the rules of
   // hooks — the loading/doc-not-found early returns further down must stay
   // the LAST thing before render, no hooks after them.
-  const mode = deriveWorkspaceMode(doc, instance, viewer);
+  const mode = deriveWorkspaceMode(doc, instance, effectiveViewer);
   const docStatus = doc?.status ?? '';
 
   const session = useDocumentSession(documentId, { enabled: docStatus === 'draft' });
@@ -128,6 +164,28 @@ export function DocumentWorkspacePage() {
   const canCancelInstance = useHasCapability('document.edit');
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
+  // F2d.8 RED-1 — submit-for-approval affordance state (ported from the retired
+  // DocumentEditorPage). editorDirty gates the pre-submit buffer flush; the
+  // dialog fields collect the governed revision reason for revision_number > 0.
+  const queryClient = useQueryClient();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [revisionDialogOpen, setRevisionDialogOpen] = useState(false);
+  const [revisionTitleInput, setRevisionTitleInput] = useState('');
+  const [revisionTitleError, setRevisionTitleError] = useState<string | null>(null);
+  const [reasonForChangeInput, setReasonForChangeInput] = useState('');
+  const [reasonForChangeError, setReasonForChangeError] = useState<string | null>(null);
+  const [reasonCategoryInput, setReasonCategoryInput] = useState('');
+  const [reasonCategoryError, setReasonCategoryError] = useState<string | null>(null);
+  const skipInitialEditorChangeRef = useRef(false);
+
+  // Dirty-guard resets whenever the current revision changes (a fresh buffer
+  // load is imminent) — mirrors the retired editor's per-buffer reset.
+  useEffect(() => {
+    skipInitialEditorChangeRef.current = true;
+    setEditorDirty(false);
+  }, [doc?.current_revision_id]);
+
   // §6 loading — shell skeleton, no central spinner.
   if (docQuery.isLoading) {
     return (
@@ -182,6 +240,140 @@ export function DocumentWorkspacePage() {
   async function handleSave(buf: ArrayBuffer) {
     const pageCount = editorRef.current?.getPageCount() ?? null;
     await autosave.queue(buf, formDataJson, pageCount);
+  }
+
+  // --- F2d.8 RED-1: submit-for-approval (draft → under_review) ---
+  const isAuthorEditing = mode === 'author-editing' || mode === 'author-changes-requested';
+  const changesRequested = mode === 'author-changes-requested';
+  const autosaveState: AutosaveState = autosave.status;
+  const unresolvedComments = commentsHook.comments.filter((c) => !c.resolved);
+  // A changes-requested resubmit is blocked while unresolved tracked changes or
+  // comments remain — the author must respond before reopening the flow.
+  const requestedChangesBlocksSubmit = changesRequested
+    && (trackedChanges.length > 0 || unresolvedComments.length > 0);
+
+  function handleEditorChange() {
+    if (skipInitialEditorChangeRef.current) {
+      skipInitialEditorChangeRef.current = false;
+      return;
+    }
+    setEditorDirty(true);
+  }
+
+  async function submitForReview(body: SubmitDocumentRequest = {}) {
+    if (session.state.phase !== 'writer' || !doc) return;
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      // Clean-buffer re-submit (F6/C5): strip visual marks of already-resolved
+      // comments BEFORE the flush persists the buffer, so the re-submitted
+      // revision carries no stale marks. Order: removeCommentMark -> saveNow/
+      // queue/flush -> submit. removeCommentMark mutates without flipping
+      // editorDirty, so force the flush path when any mark was stripped.
+      let resolvedAnyMark = false;
+      if (changesRequested) {
+        for (const comment of commentsHook.comments) {
+          if (comment.resolved) {
+            editorRef.current?.removeCommentMark(String(comment.id));
+            resolvedAnyMark = true;
+          }
+        }
+      }
+      if (editorDirty || resolvedAnyMark) {
+        const latestBuf = await editorRef.current?.saveNow();
+        if (latestBuf) {
+          const pageCount = editorRef.current?.getPageCount() ?? null;
+          await autosave.queue(latestBuf, formDataJson, pageCount);
+        }
+        const flushOk = await autosave.flush();
+        if (!flushOk) {
+          toast.error('Erro ao salvar documento antes da submissão.');
+          return;
+        }
+        setEditorDirty(false);
+      }
+      // If-Match is mandatory server-side (OCC parity with canonical /submit).
+      // Autosave commits advance the revision *id*, not documents.revision_version
+      // (that only bumps on the draft->under_review transition itself), so the
+      // cached doc.revision_version read here is still the version to match.
+      await submitForReviewRequest(documentId, body, {
+        ifMatch: `"v${doc.revision_version}"`,
+        idempotencyKey: crypto.randomUUID(),
+      });
+      // Flip the cached status immediately so the mode recomputes off
+      // under_review before the refetch lands (no editable-canvas flash).
+      queryClient.setQueryData(QK.documents.detail(documentId), (current: DocumentDetail | undefined) => {
+        if (!current) return current;
+        return { ...current, Status: 'under_review', status: 'under_review' } as DocumentDetail;
+      });
+      setEditorDirty(false);
+      await docQuery.refetch();
+      await instanceQuery.refetch();
+      await session.release();
+      setRevisionDialogOpen(false);
+      setRevisionTitleInput('');
+      setRevisionTitleError(null);
+      setReasonForChangeInput('');
+      setReasonForChangeError(null);
+      setReasonCategoryInput('');
+      setReasonCategoryError(null);
+      toast.success('Documento submetido para revisão.');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.code === 'validation.revision_title_required') {
+          setRevisionTitleError(resolveErrorMessage(err.code, err.message));
+        } else if (err.code === 'validation.reason_for_change_required') {
+          setReasonForChangeError(resolveErrorMessage(err.code, err.message));
+        } else if (err.code === 'validation.reason_category_invalid') {
+          setReasonCategoryError(resolveErrorMessage(err.code, err.message));
+        } else {
+          toast.error(resolveErrorMessage(err.code, err.message));
+        }
+      } else {
+        toast.error('Erro ao submeter documento.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleSubmitForReview() {
+    if (isSubmitting) return;
+    // First submission of a brand-new draft carries no governed revision reason;
+    // a resubmit of an existing revision requires title + reason via the dialog.
+    if ((doc?.revision_number ?? 0) === 0) {
+      void submitForReview({});
+      return;
+    }
+    setRevisionTitleInput(doc?.revision_title ?? '');
+    setRevisionTitleError(null);
+    setReasonForChangeInput('');
+    setReasonForChangeError(null);
+    setReasonCategoryInput('');
+    setReasonCategoryError(null);
+    setRevisionDialogOpen(true);
+  }
+
+  function handleConfirmSubmitForReview() {
+    if (isSubmitting) return;
+    const trimmedTitle = revisionTitleInput.trim();
+    const trimmedReason = reasonForChangeInput.trim();
+    let hasError = false;
+    if (!trimmedTitle) {
+      setRevisionTitleError('Informe o título da revisão para submeter.');
+      hasError = true;
+    }
+    if (!trimmedReason) {
+      setReasonForChangeError('Informe o motivo da alteração para submeter.');
+      hasError = true;
+    }
+    if (hasError) return;
+    const body: SubmitDocumentRequest = {
+      revision_title: trimmedTitle,
+      reason_for_change: trimmedReason,
+      ...(reasonCategoryInput ? { reason_category: reasonCategoryInput as ReasonCategory } : {}),
+    };
+    void submitForReview(body);
   }
 
   const decisionParam = searchParams.get('decision');
@@ -290,7 +482,22 @@ export function DocumentWorkspacePage() {
                 <span className={styles.revision}>{formatRevisionCode(doc.revision_number)}</span>
               ) : null}
             </div>
-            <ModeChip mode={mode} viewer={viewer} />
+            <div className={styles.headerRight}>
+              {isAuthorEditing ? (
+                <>
+                  <AutosaveStatus status={autosaveState} />
+                  <button
+                    type="button"
+                    className={editorChromeStyles.primaryBtn}
+                    onClick={handleSubmitForReview}
+                    disabled={!canEditContent || isSubmitting || requestedChangesBlocksSubmit}
+                  >
+                    Submeter para revisão
+                  </button>
+                </>
+              ) : null}
+              <ModeChip mode={mode} viewer={effectiveViewer} />
+            </div>
           </header>
 
           <main className={styles.canvas} data-testid="workspace-canvas">
@@ -337,6 +544,7 @@ export function DocumentWorkspacePage() {
                     onCommentDelete={(c: EditorComment) => { if (canUseComments) void commentsHook.remove(c); }}
                     onCommentReply={(reply: EditorComment, parent: EditorComment) => { if (canUseComments) void commentsHook.reply(reply, parent); }}
                     onAutoSave={handleSave}
+                    onChange={handleEditorChange}
                     onTrackedChangesChange={setTrackedChanges}
                   />
                 ) : (
@@ -374,6 +582,69 @@ export function DocumentWorkspacePage() {
           lifecycleActions={lifecycleActions}
         />
       </div>
+
+      {revisionDialogOpen ? (
+        <div className={styles.dialogBackdrop} role="presentation">
+          <div className={styles.dialogPanel} role="dialog" aria-modal="true" aria-labelledby="revision-title-dialog-title">
+            <h2 id="revision-title-dialog-title" className={styles.dialogTitle}>Título da revisão</h2>
+            <p className={styles.dialogText}>Informe o motivo governado desta revisão antes de submeter o documento para aprovação.</p>
+            <label className={styles.dialogField}>
+              <span>Título</span>
+              <input
+                type="text"
+                value={revisionTitleInput}
+                onChange={(event) => {
+                  setRevisionTitleInput(event.target.value);
+                  if (revisionTitleError) setRevisionTitleError(null);
+                }}
+                placeholder="Ex.: Ajuste de procedimento operacional"
+              />
+            </label>
+            {revisionTitleError ? <p role="alert" className={styles.dialogError}>{revisionTitleError}</p> : null}
+            <label className={styles.dialogField}>
+              <span>Motivo da alteração</span>
+              <textarea
+                value={reasonForChangeInput}
+                onChange={(event) => {
+                  setReasonForChangeInput(event.target.value);
+                  if (reasonForChangeError) setReasonForChangeError(null);
+                }}
+                placeholder="Descreva o motivo desta alteração governada"
+              />
+            </label>
+            {reasonForChangeError ? <p role="alert" className={styles.dialogError}>{reasonForChangeError}</p> : null}
+            <label className={styles.dialogField}>
+              <span>Categoria</span>
+              <select
+                value={reasonCategoryInput}
+                onChange={(event) => {
+                  setReasonCategoryInput(event.target.value);
+                  if (reasonCategoryError) setReasonCategoryError(null);
+                }}
+              >
+                <option value="">— Selecionar —</option>
+                {REASON_CATEGORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            {reasonCategoryError ? <p role="alert" className={styles.dialogError}>{reasonCategoryError}</p> : null}
+            <div className={styles.dialogActions}>
+              <button type="button" className={styles.dialogSecondaryBtn} onClick={() => setRevisionDialogOpen(false)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={styles.dialogPrimaryBtn}
+                onClick={handleConfirmSubmitForReview}
+                disabled={isSubmitting}
+              >
+                Confirmar submissão
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showCancelDialog ? (
         <CancelInstanceDialog
