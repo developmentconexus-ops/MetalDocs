@@ -535,7 +535,17 @@ func NewApprovalInstance(t *testing.T, db *sql.DB, opts ...Opt) ApprovalInstance
 	if s.Document != nil {
 		doc = *s.Document
 	} else {
-		doc = NewDocument(t, db, WithStatus("approved"))
+		docOpts := []Opt{WithStatus("approved")}
+		if s.TenantID != "" {
+			// Thread the caller's WithTenant through to the auto-created
+			// document — without this, a caller passing WithTenant(tenantID)
+			// alone (no WithDocument) silently got a document under a
+			// DIFFERENT, freshly-minted tenant, and every downstream query
+			// filtered on the caller's tenantID (e.g. approval_instances.tenant_id)
+			// found nothing.
+			docOpts = append(docOpts, WithTenant(s.TenantID))
+		}
+		doc = NewDocument(t, db, docOpts...)
 	}
 	var route ApprovalRoute
 	if s.Route != nil {

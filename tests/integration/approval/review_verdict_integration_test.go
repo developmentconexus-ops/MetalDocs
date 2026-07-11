@@ -26,7 +26,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/infrastructure"
-	iamdomain "metaldocs/internal/modules/iam/domain"
+	iampostgres "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
@@ -84,7 +84,7 @@ func seedReviewVerdictFixture(t *testing.T, database *sql.DB, stageKind domain.S
 	// connection so the guarded raw write is sanctioned.
 	testdb.SeedWithCaps(t, database, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
-			`UPDATE public.documents SET process_area_code_snapshot = 'QA' WHERE id = $1::uuid`,
+			`UPDATE public.documents SET process_area_code_snapshot = 'qa' WHERE id = $1::uuid`,
 			doc.ID)
 		return err
 	})
@@ -98,14 +98,74 @@ func seedReviewVerdictFixture(t *testing.T, database *sql.DB, stageKind domain.S
 		testdb.WithStatus("in_progress"),
 	)
 
-	eligible := `["` + reviewer.ID + `"]`
+	// Grant chain (production authz.Require, authz.go:144): actor ->
+	// metaldocs.user_process_areas(role) -> JOIN role_capabilities(role,
+	// capability) for area 'qa' (matches area_code_snapshot below). Every
+	// RecordVerdict/CancelInstance call in this file's tests runs through
+	// authz.Require BEFORE eligibility/SoD, so both actors need a
+	// capability-bearing role in area QA, not just eligible_actor_ids
+	// membership:
+	//   - reviewer -> role 'approver': carries approval.review (RecordVerdict's
+	//     tier-2 gate) AND document.edit (the same call's downstream
+	//     instance-approved / request_changes document-transition gate,
+	//     review_verdict_service.go:267,342).
+	//   - author -> role 'area_admin': carries document.edit (CancelInstance's
+	//     gate, cancel_service.go:88) AND approval.review. The author needs
+	//     approval.review too so TestReviewVerdict_SoDBlocksSelfVerdict reaches
+	//     the domain.CheckSoD block (sod.go) instead of failing earlier on a
+	//     plain capability denial — granting the role does NOT bypass SoD,
+	//     which is a separate same-actor check keyed off instance.SubmittedBy,
+	//     not off role/capability. No role carries BOTH 'author' and
+	//     'approver' simultaneously (ux_user_process_areas_one_active allows
+	//     only one active row per (user, tenant, area)), so 'area_admin' is
+	//     used as the single role satisfying both cap needs for this actor
+	//     across every test in this file that shares the fixture.
+	testdb.SeedWithCaps(t, database, `[{"cap":"membership.manage"},{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
+		// user_process_areas.(tenant_id, area_code) FK-references
+		// metaldocs.document_process_areas(tenant_id, code), whose code column
+		// carries CHECK area_code_format (^[a-z][a-z0-9_-]{1,63}$ — lowercase
+		// only). 'qa' is not the tenant's auto-generated taxonomy area
+		// (NewTaxonomy/NewDocument mint a random per-test code); it must be
+		// seeded explicitly (idempotent, ON CONFLICT DO NOTHING mirrors
+		// NewTaxonomy's own seeding) or the grants below 23503-fail. Lowercase
+		// 'qa' (not 'QA') to satisfy area_code_format — the documents/stage
+		// snapshot columns above have no such CHECK but must still match this
+		// value exactly for authz.Require's `upa.area_code = $2` join.
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.document_process_areas (code, tenant_id, name)
+			 VALUES ('qa', $1::uuid, 'QA') ON CONFLICT (tenant_id, code) DO NOTHING`,
+			tenant.ID,
+		); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `INSERT INTO metaldocs.user_process_areas
+			(user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by)
+			VALUES ($1,$2,$3,$4,now(),NULL,$1)`, author.ID, tenant.ID, "qa", "area_admin")
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, `INSERT INTO metaldocs.user_process_areas
+			(user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by)
+			VALUES ($1,$2,$3,$4,now(),NULL,$1)`, reviewer.ID, tenant.ID, "qa", "approver")
+		return err
+	})
+
+	// eligible_actor_ids includes BOTH actors: the author must be a member of
+	// the eligible pool for TestReviewVerdict_SoDBlocksSelfVerdict to reach
+	// the SoD check (ResolveEligibleIdentity/eligibility.go runs BEFORE
+	// domain.CheckSoD in review_verdict_service.go — an author absent from
+	// this pool would fail with ErrActorNotEligible first, never reaching
+	// ErrAuthorCannotSign). Widening the pool does not affect the other
+	// tests: quorum_snapshot is any_1_of (quorum.go), which only counts cast
+	// votes, never pool size.
+	eligible := `["` + author.ID + `","` + reviewer.ID + `"]`
 	var stageID string
 	if err := database.QueryRowContext(ctx, `
 		INSERT INTO public.approval_stage_instances
 		  (approval_instance_id, stage_order, name_snapshot, required_role_snapshot,
 		   required_capability_snapshot, area_code_snapshot, quorum_snapshot,
 		   on_eligibility_drift_snapshot, eligible_actor_ids, status, stage_kind)
-		VALUES ($1::uuid, 1, 'Review Stage', 'reviewer', 'approval.review', 'QA',
+		VALUES ($1::uuid, 1, 'Review Stage', 'reviewer', 'approval.review', 'qa',
 		        'any_1_of', 'keep_snapshot', $2::jsonb, 'active', $3)
 		RETURNING id::text`,
 		instance.ID, eligible, string(stageKind),
@@ -113,7 +173,7 @@ func seedReviewVerdictFixture(t *testing.T, database *sql.DB, stageKind domain.S
 		t.Fatalf("seed approval_stage_instances: %v", err)
 	}
 
-	repo := infrastructure.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
+	repo := infrastructure.NewPostgresApprovalRepository(database, iampostgres.NewUserDisplayNameRepository(database))
 	runner := db.NewTxRunner(database)
 	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil)
 
@@ -350,7 +410,7 @@ func TestCancelInstance_ReasonPersists(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindReview)
 
-	repo := infrastructure.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
+	repo := infrastructure.NewPostgresApprovalRepository(database, iampostgres.NewUserDisplayNameRepository(database))
 	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil)
 
 	const reason = "stakeholder withdrew (integration)"
