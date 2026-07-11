@@ -299,6 +299,11 @@ RETURNING id::text`,
 		t.Fatalf("insert route fixture: %v", err)
 	}
 
+	// approval_instances insert asserts document.submit via the tripwire; seed
+	// the tx-local capability assertion (mirrors the setConfig usage above at
+	// line ~386 for the same table/capability).
+	setConfig(t, ctx, tx, "metaldocs.asserted_caps", `[{"cap":"document.submit"}]`)
+
 	_, err = tx.ExecContext(ctx, `
 INSERT INTO approval_instances
   (id, tenant_id, document_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
