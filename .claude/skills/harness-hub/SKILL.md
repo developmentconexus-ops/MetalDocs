@@ -44,7 +44,9 @@ loop; never restate doctrine from memory, read it.
   - Verdict ACCEPT → `git merge --no-ff` → post-merge ladder (L0: build + api-lint -strict +
     module-boundaries; L1: `go test ./...` + `.\scripts\test-integration.ps1`, never hand-set
     DATABASE_URL; FE tsc when frontend touched) → rebuild affected containers → smoke :80 →
-    board task `completed`.
+    board task `completed` → cleanup: `git worktree remove` the chip worktree (check
+    `list_sessions` first — never remove a path a running session occupies) + `git branch -d`
+    the chip branch (`-d` only; refusal = unmerged work, operator decides).
   - ACCEPT-WITH-CONDITIONS / REJECT → send findings back to the SAME chip session
     (`send_message`); new corrective chip only on 2× reject.
   - `BLOCKED`/`ESCALATION` → decide within hub authority or surface to the operator; never leave

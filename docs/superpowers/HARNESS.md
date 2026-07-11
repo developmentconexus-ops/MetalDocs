@@ -55,7 +55,13 @@ first:
 | `ACK` | hub sent a mid-flight correction | one line: what was applied / why not applicable. |
 
 Hub side of the contract: `CLOSED` triggers the acceptance pipeline (independent read-only
-reviewer → verdict → merge or remediation) without operator relaying; `BLOCKED`/`ESCALATION` get
+reviewer → verdict → merge or remediation) without operator relaying. **Post-merge cleanup is
+part of acceptance:** once the merge lands and the post-merge ladder is green, the hub removes
+the chip's worktree (`git worktree remove`, `--force` for detached-HEAD leftovers; verify no
+running session occupies the path via `list_sessions` first) and safe-deletes the chip branch
+(`git branch -d` — never `-D`; a branch that refuses deletion carries unmerged work and stays
+until the operator decides). Worktrees are execution scratch, not archives — evidence lives in
+merged docs, not in leftover checkouts. `BLOCKED`/`ESCALATION` get
 a decision or an operator escalation, not silence; ACCEPT-WITH-CONDITIONS / REJECT findings go
 back **to the same chip session** via `send_message` — context is intact there, so remediation is
 a message, not a new chip (a new corrective chip only on 2× reject = redesign). Reviewer
