@@ -21,8 +21,12 @@ type DocumentProfile struct {
 	DefaultTemplateVersionID *string     `json:"default_template_version_id"`
 	OwnerUserID              *string     `json:"owner_user_id"`
 	EditableByRole           string      `json:"editable_by_role"`
-	ArchivedAt               *time.Time  `json:"archived_at"`
-	CreatedAt                time.Time   `json:"created_at"`
+	// GovernanceClass drives the per-profile route-signature policy (G1).
+	// Empty is normalized to GovernanceControlado by NewDocumentProfile,
+	// mirroring the DB column default.
+	GovernanceClass GovernanceClass `json:"governance_class"`
+	ArchivedAt      *time.Time      `json:"archived_at"`
+	CreatedAt       time.Time       `json:"created_at"`
 }
 
 // Sentinel errors returned by DocumentProfile construction and mutation.
@@ -38,6 +42,19 @@ var (
 	ErrProfileTenantRequired   = errors.New("profile tenant must not be empty")
 	ErrProfileFamilyRequired   = errors.New("profile family must not be empty")
 	ErrProfileNameRequired     = errors.New("profile name must not be empty")
+	ErrInvalidGovernanceClass  = errors.New("profile governance_class must be one of: controlado, simples, livre")
+	// ErrClassChangeRouteConflict is returned when a reclassification would
+	// leave an active approval route violating the new governance_class (e.g.
+	// simples→controlado while a review-only route is active). It is the
+	// friendly translation of the DB reclassify-guard trigger (P0001,
+	// 'ErrClassChangeRouteConflict:' prefix) and maps to HTTP 409.
+	ErrClassChangeRouteConflict = errors.New("profile reclassification conflicts with an active approval route")
+	// ErrRouteViolatesProfilePolicy is the friendly translation of the DB
+	// route-shape trigger (P0001, 'ErrRouteViolatesProfilePolicy:' prefix): an
+	// approval route write violates its profile's governance_class. Surfaced by
+	// the approval module; declared here because it originates from the
+	// taxonomy-owned governance policy.
+	ErrRouteViolatesProfilePolicy = errors.New("approval route violates the profile governance policy")
 )
 
 // ProfileCode is the immutable primary-key identifier of a DocumentProfile.
@@ -61,6 +78,7 @@ func NewDocumentProfile(input DocumentProfile) (*DocumentProfile, error) {
 		DefaultTemplateVersionID: trimOptionalString(input.DefaultTemplateVersionID),
 		OwnerUserID:              trimOptionalString(input.OwnerUserID),
 		EditableByRole:           strings.TrimSpace(input.EditableByRole),
+		GovernanceClass:          input.GovernanceClass,
 		ArchivedAt:               input.ArchivedAt,
 		CreatedAt:                input.CreatedAt,
 	}
@@ -75,6 +93,12 @@ func NewDocumentProfile(input DocumentProfile) (*DocumentProfile, error) {
 	}
 	if profile.Name == "" {
 		return nil, ErrProfileNameRequired
+	}
+	if profile.GovernanceClass == "" {
+		profile.GovernanceClass = GovernanceControlado
+	}
+	if err := profile.GovernanceClass.Validate(); err != nil {
+		return nil, err
 	}
 	if profile.Alias == "" {
 		profile.Alias = string(profile.Code)

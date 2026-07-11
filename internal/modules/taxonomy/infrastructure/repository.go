@@ -12,6 +12,9 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -35,8 +38,30 @@ type taxonomyTx struct {
 	tx *sql.Tx
 }
 
-func (t taxonomyTx) Commit() error   { return t.tx.Commit() }
+func (t taxonomyTx) Commit() error   { return mapProfilePolicyErr(t.tx.Commit()) }
 func (t taxonomyTx) Rollback() error { return t.tx.Rollback() }
+
+// mapProfilePolicyErr translates the G1 governance-policy DB triggers'
+// P0001 exceptions (migration 0295) into taxonomy domain sentinels so the
+// application/domain layers never inspect driver error codes. The
+// reclassify guard is a DEFERRABLE INITIALLY DEFERRED constraint trigger, so
+// its violation surfaces at COMMIT — hence the mapping lives on taxonomyTx.
+// Commit. Non-matching errors pass through unchanged.
+func mapProfilePolicyErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "P0001" {
+		switch {
+		case strings.HasPrefix(pgErr.Message, "ErrClassChangeRouteConflict"):
+			return domain.ErrClassChangeRouteConflict
+		case strings.HasPrefix(pgErr.Message, "ErrRouteViolatesProfilePolicy"):
+			return domain.ErrRouteViolatesProfilePolicy
+		}
+	}
+	return err
+}
 
 // db.Tx forwarding — satisfies domain.FamilyTx which embeds db.Tx (F-07).
 func (t taxonomyTx) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
@@ -83,7 +108,7 @@ func (r *ProfileRepository) GetByCode(ctx context.Context, tenantID string, code
 
 	const q = `
 SELECT code, tenant_id, family_code, name, description, alias, review_interval_days,
-       default_template_version_id, owner_user_id, editable_by_role, archived_at, created_at
+       default_template_version_id, owner_user_id, editable_by_role, governance_class, archived_at, created_at
 FROM metaldocs.document_profiles
 WHERE tenant_id = $1 AND code = $2`
 
@@ -101,6 +126,7 @@ WHERE tenant_id = $1 AND code = $2`
 		&defaultTemplateVersionID,
 		&ownerUserID,
 		&profile.EditableByRole,
+		&profile.GovernanceClass,
 		&profile.ArchivedAt,
 		&profile.CreatedAt,
 	)
@@ -134,7 +160,7 @@ func (r *ProfileRepository) List(ctx context.Context, tenantID string, includeAr
 
 	q := `
 SELECT code, tenant_id, family_code, name, description, alias, review_interval_days,
-       default_template_version_id, owner_user_id, editable_by_role, archived_at, created_at
+       default_template_version_id, owner_user_id, editable_by_role, governance_class, archived_at, created_at
 FROM metaldocs.document_profiles
 WHERE tenant_id = $1`
 	if !includeArchived {
@@ -164,6 +190,7 @@ WHERE tenant_id = $1`
 			&defaultTemplateVersionID,
 			&ownerUserID,
 			&profile.EditableByRole,
+			&profile.GovernanceClass,
 			&profile.ArchivedAt,
 			&profile.CreatedAt,
 		); err != nil {
@@ -196,9 +223,9 @@ func (r *ProfileRepository) Create(ctx context.Context, p *domain.DocumentProfil
 	}
 	const q = `
 INSERT INTO metaldocs.document_profiles
-    (code, tenant_id, family_code, name, description, alias, review_interval_days, default_template_version_id, owner_user_id, editable_by_role, archived_at)
+    (code, tenant_id, family_code, name, description, alias, review_interval_days, default_template_version_id, owner_user_id, editable_by_role, governance_class, archived_at)
 VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 
 	if _, err := tx.ExecContext(
 		ctx,
@@ -213,6 +240,7 @@ VALUES
 		stringPtrToNull(p.DefaultTemplateVersionID),
 		stringPtrToNull(p.OwnerUserID),
 		p.EditableByRole,
+		p.GovernanceClass,
 		p.ArchivedAt,
 	); err != nil {
 		return err
@@ -235,14 +263,14 @@ func (r *ProfileRepository) CreateTx(ctx context.Context, tx domain.FamilyTx, p 
 	}
 	const q = `
 INSERT INTO metaldocs.document_profiles
-    (code, tenant_id, family_code, name, description, alias, review_interval_days, default_template_version_id, owner_user_id, editable_by_role, archived_at)
+    (code, tenant_id, family_code, name, description, alias, review_interval_days, default_template_version_id, owner_user_id, editable_by_role, governance_class, archived_at)
 VALUES
-    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 	_, err := sqlTx.tx.ExecContext(
 		ctx, q,
 		p.Code, p.TenantID, p.FamilyCode, p.Name, p.Description, p.Alias,
 		p.ReviewIntervalDays, stringPtrToNull(p.DefaultTemplateVersionID),
-		stringPtrToNull(p.OwnerUserID), p.EditableByRole, p.ArchivedAt,
+		stringPtrToNull(p.OwnerUserID), p.EditableByRole, p.GovernanceClass, p.ArchivedAt,
 	)
 	return err
 }
@@ -322,7 +350,7 @@ func (r *ProfileRepository) GetByCodeForUpdate(ctx context.Context, tx domain.Fa
 	}
 	const q = `
 SELECT code, tenant_id, family_code, name, description, alias, review_interval_days,
-       default_template_version_id, owner_user_id, editable_by_role, archived_at, created_at
+       default_template_version_id, owner_user_id, editable_by_role, governance_class, archived_at, created_at
 FROM metaldocs.document_profiles
 WHERE tenant_id = $1 AND code = $2
 FOR UPDATE`
@@ -332,7 +360,7 @@ FOR UPDATE`
 	err := sqlTx.tx.QueryRowContext(ctx, q, tenantID, code).Scan(
 		&profile.Code, &profile.TenantID, &profile.FamilyCode, &profile.Name, &profile.Description,
 		&profile.Alias, &profile.ReviewIntervalDays, &defaultTemplateVersionID, &ownerUserID,
-		&profile.EditableByRole, &profile.ArchivedAt, &profile.CreatedAt,
+		&profile.EditableByRole, &profile.GovernanceClass, &profile.ArchivedAt, &profile.CreatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrProfileNotFound
@@ -379,6 +407,42 @@ WHERE tenant_id = $10 AND code = $11`
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("profile tx update rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return domain.ErrProfileNotFound
+	}
+	return nil
+}
+
+// SetGovernanceClassTx writes ONLY the governance_class column for
+// (tenantID, code) inside the caller-owned tx, requiring CapTaxonomyManage.
+// It is the narrow reclassification write (the generic Update/UpdateTx path
+// never touches governance_class). Returns domain.ErrProfileNotFound if the
+// row does not exist. Any route-shape conflict is enforced by the deferred
+// reclassify-guard trigger and surfaces at Commit (mapped to
+// domain.ErrClassChangeRouteConflict by taxonomyTx.Commit).
+func (r *ProfileRepository) SetGovernanceClassTx(ctx context.Context, tx domain.FamilyTx, tenantID string, code domain.ProfileCode, class domain.GovernanceClass) error {
+	sqlTx, ok := tx.(taxonomyTx)
+	if !ok {
+		return fmt.Errorf("invalid taxonomy tx type %T", tx)
+	}
+	if err := setAuthzGUC(ctx, sqlTx.tx); err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, sqlTx.tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return fmt.Errorf("taxonomy: authz check set governance_class: %w", err)
+	}
+	const q = `
+UPDATE metaldocs.document_profiles
+SET governance_class = $1
+WHERE tenant_id = $2 AND code = $3`
+	result, err := sqlTx.tx.ExecContext(ctx, q, class, tenantID, code)
+	if err != nil {
+		return fmt.Errorf("set governance_class %q: %w", code, err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("set governance_class rows affected: %w", err)
 	}
 	if rowsAffected == 0 {
 		return domain.ErrProfileNotFound

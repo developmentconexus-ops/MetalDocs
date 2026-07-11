@@ -133,6 +133,64 @@ func TestProfileServiceArchiveFailsWhenAlreadyArchived(t *testing.T) {
 	}
 }
 
+func TestProfileServiceReclassify_ChangesClassAndLogsEvent(t *testing.T) {
+	repo := newFakeProfileRepository()
+	repo.put(&domain.DocumentProfile{Code: "po", TenantID: "tenant-a", GovernanceClass: domain.GovernanceControlado})
+	logger := &fakeGovernanceLogger{}
+	service := NewProfileService(repo, &fakeTemplateVersionChecker{}, logger)
+
+	if err := service.Reclassify(context.Background(), "tenant-a", "po", domain.GovernanceSimples, "user-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	updated := repo.get("tenant-a", "po")
+	if updated.GovernanceClass != domain.GovernanceSimples {
+		t.Fatalf("governance_class = %q, want %q", updated.GovernanceClass, domain.GovernanceSimples)
+	}
+	if len(logger.events) != 1 {
+		t.Fatalf("expected 1 governance event, got %d", len(logger.events))
+	}
+	if logger.events[0].EventType != domain.GovernanceEventTypeProfileGovernanceClassChange {
+		t.Fatalf("event type = %q, want %q", logger.events[0].EventType, domain.GovernanceEventTypeProfileGovernanceClassChange)
+	}
+}
+
+func TestProfileServiceReclassify_NoOpWhenUnchanged(t *testing.T) {
+	repo := newFakeProfileRepository()
+	repo.put(&domain.DocumentProfile{Code: "po", TenantID: "tenant-a", GovernanceClass: domain.GovernanceSimples})
+	logger := &fakeGovernanceLogger{}
+	service := NewProfileService(repo, &fakeTemplateVersionChecker{}, logger)
+
+	if err := service.Reclassify(context.Background(), "tenant-a", "po", domain.GovernanceSimples, "user-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(logger.events) != 0 {
+		t.Fatalf("expected no governance event on no-op, got %d", len(logger.events))
+	}
+}
+
+func TestProfileServiceReclassify_RejectsInvalidClass(t *testing.T) {
+	repo := newFakeProfileRepository()
+	repo.put(&domain.DocumentProfile{Code: "po", TenantID: "tenant-a", GovernanceClass: domain.GovernanceControlado})
+	service := NewProfileService(repo, &fakeTemplateVersionChecker{}, &fakeGovernanceLogger{})
+
+	err := service.Reclassify(context.Background(), "tenant-a", "po", domain.GovernanceClass("mystery"), "user-1")
+	if !errors.Is(err, domain.ErrInvalidGovernanceClass) {
+		t.Fatalf("expected ErrInvalidGovernanceClass, got %v", err)
+	}
+}
+
+func TestProfileServiceReclassify_RejectsArchived(t *testing.T) {
+	archivedAt := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	repo := newFakeProfileRepository()
+	repo.put(&domain.DocumentProfile{Code: "po", TenantID: "tenant-a", GovernanceClass: domain.GovernanceControlado, ArchivedAt: &archivedAt})
+	service := NewProfileService(repo, &fakeTemplateVersionChecker{}, &fakeGovernanceLogger{})
+
+	err := service.Reclassify(context.Background(), "tenant-a", "po", domain.GovernanceSimples, "user-1")
+	if !errors.Is(err, domain.ErrProfileArchived) {
+		t.Fatalf("expected ErrProfileArchived, got %v", err)
+	}
+}
+
 type fakeProfileRepository struct {
 	byKey map[string]*domain.DocumentProfile
 }
@@ -187,6 +245,15 @@ func (r *fakeProfileRepository) GetByCodeForUpdate(ctx context.Context, _ domain
 
 func (r *fakeProfileRepository) UpdateTx(_ context.Context, _ domain.FamilyTx, p *domain.DocumentProfile) error {
 	r.put(p)
+	return nil
+}
+
+func (r *fakeProfileRepository) SetGovernanceClassTx(_ context.Context, _ domain.FamilyTx, tenantID string, code domain.ProfileCode, class domain.GovernanceClass) error {
+	item, ok := r.byKey[tenantID+"|"+string(code)]
+	if !ok {
+		return domain.ErrProfileNotFound
+	}
+	item.GovernanceClass = class
 	return nil
 }
 

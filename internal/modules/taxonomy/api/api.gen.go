@@ -28,6 +28,48 @@ const (
 	SessionCookieScopes sessionCookieContextKey = "sessionCookie.Scopes"
 )
 
+// Defines values for DocumentProfileItemGovernanceClass.
+const (
+	DocumentProfileItemGovernanceClassControlado DocumentProfileItemGovernanceClass = "controlado"
+	DocumentProfileItemGovernanceClassLivre      DocumentProfileItemGovernanceClass = "livre"
+	DocumentProfileItemGovernanceClassSimples    DocumentProfileItemGovernanceClass = "simples"
+)
+
+// Valid indicates whether the value is a known member of the DocumentProfileItemGovernanceClass enum.
+func (e DocumentProfileItemGovernanceClass) Valid() bool {
+	switch e {
+	case DocumentProfileItemGovernanceClassControlado:
+		return true
+	case DocumentProfileItemGovernanceClassLivre:
+		return true
+	case DocumentProfileItemGovernanceClassSimples:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TaxonomyProfileUpsertRequestGovernanceClass.
+const (
+	TaxonomyProfileUpsertRequestGovernanceClassControlado TaxonomyProfileUpsertRequestGovernanceClass = "controlado"
+	TaxonomyProfileUpsertRequestGovernanceClassLivre      TaxonomyProfileUpsertRequestGovernanceClass = "livre"
+	TaxonomyProfileUpsertRequestGovernanceClassSimples    TaxonomyProfileUpsertRequestGovernanceClass = "simples"
+)
+
+// Valid indicates whether the value is a known member of the TaxonomyProfileUpsertRequestGovernanceClass enum.
+func (e TaxonomyProfileUpsertRequestGovernanceClass) Valid() bool {
+	switch e {
+	case TaxonomyProfileUpsertRequestGovernanceClassControlado:
+		return true
+	case TaxonomyProfileUpsertRequestGovernanceClassLivre:
+		return true
+	case TaxonomyProfileUpsertRequestGovernanceClassSimples:
+		return true
+	default:
+		return false
+	}
+}
+
 // DocumentFamilyItem defines model for DocumentFamilyItem.
 type DocumentFamilyItem struct {
 	Code        string    `json:"code"`
@@ -46,12 +88,18 @@ type DocumentProfileItem struct {
 	Code                string  `json:"code"`
 	Description         string  `json:"description"`
 	FamilyCode          string  `json:"family_code"`
-	Name                string  `json:"name"`
-	RetentionDays       int     `json:"retention_days"`
-	ReviewIntervalDays  int     `json:"review_interval_days"`
-	ValidityDays        int     `json:"validity_days"`
-	WorkflowProfile     string  `json:"workflow_profile"`
+
+	// GovernanceClass Per-profile governance classification driving the approval route-signature policy (G1). controlado ⇒ the approval route must contain a signature stage; simples ⇒ a review-only route is allowed; livre ⇒ no approval route is permitted.
+	GovernanceClass    DocumentProfileItemGovernanceClass `json:"governance_class"`
+	Name               string                             `json:"name"`
+	RetentionDays      int                                `json:"retention_days"`
+	ReviewIntervalDays int                                `json:"review_interval_days"`
+	ValidityDays       int                                `json:"validity_days"`
+	WorkflowProfile    string                             `json:"workflow_profile"`
 }
+
+// DocumentProfileItemGovernanceClass Per-profile governance classification driving the approval route-signature policy (G1). controlado ⇒ the approval route must contain a signature stage; simples ⇒ a review-only route is allowed; livre ⇒ no approval route is permitted.
+type DocumentProfileItemGovernanceClass string
 
 // FieldError defines model for FieldError.
 type FieldError struct {
@@ -132,10 +180,16 @@ type TaxonomyProfileUpsertRequest struct {
 	Description              string  `json:"description"`
 	EditableByRole           string  `json:"editable_by_role"`
 	FamilyCode               string  `json:"family_code"`
-	Name                     string  `json:"name"`
-	OwnerUserId              *string `json:"owner_user_id,omitempty"`
-	ReviewIntervalDays       int     `json:"review_interval_days"`
+
+	// GovernanceClass Per-profile governance classification (G1). Optional on create; the server defaults to controlado. On update, changing this value routes through the reclassification use-case and may 409 if an active approval route would conflict with the new class.
+	GovernanceClass    *TaxonomyProfileUpsertRequestGovernanceClass `json:"governance_class,omitempty"`
+	Name               string                                       `json:"name"`
+	OwnerUserId        *string                                      `json:"owner_user_id,omitempty"`
+	ReviewIntervalDays int                                          `json:"review_interval_days"`
 }
+
+// TaxonomyProfileUpsertRequestGovernanceClass Per-profile governance classification (G1). Optional on create; the server defaults to controlado. On update, changing this value routes through the reclassification use-case and may 409 if an active approval route would conflict with the new class.
+type TaxonomyProfileUpsertRequestGovernanceClass string
 
 // BadRequest defines model for BadRequest.
 type BadRequest = Problem
@@ -3167,62 +3221,66 @@ func (sh *strictHandler) SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"//8=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

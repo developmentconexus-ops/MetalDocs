@@ -23,6 +23,12 @@ type ProfileRepository interface {
 	CreateTx(ctx context.Context, tx FamilyTx, p *DocumentProfile) error
 	Update(ctx context.Context, p *DocumentProfile) error
 	UpdateTx(ctx context.Context, tx FamilyTx, p *DocumentProfile) error
+	// SetGovernanceClassTx writes ONLY the governance_class column for
+	// (tenantID, code) inside the caller-owned tx (CapTaxonomyManage). It is
+	// the narrow reclassification write; the generic Update/UpdateTx path
+	// deliberately never touches governance_class so ordinary profile edits
+	// cannot silently reclassify.
+	SetGovernanceClassTx(ctx context.Context, tx FamilyTx, tenantID string, code ProfileCode, class GovernanceClass) error
 	BeginTx(ctx context.Context) (FamilyTx, error)
 }
 
@@ -67,6 +73,7 @@ const (
 	GovernanceEventTypeProfileUpdated               GovernanceEventType = "profile.updated"
 	GovernanceEventTypeProfileDefaultTemplateChange GovernanceEventType = "profile.default_template_change"
 	GovernanceEventTypeProfileArchived              GovernanceEventType = "profile.archived"
+	GovernanceEventTypeProfileGovernanceClassChange GovernanceEventType = "profile.governance_class_change"
 	GovernanceEventTypeAreaCreated                  GovernanceEventType = "area.created"
 	GovernanceEventTypeAreaUpdated                  GovernanceEventType = "area.updated"
 	GovernanceEventTypeAreaParentChanged            GovernanceEventType = "area.parent_changed"

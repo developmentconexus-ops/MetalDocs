@@ -3,6 +3,8 @@ package domain
 import (
 	"errors"
 	"fmt"
+
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
 // QuorumPolicy defines how many signoffs satisfy a stage.
@@ -72,8 +74,27 @@ type Route struct {
 	Stages      []Stage
 }
 
-// Validate enforces route structural invariants.
-func (r Route) Validate() error {
+// hasApprovalStage reports whether the route contains at least one approval-kind
+// (binding signature) stage. An empty Kind counts as approval: the DB column
+// defaults to 'approval' (migration 0286) and every pre-G1 route/instance is an
+// approval route, so an unset in-memory Kind must not be read as "review-only" —
+// that keeps the controlado requirement fail-closed (never wrongly blocks a
+// legitimate approval route whose Kind is defaulted at insert time).
+func hasApprovalStage(stages []Stage) bool {
+	for _, s := range stages {
+		if s.Kind == StageKindApproval || s.Kind == "" {
+			return true
+		}
+	}
+	return false
+}
+
+// Validate enforces route structural invariants and the per-profile governance
+// route-signature policy (G1). policy is the published-language consequence of
+// the owning profile's governance class, resolved off-tx and passed in by the
+// caller (Validate stays pure — it never reads taxonomy). An empty policy (unset,
+// e.g. in structural-only unit tests) imposes no signature constraint.
+func (r Route) Validate(policy taxonomydomain.RoutePolicy) error {
 	if len(r.Stages) == 0 {
 		return errors.New("route must have at least one stage")
 	}
@@ -104,6 +125,23 @@ func (r Route) Validate() error {
 			return fmt.Errorf("duplicate stage name %q in route", s.Name)
 		}
 		names[s.Name] = true
+	}
+
+	// Per-profile governance route-signature policy (G1). Belt-and-suspenders to
+	// the DB deferrable trigger; the switch is total over the published policy
+	// values, with unknown/empty fail-closing to "no extra constraint" (the DB
+	// trigger remains authoritative, so nothing weakens the signature guarantee).
+	switch policy {
+	case taxonomydomain.RoutePolicyNoRoutePermitted:
+		// livre: no approval route may exist for the profile.
+		return ErrRouteNotPermittedForProfile
+	case taxonomydomain.RoutePolicyRequireApprovalStage:
+		// controlado: the route must bind at least one signature stage.
+		if !hasApprovalStage(r.Stages) {
+			return ErrApprovalStageRequired
+		}
+	case taxonomydomain.RoutePolicyApprovalOptional, "":
+		// simples (and unset in structural-only tests): review-only route allowed.
 	}
 	return nil
 }

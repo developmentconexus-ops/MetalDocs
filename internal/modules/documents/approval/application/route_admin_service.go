@@ -15,6 +15,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -27,10 +28,23 @@ const routeProfileFKConstraint = "approval_routes_document_profile_fk"
 
 // RouteAdminService manages approval route configuration changes.
 type RouteAdminService struct {
-	repo       infrastructure.ApprovalRepository
-	emitter    EventEmitter
-	clock      Clock
-	idempStore RouteAdminIdempStore
+	repo         infrastructure.ApprovalRepository
+	emitter      EventEmitter
+	clock        Clock
+	idempStore   RouteAdminIdempStore
+	policyReader ProfilePolicyReader // G1: resolves the profile route-signature policy off-tx; nil ⇒ friendly check skipped (DB trigger is the last line)
+}
+
+// WithPolicyReader returns a copy of the service wired with the G1
+// profile-policy reader. Passing nil leaves the friendly route-shape check
+// disabled (the DB deferrable trigger remains the authoritative last line).
+func (s *RouteAdminService) WithPolicyReader(reader ProfilePolicyReader) *RouteAdminService {
+	if s == nil {
+		return nil
+	}
+	cp := *s
+	cp.policyReader = reader
+	return &cp
 }
 
 // WithIdempStore returns a copy of the service wired with an idempotency store.
@@ -154,9 +168,28 @@ func (s *RouteAdminService) Create(ctx context.Context, runner db.TxRunner, in C
 	return result, nil
 }
 
+// resolvePolicy returns the profile's route-signature policy via the G1 reader,
+// resolved OFF any write tx (H-PRE-1: the reader records CapTaxonomyView in
+// taxonomy's own short tx, so it must never run inside a lock-holding approval
+// tx). A nil reader yields "" (friendly check skipped; the DB deferrable trigger
+// stays authoritative). A read error propagates so a genuine lookup failure
+// surfaces rather than being silently downgraded (no-fallback principle).
+func (s *RouteAdminService) resolvePolicy(ctx context.Context, tenantID, profileCode string) (taxonomydomain.RoutePolicy, error) {
+	if s.policyReader == nil {
+		return "", nil
+	}
+	return s.policyReader.RoutePolicy(ctx, tenantID, profileCode)
+}
+
 func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in CreateRouteInput) (CreateRouteResult, error) {
 	var result CreateRouteResult
-	err := runner.Do(ctx, func(tx *sql.Tx) error {
+	// G1: resolve the per-profile route-signature policy OFF-TX (H-PRE-1) so the
+	// friendly route-shape check runs before the write tx opens.
+	policy, err := s.resolvePolicy(ctx, in.TenantID, in.ProfileCode)
+	if err != nil {
+		return result, err
+	}
+	err = runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
 		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
@@ -169,7 +202,7 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			Version:     1,
 			Stages:      in.Stages,
 		}
-		if err := route.Validate(); err != nil {
+		if err := route.Validate(policy); err != nil {
 			return err
 		}
 
@@ -276,9 +309,45 @@ func (s *RouteAdminService) Update(ctx context.Context, runner db.TxRunner, in U
 	return result, nil
 }
 
+// resolveUpdatePolicy resolves the route's profile route-signature policy OFF-TX
+// for an update (H-PRE-1). UpdateRouteInput carries no profile_code, so it first
+// reads the route's (immutable) profile_code in a short non-recording tx, then
+// resolves the policy via the G1 reader. The profile_code read is scoped to
+// ACTIVE routes to mirror the DB direction-A trigger, which only enforces on
+// active routes: an inactive/absent route yields "" (friendly check skipped),
+// keeping the friendly and authoritative layers identical in scope while the
+// write tx below surfaces any real not-found/stale error. Reading profile_code
+// off-tx is TOCTOU-safe because a route's profile_code is immutable across its
+// life (supersede preserves it).
+func (s *RouteAdminService) resolveUpdatePolicy(ctx context.Context, runner db.TxRunner, tenantID, routeID string) (taxonomydomain.RoutePolicy, error) {
+	if s.policyReader == nil {
+		return "", nil
+	}
+	var (
+		profileCode string
+		found       bool
+	)
+	if err := runner.Do(ctx, func(tx *sql.Tx) error {
+		code, ok, err := loadActiveRouteProfileCode(ctx, tx, tenantID, routeID)
+		profileCode, found = code, ok
+		return err
+	}); err != nil {
+		return "", err
+	}
+	if !found {
+		return "", nil
+	}
+	return s.policyReader.RoutePolicy(ctx, tenantID, profileCode)
+}
+
 func (s *RouteAdminService) updateTx(ctx context.Context, runner db.TxRunner, in UpdateRouteInput) (UpdateRouteResult, error) {
 	var result UpdateRouteResult
-	err := runner.Do(ctx, func(tx *sql.Tx) error {
+	// G1: resolve the route's profile policy OFF-TX (H-PRE-1) before the write tx.
+	policy, err := s.resolveUpdatePolicy(ctx, runner, in.TenantID, in.RouteID)
+	if err != nil {
+		return result, err
+	}
+	err = runner.Do(ctx, func(tx *sql.Tx) error {
 		ctx := authz.WithCapCache(ctx)
 
 		if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
@@ -301,7 +370,7 @@ func (s *RouteAdminService) updateTx(ctx context.Context, runner db.TxRunner, in
 			TenantID: in.TenantID,
 			Stages:   in.Stages,
 		}
-		if err := route.Validate(); err != nil {
+		if err := route.Validate(policy); err != nil {
 			return err
 		}
 
@@ -632,6 +701,30 @@ type lockedRouteState struct {
 	ID      string
 	Version int
 	Active  bool
+}
+
+// loadActiveRouteProfileCode reads the immutable profile_code of an ACTIVE route
+// with a plain non-recording SELECT (safe in any tx; no authz recording, so it
+// never trips H-PRE-1). Returns found=false when the route is inactive or absent
+// so the G1 friendly check can be skipped in lockstep with the DB trigger's
+// active-only scope.
+func loadActiveRouteProfileCode(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (string, bool, error) {
+	var code string
+	err := tx.QueryRowContext(ctx, `
+		SELECT profile_code
+		  FROM approval_routes
+		 WHERE id = $1
+		   AND tenant_id = $2
+		   AND active = TRUE`,
+		routeID, tenantID,
+	).Scan(&code)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("route_admin: load route profile_code: %w", err)
+	}
+	return code, true, nil
 }
 
 func lockRouteForUpdate(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (lockedRouteState, error) {

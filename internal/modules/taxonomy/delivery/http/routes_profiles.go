@@ -22,13 +22,14 @@ var (
 )
 
 const (
-	codeTaxProfileNotFound         problem.Code = "PROFILE_NOT_FOUND"
-	codeTaxProfileArchived         problem.Code = "PROFILE_ARCHIVED"
-	codeTaxTemplateNotPublished    problem.Code = "TEMPLATE_NOT_PUBLISHED"
-	codeTaxTemplateProfileMismatch problem.Code = "TEMPLATE_PROFILE_MISMATCH"
-	codeTaxProfileCodeImmutable    problem.Code = "PROFILE_CODE_IMMUTABLE"
-	codeTaxProfileAlreadyExists    problem.Code = "PROFILE_ALREADY_EXISTS"
-	codeTaxFamilyNotFound          problem.Code = "FAMILY_NOT_FOUND"
+	codeTaxProfileNotFound           problem.Code = "PROFILE_NOT_FOUND"
+	codeTaxProfileArchived           problem.Code = "PROFILE_ARCHIVED"
+	codeTaxTemplateNotPublished      problem.Code = "TEMPLATE_NOT_PUBLISHED"
+	codeTaxTemplateProfileMismatch   problem.Code = "TEMPLATE_PROFILE_MISMATCH"
+	codeTaxProfileCodeImmutable      problem.Code = "PROFILE_CODE_IMMUTABLE"
+	codeTaxProfileAlreadyExists      problem.Code = "PROFILE_ALREADY_EXISTS"
+	codeTaxFamilyNotFound            problem.Code = "FAMILY_NOT_FOUND"
+	codeTaxProfileClassRouteConflict problem.Code = "PROFILE_CLASS_ROUTE_CONFLICT"
 )
 
 type profileUpsertRequest struct {
@@ -41,6 +42,7 @@ type profileUpsertRequest struct {
 	DefaultTemplateVersionID *string `json:"default_template_version_id"`
 	OwnerUserID              *string `json:"owner_user_id"`
 	EditableByRole           string  `json:"editable_by_role"`
+	GovernanceClass          string  `json:"governance_class"`
 }
 
 type setDefaultTemplateRequest struct {
@@ -103,6 +105,7 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 		DefaultTemplateVersionID: req.DefaultTemplateVersionID,
 		OwnerUserID:              req.OwnerUserID,
 		EditableByRole:           strings.TrimSpace(req.EditableByRole),
+		GovernanceClass:          governanceClassOrDefault(req.GovernanceClass),
 	}
 	if profile.Code == "" {
 		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "code is required")
@@ -142,7 +145,8 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
-	if _, err := h.profiles.Get(r.Context(), tenantID, domain.ProfileCode(r.PathValue("code"))); err != nil {
+	current, err := h.profiles.Get(r.Context(), tenantID, domain.ProfileCode(r.PathValue("code")))
+	if err != nil {
 		h.writeProfileError(w, err)
 		return
 	}
@@ -171,7 +175,42 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		h.writeProfileError(w, err)
 		return
 	}
+
+	// Governance class changes NEVER travel through the generic Update path
+	// (the repository deliberately leaves governance_class untouched there, so
+	// an ordinary edit cannot silently reclassify). When the client supplies a
+	// governance_class that differs from the current one, route it through the
+	// dedicated reclassification use-case, which the DB reclassify-guard trigger
+	// can reject with a 409 if an active approval route would then conflict.
+	newClass := governanceClassOrDefault(req.GovernanceClass)
+	if req.GovernanceClass != "" && newClass != current.GovernanceClass {
+		actorUserID, ok := authn.UserIDFromContext(r.Context())
+		if !ok {
+			httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
+			return
+		}
+		if err := h.profiles.Reclassify(r.Context(), tenantID, domain.ProfileCode(updateCode), newClass, actorUserID); err != nil {
+			h.writeProfileError(w, err)
+			return
+		}
+		profile.GovernanceClass = newClass
+	} else {
+		// Unchanged (or omitted): echo the persisted class in the response.
+		profile.GovernanceClass = current.GovernanceClass
+	}
 	httpresponse.WriteJSON(w, http.StatusOK, toDocumentProfileItem(profile))
+}
+
+// governanceClassOrDefault trims the request value and defaults an empty class
+// to controlado (the server-side default declared in the OpenAPI contract and
+// the DB column default). Validation of a non-empty, non-enum value is left to
+// the domain (ErrInvalidGovernanceClass) so the mapping stays single-sourced.
+func governanceClassOrDefault(raw string) domain.GovernanceClass {
+	c := domain.GovernanceClass(strings.TrimSpace(raw))
+	if c == "" {
+		return domain.GovernanceControlado
+	}
+	return c
 }
 
 func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
@@ -245,6 +284,10 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 		httpresponse.WriteError(w, http.StatusConflict, codeTaxTemplateProfileMismatch, "template version belongs to different profile")
 	case errors.Is(err, domain.ErrProfileCodeImmutable):
 		httpresponse.WriteError(w, http.StatusBadRequest, codeTaxProfileCodeImmutable, "profile code is immutable")
+	case errors.Is(err, domain.ErrInvalidGovernanceClass):
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "governance_class must be one of: controlado, simples, livre")
+	case errors.Is(err, domain.ErrClassChangeRouteConflict):
+		httpresponse.WriteError(w, http.StatusConflict, codeTaxProfileClassRouteConflict, "reclassification conflicts with an active approval route")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
 		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "request violates data constraints")
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":

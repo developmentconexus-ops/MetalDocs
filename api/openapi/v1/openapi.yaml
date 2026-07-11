@@ -5599,7 +5599,7 @@ components:
             $ref: '#/components/schemas/DocumentFamilyItem'
     DocumentProfileItem:
       type: object
-      required: [code, family_code, name, description, review_interval_days, active_schema_version, workflow_profile, approval_required, retention_days, validity_days]
+      required: [code, family_code, name, description, review_interval_days, active_schema_version, workflow_profile, approval_required, retention_days, validity_days, governance_class]
       properties:
         code:
           type: string
@@ -5616,6 +5616,14 @@ components:
         review_interval_days:
           type: integer
           minimum: 1
+        governance_class:
+          type: string
+          description: >-
+            Per-profile governance classification driving the approval
+            route-signature policy (G1). controlado ⇒ the approval route must
+            contain a signature stage; simples ⇒ a review-only route is allowed;
+            livre ⇒ no approval route is permitted.
+          enum: [controlado, simples, livre]
         active_schema_version:
           type: integer
           minimum: 1
@@ -5700,6 +5708,14 @@ components:
           nullable: true
         editable_by_role:
           type: string
+        governance_class:
+          type: string
+          description: >-
+            Per-profile governance classification (G1). Optional on create; the
+            server defaults to controlado. On update, changing this value routes
+            through the reclassification use-case and may 409 if an active
+            approval route would conflict with the new class.
+          enum: [controlado, simples, livre]
     SetTaxonomyProfileDefaultTemplateRequest:
       type: object
       required: [template_version_id]

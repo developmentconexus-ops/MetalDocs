@@ -23,11 +23,24 @@ import (
 
 // SubmitService handles document submission for approval.
 type SubmitService struct {
-	repo     infrastructure.ApprovalRepository
-	emitter  EventEmitter
-	clock    Clock
-	cdRead   controlleddocumentsdomain.CDFieldReader
-	resolver SubmitDefaultsResolver // in-tx route/hash resolution when the client omits them (ADR 0073); nil in unit tests that always supply route_id
+	repo         infrastructure.ApprovalRepository
+	emitter      EventEmitter
+	clock        Clock
+	cdRead       controlleddocumentsdomain.CDFieldReader
+	resolver     SubmitDefaultsResolver // in-tx route/hash resolution when the client omits them (ADR 0073); nil in unit tests that always supply route_id
+	policyReader ProfilePolicyReader    // G1: resolves the profile route-signature policy off-tx; nil ⇒ friendly check skipped (DB trigger is the last line)
+}
+
+// WithPolicyReader returns a copy of the service wired with the G1
+// profile-policy reader. Passing nil leaves the friendly route-shape check
+// disabled (the DB deferrable trigger remains the authoritative last line).
+func (s *SubmitService) WithPolicyReader(reader ProfilePolicyReader) *SubmitService {
+	if s == nil {
+		return nil
+	}
+	cp := *s
+	cp.policyReader = reader
+	return &cp
 }
 
 // SubmitRequest carries all inputs for SubmitRevisionForReview.
@@ -124,8 +137,21 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			return fmt.Errorf("submit: load route: %w", err)
 		}
 
-		// Step 6: validate route structural invariants.
-		if err := route.Validate(); err != nil {
+		// Step 6: validate route structural invariants. The G1 per-profile
+		// route-signature policy is intentionally NOT re-read here (operator-
+		// ratified 2026-07-10, ADR 0073-era constraints; see ADR on per-profile
+		// signature policy). The invariant "every ACTIVE route conforms to its
+		// profile's current governance class" is held by construction at the
+		// write boundaries: route-admin Validate(policy) off-tx + the DEFERRABLE
+		// both-directions DB trigger (route writes AND reclassification). Submit
+		// binds only active routes, so the bound route already conforms; livre
+		// profiles have no active route and fail at resolution. Re-reading the
+		// policy here cannot satisfy ADR 0073 (route/profile resolved in-tx) and
+		// H-PRE-1 (no recording CapTaxonomyView read inside this lock-holding tx)
+		// simultaneously — in-tx enforcement is structurally wrong, not merely
+		// harder. So Validate runs structural-only (empty Kind fail-closes to
+		// approval).
+		if err := route.Validate(""); err != nil {
 			return fmt.Errorf("submit: invalid route: %w", err)
 		}
 
