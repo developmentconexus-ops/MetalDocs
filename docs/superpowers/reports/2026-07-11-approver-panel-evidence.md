@@ -73,7 +73,7 @@ honoured as a hint (never gates correctness — replay returns false). Backend i
 
 - L0 tsc (`tsconfig.build.json`): **CLEAN** on the integrated A–D tree (post-Slice-D, HEAD `6e71e127`).
 - L1 vitest: **643/643 passed (96 files)** across `approval` + `documents` + `shared/controlled-artifact` + `templates` — templates untouched and green (no regression from the two-action / fast-forward changes).
-- L2/L3 UI QA on :80: **BLOCKED — operator/hub dependency.** The chip's `HUB_SESSION_ID` (`local_39f1f842-1a02-4275-a6c9-2023312cd979`) no longer exists (not in `list_sessions`; session ended before this resumed run), so the REQUEST for a web-container rebuild could not be delivered. The mandatory :80 QA also requires the operator to perform login (QA personas are forbidden from typing passwords). Both dependencies are the operator's to resolve. Code is complete + L0/L1 green; only the browser-evidenced :80 QA remains. See §8 HS-1 (c).
+- L2/L3 UI QA on :80: **BLOCKED — operator/hub dependency.** The chip's `HUB_SESSION_ID` (`local_39f1f842-1a02-4275-a6c9-2023312cd979`) no longer exists (not in `list_sessions`; session ended before this resumed run), so the REQUEST for a web-container rebuild was re-routed to the coordinator session `local_e4038af3` ("Implement ratified review/approval workflow model") — ACK pending. The mandatory :80 QA also requires the operator to perform login (QA personas are forbidden from typing passwords). Both dependencies are the operator's to resolve. Code is complete + L0/L1 green; only the browser-evidenced :80 QA remains. See §8 HS-1 (c).
 
 ## 8. Defers / HS-1 items
 
