@@ -6,12 +6,14 @@ package application_test
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/modules/documents/application"
 	docrepo "metaldocs/internal/modules/documents/infrastructure"
+	"metaldocs/internal/modules/iam/authz"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/docgenv2"
 	"metaldocs/tests/integration/testdb"
@@ -50,6 +52,12 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 	// proof). iam_users is not tripwire-governed; the role write is user.manage tx-local.
 	testdb.SeedSystemAdmin(t, db, tenantID, actorID, wantDisplayName)
 
+	// SUT ctx must carry the seeded tenant + actor: CreateDocumentTx's tier-2
+	// authz.Require(document.create) reads identity off the tx-local GUCs, and
+	// downstream off-tx reads (UserDisplayNameReader, templates readers) seed
+	// their own GUCs from this ctx via TxRunner.
+	ctx = testdb.AuthzCtx(tenantID, actorID)
+
 	// Seed taxonomy parents required by the controlled_documents FK chain.
 	testdb.SeedGovernedTaxonomy(t, db, tenantID, "po", "quality")
 
@@ -62,10 +70,24 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 		testdb.WithOwner(actorID),
 	)
 
-	// Seed templates via SeedWithCaps (no factory builder exists for templates_template).
-	// templates_template carries template.create; templates_template_version shares the same
-	// tripwire. Both writes run in one transaction with caps asserted tx-locally (pool-safe).
-	testdb.SeedWithCaps(t, db, `[{"cap":"template.create"}]`, func(tx *sql.Tx) error {
+	// Seed templates via a tenant+caps-seeded tx (no factory builder exists for
+	// templates_template). templates_template carries template.create;
+	// templates_template_version shares the same tripwire AND
+	// trg_template_version_tenant_consistent, which additionally requires
+	// metaldocs.tenant_id to be set tx-locally — so this seeds tenant identity
+	// (authz.SeedTxTenant, the production chokepoint) alongside caps
+	// (testdb.SetCapsOnTx), matching the sanctioned direct-tx pattern used
+	// throughout tests/integration for tenant-consistency-guarded writes.
+	func() {
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatalf("begin template seed tx: %v", err)
+		}
+		defer tx.Rollback()
+		if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+			t.Fatalf("seed template tx tenant: %v", err)
+		}
+		testdb.SetCapsOnTx(t, tx, `[{"cap":"template.create"}]`)
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO templates_template (
 				id, tenant_id, doc_type_code, key, name, latest_version, published_version_id, created_by
@@ -75,19 +97,19 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 			)`,
 			templateID, tenantID, actorID,
 		); err != nil {
-			return err
+			t.Fatalf("seed templates_template: %v", err)
 		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO templates_template_version (
 				id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash,
 				metadata_schema, placeholder_schema, author_id, published_at
 			) VALUES (
-				$1::uuid, $4::uuid, $2::uuid, 1, 'published', 'templates/snapshot/body.docx', 'body-hash',
+				$1::uuid, $4::uuid, $2::uuid, 1, 'published', 'templates/snapshot/body.docx', $5,
 				'{}'::jsonb, '{"placeholders":[]}'::jsonb, $3, now()
 			)`,
-			templateVersionID, templateID, actorID, tenantID,
+			templateVersionID, templateID, actorID, tenantID, strings.Repeat("a", 64),
 		); err != nil {
-			return err
+			t.Fatalf("seed templates_template_version: %v", err)
 		}
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE templates_template
@@ -95,10 +117,12 @@ func TestCreateDocumentTx_PopulatesAllSnapshotColumns(t *testing.T) {
 			 WHERE id = $2::uuid`,
 			templateVersionID, templateID,
 		); err != nil {
-			return err
+			t.Fatalf("update templates_template published_version_id: %v", err)
 		}
-		return nil
-	})
+		if err := tx.Commit(); err != nil {
+			t.Fatalf("commit template seed tx: %v", err)
+		}
+	}()
 
 	cd := &controlleddocumentsdomain.ControlledDocument{
 		ID:              cdFixture.ID,

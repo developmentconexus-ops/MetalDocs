@@ -60,9 +60,9 @@ func seedOverdueStageFixture(t *testing.T, db *sql.DB, tenantID string, dueAt *t
 		INSERT INTO public.approval_stage_instances
 		  (approval_instance_id, stage_order, name_snapshot, required_role_snapshot,
 		   area_code_snapshot, quorum_snapshot, on_eligibility_drift_snapshot,
-		   eligible_actor_ids, status, stage_kind, due_at)
+		   eligible_actor_ids, status, stage_kind, due_at, required_capability_snapshot)
 		VALUES ($1::uuid, 1, 'Stage 1', 'reviewer', 'QA', 'any_1_of', 'keep_snapshot',
-		        $2::jsonb, 'active', 'review', $3)
+		        $2::jsonb, 'active', 'review', $3, 'document.review')
 		RETURNING id::text`,
 		instance.ID, eligible, nullableTime(dueAt),
 	).Scan(&id); err != nil {

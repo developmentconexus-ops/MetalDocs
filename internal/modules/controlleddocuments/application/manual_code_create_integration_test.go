@@ -82,7 +82,7 @@ func TestCreate_ManualCode_NonAdminWithCap_Succeeds(t *testing.T) {
 	tenantID, actorID, profile, area := seedActorWithGrant(t, db, "author")
 
 	svc := newManualCodeServiceForIntegration(t, db)
-	res, err := svc.Create(context.Background(), manualCmd(tenantID, actorID, profile, area))
+	res, err := svc.Create(authzCtx(tenantID, actorID), manualCmd(tenantID, actorID, profile, area))
 	if err != nil {
 		t.Fatalf("non-admin author with controlled_documents.create in area: Create = %v, want nil", err)
 	}
@@ -99,7 +99,7 @@ func TestCreate_ManualCode_NonAdminWithoutCap_Denied(t *testing.T) {
 	tenantID, actorID, profile, area := seedActorWithGrant(t, db, "")
 
 	svc := newManualCodeServiceForIntegration(t, db)
-	_, err := svc.Create(context.Background(), manualCmd(tenantID, actorID, profile, area))
+	_, err := svc.Create(authzCtx(tenantID, actorID), manualCmd(tenantID, actorID, profile, area))
 	var denied authz.ErrCapDenied
 	if !errors.As(err, &denied) {
 		t.Fatalf("non-admin without cap: Create = %v, want authz.ErrCapDenied", err)
@@ -112,7 +112,7 @@ func TestCreate_ManualCode_SystemAdmin_Succeeds(t *testing.T) {
 	testdb.SeedSystemAdmin(t, db, tenantID, actorID, "F0.2 System Admin")
 
 	svc := newManualCodeServiceForIntegration(t, db)
-	res, err := svc.Create(context.Background(), manualCmd(tenantID, actorID, profile, area))
+	res, err := svc.Create(authzCtx(tenantID, actorID), manualCmd(tenantID, actorID, profile, area))
 	if err != nil {
 		t.Fatalf("system_admin manual-code Create = %v, want nil", err)
 	}

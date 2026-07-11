@@ -8,11 +8,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	docrepo "metaldocs/internal/modules/documents/infrastructure"
+	"metaldocs/internal/modules/iam/authz"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/docgenv2"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
@@ -67,33 +69,47 @@ func seedDictTemplate(t *testing.T, db *sql.DB, tenantID, actorID, templateKey, 
 		t.Fatalf("marshal placeholder schema: %v", err)
 	}
 
-	testdb.SeedWithCaps(t, db, `[{"cap":"template.create"}]`, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO templates_template (
-				id, tenant_id, doc_type_code, key, name, latest_version, published_version_id, created_by
-			) VALUES ($1::uuid, $2, 'po', $3, $3, 1, NULL, $4)`,
-			templateID, tenantID, templateKey, actorID,
-		); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO templates_template_version (
-				id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash,
-				metadata_schema, placeholder_schema, author_id, published_at
-			) VALUES ($1::uuid, $5::uuid, $2::uuid, 1, 'published', 'templates/dict-test/body.docx', 'dict-body-hash',
-				'{}'::jsonb, $3::jsonb, $4, now())`,
-			templateVersionID, templateID, string(schema), actorID, tenantID,
-		); err != nil {
-			return err
-		}
-		if _, err := tx.ExecContext(ctx, `
-			UPDATE templates_template SET published_version_id = $1::uuid WHERE id = $2::uuid`,
-			templateVersionID, templateID,
-		); err != nil {
-			return err
-		}
-		return nil
-	})
+	// templates_template_version carries trg_template_version_tenant_consistent,
+	// which requires metaldocs.tenant_id set tx-locally in addition to the
+	// template.create tripwire cap — so this seeds tenant identity
+	// (authz.SeedTxTenant) alongside caps (testdb.SetCapsOnTx) on a
+	// self-managed tx, per the sanctioned direct-tx pattern.
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin template seed tx: %v", err)
+	}
+	defer tx.Rollback()
+	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+		t.Fatalf("seed template tx tenant: %v", err)
+	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"template.create"}]`)
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO templates_template (
+			id, tenant_id, doc_type_code, key, name, latest_version, published_version_id, created_by
+		) VALUES ($1::uuid, $2, 'po', $3, $3, 1, NULL, $4)`,
+		templateID, tenantID, templateKey, actorID,
+	); err != nil {
+		t.Fatalf("seed templates_template: %v", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO templates_template_version (
+			id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash,
+			metadata_schema, placeholder_schema, author_id, published_at
+		) VALUES ($1::uuid, $5::uuid, $2::uuid, 1, 'published', $7, $6,
+			'{}'::jsonb, $3::jsonb, $4, now())`,
+		templateVersionID, templateID, string(schema), actorID, tenantID, strings.Repeat("a", 64), "templates/dict-test/"+templateKey+"/body.docx",
+	); err != nil {
+		t.Fatalf("seed templates_template_version: %v", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE templates_template SET published_version_id = $1::uuid WHERE id = $2::uuid`,
+		templateVersionID, templateID,
+	); err != nil {
+		t.Fatalf("update templates_template published_version_id: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit template seed tx: %v", err)
+	}
 	return templateVersionID
 }
 
@@ -274,6 +290,11 @@ func TestSP2_DictionaryPin_RevisionReResolves(t *testing.T) {
 	// Update dictionary to V2.
 	dictReader.set(tenantID, phName, "V2_Corp")
 
+	// ux_documents_cd_active allows only one active document per controlled
+	// document; V1's clone left an active document under cd, so it must be
+	// superseded before V2's clone creates the next active document.
+	testdb.SupersedeActiveDocumentForCD(t, db, cdFixture.ID)
+
 	// V2 revision: re-resolve then clone.
 	dv2, err := initializer.ResolveDictionaryValues(ctx, tenantID, tplVersionID)
 	if err != nil {
@@ -343,8 +364,13 @@ func TestSP2_DictionaryPin_TwoTenantIsolation(t *testing.T) {
 	actorB := testdb.DeterministicID(t, "actor-iso-b")
 	testdb.SeedSystemAdmin(t, db, tenantA.ID, actorA, "Iso Author A")
 	testdb.SeedSystemAdmin(t, db, tenantB.ID, actorB, "Iso Author B")
-	testdb.SeedGovernedTaxonomy(t, db, tenantA.ID, "po", "quality")
-	testdb.SeedGovernedTaxonomy(t, db, tenantB.ID, "po", "quality")
+	// document_profiles.code is the table's sole PRIMARY KEY (globally unique
+	// across tenants, not (tenant_id, code) as SeedGovernedTaxonomy's ON
+	// CONFLICT target assumes) — reusing the same profile code "po" for both
+	// tenants collides on document_profiles_pkey, so each tenant gets its own
+	// code here.
+	testdb.SeedGovernedTaxonomy(t, db, tenantA.ID, "po-iso-a", "quality")
+	testdb.SeedGovernedTaxonomy(t, db, tenantB.ID, "po-iso-b", "quality")
 
 	const phID = "ph-iso"
 	const phName = "company_name"

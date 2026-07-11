@@ -120,8 +120,8 @@ VALUES
 	if err == nil {
 		t.Fatal("expected direct INSERT into user_process_areas to be blocked")
 	}
-	if got := pqCode(err); got != "42501" {
-		t.Fatalf("expected SQLSTATE 42501, got %q (err=%v)", got, err)
+	if got := pqCode(err); got != "P0001" {
+		t.Fatalf("expected SQLSTATE P0001 (ErrCapabilityNotAsserted: one of {membership.manage}), got %q (err=%v)", got, err)
 	}
 }
 
@@ -298,6 +298,11 @@ RETURNING id::text`,
 	if err != nil {
 		t.Fatalf("insert route fixture: %v", err)
 	}
+
+	// approval_instances insert asserts document.submit via the tripwire; seed
+	// the tx-local capability assertion (mirrors the setConfig usage above at
+	// line ~386 for the same table/capability).
+	setConfig(t, ctx, tx, "metaldocs.asserted_caps", `[{"cap":"document.submit"}]`)
 
 	_, err = tx.ExecContext(ctx, `
 INSERT INTO approval_instances

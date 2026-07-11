@@ -16,6 +16,18 @@ import (
 	"metaldocs/tests/integration/testdb"
 )
 
+// ctxForActor builds a context carrying BOTH identities GetActiveInstance
+// needs: the iamdomain auth-context key that authn.UserIDFromContext reads
+// (service.go:677), and the platform/tenant tenant+actor keys the TxRunner
+// chokepoint auto-seeds into the metaldocs.tenant_id/actor_id GUCs for the
+// in-tx authz.Require(document.view) call (service.go:690-701). Neither key
+// pair alone is sufficient — iamdomain.WithAuthContext alone leaves the GUCs
+// unset (authz.Require fails closed); authzCtx alone leaves UserIDFromContext
+// unsatisfied (ErrActorMissing before authz.Require is ever reached).
+func ctxForActor(tenantID, actorID string) context.Context {
+	return iamdomain.WithAuthContext(authzCtx(tenantID, actorID), actorID, nil)
+}
+
 // SEC-03 (T-006) — GetActiveDocument had no tier-2 authz.Require/capability
 // check: only the visibility_scope EXISTS check (CanRead) ran, so any
 // authenticated tenant member (default visibility_scope='company') could read
@@ -54,7 +66,7 @@ func TestGetActiveInstance_NoViewGrant_Denied(t *testing.T) {
 	cd := testdb.NewControlledDoc(t, db, testdb.WithTenant(tenant.ID))
 
 	svc := newActiveInstanceServiceForIntegration(t, db)
-	ctx := iamdomain.WithAuthContext(context.Background(), user.ID, nil)
+	ctx := ctxForActor(tenant.ID, user.ID)
 
 	_, err := svc.GetActiveInstance(ctx, tenant.ID, cd.ID)
 	var denied authz.ErrCapDenied
@@ -87,7 +99,7 @@ func TestGetActiveInstance_WithViewGrant_PassesAuthz(t *testing.T) {
 	})
 
 	svc := newActiveInstanceServiceForIntegration(t, db)
-	ctx := iamdomain.WithAuthContext(context.Background(), user.ID, nil)
+	ctx := ctxForActor(tenant.ID, user.ID)
 
 	// No active document instance exists for this fresh CD, so the call is
 	// expected to fall through to ErrNoActiveInstance — the point of this test
@@ -107,7 +119,7 @@ func TestGetActiveInstance_SystemAdmin_PassesAuthz(t *testing.T) {
 	testdb.SeedSystemAdmin(t, db, tenant.ID, user.ID, "SEC-03 System Admin")
 
 	svc := newActiveInstanceServiceForIntegration(t, db)
-	ctx := iamdomain.WithAuthContext(context.Background(), user.ID, nil)
+	ctx := ctxForActor(tenant.ID, user.ID)
 
 	_, err := svc.GetActiveInstance(ctx, tenant.ID, cd.ID)
 	var denied authz.ErrCapDenied

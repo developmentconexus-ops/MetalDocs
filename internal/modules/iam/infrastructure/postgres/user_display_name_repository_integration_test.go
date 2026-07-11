@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	"metaldocs/tests/integration/testdb"
 )
 
 // TestUserDisplayNameRepository_DisplayName_Live exercises DisplayName against a
@@ -27,21 +28,30 @@ func TestUserDisplayNameRepository_DisplayName_Live(t *testing.T) {
 	const displayName = "F4.1 Test Actor"
 
 	cleanup := func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.iam_users WHERE user_id = $1`, userID)
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.tenants WHERE id IN ($1::uuid, $2::uuid)`, tenantID, otherTenantID)
+		// iam_users and tenants carry trg_require_cap_asserted (user.manage /
+		// tenant.onboard) — assert both tx-locally so this best-effort cleanup
+		// actually deletes rows.
+		if tx, err := db.BeginTx(ctx, nil); err == nil {
+			testdb.SetCapsOnTx(t, tx, `[{"cap":"user.manage"},{"cap":"tenant.onboard"}]`)
+			_, _ = tx.ExecContext(ctx, `DELETE FROM metaldocs.iam_users WHERE user_id = $1`, userID)
+			_, _ = tx.ExecContext(ctx, `DELETE FROM metaldocs.tenants WHERE id IN ($1::uuid, $2::uuid)`, tenantID, otherTenantID)
+			_ = tx.Commit()
+		}
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
 	for _, tid := range []string{tenantID, otherTenantID} {
-		if _, err := db.ExecContext(ctx,
-			`INSERT INTO metaldocs.tenants (id, name, slug)
-			 VALUES ($1::uuid, 'F4.1 Tenant '||$1, 'f41-'||$1)
-			 ON CONFLICT (id) DO NOTHING`,
-			tid,
-		); err != nil {
-			t.Fatalf("insert tenant %s: %v", tid, err)
-		}
+		tid := tid
+		seedWithCapsIAM(t, db, `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx,
+				`INSERT INTO metaldocs.tenants (id, name, slug)
+				 VALUES ($1::uuid, 'F4.1 Tenant '||$1, 'f41-'||$1)
+				 ON CONFLICT (id) DO NOTHING`,
+				tid,
+			)
+			return err
+		})
 	}
 
 	// Seed user only in tenantID — not in otherTenantID.
@@ -103,18 +113,26 @@ func TestUserDisplayNameRepository_DisplayNames_Live(t *testing.T) {
 	const userC = "dn-batch-c-f41b" // empty display_name — should be omitted
 
 	cleanup := func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.iam_users WHERE user_id IN ($1, $2, $3)`, userA, userB, userC)
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.tenants WHERE id = $1::uuid`, tenantID)
+		// iam_users and tenants carry trg_require_cap_asserted (user.manage /
+		// tenant.onboard) — assert both tx-locally so this best-effort cleanup
+		// actually deletes rows.
+		if tx, err := db.BeginTx(ctx, nil); err == nil {
+			testdb.SetCapsOnTx(t, tx, `[{"cap":"user.manage"},{"cap":"tenant.onboard"}]`)
+			_, _ = tx.ExecContext(ctx, `DELETE FROM metaldocs.iam_users WHERE user_id IN ($1, $2, $3)`, userA, userB, userC)
+			_, _ = tx.ExecContext(ctx, `DELETE FROM metaldocs.tenants WHERE id = $1::uuid`, tenantID)
+			_ = tx.Commit()
+		}
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
-	if _, err := db.ExecContext(ctx,
-		`INSERT INTO metaldocs.tenants (id, name, slug) VALUES ($1::uuid, 'F4.1B Batch Tenant', 'f41b-batch') ON CONFLICT (id) DO NOTHING`,
-		tenantID,
-	); err != nil {
-		t.Fatalf("insert tenant: %v", err)
-	}
+	seedWithCapsIAM(t, db, `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.tenants (id, name, slug) VALUES ($1::uuid, 'F4.1B Batch Tenant', 'f41b-batch') ON CONFLICT (id) DO NOTHING`,
+			tenantID,
+		)
+		return err
+	})
 
 	seeds := []struct {
 		userID      string

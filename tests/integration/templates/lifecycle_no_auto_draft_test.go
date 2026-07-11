@@ -18,7 +18,7 @@ import (
 
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
-	"metaldocs/internal/modules/templates/repository"
+	"metaldocs/internal/modules/templates/infrastructure"
 	"metaldocs/internal/platform/objectstore"
 	platformtenant "metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
@@ -118,7 +118,7 @@ func TestLifecycle_NoAutoNextDraft(t *testing.T) {
 	approverCtx := platformtenant.WithActorID(
 		platformtenant.WithTenantID(context.Background(), tenant.ID), approver)
 
-	repo := repository.New(db)
+	repo := infrastructure.New(db)
 	svc := application.New(repo, noopPresigner{}, testClock{}, testUUID{}).
 		WithRunner(platformdb.NewTxRunner(db))
 

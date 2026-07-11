@@ -71,7 +71,7 @@ func TestFreeze_ReviewToApprovalTransition_PinsHash(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindReview)
 
-	result, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -105,7 +105,7 @@ func TestFreeze_PreInstanceComment_DoesNotBlock(t *testing.T) {
 	staleTime := time.Now().Add(-24 * time.Hour)
 	insertUnresolvedComment(t, database, fx.tenantID, fx.documentID, fx.authorID, staleTime)
 
-	result, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -136,7 +136,7 @@ func TestFreeze_DuringInstanceComment_Blocks(t *testing.T) {
 	// well within its review window.
 	insertUnresolvedComment(t, database, fx.tenantID, fx.documentID, fx.reviewerID, time.Now())
 
-	_, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	_, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -168,7 +168,11 @@ func TestFreeze_SubmitApprovalOnlyRoute_PinsHashAtSubmit(t *testing.T) {
 	ctx := context.Background()
 
 	tenant := testdb.NewTenant(t, database)
-	author := testdb.NewUser(t, database, testdb.WithTenant(tenant.ID), testdb.WithDisplayName("Author"))
+	// system_admin bypasses the document.submit capability check (ADR 0022
+	// Phase 11 F8), mirroring submit_service_reason_integration_test.go's
+	// pattern — the GUC-seeded actor still needs SOME identity/authz path,
+	// and this test isn't exercising capability-grant plumbing.
+	author := testdb.NewUser(t, database, testdb.WithTenant(tenant.ID), testdb.WithDisplayName("Author"), testdb.WithRole("system_admin"))
 	approver := testdb.NewUser(t, database, testdb.WithTenant(tenant.ID), testdb.WithDisplayName("Approver"))
 
 	doc := testdb.NewDocument(t, database,
@@ -177,12 +181,24 @@ func TestFreeze_SubmitApprovalOnlyRoute_PinsHashAtSubmit(t *testing.T) {
 		testdb.WithStatus("draft"),
 		testdb.WithSubmitReadySnapshots(),
 	)
-	if _, err := database.ExecContext(ctx,
-		`UPDATE public.documents SET process_area_code_snapshot = 'QA' WHERE id = $1::uuid`,
-		doc.ID,
-	); err != nil {
-		t.Fatalf("stamp process_area_code_snapshot: %v", err)
-	}
+	// public.user_process_areas.area_code carries an FK to
+	// metaldocs.document_process_areas(tenant_id, code), and that table's
+	// area_code_format CHECK requires a lowercase code — seed the 'qa' area
+	// row for this tenant before anything references it below.
+	testdb.SeedWithCaps(t, database, `[{"cap":"taxonomy.manage"},{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO metaldocs.document_process_areas (code, tenant_id, name)
+			 VALUES ('qa', $1::uuid, 'qa') ON CONFLICT (tenant_id, code) DO NOTHING`,
+			tenant.ID,
+		); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx,
+			`UPDATE public.documents SET process_area_code_snapshot = 'qa' WHERE id = $1::uuid`,
+			doc.ID,
+		)
+		return err
+	})
 
 	route := testdb.NewApprovalRoute(t, database, testdb.WithTenant(tenant.ID))
 	// Seed a single approval-kind stage on the route (stage_kind defaults to
@@ -191,7 +207,7 @@ func TestFreeze_SubmitApprovalOnlyRoute_PinsHashAtSubmit(t *testing.T) {
 		INSERT INTO public.approval_route_stages
 		  (route_id, stage_order, name, required_role, required_capability,
 		   area_code, quorum, on_eligibility_drift, stage_kind)
-		VALUES ($1::uuid, 1, 'Approval Stage', 'approver', 'document.signoff', 'QA',
+		VALUES ($1::uuid, 1, 'Approval Stage', 'approver', 'document.signoff', 'qa',
 		        'any_1_of', 'keep_snapshot', 'approval')`,
 		route.ID,
 	); err != nil {
@@ -201,12 +217,12 @@ func TestFreeze_SubmitApprovalOnlyRoute_PinsHashAtSubmit(t *testing.T) {
 	// ResolveEligibleActors (called by SubmitRevisionForReview) reads
 	// metaldocs.v_active_user_areas, backed by public.user_process_areas —
 	// the approver must have an active area-membership row whose `role`
-	// matches the stage's required_role ('approver') in area 'QA'.
+	// matches the stage's required_role ('approver') in area 'qa'.
 	testdb.SeedWithCaps(t, database, `[{"cap":"membership.manage"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
 			`INSERT INTO public.user_process_areas
 			   (user_id, tenant_id, area_code, role, effective_from)
-			 VALUES ($1, $2::uuid, 'QA', 'approver', now() - interval '1 hour')`,
+			 VALUES ($1, $2::uuid, 'qa', 'approver', now() - interval '1 hour')`,
 			approver.ID, tenant.ID,
 		)
 		return err
@@ -216,7 +232,10 @@ func TestFreeze_SubmitApprovalOnlyRoute_PinsHashAtSubmit(t *testing.T) {
 	runner := db.NewTxRunner(database)
 	services := application.NewServices(repo, application.NewSQLEmitter(), application.RealClock{}, nil)
 
-	result, err := services.Submit.SubmitRevisionForReview(ctx, runner, application.SubmitRequest{
+	// authz.Require needs the metaldocs.tenant_id / actor_id GUCs seeded on
+	// the tx; TxRunner.seedTxIdentityFromContext pulls them from ctx.
+	authzCtx := testdb.AuthzCtx(tenant.ID, author.ID)
+	result, err := services.Submit.SubmitRevisionForReview(authzCtx, runner, application.SubmitRequest{
 		TenantID:        tenant.ID,
 		DocumentID:      doc.ID,
 		RouteID:         route.ID,
@@ -243,7 +262,7 @@ func TestFreeze_Idempotent_ReentryIsNoop(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindReview)
 
-	result, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+	result, err := fx.svc.RecordVerdict(fx.ctxFor(fx.reviewerID), fx.runner, application.ReviewVerdictRequest{
 		TenantID:        fx.tenantID,
 		InstanceID:      fx.instanceID,
 		StageInstanceID: fx.stageID,
@@ -263,8 +282,9 @@ func TestFreeze_Idempotent_ReentryIsNoop(t *testing.T) {
 	}
 
 	repo := infrastructure.NewPostgresApprovalRepository(database, iamdomain.NoopUserDisplayNameReader{})
-	err = fx.runner.Do(context.Background(), func(tx *sql.Tx) error {
-		won, perr := repo.PinFrozenHash(context.Background(), tx, fx.tenantID, fx.instanceID, "a-different-hash-should-never-win")
+	reentryCtx := fx.ctxFor(fx.reviewerID)
+	err = fx.runner.Do(reentryCtx, func(tx *sql.Tx) error {
+		won, perr := repo.PinFrozenHash(reentryCtx, tx, fx.tenantID, fx.instanceID, "a-different-hash-should-never-win")
 		if perr != nil {
 			return perr
 		}

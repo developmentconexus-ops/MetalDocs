@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"metaldocs/internal/modules/iam/authz"
 )
 
 // InsertDraftDocument inserts a minimal draft document with an initial revision
@@ -43,13 +45,7 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 	docxStorageKey := "templates/test-seed/" + templateKey + "/body.docx"
 	contentHash := strings.Repeat("0", 64)
 
-	seedWithCaps(t, db, `[{"cap":"template.create"}]`, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx,
-			`SELECT set_config('metaldocs.tenant_id', $1, true)`, tenantID,
-		); err != nil {
-			return fmt.Errorf("set tenant_id GUC: %w", err)
-		}
-
+	seedWithCapsIdentity(t, db, tenantID, userID, `[{"cap":"template.create"}]`, func(tx *sql.Tx) error {
 		if err := tx.QueryRowContext(ctx,
 			`INSERT INTO `+Qualified(schema, "templates_template")+
 				` (id, tenant_id, doc_type_code, key, name, description, latest_version, published_version_id, created_by, created_at)
@@ -83,7 +79,7 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 	})
 
 	// Insert document — guarded by document.create tripwire.
-	seedWithCaps(t, db, `[{"cap":"document.create"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, tenantID, userID, `[{"cap":"document.create"}]`, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx,
 			`INSERT INTO `+Qualified(schema, "documents")+
 				` (tenant_id, template_version_id, name, status, form_data_json, created_by)
@@ -119,7 +115,7 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 	}
 
 	// Update document pointers — guarded by document.edit tripwire.
-	seedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, tenantID, userID, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
 			`UPDATE `+Qualified(schema, "documents")+
 				` SET current_revision_id=$1::uuid, active_session_id=$2::uuid, updated_at=now()
@@ -208,6 +204,68 @@ func seedWithCaps(t *testing.T, db *sql.DB, capsJSON string, fn func(tx *sql.Tx)
 	}
 }
 
+// seedTx is the identity-aware sibling of seedWithCaps: same tx-local,
+// pool-safe shape, but ALSO seeds the metaldocs.tenant_id (and, when actorID
+// is non-empty, metaldocs.actor_id) GUC on the same tx before fn runs — via
+// the production authz.SeedTxIdentity / authz.SeedTxTenant functions, never
+// hand-written set_config. This satisfies both the tenant-consistency
+// triggers (e.g. trg_template_version_tenant_consistent) and any authz.Require
+// call fn makes on its way to a guarded write. capsJSON == "" skips the
+// asserted_caps assertion entirely, for builders that write tables with no
+// trg_require_cap_asserted tripwire.
+func seedTx(t *testing.T, db *sql.DB, tenantID, actorID, capsJSON string, fn func(tx *sql.Tx) error) {
+	t.Helper()
+	ctx := context.Background()
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("seedTx: begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	if actorID != "" {
+		if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+			t.Fatalf("seedTx: seed identity: %v", err)
+		}
+	} else {
+		if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+			t.Fatalf("seedTx: seed tenant: %v", err)
+		}
+	}
+
+	if capsJSON != "" {
+		if _, err := tx.ExecContext(ctx,
+			`SELECT set_config('metaldocs.asserted_caps', $1, true)`, capsJSON,
+		); err != nil {
+			t.Fatalf("seedTx: assert caps %s: %v", capsJSON, err)
+		}
+	}
+	if err := fn(tx); err != nil {
+		t.Fatalf("seedTx: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("seedTx: commit: %v", err)
+	}
+}
+
+// seedWithCapsIdentity is seedWithCaps + tenant/actor GUC seeding. Use for any
+// guarded (trg_require_cap_asserted) write whose builder Spec knows the
+// tenant, and the actor when one exists.
+func seedWithCapsIdentity(t *testing.T, db *sql.DB, tenantID, actorID, capsJSON string, fn func(tx *sql.Tx) error) {
+	t.Helper()
+	seedTx(t, db, tenantID, actorID, capsJSON, fn)
+}
+
+// seedTenantOnly seeds tenant/actor identity on a tx-local seed transaction
+// for writes to tables with NO trg_require_cap_asserted tripwire (so there is
+// no capability to assert), but that still need metaldocs.tenant_id (and
+// optionally metaldocs.actor_id) set — either for a tenant-consistency
+// trigger or for an authz.Require call inside fn.
+func seedTenantOnly(t *testing.T, db *sql.DB, tenantID, actorID string, fn func(tx *sql.Tx) error) {
+	t.Helper()
+	seedTx(t, db, tenantID, actorID, "", fn)
+}
+
 // SeedGovernedTaxonomy seeds the governed FK-parent chain required before any
 // controlled_documents insert: a shared document_families row, plus the
 // (tenantID, processAreaCode) document_process_areas row and the
@@ -224,7 +282,7 @@ func SeedGovernedTaxonomy(t *testing.T, db *sql.DB, tenantID, profileCode, proce
 
 	const familyCode = "test-family"
 
-	seedWithCaps(t, db, `[{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, tenantID, "", `[{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO `+Qualified("", "document_families")+` (code, name)
 			 VALUES ($1, $1)
@@ -271,7 +329,15 @@ func SupersedeActiveDocumentForCD(t *testing.T, db *sql.DB, controlledDocumentID
 	t.Helper()
 	ctx := context.Background()
 
-	seedWithCaps(t, db, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+	var tenantID string
+	if err := db.QueryRowContext(ctx,
+		`SELECT tenant_id::text FROM `+Qualified("", "controlled_documents")+` WHERE id = $1::uuid`,
+		controlledDocumentID,
+	).Scan(&tenantID); err != nil {
+		t.Fatalf("SupersedeActiveDocumentForCD: resolve tenant: %v", err)
+	}
+
+	seedWithCapsIdentity(t, db, tenantID, "", `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
 		var docID string
 		if err := tx.QueryRowContext(ctx,
 			`SELECT id::text FROM `+Qualified("", "documents")+`
@@ -330,7 +396,7 @@ func SeedSystemAdmin(t *testing.T, db *sql.DB, tenantID, userID, displayName str
 	// — the INSERT now requires tenant.onboard asserted tx-locally
 	// (seedWithCaps, mirrors testdb.NewTenant / every other tripwire-guarded
 	// builder in this package).
-	seedWithCaps(t, db, `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, tenantID, userID, `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
 			`INSERT INTO metaldocs.tenants (id, name, slug)
 			 VALUES ($1::uuid, $2, $1::text)
@@ -340,7 +406,7 @@ func SeedSystemAdmin(t *testing.T, db *sql.DB, tenantID, userID, displayName str
 		return err
 	})
 
-	seedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, tenantID, userID, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
 			`INSERT INTO `+Qualified("", "iam_users")+` (user_id, display_name, tenant_id)
 			 VALUES ($1, $2, $3::uuid)
@@ -350,7 +416,7 @@ func SeedSystemAdmin(t *testing.T, db *sql.DB, tenantID, userID, displayName str
 		return err
 	})
 
-	seedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, tenantID, userID, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx,
 			`INSERT INTO `+Qualified("", "iam_user_roles")+` (user_id, role_code, tenant_id, assigned_by)
 			 VALUES ($1, 'system_admin', $2::uuid, $1)
@@ -389,32 +455,46 @@ func SeedUser(t *testing.T, ctx context.Context, db *sql.DB, schema, userID, dis
 
 // SeedDocument inserts a minimal documents row with a caller-supplied document
 // ID (no CD-governed lineage — use NewDocument when the test needs a
-// controlled_documents parent).
+// controlled_documents parent). public.documents carries trg_require_cap_asserted
+// (document.create), same tripwire NewDocument asserts — so this goes through
+// the identity-aware chokepoint, not the tenant-only sibling.
 func SeedDocument(t *testing.T, ctx context.Context, db *sql.DB, schema, docID, tenantID, createdBy string) {
 	t.Helper()
-	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
-		INSERT INTO %s (id, tenant_id, name, status, created_by, revision_version, created_at, updated_at)
-		VALUES ($1::uuid, $2::uuid, 'Test Document', 'draft', $3, 1, now(), now())
-		ON CONFLICT (id) DO NOTHING`,
-		Qualified(schema, "documents")),
-		docID, tenantID, createdBy,
-	); err != nil {
-		t.Fatalf("SeedDocument: %v", err)
-	}
+	// template_version_id (uuid NOT NULL) and form_data_json (jsonb NOT NULL)
+	// carry no FK to templates_template_version on public.documents, so a
+	// freshly minted uuid satisfies the NOT NULL without an extra seed
+	// (mirrors factory.go's NewDocument free-mint idiom for the same column).
+	seedWithCapsIdentity(t, db, tenantID, createdBy, `[{"cap":"document.create"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, fmt.Sprintf(`
+			INSERT INTO %s (id, tenant_id, template_version_id, name, status, form_data_json, created_by, revision_version, created_at, updated_at)
+			VALUES ($1::uuid, $2::uuid, gen_random_uuid(), 'Test Document', 'draft', '{}'::jsonb, $3, 1, now(), now())
+			ON CONFLICT (id) DO NOTHING`,
+			Qualified(schema, "documents")),
+			docID, tenantID, createdBy,
+		)
+		return err
+	})
 }
 
 // SeedRouteConfig inserts a minimal approval_routes row with a caller-supplied
-// route ID (no owner/taxonomy auto-wiring — use NewApprovalRoute when the test
-// needs a governed profile chain).
+// route ID. approval_routes carries FK approval_routes_document_profile_fk
+// (tenant_id, profile_code) -> document_profiles(tenant_id, code), so this
+// seeds the minimal governed profile the FK requires via SeedGovernedTaxonomy
+// (document_families + document_process_areas + document_profiles, asserting
+// taxonomy.manage) before inserting the route. profileCode must satisfy
+// document_profiles' CHECK constraint (lowercase, ^[a-z][a-z0-9_-]{1,63}$) —
+// callers passing an uppercase/mixed-case code will fail that CHECK.
 func SeedRouteConfig(t *testing.T, ctx context.Context, db *sql.DB, schema, routeID, tenantID, profileCode string) {
 	t.Helper()
-	if _, err := db.ExecContext(ctx, fmt.Sprintf(`
-		INSERT INTO %s (id, tenant_id, name, profile_code, active, created_at, updated_at)
-		VALUES ($1::uuid, $2::uuid, 'Test Route', $3, true, now(), now())
-		ON CONFLICT (id) DO NOTHING`,
-		Qualified(schema, "approval_routes")),
-		routeID, tenantID, profileCode,
-	); err != nil {
-		t.Fatalf("SeedRouteConfig: %v", err)
-	}
+	SeedGovernedTaxonomy(t, db, tenantID, profileCode, profileCode)
+	seedTenantOnly(t, db, tenantID, "", func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, fmt.Sprintf(`
+			INSERT INTO %s (id, tenant_id, name, profile_code, created_by, active, created_at)
+			VALUES ($1::uuid, $2::uuid, 'Test Route', $3, 'system', true, now())
+			ON CONFLICT (id) DO NOTHING`,
+			Qualified(schema, "approval_routes")),
+			routeID, tenantID, profileCode,
+		)
+		return err
+	})
 }

@@ -44,6 +44,15 @@ import (
 // approval_route_stages row (quorum any_1_of, no quorum_m) so
 // SubmitService.SubmitRevisionForReview's route.Validate() and stage-instance
 // creation succeed. NewApprovalRoute (testdb factory) does not seed stages.
+//
+// It also grants a fresh user the stage's required_role ('approver') in the
+// stage's area_code ('area-001'): SubmitRevisionForReview's stage-instance
+// creation calls ResolveEligibleActors(tenantID, area_code, required_role)
+// (submit_service.go step 8) and fails closed with domain.ErrEmptyEligiblePool
+// when that pool is empty (W6) — independent of the submitting actor's own
+// capability grants (system_admin bypasses authz.Require's capability gate,
+// not this membership-pool resolution). The grantee need not be the actor;
+// ResolveEligibleActors only needs SOME eligible user to exist.
 func seedSubmitRouteWithStage(t *testing.T, dbc *sql.DB, tenantID, profileCode string) string {
 	t.Helper()
 	route := testdb.NewApprovalRoute(t, dbc, testdb.WithTenant(tenantID), testdb.WithProfile(profileCode))
@@ -55,6 +64,30 @@ func seedSubmitRouteWithStage(t *testing.T, dbc *sql.DB, tenantID, profileCode s
 	); err != nil {
 		t.Fatalf("seed approval_route_stages: %v", err)
 	}
+
+	approver := testdb.NewUser(t, dbc, testdb.WithTenant(tenantID), testdb.WithDisplayName("Stage Approver"))
+	testdb.SeedWithCaps(t, dbc, `[{"cap":"membership.manage"},{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
+		// user_process_areas.(tenant_id, area_code) FK-references
+		// metaldocs.document_process_areas(tenant_id, code); 'area-001' is not
+		// auto-seeded for this test's freshly-minted tenant, so the grant below
+		// 23503-fails without seeding it first (idempotent, mirrors
+		// review_verdict_integration_test.go's seedReviewVerdictFixture).
+		if _, err := tx.ExecContext(context.Background(),
+			`INSERT INTO metaldocs.document_process_areas (code, tenant_id, name)
+			 VALUES ('area-001', $1::uuid, 'Area 001') ON CONFLICT (tenant_id, code) DO NOTHING`,
+			tenantID,
+		); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(context.Background(),
+			`INSERT INTO metaldocs.user_process_areas
+			    (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by)
+			 VALUES ($1, $2::uuid, 'area-001', 'approver', now(), NULL, $1)`,
+			approver.ID, tenantID,
+		)
+		return err
+	})
+
 	return route.ID
 }
 

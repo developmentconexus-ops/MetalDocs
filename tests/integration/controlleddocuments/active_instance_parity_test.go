@@ -12,7 +12,7 @@ import (
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
-	docrepo "metaldocs/internal/modules/documents/repository"
+	docrepo "metaldocs/internal/modules/documents/infrastructure"
 	"metaldocs/tests/integration/testdb"
 )
 

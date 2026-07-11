@@ -16,6 +16,7 @@ import (
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
 	platformdb "metaldocs/internal/platform/db"
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -289,7 +290,11 @@ func TestTenantIsolation_CreateCD_CrossTenantProfile_NotFound(t *testing.T) {
 		newInvariantReadyDocumentInitializer(),
 	)
 
+	// ProfileRepository.GetByCode reads tenant from context (platform tenant GUC
+	// source) — seed tenant B into ctx so the read is tenant-scoped and reaches
+	// ErrProfileNotFound instead of erroring "tenant: not present in context".
 	ctx := iamdomain.WithAuthContext(context.Background(), userB.ID, nil)
+	ctx = tenant.WithTenantID(ctx, tenantB.ID)
 	_, err := svc.Create(ctx, CreateControlledDocumentCmd{
 		TenantID:         tenantB.ID,
 		ProfileCode:      taxA.ProfileCode,     // exists only under tenant A

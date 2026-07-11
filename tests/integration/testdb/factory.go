@@ -204,13 +204,6 @@ func newSpec(opts []Opt) *Spec {
 	return s
 }
 
-func exec(t *testing.T, db *sql.DB, query string, args ...any) {
-	t.Helper()
-	if _, err := db.ExecContext(context.Background(), query, args...); err != nil {
-		t.Fatalf("factory exec failed: %v\nquery: %s", err, query)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Builders
 // ---------------------------------------------------------------------------
@@ -227,7 +220,7 @@ func NewTenant(t *testing.T, db *sql.DB, opts ...Opt) Tenant {
 	if id == "" {
 		id = uuid.NewString()
 	}
-	seedWithCaps(t, db, `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, id, "", `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(context.Background(),
 			`INSERT INTO metaldocs.tenants (id, name, slug)
 			 VALUES ($1::uuid, $2, $1::text)
@@ -261,7 +254,7 @@ func NewUser(t *testing.T, db *sql.DB, opts ...Opt) User {
 		display = "Test User " + userID
 	}
 
-	seedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, tenantID, userID, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(context.Background(),
 			`INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
 			 VALUES ($1, $2, $3::uuid)
@@ -272,7 +265,7 @@ func NewUser(t *testing.T, db *sql.DB, opts ...Opt) User {
 	})
 
 	if s.Role != "" {
-		seedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+		seedWithCapsIdentity(t, db, tenantID, userID, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
 			_, err := tx.ExecContext(context.Background(),
 				`INSERT INTO metaldocs.iam_user_roles (user_id, role_code, tenant_id, assigned_by)
 				 VALUES ($1, $2, $3::uuid, $1)
@@ -312,7 +305,7 @@ func NewTaxonomy(t *testing.T, db *sql.DB, opts ...Opt) Taxonomy {
 		class = "simples"
 	}
 
-	seedWithCaps(t, db, `[{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, tenantID, "", `[{"cap":"taxonomy.manage"}]`, func(tx *sql.Tx) error {
 		ctx := context.Background()
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO metaldocs.document_families (code, name)
@@ -379,7 +372,7 @@ func NewControlledDoc(t *testing.T, db *sql.DB, opts ...Opt) ControlledDoc {
 		title = "Test Controlled Doc"
 	}
 
-	seedWithCaps(t, db, `[{"cap":"controlled_documents.create"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, tenantID, owner, `[{"cap":"controlled_documents.create"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(context.Background(),
 			`INSERT INTO public.controlled_documents
 			   (id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status)
@@ -483,7 +476,7 @@ func NewDocument(t *testing.T, db *sql.DB, opts ...Opt) Document {
 	query := `INSERT INTO public.documents (` + strings.Join(cols, ", ") + `)
 		 VALUES (` + strings.Join(placeholders, ", ") + `)`
 
-	seedWithCaps(t, db, `[{"cap":"document.create"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, cd.TenantID, owner, `[{"cap":"document.create"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(context.Background(), query, args...)
 		return err
 	})
@@ -519,11 +512,14 @@ func NewApprovalRoute(t *testing.T, db *sql.DB, opts ...Opt) ApprovalRoute {
 		name = "Route"
 	}
 	id := uuid.NewString()
-	exec(t, db,
-		`INSERT INTO public.approval_routes (id, tenant_id, name, profile_code, active, created_by)
-		 VALUES ($1::uuid, $2::uuid, $3, $4, true, $5)`,
-		id, tenantID, name, profile, owner,
-	)
+	seedTenantOnly(t, db, tenantID, owner, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(),
+			`INSERT INTO public.approval_routes (id, tenant_id, name, profile_code, active, created_by)
+			 VALUES ($1::uuid, $2::uuid, $3, $4, true, $5)`,
+			id, tenantID, name, profile, owner,
+		)
+		return err
+	})
 	return ApprovalRoute{ID: id, TenantID: tenantID, ProfileCode: profile}
 }
 
@@ -539,7 +535,17 @@ func NewApprovalInstance(t *testing.T, db *sql.DB, opts ...Opt) ApprovalInstance
 	if s.Document != nil {
 		doc = *s.Document
 	} else {
-		doc = NewDocument(t, db, WithStatus("approved"))
+		docOpts := []Opt{WithStatus("approved")}
+		if s.TenantID != "" {
+			// Thread the caller's WithTenant through to the auto-created
+			// document — without this, a caller passing WithTenant(tenantID)
+			// alone (no WithDocument) silently got a document under a
+			// DIFFERENT, freshly-minted tenant, and every downstream query
+			// filtered on the caller's tenantID (e.g. approval_instances.tenant_id)
+			// found nothing.
+			docOpts = append(docOpts, WithTenant(s.TenantID))
+		}
+		doc = NewDocument(t, db, docOpts...)
 	}
 	var route ApprovalRoute
 	if s.Route != nil {
@@ -574,7 +580,7 @@ func NewApprovalInstance(t *testing.T, db *sql.DB, opts ...Opt) ApprovalInstance
 		frozenHash = sql.NullString{String: strings.Repeat("a", 64), Valid: true}
 	}
 
-	seedWithCaps(t, db, `[{"cap":"document.submit"}]`, func(tx *sql.Tx) error {
+	seedWithCapsIdentity(t, db, doc.TenantID, submitter, `[{"cap":"document.submit"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(context.Background(),
 			`INSERT INTO public.approval_instances
 			   (id, tenant_id, document_id, route_id, route_version_snapshot, status,
@@ -628,13 +634,16 @@ func NewNotification(t *testing.T, db *sql.DB, opts ...Opt) Notification {
 		status = "PENDING"
 	}
 
-	exec(t, db,
-		`INSERT INTO metaldocs.notifications
-		   (id, tenant_id, recipient_user_id, event_type, resource_type, resource_id, title, message, status)
-		 VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9)`,
-		id, tenantID, recipient, eventType, resourceType, resourceID,
-		"Novo documento controlado para leitura", "Um documento foi publicado.", status,
-	)
+	seedTenantOnly(t, db, tenantID, "", func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(context.Background(),
+			`INSERT INTO metaldocs.notifications
+			   (id, tenant_id, recipient_user_id, event_type, resource_type, resource_id, title, message, status)
+			 VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9)`,
+			id, tenantID, recipient, eventType, resourceType, resourceID,
+			"Novo documento controlado para leitura", "Um documento foi publicado.", status,
+		)
+		return err
+	})
 
 	return Notification{
 		ID: id, TenantID: tenantID, RecipientUserID: recipient,

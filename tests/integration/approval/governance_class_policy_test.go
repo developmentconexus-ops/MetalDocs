@@ -362,12 +362,7 @@ func reclassify(t *testing.T, db *sql.DB, tenantID, code, class string) error {
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(ctx,
-		`SELECT set_config('metaldocs.asserted_caps', $1, true)`,
-		`[{"cap":"taxonomy.manage"}]`,
-	); err != nil {
-		t.Fatalf("assert taxonomy.manage: %v", err)
-	}
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"taxonomy.manage"}]`)
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE metaldocs.document_profiles SET governance_class = $1
 		  WHERE tenant_id = $2::uuid AND code = $3`,

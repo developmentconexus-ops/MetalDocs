@@ -40,9 +40,9 @@ func seedActiveStageForOversightFixture(t *testing.T, database *sql.DB, tenantID
 			INSERT INTO public.approval_stage_instances
 			  (approval_instance_id, stage_order, name_snapshot, required_role_snapshot,
 			   area_code_snapshot, quorum_snapshot, on_eligibility_drift_snapshot,
-			   eligible_actor_ids, status, stage_kind)
+			   eligible_actor_ids, status, stage_kind, required_capability_snapshot)
 			VALUES ($1::uuid, 1, 'Stage 1', 'reviewer', 'QA', 'any_1_of', 'keep_snapshot',
-			        $2::jsonb, 'active', 'approval')`,
+			        $2::jsonb, 'active', 'approval', 'document.review')`,
 			inst.ID, eligible,
 		)
 		return err

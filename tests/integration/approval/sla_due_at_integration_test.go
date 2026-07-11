@@ -91,30 +91,34 @@ func TestInsertStageInstances_ActiveStageGetsDueAt_PendingStageStaysNull(t *test
 	err := runner.Do(ctx, func(tx *sql.Tx) error {
 		return repo.InsertStageInstances(ctx, tx, []domain.StageInstance{
 			{
-				ID:                   stage1ID,
-				ApprovalInstanceID:   instance.ID,
-				StageOrder:           1,
-				NameSnapshot:         "Stage 1",
-				RequiredRoleSnapshot: "reviewer",
-				AreaCodeSnapshot:     "QA",
-				QuorumSnapshot:       domain.QuorumAny1Of,
-				Kind:                 domain.StageKindReview,
-				EligibleActorIDs:     []string{author.ID},
-				Status:               domain.StageActive,
-				DueInDaysSnapshot:    &three,
+				ID:                         stage1ID,
+				ApprovalInstanceID:         instance.ID,
+				StageOrder:                 1,
+				NameSnapshot:               "Stage 1",
+				RequiredRoleSnapshot:       "reviewer",
+				RequiredCapabilitySnapshot: "document.review",
+				AreaCodeSnapshot:           "QA",
+				QuorumSnapshot:             domain.QuorumAny1Of,
+				OnEligibilityDriftSnapshot: domain.DriftKeepSnapshot,
+				Kind:                       domain.StageKindReview,
+				EligibleActorIDs:           []string{author.ID},
+				Status:                     domain.StageActive,
+				DueInDaysSnapshot:          &three,
 			},
 			{
-				ID:                   stage2ID,
-				ApprovalInstanceID:   instance.ID,
-				StageOrder:           2,
-				NameSnapshot:         "Stage 2",
-				RequiredRoleSnapshot: "reviewer",
-				AreaCodeSnapshot:     "QA",
-				QuorumSnapshot:       domain.QuorumAny1Of,
-				Kind:                 domain.StageKindReview,
-				EligibleActorIDs:     []string{author.ID},
-				Status:               domain.StagePending,
-				DueInDaysSnapshot:    &five,
+				ID:                         stage2ID,
+				ApprovalInstanceID:         instance.ID,
+				StageOrder:                 2,
+				NameSnapshot:               "Stage 2",
+				RequiredRoleSnapshot:       "reviewer",
+				RequiredCapabilitySnapshot: "document.review",
+				AreaCodeSnapshot:           "QA",
+				QuorumSnapshot:             domain.QuorumAny1Of,
+				OnEligibilityDriftSnapshot: domain.DriftKeepSnapshot,
+				Kind:                       domain.StageKindReview,
+				EligibleActorIDs:           []string{author.ID},
+				Status:                     domain.StagePending,
+				DueInDaysSnapshot:          &five,
 			},
 		})
 	})
@@ -173,9 +177,9 @@ func TestUpdateStageStatus_ActivationRecomputesDueAt_FromOwnSnapshot(t *testing.
 		INSERT INTO public.approval_stage_instances
 		  (approval_instance_id, stage_order, name_snapshot, required_role_snapshot,
 		   area_code_snapshot, quorum_snapshot, on_eligibility_drift_snapshot,
-		   eligible_actor_ids, status, stage_kind, due_in_days_snapshot)
+		   eligible_actor_ids, status, stage_kind, due_in_days_snapshot, required_capability_snapshot)
 		VALUES ($1::uuid, 2, 'Stage 2', 'reviewer', 'QA', 'any_1_of', 'keep_snapshot',
-		        $2::jsonb, 'pending', 'review', NULL)
+		        $2::jsonb, 'pending', 'review', NULL, 'document.review')
 		RETURNING id::text`,
 		instance.ID, `["`+author.ID+`"]`,
 	).Scan(&stage2ID); err != nil {
@@ -228,9 +232,9 @@ func TestUpdateStageStatus_ActivationSetsDueAt_FromNonNullSnapshot(t *testing.T)
 		INSERT INTO public.approval_stage_instances
 		  (approval_instance_id, stage_order, name_snapshot, required_role_snapshot,
 		   area_code_snapshot, quorum_snapshot, on_eligibility_drift_snapshot,
-		   eligible_actor_ids, status, stage_kind, due_in_days_snapshot)
+		   eligible_actor_ids, status, stage_kind, due_in_days_snapshot, required_capability_snapshot)
 		VALUES ($1::uuid, 1, 'Stage 1', 'reviewer', 'QA', 'any_1_of', 'keep_snapshot',
-		        $2::jsonb, 'pending', 'review', 7)
+		        $2::jsonb, 'pending', 'review', 7, 'document.review')
 		RETURNING id::text`,
 		instance.ID, `["`+author.ID+`"]`,
 	).Scan(&stageID); err != nil {

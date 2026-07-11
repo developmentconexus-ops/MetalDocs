@@ -1,6 +1,6 @@
 //go:build integration
 
-package riverjobs
+package riverjobs_test
 
 // M5 F5.2 T6 — P4 proof (THE load-bearing one, ADR 0067 §H-PRE-1 retirement).
 //
@@ -32,6 +32,7 @@ import (
 	"github.com/riverqueue/river/rivermigrate"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 
+	riverjobs "metaldocs/internal/platform/jobs/river"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -82,10 +83,10 @@ func TestSingleton_P4_HPRE1_ExactlyOnceAcrossTwoClients(t *testing.T) {
 	var count int64
 	done := make(chan struct{})
 
-	newBundle := func() *ClientBundle {
+	newBundle := func() *riverjobs.ClientBundle {
 		workers := river.NewWorkers()
 		river.AddWorker(workers, &countingWorker{count: &count, done: done})
-		bundle, err := NewClientBundle(db, Config{
+		bundle, err := riverjobs.NewClientBundle(db, riverjobs.Config{
 			Schema:              schema,
 			SkipUnknownJobCheck: true,
 			Queues: map[string]river.QueueConfig{

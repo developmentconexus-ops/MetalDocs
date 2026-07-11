@@ -83,7 +83,12 @@ func TestPublishApproved_DoesNotAutoCreateNextVersion(t *testing.T) {
 	svcs := NewServices(repo, emitter, clock, cdRead)
 	runner := db.NewTxRunner(database)
 
-	res, err := svcs.Publish.PublishApproved(ctx, runner, PublishRequest{
+	// authz.Require needs the metaldocs.tenant_id / actor_id GUCs seeded on
+	// the tx; TxRunner.seedTxIdentityFromContext pulls them from ctx via
+	// tenant.WithTenantID/WithActorID (testdb.AuthzCtx below).
+	authzCtx := testdb.AuthzCtx(tnt.ID, user.ID)
+
+	res, err := svcs.Publish.PublishApproved(authzCtx, runner, PublishRequest{
 		TenantID:   tnt.ID,
 		InstanceID: inst.ID,
 		PublishedBy: user.ID,

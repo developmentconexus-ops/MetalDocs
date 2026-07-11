@@ -13,7 +13,7 @@ import (
 
 func TestReflect_RepositoryNoBeginTx(t *testing.T) {
 	root := repoRootForIntegrationTests()
-	repoDir := filepath.Join(root, "internal", "modules", "documents", "approval", "repository")
+	repoDir := filepath.Join(root, "internal", "modules", "documents", "approval", "infrastructure")
 	assertNoForbiddenTxCalls(t, repoDir, []string{"db.BeginTx(", "tx.Commit(", "tx.Rollback("})
 }
 

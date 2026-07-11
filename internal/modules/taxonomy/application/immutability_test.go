@@ -15,6 +15,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"metaldocs/internal/platform/tenant"
+	"metaldocs/tests/integration/testdb"
 )
 
 func TestCodeImmutability(t *testing.T) {
@@ -42,6 +43,19 @@ func TestCodeImmutability(t *testing.T) {
 	}
 	defer tx.Rollback()
 
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"taxonomy.manage"}]`)
+
+	// document_profiles.family_code FKs to document_families(code); ensure the
+	// "procedure" family exists (dev-seed only ships "quality").
+	if _, err := tx.ExecContext(
+		context.Background(),
+		`INSERT INTO metaldocs.document_families (code, name, description, is_active)
+		 VALUES ('procedure', 'Procedure', 'seeded by TestCodeImmutability', TRUE)
+		 ON CONFLICT (code) DO NOTHING`,
+	); err != nil {
+		t.Fatalf("seed document_family: %v", err)
+	}
+
 	oldCode := "immut_old_" + time.Now().UTC().Format("150405")
 	newCode := "immut_new_" + time.Now().UTC().Format("150405")
 	tenantID := tenant.DevTenantID
@@ -49,9 +63,9 @@ func TestCodeImmutability(t *testing.T) {
 	_, err = tx.ExecContext(
 		context.Background(),
 		`INSERT INTO metaldocs.document_profiles
-		    (code, tenant_id, family_code, name, description, review_interval_days, editable_by_role)
+		    (code, tenant_id, family_code, name, description, review_interval_days, editable_by_role, alias)
 		 VALUES
-		    ($1, $2, $3, $4, $5, $6, $7)`,
+		    ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		oldCode,
 		tenantID,
 		"procedure",
@@ -59,6 +73,7 @@ func TestCodeImmutability(t *testing.T) {
 		"test",
 		30,
 		"admin",
+		"immut",
 	)
 	if err != nil {
 		t.Fatalf("insert profile: %v", err)

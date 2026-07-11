@@ -274,7 +274,7 @@ func TestInsertStageInstances_ActiveStageWithNilDueInDays_NoTypeInferenceError(t
 		{
 			ID:                         uuid.NewString(),
 			ApprovalInstanceID:         inst.ID,
-			StageOrder:                 0,
+			StageOrder:                 1,
 			NameSnapshot:               "Review",
 			RequiredRoleSnapshot:       "reviewer",
 			RequiredCapabilitySnapshot: "document.review",
@@ -291,7 +291,7 @@ func TestInsertStageInstances_ActiveStageWithNilDueInDays_NoTypeInferenceError(t
 		{
 			ID:                         uuid.NewString(),
 			ApprovalInstanceID:         inst.ID,
-			StageOrder:                 1,
+			StageOrder:                 2,
 			NameSnapshot:               "Approve",
 			RequiredRoleSnapshot:       "approver",
 			RequiredCapabilitySnapshot: "document.signoff",
