@@ -6,6 +6,7 @@ package infrastructure_test
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 
 	"metaldocs/internal/modules/templates/infrastructure"
@@ -35,6 +36,10 @@ func TestTemplateVersionReader_GetTemplateVersionState_Live(t *testing.T) {
 	publishedVersionID := testdb.DeterministicID(t, "tvs-version-published")
 	obsoleteVersionID := testdb.DeterministicID(t, "tvs-version-obsolete")
 	absentVersionID := testdb.DeterministicID(t, "tvs-version-absent")
+	// content_hash CHECK requires '' or exactly 64 chars (chk_template_version_content_hash_non_draft);
+	// stub 64-hex hashes, mirroring fixtures.go's contentHash idiom.
+	publishedContentHash := strings.Repeat("1", 64)
+	obsoleteContentHash := strings.Repeat("2", 64)
 
 	// templates_template and templates_template_version carry the template.create
 	// authz tripwire; assert the cap tx-locally via SeedWithCaps (pool-safe,
@@ -62,10 +67,10 @@ func TestTemplateVersionReader_GetTemplateVersionState_Live(t *testing.T) {
 				id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 				metadata_schema, placeholder_schema, author_id, published_at
 			) VALUES (
-				$1::uuid, $4::uuid, $2::uuid, 1, 0, 'published', 'templates/tvs/body.docx', 'body-hash-1',
+				$1::uuid, $4::uuid, $2::uuid, 1, 0, 'published', 'templates/tvs/body.docx', $5,
 				'{}'::jsonb, '{"placeholders":[]}'::jsonb, $3, now()
 			)`,
-			publishedVersionID, templateID, actorID, tnt.ID,
+			publishedVersionID, templateID, actorID, tnt.ID, publishedContentHash,
 		); err != nil {
 			return err
 		}
@@ -74,10 +79,10 @@ func TestTemplateVersionReader_GetTemplateVersionState_Live(t *testing.T) {
 				id, tenant_id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 				metadata_schema, placeholder_schema, author_id, published_at
 			) VALUES (
-				$1::uuid, $4::uuid, $2::uuid, 2, 1, 'obsolete', 'templates/tvs/body2.docx', 'body-hash-2',
+				$1::uuid, $4::uuid, $2::uuid, 2, 1, 'obsolete', 'templates/tvs/body2.docx', $5,
 				'{}'::jsonb, '{"placeholders":[]}'::jsonb, $3, now()
 			)`,
-			obsoleteVersionID, templateID, actorID, tnt.ID,
+			obsoleteVersionID, templateID, actorID, tnt.ID, obsoleteContentHash,
 		); err != nil {
 			return err
 		}

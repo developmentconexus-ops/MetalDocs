@@ -460,10 +460,14 @@ func SeedUser(t *testing.T, ctx context.Context, db *sql.DB, schema, userID, dis
 // the identity-aware chokepoint, not the tenant-only sibling.
 func SeedDocument(t *testing.T, ctx context.Context, db *sql.DB, schema, docID, tenantID, createdBy string) {
 	t.Helper()
+	// template_version_id (uuid NOT NULL) and form_data_json (jsonb NOT NULL)
+	// carry no FK to templates_template_version on public.documents, so a
+	// freshly minted uuid satisfies the NOT NULL without an extra seed
+	// (mirrors factory.go's NewDocument free-mint idiom for the same column).
 	seedWithCapsIdentity(t, db, tenantID, createdBy, `[{"cap":"document.create"}]`, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, fmt.Sprintf(`
-			INSERT INTO %s (id, tenant_id, name, status, created_by, revision_version, created_at, updated_at)
-			VALUES ($1::uuid, $2::uuid, 'Test Document', 'draft', $3, 1, now(), now())
+			INSERT INTO %s (id, tenant_id, template_version_id, name, status, form_data_json, created_by, revision_version, created_at, updated_at)
+			VALUES ($1::uuid, $2::uuid, gen_random_uuid(), 'Test Document', 'draft', '{}'::jsonb, $3, 1, now(), now())
 			ON CONFLICT (id) DO NOTHING`,
 			Qualified(schema, "documents")),
 			docID, tenantID, createdBy,

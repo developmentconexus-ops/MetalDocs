@@ -71,9 +71,9 @@ func seedTemplateWithVersion(t *testing.T, db *sql.DB, tenantID, templateID stri
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO public.templates_template
 		   (id, tenant_id, doc_type_code, key, name, description,
-		    visibility, latest_version, created_by, system_owned)
+		    latest_version, created_by, system_owned)
 		 VALUES ($1::uuid, $2::uuid, 'system', $3, 'Test Template', '',
-		         'internal', $4, 'tester', false)`,
+		         $4, 'tester', false)`,
 		templateID, tenantID, "tpl-key-"+templateID, versionNumber,
 	); err != nil {
 		t.Fatalf("seed template: %v", err)

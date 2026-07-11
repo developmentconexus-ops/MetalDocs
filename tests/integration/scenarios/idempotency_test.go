@@ -35,7 +35,7 @@ func TestIdempotency_SameKeyReplay(t *testing.T) {
 		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
-			($1::uuid, $2, $3, $4, 'abc', 201, '{}'::jsonb, 'completed', now() + interval '1 day')`,
+			($1::uuid, $2, $3, $4, 'abc', 201, '\x7b7d'::bytea, 'completed', now() + interval '1 day')`,
 		tenantID, actorUserID, routeTemplate, key,
 	); err != nil {
 		t.Fatalf("seed insert: %v", err)
@@ -46,7 +46,7 @@ func TestIdempotency_SameKeyReplay(t *testing.T) {
 		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
-			($1::uuid, $2, $3, $4, 'abc', 201, '{}'::jsonb, 'completed', now() + interval '1 day')
+			($1::uuid, $2, $3, $4, 'abc', 201, '\x7b7d'::bytea, 'completed', now() + interval '1 day')
 		ON CONFLICT (tenant_id, actor_user_id, route_template, key)
 		DO UPDATE SET
 			payload_hash = metaldocs.idempotency_keys.payload_hash
@@ -101,7 +101,7 @@ func TestIdempotency_SameKeyDifferentPayload(t *testing.T) {
 		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
-			($1::uuid, $2, $3, $4, 'hash-A', 200, '{}'::jsonb, 'completed', now() + interval '1 day')`,
+			($1::uuid, $2, $3, $4, 'hash-A', 200, '\x7b7d'::bytea, 'completed', now() + interval '1 day')`,
 		tenantID, actorUserID, routeTemplate, key,
 	); err != nil {
 		t.Fatalf("seed insert: %v", err)
@@ -111,7 +111,7 @@ func TestIdempotency_SameKeyDifferentPayload(t *testing.T) {
 		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
-			($1::uuid, $2, $3, $4, 'hash-B', 200, '{}'::jsonb, 'completed', now() + interval '1 day')
+			($1::uuid, $2, $3, $4, 'hash-B', 200, '\x7b7d'::bytea, 'completed', now() + interval '1 day')
 		ON CONFLICT (tenant_id, actor_user_id, route_template, key) DO NOTHING`,
 		tenantID, actorUserID, routeTemplate, key,
 	); err != nil {
@@ -159,7 +159,7 @@ func TestIdempotency_Expired_NewEntry(t *testing.T) {
 		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
-			($1::uuid, $2, $3, $4, 'old-hash', 200, '{}'::jsonb, 'completed', now() - interval '1 hour')`,
+			($1::uuid, $2, $3, $4, 'old-hash', 200, '\x7b7d'::bytea, 'completed', now() - interval '1 hour')`,
 		tenantID, actorUserID, routeTemplate, key,
 	); err != nil {
 		t.Fatalf("seed expired row: %v", err)
@@ -183,7 +183,7 @@ func TestIdempotency_Expired_NewEntry(t *testing.T) {
 		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
-			($1::uuid, $2, $3, $4, 'new-hash', 201, '{}'::jsonb, 'completed', $5)`,
+			($1::uuid, $2, $3, $4, 'new-hash', 201, '\x7b7d'::bytea, 'completed', $5)`,
 		tenantID, actorUserID, routeTemplate, key, newExpiry,
 	); err != nil {
 		t.Fatalf("insert new row after janitor cleanup: %v", err)
@@ -245,7 +245,7 @@ func TestIdempotency_Concurrent_OnlyOneWins(t *testing.T) {
 				INSERT INTO metaldocs.idempotency_keys
 					(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 				VALUES
-					($1::uuid, $2, $3, $4, $5, 200, '{}'::jsonb, 'completed', now() + interval '1 day')`,
+					($1::uuid, $2, $3, $4, $5, 200, '\x7b7d'::bytea, 'completed', now() + interval '1 day')`,
 				tenantID, actorUserID, routeTemplate, key, fmt.Sprintf("concurrent-hash-%d", i),
 			)
 			errs[i] = err
