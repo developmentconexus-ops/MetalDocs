@@ -64,6 +64,11 @@ subagents dispatched by the hub are **git read-only** (diff/show/log; never chec
 hub→chip `send_message` prompts the operator to confirm each send; chip→hub arrives on the hub's
 next turn. That keeps the operator in the loop by design.
 
+**Hub bootstrap:** any fresh session becomes the hub via the `harness-hub` skill
+(`.claude/skills/harness-hub/SKILL.md`) — it reconstructs hub state from repo truth (this file,
+ROADMAP, git, task board, live chip sessions, :80 stack health) and runs the loop below. One hub
+at a time; a new hub first confirms the old hub session is not mid-merge.
+
 **Hub instrumentation:** the hub mirrors the ROADMAP queue as its own native task board
 (one task per unit, blockedBy = the roadmap's ordering locks), may read a chip session's
 transcript mid-flight (`list_events`, operator-approved) for audit, may inject corrections into
