@@ -22,6 +22,7 @@ export interface DocumentProfile {
   defaultTemplateVersionId: string | null;
   ownerUserId: string | null;
   editableByRole: string;
+  governanceClass: components["schemas"]["DocumentProfileItem"]["governance_class"];
   archivedAt: string | null;
   createdAt: string;
 }
