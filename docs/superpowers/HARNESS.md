@@ -37,7 +37,32 @@ copied from the main checkout (never printed). Chip prompts must state this.
 numbered instructions, not a passing mention; (b) "read docs/superpowers/HARNESS.md §4–§5 before
 implementing"; (c) the evidence.md dispatch-ledger requirement — the hub rejects closures whose
 evidence lists no implementer/reviewer dispatches; (d) the task-board obligation — create the
-native task board from the plan before any dispatch, keep statuses live.
+native task board from the plan before any dispatch, keep statuses live; (e) the hub comms
+contract below, including the hub's `HUB_SESSION_ID` so the chip can address it from turn one.
+
+**Hub–chip comms protocol (operator-ratified 2026-07-11).** Chips are not fire-and-forget: every
+chip session talks to the hub over `mcp__ccd_session_mgmt__send_message` (target =
+`HUB_SESSION_ID` from the chip prompt; fallback: `list_sessions` and match the hub by cwd = repo
+root + hub title). Messages are structured events, not chat — one message per event, header line
+first:
+
+| Event | When | Payload (keep caveman-brief) |
+|---|---|---|
+| `CLOSED` | unit done, commits in place | unit id · branch + commit range · gates run + results · defers · HS-1 items. **Mandatory** — the closure report travels as a message, never sits waiting in the chip transcript. |
+| `BLOCKED` | stop-rule hit (architecture contradiction, broken prerequisite, budget ceiling) | what blocked, evidence, smallest unblock ask. Send IMMEDIATELY — do not burn budget waiting or patching around it. |
+| `ESCALATION` | out-of-scope defect found (pre-existing debt, product defect) | classification + reproduction pointer; keep fixing in-scope work meanwhile if possible. |
+| `REQUEST` | needs a shared resource | e.g. :80 stack rebuild/restart, DB reseed — the hub owns shared infra; chips never take it. |
+| `ACK` | hub sent a mid-flight correction | one line: what was applied / why not applicable. |
+
+Hub side of the contract: `CLOSED` triggers the acceptance pipeline (independent read-only
+reviewer → verdict → merge or remediation) without operator relaying; `BLOCKED`/`ESCALATION` get
+a decision or an operator escalation, not silence; ACCEPT-WITH-CONDITIONS / REJECT findings go
+back **to the same chip session** via `send_message` — context is intact there, so remediation is
+a message, not a new chip (a new corrective chip only on 2× reject = redesign). Reviewer
+subagents dispatched by the hub are **git read-only** (diff/show/log; never checkout/apply/stash
+— an acceptance reviewer once contaminated the main index via checkout). Known friction, accepted:
+hub→chip `send_message` prompts the operator to confirm each send; chip→hub arrives on the hub's
+next turn. That keeps the operator in the loop by design.
 
 **Hub instrumentation:** the hub mirrors the ROADMAP queue as its own native task board
 (one task per unit, blockedBy = the roadmap's ordering locks), may read a chip session's
@@ -61,7 +86,8 @@ P6 JUDGE     milestone validation gate (milestone end only) — separation of po
              read-only milestone-reviewer crew). Legacy programs mid-flight (M2d, M5) whose
              worktrees still carry the old milestone-validator agent may finish on it.
 P7 CLOSE     evidence.md (commands+outcomes+review disposition+bounded defers+REQ IDs)
-             → commit → HS-1 operator gate where the program requires it → update ROADMAP row
+             → commit → CLOSED message to hub (comms protocol above) → hub acceptance pipeline
+             → HS-1 operator gate where the program requires it → update ROADMAP row
 ```
 
 Stop rules (inherited, restated): architecture contradiction mid-implementation = AS-2 stop, not
@@ -190,5 +216,8 @@ can't render (F-UI-1 class), the task reports CANNOT immediately — never fakes
   ladder from L0 — no partial re-verification of "just the failing bit".
 - Same slice fails review twice: escalate to orchestrator redesign of the slice, not a third patch.
 - Contradiction with an invariant/ADR: STOP, write the finding, operator decides (AS-1/AS-2 shape).
+- Any stop-rule hit inside a chip session: send `BLOCKED` (or `ESCALATION` for out-of-scope
+  defects) to the hub immediately per the §2 comms protocol — never wait silently in the chip
+  transcript for the operator to notice.
 - Never: skip hooks, force-push, fake evidence, widen scope to "fix while here" (spawn_task chip
   for out-of-scope findings instead).
