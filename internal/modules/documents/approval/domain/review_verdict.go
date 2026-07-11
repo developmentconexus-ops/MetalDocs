@@ -20,17 +20,23 @@ const (
 	VerdictRequestChanges Verdict = "request_changes"
 )
 
-// ErrVerdictWrongStageKind is returned by NewVerdict when the target stage is
-// not StageKindReview — verdicts may only be recorded against review-kind
-// stages (approval-kind stages use signoffs).
-var ErrVerdictWrongStageKind = errors.New("review_verdict: stage must be kind 'review'")
+// ErrVerdictWrongStageKind is returned by NewVerdict when the target stage
+// kind is neither StageKindReview nor StageKindApproval.
+var ErrVerdictWrongStageKind = errors.New("review_verdict: stage kind must be 'review' or 'approval'")
 
 // ErrVerdictCommentRequired is returned by NewVerdict when Verdict is
 // VerdictRequestChanges and Comment is empty.
 var ErrVerdictCommentRequired = errors.New("review_verdict: comment is required for request_changes")
 
-// ReviewVerdict is an immutable value object recorded against a review-kind
-// stage. Mirrors Signoff's shape (unexported fields, getters, no setters).
+// ErrVerdictReadyOnApprovalStage is returned by NewVerdict when a `ready`
+// verdict targets an approval-kind stage. Approval stages accept only
+// `request_changes` (R3/G2: an approver may return a document without
+// signing, but `ready` would bypass the e-signature ceremony).
+var ErrVerdictReadyOnApprovalStage = errors.New("review_verdict: 'ready' verdict is not allowed on an approval-kind stage")
+
+// ReviewVerdict is an immutable value object recorded against a stage of the
+// approval route (review- or approval-kind). Mirrors Signoff's shape
+// (unexported fields, getters, no setters).
 type ReviewVerdict struct {
 	id                       string
 	approvalInstanceID       string
@@ -93,8 +99,11 @@ type VerdictParams struct {
 }
 
 // NewVerdict constructs an immutable ReviewVerdict value object. Enforces:
-// the stage must be StageKindReview; request_changes requires a non-empty
-// Comment; Verdict must be one of the two defined values.
+// review-kind stages accept both ready and request_changes; approval-kind
+// stages accept only request_changes (R3/G2) and reject ready via
+// ErrVerdictReadyOnApprovalStage; any other stage kind is rejected via
+// ErrVerdictWrongStageKind. request_changes requires a non-empty Comment;
+// Verdict must be one of the two defined values.
 func NewVerdict(p VerdictParams) (*ReviewVerdict, error) {
 	if p.ID == "" {
 		return nil, errors.New("review_verdict: ID is required")
@@ -114,7 +123,15 @@ func NewVerdict(p VerdictParams) (*ReviewVerdict, error) {
 	if p.VerdictAt.IsZero() {
 		return nil, errors.New("review_verdict: VerdictAt must not be zero")
 	}
-	if p.StageKind != StageKindReview {
+	switch p.StageKind {
+	case StageKindReview:
+		// review stages accept both ready and request_changes
+	case StageKindApproval:
+		if p.Verdict == VerdictReady {
+			return nil, ErrVerdictReadyOnApprovalStage
+		}
+		// approval stages accept only request_changes (R3/G2)
+	default:
 		return nil, ErrVerdictWrongStageKind
 	}
 	switch p.Verdict {

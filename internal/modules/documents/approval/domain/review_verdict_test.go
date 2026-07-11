@@ -62,12 +62,65 @@ func TestNewVerdict_RequestChangesWithComment(t *testing.T) {
 	}
 }
 
-func TestNewVerdict_WrongStageKindRejected(t *testing.T) {
+func TestNewVerdict_ReadyOnApprovalStageRejected(t *testing.T) {
 	_, err := NewVerdict(VerdictParams{
 		ID:                 "v1",
 		ApprovalInstanceID: "inst-1",
 		StageInstanceID:    "s1",
 		StageKind:          StageKindApproval,
+		ActorUserID:        "u1",
+		ActorTenantID:      "t1",
+		Verdict:            VerdictReady,
+		VerdictAt:          time.Now(),
+	})
+	if !errors.Is(err, ErrVerdictReadyOnApprovalStage) {
+		t.Errorf("want ErrVerdictReadyOnApprovalStage; got %v", err)
+	}
+}
+
+func TestNewVerdict_RequestChangesOnApprovalStageAllowed(t *testing.T) {
+	v, err := NewVerdict(VerdictParams{
+		ID:                 "v1",
+		ApprovalInstanceID: "inst-1",
+		StageInstanceID:    "s1",
+		StageKind:          StageKindApproval,
+		ActorUserID:        "u1",
+		ActorTenantID:      "t1",
+		Verdict:            VerdictRequestChanges,
+		Comment:            "please fix section 3",
+		VerdictAt:          time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("NewVerdict: %v", err)
+	}
+	if v.Verdict() != VerdictRequestChanges {
+		t.Errorf("want VerdictRequestChanges; got %s", v.Verdict())
+	}
+}
+
+func TestNewVerdict_RequestChangesOnApprovalStageWithoutCommentRejected(t *testing.T) {
+	_, err := NewVerdict(VerdictParams{
+		ID:                 "v1",
+		ApprovalInstanceID: "inst-1",
+		StageInstanceID:    "s1",
+		StageKind:          StageKindApproval,
+		ActorUserID:        "u1",
+		ActorTenantID:      "t1",
+		Verdict:            VerdictRequestChanges,
+		Comment:            "",
+		VerdictAt:          time.Now(),
+	})
+	if !errors.Is(err, ErrVerdictCommentRequired) {
+		t.Errorf("want ErrVerdictCommentRequired; got %v", err)
+	}
+}
+
+func TestNewVerdict_UnknownStageKindRejected(t *testing.T) {
+	_, err := NewVerdict(VerdictParams{
+		ID:                 "v1",
+		ApprovalInstanceID: "inst-1",
+		StageInstanceID:    "s1",
+		StageKind:          StageKind("bogus"),
 		ActorUserID:        "u1",
 		ActorTenantID:      "t1",
 		Verdict:            VerdictReady,

@@ -122,10 +122,18 @@ func (s *ReviewVerdictService) RecordVerdict(ctx context.Context, runner db.TxRu
 			return infrastructure.ErrStageNotActive
 		}
 
-		// Verdicts are only valid against review-kind stages; approval-kind
-		// stages use signoffs. NewVerdict enforces this too, but checking here
-		// first lets us return a clean error before any eligibility/SoD work.
-		if activeStage.Kind != domain.StageKindReview {
+		// Verdicts are valid on review stages (both values) and on approval
+		// stages only as request_changes (R3/G2: approval powers include the
+		// power to converse/return without signing; `ready` on an approval stage
+		// would bypass the e-signature ceremony). Checked here first for a clean
+		// error before eligibility/SoD work; NewVerdict re-enforces authoritatively.
+		switch activeStage.Kind {
+		case domain.StageKindReview:
+		case domain.StageKindApproval:
+			if req.Verdict == domain.VerdictReady {
+				return domain.ErrVerdictReadyOnApprovalStage
+			}
+		default:
 			return domain.ErrVerdictWrongStageKind
 		}
 

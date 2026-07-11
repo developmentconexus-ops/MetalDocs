@@ -72,6 +72,20 @@ func TestMapErrorToResponse(t *testing.T) {
 			wantTitle:  domain.ErrNoActiveStage.Error(),
 		},
 		{
+			name:       "R3/G2 verdict ready on approval stage",
+			err:        domain.ErrVerdictReadyOnApprovalStage,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   "state.verdict_ready_on_approval_stage",
+			wantTitle:  domain.ErrVerdictReadyOnApprovalStage.Error(),
+		},
+		{
+			name:       "R3/G2 verdict wrong stage kind (unreachable internal-state -> 500)",
+			err:        domain.ErrVerdictWrongStageKind,
+			wantStatus: http.StatusInternalServerError,
+			wantCode:   "internal.verdict_wrong_stage_kind",
+			wantTitle:  "internal error", // 5xx bodies stay generic; raw sentinel not leaked
+		},
+		{
 			name:       "repository route in use",
 			err:        infrastructure.ErrRouteInUse,
 			wantStatus: http.StatusConflict,

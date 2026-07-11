@@ -65,13 +65,16 @@ func seedReviewVerdictFixture(t *testing.T, database *sql.DB, stageKind domain.S
 	)
 
 	// Stamp process_area_code_snapshot so LoadDocumentAreaCode resolves the
-	// area without needing a controlled-document field-reader wired.
-	if _, err := database.ExecContext(ctx,
-		`UPDATE public.documents SET process_area_code_snapshot = 'QA' WHERE id = $1::uuid`,
-		doc.ID,
-	); err != nil {
-		t.Fatalf("stamp process_area_code_snapshot: %v", err)
-	}
+	// area without needing a controlled-document field-reader wired. The
+	// documents UPDATE tripwire (migration 0275) requires an asserted
+	// capability; SeedWithCaps asserts document.edit tx-locally on the same
+	// connection so the guarded raw write is sanctioned.
+	testdb.SeedWithCaps(t, database, `[{"cap":"document.edit"}]`, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx,
+			`UPDATE public.documents SET process_area_code_snapshot = 'QA' WHERE id = $1::uuid`,
+			doc.ID)
+		return err
+	})
 
 	route := testdb.NewApprovalRoute(t, database, testdb.WithTenant(tenant.ID))
 
@@ -223,10 +226,12 @@ func TestReviewVerdict_RequestChangesRequiresComment(t *testing.T) {
 	}
 }
 
-// TestReviewVerdict_WrongStageKindRejected asserts a verdict against an
-// approval-kind active stage (signoffs' domain, not review verdicts) is
-// rejected with ErrVerdictWrongStageKind before any eligibility/SoD work.
-func TestReviewVerdict_WrongStageKindRejected(t *testing.T) {
+// TestReviewVerdict_ReadyOnApprovalStageRejected asserts a `ready` verdict
+// against an approval-kind active stage is rejected with
+// ErrVerdictReadyOnApprovalStage before any eligibility/SoD work (R3/G2:
+// approval stages accept only request_changes; `ready` would bypass the
+// e-signature ceremony).
+func TestReviewVerdict_ReadyOnApprovalStageRejected(t *testing.T) {
 	database, _ := testdb.Open(t)
 	fx := seedReviewVerdictFixture(t, database, domain.StageKindApproval)
 
@@ -237,8 +242,46 @@ func TestReviewVerdict_WrongStageKindRejected(t *testing.T) {
 		ActorUserID:     fx.reviewerID,
 		Verdict:         domain.VerdictReady,
 	})
-	if !errors.Is(err, domain.ErrVerdictWrongStageKind) {
-		t.Fatalf("err = %v; want domain.ErrVerdictWrongStageKind", err)
+	if !errors.Is(err, domain.ErrVerdictReadyOnApprovalStage) {
+		t.Fatalf("err = %v; want domain.ErrVerdictReadyOnApprovalStage", err)
+	}
+
+	// No side effects: instance must remain in_progress.
+	if got := instanceStatus(t, database, fx.instanceID); got != string(domain.InstanceInProgress) {
+		t.Errorf("instance status = %q; want in_progress (no mutation on validation failure)", got)
+	}
+}
+
+// TestReviewVerdict_RequestChangesOnApprovalStageThawsToDraft asserts a
+// request_changes verdict against an approval-kind active stage (R3/G2: the
+// power to converse/return without signing) collapses the instance to
+// changes_requested and reverts the document to draft — mirrors
+// TestReviewVerdict_RequestChangesCollapsesInstanceAndDocument for a
+// review-kind stage.
+func TestReviewVerdict_RequestChangesOnApprovalStageThawsToDraft(t *testing.T) {
+	database, _ := testdb.Open(t)
+	fx := seedReviewVerdictFixture(t, database, domain.StageKindApproval)
+
+	result, err := fx.svc.RecordVerdict(context.Background(), fx.runner, application.ReviewVerdictRequest{
+		TenantID:        fx.tenantID,
+		InstanceID:      fx.instanceID,
+		StageInstanceID: fx.stageID,
+		ActorUserID:     fx.reviewerID,
+		Verdict:         domain.VerdictRequestChanges,
+		Comment:         "return for edits",
+	})
+	if err != nil {
+		t.Fatalf("RecordVerdict(request_changes): %v", err)
+	}
+	if !result.ChangesRequested {
+		t.Errorf("ChangesRequested = false; want true")
+	}
+
+	if got := instanceStatus(t, database, fx.instanceID); got != string(domain.InstanceChangesRequested) {
+		t.Errorf("instance status = %q; want %q", got, domain.InstanceChangesRequested)
+	}
+	if got := documentStatus(t, database, fx.documentID); got != "draft" {
+		t.Errorf("document status = %q; want draft", got)
 	}
 }
 

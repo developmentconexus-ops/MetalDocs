@@ -92,6 +92,10 @@ const (
 	approvalCodeValidationSelfDelegation    problem.Code = "validation.self_delegation"
 	approvalCodeValidationDelegationWindow  problem.Code = "validation.delegation_window_invalid"
 	approvalCodeNotFoundDelegation          problem.Code = "not_found.delegation"
+
+	// R3/G2 — review-verdict stage-kind guard.
+	approvalCodeStateVerdictReadyOnApprovalStage problem.Code = "state.verdict_ready_on_approval_stage"
+	approvalCodeInternalVerdictWrongStageKind    problem.Code = "internal.verdict_wrong_stage_kind"
 )
 
 // ValidationError is a generic request-validation failure mapped to HTTP 400
@@ -232,6 +236,21 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, domain.ErrNoActiveStage):
 		statusCode = http.StatusConflict
 		code = approvalCodeStateInstanceCompleted
+	case errors.Is(err, domain.ErrVerdictReadyOnApprovalStage):
+		// R3/G2: a `ready` verdict targeting an approval-kind stage is a
+		// business-rule rejection of a semantically-valid request — 422,
+		// mirroring the v2dom.ErrEffectiveDateMissing / ErrReasonForChangeRequired
+		// precedent above.
+		statusCode = http.StatusUnprocessableEntity
+		code = approvalCodeStateVerdictReadyOnApprovalStage
+	case errors.Is(err, domain.ErrVerdictWrongStageKind):
+		// Only reachable if an active stage carries a kind outside the
+		// DB-constrained {review,approval} set — corrupted internal state, not a
+		// client-caused condition. 500 with a distinct internal.* code, matching
+		// the ErrInsufficientPrivilege / ErrUnknownDB precedent above (not the 422
+		// business-rule class used for ready-on-approval).
+		statusCode = http.StatusInternalServerError
+		code = approvalCodeInternalVerdictWrongStageKind
 	case errors.Is(err, application.ErrDocumentNotFound):
 		statusCode = http.StatusNotFound
 		code = approvalCodeNotFoundDocument
