@@ -253,6 +253,13 @@ var routeRules = []routeRule{
 	// Every runtime verb under this prefix now has its own explicit row matching
 	// its tier-2 authz.Require call.
 	{method: http.MethodPost, pathPrefix: "/api/v1/approval/instances/", pathSuffix: "/signoffs", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// Fast-forward ("Aprovar já", R5, unit 2.3 G3): records a review verdict AND
+	// a binding e-signature approval in one call. Gated on the SAME capability
+	// as stage-signoff (CapDocumentSignoff) — the signature leg is the
+	// strictest of the two writes it performs, so tier-1 must not be looser
+	// than a plain signoff. Tier-2 (CapApprovalReview + CapDocumentSignoff) is
+	// enforced in-tx by the two composed cores (application.FastForwardService).
+	{method: http.MethodPost, pathPrefix: "/api/v1/approval/instances/", pathSuffix: "/fast-forward", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
 	// Review-stage runtime verdicts (M2b F4): tier-2 gates on approval.review
 	// (LoadDocumentAreaCode-resolved area), not document.signoff — verdicts are
 	// a distinct capability class from binding e-signature approvals.

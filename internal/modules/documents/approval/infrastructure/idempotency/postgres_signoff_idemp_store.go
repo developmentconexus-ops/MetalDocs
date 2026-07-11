@@ -14,6 +14,15 @@ import (
 const (
 	documentSignoffRouteTemplate = "POST /api/v1/documents/{id}/signoff"
 	stageSignoffRouteTemplate    = "POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs"
+	// fastForwardRouteTemplate (R5, unit 2.3 G3) is deliberately its OWN
+	// template, distinct from stageSignoffRouteTemplate. Fast-forward and
+	// stage-signoff are different endpoints with different payload shapes
+	// (fast-forward has no `decision` field); sharing a template would let a
+	// replayed stage-signoff Idempotency-Key collide with an unrelated
+	// fast-forward call for the same (tenant, actor, key). Note review-verdict
+	// reuses the stage-signoff template today (a pre-existing quirk) — that is
+	// NOT repeated here; fast-forward gets its own.
+	fastForwardRouteTemplate = "POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/fast-forward"
 )
 
 // SignoffReplayHandle commits or fails an in-flight signoff idempotency slot
@@ -48,8 +57,9 @@ func (h *SignoffReplayHandle) Fail(cause error) error {
 // PostgresSignoffIdempStore implements application.SignoffIdempStore for the
 // document-level and stage-level signoff endpoints.
 type PostgresSignoffIdempStore struct {
-	document *idempotency.Store
-	stage    *idempotency.Store
+	document    *idempotency.Store
+	stage       *idempotency.Store
+	fastForward *idempotency.Store
 }
 
 // NewPostgresSignoffIdempStore constructs a PostgresSignoffIdempStore backed by
@@ -61,8 +71,9 @@ func NewPostgresSignoffIdempStore(db *sql.DB) *PostgresSignoffIdempStore {
 		return &PostgresSignoffIdempStore{}
 	}
 	return &PostgresSignoffIdempStore{
-		document: idempotency.New(db, documentSignoffRouteTemplate),
-		stage:    idempotency.New(db, stageSignoffRouteTemplate),
+		document:    idempotency.New(db, documentSignoffRouteTemplate),
+		stage:       idempotency.New(db, stageSignoffRouteTemplate),
+		fastForward: idempotency.New(db, fastForwardRouteTemplate),
 	}
 }
 
@@ -76,6 +87,13 @@ func (s *PostgresSignoffIdempStore) BeginDocumentReplay(ctx context.Context, ten
 // signoff endpoint. See beginReplayRaw for the return contract.
 func (s *PostgresSignoffIdempStore) BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {
 	return s.beginReplay(ctx, s.stage, tenantID, actorID, idempKey, payloadHash)
+}
+
+// BeginFastForwardReplay claims or replays an idempotency slot for the
+// fast-forward endpoint, under its own fastForwardRouteTemplate (not the
+// stage-signoff template). See beginReplayRaw for the return contract.
+func (s *PostgresSignoffIdempStore) BeginFastForwardReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {
+	return s.beginReplay(ctx, s.fastForward, tenantID, actorID, idempKey, payloadHash)
 }
 
 func (s *PostgresSignoffIdempStore) beginReplay(ctx context.Context, store *idempotency.Store, tenantID, actorID, idempKey, payloadHash string) (application.SignoffReplayCommitter, *application.SignoffReplay, error) {

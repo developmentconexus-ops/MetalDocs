@@ -96,6 +96,10 @@ const (
 	// R3/G2 — review-verdict stage-kind guard.
 	approvalCodeStateVerdictReadyOnApprovalStage problem.Code = "state.verdict_ready_on_approval_stage"
 	approvalCodeInternalVerdictWrongStageKind    problem.Code = "internal.verdict_wrong_stage_kind"
+
+	// R5/unit 2.3 G3 — fast-forward ("Aprovar já") composition guards.
+	approvalCodeStateFastForwardStageNotCompleted problem.Code = "state.fast_forward_stage_not_completed"
+	approvalCodeStateFastForwardNotEligible       problem.Code = "state.fast_forward_not_eligible"
 )
 
 // ValidationError is a generic request-validation failure mapped to HTTP 400
@@ -281,6 +285,21 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, application.ErrDelegationNotFoundOrNotOwned):
 		statusCode = http.StatusNotFound
 		code = approvalCodeNotFoundDelegation
+	case errors.Is(err, domain.ErrFastForwardStageNotCompleted):
+		// R5: the actor's `ready` verdict was recorded but did not satisfy the
+		// active stage's quorum (e.g. all_of with a co-reviewer still pending) —
+		// an illegal state for the fast-forward composite write, not a client
+		// validation error. 409, mirroring the other illegal-state-for-write
+		// cases above (stale revision / instance completed).
+		statusCode = http.StatusConflict
+		code = approvalCodeStateFastForwardStageNotCompleted
+	case errors.Is(err, domain.ErrFastForwardNotEligible):
+		// R5: the verdict completed the stage, but the instance is already
+		// approved, there is no next stage, or the actor is not in the next
+		// (approval-kind) stage's eligible pool — the composite fast-forward
+		// write cannot proceed as one transaction. 409, same class as above.
+		statusCode = http.StatusConflict
+		code = approvalCodeStateFastForwardNotEligible
 	case errors.Is(err, domain.ErrEmptyEligiblePool):
 		// F2 (W6): a stage whose eligibility resolution yields zero actors is a
 		// business-rule rejection at submit time (422), not a 500 — and this
