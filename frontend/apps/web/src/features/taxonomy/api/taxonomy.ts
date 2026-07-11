@@ -40,6 +40,7 @@ function toDocumentProfile(item: DocumentProfileItem): DocumentProfile {
     defaultTemplateVersionId: null,
     ownerUserId: null,
     editableByRole: item.workflow_profile,
+    governanceClass: item.governance_class,
     archivedAt: null,
     createdAt: "",
   };

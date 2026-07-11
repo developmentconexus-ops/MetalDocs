@@ -1,47 +1,23 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-// @ts-expect-error uuid package exists in workspace, no typings exposed in this app.
-import { v4 as uuidv4 } from 'uuid';
 
 import { Dialog } from '../../../../components/ui';
 import { resolveErrorMessage } from '../../../../lib/api/problem';
 import { useAreasQuery } from '../../../documents/queries/useAreasQuery';
 import { useProfilesQuery } from '../../../taxonomy/queries/useProfilesQuery';
 import { useIamRolesQuery } from '../../queries/useIamRolesQuery';
-import type {
-  CreateRouteRequest,
-  RouteSummary,
-  StageRequest,
-  UpdateRouteRequest,
-} from '../../api/routeAdminApi';
+import type { CreateRouteRequest, RouteSummary, UpdateRouteRequest } from '../../api/routeAdminApi';
+import { ApprovalPolicyBadge } from './ApprovalPolicyBadge';
 import {
-  DRIFT_POLICY_OPTIONS,
-  QUORUM_KIND_OPTIONS,
-  describeDriftPolicy,
-  describeQuorumKind,
-  labelForDriftPolicy,
-  labelForQuorumKind,
-  type DriftPolicy,
-  type QuorumKind,
-} from './routeAdminLabels';
+  approveNowOverlapNote,
+  authorExcludedNote,
+  livreBlockedMessage,
+  routePolicyFor,
+  type GovernanceClass,
+} from './routeGovernance';
+import { defaultStage, toDraft, toStageRequests, validateDraft, type RouteDraft } from './routeDraft';
+import { RouteFlowPreview } from './RouteFlowPreview';
+import { StageCard, type StageDraft } from './StageCard';
 import styles from './RouteAdmin.module.css';
-
-interface StageDraft {
-  /** Stable id per draft row so React keys stay constant across edits. */
-  uid: string;
-  label: string;
-  requiredRole: string;
-  requiredCapability: string;
-  areaCode: string;
-  quorumKind: QuorumKind;
-  m: string;
-  driftPolicy: DriftPolicy;
-}
-
-interface RouteDraft {
-  name: string;
-  profileCode: string;
-  stages: StageDraft[];
-}
 
 export interface RouteEditorSubmission {
   /** Present when editing an existing route. */
@@ -60,96 +36,6 @@ interface RouteEditorDialogProps {
   /** Pre-built submission lets the container decide create vs update. */
   onSubmit: (payload: RouteEditorSubmission) => Promise<void>;
   onClose: () => void;
-}
-
-function defaultStage(): StageDraft {
-  return {
-    uid: uuidv4() as string,
-    label: '',
-    requiredRole: '',
-    requiredCapability: 'doc.signoff',
-    areaCode: '',
-    quorumKind: 'any_1_of',
-    m: '1',
-    driftPolicy: 'reduce_quorum',
-  };
-}
-
-function toDraft(route: RouteSummary | null): RouteDraft {
-  if (!route) {
-    return { name: '', profileCode: '', stages: [defaultStage()] };
-  }
-  return {
-    name: route.name,
-    profileCode: route.profile_code,
-    stages: route.stages.map((stage) => ({
-      uid: uuidv4() as string,
-      label: stage.name,
-      requiredRole: stage.required_role ?? '',
-      requiredCapability: stage.required_capability || 'doc.signoff',
-      areaCode: stage.area_code ?? '',
-      quorumKind: stage.quorum,
-      m: String(stage.quorum_m ?? 1),
-      driftPolicy: stage.drift_policy,
-    })),
-  };
-}
-
-function toStageRequests(draft: RouteDraft): StageRequest[] {
-  return draft.stages.map((stage, index): StageRequest => {
-    const payload: StageRequest = {
-      order: index + 1,
-      name: stage.label.trim(),
-      required_role: stage.requiredRole.trim(),
-      required_capability: stage.requiredCapability.trim() || 'doc.signoff',
-      area_code: stage.areaCode.trim(),
-      quorum: stage.quorumKind,
-      drift_policy: stage.driftPolicy,
-    };
-    if (stage.quorumKind === 'm_of_n') {
-      payload.quorum_m = Number(stage.m);
-    }
-    return payload;
-  });
-}
-
-function validateDraft(draft: RouteDraft, isEdit: boolean): string | null {
-  if (!draft.name.trim()) {
-    return 'Informe o nome da rota.';
-  }
-  if (!isEdit && !draft.profileCode.trim()) {
-    return 'Informe o código do perfil.';
-  }
-  if (draft.stages.length === 0) {
-    return 'A rota deve possuir ao menos uma etapa.';
-  }
-
-  const labels = new Set<string>();
-  for (const stage of draft.stages) {
-    const label = stage.label.trim();
-    if (!label) {
-      return 'Toda etapa deve ter nome.';
-    }
-    const normalized = label.toLocaleLowerCase('pt-BR');
-    if (labels.has(normalized)) {
-      return 'Nomes de etapa devem ser distintos.';
-    }
-    labels.add(normalized);
-
-    if (!stage.requiredRole) {
-      return `A etapa "${label}" deve ter uma role definida.`;
-    }
-    if (!stage.areaCode) {
-      return `A etapa "${label}" deve ter uma área definida.`;
-    }
-    if (stage.quorumKind === 'm_of_n') {
-      const mValue = Number(stage.m);
-      if (!Number.isFinite(mValue) || mValue < 1) {
-        return `Na etapa "${label}", informe um valor de M válido.`;
-      }
-    }
-  }
-  return null;
 }
 
 export function RouteEditorDialog({
@@ -186,6 +72,15 @@ export function RouteEditorDialog({
   const profileOptions = profilesQuery.data ?? [];
   const hasNoProfiles = !profilesQuery.isLoading && !profilesQuery.isError && profileOptions.length === 0;
 
+  // Governance class is only known when `draft.profileCode` matches an active
+  // profile option. On edit, an archived route's profile may not be in that
+  // list — in that case client-side gating is skipped and the backend is the
+  // sole enforcer (wiring req #2).
+  const selectedProfile = profileOptions.find((profile) => profile.code === draft.profileCode);
+  const governanceClass: GovernanceClass | null = selectedProfile?.governanceClass ?? null;
+  const policy = governanceClass ? routePolicyFor(governanceClass) : null;
+  const isRouteBlocked = policy !== null && !policy.routeAllowed;
+
   const updateStage = (uid: string, patch: Partial<StageDraft>) => {
     setDraft((prev) => ({
       ...prev,
@@ -208,7 +103,7 @@ export function RouteEditorDialog({
     event.preventDefault();
     setError(null);
 
-    const validationError = validateDraft(draft, isEdit);
+    const validationError = validateDraft(draft, isEdit, governanceClass);
     if (validationError) {
       setError(validationError);
       return;
@@ -257,7 +152,7 @@ export function RouteEditorDialog({
         type="submit"
         form="route-editor-form"
         className={styles.primaryButton}
-        disabled={isSubmitting}
+        disabled={isSubmitting || isRouteBlocked}
       >
         {isSubmitting ? 'Salvando…' : 'Salvar rota'}
       </button>
@@ -351,6 +246,21 @@ export function RouteEditorDialog({
           </small>
         ) : null}
 
+        {policy ? (
+          <ApprovalPolicyBadge policy={policy} />
+        ) : draft.profileCode ? (
+          <small className={styles.helpText}>Perfil não classificado.</small>
+        ) : null}
+
+        {isRouteBlocked ? (
+          <p className={styles.warningBox} role="alert">
+            {livreBlockedMessage()}
+          </p>
+        ) : null}
+
+        <p className={styles.noteBox}>{authorExcludedNote()}</p>
+        <p className={styles.noteBox}>{approveNowOverlapNote()}</p>
+
         <section className={styles.stageSection}>
           <div className={styles.stageSectionHeader}>
             <h3 className={styles.sectionTitle}>Etapas</h3>
@@ -358,141 +268,36 @@ export function RouteEditorDialog({
               type="button"
               className={styles.ghostButton}
               onClick={addStage}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isRouteBlocked}
             >
               Adicionar etapa
             </button>
           </div>
 
-          {draft.stages.map((stage, index) => {
-            const stageNumber = index + 1;
-            const isOnly = draft.stages.length === 1;
-            return (
-              <article className={styles.stageCard} key={stage.uid}>
-                <div className={styles.stageHeader}>
-                  <strong>Etapa {stageNumber}</strong>
-                  <button
-                    type="button"
-                    className={styles.linkButton}
-                    onClick={() => removeStage(stage.uid)}
-                    disabled={isSubmitting || isOnly}
-                    title={isOnly ? 'A rota deve ter ao menos uma etapa.' : undefined}
-                  >
-                    Remover
-                  </button>
-                </div>
+          <RouteFlowPreview
+            stages={draft.stages.map((stage) => ({
+              uid: stage.uid,
+              label: stage.label,
+              kind: stage.stageKind,
+              quorum: stage.quorumKind,
+            }))}
+          />
 
-                <label className={styles.fieldLabel} htmlFor={`stage-label-${stage.uid}`}>
-                  Nome da etapa {stageNumber}
-                </label>
-                <input
-                  id={`stage-label-${stage.uid}`}
-                  className={styles.input}
-                  value={stage.label}
-                  onChange={(event) => updateStage(stage.uid, { label: event.target.value })}
-                  disabled={isSubmitting}
-                />
-
-                <label className={styles.fieldLabel} htmlFor={`stage-role-${stage.uid}`}>
-                  Role requerida da etapa {stageNumber}
-                </label>
-                <select
-                  id={`stage-role-${stage.uid}`}
-                  className={styles.input}
-                  value={stage.requiredRole}
-                  onChange={(event) => updateStage(stage.uid, { requiredRole: event.target.value })}
-                  disabled={isSubmitting || rolesQuery.isLoading}
-                >
-                  <option value="" disabled>
-                    {rolesQuery.isLoading ? 'Carregando roles…' : 'Selecione a role'}
-                  </option>
-                  {roleOptions.map((role) => (
-                    <option key={role.code} value={role.code} title={role.description}>
-                      {role.label}
-                    </option>
-                  ))}
-                </select>
-
-                <label className={styles.fieldLabel} htmlFor={`stage-area-${stage.uid}`}>
-                  Área da etapa {stageNumber}
-                </label>
-                <select
-                  id={`stage-area-${stage.uid}`}
-                  className={styles.input}
-                  value={stage.areaCode}
-                  onChange={(event) => updateStage(stage.uid, { areaCode: event.target.value })}
-                  disabled={isSubmitting || areasQuery.isLoading}
-                >
-                  <option value="" disabled>
-                    {areasQuery.isLoading ? 'Carregando áreas…' : 'Selecione a área'}
-                  </option>
-                  {areaOptions.map((area) => (
-                    <option key={area.code} value={area.code}>
-                      {area.name} ({area.code})
-                    </option>
-                  ))}
-                </select>
-
-                <label className={styles.fieldLabel} htmlFor={`stage-quorum-${stage.uid}`}>
-                  Quórum da etapa {stageNumber}
-                </label>
-                <select
-                  id={`stage-quorum-${stage.uid}`}
-                  className={styles.input}
-                  value={stage.quorumKind}
-                  onChange={(event) =>
-                    updateStage(stage.uid, { quorumKind: event.target.value as QuorumKind })
-                  }
-                  disabled={isSubmitting}
-                >
-                  {QUORUM_KIND_OPTIONS.map((kind) => (
-                    <option key={kind} value={kind}>
-                      {labelForQuorumKind(kind)}
-                    </option>
-                  ))}
-                </select>
-                <small className={styles.helpText}>{describeQuorumKind(stage.quorumKind)}</small>
-
-                {stage.quorumKind === 'm_of_n' ? (
-                  <>
-                    <label className={styles.fieldLabel} htmlFor={`stage-m-${stage.uid}`}>
-                      M da etapa {stageNumber}
-                    </label>
-                    <input
-                      id={`stage-m-${stage.uid}`}
-                      className={styles.input}
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={stage.m}
-                      onChange={(event) => updateStage(stage.uid, { m: event.target.value })}
-                      disabled={isSubmitting}
-                    />
-                  </>
-                ) : null}
-
-                <label className={styles.fieldLabel} htmlFor={`stage-drift-${stage.uid}`}>
-                  Política de drift da etapa {stageNumber}
-                </label>
-                <select
-                  id={`stage-drift-${stage.uid}`}
-                  className={styles.input}
-                  value={stage.driftPolicy}
-                  onChange={(event) =>
-                    updateStage(stage.uid, { driftPolicy: event.target.value as DriftPolicy })
-                  }
-                  disabled={isSubmitting}
-                >
-                  {DRIFT_POLICY_OPTIONS.map((policy) => (
-                    <option key={policy} value={policy}>
-                      {labelForDriftPolicy(policy)}
-                    </option>
-                  ))}
-                </select>
-                <small className={styles.helpText}>{describeDriftPolicy(stage.driftPolicy)}</small>
-              </article>
-            );
-          })}
+          {draft.stages.map((stage, index) => (
+            <StageCard
+              key={stage.uid}
+              stage={stage}
+              stageNumber={index + 1}
+              isOnly={draft.stages.length === 1}
+              disabled={isSubmitting || isRouteBlocked}
+              roleOptions={roleOptions}
+              roleOptionsLoading={rolesQuery.isLoading}
+              areaOptions={areaOptions}
+              areaOptionsLoading={areasQuery.isLoading}
+              updateStage={updateStage}
+              removeStage={removeStage}
+            />
+          ))}
         </section>
       </form>
     </Dialog>

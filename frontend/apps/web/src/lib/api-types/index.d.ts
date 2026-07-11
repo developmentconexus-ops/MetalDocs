@@ -2789,6 +2789,11 @@ export interface components {
             alias?: string;
             description: string;
             review_interval_days: number;
+            /**
+             * @description Per-profile governance classification driving the approval route-signature policy (G1). controlado ⇒ the approval route must contain a signature stage; simples ⇒ a review-only route is allowed; livre ⇒ no approval route is permitted.
+             * @enum {string}
+             */
+            governance_class: "controlado" | "simples" | "livre";
             active_schema_version: number;
             workflow_profile: string;
             approval_required: boolean;
@@ -2824,6 +2829,11 @@ export interface components {
             default_template_version_id?: string | null;
             owner_user_id?: string | null;
             editable_by_role: string;
+            /**
+             * @description Per-profile governance classification (G1). Optional on create; the server defaults to controlado. On update, changing this value routes through the reclassification use-case and may 409 if an active approval route would conflict with the new class.
+             * @enum {string}
+             */
+            governance_class?: "controlado" | "simples" | "livre";
         };
         SetTaxonomyProfileDefaultTemplateRequest: {
             template_version_id: string;

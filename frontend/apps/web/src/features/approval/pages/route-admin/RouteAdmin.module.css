@@ -301,3 +301,153 @@
   font-size: 0.85rem;
   margin-bottom: 8px;
 }
+
+.policyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.policyBadgeRequired {
+  color: #14532d;
+  background: #dcfce7;
+  border: 1px solid var(--slate-success-border);
+}
+
+.policyBadgeOptional {
+  color: var(--slate-text-muted);
+  background: #f1f5f9;
+  border: 1px solid #cbd5f5;
+}
+
+.policyBadgeBlocked {
+  color: var(--slate-danger-text);
+  background: var(--slate-danger-bg-2);
+  border: 1px solid #fecaca;
+}
+
+.pillGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pillOption {
+  position: relative;
+}
+
+.pillOption input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.pillLabel {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--color-border, rgba(15, 23, 42, 0.16));
+  background: var(--surface);
+  color: var(--color-text, #1e293b);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.pillLabelSelected {
+  background: var(--color-accent, #2563eb);
+  border-color: var(--color-accent, #2563eb);
+  color: var(--surface);
+}
+
+.pillOption input:focus-visible + .pillLabel {
+  outline: 2px solid var(--color-accent, #2563eb);
+  outline-offset: 1px;
+}
+
+.pillOption input:disabled + .pillLabel {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.actorSlot {
+  border: 1px solid var(--color-border-subtle, rgba(15, 23, 42, 0.1));
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.actorSlotLegend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text, #1e293b);
+  padding: 0;
+}
+
+.flowPreview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.flowChip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--color-border-subtle, rgba(15, 23, 42, 0.1));
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: var(--color-surface-subtle, #f8fafc);
+  min-width: 120px;
+}
+
+.flowChipLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text, #1e293b);
+}
+
+.flowChipMeta {
+  font-size: 0.75rem;
+  color: var(--slate-text-muted);
+}
+
+.flowArrow {
+  color: var(--slate-text-muted);
+  font-size: 1rem;
+}
+
+.flowRoundBreak {
+  width: 100%;
+  border: none;
+  border-top: 1px dashed var(--color-border, rgba(15, 23, 42, 0.16));
+  margin: 4px 0;
+}
+
+.flowEmpty {
+  color: var(--slate-text-muted);
+  font-size: 0.9rem;
+}
+
+.noteBox {
+  background: var(--color-surface-subtle, #f8fafc);
+  border: 1px solid var(--color-border-subtle, rgba(15, 23, 42, 0.08));
+  color: var(--slate-text-muted);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  margin: 0;
+}

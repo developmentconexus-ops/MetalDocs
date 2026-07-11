@@ -46,6 +46,7 @@ function stageRequestToSummary(
     quorum: stage.quorum,
     quorum_m: stage.quorum_m ?? null,
     drift_policy: stage.drift_policy,
+    stage_kind: stage.stage_kind,
   };
 }
 

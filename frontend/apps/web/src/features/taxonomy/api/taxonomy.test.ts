@@ -78,6 +78,33 @@ describe('fetchProfiles', () => {
     });
   });
 
+  it('maps governance_class (wire) to governanceClass (app shape)', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        items: [
+          {
+            code: 'pop',
+            family_code: 'sop',
+            name: 'Procedimento Operacional',
+            description: 'desc',
+            review_interval_days: 365,
+            active_schema_version: 1,
+            workflow_profile: 'editor',
+            approval_required: true,
+            retention_days: 30,
+            validity_days: 365,
+            governance_class: 'simples',
+          },
+        ],
+      },
+      error: undefined,
+    });
+
+    const profiles = await fetchProfiles();
+
+    expect(profiles[0].governanceClass).toBe('simples');
+  });
+
   it('returns an empty array when items is absent', async () => {
     mockGet.mockResolvedValue({ data: {}, error: undefined });
     const profiles = await fetchProfiles();

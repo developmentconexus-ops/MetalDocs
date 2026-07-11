@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { toast } from 'sonner';
 
+import { QK } from '../../../lib/queryKeys';
 import { ApprovalError } from '../api/mutationClient';
 import * as routeAdminApi from '../api/routeAdminApi';
+import type { ListRoutesResponse } from '../api/routeAdminApi';
 import { useCreateRoute, useUpdateRoute } from './useRouteAdminMutations';
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
@@ -25,6 +27,12 @@ function wrapper({ children }: { children: ReactNode }) {
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   });
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
+
+function makeWrapperWithClient(client: QueryClient) {
+  return function ClientWrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
 }
 
 const createStage = () => ({
@@ -78,5 +86,62 @@ describe('useRouteAdminMutations toast behaviour', () => {
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rota criada.'));
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('preserves stage_kind in the optimistic cache patch before onSettled refetch', async () => {
+    const client = new QueryClient({
+      defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
+    });
+    const queryKey = QK.approval.routes.list();
+    const initial: ListRoutesResponse = {
+      routes: [
+        {
+          id: 'route-a',
+          name: 'Rota A',
+          tenant_id: 'tenant-1',
+          profile_code: 'JUR',
+          active: true,
+          version: 1,
+          stages: [
+            {
+              order: 1,
+              name: 'Revisão',
+              required_role: 'approver',
+              required_capability: 'doc.signoff',
+              area_code: 'ops',
+              quorum: 'any_1_of',
+              quorum_m: null,
+              drift_policy: 'reduce_quorum',
+              stage_kind: 'review',
+            },
+          ],
+          created_at: '2026-01-01T00:00:00.000Z',
+          updated_at: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      total: 1,
+    };
+    client.setQueryData(queryKey, initial);
+
+    // Never-resolving promise: lets us inspect the cache mid-flight, before
+    // onSuccess/onSettled would refetch and mask a broken optimistic patch.
+    vi.mocked(routeAdminApi.updateRoute).mockReturnValueOnce(new Promise(() => {}));
+
+    const { result } = renderHook(() => useUpdateRoute(), {
+      wrapper: makeWrapperWithClient(client),
+    });
+
+    result.current.mutate({
+      routeId: 'route-a',
+      body: {
+        name: 'Rota A',
+        stages: [{ ...createStage(), stage_kind: 'approval' }],
+      },
+    });
+
+    await waitFor(() => {
+      const cached = client.getQueryData<ListRoutesResponse>(queryKey);
+      expect(cached?.routes[0]?.stages[0]?.stage_kind).toBe('approval');
+    });
   });
 });
