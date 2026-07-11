@@ -3495,11 +3495,14 @@ paths:
     post:
       summary: Record review-stage runtime verdict
       description: >-
-        Records a `ready`/`request_changes` verdict against a review-kind
-        stage (StageKind=review). `ready` is quorum-counted exactly like a
-        signoff approval; `request_changes` immediately collapses the
-        instance to changes_requested and reverts the document to draft
-        (no quorum needed) — requires a non-empty comment (M2b F4).
+        Records a `ready`/`request_changes` verdict. `ready` is accepted only
+        on review-kind stages (StageKind=review) and is quorum-counted
+        exactly like a signoff approval; a `ready` verdict on an
+        approval-kind stage is rejected with 422. `request_changes` is
+        accepted on both review- and approval-kind stages — it is
+        comment-only (requires a non-empty comment, M2b F4), immediately
+        collapses the instance to changes_requested, and reverts the
+        document to draft (no quorum needed).
       tags: [approval]
       operationId: recordApprovalReviewVerdict
       x-authz-area:
@@ -3540,6 +3543,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
         '500':
