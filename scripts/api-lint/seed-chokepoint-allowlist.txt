@@ -34,3 +34,5 @@ internal/modules/taxonomy/infrastructure/authz_guc.go:31  # raw BeginTx — shar
 
 internal/modules/iam/application/onboard_tenant_service.go:182  # category B — platform-operator tenant onboarding: actor identity arrives as explicit args (operator-tooling API), the tx later re-seeds to the NEW tenant for provisioning writes; carrier-less-ctx callers (tests/tooling) get no chokepoint auto-seed, so this manual seed is load-bearing
 internal/modules/iam/application/tenant_lifecycle_service.go:188  # category B — cross-tenant operator tooling (tenant.export/tenant.erase): actor's tenant ≠ target tenant, identity arrives as explicit args, tx later re-seeds to the TARGET tenant before the job INSERT; carrier-less-ctx callers get no chokepoint auto-seed
+
+tests/integration/testdb/fixtures.go:227  # raw BeginTx — canonical testdb fixture factory, not chokepoint-covered

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	"metaldocs/tests/integration/testdb"
 )
 
 // TestTenantUserRepository_TenantUserIDs_Live exercises TenantUserIDs against a
@@ -23,31 +24,45 @@ func TestTenantUserRepository_TenantUserIDs_Live(t *testing.T) {
 	ctx := context.Background()
 	repo := iampg.NewTenantUserRepository(db)
 
-	const tenantID = "f4500000-0000-4000-8000-0000000000aa"
-	const otherTenantID = "f4500000-0000-4000-8000-0000000000bb"
-	const unknownTenantID = "f4500000-0000-4000-8000-0000000000cc"
+	// NOTE: distinct from security package's port-parity F4.5 tenant literals
+	// (f4500000-...) — this test's cap-assert fix surfaced a cross-package
+	// tenant-ID collision that was previously masked by both tests failing
+	// earlier (P0001) before ever reaching a query that would observe it.
+	const tenantID = "f4520000-0000-4000-8000-0000000000aa"
+	const otherTenantID = "f4520000-0000-4000-8000-0000000000bb"
+	const unknownTenantID = "f4520000-0000-4000-8000-0000000000cc"
 	const userActive = "tur-active-f45"
 	const userDeactivated = "tur-deactivated-f45"
 	const userOtherTenant = "tur-other-f45"
 
 	cleanup := func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.iam_users WHERE user_id IN ($1, $2, $3)`,
-			userActive, userDeactivated, userOtherTenant)
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.tenants WHERE id IN ($1::uuid, $2::uuid)`,
-			tenantID, otherTenantID)
+		// iam_users and tenants carry trg_require_cap_asserted (user.manage /
+		// tenant.onboard) — assert both tx-locally so this best-effort cleanup
+		// actually deletes rows instead of silently no-op'ing and leaking
+		// duplicate-key state into the next run.
+		if tx, err := db.BeginTx(ctx, nil); err == nil {
+			testdb.SetCapsOnTx(t, tx, `[{"cap":"user.manage"},{"cap":"tenant.onboard"}]`)
+			_, _ = tx.ExecContext(ctx, `DELETE FROM metaldocs.iam_users WHERE user_id IN ($1, $2, $3)`,
+				userActive, userDeactivated, userOtherTenant)
+			_, _ = tx.ExecContext(ctx, `DELETE FROM metaldocs.tenants WHERE id IN ($1::uuid, $2::uuid)`,
+				tenantID, otherTenantID)
+			_ = tx.Commit()
+		}
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
 	for _, tid := range []string{tenantID, otherTenantID} {
-		if _, err := db.ExecContext(ctx,
-			`INSERT INTO metaldocs.tenants (id, name, slug)
-			 VALUES ($1::uuid, 'F4.5 Tenant '||$1, 'f45-'||$1)
-			 ON CONFLICT (id) DO NOTHING`,
-			tid,
-		); err != nil {
-			t.Fatalf("insert tenant %s: %v", tid, err)
-		}
+		tid := tid
+		seedWithCapsIAM(t, db, `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx,
+				`INSERT INTO metaldocs.tenants (id, name, slug)
+				 VALUES ($1::uuid, 'F4.5 Tenant '||$1, 'f45-'||$1)
+				 ON CONFLICT (id) DO NOTHING`,
+				tid,
+			)
+			return err
+		})
 	}
 
 	// Two members of tenantID — one deactivated; one member of otherTenantID.

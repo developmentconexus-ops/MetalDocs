@@ -26,6 +26,7 @@ import (
 
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
+	"metaldocs/tests/integration/testdb"
 )
 
 func openLiveSecurityDB(t *testing.T) *sql.DB {
@@ -74,20 +75,28 @@ func TestSecurityRepository_NoIamUsersJoin_Live(t *testing.T) {
 	cleanup := func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.auth_sessions WHERE user_id = ANY($1)`, asArray(allUsers))
 		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.auth_identities WHERE user_id = ANY($1)`, asArray(allUsers))
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.iam_users WHERE user_id = ANY($1)`, asArray(allUsers))
-		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.tenants WHERE id IN ($1::uuid, $2::uuid)`, tenantA, tenantB)
+		// iam_users and tenants carry trg_require_cap_asserted (user.manage / tenant.onboard) —
+		// assert both tx-locally so this best-effort cleanup actually deletes rows instead of
+		// silently no-op'ing and leaking duplicate-key state into the next run.
+		if tx, err := db.BeginTx(ctx, nil); err == nil {
+			testdb.SetCapsOnTx(t, tx, `[{"cap":"user.manage"},{"cap":"tenant.onboard"}]`)
+			_, _ = tx.ExecContext(ctx, `DELETE FROM metaldocs.iam_users WHERE user_id = ANY($1)`, asArray(allUsers))
+			_, _ = tx.ExecContext(ctx, `DELETE FROM metaldocs.tenants WHERE id IN ($1::uuid, $2::uuid)`, tenantA, tenantB)
+			_ = tx.Commit()
+		}
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
 	// Tenants.
 	for _, tid := range []string{tenantA, tenantB} {
-		if _, err := db.ExecContext(ctx,
-			`INSERT INTO metaldocs.tenants (id, name, slug)
-			 VALUES ($1::uuid, 'F4.6 Tenant '||$1, 'f46-'||$1)
-			 ON CONFLICT (id) DO NOTHING`, tid); err != nil {
-			t.Fatalf("insert tenant %s: %v", tid, err)
-		}
+		testdb.SeedWithCaps(t, db, `[{"cap":"tenant.onboard"}]`, func(tx *sql.Tx) error {
+			_, err := tx.ExecContext(ctx,
+				`INSERT INTO metaldocs.tenants (id, name, slug)
+				 VALUES ($1::uuid, 'F4.6 Tenant '||$1, 'f46-'||$1)
+				 ON CONFLICT (id) DO NOTHING`, tid)
+			return err
+		})
 	}
 
 	// iam_users membership (NO row for userGhost — proves JOIN removal + fallback).
@@ -100,17 +109,21 @@ func TestSecurityRepository_NoIamUsersJoin_Live(t *testing.T) {
 		{userDeact, "Deact Sec", tenantA, true},
 		{userOther, "Other Sec", tenantB, false},
 	} {
-		if _, err := db.ExecContext(ctx,
-			`INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, tenant_id, created_at, updated_at)
-			 VALUES ($1, $2, TRUE, $3::uuid, now(), now())`, m.id, m.name, m.tenant); err != nil {
-			t.Fatalf("insert iam_user %s: %v", m.id, err)
-		}
-		if m.deactivated {
-			if _, err := db.ExecContext(ctx,
-				`UPDATE metaldocs.iam_users SET deactivated_at = now() WHERE user_id = $1`, m.id); err != nil {
-				t.Fatalf("deactivate %s: %v", m.id, err)
+		m := m
+		testdb.SeedWithCaps(t, db, `[{"cap":"user.manage"}]`, func(tx *sql.Tx) error {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, tenant_id, created_at, updated_at)
+				 VALUES ($1, $2, TRUE, $3::uuid, now(), now())`, m.id, m.name, m.tenant); err != nil {
+				return err
 			}
-		}
+			if m.deactivated {
+				if _, err := tx.ExecContext(ctx,
+					`UPDATE metaldocs.iam_users SET deactivated_at = now() WHERE user_id = $1`, m.id); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
 	}
 
 	// auth_identities — all four; locked; userActive over the failed-login threshold.

@@ -120,8 +120,8 @@ VALUES
 	if err == nil {
 		t.Fatal("expected direct INSERT into user_process_areas to be blocked")
 	}
-	if got := pqCode(err); got != "42501" {
-		t.Fatalf("expected SQLSTATE 42501, got %q (err=%v)", got, err)
+	if got := pqCode(err); got != "P0001" {
+		t.Fatalf("expected SQLSTATE P0001 (ErrCapabilityNotAsserted: one of {membership.manage}), got %q (err=%v)", got, err)
 	}
 }
 

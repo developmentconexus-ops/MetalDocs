@@ -47,6 +47,10 @@ func previewRequest(t *testing.T, tenantID, actorUserID string) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/preview-code", nil)
 	ctx := tenant.WithTenantID(req.Context(), tenantID)
+	// TxRunner.seedTxIdentityFromContext reads the actor via
+	// platformtenant.ActorFromContext — seed both the tenant and actor GUC
+	// sources so the SUT-owned tx has metaldocs.actor_id set (else P0001 → 500).
+	ctx = tenant.WithActorID(ctx, actorUserID)
 	ctx = iamdomain.WithAuthContext(ctx, actorUserID, []iamdomain.Role{"author"})
 	return req.WithContext(ctx)
 }

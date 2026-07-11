@@ -6,11 +6,13 @@ package jobs
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
+	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/infrastructure"
 	"metaldocs/internal/platform/objectstore"
@@ -67,7 +69,22 @@ func seedTemplateWithVersion(t *testing.T, db *sql.DB, tenantID, templateID stri
 	}
 	defer tx.Rollback()
 
-	testdb.SetCapsOnTx(t, tx, `[{"cap":"template.create"}]`)
+	testdb.SetCapsOnTx(t, tx, `[{"cap":"template.create"},{"cap":"tenant.onboard"}]`)
+	if err := authz.SeedTxTenant(ctx, tx, tenantID); err != nil {
+		t.Fatalf("seed tenant GUC: %v", err)
+	}
+	// templates_template_version.tenant_id FKs to metaldocs.tenants(id).
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO metaldocs.tenants (id, name, slug)
+		 VALUES ($1::uuid, 'Orphan Sweeper Tenant '||$1, 'orphan-'||$1)
+		 ON CONFLICT (id) DO NOTHING`,
+		tenantID,
+	); err != nil {
+		t.Fatalf("seed tenant: %v", err)
+	}
+	// chk_template_version_content_hash requires either '' or exactly 64 chars
+	// (sha256 hex digest length).
+	contentHash := strings.Repeat("0", 64)
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO public.templates_template
 		   (id, tenant_id, doc_type_code, key, name, description,
@@ -82,8 +99,8 @@ func seedTemplateWithVersion(t *testing.T, db *sql.DB, tenantID, templateID stri
 		`INSERT INTO public.templates_template_version
 		   (id, tenant_id, template_id, version_number, status, docx_storage_key, content_hash,
 		    metadata_schema, placeholder_schema, author_id, pending_approver_role, lock_version)
-		 VALUES ($1::uuid, $5::uuid, $2::uuid, $3, 'draft', $4, 'hash', '{}'::jsonb, '[]'::jsonb, 'tester', 'approver', 0)`,
-		uuid.NewString(), templateID, versionNumber, docxKey, tenantID,
+		 VALUES ($1::uuid, $6::uuid, $2::uuid, $3, 'draft', $4, $5, '{}'::jsonb, '[]'::jsonb, 'tester', 'approver', 0)`,
+		uuid.NewString(), templateID, versionNumber, docxKey, contentHash, tenantID,
 	); err != nil {
 		t.Fatalf("seed version: %v", err)
 	}
@@ -109,8 +126,14 @@ func TestTemplateOrphanSweeper_DeletesOnlyAgedUnreferenced(t *testing.T) {
 
 	// A separate tenant also owns a template, so TenantIDsWithTemplates returns
 	// more than one tenant and the per-tenant prefix scoping is exercised.
-	seedTemplateWithVersion(t, db, tenantB, uuid.NewString(), 1,
-		application.TenantTemplatePrefix(tenantB)+"other/versions/1.docx")
+	// crossTenant is tenant B's OWN referenced docx object (sweepOnce reconciles
+	// EVERY tenant, so B's own sweep would delete an aged UNREFERENCED object
+	// under B's prefix — the cross-tenant survival being asserted holds because
+	// tenant A's sweep is prefix-scoped and never enumerates B's prefix, and
+	// because the key is referenced under B's own sweep).
+	tenantBTemplateID := uuid.NewString()
+	crossTenant := application.TemplateVersionDocxKey(tenantB, tenantBTemplateID, 1)
+	seedTemplateWithVersion(t, db, tenantB, tenantBTemplateID, 1, crossTenant)
 
 	now := time.Now().UTC()
 	old := now.Add(-48 * time.Hour)  // older than maxAge
@@ -123,8 +146,7 @@ func TestTemplateOrphanSweeper_DeletesOnlyAgedUnreferenced(t *testing.T) {
 	store.put(oldOrphan, old) // unreferenced + old               -> DELETED
 	youngOrphan := application.TenantTemplatePrefix(tenantA) + templateID + "/versions/100.docx"
 	store.put(youngOrphan, young) // unreferenced + young             -> survives
-	crossTenant := application.TenantTemplatePrefix(tenantB) + "x/versions/1.docx"
-	store.put(crossTenant, old) // tenant B's prefix                -> never touched by A's sweep
+	store.put(crossTenant, old)   // tenant B's prefix                -> never touched by A's sweep
 
 	const maxAge = 24 * time.Hour
 	deleted, err := sweepOnce(context.Background(), repo, store, maxAge)
