@@ -324,6 +324,29 @@ the implementer never caught by running them — fixed in-slice:
   No production Go changed (schema + tests only).
 - Independent SONNET reviewer dispatched for this slice (verdict pending).
 
+### P3.S2b-1 — repo read-path NULL-legacy-col tolerance (DONE, commit 3e8a48e6)
+SONNET implementer, TDD RED→GREEN on the two P3.S2a tests deferred by S2b-0.
+- **Change (infra-only, 2 files, 40+/24-):** LoadInstance (~315), LoadInstancesByIDs (~929), LoadRoute
+  (~1758) switched INNER→LEFT JOIN documents + nullable scans (document_id/revision_version via
+  sql.NullString/NullInt64 → ""/0; profile_code via sql.NullString → ""). Subject still hydrated from real
+  subject_kind/subject_key (P3.S2a). LoadActiveInstanceByDocument / LoadInstanceByDocumentForView left
+  INNER (document-keyed WHERE document_id=$x — template rows never match). No write/domain/contract change.
+- **RED (unskipped, pre-fix):** LoadInstance → "no active approval instance for document" (INNER JOIN drop);
+  LoadRoute → "converting NULL to string is unsupported". **GREEN (post-fix):** both pass; the two tests
+  unskipped.
+- **Gates:** go build ✓, go vet -tags integration approval/... ✓, api-lint -strict → 0 ✓, module-boundaries
+  → OK ✓, test-integration ./internal/modules/approval/... → all 8 subpkgs ok ✓.
+- Independent SONNET reviewer dispatched (verdict pending) — adversarial focus: does LEFT JOIN mask a
+  dangling / cross-tenant document_id for DOCUMENT rows (regression axis)?
+- **Reviewer verdict: ACCEPT** (5 axes cleared incl. document-path-regression). Non-blocking Finding #1:
+  the LEFT JOIN's only document-row miss path is a `d.tenant_id != ai.tenant_id` split-brain, which used
+  to error under INNER JOIN but now returns a row with RevisionVersion silently collapsed to 0 — a narrow
+  deviation from the no-fallback fail-closed principle. Judged in-boundary + small → folded in now.
+- **Hardening follow-on (commit 52742413):** fail-loud no-fallback guard in LoadInstance +
+  LoadInstancesByIDs — `subjectKind=="document" && !revisionVersion.Valid` now returns an integrity error
+  instead of emitting RevisionVersion=0. Template rows (NULL document/revision) unaffected. Gates: go build
+  ✓, go vet -tags integration ✓, test-integration ./internal/modules/approval/... → all subpkgs ok ✓.
+
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
   cross-tenant sequence ×1, scenarios ×3, tenantdata ×1). Bar for every slice: zero NEW failures.
