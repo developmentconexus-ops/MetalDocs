@@ -18,8 +18,8 @@
 | P1.S2 re-port audit edge | 2026-07-12 | main (verify) | — | boundary-lint GREEN | b37c46d0 | VOID — no real violation |
 | P1.S3 composition + codegen | 2026-07-12 | main (config align) | self+gates | api-lint 0 violations; unit tests green | 092a79d2 | DONE |
 | P1.S4 supersede ADR 0072 + guard | 2026-07-12 | main | negative-plant proof | boundary GREEN; plant RED→revert-clean→GREEN | 7f407646 | DONE |
-| P2.S1 migration + backfill | 2026-07-12 | sonnet | sonnet ACCEPT-WITH-NITS | build+vet; 8 testMig0296 GREEN (canonical); api-lint 0; check-db-bootstrap | (commit below) | GREEN |
-| P2.S2 domain generalize | — | sonnet | sonnet (indep) | byte-equal doc path | — | pending |
+| P2.S1 migration + backfill | 2026-07-12 | sonnet | sonnet ACCEPT-WITH-NITS | build+vet; 8 testMig0296 GREEN (canonical); api-lint 0; check-db-bootstrap PASS | 82b897f1 | DONE |
+| P2.S2 domain generalize | 2026-07-12 | sonnet | sonnet ACCEPT-WITH-NITS | byte-equal doc path; version-copy col-order CONFIRMED (indep + reviewer) | fe581164 | DONE |
 | P2.S3 route-admin contract delta | — | sonnet | sonnet (indep) | additive-only diff | — | pending |
 | P3.S1 in-flight count | — | main/haiku | — | count + query recorded | — | pending |
 | P3.S2 template entry points | — | sonnet | sonnet (indep) | tier-1 caps, kernel wire | — | pending |
@@ -117,6 +117,29 @@ proven (every re-compiled dependent reproduces its exact pre-existing accepted-R
 - Expand-phase compat shim: `default_approval_subject()` BEFORE-INSERT trigger backfills subject
   cols from legacy document cols when omitted → existing Go/testdb INSERTs work under new NOT NULL
   without a Go cutover. **Contract-phase debt (drop in P2.S2) tracked.**
+
+### P2.S2 gates — domain Subject(kind,key) + explicit persistence (commit fe581164)
+- New: `internal/modules/approval/domain/subject.go` (`SubjectKind` enum document|template, `Subject{Kind,Key}`,
+  `NewDocumentSubject`, `Validate`/`Equal`/`String`) + `subject_test.go` (value object + Route/Instance
+  projection invariants). `Route`/`Instance` gain `Subject` field.
+- Production repo now writes `subject_kind`/`subject_key` EXPLICITLY on all 3 INSERT paths:
+  `InsertInstance` (from `inst.Subject`, zero-value fallback → `NewDocumentSubject(document_id)`),
+  route create (`route_admin_service.go` ~211), route version-copy/supersede (SQL `INSERT ... SELECT`
+  copies source row's own subject cols). Compat trigger now a **production no-op** (still backstops testdb).
+- Read hydration: `Subject` DERIVED in Go from legacy col (`NewDocumentSubject(profile_code/document_id)`)
+  at all Route/Instance hydration sites — lower risk, provably equivalent for document rows
+  (backfill set subject_key=document_id/profile_code). Diverges only if non-document subject_key ever
+  differs → safe this phase (document-only); revisit at P3 template rows.
+- Gates: `go build`/`go vet` clean · `go test ./internal/modules/approval/...` green ·
+  consumers (documents, templates) green · full `go test ./...` (non-integration) no FAIL ·
+  canonical `test-integration.ps1 -Package ./internal/modules/approval/...` PASS + `./tests/integration/approval/...`
+  PASS (document submit/signoff byte-equal) · api-lint **0** · `check-module-boundaries.ps1` **OK**.
+  No accepted-RED baseline test touched/newly broken.
+- Reviewer **ACCEPT-WITH-NITS**, zero must-fix. Highest-risk item (version-copy `INSERT...SELECT`
+  column order) CONFIRMED correct by BOTH an independent orchestrator read and the reviewer
+  (8-col positional match, copies source route's own subject). Two nits (both "document-only-safe,
+  breaks at P3 templates"): InsertInstance zero-Subject fallback + derive-from-legacy hydration —
+  now tracked as explicit P3.S2 must-close items in the plan.
 
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments

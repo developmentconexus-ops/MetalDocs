@@ -105,6 +105,15 @@ document approval lifecycle unchanged. Behavior byte-equal proven BEFORE any P2 
 - **P3.S2** — template entry points (R2): openapi
   `/templates/{id}/versions/{n}/submit-for-approval` + `/signoff`; tier-1 caps; handlers onto the
   kernel application service (`subject_kind=template`, `subject_key=doc_type`).
+  **MUST also close two P2.S2-deferred safety items (document-only assumptions that break with
+  template rows):** (a) `InsertInstance` zero-`Subject` fallback → `NewDocumentSubject(document_id)`
+  (`internal/modules/approval/infrastructure/postgres_approval_repository.go` ~49-52) must be removed
+  or replaced with a hard require, else a forgotten template Subject is silently mis-tagged
+  `document`. (b) Route/Instance read-hydration currently DERIVES `Subject` from the legacy
+  `profile_code`/`document_id` column (`postgres_approval_repository.go` LoadRoute/LoadInstance/
+  LoadActiveInstanceByDocument/LoadInstanceByDocumentForView/LoadInstancesByIDs) — this is only
+  equivalent while all rows are document rows with `subject_key==document_id/profile_code`; once
+  template rows exist it MUST SELECT the real `subject_kind`/`subject_key` columns.
 - **P3.S3** — data migration: `ApprovalConfig{ReviewerRole?, ApproverRole}` → kernel routes (2-stage,
   or 1-stage when no reviewer) per doc_type; cutover rule from P3.S1.
 - **P3.S4** — retire parallel path: remove `/templates/{id}/approval-config` + `/approve`;
