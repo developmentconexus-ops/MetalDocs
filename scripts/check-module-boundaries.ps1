@@ -22,8 +22,9 @@ if (-not (Test-Path $moduleRoot)) {
 }
 
 # ---------------------------------------------------------------------------
-# Allow-model (REQ-TOP-1, realigned F9.5 — see wiki/decisions/<ADR>
-# approval-nested-exception-and-boundary-model.md).
+# Allow-model (REQ-TOP-1, realigned F9.5; approval promoted to first-class
+# module by ADR 0082 which supersedes ADR 0072 — see
+# wiki/decisions/0082-approval-kernel-extraction.md).
 #
 # REQ-TOP-1: cross-module access goes through a module's application service
 # or published Go interface -- NEVER another module's repository, SQL, or
@@ -59,17 +60,15 @@ $publishedPackages = @(
   "resolvers"           # render/resolvers -- field-resolver registry consumed by render callers
 )
 
-# documents/approval is a nested exception (ADR <NNNN>): it lives inside the
-# documents bounded context, not as its own top-level module. Edges between
-# documents and documents/approval (either direction) are INTERNAL to the
-# documents module and are never flagged. External consumers (any other
-# module, or documents' own delivery/http reaching into approval) may import
-# ONLY approval's published surface -- domain/application/api are already
-# covered by $allowedLayers; approval has no separate http/contracts package
-# today (verified 2026-07-06), so the general allow-list already suffices.
-# This list is where a NEW published approval package would be added if one
-# is introduced later (promotion trigger recorded in the ADR).
-$approvalPublishedExtra = @()
+# NOTE (ADR 0082, supersedes ADR 0072): approval is now a first-class
+# top-level module (internal/modules/approval), extracted from documents.
+# The former documents/approval nested-exception special-casing is retired --
+# approval is treated exactly like any other module. Its published surface is
+# domain/application/api (covered by $allowedLayers). This is STRICTER than the
+# old nested model: documents may no longer reach approval/http or
+# approval/infrastructure, only its published layers, and vice-versa. If a NEW
+# published approval package (one level deeper than a layer) is ever introduced,
+# add it to $publishedPackages above, not via any documents-family bypass.
 
 # Explicit debt allow-list: the ONLY sanctioned suppression mechanism for a
 # true violation that cannot be mechanically fixed without a port/interface
@@ -113,11 +112,7 @@ foreach ($file in $goFiles) {
   $currentModule = $Matches[1]
   $currentRest = $Matches[2]
 
-  # documents/approval is internal to the documents module for edge purposes.
   $currentIdentity = $currentModule
-  if ($currentModule -eq "documents" -and $currentRest -match '^approval(/|$)') {
-    $currentIdentity = "documents/approval"
-  }
 
   $content = Get-Content $file.FullName -Raw
   $importMatches = [regex]::Matches($content, '"metaldocs/internal/modules/([^"]+)"')
@@ -125,28 +120,13 @@ foreach ($file in $goFiles) {
     $importSuffix = $match.Groups[1].Value
     $importPath = "metaldocs/internal/modules/$importSuffix"
 
-    # Determine target module identity, honoring the documents/approval nest.
-    if ($importSuffix -match '^documents/approval(/|$)') {
-      $targetIdentity = "documents/approval"
-      $targetLayerPath = $importSuffix -replace '^documents/approval/?', ''
-    } else {
-      $parts = $importSuffix -split '/', 2
-      $targetIdentity = $parts[0]
-      $targetLayerPath = if ($parts.Length -gt 1) { $parts[1] } else { "" }
-    }
+    # Determine target module identity.
+    $parts = $importSuffix -split '/', 2
+    $targetIdentity = $parts[0]
+    $targetLayerPath = if ($parts.Length -gt 1) { $parts[1] } else { "" }
 
-    # Intra-module (including the documents<->approval nested exception): allowed.
+    # Intra-module: allowed.
     if ($targetIdentity -eq $currentIdentity) {
-      continue
-    }
-
-    # documents <-> documents/approval is the nested exception: internal, allowed
-    # in both directions regardless of layer.
-    $bothInDocumentsFamily = (
-      ($currentIdentity -eq "documents" -or $currentIdentity -eq "documents/approval") -and
-      ($targetIdentity -eq "documents" -or $targetIdentity -eq "documents/approval")
-    )
-    if ($bothInDocumentsFamily) {
       continue
     }
 
