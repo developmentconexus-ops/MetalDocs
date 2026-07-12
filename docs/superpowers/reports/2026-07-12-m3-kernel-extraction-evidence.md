@@ -22,7 +22,8 @@
 | P2.S2 domain generalize | 2026-07-12 | sonnet | sonnet ACCEPT-WITH-NITS | byte-equal doc path; version-copy col-order CONFIRMED (indep + reviewer) | fe581164 | DONE |
 | P2.S3 route-admin contract delta | 2026-07-12 | sonnet | sonnet ACCEPT | additive-only diff proven; regen-clean; byte-equal default | 9062f169 | DONE |
 | P3.S1 in-flight count | 2026-07-12 | main | — | 0 under_review, 0 approved, 0 config → HARD CUTOVER | (evidence) | DONE |
-| P3.S2 template entry points | — | sonnet | sonnet (indep) | tier-1 caps, kernel wire | — | pending |
+| P3.S2a repository subject truth | 2026-07-12 | sonnet | sonnet ACCEPT | hard-require + 5-site hydration scan-order verified; template round-trip real; doc byte-equal | ec922e97 | DONE |
+| P3.S2b template entry points | — | sonnet | sonnet (indep) | tier-1 caps reuse, subject-aware authz-area, kernel wire | — | pending |
 | P3.S3 config→route migration | — | sonnet | sonnet (indep) | cutover rule applied | — | pending |
 | P3.S4 retire parallel path | — | sonnet | sonnet (indep) | contract diff | — | pending |
 
@@ -249,6 +250,32 @@ proven (every re-compiled dependent reproduces its exact pre-existing accepted-R
   subject-agnostic `approval.submit`/`approval.signoff` (subject-appropriate scope) would remove the
   `'tenant'`-sentinel accommodation. Large cross-cutting change (new caps → 10-touchpoint walk +
   tripwire re-render + grant migration); explicitly out of M3 scope.
+
+### P3.S2a gates — repository subject truth (commit ec922e97)
+- **(a) hard-require:** `InsertInstance` zero-`Subject` fallback removed → `inst.Subject.Validate()`
+  errors (ErrInvalidSubjectKind/ErrEmptySubjectKey); binds `inst.Subject.Kind/.Key` as-is. Only
+  production caller `submit_service.go:202` already sets Subject — no caller broken. Compat trigger
+  kept (backstops raw-SQL testdb factory, which omits subject cols).
+- **(b) hydration:** 5 sites (LoadInstance, LoadActiveInstanceByDocument, LoadInstanceByDocumentForView,
+  LoadInstancesByIDs, LoadRoute) now SELECT real `subject_kind`/`subject_key` (appended last) + Scan
+  aligned (reviewer verified column-order↔Scan-order at EACH site); Subject built from real columns,
+  legacy `profile_code`/`document_id` retained.
+- **Tests (new `postgres_approval_repository_subject_integration_test.go`):** template round-trip
+  (instance + route, key ≠ document_id/profile_code) RED under old derivation → GREEN; zero-Subject
+  error test (`errors.Is` sentinel, zero rows); document byte-equal control. RED→GREEN proven via
+  git-stash A/B, not inferred.
+- Gates (reviewer ran fresh): build/vet clean (+ `-tags integration`); approval+documents+templates
+  unit `ok`; api-lint **0**; boundaries **OK**; `test-integration.ps1 -Package
+  ./internal/modules/approval/...` PASS (4 new tests individually PASS); `./tests/integration/approval/...`
+  `ok`. Reviewer **ACCEPT**, zero must-fix/nits.
+- **ENVIRONMENT FLAG (not a slice defect — pre-M3-close action):** broad `./tests/integration/...`
+  run shows iam/scenarios/tenantdata failures with test-DB SCHEMA DRIFT (`relation
+  "metaldocs.tenant_keys" does not exist`, `column "governance_class" of relation "document_profiles"
+  does not exist`, `iam_user_roles_pkey` dup). Reviewer A/B (revert 2 files, re-run) → IDENTICAL with &
+  without the slice → conclusively pre-existing stale/orphan test-DB template drift, ZERO new attributable
+  to this slice. The recorded 9-baseline is stale vs the current environment. **ACTION before
+  milestone-validator: rebuild the testdb template + drop orphan `metaldocs_test_*` DBs so the C-gate
+  clean re-run reflects code truth, not env drift.**
 
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
