@@ -13,13 +13,13 @@ import (
 
 func TestReflect_RepositoryNoBeginTx(t *testing.T) {
 	root := repoRootForIntegrationTests()
-	repoDir := filepath.Join(root, "internal", "modules", "documents", "approval", "infrastructure")
+	repoDir := filepath.Join(root, "internal", "modules", "approval", "infrastructure")
 	assertNoForbiddenTxCalls(t, repoDir, []string{"db.BeginTx(", "tx.Commit(", "tx.Rollback("})
 }
 
 func TestHTTPHandlers_NoBeginTx(t *testing.T) {
 	root := repoRootForIntegrationTests()
-	httpDir := filepath.Join(root, "internal", "modules", "documents", "approval", "http")
+	httpDir := filepath.Join(root, "internal", "modules", "approval", "http")
 	assertNoForbiddenTxCalls(t, httpDir, []string{"db.BeginTx("})
 }
 
