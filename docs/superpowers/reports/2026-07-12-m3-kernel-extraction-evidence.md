@@ -394,7 +394,20 @@ resolution. Rails-consistent (R2a "thin entry points on shared kernel").
   (baseline :1061) makes a real 'tenant' area impossible — sentinel collision structurally excluded.
 - Gates: build ✓, api-lint 0 ✓, module-boundaries OK ✓, vet ✓, unit ✓, integration ✓. Zero doc-path change.
 
-#### P3.S2b-3b — thin template submit + signoff path — IN PROGRESS (blocked on eligibility-area investigation)
+#### P3.S2b-3b — thin template submit + signoff path — IN PROGRESS (decomposed i/ii/iii)
+
+**3b-i — area-blind ResolveEligibleActors ('tenant' sentinel) — DONE, commit `182909c4`, main self-review ACCEPT**
+- SQL delta: `AND area_code = $2` → `AND ($2 = 'tenant' OR area_code = $2)` in `postgres_approval_repository.go`
+  ResolveEligibleActors; mirrors authz.go:155 `($2='tenant' OR upa.area_code=$2)` exactly. Only area
+  filter in the fn. Reads `metaldocs.v_active_user_areas`.
+- Identity-model check (STOP-candidate, resolved no-STOP): view = one row per (user,area,role);
+  `$2='tenant'` makes predicate unconditionally true → returns the role holder in ANY area. No synthetic
+  tenant-wide row needed. Real-area path: `$2<>'tenant'` → OR-left false → `area_code=$2` byte-identical.
+- Test `eligible_actors_area_blind_integration_test.go` (+100): seeds tenantWideApprover (area 'quality')
+  + scopedOnlyInX (area 'safety'); area-blind ('tenant') finds approver (RED empty pre-fix → GREEN post),
+  area-scoped ('quality') assertion proves no real-area behavior change. Full gate ladder PASS; no deviations.
+- **3b-ii — thin template submit path** — pending (blocked by 3b-i, now unblocked).
+- **3b-iii — template signoff + completion port** — pending (blocked by 3b-i, 3b-ii).
 
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
