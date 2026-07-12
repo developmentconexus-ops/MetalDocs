@@ -18,7 +18,7 @@
 | P1.S2 re-port audit edge | 2026-07-12 | main (verify) | — | boundary-lint GREEN | b37c46d0 | VOID — no real violation |
 | P1.S3 composition + codegen | 2026-07-12 | main (config align) | self+gates | api-lint 0 violations; unit tests green | 092a79d2 | DONE |
 | P1.S4 supersede ADR 0072 + guard | 2026-07-12 | main | negative-plant proof | boundary GREEN; plant RED→revert-clean→GREEN | 7f407646 | DONE |
-| P2.S1 migration + backfill | — | sonnet | sonnet (indep) | testdb backfill | — | pending |
+| P2.S1 migration + backfill | 2026-07-12 | sonnet | sonnet ACCEPT-WITH-NITS | build+vet; 8 testMig0296 GREEN (canonical); api-lint 0; check-db-bootstrap | (commit below) | GREEN |
 | P2.S2 domain generalize | — | sonnet | sonnet (indep) | byte-equal doc path | — | pending |
 | P2.S3 route-admin contract delta | — | sonnet | sonnet (indep) | additive-only diff | — | pending |
 | P3.S1 in-flight count | — | main/haiku | — | count + query recorded | — | pending |
@@ -94,6 +94,29 @@ longer exists) → cleaned in P1.S4 with negative-plant proof.
 **PHASE 1 (pure relocate) — CLOSED.** Boundary-lint GREEN + negative-plant; byte-equal behavior
 proven (every re-compiled dependent reproduces its exact pre-existing accepted-RED; zero new). ADR
 0072 ruling (a) superseded by ADR 0082 here.
+
+## Phase 2 — generalize (subject_kind, subject_key)
+
+### P2.S1 gates — migration 0296 (expand phase)
+- Files: `db/migrations/0296_approval_subject_generalization.sql` + `tests/integration/migrations/migration_0296_test.go` (8 tests).
+- `go build ./...` + `go vet -tags=integration ./tests/integration/migrations/...` → green.
+- `.\scripts\test-integration.ps1 -Package ./tests/integration/migrations/... -Run TestMigration0296`
+  → **PASS** (canonical runner, DATABASE_URL derived from .env — never hand-set). 8/8 GREEN.
+  Coverage: backfill values both tables, CHECK reject (23514), unique reject (23505),
+  partial-index allows inactive dup (route-versioning regression guard), template-subject
+  insertable both tables, kept-index existence.
+- `api-lint -strict` → **0 violations** (DB-only slice, no contract change).
+- `check-db-bootstrap.ps1` → forward-migration execution on clean bootstrap (fresh volume).
+- Implementer runtime-truth correction: baseline `approval_routes_tenant_profile_key` was already
+  dropped by 0287 route-versioning → migration keeps the ACTUAL post-0287 constraints
+  (`approval_routes_active_profile_uq`/`_profile_version_uq`). `ux_approval_routes_tenant_subject`
+  made PARTIAL `WHERE active` to match (superseded rows share subject_key).
+- Independent reviewer: **ACCEPT-WITH-NITS**, zero must-fix correctness defects. Nit-1 (compat-trigger
+  removal not tracked) FIXED — debt now recorded in migration header + P2.S2 plan line. Nit-2
+  (index existence-only assertion) left: partial/unique semantics covered by dedicated tests.
+- Expand-phase compat shim: `default_approval_subject()` BEFORE-INSERT trigger backfills subject
+  cols from legacy document cols when omitted → existing Go/testdb INSERTs work under new NOT NULL
+  without a Go cutover. **Contract-phase debt (drop in P2.S2) tracked.**
 
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments

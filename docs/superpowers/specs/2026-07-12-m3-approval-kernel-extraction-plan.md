@@ -87,6 +87,11 @@ document approval lifecycle unchanged. Behavior byte-equal proven BEFORE any P2 
   still resolve.
 - **P2.S2** — domain generalization: route/instance value objects keyed by `(subject_kind,
   subject_key)`; `profile_code` becomes a document-subject projection. Byte-equal for document path.
+  **Includes (contract-phase debt from P2.S1):** once production repositories AND the
+  `tests/integration/testdb` factory write `subject_kind`/`subject_key` explicitly, DROP the
+  temporary `public.default_approval_subject()` compatibility triggers/function introduced by
+  migration 0296 (a follow-on contract migration). Leaving them in place would silently default a
+  forgotten subject write to `'document'`, masking the very bug the CHECK constraint guards.
 - **P2.S3** — route-admin contract delta (R1): openapi `CreateRouteRequest` + `RouteResponse` +
   `ListRoutesResponse` additive fields; regenerate; service accepts subject_kind/subject_key,
   defaults to document when only profile_code sent. Contract-diff additive-only proof.
