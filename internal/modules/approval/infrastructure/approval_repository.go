@@ -50,6 +50,12 @@ type Route struct {
 	Name        string
 	TenantID    string
 	ProfileCode string
+	// SubjectKind and SubjectKey generalize what this route governs (M3
+	// kernel extraction, ADR 0082 / P2.S3). For every route created via the
+	// legacy document path, SubjectKind == "document" and SubjectKey ==
+	// ProfileCode.
+	SubjectKind string
+	SubjectKey  string
 	Active      bool
 	Version     int
 	CreatedAt   time.Time

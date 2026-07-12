@@ -616,7 +616,7 @@ func (r *postgresApprovalRepository) LoadActorDisplayName(ctx context.Context, t
 }
 
 const listRoutesQuery = `
-		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.active, r.version, r.created_at, r.created_at AS updated_at,
+		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.subject_kind, r.subject_key, r.active, r.version, r.created_at, r.created_at AS updated_at,
 		       s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.quorum_m, s.on_eligibility_drift,
 		       s.stage_kind, s.due_in_days,
 		       (SELECT COUNT(*) FROM approval_routes WHERE tenant_id = $1::uuid) AS total_count
@@ -633,6 +633,7 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 	for rows.Next() {
 		var (
 			routeID, routeName, routeTenantID, profileCode string
+			subjectKind, subjectKey                        string
 			active                                         bool
 			version                                        int
 			createdAt, updatedAt                           time.Time
@@ -645,7 +646,7 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 			totalCount                                     int64
 		)
 		if err := rows.Scan(
-			&routeID, &routeName, &routeTenantID, &profileCode, &active, &version, &createdAt, &updatedAt,
+			&routeID, &routeName, &routeTenantID, &profileCode, &subjectKind, &subjectKey, &active, &version, &createdAt, &updatedAt,
 			&stage.Order, &stageName, &stageRole, &stageCapability, &stageArea, &stageQuorum, &stageQuorumM, &stageDrift,
 			&stageKind, &stageDueInDays,
 			&totalCount,
@@ -660,6 +661,8 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 				Name:        routeName,
 				TenantID:    routeTenantID,
 				ProfileCode: profileCode,
+				SubjectKind: subjectKind,
+				SubjectKey:  subjectKey,
 				Active:      active,
 				Version:     version,
 				CreatedAt:   createdAt,

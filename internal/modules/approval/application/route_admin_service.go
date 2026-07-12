@@ -76,10 +76,18 @@ var ErrRouteProfileUnknown = errors.New("route_admin: profile_code not registere
 
 // CreateRouteInput carries all inputs for Create.
 type CreateRouteInput struct {
-	TenantID       string
-	ProfileCode    string
-	Name           string
-	ActorUserID    string
+	TenantID    string
+	ProfileCode string
+	Name        string
+	ActorUserID string
+	// SubjectKind and SubjectKey generalize what the route governs (M3 kernel
+	// extraction, ADR 0082 / P2.S3). Both empty ⇒ the legacy default
+	// (document, ProfileCode) — byte-equal to pre-P2.S3 behavior. Either may
+	// be supplied without the other: an empty SubjectKey defaults to
+	// ProfileCode only when the effective kind is document; otherwise
+	// route.Subject.Validate() rejects the empty key.
+	SubjectKind    string
+	SubjectKey     string
 	IdempotencyKey string
 	Stages         []domain.Stage
 }
@@ -181,6 +189,26 @@ func (s *RouteAdminService) resolvePolicy(ctx context.Context, tenantID, profile
 	return s.policyReader.RoutePolicy(ctx, tenantID, profileCode)
 }
 
+// resolveCreateRouteSubject builds the route's Subject from CreateRouteInput
+// (M3 kernel extraction, ADR 0082 / P2.S3). When both SubjectKind and
+// SubjectKey are absent, this reproduces the pre-P2.S3 default exactly:
+// (document, ProfileCode). An explicit SubjectKind is used as given; an
+// explicit SubjectKey is used as given; either one alone still lets the
+// other default (SubjectKey defaults to ProfileCode only for the document
+// kind — a non-document kind with no key fails Subject.Validate rather than
+// silently defaulting to a document key).
+func resolveCreateRouteSubject(in CreateRouteInput) domain.Subject {
+	kind := domain.SubjectKind(in.SubjectKind)
+	if kind == "" {
+		kind = domain.SubjectKindDocument
+	}
+	key := in.SubjectKey
+	if key == "" && kind == domain.SubjectKindDocument {
+		key = in.ProfileCode
+	}
+	return domain.Subject{Kind: kind, Key: key}
+}
+
 func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in CreateRouteInput) (CreateRouteResult, error) {
 	var result CreateRouteResult
 	// G1: resolve the per-profile route-signature policy OFF-TX (H-PRE-1) so the
@@ -196,10 +224,15 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
+		subject := resolveCreateRouteSubject(in)
+		if err := subject.Validate(); err != nil {
+			return err
+		}
+
 		route := domain.Route{
 			TenantID:    in.TenantID,
 			ProfileCode: in.ProfileCode,
-			Subject:     domain.NewDocumentSubject(in.ProfileCode),
+			Subject:     subject,
 			Version:     1,
 			Stages:      in.Stages,
 		}

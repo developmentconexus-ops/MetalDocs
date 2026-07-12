@@ -238,6 +238,62 @@ func TestCreateRoute_ProfileUnknown(t *testing.T) {
 	}
 }
 
+// TestCreateRoute_SubjectFieldsOmitted_NoSubjectKindPassed verifies the
+// backward-compat default path: a CreateRouteRequest with no subject_kind /
+// subject_key fields decodes to a CreateRouteInput with both empty, leaving
+// the service's default-to-document logic to apply.
+func TestCreateRoute_SubjectFieldsOmitted_NoSubjectKindPassed(t *testing.T) {
+	svc := &fakeRouteAdminService{
+		createResult: application.CreateRouteResult{RouteID: "route-123"},
+	}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"document.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Idempotency-Key", "idem-1")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusCreated)
+	}
+	if svc.createReq.SubjectKind != "" || svc.createReq.SubjectKey != "" {
+		t.Fatalf("expected empty subject fields on omission; got kind=%q key=%q", svc.createReq.SubjectKind, svc.createReq.SubjectKey)
+	}
+}
+
+// TestCreateRoute_SubjectFieldsPassedThrough verifies an explicit
+// subject_kind/subject_key on the wire is decoded and passed to the service.
+func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
+	svc := &fakeRouteAdminService{
+		createResult: application.CreateRouteResult{RouteID: "route-123"},
+	}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	body := `{"profile_code":"ops","name":"Ops Route","subject_kind":"document","subject_key":"custom-key","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"document.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Idempotency-Key", "idem-1")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusCreated)
+	}
+	if svc.createReq.SubjectKind != "document" || svc.createReq.SubjectKey != "custom-key" {
+		t.Fatalf("subject fields not passed through: kind=%q key=%q", svc.createReq.SubjectKind, svc.createReq.SubjectKey)
+	}
+}
+
 func TestListRoutes_CanonicalStageNames(t *testing.T) {
 	// The list response must serialise stages with canonical field names
 	// (`name`, `quorum`) — not the legacy `label`/`quorum_kind`.
@@ -631,5 +687,47 @@ func TestListRoutes_TotalReflectsRepoCount(t *testing.T) {
 	}
 	if out.Total != 42 {
 		t.Fatalf("total = %d; want 42", out.Total)
+	}
+}
+
+// TestListRoutes_ExposesSubjectFields verifies P2.S3's read-model delta: the
+// list response includes subject_kind/subject_key for a route, mirroring the
+// document/profile_code default for an existing document route.
+func TestListRoutes_ExposesSubjectFields(t *testing.T) {
+	svc := &fakeRouteAdminService{
+		listResult: application.ListRoutesResult{Routes: []infrastructure.Route{
+			{
+				ID: "r1", Name: "Ops", TenantID: "tenant-1", ProfileCode: "ops",
+				Active: true, Version: 3, Total: 1,
+				SubjectKind: "document",
+				SubjectKey:  "ops",
+				Stages: []infrastructure.RouteStage{
+					{Order: 1, Name: "Review", RequiredRole: "approver", RequiredCapability: "document.signoff", AreaCode: "ops", Quorum: "any_1_of", DriftPolicy: "reduce_quorum"},
+				},
+			},
+		}},
+	}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/routes", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	var out contracts.ListRoutesResponse
+	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(out.Routes) != 1 {
+		t.Fatalf("routes len = %d, want 1", len(out.Routes))
+	}
+	if out.Routes[0].SubjectKind != "document" || out.Routes[0].SubjectKey != "ops" {
+		t.Fatalf("subject fields = kind=%q key=%q; want kind=document key=ops", out.Routes[0].SubjectKind, out.Routes[0].SubjectKey)
 	}
 }

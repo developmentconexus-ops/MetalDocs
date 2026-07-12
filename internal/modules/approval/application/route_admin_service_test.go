@@ -147,6 +147,14 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 		return &routeAdminRows{cols: []string{"v"}, values: []driver.Value{"ok"}}, nil
 	}
 	if strings.Contains(lower, "insert into approval_routes") && strings.Contains(lower, "returning id") {
+		if len(args) >= 6 {
+			if v, ok := args[4].(string); ok {
+				s.conn.capturedSubjectKind = v
+			}
+			if v, ok := args[5].(string); ok {
+				s.conn.capturedSubjectKey = v
+			}
+		}
 		if s.conn.insertRouteErr != nil {
 			return nil, s.conn.insertRouteErr
 		}
@@ -228,6 +236,8 @@ type routeAdminConn struct {
 	stageLoadStages      []domain.Stage
 	stageDeleteExecCount int
 	insertRouteErr       error
+	capturedSubjectKind  string
+	capturedSubjectKey   string
 }
 
 func (c *routeAdminConn) Prepare(query string) (driver.Stmt, error) {
@@ -432,6 +442,127 @@ func TestRouteAdminCreate_OtherFKViolation(t *testing.T) {
 	// The wrapped error must still carry FK violation context.
 	if !errors.Is(err, infrastructure.ErrFKViolation) {
 		t.Errorf("expected wrapped ErrFKViolation; got %v", err)
+	}
+}
+
+// TestRouteAdminCreate_SubjectDefaultsToDocument verifies P2.S3's byte-equal
+// default: when CreateRouteInput carries no SubjectKind/SubjectKey, the
+// persisted subject must be (document, profile_code) — identical to
+// pre-P2.S3 behavior.
+func TestRouteAdminCreate_SubjectDefaultsToDocument(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "po",
+		Name:        "PO Route",
+		ActorUserID: "user-1",
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create: unexpected error: %v", err)
+	}
+	if conn.capturedSubjectKind != string(domain.SubjectKindDocument) {
+		t.Errorf("subject_kind = %q, want %q", conn.capturedSubjectKind, domain.SubjectKindDocument)
+	}
+	if conn.capturedSubjectKey != "po" {
+		t.Errorf("subject_key = %q, want %q", conn.capturedSubjectKey, "po")
+	}
+}
+
+// TestRouteAdminCreate_ExplicitDocumentSubject verifies that an explicit
+// subject_kind=document + subject_key is accepted and stored as given.
+func TestRouteAdminCreate_ExplicitDocumentSubject(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "po",
+		Name:        "PO Route",
+		ActorUserID: "user-1",
+		SubjectKind: string(domain.SubjectKindDocument),
+		SubjectKey:  "explicit-doc-key",
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create: unexpected error: %v", err)
+	}
+	if conn.capturedSubjectKind != string(domain.SubjectKindDocument) {
+		t.Errorf("subject_kind = %q, want %q", conn.capturedSubjectKind, domain.SubjectKindDocument)
+	}
+	if conn.capturedSubjectKey != "explicit-doc-key" {
+		t.Errorf("subject_key = %q, want %q", conn.capturedSubjectKey, "explicit-doc-key")
+	}
+}
+
+// TestRouteAdminCreate_SubjectKindTemplate_AcceptedNoGovernance verifies that
+// subject_kind=template with a subject_key is accepted and persisted
+// faithfully (P2.S3 plumbs the field only; no template-specific governance
+// is added in this slice — Phase 3 scope).
+func TestRouteAdminCreate_SubjectKindTemplate_AcceptedNoGovernance(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "po",
+		Name:        "PO Route",
+		ActorUserID: "user-1",
+		SubjectKind: string(domain.SubjectKindTemplate),
+		SubjectKey:  "tmpl-1",
+		Stages:      validRouteStages(),
+	})
+	if err != nil {
+		t.Fatalf("Create: unexpected error: %v", err)
+	}
+	if conn.capturedSubjectKind != string(domain.SubjectKindTemplate) {
+		t.Errorf("subject_kind = %q, want %q", conn.capturedSubjectKind, domain.SubjectKindTemplate)
+	}
+	if conn.capturedSubjectKey != "tmpl-1" {
+		t.Errorf("subject_key = %q, want %q", conn.capturedSubjectKey, "tmpl-1")
+	}
+}
+
+// TestRouteAdminCreate_InvalidSubjectKind verifies an unknown subject_kind is
+// rejected via domain.Subject.Validate (ErrInvalidSubjectKind), never
+// silently accepted or defaulted.
+func TestRouteAdminCreate_InvalidSubjectKind(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "po",
+		Name:        "PO Route",
+		ActorUserID: "user-1",
+		SubjectKind: "bogus",
+		SubjectKey:  "x",
+		Stages:      validRouteStages(),
+	})
+	if !errors.Is(err, domain.ErrInvalidSubjectKind) {
+		t.Fatalf("expected ErrInvalidSubjectKind; got %v", err)
 	}
 }
 

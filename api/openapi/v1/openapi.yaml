@@ -7127,6 +7127,23 @@ components:
       properties:
         profile_code: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
         name: { type: string, minLength: 1, maxLength: 200 }
+        subject_kind:
+          type: string
+          enum: [document, template]
+          description: >-
+            M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults
+            to `document`, preserving the legacy (document, profile_code)
+            subject unchanged. A non-document kind is accepted and persisted
+            faithfully but carries no template-specific governance in this
+            slice (Phase 3).
+        subject_key:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: >-
+            M3 kernel extraction (ADR 0082, P2.S3). Optional; omitted defaults
+            to `profile_code` when `subject_kind` is `document` (or absent),
+            preserving byte-equal legacy behavior.
         stages:
           type: array
           minItems: 1
@@ -7170,6 +7187,19 @@ components:
         name: { type: string }
         tenant_id: { type: string, format: uuid }
         profile_code: { type: string }
+        subject_kind:
+          type: string
+          enum: [document, template]
+          description: >-
+            M3 kernel extraction (ADR 0082, P2.S3). What this route governs;
+            `document` for every route created via the legacy profile_code
+            path.
+        subject_key:
+          type: string
+          description: >-
+            M3 kernel extraction (ADR 0082, P2.S3). The governed entity's key
+            within subject_kind's bounded context; equals profile_code for a
+            document-subject route.
         active: { type: boolean }
         version:
           type: integer

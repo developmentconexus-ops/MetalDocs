@@ -62,14 +62,23 @@ type StageRequest struct {
 
 // CreateRouteRequest is the decoded body for the create-route endpoint.
 type CreateRouteRequest struct {
-	ProfileCode    string         `json:"profile_code"`
-	Name           string         `json:"name"`
-	Stages         []StageRequest `json:"stages"`
+	ProfileCode string         `json:"profile_code"`
+	Name        string         `json:"name"`
+	Stages      []StageRequest `json:"stages"`
+	// SubjectKind and SubjectKey generalize what the route governs (M3 kernel
+	// extraction, ADR 0082 / P2.S3). Both optional on the wire; profile_code
+	// stays required as the backward-compat alias for the document case.
+	// Omitting both preserves the legacy (document, profile_code) subject
+	// byte-equal to pre-P2.S3 behavior — the application service applies that
+	// default, not this contract layer.
+	SubjectKind    string `json:"subject_kind,omitempty"`
+	SubjectKey     string `json:"subject_key,omitempty"`
 	IdempotencyKey string
 }
 
 // Validate enforces ProfileCode and Name are non-empty, ProfileCode matches the
-// route-code pattern, and Stages passes validateStages.
+// route-code pattern, SubjectKind (if supplied) is a known enum value, and
+// Stages passes validateStages.
 func (r CreateRouteRequest) Validate() error {
 	if err := validateRequired("profile_code", r.ProfileCode); err != nil {
 		return wrapValidation(err)
@@ -79,6 +88,11 @@ func (r CreateRouteRequest) Validate() error {
 	}
 	if err := validateRequired("name", r.Name); err != nil {
 		return wrapValidation(err)
+	}
+	switch r.SubjectKind {
+	case "", "document", "template":
+	default:
+		return wrapValidation(fmt.Errorf("subject_kind must be one of: document, template"))
 	}
 	return wrapValidation(validateStages(r.Stages))
 }
@@ -259,10 +273,15 @@ type ListStageItem struct {
 
 // ListRouteItem is one row of the list-routes response.
 type ListRouteItem struct {
-	ID          string          `json:"id"`
-	Name        string          `json:"name"`
-	TenantID    string          `json:"tenant_id"`
-	ProfileCode string          `json:"profile_code"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	TenantID    string `json:"tenant_id"`
+	ProfileCode string `json:"profile_code"`
+	// SubjectKind and SubjectKey generalize what this route governs (M3
+	// kernel extraction, ADR 0082 / P2.S3). document/profile_code for every
+	// route created via the legacy document path.
+	SubjectKind string          `json:"subject_kind,omitempty"`
+	SubjectKey  string          `json:"subject_key,omitempty"`
 	Active      bool            `json:"active"`
 	Version     int             `json:"version"`
 	Stages      []ListStageItem `json:"stages"`

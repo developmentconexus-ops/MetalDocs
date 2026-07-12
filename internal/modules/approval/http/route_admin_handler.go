@@ -49,6 +49,8 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		ProfileCode:    req.ProfileCode,
 		Name:           req.Name,
 		ActorUserID:    actorID,
+		SubjectKind:    req.SubjectKind,
+		SubjectKey:     req.SubjectKey,
 		IdempotencyKey: idempotencyKey,
 		Stages:         mapStageRequests(req.Stages),
 	})
@@ -240,6 +242,8 @@ func mapListRoute(route infrastructure.Route) contracts.ListRouteItem {
 		Name:        route.Name,
 		TenantID:    route.TenantID,
 		ProfileCode: route.ProfileCode,
+		SubjectKind: route.SubjectKind,
+		SubjectKey:  route.SubjectKey,
 		Active:      route.Active,
 		Version:     route.Version,
 		Stages:      stages,
