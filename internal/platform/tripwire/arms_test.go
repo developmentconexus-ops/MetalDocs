@@ -119,16 +119,18 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 // arm); M7 F7.3 re-rendered it to 0279 (tenant_lifecycle_jobs/INSERT arm +
 // one-time attachment, ADR 0070), then to db/migrations/0283_*.sql (DELETE
 // paths RETURN OLD — RETURN NEW on BEFORE DELETE silently cancelled DELETEs),
-// then to db/migrations/0284_*.sql (ADR 0083, M3 P3.S2b-3b-0:
+// then to db/migrations/0299_*.sql (ADR 0083, M3 P3.S2b-3b-0:
 // approval_instances/INSERT arm subject-discriminated into a nested CASE
-// NEW.subject_kind), so the golden target advances with the latest rendered
-// migration (M7 validation-contract.md §5, M6 §3, M2 §1.4/§1.5.a, ADR 0083).
+// NEW.subject_kind; numbered 0299 to avoid the 0284_ci_rls_role prefix
+// collision — migrate.Apply dedupes by 4-digit prefix only), so the golden
+// target advances with the latest rendered migration (M7 validation-contract.md
+// §5, M6 §3, M2 §1.4/§1.5.a, ADR 0083).
 func TestRenderMigration_MatchesCommittedFile(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		t.Fatalf("locate repo root: %v", err)
 	}
-	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0284_tripwire_subject_discriminated_arms.sql")
+	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0299_tripwire_subject_discriminated_arms.sql")
 
 	committed, err := os.ReadFile(migrationPath)
 	if err != nil {

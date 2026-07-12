@@ -1,4 +1,4 @@
--- 0284_tripwire_subject_discriminated_arms.sql
+-- 0299_tripwire_subject_discriminated_arms.sql
 -- M3 P3.S2b-3b-0 (approval-remediation, kernel extraction, ADR 0083 —
 -- extends ADR 0082): approval_instances is a shared (subject_kind,
 -- subject_key) kernel table, but the capability tripwire
@@ -46,7 +46,7 @@ DECLARE
 BEGIN
   CASE
     WHEN TG_TABLE_NAME = 'approval_instances' AND TG_OP = 'INSERT' THEN
-      -- 0284 (ADR 0083): approval_instances is a shared (subject_kind,
+      -- 0299 (ADR 0083): approval_instances is a shared (subject_kind,
       -- subject_key) kernel table (ADR 0082); the required capability is
       -- subject-discriminated so a flat match-one arm cannot express
       -- "document rows require document.submit; template rows require
@@ -252,7 +252,7 @@ CREATE TRIGGER trg_require_cap_asserted
 -- ── schema_migrations ledger ─────────────────────────────────────────────────────────────
 
 INSERT INTO public.schema_migrations (version, description)
-VALUES ('0284', 'M3 P3.S2b-3b-0 (ADR 0083): approval_instances/INSERT arm split into two subject-discriminated entries (subject_kind=document -> document.submit; subject_kind=template -> template.submit, never unioned) via a nested CASE NEW.subject_kind with a fail-closed ELSE. No other arm/cap change; every other branch byte-for-byte from 0283; machine-generated from internal/platform/tripwire.')
+VALUES ('0299', 'M3 P3.S2b-3b-0 (ADR 0083): approval_instances/INSERT arm split into two subject-discriminated entries (subject_kind=document -> document.submit; subject_kind=template -> template.submit, never unioned) via a nested CASE NEW.subject_kind with a fail-closed ELSE. No other arm/cap change; every other branch byte-for-byte from 0283; machine-generated from internal/platform/tripwire.')
 ON CONFLICT (version) DO NOTHING;
 
 COMMIT;

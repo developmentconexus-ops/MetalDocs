@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// RenderMigration renders the full 0284 forward-only migration SQL,
+// RenderMigration renders the full 0299 forward-only migration SQL,
 // regenerated from the prior tripwire migration (0283) with every CASE branch
 // preserved byte-for-byte EXCEPT approval_instances/INSERT, which becomes a
 // nested CASE NEW.subject_kind (ADR 0083, M3 P3.S2b-3b-0): document rows
@@ -35,7 +35,7 @@ func RenderMigration() string {
 		"BEGIN\n" +
 		"  CASE\n" +
 		"    WHEN TG_TABLE_NAME = 'approval_instances' AND TG_OP = 'INSERT' THEN\n" +
-		"      -- 0284 (ADR 0083): approval_instances is a shared (subject_kind,\n" +
+		"      -- 0299 (ADR 0083): approval_instances is a shared (subject_kind,\n" +
 		"      -- subject_key) kernel table (ADR 0082); the required capability is\n" +
 		"      -- subject-discriminated so a flat match-one arm cannot express\n" +
 		"      -- \"document rows require document.submit; template rows require\n" +
@@ -233,16 +233,16 @@ func RenderMigration() string {
 		"-- ── schema_migrations ledger ─────────────────────────────────────────────────────────────\n" +
 		"\n" +
 		"INSERT INTO public.schema_migrations (version, description)\n" +
-		"VALUES ('0284', '" + ledgerDescription + "')\n" +
+		"VALUES ('0299', '" + ledgerDescription + "')\n" +
 		"ON CONFLICT (version) DO NOTHING;\n" +
 		"\n" +
 		"COMMIT;\n"
 }
 
-// migrationHeader is the file-header comment block for 0284, in
+// migrationHeader is the file-header comment block for 0299, in
 // 0269/0270/0271/0275/0277/0283 house style: goal/incident framing, root
 // cause, writer inventory, fix statement.
-const migrationHeader = `-- 0284_tripwire_subject_discriminated_arms.sql
+const migrationHeader = `-- 0299_tripwire_subject_discriminated_arms.sql
 -- M3 P3.S2b-3b-0 (approval-remediation, kernel extraction, ADR 0083 —
 -- extends ADR 0082): approval_instances is a shared (subject_kind,
 -- subject_key) kernel table, but the capability tripwire

@@ -1,8 +1,9 @@
 // Command gen-tripwire writes the machine-generated tripwire migration SQL
 // (internal/platform/tripwire.RenderMigration()) to the latest canonical
-// migration path (0284 as of M3 P3.S2b-3b-0, ADR 0083: approval_instances
+// migration path (0299 as of M3 P3.S2b-3b-0, ADR 0083: approval_instances
 // arm splits into subject-discriminated document/template entries via a
-// nested CASE NEW.subject_kind).
+// nested CASE NEW.subject_kind; numbered 0299 to avoid the 0284_ci_rls_role
+// prefix collision — migrate.Apply dedupes by 4-digit prefix only).
 //
 // Usage: go run ./cmd/gen-tripwire [output-path]
 // With no argument, writes to the canonical path relative to the repo root
@@ -17,7 +18,7 @@ import (
 	"metaldocs/internal/platform/tripwire"
 )
 
-const defaultRelPath = "db/migrations/0284_tripwire_subject_discriminated_arms.sql"
+const defaultRelPath = "db/migrations/0299_tripwire_subject_discriminated_arms.sql"
 
 func main() {
 	out := defaultRelPath
