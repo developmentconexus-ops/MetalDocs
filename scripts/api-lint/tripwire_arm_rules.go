@@ -47,8 +47,14 @@ import (
 // splits into two subject-discriminated entries — document rows require
 // document.submit, template rows require template.submit, via a nested CASE
 // NEW.subject_kind, never unioned; numbered 0299 to avoid the 0284_ci_rls_role
-// prefix collision — migrate.Apply dedupes by 4-digit prefix only).
-const tripwireMigrationPath = "db/migrations/0299_tripwire_subject_discriminated_arms.sql"
+// prefix collision — migrate.Apply dedupes by 4-digit prefix only), then to
+// 0300 (ADR 0083 follow-on, M3 P3.S2b-3b-iii-a: approval_signoffs/INSERT arm
+// splits into two parent-lookup-discriminated entries — approval_signoffs has
+// no direct subject_kind column, so the trigger SELECTs the parent
+// approval_instances row's subject_kind and CASEs on the looked-up value;
+// document-parent rows require document.signoff, template-parent rows
+// require template.approve, never unioned).
+const tripwireMigrationPath = "db/migrations/0300_tripwire_signoff_parent_discriminator.sql"
 
 // gatedTableSet returns the set of table names present in TripwireArms — the
 // tables TRIPWIRE-ARM-DRIFT restricts its attention to (contract §1.5.b: "only

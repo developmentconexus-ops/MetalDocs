@@ -29,11 +29,12 @@ func TestTripwireArms_CapsAreRegistryReal(t *testing.T) {
 // validation-contract.md §5 (F7.2, ADR 0070: +1 tenants/INSERT arm gated on
 // tenant.onboard — 19 entries), M7 §5 (F7.3, ADR 0070: +1
 // tenant_lifecycle_jobs/INSERT arm gated on tenant.export OR tenant.erase — 20
-// entries), and ADR 0083 / M3 P3.S2b-3b-0 (approval_instances/INSERT arm #1
-// splits into two subject-discriminated entries — 21 entries). Divergence is
-// HS-7. The key includes WhenValue so the two approval_instances entries
-// (same table+op, different subject_kind) are distinct rows rather than
-// colliding.
+// entries), ADR 0083 / M3 P3.S2b-3b-0 (approval_instances/INSERT arm #1
+// splits into two subject-discriminated entries — 21 entries), and ADR 0083's
+// follow-on / M3 P3.S2b-3b-iii-a (approval_signoffs/INSERT arm #2 splits into
+// two parent-lookup-discriminated entries — 22 entries). Divergence is HS-7.
+// The key includes WhenValue so the discriminated entries (same table+op,
+// different subject) are distinct rows rather than colliding.
 func TestTripwireArms_MatchesContractTable(t *testing.T) {
 	type key struct {
 		table     string
@@ -47,7 +48,12 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 		// require exactly template.submit, never unioned.
 		{"approval_instances", OpInsert, "document"}: {iamdomain.CapDocumentSubmit},
 		{"approval_instances", OpInsert, "template"}: {iamdomain.CapTemplateSubmit},
-		{"approval_signoffs", OpInsert, ""}:          {iamdomain.CapDocumentSignoff},
+		// ADR 0083 follow-on: approval_signoffs/INSERT is
+		// parent-lookup-discriminated — parent subject_kind='document'
+		// requires exactly document.signoff, parent subject_kind='template'
+		// requires exactly template.approve, never unioned.
+		{"approval_signoffs", OpInsert, "document"}: {iamdomain.CapDocumentSignoff},
+		{"approval_signoffs", OpInsert, "template"}: {iamdomain.CapTemplateApprove},
 		{"iam_user_roles", OpAny, ""}:                {iamdomain.CapUserManage},
 		{"user_process_areas", OpAny, ""}:            {iamdomain.CapMembershipManage},
 		{"documents", OpInsert, ""}:                  {iamdomain.CapDocumentCreate},
@@ -122,15 +128,18 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 // then to db/migrations/0299_*.sql (ADR 0083, M3 P3.S2b-3b-0:
 // approval_instances/INSERT arm subject-discriminated into a nested CASE
 // NEW.subject_kind; numbered 0299 to avoid the 0284_ci_rls_role prefix
-// collision — migrate.Apply dedupes by 4-digit prefix only), so the golden
-// target advances with the latest rendered migration (M7 validation-contract.md
-// §5, M6 §3, M2 §1.4/§1.5.a, ADR 0083).
+// collision — migrate.Apply dedupes by 4-digit prefix only), then to
+// db/migrations/0300_*.sql (ADR 0083 follow-on, M3 P3.S2b-3b-iii-a:
+// approval_signoffs/INSERT arm parent-lookup-discriminated via a SELECT of
+// the parent approval_instances row's subject_kind + a nested CASE), so the
+// golden target advances with the latest rendered migration (M7
+// validation-contract.md §5, M6 §3, M2 §1.4/§1.5.a, ADR 0083 + follow-on).
 func TestRenderMigration_MatchesCommittedFile(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		t.Fatalf("locate repo root: %v", err)
 	}
-	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0299_tripwire_subject_discriminated_arms.sql")
+	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0300_tripwire_signoff_parent_discriminator.sql")
 
 	committed, err := os.ReadFile(migrationPath)
 	if err != nil {
