@@ -39,12 +39,24 @@ func NewPostgresApprovalRepository(db *sql.DB, displayName iamdomain.UserDisplay
 
 // InsertInstance writes a new approval_instances row within the caller's transaction.
 func (r *postgresApprovalRepository) InsertInstance(ctx context.Context, tx db.Tx, inst domain.Instance) error {
+	// P2.S2 (M3 kernel extraction): subject_kind/subject_key are written
+	// explicitly from the domain Subject rather than relying on the 0296
+	// compat trigger (default_approval_subject()), which now only backstops
+	// callers that omit them (e.g. the test fixture factory) — see ADR 0082.
+	// A zero-value Subject (Kind=="") falls back to the legacy document
+	// projection so any caller that has not yet been threaded onto Subject
+	// still gets a correct row instead of failing the NOT NULL/CHECK
+	// constraint.
+	subject := inst.Subject
+	if subject.Kind == "" {
+		subject = domain.NewDocumentSubject(inst.DocumentID)
+	}
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO approval_instances
 		  (id, tenant_id, document_id, route_id, route_version_snapshot,
 		   status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key,
-		   frozen_content_hash, cancel_reason)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		   frozen_content_hash, cancel_reason, subject_kind, subject_key)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
 		inst.ID,
 		inst.TenantID,
 		inst.DocumentID,
@@ -57,6 +69,8 @@ func (r *postgresApprovalRepository) InsertInstance(ctx context.Context, tx db.T
 		inst.IdempotencyKey,
 		inst.FrozenContentHash,
 		inst.CancelReason,
+		string(subject.Kind),
+		subject.Key,
 	)
 	if err != nil {
 		return MapPgError(err, MapHints{})
@@ -264,7 +278,7 @@ func scanSignoff(row rowScanner) (*domain.Signoff, error) {
 		id, instanceID, stageID, actorUserID, actorTenantID string
 		decision, comment, signatureMethod, contentHash     string
 		signatureMeaning                                    string
-		onBehalfOf                                           string
+		onBehalfOf                                          string
 		signedAt                                            time.Time
 		sigPayload                                          []byte
 	)
@@ -336,6 +350,7 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx db.Tx,
 	if cancelReason.Valid {
 		inst.CancelReason = &cancelReason.String
 	}
+	inst.Subject = domain.NewDocumentSubject(inst.DocumentID)
 
 	stages, err := r.loadStageInstances(ctx, tx, tenantID, inst.ID)
 	if err != nil {
@@ -390,6 +405,7 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 	if cancelReason.Valid {
 		inst.CancelReason = &cancelReason.String
 	}
+	inst.Subject = domain.NewDocumentSubject(inst.DocumentID)
 
 	stages, err := r.loadStageInstances(ctx, tx, tenantID, inst.ID)
 	if err != nil {
@@ -445,6 +461,7 @@ func (r *postgresApprovalRepository) LoadInstanceByDocumentForView(ctx context.C
 	if cancelReason.Valid {
 		inst.CancelReason = &cancelReason.String
 	}
+	inst.Subject = domain.NewDocumentSubject(inst.DocumentID)
 
 	stages, err := r.loadStageInstances(ctx, tx, tenantID, inst.ID)
 	if err != nil {
@@ -952,6 +969,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		if cancelReason.Valid {
 			inst.CancelReason = &cancelReason.String
 		}
+		inst.Subject = domain.NewDocumentSubject(inst.DocumentID)
 		cp := inst
 		byID[inst.ID] = &cp
 	}
@@ -1730,6 +1748,12 @@ func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, te
 		}
 		return domain.Route{}, err
 	}
+	// P2.S2: every route hydrated by the current document code path is a
+	// document route, so Subject is derived from the already-selected legacy
+	// profile_code column rather than adding subject_kind/subject_key to the
+	// SELECT — equivalent for the document case and lower-risk (no new NULL
+	// handling, no schema-drift surface on this read).
+	route.Subject = domain.NewDocumentSubject(route.ProfileCode)
 
 	rows, err := tx.QueryContext(ctx, `
 		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,

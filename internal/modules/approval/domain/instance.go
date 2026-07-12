@@ -76,9 +76,16 @@ type StageInstance struct {
 
 // Instance is the approval instance aggregate.
 type Instance struct {
-	ID                   string
-	TenantID             string
-	DocumentID           string
+	ID         string
+	TenantID   string
+	DocumentID string
+	// Subject generalizes what this instance governs (M3 kernel extraction,
+	// ADR 0082 / P2.S2). For every instance constructed by the current
+	// document code path, Subject == {SubjectKindDocument, DocumentID} by
+	// construction — DocumentID remains the canonical field for existing
+	// consumers, Subject is the field the repository persists to
+	// subject_kind/subject_key.
+	Subject              Subject
 	RouteID              string
 	RouteVersionSnapshot int
 	Status               InstanceStatus

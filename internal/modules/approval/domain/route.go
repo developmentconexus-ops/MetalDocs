@@ -70,8 +70,14 @@ type Route struct {
 	ID          string
 	TenantID    string
 	ProfileCode string
-	Version     int
-	Stages      []Stage
+	// Subject generalizes what this route governs (M3 kernel extraction, ADR
+	// 0082 / P2.S2). For every route constructed by the current document code
+	// path, Subject == {SubjectKindDocument, ProfileCode} by construction —
+	// ProfileCode remains the canonical field for existing consumers, Subject
+	// is the field the repository persists to subject_kind/subject_key.
+	Subject Subject
+	Version int
+	Stages  []Stage
 }
 
 // hasApprovalStage reports whether the route contains at least one approval-kind

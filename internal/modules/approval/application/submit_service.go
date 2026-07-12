@@ -199,6 +199,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 			ID:                   instanceID,
 			TenantID:             req.TenantID,
 			DocumentID:           req.DocumentID,
+			Subject:              domain.NewDocumentSubject(req.DocumentID),
 			RouteID:              routeID,
 			RouteVersionSnapshot: route.Version,
 			Status:               domain.InstanceInProgress,

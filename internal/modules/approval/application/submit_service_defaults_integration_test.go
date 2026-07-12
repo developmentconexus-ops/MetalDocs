@@ -132,6 +132,64 @@ func instanceRouteAndHash(t *testing.T, dbc *sql.DB, instanceID string) (routeID
 	return routeID, contentHash
 }
 
+// instanceSubject reads back the persisted subject_kind/subject_key for the
+// created approval instance.
+func instanceSubject(t *testing.T, dbc *sql.DB, instanceID string) (subjectKind, subjectKey string) {
+	t.Helper()
+	if err := dbc.QueryRowContext(context.Background(),
+		`SELECT subject_kind, subject_key
+		   FROM public.approval_instances WHERE id = $1::uuid`,
+		instanceID,
+	).Scan(&subjectKind, &subjectKey); err != nil {
+		t.Fatalf("read back approval_instances subject columns: %v", err)
+	}
+	return subjectKind, subjectKey
+}
+
+// TestSubmitPersistsExplicitDocumentSubject_RealDB (P2.S2, M3 kernel
+// extraction / ADR 0082) proves the PRODUCTION submit path — SubmitService →
+// postgresApprovalRepository.InsertInstance — now writes subject_kind='document'
+// and subject_key=document_id explicitly from the domain Subject, rather than
+// relying on the 0296 default_approval_subject() compat trigger. The trigger
+// only fills NULLs, so an explicit Go-side write proves the production repo
+// (not the trigger) is the source of truth for this row.
+func TestSubmitPersistsExplicitDocumentSubject_RealDB(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+
+	tnt := testdb.NewTenant(t, dbc)
+	actor := testdb.NewUser(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithRole("system_admin"))
+	doc := testdb.NewDocument(t, dbc, testdb.WithTenant(tnt.ID), testdb.WithOwner(actor.ID), testdb.WithStatus("draft"), testdb.WithRevisionNumber(0), testdb.WithSubmitReadySnapshots())
+
+	profileCode := profileCodeForDoc(t, dbc, doc.ControlledDocumentID)
+	routeID := seedSubmitRouteWithStage(t, dbc, tnt.ID, profileCode)
+
+	svc := newSubmitServiceWithResolver(t, dbc)
+	runner := db.NewTxRunner(dbc)
+
+	req := SubmitRequest{
+		TenantID:        tnt.ID,
+		DocumentID:      doc.ID,
+		RouteID:         routeID,
+		SubmittedBy:     actor.ID,
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 0,
+		IdempotencyKey:  "88888888-8888-8888-8888-888888888888",
+	}
+
+	res, err := svc.SubmitRevisionForReview(submitCtxWithIdentity(tnt.ID, actor.ID), runner, req)
+	if err != nil {
+		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
+	}
+
+	gotKind, gotKey := instanceSubject(t, dbc, res.InstanceID)
+	if gotKind != "document" {
+		t.Fatalf("subject_kind = %q, want %q", gotKind, "document")
+	}
+	if gotKey != doc.ID {
+		t.Fatalf("subject_key = %q, want document_id %q", gotKey, doc.ID)
+	}
+}
+
 // TestSubmitResolvesActiveRoute_RealDB — case 1: no-route resolution. RouteID:""
 // forces resolveActiveRoute to pick the single active route for the document's
 // profile in-tx; the created instance's route_id must equal the seeded route.

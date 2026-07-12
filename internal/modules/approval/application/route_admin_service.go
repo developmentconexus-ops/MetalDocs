@@ -199,6 +199,7 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 		route := domain.Route{
 			TenantID:    in.TenantID,
 			ProfileCode: in.ProfileCode,
+			Subject:     domain.NewDocumentSubject(in.ProfileCode),
 			Version:     1,
 			Stages:      in.Stages,
 		}
@@ -209,10 +210,11 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 		var routeID string
 		err := tx.QueryRowContext(ctx, `
 			INSERT INTO approval_routes
-				(tenant_id, profile_code, name, version, created_by, active)
-			VALUES ($1, $2, $3, 1, $4, TRUE)
+				(tenant_id, profile_code, name, version, created_by, active, subject_kind, subject_key)
+			VALUES ($1, $2, $3, 1, $4, TRUE, $5, $6)
 			RETURNING id`,
 			in.TenantID, in.ProfileCode, in.Name, in.ActorUserID,
+			string(route.Subject.Kind), route.Subject.Key,
 		).Scan(&routeID)
 		if err != nil {
 			mapped := infrastructure.MapPgError(err, infrastructure.MapHints{})
@@ -490,8 +492,8 @@ func (s *RouteAdminService) updateInPlaceOrSupersede(ctx context.Context, tx *sq
 	newVersion = locked.Version + 1
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO approval_routes
-			(tenant_id, profile_code, name, version, created_by, active)
-		SELECT tenant_id, profile_code, $1, $2, $3, TRUE
+			(tenant_id, profile_code, name, version, created_by, active, subject_kind, subject_key)
+		SELECT tenant_id, profile_code, $1, $2, $3, TRUE, subject_kind, subject_key
 		  FROM approval_routes
 		 WHERE id = $4
 		RETURNING id`,
