@@ -293,6 +293,37 @@ proven (every re-compiled dependent reproduces its exact pre-existing accepted-R
   committed expand/contract is within P3 scope; it fulfills 0296's own note rather than deviating from a rail.
   Flagged here for the HS-1 close review.
 
+### P3.S2b-0 — relax migration 0297 (DONE, commit c70d890e)
+Stalled implementer wrote both files (migration + migration_0297_test.go) but never gated/committed
+(same stall as P2.S1). Recovered by running the ladder myself. Running the tests surfaced real defects
+the implementer never caught by running them — fixed in-slice:
+- **migration 0297 DDL: correct as written.** DROP NOT NULL on document_id/profile_code; both legacy FKs
+  KEPT (NULL-tolerant under MATCH SIMPLE); 4 projection CHECKs (document/template × instances/routes);
+  subject-scoped partial unique idempotency index alongside the kept legacy one; schema_migrations '0297'
+  ON CONFLICT DO NOTHING. E-PROD-2 (document_profiles) untouched. All 10 migration_0297_test.go cases green.
+- **0296 tests broke (4)** — they seeded template rows with legacy cols POPULATED (forced by the old
+  NOT NULL); 0297's projection CHECK correctly rejects that shape (23514). Fix (0297 owns the test updates
+  its invariant necessitates): removed the two now-superseded template-insertability tests (0297 re-proves
+  them with the correct NULL-legacy-col shape); switched the two subject-unique-index tests to NULL
+  profile_code so template rows satisfy the projection CHECK.
+- **0297 `AllowsDistinctIdempotencyKeys` mis-designed** — two ACTIVE rows same subject collided on the
+  pre-existing `ux_approval_instances_active_subject` (one-active-per-subject) index, never reaching the
+  idempotency index it meant to test. Fixed: drive the first row terminal ('approved') so the active-subject
+  partial index (WHERE in_progress) is out of play, isolating the new idempotency index. Same isolation
+  applied to `RejectsDuplicateTemplateSubmit` (was passing for the wrong reason).
+- **P3.S2a template read tests → RED-deferred to P3.S2b-1 (2, t.Skip'd).** Landing 0297 exposed that the
+  repo READ paths are not NULL-legacy-col tolerant: `LoadInstance` INNER JOINs `documents ON ai.document_id`
+  (drops NULL-document_id template rows → ErrNoActiveInstance) and scans document_id into a non-nullable
+  string; `LoadRoute` scans profile_code into a non-nullable string ("converting NULL to string is
+  unsupported"). Making the repo read path subject-generic (LEFT JOIN + nullable scans + subject-keyed
+  queries) is squarely P3.S2b-1, not this schema-only slice. Skipped with explicit "unskip in P3.S2b-1"
+  markers; document byte-equal + zero-subject error tests stay green. This is a genuine latent P3.S2a gap
+  (its read-hydration was only ever tested against template rows still carrying legacy cols).
+- **Gates:** go build ✓, go vet -tags integration ✓, api-lint -strict → 0 ✓, check-module-boundaries → OK ✓,
+  test-integration migrations → PASS ✓, test-integration ./internal/modules/approval/... → PASS ✓.
+  No production Go changed (schema + tests only).
+- Independent SONNET reviewer dispatched for this slice (verdict pending).
+
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
   cross-tenant sequence ×1, scenarios ×3, tenantdata ×1). Bar for every slice: zero NEW failures.
