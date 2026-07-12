@@ -21,7 +21,7 @@
 | P2.S1 migration + backfill | 2026-07-12 | sonnet | sonnet ACCEPT-WITH-NITS | build+vet; 8 testMig0296 GREEN (canonical); api-lint 0; check-db-bootstrap PASS | 82b897f1 | DONE |
 | P2.S2 domain generalize | 2026-07-12 | sonnet | sonnet ACCEPT-WITH-NITS | byte-equal doc path; version-copy col-order CONFIRMED (indep + reviewer) | fe581164 | DONE |
 | P2.S3 route-admin contract delta | 2026-07-12 | sonnet | sonnet ACCEPT | additive-only diff proven; regen-clean; byte-equal default | 9062f169 | DONE |
-| P3.S1 in-flight count | — | main/haiku | — | count + query recorded | — | pending |
+| P3.S1 in-flight count | 2026-07-12 | main | — | 0 under_review, 0 approved, 0 config → HARD CUTOVER | (evidence) | DONE |
 | P3.S2 template entry points | — | sonnet | sonnet (indep) | tier-1 caps, kernel wire | — | pending |
 | P3.S3 config→route migration | — | sonnet | sonnet (indep) | cutover rule applied | — | pending |
 | P3.S4 retire parallel path | — | sonnet | sonnet (indep) | contract diff | — | pending |
@@ -175,6 +175,30 @@ proven (every re-compiled dependent reproduces its exact pre-existing accepted-R
   P2.S3 (route-admin additive contract) all DONE + committed. Existing document routes/instances
   byte-equal; contract diff additive-only; kernel now keyed by `(subject_kind, subject_key)` with
   document as the projection. Ready for Phase 3 (templates onto kernel).
+
+## Phase 3 — templates onto kernel
+
+### P3.S1 gates — R4 in-flight template-approval count (2026-07-12)
+- **State location (runtime truth):** templates approval state is templates-OWNED, NOT the kernel.
+  It is `public.templates_template_version.status text` (CHECK ∈ {draft, under_review, approved,
+  published, obsolete}). Static role config is `public.templates_approval_config`
+  (`template_id` PK, `reviewer_role?`, `approver_role`). No `approval_instances` row / no
+  `subject_kind='template'` exists yet. In-flight = `under_review` (submitted, undecided);
+  reviewer-accepted-but-unpublished = `approved`. Rejected collapses to `draft` (no `rejected` state).
+- **Counts (dev DB, cross-tenant; POSTGRES_USER is superuser+BYPASSRLS so RLS inert — genuine total):**
+  - `SELECT status, count(*) FROM public.templates_template_version GROUP BY status;` → only `published|1`.
+  - `SELECT count(*) FROM public.templates_template_version WHERE status = 'under_review';` → **0**
+  - `SELECT count(*) FROM public.templates_template_version WHERE status IN ('under_review','approved');` → **0**
+  - `SELECT count(*) FROM public.templates_approval_config;` → **0**
+- **R4 decision: HARD CUTOVER.** Dev shows 0 in-flight approvals AND 0 approval-config rows — nothing
+  to drain, nothing to migrate. No silent state loss possible.
+- **Safety backstop (design constraint carried into P3.S3/P3.S4):** the P3.S3 data migration migrates
+  ONLY the static `templates_approval_config` → kernel routes and MUST NOT mutate/destroy any
+  `templates_template_version.status` row (the version enum is left intact), so even a non-dev target
+  with nonzero in-flight versions is not silently lost. The actual old-path retirement (P3.S4) is the
+  behavior switch; its deploy MUST re-run the `under_review`/`approved` count above on the target DB
+  and only hard-cutover when both return 0 — nonzero → drain (old path finishes in-flight, new
+  submissions route through the kernel). This preserves R4 for any DB regardless of what dev showed.
 
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
