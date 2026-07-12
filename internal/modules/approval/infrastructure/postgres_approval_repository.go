@@ -359,6 +359,16 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx db.Tx,
 	if revisionVersion.Valid {
 		inst.RevisionVersion = int(revisionVersion.Int64)
 	}
+	// P3.S2b-1 (M3 kernel extraction) — no-fallback fail-closed guard: a
+	// document-subject row MUST join a documents row (projection CHECK
+	// approval_instances_document_subject_projection_check + the kept
+	// approval_instances_document_id_fkey guarantee it). A NULL
+	// revision_version here means the LEFT JOIN found no matching in-tenant
+	// document — an upstream invariant break (tenant split-brain / deleted
+	// document). Refuse to substitute RevisionVersion=0; fail loud.
+	if subjectKind == string(domain.SubjectKindDocument) && !revisionVersion.Valid {
+		return nil, fmt.Errorf("approval: LoadInstance %s: document-subject instance has no matching in-tenant document (integrity violation)", id)
+	}
 	if completedAt.Valid {
 		inst.CompletedAt = &completedAt.Time
 	}
@@ -1003,6 +1013,13 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		}
 		if revisionVersion.Valid {
 			inst.RevisionVersion = int(revisionVersion.Int64)
+		}
+		// P3.S2b-1 (M3 kernel extraction) — no-fallback fail-closed guard,
+		// mirrors LoadInstance: a document-subject row with a NULL
+		// revision_version means the LEFT JOIN found no matching in-tenant
+		// document. Refuse to substitute RevisionVersion=0; fail loud.
+		if subjectKind == string(domain.SubjectKindDocument) && !revisionVersion.Valid {
+			return nil, fmt.Errorf("approval: LoadInstancesByIDs %s: document-subject instance has no matching in-tenant document (integrity violation)", inst.ID)
 		}
 		if completedAt.Valid {
 			inst.CompletedAt = &completedAt.Time
