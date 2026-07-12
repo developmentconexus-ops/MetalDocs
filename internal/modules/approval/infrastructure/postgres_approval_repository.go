@@ -318,7 +318,14 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx db.Tx,
 	var frozenContentHash, cancelReason sql.NullString
 
 	var subjectKind, subjectKey string
+	var documentID sql.NullString
+	var revisionVersion sql.NullInt64
 
+	// P3.S2b-1 (M3 kernel extraction): LEFT JOIN documents — a template row
+	// has NULL ai.document_id, which an INNER JOIN would drop entirely.
+	// document_id/revision_version are scanned through nullable holders and
+	// collapse to the DocumentID="" / RevisionVersion=0 sentinel for
+	// non-document subjects; Subject (below) carries the real key.
 	err := tx.QueryRowContext(ctx, `
 		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
 		       d.revision_version,
@@ -327,14 +334,14 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx db.Tx,
 		       ai.frozen_content_hash, ai.cancel_reason,
 		       ai.subject_kind, ai.subject_key
 		FROM approval_instances ai
-		JOIN documents d
+		LEFT JOIN documents d
 		  ON d.id = ai.document_id
 		 AND d.tenant_id = ai.tenant_id
 		WHERE ai.id = $1 AND ai.tenant_id = $2`,
 		id, tenantID,
 	).Scan(
-		&inst.ID, &inst.TenantID, &inst.DocumentID, &inst.RouteID, &inst.RouteVersionSnapshot,
-		&inst.RevisionVersion,
+		&inst.ID, &inst.TenantID, &documentID, &inst.RouteID, &inst.RouteVersionSnapshot,
+		&revisionVersion,
 		&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
 		&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
 		&frozenContentHash, &cancelReason,
@@ -345,6 +352,12 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx db.Tx,
 	}
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
+	}
+	if documentID.Valid {
+		inst.DocumentID = documentID.String
+	}
+	if revisionVersion.Valid {
+		inst.RevisionVersion = int(revisionVersion.Int64)
 	}
 	if completedAt.Valid {
 		inst.CompletedAt = &completedAt.Time
@@ -944,6 +957,8 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 	ids = deduped
 
 	// ── 1. Load instance headers ──────────────────────────────────────────────
+	// P3.S2b-1 (M3 kernel extraction): LEFT JOIN documents — see LoadInstance's
+	// comment for why (template rows have NULL document_id).
 	headerRows, err := tx.QueryContext(ctx, `
 		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
 		       d.revision_version,
@@ -952,7 +967,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		       ai.frozen_content_hash, ai.cancel_reason,
 		       ai.subject_kind, ai.subject_key
 		FROM approval_instances ai
-		JOIN documents d
+		LEFT JOIN documents d
 		  ON d.id = ai.document_id
 		 AND d.tenant_id = ai.tenant_id
 		WHERE ai.id = ANY($1)
@@ -971,15 +986,23 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		var completedAt sql.NullTime
 		var frozenContentHash, cancelReason sql.NullString
 		var subjectKind, subjectKey string
+		var documentID sql.NullString
+		var revisionVersion sql.NullInt64
 		if err := headerRows.Scan(
-			&inst.ID, &inst.TenantID, &inst.DocumentID, &inst.RouteID, &inst.RouteVersionSnapshot,
-			&inst.RevisionVersion,
+			&inst.ID, &inst.TenantID, &documentID, &inst.RouteID, &inst.RouteVersionSnapshot,
+			&revisionVersion,
 			&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
 			&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
 			&frozenContentHash, &cancelReason,
 			&subjectKind, &subjectKey,
 		); err != nil {
 			return nil, fmt.Errorf("scan approval instance header: %w", err)
+		}
+		if documentID.Valid {
+			inst.DocumentID = documentID.String
+		}
+		if revisionVersion.Valid {
+			inst.RevisionVersion = int(revisionVersion.Int64)
 		}
 		if completedAt.Valid {
 			inst.CompletedAt = &completedAt.Time
@@ -1758,17 +1781,23 @@ func (r *postgresApprovalRepository) LoadHeadContentHash(ctx context.Context, tx
 func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID string) (domain.Route, error) {
 	var route domain.Route
 	var subjectKind, subjectKey string
+	var profileCode sql.NullString
 	err := tx.QueryRowContext(ctx, `
 		SELECT id, tenant_id, profile_code, version, subject_kind, subject_key
 		FROM approval_routes
 		WHERE id = $1 AND tenant_id = $2 AND active = TRUE`,
 		routeID, tenantID,
-	).Scan(&route.ID, &route.TenantID, &route.ProfileCode, &route.Version, &subjectKind, &subjectKey)
+	).Scan(&route.ID, &route.TenantID, &profileCode, &route.Version, &subjectKind, &subjectKey)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Route{}, fmt.Errorf("route %s not found for tenant %s", routeID, tenantID)
 		}
 		return domain.Route{}, err
+	}
+	// P3.S2b-1 (M3 kernel extraction): profile_code is NULL for a template
+	// route; collapse to "" — Subject (below) carries the real key.
+	if profileCode.Valid {
+		route.ProfileCode = profileCode.String
 	}
 	// P3.S2a (M3 kernel extraction): hydrate Subject from the REAL
 	// subject_kind/subject_key columns rather than deriving it from

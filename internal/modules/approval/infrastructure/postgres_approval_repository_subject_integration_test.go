@@ -71,16 +71,8 @@ func insertInstanceTx(t *testing.T, db *sql.DB, tenantID, actorID string) *sql.T
 // template-write cutover is P3.S2b-1. This test's mandate is the READ side,
 // which is fully exercised here against a real template row.
 func TestLoadInstance_TemplateSubject_RoundTrips_RealDB(t *testing.T) {
-	// RED-deferred to P3.S2b-1. Migration 0297 (this slice, P3.S2b-0) makes a
-	// NULL-document_id template row legal at the schema level (proven green by
-	// tests/integration/migrations/migration_0297_test.go). But LoadInstance's
-	// read query still INNER JOINs documents ON ai.document_id and scans
-	// document_id into a non-nullable string — both document-only assumptions
-	// that drop / fail on a template row. Making the repo READ path
-	// subject-generic (LEFT JOIN + nullable document_id/revision scans) is
-	// P3.S2b-1 (repo subject-generalization), not this schema-only slice. Unskip
-	// and implement there.
-	t.Skip("unskip in P3.S2b-1: LoadInstance read path is not yet NULL-document_id tolerant")
+	// P3.S2b-1: repo READ path is now NULL-document_id tolerant (LEFT JOIN +
+	// nullable document_id/revision scans in LoadInstance/LoadInstancesByIDs).
 
 	dbc, _ := testdb.Open(t)
 	repo := NewPostgresApprovalRepository(dbc, iamdomain.NoopUserDisplayNameReader{})
@@ -221,12 +213,7 @@ func TestInsertInstance_ZeroSubject_ReturnsError_RealDB(t *testing.T) {
 // BEFORE INSERT, so this exercises exactly the persisted-value case the read
 // path must trust).
 func TestLoadRoute_TemplateSubject_RoundTrips_RealDB(t *testing.T) {
-	// RED-deferred to P3.S2b-1. Migration 0297 makes a NULL-profile_code template
-	// route legal (proven green by migration_0297_test.go), but LoadRoute still
-	// scans profile_code into a non-nullable string ("converting NULL to string
-	// is unsupported"). Making the repo READ path nullable-profile_code tolerant
-	// is P3.S2b-1 (repo subject-generalization), not this schema-only slice.
-	t.Skip("unskip in P3.S2b-1: LoadRoute read path is not yet NULL-profile_code tolerant")
+	// P3.S2b-1: repo READ path is now NULL-profile_code tolerant.
 
 	dbc, _ := testdb.Open(t)
 	repo := NewPostgresApprovalRepository(dbc, iamdomain.NoopUserDisplayNameReader{})
