@@ -110,6 +110,29 @@ document approval lifecycle unchanged. Behavior byte-equal proven BEFORE any P2 
   (`postgres_approval_repository.go` LoadRoute/LoadInstance/LoadActiveInstanceByDocument/
   LoadInstanceByDocumentForView/LoadInstancesByIDs) — MUST SELECT the real `subject_kind`/`subject_key`
   columns (only equivalent while all rows are document rows).
+- **P3.S2b-0** (PREREQUISITE migration — surfaced by the P3.S2b-1 STOP; 0296 pre-declared it as "a
+  later phase"). The template-INSERT path is blocked by legacy document-only NOT NULL + FK on the
+  approval tables: `approval_instances.document_id uuid NOT NULL` FK→`documents(id)`
+  (baseline :1971 / :4129); `approval_routes.profile_code NOT NULL` FK→`document_profiles(tenant_id,code)`
+  (:4161). A `(template, version_id)` instance / `(template, template_id)` route has no such document row.
+  RELAX (expand, forward-only, idempotent):
+  - `ALTER COLUMN document_id DROP NOT NULL` (approval_instances) + `profile_code DROP NOT NULL`
+    (approval_routes). **KEEP both FKs** — they are NULL-tolerant (single-col FK skips NULL rows;
+    composite MATCH SIMPLE skips any-NULL), so document rows stay fully integrity-checked while template
+    rows set the legacy col NULL. Do NOT drop the FKs.
+  - Projection CHECKs (DB enforces the subject invariant): instances
+    `CHECK (subject_kind <> 'document' OR document_id IS NOT NULL)` +
+    `CHECK (subject_kind <> 'template' OR document_id IS NULL)`; routes the same on `profile_code`.
+  - Template route uniqueness already handled by 0296 `ux_approval_routes_tenant_subject` (NULL
+    profile_codes are distinct in the kept `approval_routes_active_profile_uq`, so no false collision).
+  - **Verify submit idempotency:** if approval submit dedups via the DB index
+    `approval_instances_document_id_idempotency_key_key (document_id, idempotency_key)`, that leaves
+    template rows (NULL document_id → NULLs distinct) UN-deduped — add a subject-scoped unique
+    (`(tenant_id, subject_kind, subject_key, idempotency_key) WHERE idempotency_key IS NOT NULL`) so
+    template submit idempotency holds. If submit idempotency is via the platform `idempotency_keys`
+    store instead, no approval-table change needed — confirm which and act accordingly.
+  - testdb integration: template instance + route now INSERTable; document rows still rejected when
+    legacy key missing; document path byte-equal. This migration UNBLOCKS P3.S2b-1.
 - **P3.S2b** — template entry points (R2): openapi
   `/templates/{id}/versions/{n}/submit-for-approval` + `/signoff`; tier-1 caps; handlers onto the
   kernel application service (`subject_kind=template`). Adds a subject-generic route-selection method

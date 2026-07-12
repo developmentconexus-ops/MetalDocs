@@ -277,6 +277,22 @@ proven (every re-compiled dependent reproduces its exact pre-existing accepted-R
   milestone-validator: rebuild the testdb template + drop orphan `metaldocs_test_*` DBs so the C-gate
   clean re-run reflects code truth, not env drift.**
 
+### P3.S2b-1 STOP → P3.S2b-0 prerequisite migration (architecture contradiction, resolved in-boundary)
+- **STOP (correct):** S2b-1 implementer refused to write the template-insert path — `approval_instances.document_id`
+  is `uuid NOT NULL` FK→`documents(id)` (baseline :1971/:4129) and `approval_routes.profile_code` is NOT NULL
+  FK→`document_profiles` (:4161). A template subject has no document row → template INSERT is impossible;
+  the TDD suite could never go green. Migration 0296 EXPLICITLY deferred relaxing `document_id` NOT NULL to
+  "a later phase" — my plan's P3.S2b never scheduled it. Gap in the plan, not authorization to schema-patch
+  mid-slice. No code changed, no commit.
+- **Resolution (in-boundary — 0296 pre-declared this, no ratified rail crossed):** insert P3.S2b-0, a relax
+  migration BEFORE S2b-1. `DROP NOT NULL` on `document_id`/`profile_code`; KEEP both FKs (NULL-tolerant:
+  single-col FK skips NULL, composite MATCH SIMPLE skips any-NULL → document rows stay integrity-checked,
+  template rows NULL the legacy col); add projection CHECKs (document rows require the legacy key, template
+  rows forbid it). Verify + cover template submit idempotency. Full design in plan §P3.S2b-0.
+- **Not escalated to a new operator gate:** relaxing a pre-declared NOT NULL/FK to complete the milestone's
+  committed expand/contract is within P3 scope; it fulfills 0296's own note rather than deviating from a rail.
+  Flagged here for the HS-1 close review.
+
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
   cross-tenant sequence ×1, scenarios ×3, tenantdata ×1). Bar for every slice: zero NEW failures.
