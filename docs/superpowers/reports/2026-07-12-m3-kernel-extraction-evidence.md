@@ -374,6 +374,28 @@ review per commit (never the implementer).
   `ErrRevisionTitleRequired` convention); HTTP handler test RED (500) → GREEN (422). Full ladder green.
 - **Disposition: ACCEPT** — 3-commit unit sound; regression closed; all reviewer findings resolved.
 
+### P3.S2b-3 — subject-generic write path (decomposed: 3a area-resolution, 3b template path)
+**Architecture (Global-Maximum):** the document `SubmitService`/`decision_service` orchestration is deeply
+document-eQMS-shaped (draft→under_review transition, CD-link, content hash, revision title, reason-for-change)
+— NOT generalized in place. The shared kernel = domain + repository + authz layer (already shared). Templates
+get a THIN parallel write path reusing kernel primitives; document orchestration untouched beyond area
+resolution. Rails-consistent (R2a "thin entry points on shared kernel").
+
+#### P3.S2b-3a — subject-aware authz-area resolution (DONE, commit 6825afc3, reviewer ACCEPT)
+- New `application/subject_area.go`: `resolveSubjectAreaCode(ctx, tx, cdRead, tenantID, subject)` — template →
+  `"tenant"` sentinel (authz.go:155 `($2='tenant' OR upa.area_code=$2)` → area-blind, since templates have no
+  process area); document → delegate to `docapp.LoadDocumentAreaCode(subject.Key)`; unknown kind → error.
+- Call sites switched: `submit_service.go:95` (`NewDocumentSubject(req.DocumentID)`), `decision_service.go:264`
+  (`instance.Subject`). Document-path byte-identical (subject.Key == documentID for document instances).
+- Deviation (disclosed, legit): 4 pre-P3.S2a signoff-test fixtures never set Subject → zero-value rejected by
+  the new helper; added `Subject: NewDocumentSubject(...)` (matches production hydration). Not a prod gap.
+- **Reviewer ACCEPT (6 axes).** Axis-2 hammered: every prod signoff path re-runs LoadInstance internally +
+  0296 NOT NULL/CHECK/backfill/trigger ⇒ no unhydrated Subject reachable. Axis-3: `area_code_not_tenant` CHECK
+  (baseline :1061) makes a real 'tenant' area impossible — sentinel collision structurally excluded.
+- Gates: build ✓, api-lint 0 ✓, module-boundaries OK ✓, vet ✓, unit ✓, integration ✓. Zero doc-path change.
+
+#### P3.S2b-3b — thin template submit + signoff path — IN PROGRESS (blocked on eligibility-area investigation)
+
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
   cross-tenant sequence ×1, scenarios ×3, tenantdata ×1). Bar for every slice: zero NEW failures.
