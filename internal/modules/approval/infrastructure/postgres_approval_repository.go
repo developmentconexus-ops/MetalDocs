@@ -52,6 +52,18 @@ func (r *postgresApprovalRepository) InsertInstance(ctx context.Context, tx db.T
 		return fmt.Errorf("approval: InsertInstance requires a valid Subject: %w", err)
 	}
 	subject := inst.Subject
+	// P3.S2b-3b-ii: document_id is a uuid column, NULL-able since migration
+	// 0297 for template-subject rows (whose projection CHECK requires
+	// document_id IS NULL). inst.DocumentID is a plain Go string; a
+	// template-subject Instance leaves it "" by construction (there is no
+	// document), and binding "" directly would fail uuid cast (invalid input
+	// syntax), not satisfy the NOT NULL that no longer exists. Bind driver
+	// NULL for an empty value so both the document path (always non-empty)
+	// and the template path (always empty) persist correctly.
+	var documentID any
+	if inst.DocumentID != "" {
+		documentID = inst.DocumentID
+	}
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO approval_instances
 		  (id, tenant_id, document_id, route_id, route_version_snapshot,
@@ -60,7 +72,7 @@ func (r *postgresApprovalRepository) InsertInstance(ctx context.Context, tx db.T
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
 		inst.ID,
 		inst.TenantID,
-		inst.DocumentID,
+		documentID,
 		inst.RouteID,
 		inst.RouteVersionSnapshot,
 		string(inst.Status),

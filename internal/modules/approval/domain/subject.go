@@ -44,6 +44,18 @@ func NewDocumentSubject(key string) Subject {
 	return Subject{Kind: SubjectKindDocument, Key: key}
 }
 
+// NewTemplateSubject builds a Subject for the template bounded context (M3
+// P3.S2b-3b-ii, ADR 0082 template extension). key is the template version id
+// for an Instance (the artifact under approval) — symmetric with
+// NewDocumentSubject, whose key is the analogous per-call identifier. A
+// template ROUTE's subject key is the template id (the governance selector),
+// set directly by the caller since route creation for templates is a later
+// slice (#19); this constructor is only used for the two-level keying's
+// instance/artifact side.
+func NewTemplateSubject(key string) Subject {
+	return Subject{Kind: SubjectKindTemplate, Key: key}
+}
+
 // Validate returns ErrInvalidSubjectKind unless Kind is exactly
 // SubjectKindDocument or SubjectKindTemplate, and ErrEmptySubjectKey if Key
 // is empty.

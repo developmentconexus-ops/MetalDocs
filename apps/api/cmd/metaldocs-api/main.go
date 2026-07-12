@@ -639,6 +639,10 @@ func main() {
 	// adapter reads through the taxonomy profileRepo (own short tx, CapTaxonomyView,
 	// H-PRE-1). The DB deferrable trigger remains the authoritative last line.
 	approvalServices = approvalServices.WithProfilePolicyReader(approvalrepo.NewProfilePolicyReader(profileRepo))
+	// M3 P3.S2b-3b-ii: wire the approval-owned TemplateVersionReader port to
+	// the templates-side adapter. approval never imports templates
+	// infrastructure beyond this narrow interface satisfaction.
+	approvalServices = approvalServices.WithTemplateVersionReader(templatesinfra.NewApprovalVersionReader())
 	jobsCfg, err := config.LoadJobsConfig()
 	if err != nil {
 		slog.Error("invalid jobs config", "err", err)

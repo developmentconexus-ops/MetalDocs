@@ -1,0 +1,54 @@
+package infrastructure
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+
+	"metaldocs/internal/platform/db"
+)
+
+// ApprovalVersionReader is the templates-side adapter for the approval
+// module's TemplateVersionReader port (M3 P3.S2b-3b-ii). It is the ONLY
+// surface through which approval's TemplateSubmitService reads
+// templates_template_version status — approval never imports this package's
+// sibling types or queries the table directly, preserving the module
+// boundary (approval -> templates ONLY via an approval-owned injected
+// interface). Unlike TemplateVersionReader above (used by documents/
+// controlleddocuments, off-tx via the shared *sql.DB pool), this adapter
+// runs its read on the CALLER's transaction (db.Tx) so the draft-status
+// check participates in approval's submit tx exactly like every other
+// in-tx read on that path (mirrors SubmitDefaultsResolver.
+// LoadControlledDocumentID's tx-scoped shape).
+type ApprovalVersionReader struct{}
+
+// NewApprovalVersionReader constructs the adapter. It is stateless — the tx
+// is supplied per call by the caller (approval's TxRunner-owned tx).
+func NewApprovalVersionReader() *ApprovalVersionReader {
+	return &ApprovalVersionReader{}
+}
+
+// LoadTemplateVersionStatus returns templates_template_version.status for
+// templateVersionID, scoped to tenantID, read inside tx. ok is false when no
+// row matches (absent id, or a cross-tenant id — the WHERE clause itself
+// enforces tenant scoping, no reliance on RLS alone).
+func (r *ApprovalVersionReader) LoadTemplateVersionStatus(ctx context.Context, tx db.Tx, tenantID, templateVersionID string) (string, bool, error) {
+	var status sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT status
+		  FROM templates_template_version
+		 WHERE id = $1
+		   AND tenant_id = $2`,
+		templateVersionID, tenantID,
+	).Scan(&status)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	if !status.Valid {
+		return "", false, nil
+	}
+	return status.String, true, nil
+}

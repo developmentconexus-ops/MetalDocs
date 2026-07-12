@@ -50,11 +50,17 @@ func insertInstanceTx(t *testing.T, db *sql.DB, tenantID, actorID string) *sql.T
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		t.Fatalf("seed identity: %v", err)
 	}
+	// Assert BOTH submit caps: the approval_instances INSERT tripwire is now
+	// subject-discriminated (ADR 0083, migration 0299) — a document row requires
+	// document.submit, a template row requires template.submit. This shared
+	// helper seeds instances of either subject kind, so it asserts both; the
+	// trigger's per-row CASE picks the one it needs. (Asserting an unused cap is
+	// harmless — the trigger checks membership, not exclusivity.)
 	if _, err := tx.ExecContext(ctx,
 		`SELECT set_config('metaldocs.asserted_caps', $1, true)`,
-		`[{"cap":"document.submit"}]`,
+		`[{"cap":"document.submit"},{"cap":"template.submit"}]`,
 	); err != nil {
-		t.Fatalf("assert document.submit cap: %v", err)
+		t.Fatalf("assert submit caps: %v", err)
 	}
 	return tx
 }

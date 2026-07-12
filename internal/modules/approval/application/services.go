@@ -12,8 +12,8 @@ import (
 	"errors"
 	"time"
 
-	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/approval/infrastructure"
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	docsdomain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/platform/db"
 )
@@ -33,20 +33,21 @@ func (RealClock) Now() time.Time { return time.Now().UTC() }
 // subsystem. Each field is a focused service; all share the same repo,
 // emitter, and clock.
 type Services struct {
-	Submit        *SubmitService
-	Decision      *DecisionService
-	Publish       *PublishService
-	Scheduler     *SchedulerService
-	Supersede     *SupersedeService
-	Obsolete      *ObsoleteService
-	Cancel        *CancelService
-	Read          *ReadService
-	RouteAdmin    *RouteAdminService
-	MarkReviewed  *MarkReviewedService
-	ReviewVerdict *ReviewVerdictService
-	Delegation    *DelegationService
-	FastForward   *FastForwardService
-	clock         Clock
+	Submit         *SubmitService
+	TemplateSubmit *TemplateSubmitService
+	Decision       *DecisionService
+	Publish        *PublishService
+	Scheduler      *SchedulerService
+	Supersede      *SupersedeService
+	Obsolete       *ObsoleteService
+	Cancel         *CancelService
+	Read           *ReadService
+	RouteAdmin     *RouteAdminService
+	MarkReviewed   *MarkReviewedService
+	ReviewVerdict  *ReviewVerdictService
+	Delegation     *DelegationService
+	FastForward    *FastForwardService
+	clock          Clock
 }
 
 // ScheduledPublishJobInput carries the parameters needed to enqueue a scheduled-publish job.
@@ -81,20 +82,21 @@ func NewServices(repo infrastructure.ApprovalRepository, emitter EventEmitter, c
 	decision := &DecisionService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead}
 	reviewVerdict := &ReviewVerdictService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead}
 	return &Services{
-		Submit:        &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead, resolver: resolver},
-		Decision:      decision,
-		Publish:       &PublishService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
-		Scheduler:     &SchedulerService{repo: repo, emitter: emitter, clock: clock},
-		Supersede:     &SupersedeService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
-		Obsolete:      &ObsoleteService{repo: repo, emitter: emitter, clock: clock},
-		Cancel:        newCancelService(repo, emitter, clock),
-		Read:          newReadService(repo, cdRead),
-		RouteAdmin:    &RouteAdminService{repo: repo, emitter: emitter, clock: clock},
-		MarkReviewed:  NewMarkReviewedService(emitter, clock),
-		ReviewVerdict: reviewVerdict,
-		Delegation:    newDelegationService(repo, emitter, clock),
-		FastForward:   newFastForwardService(reviewVerdict, decision),
-		clock:         clock,
+		Submit:         &SubmitService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead, resolver: resolver},
+		TemplateSubmit: NewTemplateSubmitService(repo, emitter, clock, nil),
+		Decision:       decision,
+		Publish:        &PublishService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		Scheduler:      &SchedulerService{repo: repo, emitter: emitter, clock: clock},
+		Supersede:      &SupersedeService{repo: repo, emitter: emitter, clock: clock, cdRead: cdRead},
+		Obsolete:       &ObsoleteService{repo: repo, emitter: emitter, clock: clock},
+		Cancel:         newCancelService(repo, emitter, clock),
+		Read:           newReadService(repo, cdRead),
+		RouteAdmin:     &RouteAdminService{repo: repo, emitter: emitter, clock: clock},
+		MarkReviewed:   NewMarkReviewedService(emitter, clock),
+		ReviewVerdict:  reviewVerdict,
+		Delegation:     newDelegationService(repo, emitter, clock),
+		FastForward:    newFastForwardService(reviewVerdict, decision),
+		clock:          clock,
 	}
 }
 
@@ -145,6 +147,20 @@ func (s *Services) WithProfilePolicyReader(reader ProfilePolicyReader) *Services
 	}
 	if s.RouteAdmin != nil {
 		s.RouteAdmin = s.RouteAdmin.WithPolicyReader(reader)
+	}
+	return s
+}
+
+// WithTemplateVersionReader wires the approval-owned TemplateVersionReader
+// port into TemplateSubmit (M3 P3.S2b-3b-ii). Call after NewServices. A nil
+// reader leaves the draft-status guard fail-closed (ErrTemplateVersionNotFound
+// on every submit) rather than unenforced.
+func (s *Services) WithTemplateVersionReader(reader TemplateVersionReader) *Services {
+	if s == nil {
+		return s
+	}
+	if s.TemplateSubmit != nil {
+		s.TemplateSubmit = NewTemplateSubmitService(s.TemplateSubmit.repo, s.TemplateSubmit.emitter, s.TemplateSubmit.clock, reader)
 	}
 	return s
 }
