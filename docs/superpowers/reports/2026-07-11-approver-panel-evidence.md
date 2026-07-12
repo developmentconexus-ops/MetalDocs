@@ -73,14 +73,78 @@ honoured as a hint (never gates correctness — replay returns false). Backend i
 
 - L0 tsc (`tsconfig.build.json`): **CLEAN** on the integrated A–D tree (post-Slice-D, HEAD `6e71e127`).
 - L1 vitest: **643/643 passed (96 files)** across `approval` + `documents` + `shared/controlled-artifact` + `templates` — templates untouched and green (no regression from the two-action / fast-forward changes).
-- L2/L3 UI QA on :80: **BLOCKED — operator/hub dependency.** The chip's `HUB_SESSION_ID` (`local_39f1f842-1a02-4275-a6c9-2023312cd979`) no longer exists (not in `list_sessions`; session ended before this resumed run), so the REQUEST for a web-container rebuild was re-routed to the coordinator session `local_e4038af3` ("Implement ratified review/approval workflow model") — ACK pending. The mandatory :80 QA also requires the operator to perform login (QA personas are forbidden from typing passwords). Both dependencies are the operator's to resolve. Code is complete + L0/L1 green; only the browser-evidenced :80 QA remains. See §8 HS-1 (c).
+### L2/L3 :80 browser QA — proof (a) two-action approval panel = **PASS** (2026-07-11)
+
+Hub rebuilt web off HEAD `ad5977b0` (bundle freshness verified: served `approvalApi-*.js` contains "fast-forward", `DocumentWorkspacePage-*.js` contains "Aprovar já"). Fresh-session browser QA on gateway :80 (operator performed all persona logins — QA never typed passwords):
+
+State built via UI: `author-test` created PO-RH-003 (área rh), submitted → `po` profile route = **Revisao** (review; actors admin+approver) → **Aprovacao** (approval; actor approver-test). `approver` recorded "Pronto para aprovação" (quorum 1) → review passed → approval stage active. Doc id `5b8a8db4-4bce-4929-9391-b79af90c2bd2`.
+
+- **Review footer (as `approver`, Revisando):** shows exactly **"Pronto para aprovação" + "Solicitar mudanças"** and **no "Aprovar já"** — correct negative control (approver is review-only, not on the next approval stage; `deriveFastForwardOffer` → null). ✓
+- **Approval panel (as `approver-test`, Aprovando):** single decision option **"Assinar e aprovar"**, radio **unselected on mount**, primary CTA **disabled "🔒 Selecione uma decisão"** (no preselection, spec §5); **no "Assinar e devolver"** (signed reject removed, R3); secondary **"Solicitar mudanças"** present (two actions, R3); ASSINATURA (Senha) + legal MP 2.200-2/2001 ceremony intact. Selecting the radio reveals the approve-tone meaning-of-signature line and flips the CTA to "Assinar e aprovar" (gated on password+legal). ✓
+
+### Proof (b) "Aprovar já" positive path — closed by DB-backed integration tests (2026-07-12)
+
+The live-positive UI affordance needs a persona on BOTH a review stage and the following
+approval stage. Rather than hand-build a one-off overlap route through route-admin (a local
+workaround to demonstrate an already-verified code path — and blocked besides: the `admin`
+account was locked and interactive password entry is prohibited for the agent), the positive
+path is proven at the **backend gesture layer** it actually exercises — the exact endpoint the
+"Aprovar já" button POSTs to — via `tests/integration/approval/fast_forward_integration_test.go`,
+run against the live docker Postgres through the canonical `scripts/test-integration.ps1`:
+
+```
+[test-integration] postgres reachable.
+[test-integration] go test -tags=integration -run FastForward ./tests/integration/approval/...
+[test-integration] PASS.   ok  metaldocs/tests/integration/approval  12.014s
+```
+
+Six cases, all green — the fixture's `seedReviewThenApprovalFixture` seeds precisely the
+**reviewer-also-approver overlap** the UI offer requires:
+
+| Test | Proves |
+|---|---|
+| `TestFastForward_HappyPath_ReviewerAlsoApprover` | overlap persona → **exactly 1 ready verdict + 1 approve signoff in ONE tx → instance `approved`, document `approved`** (+2 governance events) |
+| `TestFastForward_NotEligible_ReviewerNotInApprovalPool` | not on next approval pool → atomic rollback, zero new rows |
+| `TestFastForward_StageNotCompleted_AllOfQuorumOnlyOneActs` | review quorum incomplete → signoff leg errors, verdict leg rolls back too |
+| `TestFastForward_G2Regression_ApprovalKindActiveStageRejected` | active stage is approval-kind → rejected, instance stays `in_progress` |
+| `TestFastForward_SoDBlocksAuthorSelfFastForward` | author self-fast-forward → `ErrAuthorCannotSign` before signoff leg |
+| `TestFastForward_ContentHashMismatch_SignoffLegErrorPropagates` | wrong content_hash → whole tx (incl. recorded verdict) rolls back |
+
+**The "Aprovar já" chain is therefore proven at every layer with zero manual login:**
+- **FE logic** — `npx vitest run` = **27/27** (`fastForwardOffer` 9 cases + `DecisionFooter` 18
+  cases, the latter asserting the exact fast-forward mutation args: `{ instanceId, stageId:
+  reviewStageId, etag, body: { password_token, content_hash, comment? } }`).
+- **Backend gesture** — 6 integration cases above, live Postgres, happy path lands `approved`.
+- **Live :80 UI** — proof (a) two-action panel + the negative control (review-only persona sees
+  NO "Aprovar já") above.
+
+The one remaining non-automated seam is the literal browser click→POST wiring, which the
+`DecisionFooter` vitest pins by exact call args. A full-stack Playwright UI e2e for it is a
+**harness build-out** (integration-tagged API serving the SPA + a fresh spec — the existing
+`e2e/flows/*` specs are stale against the workspace-redirect UI and none cover fast-forward),
+i.e. a follow-up harness unit, not this FE unit's code. Logged as HS-1 (d).
+
+### Prior blocker note (resolved)
+
+- L2/L3 UI QA on :80: **~~BLOCKED — operator/hub dependency.~~ RESOLVED — hub rebuilt :80, proof (a) PASS (above).** The chip's `HUB_SESSION_ID` (`local_39f1f842-1a02-4275-a6c9-2023312cd979`) no longer exists (not in `list_sessions`; session ended before this resumed run), so the REQUEST for a web-container rebuild was re-routed to the coordinator session `local_e4038af3` ("Implement ratified review/approval workflow model") — ACK pending. The mandatory :80 QA also requires the operator to perform login (QA personas are forbidden from typing passwords). Both dependencies are the operator's to resolve. Code is complete + L0/L1 green; only the browser-evidenced :80 QA remains. See §8 HS-1 (c).
 
 ## 8. Defers / HS-1 items
 
 - HS-1 (a): fast-forward "opportunistic single-gesture" interpretation vs chip's "after recording a verdict" prose (see §4).
 - HS-1 (b): `?decision=` deep-link preselection removed (spec §5 mandate) — inbox→panel now lands unselected.
 - (carry) 21 CFR/MP jurisdiction of the meaning-of-signature copy (pre-existing, spec §6) — untouched.
-- HS-1 (c): **:80 UI QA not yet executed** — hub session stale/unreachable + operator login required. Operator must (1) rebuild+serve the web container off HEAD `6e71e127` on the gateway :80, and (2) perform the persona logins, then the browser QA can run. Two personas needed: (a) an **approval**-kind active stage to verify the two actions ("Assinar e aprovar" + "Solicitar mudanças"; no "Assinar e devolver"); (b) a reviewer who is **also the next-stage approver** to verify "Aprovar já". Until then, closure is code-complete + L0/L1-green but the mandatory browser evidence is outstanding.
+- HS-1 (c): **:80 UI QA proof (a) = PASS** (two-action panel + negative control). Proof (b)
+  positive "Aprovar já" closed at the backend-gesture + FE-logic layers (see §7) — the seeded
+  `po` route has no reviewer/approver overlap and the `admin` account was locked, so the live
+  browser-positive was proven via the DB-backed integration suite instead of a hand-built
+  overlap route.
+- HS-1 (d): **full-stack Playwright UI e2e for the fast-forward click→POST is a harness gap, not
+  a code gap.** `dev-api.ps1` builds the API without `-tags integration` (no `/internal/test/seed`
+  endpoint) and the deployed `:80` prod image excludes it too; the `e2e/flows/*` specs are stale
+  against the workspace-redirect UI and none cover fast-forward. Standing up an integration-tagged
+  API that serves the SPA + authoring a fresh fast-forward spec is a follow-up **harness** unit.
+  The seed fixture already bakes in the reviewer-also-approver overlap (`e2e_seed.go`
+  `ensureApprovalRoute` — two `approver` stages), so that spec is mechanical once the stack exists.
 
 ## 9. Commits (branch `claude/amazing-saha-589663`, NOT pushed)
 
