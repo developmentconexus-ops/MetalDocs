@@ -28,9 +28,9 @@ import (
 	"testing"
 	"time"
 
-	"metaldocs/internal/modules/documents/approval/application"
-	"metaldocs/internal/modules/documents/approval/domain"
-	"metaldocs/internal/modules/documents/approval/infrastructure"
+	"metaldocs/internal/modules/approval/application"
+	"metaldocs/internal/modules/approval/domain"
+	"metaldocs/internal/modules/approval/infrastructure"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	approvaldomain "metaldocs/internal/modules/documents/approval/domain"
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	documentsdomain "metaldocs/internal/modules/documents/domain"
 )
 

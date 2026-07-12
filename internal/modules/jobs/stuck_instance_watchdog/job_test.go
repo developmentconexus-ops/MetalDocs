@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"metaldocs/internal/modules/documents/approval/application"
+	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/iam/authz"
 	platformdb "metaldocs/internal/platform/db"
 )

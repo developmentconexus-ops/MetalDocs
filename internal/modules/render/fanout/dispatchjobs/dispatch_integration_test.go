@@ -6,7 +6,7 @@ package dispatchjobs
 // Real-DB equivalence proofs for the M5 F5.3 staging pdf/materialize dispatch
 // migration off the poll loop onto River (T1-T4, see commits 268f68da,
 // f9a713c2, 8242584c, a6a0d868). Mirrors the testdb-factory convention used by
-// internal/modules/documents/approval/jobs/scheduled_publish_job_test.go: a
+// internal/modules/approval/jobs/scheduled_publish_job_test.go: a
 // template-cloned database per test, real repos/publisher/River client, no
 // fakes for the system-under-test.
 //

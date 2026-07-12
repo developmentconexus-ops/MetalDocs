@@ -40,7 +40,7 @@ var noResponseMapExemptFiles = []string{
 // SCOPE — every package that registers a public route, not just delivery/http:
 //
 //	internal/modules/<m>/delivery/http/   (the original H-D scope)
-//	internal/modules/documents/approval/http/
+//	internal/modules/approval/http/
 //	internal/modules/iam/presence/
 //	internal/platform/observability/
 //
@@ -136,7 +136,7 @@ func inRegisteredRoutePackage(path string) bool {
 	switch {
 	case strings.Contains(s, "internal/modules/") && strings.Contains(s, "/delivery/http/"):
 		return true
-	case strings.Contains(s, "internal/modules/documents/approval/http/"):
+	case strings.Contains(s, "internal/modules/approval/http/"):
 		return true
 	case strings.Contains(s, "internal/modules/iam/presence/"):
 		return true

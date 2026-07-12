@@ -14,10 +14,10 @@ import (
 	"github.com/riverqueue/river"
 
 	auditpg "metaldocs/internal/modules/audit/infrastructure/postgres"
-	approvalapp "metaldocs/internal/modules/documents/approval/application"
-	approvaljobs "metaldocs/internal/modules/documents/approval/jobs"
+	approvalapp "metaldocs/internal/modules/approval/application"
+	approvaljobs "metaldocs/internal/modules/approval/jobs"
 	cdinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
-	approvalrepo "metaldocs/internal/modules/documents/approval/infrastructure"
+	approvalrepo "metaldocs/internal/modules/approval/infrastructure"
 	documentsrepo "metaldocs/internal/modules/documents/infrastructure"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"

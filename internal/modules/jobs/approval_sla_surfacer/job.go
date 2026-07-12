@@ -27,7 +27,7 @@ import (
 
 	"github.com/riverqueue/river"
 
-	approvaldomain "metaldocs/internal/modules/documents/approval/domain"
+	approvaldomain "metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/iam/authz"
 )
 

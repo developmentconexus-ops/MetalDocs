@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
-	"metaldocs/internal/modules/documents/approval/infrastructure/signature"
+	"metaldocs/internal/modules/approval/infrastructure/signature"
 )
 
 // authPasswordHashReader adapts the auth module's identity repository to the

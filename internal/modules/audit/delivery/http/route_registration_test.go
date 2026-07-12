@@ -5,7 +5,7 @@ package httpdelivery_test
 // through the generated auditapi.HandlerWithOptions mount rather than the
 // prior hand-written mux.HandleFunc registrations, and that the mount does
 // not accidentally serve extra, unspec'd routes. Mirrors the approval
-// CON-03 pin test (internal/modules/documents/approval/http/router_test.go
+// CON-03 pin test (internal/modules/approval/http/router_test.go
 // TestRegisterRoutes_AllRoutesRegistered).
 
 import (

@@ -10,7 +10,7 @@ import (
 
 	"github.com/riverqueue/river"
 
-	"metaldocs/internal/modules/documents/approval/application"
+	"metaldocs/internal/modules/approval/application"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/db"
 )

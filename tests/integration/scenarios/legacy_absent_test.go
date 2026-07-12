@@ -98,7 +98,7 @@ func TestStaticcheckInstalled(t *testing.T) {
 	}
 
 	root := repoRootForIntegrationTests()
-	cmd := exec.Command("staticcheck", "./internal/modules/documents/approval/...")
+	cmd := exec.Command("staticcheck", "./internal/modules/approval/...")
 	cmd.Dir = root
 	out, err := cmd.CombinedOutput()
 	output := strings.TrimSpace(string(out))
