@@ -242,6 +242,17 @@ can't render (F-UI-1 class), the task reports CANNOT immediately — never fakes
    `<milestone>/qa/browser-qa-<date>.md` with GREEN/RED per journey; RED = exact repro, no fix
    attempts (separation of powers — QA judges, orchestrator fixes, re-run FULL ladder after fix).
 
+**Login/personas rule (operator-ratified 2026-07-11):** QA state and identities are REPO
+KNOWLEDGE, not operator favors. Before asking the operator for ANYTHING, QA reads
+`wiki/references/local-dev-startup.md` (seeded personas table: identifiers, passwords, roles —
+dev-only seeds, documented in-repo, NOT secrets) and `wiki/quality/qa-operating-system.md`, and
+checks for seed fixtures that already bake the needed state (e.g. `e2e_seed.go` bakes the
+reviewer-also-approver overlap). Login is scripted with the seeded dev credentials (API login →
+session cookie, or driving the login form with the DOCUMENTED seed password). The old
+"QA personas never type passwords" rule applies to REAL credentials only — seeded dev personas
+are test fixtures. Asking the operator to type a password that is written in the wiki = FAIL of
+QA self-sufficiency; operator-manual steps are a last resort for genuinely non-seeded state.
+
 ## 7. Context & handoff discipline
 
 - Fresh Opus session per milestone; fresh spawn per QA. Handoff state lives ONLY in: ROADMAP.md
