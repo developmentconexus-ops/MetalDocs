@@ -1731,9 +1731,29 @@ export interface paths {
         put?: never;
         /**
          * Record review-stage runtime verdict
-         * @description Records a `ready`/`request_changes` verdict against a review-kind stage (StageKind=review). `ready` is quorum-counted exactly like a signoff approval; `request_changes` immediately collapses the instance to changes_requested and reverts the document to draft (no quorum needed) — requires a non-empty comment (M2b F4).
+         * @description Records a `ready`/`request_changes` verdict. `ready` is accepted only on review-kind stages (StageKind=review) and is quorum-counted exactly like a signoff approval; a `ready` verdict on an approval-kind stage is rejected with 422. `request_changes` is accepted on both review- and approval-kind stages — it is comment-only (requires a non-empty comment, M2b F4), immediately collapses the instance to changes_requested, and reverts the document to draft (no quorum needed).
          */
         post: operations["recordApprovalReviewVerdict"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approval/instances/{instance_id}/stages/{stage_id}/fast-forward": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record "Aprovar já" fast-forward
+         * @description R5 (unit 2.3 G3): one gesture records a `ready` review verdict AND an approve signoff on the now-active approval stage as two separate ledger writes in one transaction. `stage_id` is the active review stage receiving the verdict. Only offered when the review stage completes onto a now-active approval-kind stage the acting actor is eligible on (see ReviewVerdictResponse.fast_forward_eligible); a verdict that does not complete the stage, or completes it without actor eligibility on the next approval stage, is rejected.
+         */
+        post: operations["recordApprovalFastForward"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3495,6 +3515,27 @@ export interface components {
         ReviewVerdictResponse: {
             verdict_id: string;
             was_replay: boolean;
+            outcome: string;
+            /** @description R5 (unit 2.3 G3) — true iff this verdict completed the review stage (quorum satisfied) AND the actor is eligible on the now-active approval-kind stage. */
+            fast_forward_eligible: boolean;
+            /**
+             * Format: uuid
+             * @description R5 — the now-active stage's id, present only when fast_forward_eligible is true.
+             */
+            next_stage_id?: string;
+        };
+        FastForwardRequest: {
+            /** @description Optional verdict comment recorded on the `ready` review-verdict leg. */
+            comment?: string;
+            /** @description Re-authentication password for the signature (password_reauth method). */
+            password_token: string;
+            /** @description SHA-256 hex digest of the content being signed off. */
+            content_hash: string;
+        };
+        FastForwardResponse: {
+            signoff_id: string;
+            was_replay: boolean;
+            /** @description Final outcome of the signature leg (same vocabulary as signoff). */
             outcome: string;
         };
         ApprovalInboxItem: {
@@ -7326,6 +7367,47 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["UnprocessableEntity"];
+            428: components["responses"]["PreconditionRequired"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    recordApprovalFastForward: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>" */
+                "If-Match": string;
+            };
+            path: {
+                instance_id: string;
+                stage_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FastForwardRequest"];
+            };
+        };
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FastForwardResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["UnprocessableEntity"];
             428: components["responses"]["PreconditionRequired"];
             500: components["responses"]["InternalServerError"];
         };

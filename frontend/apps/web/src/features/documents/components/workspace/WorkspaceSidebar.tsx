@@ -7,6 +7,7 @@ import type { ArtifactAction, ArtifactDecisionModel, ArtifactMetaModel, VersionH
 import { ApprovalTimeline } from '../../../approval/components/sidebar/ApprovalTimeline';
 import { DecisionFooter } from '../../../approval/components/sidebar/DecisionFooter';
 import type { ApprovalInstance, StageInstance } from '../../../approval/api/approvalTypes';
+import type { FastForwardOffer } from '../../../approval/lib/fastForwardOffer';
 import { mapApprovalChain } from '../../lib/approvalWorkflow';
 import { formatRevisionCode } from '../../../../lib/labels/revisionCode';
 import { parseDocumentStatus } from '../../lib/parseDocumentStatus';
@@ -43,6 +44,10 @@ export interface WorkspaceSidebarProps {
    * no lifecycle action applies. Replaces the former S2a NO_ACTIONS placeholder.
    */
   lifecycleActions?: ArtifactAction[];
+  /** G3 (unit 2.4) — opportunistic "Aprovar já" offer, display hint only. */
+  fastForwardOffer?: FastForwardOffer | null;
+  /** G3 (unit 2.4) — the SAME content_hash the normal approve signoff uses. */
+  contentHash?: string | null;
 }
 
 /**
@@ -66,6 +71,8 @@ export function WorkspaceSidebar({
   decision = null,
   contextualPanel = null,
   lifecycleActions = [],
+  fastForwardOffer = null,
+  contentHash = null,
 }: WorkspaceSidebarProps) {
   const [metaOpen, setMetaOpen] = useState(true);
 
@@ -133,6 +140,8 @@ export function WorkspaceSidebar({
           instance={instance}
           activeStage={activeStage}
           onRefetchInstance={onRefetchInstance}
+          fastForwardOffer={fastForwardOffer}
+          contentHash={contentHash}
         />
       ) : null}
 

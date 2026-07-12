@@ -1,14 +1,20 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ApprovalInstance, StageInstance } from '../../../api/approvalTypes';
+import type { FastForwardOffer } from '../../../lib/fastForwardOffer';
 import type { ArtifactAction, ArtifactDecisionModel } from '../../../../shared/controlled-artifact/types';
 import { DecisionFooter } from '../DecisionFooter';
 
 const mutateAsyncMock = vi.fn();
+const fastForwardMutateAsyncMock = vi.fn();
 
 vi.mock('../../../queries/useReviewVerdictMutation', () => ({
   useReviewVerdictMutation: () => ({ mutateAsync: mutateAsyncMock }),
+}));
+
+vi.mock('../../../queries/useFastForwardMutation', () => ({
+  useFastForwardMutation: () => ({ mutateAsync: fastForwardMutateAsyncMock }),
 }));
 
 function makeViewer(overrides: Record<string, unknown> = {}) {
@@ -67,21 +73,12 @@ function makeDecision(overrides: Partial<ArtifactDecisionModel> = {}): ArtifactD
         submitLabel: 'Assinar e aprovar',
         requiresReason: false,
       },
-      {
-        key: 'reject',
-        label: 'Assinar e devolver',
-        description: 'Devolve o documento.',
-        tone: 'reject',
-        submitLabel: 'Assinar e devolver',
-        requiresReason: true,
-      },
     ],
     reasonLabel: 'Justificativa',
     reasonPlaceholder: 'Comentário…',
     password: { label: 'Senha' },
     legal: { text: 'Confirmo que revisei o conteúdo integralmente e que esta decisão tem efeito de assinatura eletrônica conforme a MP 2.200-2/2001.' },
     signer: { name: 'Ana Revisora', detail: 'ana@example.com', note: 'Assinatura digital gerada no ato da confirmação.' },
-    defaultOptionKey: null,
     submit: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -91,6 +88,8 @@ describe('DecisionFooter', () => {
   beforeEach(() => {
     mutateAsyncMock.mockReset();
     mutateAsyncMock.mockResolvedValue({ verdict_id: 'v1', was_replay: false, outcome: 'ok' });
+    fastForwardMutateAsyncMock.mockReset();
+    fastForwardMutateAsyncMock.mockResolvedValue({ signoff_id: 'so-1', was_replay: false, outcome: 'ok' });
   });
 
   describe('review mode', () => {
@@ -187,10 +186,107 @@ describe('DecisionFooter', () => {
       expect(screen.queryByLabelText(/senha/i)).toBeNull();
       expect(screen.queryByRole('button', { name: /Aprovar e assinar/i })).toBeNull();
     });
+
+    const fastForwardOffer: FastForwardOffer = {
+      reviewStageId: 'stage-1',
+      nextApprovalStageId: 'stage-approval-1',
+    };
+
+    it('renders "Aprovar já" when a fastForwardOffer and contentHash are present', () => {
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={vi.fn()}
+          fastForwardOffer={fastForwardOffer}
+          contentHash="abc123"
+        />,
+      );
+      expect(screen.getByRole('button', { name: 'Aprovar já' })).toBeTruthy();
+    });
+
+    it('does not render "Aprovar já" without an offer', () => {
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={vi.fn()}
+          fastForwardOffer={null}
+          contentHash="abc123"
+        />,
+      );
+      expect(screen.queryByRole('button', { name: 'Aprovar já' })).toBeNull();
+    });
+
+    it('does not render "Aprovar já" without a contentHash', () => {
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={vi.fn()}
+          fastForwardOffer={fastForwardOffer}
+          contentHash={null}
+        />,
+      );
+      expect(screen.queryByRole('button', { name: 'Aprovar já' })).toBeNull();
+    });
+
+    it('clicking "Aprovar já" opens the signature dialog with a password field', () => {
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ viewer: makeViewer({ eligible_for_active_stage: true }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={vi.fn()}
+          fastForwardOffer={fastForwardOffer}
+          contentHash="abc123"
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Aprovar já' }));
+      expect(screen.getByRole('dialog', { name: 'Aprovar já' })).toBeTruthy();
+      expect(screen.getByLabelText('Senha')).toBeTruthy();
+    });
+
+    it('submitting the fast-forward dialog with a password calls the mutation with the exact args and refetches', async () => {
+      const onRefetchInstance = vi.fn();
+      render(
+        <DecisionFooter
+          decision={null}
+          actions={[]}
+          instance={makeInstance({ etag: '"v9"', viewer: makeViewer({ eligible_for_active_stage: true }) })}
+          activeStage={makeStage()}
+          onRefetchInstance={onRefetchInstance}
+          fastForwardOffer={fastForwardOffer}
+          contentHash="abc123"
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Aprovar já' }));
+      const dialog = screen.getByRole('dialog', { name: 'Aprovar já' });
+      fireEvent.change(within(dialog).getByLabelText('Senha'), { target: { value: 'hunter2' } });
+      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'Tudo certo' } });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Assinar e avançar' }));
+
+      await waitFor(() => {
+        expect(fastForwardMutateAsyncMock).toHaveBeenCalledWith({
+          instanceId: 'inst-1',
+          stageId: 'stage-1',
+          etag: '"v9"',
+          body: { password_token: 'hunter2', content_hash: 'abc123', comment: 'Tudo certo' },
+        });
+      });
+      await waitFor(() => expect(onRefetchInstance).toHaveBeenCalled());
+    });
   });
 
   describe('approval mode', () => {
-    it('renders the decision panel with password field, no verdict CTAs', () => {
+    it('renders the decision panel with password field and a "Solicitar mudanças" button, no verdict CTAs', () => {
       render(
         <DecisionFooter
           decision={makeDecision()}
@@ -201,14 +297,27 @@ describe('DecisionFooter', () => {
         />,
       );
       expect(screen.getByLabelText('Senha')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Solicitar mudanças' })).toBeTruthy();
       expect(screen.queryByRole('button', { name: 'Pronto para aprovação' })).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Solicitar mudanças' })).toBeNull();
+    });
+
+    it('does not offer "Assinar e devolver" (signed rejection removed from the UI)', () => {
+      render(
+        <DecisionFooter
+          decision={makeDecision()}
+          actions={[]}
+          instance={makeInstance()}
+          activeStage={makeStage({ stage_kind: 'approval' })}
+          onRefetchInstance={vi.fn()}
+        />,
+      );
+      expect(screen.queryByText(/Assinar e devolver/)).toBeNull();
     });
 
     it('shows meaning-of-signature line "declara aprovação" for the approve option', () => {
       render(
         <DecisionFooter
-          decision={makeDecision({ defaultOptionKey: 'approve' })}
+          decision={makeDecision()}
           actions={[]}
           instance={makeInstance()}
           activeStage={makeStage({ stage_kind: 'approval' })}
@@ -219,18 +328,34 @@ describe('DecisionFooter', () => {
       expect(screen.getByText(/declara aprovação/)).toBeTruthy();
     });
 
-    it('shows meaning-of-signature line "declara rejeição" for the reject option', () => {
+    it('"Solicitar mudanças" opens a dialog and submits request_changes on the approval stage', async () => {
+      const onRefetchInstance = vi.fn();
       render(
         <DecisionFooter
           decision={makeDecision()}
           actions={[]}
-          instance={makeInstance()}
-          activeStage={makeStage({ stage_kind: 'approval' })}
-          onRefetchInstance={vi.fn()}
+          instance={makeInstance({ etag: '"v9"' })}
+          activeStage={makeStage({ id: 'stage-approval-1', stage_kind: 'approval' })}
+          onRefetchInstance={onRefetchInstance}
         />,
       );
-      fireEvent.click(screen.getByRole('radio', { name: /Assinar e devolver/ }));
-      expect(screen.getByText(/declara rejeição/)).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Solicitar mudanças' }));
+      const dialog = screen.getByRole('dialog', { name: 'Solicitar mudanças' });
+      const submitBtn = within(dialog).getByRole('button', { name: 'Enviar solicitação' });
+      expect(submitBtn).toBeDisabled();
+
+      fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'Ajustar cláusula 4' } });
+      fireEvent.click(submitBtn);
+
+      await waitFor(() => {
+        expect(mutateAsyncMock).toHaveBeenCalledWith({
+          instanceId: 'inst-1',
+          stageId: 'stage-approval-1',
+          etag: '"v9"',
+          body: { verdict: 'request_changes', comment: 'Ajustar cláusula 4' },
+        });
+      });
+      await waitFor(() => expect(onRefetchInstance).toHaveBeenCalled());
     });
 
     it('renders "Outras ações" secondary group when actions are present', () => {

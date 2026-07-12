@@ -6,6 +6,8 @@ import type {
   ApprovalDelegation,
   ApprovalInstance,
   CreateApprovalDelegationRequest,
+  FastForwardRequest,
+  FastForwardResponse,
   ListInboxParams,
   ListInboxResponse,
   ReviewVerdictRequest,
@@ -20,6 +22,16 @@ interface ReviewVerdictArgs {
   stageId: string;
   etag: string;
   body: ReviewVerdictRequest;
+}
+
+// G3 (unit 2.4): the fast-forward request/args wrapper mirrors ReviewVerdictArgs
+// exactly — stage_id is the active REVIEW stage, etag is the instance's current
+// version, both supplied by the caller (same shape as reviewVerdict).
+interface FastForwardArgs {
+  instanceId: string;
+  stageId: string;
+  etag: string;
+  body: FastForwardRequest;
 }
 
 // Contract-first: every approval mutation's request/response body is the codegen
@@ -99,6 +111,23 @@ export function reviewVerdict({
   return mutate(
     'POST',
     `${BASE}/approval/instances/${instanceId}/stages/${stageId}/review-verdict`,
+    body,
+    { ifMatch: etag },
+  );
+}
+
+// G3 (unit 2.4): fast-forward records the verdict leg + the approve-signoff
+// leg on the now-active approval stage in ONE tx. Same optimistic-concurrency
+// (If-Match) and Idempotency-Key handling as reviewVerdict/signoff.
+export function fastForward({
+  instanceId,
+  stageId,
+  etag,
+  body,
+}: FastForwardArgs): Promise<FastForwardResponse> {
+  return mutate(
+    'POST',
+    `${BASE}/approval/instances/${instanceId}/stages/${stageId}/fast-forward`,
     body,
     { ifMatch: etag },
   );

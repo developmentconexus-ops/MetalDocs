@@ -364,7 +364,7 @@ describe('DocumentWorkspacePage', () => {
     expect(screen.getByTestId('delegation-badge')).toHaveTextContent('Assinando por delegação de Bruno Said');
   });
 
-  it('approving + ?decision=approve: preselects the approve option (M2c regression precedent)', async () => {
+  it('approving + ?decision=approve: does NOT preselect an option (spec §5 — user must actively choose)', async () => {
     vi.spyOn(documentsApi, 'getDocument').mockResolvedValue(makeDoc({ status: 'under_review' }));
     vi.spyOn(documentsApi, 'getApprovalInstance').mockResolvedValue(
       makeInstance({
@@ -380,7 +380,10 @@ describe('DocumentWorkspacePage', () => {
     renderAt('/documents/doc-1/workspace?decision=approve');
 
     await waitFor(() => expect(screen.getByTestId('editor')).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByText(/declara aprovação/)).toBeInTheDocument());
+    for (const radio of screen.getAllByRole('radio')) {
+      expect(radio).toHaveAttribute('aria-checked', 'false');
+    }
+    expect(screen.queryByText(/declara aprovação/)).not.toBeInTheDocument();
   });
 
   it('approving, NOT eligible (SoD): no signature panel even on an approval-kind active stage', async () => {

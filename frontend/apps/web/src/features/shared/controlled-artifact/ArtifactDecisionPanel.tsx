@@ -33,7 +33,7 @@ function errorMessage(error: unknown): string {
  * whose label follows the selected option.
  */
 export function ArtifactDecisionPanel({ model }: ArtifactDecisionPanelProps) {
-  const [selectedKey, setSelectedKey] = useState<string | null>(model.defaultOptionKey ?? null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
   const [legalChecked, setLegalChecked] = useState(false);

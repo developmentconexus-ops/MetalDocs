@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { ArtifactDecisionPanel } from '../../../shared/controlled-artifact/ArtifactDecisionPanel';
 import type { ArtifactAction, ArtifactDecisionModel } from '../../../shared/controlled-artifact/types';
 import type { ApprovalInstance, StageInstance } from '../../api/approvalTypes';
+import type { FastForwardOffer } from '../../lib/fastForwardOffer';
 import { deriveStageMode } from '../../lib/workspaceMode';
 import { useReviewVerdictMutation } from '../../queries/useReviewVerdictMutation';
+import { useFastForwardMutation } from '../../queries/useFastForwardMutation';
 import styles from './DecisionFooter.module.css';
 
 interface DecisionFooterProps {
@@ -13,6 +15,10 @@ interface DecisionFooterProps {
   instance: ApprovalInstance;
   activeStage: StageInstance | undefined;
   onRefetchInstance: () => Promise<void> | void;
+  /** G3 (unit 2.4) — opportunistic "Aprovar já" offer, display hint only. */
+  fastForwardOffer?: FastForwardOffer | null;
+  /** G3 (unit 2.4) — the SAME content_hash the normal approve signoff uses. */
+  contentHash?: string | null;
 }
 
 function variantClass(action: ArtifactAction): string {
@@ -64,12 +70,238 @@ function MeaningOfSignatureLine({ tone }: { tone: 'approve' | 'reject' }) {
   return <p className={styles.meaningLine}>{text}</p>;
 }
 
-/** Wraps ArtifactDecisionPanel to surface the selected option's tone for the
- *  meaning-of-signature line without altering the panel itself. */
-function ApprovalModeFooter({ decision, actions }: { decision: ArtifactDecisionModel; actions: ArtifactAction[] }) {
-  const [selectedTone, setSelectedTone] = useState<'approve' | 'reject' | null>(
-    decision.options.find((o) => o.key === decision.defaultOptionKey)?.tone ?? null,
+/**
+ * Shared request-changes verdict unit (R3): the single place that submits a
+ * `request_changes` verdict on the active stage via `useReviewVerdictMutation`.
+ * Used by both `ReviewModeFooter` (review-kind stages) and `ApprovalModeFooter`
+ * (approval-kind stages, per G2 — the guard allows `request_changes`, never
+ * `ready`, on approval stages).
+ */
+function useRequestChangesVerdict({
+  instance,
+  activeStage,
+  onRefetchInstance,
+}: {
+  instance: ApprovalInstance;
+  activeStage: StageInstance | undefined;
+  onRefetchInstance: () => Promise<void> | void;
+}) {
+  const verdictMutation = useReviewVerdictMutation();
+  const [open, setOpen] = useState(false);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const canSubmit = activeStage != null;
+
+  async function submit() {
+    if (!activeStage) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await verdictMutation.mutateAsync({
+        instanceId: instance.id,
+        stageId: activeStage.id,
+        etag: instance.etag,
+        body: { verdict: 'request_changes', comment: comment.trim() },
+      });
+      setOpen(false);
+      setComment('');
+      await onRefetchInstance();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível registrar a decisão. Tente novamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function reset() {
+    setOpen(false);
+    setComment('');
+  }
+
+  return { open, setOpen, comment, setComment, submitting, error, canSubmit, submit, reset };
+}
+
+type RequestChangesUnit = ReturnType<typeof useRequestChangesVerdict>;
+
+/**
+ * G3 (unit 2.4) — the "Aprovar já" fast-forward gesture: a standalone
+ * signature ceremony (password + optional comment) that submits to the
+ * fast-forward endpoint, NOT the review-verdict endpoint. It is intentionally
+ * NOT built on `useRequestChangesVerdict` — it is a different mutation with a
+ * different contract (password_token + content_hash, no verdict field).
+ */
+function useFastForward({
+  instance,
+  offer,
+  contentHash,
+  onRefetchInstance,
+}: {
+  instance: ApprovalInstance;
+  offer: FastForwardOffer | null;
+  contentHash: string | null;
+  onRefetchInstance: () => Promise<void> | void;
+}) {
+  const fastForwardMutation = useFastForwardMutation();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // The offer is a display hint only — this hook still guards on it being
+  // present (with a non-empty contentHash) before it will ever submit,
+  // regardless of what the caller renders.
+  const available = offer != null && !!contentHash;
+  const canSubmit = available && password.length > 0 && !submitting;
+
+  async function submit() {
+    if (!available || !offer || !contentHash || password.length === 0) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const trimmedComment = comment.trim();
+      await fastForwardMutation.mutateAsync({
+        instanceId: instance.id,
+        stageId: offer.reviewStageId,
+        etag: instance.etag,
+        body: {
+          password_token: password,
+          content_hash: contentHash,
+          ...(trimmedComment.length > 0 ? { comment: trimmedComment } : {}),
+        },
+      });
+      setOpen(false);
+      setPassword('');
+      setComment('');
+      await onRefetchInstance();
+    } catch (err) {
+      // Fail-closed (no swallowed errors): the backend ErrFastForward* problem+
+      // json message IS the friendly fallback — the reviewer can still use
+      // "Pronto para aprovação" separately.
+      setError(err instanceof Error ? err.message : 'Não foi possível concluir a assinatura. Tente novamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function reset() {
+    setOpen(false);
+    setPassword('');
+    setComment('');
+    setError(null);
+  }
+
+  return { open, setOpen, password, setPassword, comment, setComment, submitting, error, canSubmit, available, submit, reset };
+}
+
+type FastForwardUnit = ReturnType<typeof useFastForward>;
+
+/** Presentational signature dialog for the "Aprovar já" fast-forward gesture. */
+function FastForwardDialog({ unit }: { unit: FastForwardUnit }) {
+  const passwordFieldId = useId();
+  return (
+    <div className={styles.requestChangesDialog} role="dialog" aria-label="Aprovar já">
+      <MeaningOfSignatureLine tone="approve" />
+      <label className={styles.field} htmlFor={passwordFieldId}>
+        <span className={styles.fieldLabel}>Senha</span>
+        <input
+          id={passwordFieldId}
+          className={styles.textarea}
+          type="password"
+          autoComplete="current-password"
+          value={unit.password}
+          onChange={(e) => unit.setPassword(e.target.value)}
+          disabled={unit.submitting}
+        />
+      </label>
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Comentário · opcional</span>
+        <textarea
+          className={styles.textarea}
+          rows={3}
+          value={unit.comment}
+          onChange={(e) => unit.setComment(e.target.value)}
+          disabled={unit.submitting}
+        />
+      </label>
+      <div className={styles.dialogActions}>
+        <button
+          type="button"
+          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+          disabled={unit.submitting}
+          onClick={unit.reset}
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+          disabled={!unit.canSubmit}
+          onClick={() => void unit.submit()}
+        >
+          Assinar e avançar
+        </button>
+      </div>
+    </div>
   );
+}
+
+/** Presentational comment dialog shared by both footer modes. */
+function RequestChangesDialog({ unit }: { unit: RequestChangesUnit }) {
+  return (
+    <div className={styles.requestChangesDialog} role="dialog" aria-label="Solicitar mudanças">
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Comentário · obrigatório</span>
+        <textarea
+          className={styles.textarea}
+          rows={3}
+          value={unit.comment}
+          onChange={(e) => unit.setComment(e.target.value)}
+          disabled={unit.submitting}
+        />
+      </label>
+      <div className={styles.dialogActions}>
+        <button
+          type="button"
+          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+          disabled={unit.submitting}
+          onClick={unit.reset}
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+          disabled={unit.comment.trim().length === 0 || unit.submitting}
+          onClick={() => void unit.submit()}
+        >
+          Enviar solicitação
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Wraps ArtifactDecisionPanel (approve-only signoff ceremony) to surface the
+ *  selected option's tone for the meaning-of-signature line, plus a secondary
+ *  "Solicitar mudanças" comment-only verdict (R3: exactly two actions). */
+function ApprovalModeFooter({
+  decision,
+  actions,
+  instance,
+  activeStage,
+  onRefetchInstance,
+}: {
+  decision: ArtifactDecisionModel;
+  actions: ArtifactAction[];
+  instance: ApprovalInstance;
+  activeStage: StageInstance | undefined;
+  onRefetchInstance: () => Promise<void> | void;
+}) {
+  const [selectedTone, setSelectedTone] = useState<'approve' | 'reject' | null>(null);
+  const requestChanges = useRequestChangesVerdict({ instance, activeStage, onRefetchInstance });
 
   return (
     <div
@@ -88,6 +320,26 @@ function ApprovalModeFooter({ decision, actions }: { decision: ArtifactDecisionM
     >
       {selectedTone != null && <MeaningOfSignatureLine tone={selectedTone} />}
       <ArtifactDecisionPanel model={decision} />
+
+      {!requestChanges.open ? (
+        <button
+          type="button"
+          className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
+          disabled={!requestChanges.canSubmit}
+          onClick={() => requestChanges.setOpen(true)}
+        >
+          Solicitar mudanças
+        </button>
+      ) : (
+        <RequestChangesDialog unit={requestChanges} />
+      )}
+
+      {requestChanges.error != null && (
+        <div className={styles.error} role="alert">
+          {requestChanges.error}
+        </div>
+      )}
+
       <OtherActions actions={actions} />
     </div>
   );
@@ -98,50 +350,58 @@ function ReviewModeFooter({
   activeStage,
   actions,
   onRefetchInstance,
+  fastForwardOffer = null,
+  contentHash = null,
 }: {
   instance: ApprovalInstance;
   activeStage: StageInstance | undefined;
   actions: ArtifactAction[];
   onRefetchInstance: () => Promise<void> | void;
+  fastForwardOffer?: FastForwardOffer | null;
+  contentHash?: string | null;
 }) {
   const verdictMutation = useReviewVerdictMutation();
-  const [showRequestChanges, setShowRequestChanges] = useState(false);
-  const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const requestChanges = useRequestChangesVerdict({ instance, activeStage, onRefetchInstance });
+  const fastForward = useFastForward({ instance, offer: fastForwardOffer, contentHash, onRefetchInstance });
+  const [submittingReady, setSubmittingReady] = useState(false);
+  const [readyError, setReadyError] = useState<string | null>(null);
 
   const canSubmitVerdict = activeStage != null;
 
-  async function submitVerdict(verdict: 'ready' | 'request_changes', commentValue?: string) {
+  async function submitReady() {
     if (!activeStage) return;
-    setSubmitting(true);
-    setError(null);
+    setSubmittingReady(true);
+    setReadyError(null);
     try {
       await verdictMutation.mutateAsync({
         instanceId: instance.id,
         stageId: activeStage.id,
         etag: instance.etag,
-        body: commentValue != null ? { verdict, comment: commentValue } : { verdict },
+        body: { verdict: 'ready' },
       });
-      setShowRequestChanges(false);
-      setComment('');
       await onRefetchInstance();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível registrar a decisão. Tente novamente.');
+      setReadyError(err instanceof Error ? err.message : 'Não foi possível registrar a decisão. Tente novamente.');
     } finally {
-      setSubmitting(false);
+      setSubmittingReady(false);
     }
   }
 
+  const submitting = submittingReady || requestChanges.submitting;
+  const error = readyError ?? requestChanges.error ?? fastForward.error;
+  const showFastForward = fastForward.available;
+
   return (
     <div className={styles.footer} data-testid="approval-sidebar-footer" style={{ position: 'sticky', bottom: 0 }}>
-      {!showRequestChanges ? (
+      {fastForward.open ? (
+        <FastForwardDialog unit={fastForward} />
+      ) : !requestChanges.open ? (
         <div className={styles.verdictActions}>
           <button
             type="button"
             className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
             disabled={!canSubmitVerdict || submitting}
-            onClick={() => void submitVerdict('ready')}
+            onClick={() => void submitReady()}
           >
             Pronto para aprovação
           </button>
@@ -149,45 +409,23 @@ function ReviewModeFooter({
             type="button"
             className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
             disabled={!canSubmitVerdict || submitting}
-            onClick={() => setShowRequestChanges(true)}
+            onClick={() => requestChanges.setOpen(true)}
           >
             Solicitar mudanças
           </button>
-        </div>
-      ) : (
-        <div className={styles.requestChangesDialog} role="dialog" aria-label="Solicitar mudanças">
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Comentário · obrigatório</span>
-            <textarea
-              className={styles.textarea}
-              rows={3}
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              disabled={submitting}
-            />
-          </label>
-          <div className={styles.dialogActions}>
-            <button
-              type="button"
-              className={`${styles.actionBtn} ${styles.actionBtnSecondary}`}
-              disabled={submitting}
-              onClick={() => {
-                setShowRequestChanges(false);
-                setComment('');
-              }}
-            >
-              Cancelar
-            </button>
+          {showFastForward && (
             <button
               type="button"
               className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
-              disabled={comment.trim().length === 0 || submitting}
-              onClick={() => void submitVerdict('request_changes', comment.trim())}
+              disabled={submitting}
+              onClick={() => fastForward.setOpen(true)}
             >
-              Enviar solicitação
+              Aprovar já
             </button>
-          </div>
+          )}
         </div>
+      ) : (
+        <RequestChangesDialog unit={requestChanges} />
       )}
 
       {error != null && (
@@ -224,9 +462,19 @@ export function DecisionFooter({
   instance,
   activeStage,
   onRefetchInstance,
+  fastForwardOffer = null,
+  contentHash = null,
 }: DecisionFooterProps) {
   if (decision != null) {
-    return <ApprovalModeFooter decision={decision} actions={actions} />;
+    return (
+      <ApprovalModeFooter
+        decision={decision}
+        actions={actions}
+        instance={instance}
+        activeStage={activeStage}
+        onRefetchInstance={onRefetchInstance}
+      />
+    );
   }
 
   const stageMode = deriveStageMode(
@@ -241,6 +489,8 @@ export function DecisionFooter({
         activeStage={activeStage}
         actions={actions}
         onRefetchInstance={onRefetchInstance}
+        fastForwardOffer={fastForwardOffer}
+        contentHash={contentHash}
       />
     );
   }
