@@ -406,8 +406,19 @@ resolution. Rails-consistent (R2a "thin entry points on shared kernel").
 - Test `eligible_actors_area_blind_integration_test.go` (+100): seeds tenantWideApprover (area 'quality')
   + scopedOnlyInX (area 'safety'); area-blind ('tenant') finds approver (RED empty pre-fix → GREEN post),
   area-scoped ('quality') assertion proves no real-area behavior change. Full gate ladder PASS; no deviations.
-- **3b-ii — thin template submit path** — pending (blocked by 3b-i, now unblocked).
-- **3b-iii — template signoff + completion port** — pending (blocked by 3b-i, 3b-ii).
+- **3b-ii — thin template submit path** — **STOP / ESCALATED** (architecture contradiction in authz tripwire kernel). Implementer work green at L1 (2 real-DB tests PASS) but blocked at L0 (api-lint). WIP preserved `git stash@{0}`. Details below.
+- **3b-iii — template signoff + completion port** — pending (blocked by 3b-ii, and by the SAME kernel gap on `approval_signoffs`).
+
+##### P3.S2b-3b-ii STOP — tripwire arm kernel is not subject-generic (ADR 0082 gap)
+**Root cause.** ADR 0082 generalized `approval_instances` to a SHARED table (`subject_kind ∈ {document, template}`), touching the table's columns/indexes/constraints — but NOT the authz last-line-of-defense trigger `enforce_capability_asserted()` nor its Go source of truth `internal/platform/tripwire.TripwireArms`. Arm #1 still hardcodes `(approval_instances, INSERT) → [document.submit]`.
+
+**Why it can't be fixed inside the slice (both attempts empirically confirmed):**
+- Assert `CapDocumentSubmit` (`ScopeArea`) with the `"tenant"` area-blind sentinel (required for template stages, ratified 3b-i/3a) → integration GREEN but api-lint `authz-area-scope-binding` FAILS (ADR 0022 Phase 7: area-grade caps may not be enforced with literal `"tenant"`). Reproduced ×2.
+- Assert `CapTemplateSubmit` (`ScopeTenant`, correct area-blind classification — already in the registry) → api-lint clean but DB trigger rejects: `ErrCapabilityNotAsserted: none of {document.submit} present … on approval_instances (P0001)`.
+
+**Why the naive kernel widen is a SECURITY REGRESSION (rejected).** The trigger match is **match-one** (`arms.go`: "any one present in asserted_caps satisfies the branch"). Widening arm #1 to `[document.submit, template.submit]` would let a holder of ONLY `template.submit` authorize a **document**-subject INSERT. The `Arm` model `(table, op)→caps` has no column-value discriminator, so it cannot express "document rows require document.submit; template rows require template.submit" on a shared table. (Template-only tables like `templates_template_version` avoid this because they are not shared with documents.)
+
+**Global-maximum fix (recommended, pending operator ratification — HS-7):** extend the tripwire arm kernel with an optional subject discriminator (`WhenColumn`/`WhenValue`, e.g. `subject_kind`); `RenderMigration()` emits a nested `CASE NEW.subject_kind` for `approval_instances`; split arm #1 → document→`document.submit`, template→`template.submit`. Regenerate golden migration (new `db/migrations/0284_*.sql`), bump `tripwireMigrationPath`, keep TRIPWIRE-ARM-PARITY + TRIPWIRE-ARM-DRIFT green. Then 3b-ii resumes trivially (assert `CapTemplateSubmit`). Same discriminator (via join) later resolves the identical `approval_signoffs` gap for 3b-iii. **Blocked on operator ratification because it amends the binding GMR M2 validation-contract arm set (arms.go HS-7 clause) and touches the authz last line of defense.**
 
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
