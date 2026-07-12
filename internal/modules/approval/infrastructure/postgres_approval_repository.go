@@ -1691,11 +1691,15 @@ func (r *postgresApprovalRepository) LoadFrozenContentHash(ctx context.Context, 
 // is never future; effective_to > now() is empty), retiring the Model-B interval
 // leak (ADR 0037 D2). H-PRE-1 preserved: still a plain, non-recording in-tx SELECT.
 func (r *postgresApprovalRepository) ResolveEligibleActors(ctx context.Context, tx db.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
+	// Template stages pass the 'tenant' sentinel (templates carry no process
+	// area) → area-blind, matching the role in ANY area (mirrors the authz
+	// predicate at internal/modules/iam/authz/authz.go:155). Document stages
+	// pass a real area code → unchanged, area-scoped match.
 	rows, err := tx.QueryContext(ctx,
 		`SELECT user_id
 		   FROM metaldocs.v_active_user_areas
 		  WHERE tenant_id = $1::uuid
-		    AND area_code = $2
+		    AND ($2 = 'tenant' OR area_code = $2)
 		    AND role      = $3`,
 		tenantID, areaCode, requiredRole,
 	)
