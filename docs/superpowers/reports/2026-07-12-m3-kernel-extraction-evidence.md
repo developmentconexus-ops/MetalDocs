@@ -20,7 +20,7 @@
 | P1.S4 supersede ADR 0072 + guard | 2026-07-12 | main | negative-plant proof | boundary GREEN; plant RED→revert-clean→GREEN | 7f407646 | DONE |
 | P2.S1 migration + backfill | 2026-07-12 | sonnet | sonnet ACCEPT-WITH-NITS | build+vet; 8 testMig0296 GREEN (canonical); api-lint 0; check-db-bootstrap PASS | 82b897f1 | DONE |
 | P2.S2 domain generalize | 2026-07-12 | sonnet | sonnet ACCEPT-WITH-NITS | byte-equal doc path; version-copy col-order CONFIRMED (indep + reviewer) | fe581164 | DONE |
-| P2.S3 route-admin contract delta | — | sonnet | sonnet (indep) | additive-only diff | — | pending |
+| P2.S3 route-admin contract delta | 2026-07-12 | sonnet | sonnet ACCEPT | additive-only diff proven; regen-clean; byte-equal default | 9062f169 | DONE |
 | P3.S1 in-flight count | — | main/haiku | — | count + query recorded | — | pending |
 | P3.S2 template entry points | — | sonnet | sonnet (indep) | tier-1 caps, kernel wire | — | pending |
 | P3.S3 config→route migration | — | sonnet | sonnet (indep) | cutover rule applied | — | pending |
@@ -140,6 +140,41 @@ proven (every re-compiled dependent reproduces its exact pre-existing accepted-R
   (8-col positional match, copies source route's own subject). Two nits (both "document-only-safe,
   breaks at P3 templates"): InsertInstance zero-Subject fallback + derive-from-legacy hydration —
   now tracked as explicit P3.S2 must-close items in the plan.
+
+### P2.S3 gates — route-admin subject contract delta (commit 9062f169)
+- **R1 additive-only, zero breaking change** — `git show 9062f169 -- api/openapi/v1/openapi.yaml`:
+  `CreateRouteRequest.required` unchanged `[profile_code, name, stages]`;
+  `RouteSummary.required` unchanged `[id, name, tenant_id, profile_code, active, version, stages,
+  created_at, updated_at]`. `subject_kind` (enum document|template) + `subject_key` added as OPTIONAL
+  props outside both `required` lists. No field removed, no new required entry, no type/pattern/enum
+  narrowing on any existing field. **Reviewer determination: NO breaking change.**
+- **Regen-clean** — `go generate ./internal/modules/approval/api/...` reproduces committed `api.gen.go`
+  byte-for-byte (working tree clean after regen). New fields pointer-typed/optional
+  (`SubjectKind *CreateRouteRequestSubjectKind`, `SubjectKey *string`). Not hand-edited.
+- **Byte-equal default** — `resolveCreateRouteSubject` (route_admin_service.go): both fields absent →
+  `Subject=(document, profile_code)`, identical persisted row to pre-slice. Proven two ways:
+  fake-driver INSERT-arg capture unit test + real-Postgres `SELECT subject_kind, subject_key`
+  integration test (`route_admin_service_subject_integration_test.go`). `profile_code` stays required
+  throughout (contract, input struct, INSERT).
+- **Enum validation at both layers** — HTTP `http/contracts/route.go` `CreateRouteRequest.Validate()`
+  (reject unknown → 400) + domain `domain/subject.go` `Subject.Validate()` (`ErrInvalidSubjectKind`).
+  Hand-written `contracts` package + generated `api.gen.go` both carry the fields, verified in sync
+  (module decodes via hand-written contracts; gen types drive the strict-server route guard only).
+- **Scope guard held** — grep of full commit diff: NO template routes, NO template governance, NO new
+  capability, NO G1-policy change, NO P3.S4 retired-path work. `subject_kind=template` accepted +
+  persisted faithfully with zero governance (Phase-3 wiring deferred).
+- Gates (reviewer ran fresh, all green): `go build`/`go vet` clean · `go test
+  ./internal/modules/approval/...` (8 pkgs) ok · consumers documents+templates ok · full `go test ./...`
+  no FAIL · api-lint **0** · `check-module-boundaries.ps1` **OK** · canonical
+  `test-integration.ps1 -Package ./internal/modules/approval/...` PASS, zero NEW failures (approval-only
+  scope, none of the 9 baseline-RED pkgs exercised).
+- Reviewer **ACCEPT**, zero must-fix, zero nits.
+
+### Phase-2 close
+- P2.S1 (DB expand + backfill + compat trigger) · P2.S2 (domain Subject + explicit persistence) ·
+  P2.S3 (route-admin additive contract) all DONE + committed. Existing document routes/instances
+  byte-equal; contract diff additive-only; kernel now keyed by `(subject_kind, subject_key)` with
+  document as the projection. Ready for Phase 3 (templates onto kernel).
 
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
