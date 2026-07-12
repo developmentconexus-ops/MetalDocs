@@ -74,6 +74,15 @@ var ErrRouteDeactivateReasonRequired = errors.New("route_admin: deactivate reaso
 // as an actionable 4xx instead of an opaque 500.
 var ErrRouteProfileUnknown = errors.New("route_admin: profile_code not registered for tenant")
 
+// ErrDocumentSubjectKeyMismatch is returned when a document-subject route's
+// effective SubjectKey diverges from its ProfileCode. Per ratified rail R1,
+// profile_code is the backward-compat ALIAS for (document, profile_code) —
+// LoadActiveRouteIDByProfile delegates to LoadActiveRouteIDBySubject(tenantID,
+// "document", profileCode), so a document route whose subject_key differs
+// from profile_code would be unfindable by the alias lookup. That divergence
+// must be impossible, not merely discouraged.
+var ErrDocumentSubjectKeyMismatch = errors.New("approval: document route subject_key must equal profile_code")
+
 // CreateRouteInput carries all inputs for Create.
 type CreateRouteInput struct {
 	TenantID    string
@@ -197,7 +206,15 @@ func (s *RouteAdminService) resolvePolicy(ctx context.Context, tenantID, profile
 // other default (SubjectKey defaults to ProfileCode only for the document
 // kind — a non-document kind with no key fails Subject.Validate rather than
 // silently defaulting to a document key).
-func resolveCreateRouteSubject(in CreateRouteInput) domain.Subject {
+//
+// Rail R1 invariant: profile_code is the backward-compat ALIAS for
+// (document, profile_code). So once defaulting is done, a document-kind
+// subject whose key diverges from ProfileCode is rejected with
+// ErrDocumentSubjectKeyMismatch — an explicit subject_kind=document plus a
+// divergent subject_key would otherwise be silently accepted and become
+// unfindable via the profile-code alias lookup. Template subjects are
+// unaffected: their key has no relationship to profile_code.
+func resolveCreateRouteSubject(in CreateRouteInput) (domain.Subject, error) {
 	kind := domain.SubjectKind(in.SubjectKind)
 	if kind == "" {
 		kind = domain.SubjectKindDocument
@@ -206,7 +223,10 @@ func resolveCreateRouteSubject(in CreateRouteInput) domain.Subject {
 	if key == "" && kind == domain.SubjectKindDocument {
 		key = in.ProfileCode
 	}
-	return domain.Subject{Kind: kind, Key: key}
+	if kind == domain.SubjectKindDocument && key != in.ProfileCode {
+		return domain.Subject{}, ErrDocumentSubjectKeyMismatch
+	}
+	return domain.Subject{Kind: kind, Key: key}, nil
 }
 
 func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in CreateRouteInput) (CreateRouteResult, error) {
@@ -224,7 +244,10 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 			return err
 		}
 
-		subject := resolveCreateRouteSubject(in)
+		subject, err := resolveCreateRouteSubject(in)
+		if err != nil {
+			return err
+		}
 		if err := subject.Validate(); err != nil {
 			return err
 		}
@@ -241,7 +264,7 @@ func (s *RouteAdminService) createTx(ctx context.Context, runner db.TxRunner, in
 		}
 
 		var routeID string
-		err := tx.QueryRowContext(ctx, `
+		err = tx.QueryRowContext(ctx, `
 			INSERT INTO approval_routes
 				(tenant_id, profile_code, name, version, created_by, active, subject_kind, subject_key)
 			VALUES ($1, $2, $3, 1, $4, TRUE, $5, $6)

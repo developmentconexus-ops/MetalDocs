@@ -269,6 +269,15 @@ func TestCreateRoute_SubjectFieldsOmitted_NoSubjectKindPassed(t *testing.T) {
 
 // TestCreateRoute_SubjectFieldsPassedThrough verifies an explicit
 // subject_kind/subject_key on the wire is decoded and passed to the service.
+//
+// The fixture uses a TEMPLATE subject, not a document one: per rail R1,
+// profile_code is the backward-compat alias for (document, profile_code), so
+// a document-subject route's subject_key must equal its profile_code
+// (application.ErrDocumentSubjectKeyMismatch — M3 P3.S2b-2 regression fix).
+// A document+divergent-key body is no longer a legal shape to prove
+// pass-through with; a template subject's key has no such relationship to
+// profile_code, so it still exercises the same decode/pass-through path
+// without encoding an illegal state.
 func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	svc := &fakeRouteAdminService{
 		createResult: application.CreateRouteResult{RouteID: "route-123"},
@@ -276,7 +285,7 @@ func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	h := &Handler{routeAdmin: svc}
 	mux := routeAdminTestMux(h)
 
-	body := `{"profile_code":"ops","name":"Ops Route","subject_kind":"document","subject_key":"custom-key","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"document.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
+	body := `{"profile_code":"ops","name":"Ops Route","subject_kind":"template","subject_key":"tmpl-custom-1","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"document.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -289,7 +298,7 @@ func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusCreated)
 	}
-	if svc.createReq.SubjectKind != "document" || svc.createReq.SubjectKey != "custom-key" {
+	if svc.createReq.SubjectKind != "template" || svc.createReq.SubjectKey != "tmpl-custom-1" {
 		t.Fatalf("subject fields not passed through: kind=%q key=%q", svc.createReq.SubjectKind, svc.createReq.SubjectKey)
 	}
 }

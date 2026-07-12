@@ -477,7 +477,12 @@ func TestRouteAdminCreate_SubjectDefaultsToDocument(t *testing.T) {
 }
 
 // TestRouteAdminCreate_ExplicitDocumentSubject verifies that an explicit
-// subject_kind=document + subject_key is accepted and stored as given.
+// subject_kind=document + subject_key is accepted and stored as given, as
+// long as the explicit key equals profile_code. Per rail R1 (M3 P3.S2b-2
+// regression fix: ErrDocumentSubjectKeyMismatch), a document route's
+// subject_key is the backward-compat ALIAS for profile_code — a divergent
+// explicit key is now rejected; see
+// TestRouteAdminCreate_DocumentSubjectKeyMismatch for that case.
 func TestRouteAdminCreate_ExplicitDocumentSubject(t *testing.T) {
 	conn := &routeAdminConn{authzGranted: true}
 	db := newRouteAdminTestDB(t, conn)
@@ -493,7 +498,7 @@ func TestRouteAdminCreate_ExplicitDocumentSubject(t *testing.T) {
 		Name:        "PO Route",
 		ActorUserID: "user-1",
 		SubjectKind: string(domain.SubjectKindDocument),
-		SubjectKey:  "explicit-doc-key",
+		SubjectKey:  "po",
 		Stages:      validRouteStages(),
 	})
 	if err != nil {
@@ -502,8 +507,8 @@ func TestRouteAdminCreate_ExplicitDocumentSubject(t *testing.T) {
 	if conn.capturedSubjectKind != string(domain.SubjectKindDocument) {
 		t.Errorf("subject_kind = %q, want %q", conn.capturedSubjectKind, domain.SubjectKindDocument)
 	}
-	if conn.capturedSubjectKey != "explicit-doc-key" {
-		t.Errorf("subject_key = %q, want %q", conn.capturedSubjectKey, "explicit-doc-key")
+	if conn.capturedSubjectKey != "po" {
+		t.Errorf("subject_key = %q, want %q", conn.capturedSubjectKey, "po")
 	}
 }
 
@@ -563,6 +568,38 @@ func TestRouteAdminCreate_InvalidSubjectKind(t *testing.T) {
 	})
 	if !errors.Is(err, domain.ErrInvalidSubjectKind) {
 		t.Fatalf("expected ErrInvalidSubjectKind; got %v", err)
+	}
+}
+
+// TestRouteAdminCreate_DocumentSubjectKeyMismatch verifies that an explicit
+// subject_kind=document with a subject_key that diverges from profile_code
+// is rejected with ErrDocumentSubjectKeyMismatch (M3 P3.S2b-2 regression
+// fix). Per rail R1, profile_code is the backward-compat alias for
+// (document, profile_code) — LoadActiveRouteIDByProfile delegates to
+// LoadActiveRouteIDBySubject(tenantID, "document", profileCode), so a
+// document route whose subject_key differs from profile_code would be
+// unfindable by that alias lookup and would regress document submission to
+// ErrApprovalRouteMissing.
+func TestRouteAdminCreate_DocumentSubjectKeyMismatch(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Create(context.Background(), newTxRunner(db), CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "ops",
+		Name:        "Ops Route",
+		ActorUserID: "user-1",
+		SubjectKind: string(domain.SubjectKindDocument),
+		SubjectKey:  "custom-key",
+		Stages:      validRouteStages(),
+	})
+	if !errors.Is(err, ErrDocumentSubjectKeyMismatch) {
+		t.Fatalf("expected ErrDocumentSubjectKeyMismatch; got %v", err)
 	}
 }
 
