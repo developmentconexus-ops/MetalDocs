@@ -39,18 +39,19 @@ func NewPostgresApprovalRepository(db *sql.DB, displayName iamdomain.UserDisplay
 
 // InsertInstance writes a new approval_instances row within the caller's transaction.
 func (r *postgresApprovalRepository) InsertInstance(ctx context.Context, tx db.Tx, inst domain.Instance) error {
-	// P2.S2 (M3 kernel extraction): subject_kind/subject_key are written
-	// explicitly from the domain Subject rather than relying on the 0296
-	// compat trigger (default_approval_subject()), which now only backstops
-	// callers that omit them (e.g. the test fixture factory) — see ADR 0082.
-	// A zero-value Subject (Kind=="") falls back to the legacy document
-	// projection so any caller that has not yet been threaded onto Subject
-	// still gets a correct row instead of failing the NOT NULL/CHECK
-	// constraint.
-	subject := inst.Subject
-	if subject.Kind == "" {
-		subject = domain.NewDocumentSubject(inst.DocumentID)
+	// P3.S2a (M3 kernel extraction): subject_kind/subject_key are written
+	// explicitly from the domain Subject — no silent document fallback. A
+	// caller that forgets to set inst.Subject (e.g. a future template writer)
+	// must fail loudly here rather than mis-tag a template row as "document",
+	// which is exactly the bug the CHECK constraint (migration 0296) guards
+	// against. The 0296 compat trigger (default_approval_subject()) still
+	// exists as a backstop for writers that omit the columns entirely (e.g.
+	// the testdb factory's raw-SQL inserts) but production callers of this
+	// method must now supply a valid Subject.
+	if err := inst.Subject.Validate(); err != nil {
+		return fmt.Errorf("approval: InsertInstance requires a valid Subject: %w", err)
 	}
+	subject := inst.Subject
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO approval_instances
 		  (id, tenant_id, document_id, route_id, route_version_snapshot,
@@ -316,12 +317,15 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx db.Tx,
 	var completedAt sql.NullTime
 	var frozenContentHash, cancelReason sql.NullString
 
+	var subjectKind, subjectKey string
+
 	err := tx.QueryRowContext(ctx, `
 		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
 		       d.revision_version,
 		       ai.status, ai.submitted_by, ai.submitted_at, ai.completed_at,
 		       ai.content_hash_at_submit, ai.idempotency_key,
-		       ai.frozen_content_hash, ai.cancel_reason
+		       ai.frozen_content_hash, ai.cancel_reason,
+		       ai.subject_kind, ai.subject_key
 		FROM approval_instances ai
 		JOIN documents d
 		  ON d.id = ai.document_id
@@ -334,6 +338,7 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx db.Tx,
 		&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
 		&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
 		&frozenContentHash, &cancelReason,
+		&subjectKind, &subjectKey,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoActiveInstance
@@ -350,7 +355,11 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx db.Tx,
 	if cancelReason.Valid {
 		inst.CancelReason = &cancelReason.String
 	}
-	inst.Subject = domain.NewDocumentSubject(inst.DocumentID)
+	// P3.S2a (M3 kernel extraction): hydrate Subject from the REAL
+	// subject_kind/subject_key columns rather than deriving it from
+	// document_id — the derivation is only correct while every row is a
+	// document row, which breaks once template-subject rows exist.
+	inst.Subject = domain.Subject{Kind: domain.SubjectKind(subjectKind), Key: subjectKey}
 
 	stages, err := r.loadStageInstances(ctx, tx, tenantID, inst.ID)
 	if err != nil {
@@ -366,13 +375,15 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 	var inst domain.Instance
 	var completedAt sql.NullTime
 	var frozenContentHash, cancelReason sql.NullString
+	var subjectKind, subjectKey string
 
 	err := tx.QueryRowContext(ctx, `
 		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
 		       d.revision_version,
 		       ai.status, ai.submitted_by, ai.submitted_at, ai.completed_at,
 		       ai.content_hash_at_submit, ai.idempotency_key,
-		       ai.frozen_content_hash, ai.cancel_reason
+		       ai.frozen_content_hash, ai.cancel_reason,
+		       ai.subject_kind, ai.subject_key
 		FROM approval_instances ai
 		JOIN documents d
 		  ON d.id = ai.document_id
@@ -389,6 +400,7 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 		&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
 		&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
 		&frozenContentHash, &cancelReason,
+		&subjectKind, &subjectKey,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoActiveInstance
@@ -405,7 +417,7 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 	if cancelReason.Valid {
 		inst.CancelReason = &cancelReason.String
 	}
-	inst.Subject = domain.NewDocumentSubject(inst.DocumentID)
+	inst.Subject = domain.Subject{Kind: domain.SubjectKind(subjectKind), Key: subjectKey}
 
 	stages, err := r.loadStageInstances(ctx, tx, tenantID, inst.ID)
 	if err != nil {
@@ -422,13 +434,15 @@ func (r *postgresApprovalRepository) LoadInstanceByDocumentForView(ctx context.C
 	var inst domain.Instance
 	var completedAt sql.NullTime
 	var frozenContentHash, cancelReason sql.NullString
+	var subjectKind, subjectKey string
 
 	err := tx.QueryRowContext(ctx, `
 		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
 		       d.revision_version,
 		       ai.status, ai.submitted_by, ai.submitted_at, ai.completed_at,
 		       ai.content_hash_at_submit, ai.idempotency_key,
-		       ai.frozen_content_hash, ai.cancel_reason
+		       ai.frozen_content_hash, ai.cancel_reason,
+		       ai.subject_kind, ai.subject_key
 		FROM approval_instances ai
 		JOIN documents d
 		  ON d.id = ai.document_id
@@ -445,6 +459,7 @@ func (r *postgresApprovalRepository) LoadInstanceByDocumentForView(ctx context.C
 		&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
 		&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
 		&frozenContentHash, &cancelReason,
+		&subjectKind, &subjectKey,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoActiveInstance
@@ -461,7 +476,7 @@ func (r *postgresApprovalRepository) LoadInstanceByDocumentForView(ctx context.C
 	if cancelReason.Valid {
 		inst.CancelReason = &cancelReason.String
 	}
-	inst.Subject = domain.NewDocumentSubject(inst.DocumentID)
+	inst.Subject = domain.Subject{Kind: domain.SubjectKind(subjectKind), Key: subjectKey}
 
 	stages, err := r.loadStageInstances(ctx, tx, tenantID, inst.ID)
 	if err != nil {
@@ -934,7 +949,8 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		       d.revision_version,
 		       ai.status, ai.submitted_by, ai.submitted_at, ai.completed_at,
 		       ai.content_hash_at_submit, ai.idempotency_key,
-		       ai.frozen_content_hash, ai.cancel_reason
+		       ai.frozen_content_hash, ai.cancel_reason,
+		       ai.subject_kind, ai.subject_key
 		FROM approval_instances ai
 		JOIN documents d
 		  ON d.id = ai.document_id
@@ -954,12 +970,14 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		var inst domain.Instance
 		var completedAt sql.NullTime
 		var frozenContentHash, cancelReason sql.NullString
+		var subjectKind, subjectKey string
 		if err := headerRows.Scan(
 			&inst.ID, &inst.TenantID, &inst.DocumentID, &inst.RouteID, &inst.RouteVersionSnapshot,
 			&inst.RevisionVersion,
 			&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
 			&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
 			&frozenContentHash, &cancelReason,
+			&subjectKind, &subjectKey,
 		); err != nil {
 			return nil, fmt.Errorf("scan approval instance header: %w", err)
 		}
@@ -972,7 +990,7 @@ func (r *postgresApprovalRepository) LoadInstancesByIDs(ctx context.Context, tx 
 		if cancelReason.Valid {
 			inst.CancelReason = &cancelReason.String
 		}
-		inst.Subject = domain.NewDocumentSubject(inst.DocumentID)
+		inst.Subject = domain.Subject{Kind: domain.SubjectKind(subjectKind), Key: subjectKey}
 		cp := inst
 		byID[inst.ID] = &cp
 	}
@@ -1739,24 +1757,24 @@ func (r *postgresApprovalRepository) LoadHeadContentHash(ctx context.Context, tx
 // the caller's transaction.
 func (r *postgresApprovalRepository) LoadRoute(ctx context.Context, tx db.Tx, tenantID, routeID string) (domain.Route, error) {
 	var route domain.Route
+	var subjectKind, subjectKey string
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, tenant_id, profile_code, version
+		SELECT id, tenant_id, profile_code, version, subject_kind, subject_key
 		FROM approval_routes
 		WHERE id = $1 AND tenant_id = $2 AND active = TRUE`,
 		routeID, tenantID,
-	).Scan(&route.ID, &route.TenantID, &route.ProfileCode, &route.Version)
+	).Scan(&route.ID, &route.TenantID, &route.ProfileCode, &route.Version, &subjectKind, &subjectKey)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Route{}, fmt.Errorf("route %s not found for tenant %s", routeID, tenantID)
 		}
 		return domain.Route{}, err
 	}
-	// P2.S2: every route hydrated by the current document code path is a
-	// document route, so Subject is derived from the already-selected legacy
-	// profile_code column rather than adding subject_kind/subject_key to the
-	// SELECT — equivalent for the document case and lower-risk (no new NULL
-	// handling, no schema-drift surface on this read).
-	route.Subject = domain.NewDocumentSubject(route.ProfileCode)
+	// P3.S2a (M3 kernel extraction): hydrate Subject from the REAL
+	// subject_kind/subject_key columns rather than deriving it from
+	// profile_code — the derivation is only correct while every row is a
+	// document route, which breaks once template-subject routes exist.
+	route.Subject = domain.Subject{Kind: domain.SubjectKind(subjectKind), Key: subjectKey}
 
 	rows, err := tx.QueryContext(ctx, `
 		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,
