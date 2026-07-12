@@ -42,12 +42,12 @@ internal/modules/controlleddocuments/infrastructure/repository.go|UpdateStatus
 internal/modules/controlleddocuments/infrastructure/repository.go|UpdateStatusTx
 internal/modules/controlleddocuments/infrastructure/repository.go|createVisibilityGrants
 internal/modules/controlleddocuments/infrastructure/repository.go|ensureCounterViaExec
-internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|InsertInstance
-internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|MarkSuperseded
-internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|PinFrozenHash
-internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateInstanceStatus
-internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateInstanceStatusWithReason
-internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|UpdateStageStatus
+internal/modules/approval/infrastructure/postgres_approval_repository.go|InsertInstance
+internal/modules/approval/infrastructure/postgres_approval_repository.go|MarkSuperseded
+internal/modules/approval/infrastructure/postgres_approval_repository.go|PinFrozenHash
+internal/modules/approval/infrastructure/postgres_approval_repository.go|UpdateInstanceStatus
+internal/modules/approval/infrastructure/postgres_approval_repository.go|UpdateInstanceStatusWithReason
+internal/modules/approval/infrastructure/postgres_approval_repository.go|UpdateStageStatus
 # F9/ADR 0077 approval delegation: tier-2 authz lives one layer up in
 # DelegationService (same tx). CreateDelegation's authorization is ownership-
 # by-construction (delegatorID is always the caller's own actor id, derived
@@ -55,8 +55,8 @@ internal/modules/documents/approval/infrastructure/postgres_approval_repository.
 # your own eligibility). RevokeDelegation calls authz.Require(CapApprovalOversee)
 # before the delete to decide oversee-widened scope, then the repo's own
 # WHERE clause (delegator_id = $3 OR $4::boolean) is the final ownership gate.
-internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|InsertDelegation
-internal/modules/documents/approval/infrastructure/postgres_approval_repository.go|DeleteDelegation
+internal/modules/approval/infrastructure/postgres_approval_repository.go|InsertDelegation
+internal/modules/approval/infrastructure/postgres_approval_repository.go|DeleteDelegation
 internal/modules/documents/infrastructure/repository.go|SeedDictionaryValuesTx
 internal/modules/documents/infrastructure/repository.go|DeleteComment
 internal/modules/documents/infrastructure/repository.go|DeleteExpiredPending
