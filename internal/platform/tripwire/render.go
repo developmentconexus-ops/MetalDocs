@@ -5,16 +5,17 @@ import (
 	"strings"
 )
 
-// RenderMigration renders the full 0283 forward-only migration SQL,
-// regenerated from the prior tripwire migration (0277) with every CASE branch
-// preserved byte-for-byte plus one new branch — tenant_lifecycle_jobs/INSERT
-// (M7 F7.3, ADR 0070) — whose v_required_caps literal is produced from
-// TripwireArms entry #20, and the one-time trigger attachment on
-// metaldocs.tenant_lifecycle_jobs (0259/0277 attachment precedent). Branch
-// order follows M2 validation-contract.md §1.2 as extended by M6 §3
-// (documents/UPDATE gains document.review), M7 §5 (tenants/INSERT arm) and M7
-// §5 (tenant_lifecycle_jobs/INSERT arm). Determinism: TripwireArms is a fixed
-// slice, so this returns identical output every call.
+// RenderMigration renders the full 0284 forward-only migration SQL,
+// regenerated from the prior tripwire migration (0283) with every CASE branch
+// preserved byte-for-byte EXCEPT approval_instances/INSERT, which becomes a
+// nested CASE NEW.subject_kind (ADR 0083, M3 P3.S2b-3b-0): document rows
+// require exactly document.submit, template rows require exactly
+// template.submit, never unioned. Branch order follows M2
+// validation-contract.md §1.2 as extended by M6 §3 (documents/UPDATE gains
+// document.review), M7 §5 (tenants/INSERT arm), M7 §5
+// (tenant_lifecycle_jobs/INSERT arm), and ADR 0083 (approval_instances/INSERT
+// subject discrimination). Determinism: TripwireArms is a fixed slice, so
+// this returns identical output every call.
 func RenderMigration() string {
 	return migrationHeader +
 		"BEGIN;\n" +
@@ -34,7 +35,15 @@ func RenderMigration() string {
 		"BEGIN\n" +
 		"  CASE\n" +
 		"    WHEN TG_TABLE_NAME = 'approval_instances' AND TG_OP = 'INSERT' THEN\n" +
-		"      v_required_caps := " + renderArray(findArm("approval_instances", OpInsert)) + ";\n" +
+		"      -- 0284 (ADR 0083): approval_instances is a shared (subject_kind,\n" +
+		"      -- subject_key) kernel table (ADR 0082); the required capability is\n" +
+		"      -- subject-discriminated so a flat match-one arm cannot express\n" +
+		"      -- \"document rows require document.submit; template rows require\n" +
+		"      -- template.submit\" without a cross-subject security regression\n" +
+		"      -- (ADR 0083 \"why the obvious widen is a security regression\").\n" +
+		"      -- Nested CASE on NEW.subject_kind; the two subjects' capability\n" +
+		"      -- sets are never unioned.\n" +
+		renderDiscriminatedCase(findArms("approval_instances", OpInsert)) +
 		"      v_tenant_id     := COALESCE(NEW.tenant_id, OLD.tenant_id);\n" +
 		"    WHEN TG_TABLE_NAME = 'approval_signoffs' AND TG_OP = 'INSERT' THEN\n" +
 		"      v_required_caps := " + renderArray(findArm("approval_signoffs", OpInsert)) + ";\n" +
@@ -224,55 +233,110 @@ func RenderMigration() string {
 		"-- ── schema_migrations ledger ─────────────────────────────────────────────────────────────\n" +
 		"\n" +
 		"INSERT INTO public.schema_migrations (version, description)\n" +
-		"VALUES ('0283', '" + ledgerDescription + "')\n" +
+		"VALUES ('0284', '" + ledgerDescription + "')\n" +
 		"ON CONFLICT (version) DO NOTHING;\n" +
 		"\n" +
 		"COMMIT;\n"
 }
 
-// migrationHeader is the file-header comment block for 0279, in
-// 0269/0270/0271/0275/0277 house style: goal/incident framing, root cause,
-// writer inventory, fix statement.
-const migrationHeader = `-- 0283_tripwire_delete_return_old.sql
--- M7 F7.3 Task F fix (global-maximum-remediation, milestone-7-tenant-lifecycle,
--- ADR 0070): public.enforce_capability_asserted() is a BEFORE INSERT OR UPDATE
--- OR DELETE row trigger, and every code path ended in RETURN NEW. For a DELETE,
--- NEW is unassigned (NULL), and a BEFORE row trigger returning NULL SILENTLY
--- CANCELS the row operation — so every DELETE on a trigger-carrying table was
--- a no-op with a success result: no error, 0 rows actually deleted. Latent
--- since the trigger's introduction; surfaced by M7 tenant erasure
--- (TestTenantErasure_ChainStaysGreen: erased tenant kept its iam_users rows
--- while the INSERT-only-armed tenant_lifecycle_jobs table erased fine).
+// migrationHeader is the file-header comment block for 0284, in
+// 0269/0270/0271/0275/0277/0283 house style: goal/incident framing, root
+// cause, writer inventory, fix statement.
+const migrationHeader = `-- 0284_tripwire_subject_discriminated_arms.sql
+-- M3 P3.S2b-3b-0 (approval-remediation, kernel extraction, ADR 0083 —
+-- extends ADR 0082): approval_instances is a shared (subject_kind,
+-- subject_key) kernel table, but the capability tripwire
+-- enforce_capability_asserted() hardcoded approval_instances INSERT ->
+-- ARRAY['document.submit'] (its Go source of truth, TripwireArms arm #1, had
+-- no column discriminator). When the templates module submits a template
+-- version for approval, the trigger's match-one semantics meant the "obvious"
+-- fix -- widening the arm to ARRAY['document.submit', 'template.submit'] --
+-- would be a SECURITY REGRESSION: a principal holding only template.submit
+-- would authorize a document-subject insert (and vice versa), cross-
+-- contaminating the two subjects' capability requirements on the shared
+-- table.
 --
--- Fix, at the generator (internal/platform/tripwire/render.go), regenerated
--- here: (1) both success exits (scheduler-bypass path and cap-asserted path)
--- RETURN OLD when TG_OP = 'DELETE', NEW otherwise; (2) v_tenant_id branches
--- read COALESCE(NEW.tenant_id, OLD.tenant_id) so DELETE governance rows carry
--- the real tenant; (3) the governance_events resource_id falls back
--- NEW.id -> OLD.id -> 'unknown'.
+-- Fix, at the generator (internal/platform/tripwire/arms.go + render.go),
+-- regenerated here: TripwireArms arm #1 splits into two subject-discriminated
+-- entries (WhenColumn "subject_kind", WhenValue "document" / "template");
+-- RenderMigration emits a nested CASE NEW.subject_kind inside the
+-- approval_instances/INSERT branch, assigning v_required_caps :=
+-- ARRAY['document.submit'] or ARRAY['template.submit'] per subject (never
+-- unioned), with a fail-closed ELSE (RAISE P0001) for any other
+-- subject_kind.
 --
--- No arm/cap change of any kind — the CASE branch inventory and every
--- v_required_caps literal are reproduced byte-for-byte from 0279. This
+-- No other arm/cap change of any kind -- every other CASE branch and its
+-- v_required_caps literal are reproduced byte-for-byte from 0283. This
 -- migration is machine-generated from internal/platform/tripwire
 -- (TripwireArms + RenderMigration) per the M2 regeneration protocol
--- (milestone-2-authz-enforcement-generation/validation-contract.md §1.2/§1.4).
--- Supersedes 0279 as the latest definition of
+-- (milestone-2-authz-enforcement-generation/validation-contract.md §1.2/§1.4)
+-- as amended by ADR 0083. Supersedes 0283 as the latest definition of
 -- public.enforce_capability_asserted().
 
 `
 
-const ledgerDescription = "M7 F7.3 Task F fix: enforce_capability_asserted() returned NEW on every path -- NULL for DELETE, silently cancelling every DELETE on a trigger-carrying table. Now RETURN OLD when TG_OP is DELETE (both bypass and cap-asserted exits), v_tenant_id = COALESCE(NEW.tenant_id, OLD.tenant_id), governance resource_id falls back to OLD.id. No arm/cap change; branches byte-for-byte from 0279; machine-generated from internal/platform/tripwire."
+const ledgerDescription = "M3 P3.S2b-3b-0 (ADR 0083): approval_instances/INSERT arm split into two subject-discriminated entries (subject_kind=document -> document.submit; subject_kind=template -> template.submit, never unioned) via a nested CASE NEW.subject_kind with a fail-closed ELSE. No other arm/cap change; every other branch byte-for-byte from 0283; machine-generated from internal/platform/tripwire."
 
-// findArm returns the Arm for (table, op), panicking if absent — every
-// branch rendered above must correspond to a TripwireArms entry (parity is
-// structural, not just tested).
+// findArm returns the single, undiscriminated Arm for (table, op), panicking
+// if absent or if the pair is discriminated (multiple entries share the
+// (table,op) — use findArms + renderDiscriminatedCase for those instead;
+// every branch rendered above must correspond to a TripwireArms entry, parity
+// is structural, not just tested).
 func findArm(table string, op Op) Arm {
+	arms := findArms(table, op)
+	if len(arms) != 1 {
+		panic(fmt.Sprintf("tripwire: findArm(%s, %s) expects exactly 1 undiscriminated arm, found %d — use findArms for a discriminated (table,op) pair", table, op, len(arms)))
+	}
+	return arms[0]
+}
+
+// findArms returns every TripwireArms entry for (table, op), in TripwireArms
+// order, panicking if none exist. A (table,op) pair with more than one entry
+// is discriminated (ADR 0083): every entry for that pair MUST carry a
+// WhenColumn/WhenValue pair.
+func findArms(table string, op Op) []Arm {
+	var out []Arm
 	for _, arm := range TripwireArms {
 		if arm.Table == table && arm.Op == op {
-			return arm
+			out = append(out, arm)
 		}
 	}
-	panic(fmt.Sprintf("tripwire: no TripwireArms entry for (%s, %s)", table, op))
+	if len(out) == 0 {
+		panic(fmt.Sprintf("tripwire: no TripwireArms entry for (%s, %s)", table, op))
+	}
+	return out
+}
+
+// renderDiscriminatedCase renders a nested CASE NEW.<WhenColumn> ... END CASE
+// block that assigns v_required_caps per discriminated arm (ADR 0083),
+// followed by a fail-closed ELSE (RAISE P0001) mirroring the outer CASE's
+// ELSE style for any subject value with no arm. Panics if the arms disagree
+// on WhenColumn, or if any arm is undiscriminated (WhenColumn == "") — a
+// programming error: this function is only called for (table,op) pairs with
+// more than one TripwireArms entry, which are discriminated by construction.
+func renderDiscriminatedCase(arms []Arm) string {
+	whenColumn := arms[0].WhenColumn
+	table := arms[0].Table
+	if whenColumn == "" {
+		panic(fmt.Sprintf("tripwire: renderDiscriminatedCase called for (%s, %s) with an undiscriminated arm (empty WhenColumn)", table, arms[0].Op))
+	}
+	var b strings.Builder
+	b.WriteString("      CASE NEW." + whenColumn + "\n")
+	for _, arm := range arms {
+		if arm.WhenColumn != whenColumn {
+			panic(fmt.Sprintf("tripwire: discriminated arms for (%s, %s) disagree on WhenColumn (%q vs %q)", arm.Table, arm.Op, whenColumn, arm.WhenColumn))
+		}
+		if arm.WhenValue == "" {
+			panic(fmt.Sprintf("tripwire: discriminated arm for (%s, %s) has an empty WhenValue", arm.Table, arm.Op))
+		}
+		b.WriteString("        WHEN '" + arm.WhenValue + "' THEN\n")
+		b.WriteString("          v_required_caps := " + renderArray(arm) + ";\n")
+	}
+	b.WriteString("        ELSE\n")
+	b.WriteString("          RAISE EXCEPTION 'ErrCapabilityNotAsserted: no capability mapping for " + table + " " + whenColumn + " %, op %; enforce_capability_asserted has no discriminated arm for this subject', NEW." + whenColumn + ", TG_OP\n")
+	b.WriteString("            USING ERRCODE = 'P0001';\n")
+	b.WriteString("      END CASE;\n")
+	return b.String()
 }
 
 // renderArray renders an Arm's Caps as a Postgres ARRAY[...] literal of

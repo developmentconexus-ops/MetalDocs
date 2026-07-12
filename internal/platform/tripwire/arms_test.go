@@ -27,47 +27,56 @@ func TestTripwireArms_CapsAreRegistryReal(t *testing.T) {
 // validation-contract.md §1.2 exactly, as extended by M6 validation-contract.md
 // §3 (documents/UPDATE additionally gains document.review), M7
 // validation-contract.md §5 (F7.2, ADR 0070: +1 tenants/INSERT arm gated on
-// tenant.onboard — 19 entries) and M7 §5 (F7.3, ADR 0070: +1
+// tenant.onboard — 19 entries), M7 §5 (F7.3, ADR 0070: +1
 // tenant_lifecycle_jobs/INSERT arm gated on tenant.export OR tenant.erase — 20
-// entries). Divergence is HS-7.
+// entries), and ADR 0083 / M3 P3.S2b-3b-0 (approval_instances/INSERT arm #1
+// splits into two subject-discriminated entries — 21 entries). Divergence is
+// HS-7. The key includes WhenValue so the two approval_instances entries
+// (same table+op, different subject_kind) are distinct rows rather than
+// colliding.
 func TestTripwireArms_MatchesContractTable(t *testing.T) {
 	type key struct {
-		table string
-		op    Op
+		table     string
+		op        Op
+		whenValue string
 	}
 
 	want := map[key][]iamdomain.Capability{
-		{"approval_instances", OpInsert}:   {iamdomain.CapDocumentSubmit},
-		{"approval_signoffs", OpInsert}:    {iamdomain.CapDocumentSignoff},
-		{"iam_user_roles", OpAny}:          {iamdomain.CapUserManage},
-		{"user_process_areas", OpAny}:      {iamdomain.CapMembershipManage},
-		{"documents", OpInsert}:            {iamdomain.CapDocumentCreate},
-		{"documents", OpUpdate}:            {iamdomain.CapDocumentEdit, iamdomain.CapDocumentObsolete, iamdomain.CapMembershipManage, iamdomain.CapDocumentReview},
-		{"controlled_documents", OpInsert}: {iamdomain.CapControlledDocumentCreate},
-		{"controlled_documents", OpUpdate}: {iamdomain.CapControlledDocumentObsolete, iamdomain.CapControlledDocumentSupersede},
-		{"cd_sequence_counters", OpAny}:    {iamdomain.CapControlledDocumentCreate},
-		{"document_profiles", OpAny}:       {iamdomain.CapTaxonomyManage},
-		{"document_process_areas", OpAny}:  {iamdomain.CapTaxonomyManage},
-		{"document_families", OpAny}:       {iamdomain.CapTaxonomyManage},
-		{"templates_template", OpAny}: {
+		// ADR 0083: approval_instances/INSERT is subject-discriminated —
+		// document rows require exactly document.submit, template rows
+		// require exactly template.submit, never unioned.
+		{"approval_instances", OpInsert, "document"}: {iamdomain.CapDocumentSubmit},
+		{"approval_instances", OpInsert, "template"}: {iamdomain.CapTemplateSubmit},
+		{"approval_signoffs", OpInsert, ""}:          {iamdomain.CapDocumentSignoff},
+		{"iam_user_roles", OpAny, ""}:                {iamdomain.CapUserManage},
+		{"user_process_areas", OpAny, ""}:            {iamdomain.CapMembershipManage},
+		{"documents", OpInsert, ""}:                  {iamdomain.CapDocumentCreate},
+		{"documents", OpUpdate, ""}:                  {iamdomain.CapDocumentEdit, iamdomain.CapDocumentObsolete, iamdomain.CapMembershipManage, iamdomain.CapDocumentReview},
+		{"controlled_documents", OpInsert, ""}:       {iamdomain.CapControlledDocumentCreate},
+		{"controlled_documents", OpUpdate, ""}:       {iamdomain.CapControlledDocumentObsolete, iamdomain.CapControlledDocumentSupersede},
+		{"cd_sequence_counters", OpAny, ""}:          {iamdomain.CapControlledDocumentCreate},
+		{"document_profiles", OpAny, ""}:             {iamdomain.CapTaxonomyManage},
+		{"document_process_areas", OpAny, ""}:        {iamdomain.CapTaxonomyManage},
+		{"document_families", OpAny, ""}:             {iamdomain.CapTaxonomyManage},
+		{"templates_template", OpAny, ""}: {
 			iamdomain.CapTemplateCreate, iamdomain.CapTemplateEdit, iamdomain.CapTemplateSubmit,
 			iamdomain.CapTemplateApprove, iamdomain.CapTemplatePublish, iamdomain.CapTemplateArchive,
 		},
-		{"templates_template_version", OpAny}: {
+		{"templates_template_version", OpAny, ""}: {
 			iamdomain.CapTemplateCreate, iamdomain.CapTemplateEdit, iamdomain.CapTemplateSubmit,
 			iamdomain.CapTemplateReview, iamdomain.CapTemplateApprove, iamdomain.CapTemplatePublish,
 		},
-		{"iam_users", OpAny}:         {iamdomain.CapUserManage},
-		{"iam_groups", OpAny}:        {iamdomain.CapUserManage},
-		{"iam_group_members", OpAny}: {iamdomain.CapUserManage},
-		{"iam_group_roles", OpAny}:   {iamdomain.CapUserManage},
+		{"iam_users", OpAny, ""}:         {iamdomain.CapUserManage},
+		{"iam_groups", OpAny, ""}:        {iamdomain.CapUserManage},
+		{"iam_group_members", OpAny, ""}: {iamdomain.CapUserManage},
+		{"iam_group_roles", OpAny, ""}:   {iamdomain.CapUserManage},
 		// M7 F7.2 (ADR 0070, M7 validation-contract.md §5 touchpoint 6):
 		// onboarding INSERTs metaldocs.tenants under tenant.onboard.
-		{"tenants", OpInsert}: {iamdomain.CapTenantOnboard},
+		{"tenants", OpInsert, ""}: {iamdomain.CapTenantOnboard},
 		// M7 F7.3 (ADR 0070, M7 validation-contract.md §5 touchpoint 6):
 		// export/erase enqueue INSERTs metaldocs.tenant_lifecycle_jobs under
 		// tenant.export OR tenant.erase (match-one).
-		{"tenant_lifecycle_jobs", OpInsert}: {iamdomain.CapTenantExport, iamdomain.CapTenantErase},
+		{"tenant_lifecycle_jobs", OpInsert, ""}: {iamdomain.CapTenantExport, iamdomain.CapTenantErase},
 	}
 
 	if len(TripwireArms) != len(want) {
@@ -76,24 +85,24 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 
 	seen := make(map[key]bool, len(TripwireArms))
 	for _, arm := range TripwireArms {
-		k := key{arm.Table, arm.Op}
+		k := key{arm.Table, arm.Op, arm.WhenValue}
 		if seen[k] {
-			t.Errorf("duplicate TripwireArms entry for (%s, %s)", arm.Table, arm.Op)
+			t.Errorf("duplicate TripwireArms entry for (%s, %s, whenValue=%q)", arm.Table, arm.Op, arm.WhenValue)
 		}
 		seen[k] = true
 
 		wantCaps, ok := want[k]
 		if !ok {
-			t.Errorf("TripwireArms has unexpected entry (%s, %s) not present in contract §1.2", arm.Table, arm.Op)
+			t.Errorf("TripwireArms has unexpected entry (%s, %s, whenValue=%q) not present in contract §1.2", arm.Table, arm.Op, arm.WhenValue)
 			continue
 		}
 		if len(arm.Caps) != len(wantCaps) {
-			t.Errorf("(%s,%s): got %d caps %v, want %d caps %v", arm.Table, arm.Op, len(arm.Caps), arm.Caps, len(wantCaps), wantCaps)
+			t.Errorf("(%s,%s,%q): got %d caps %v, want %d caps %v", arm.Table, arm.Op, arm.WhenValue, len(arm.Caps), arm.Caps, len(wantCaps), wantCaps)
 			continue
 		}
 		for i, c := range arm.Caps {
 			if c != wantCaps[i] {
-				t.Errorf("(%s,%s) cap[%d]: got %q, want %q", arm.Table, arm.Op, i, c, wantCaps[i])
+				t.Errorf("(%s,%s,%q) cap[%d]: got %q, want %q", arm.Table, arm.Op, arm.WhenValue, i, c, wantCaps[i])
 			}
 		}
 	}
@@ -110,14 +119,16 @@ func TestTripwireArms_MatchesContractTable(t *testing.T) {
 // arm); M7 F7.3 re-rendered it to 0279 (tenant_lifecycle_jobs/INSERT arm +
 // one-time attachment, ADR 0070), then to db/migrations/0283_*.sql (DELETE
 // paths RETURN OLD — RETURN NEW on BEFORE DELETE silently cancelled DELETEs),
-// so the golden target advances with the latest rendered migration (M7
-// validation-contract.md §5, M6 §3, M2 §1.4/§1.5.a).
+// then to db/migrations/0284_*.sql (ADR 0083, M3 P3.S2b-3b-0:
+// approval_instances/INSERT arm subject-discriminated into a nested CASE
+// NEW.subject_kind), so the golden target advances with the latest rendered
+// migration (M7 validation-contract.md §5, M6 §3, M2 §1.4/§1.5.a, ADR 0083).
 func TestRenderMigration_MatchesCommittedFile(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
 		t.Fatalf("locate repo root: %v", err)
 	}
-	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0283_tripwire_delete_return_old.sql")
+	migrationPath := filepath.Join(repoRoot, "db", "migrations", "0284_tripwire_subject_discriminated_arms.sql")
 
 	committed, err := os.ReadFile(migrationPath)
 	if err != nil {

@@ -42,8 +42,12 @@ import (
 // (tenants/INSERT arm gated on tenant.onboard + attachment, ADR 0070); M7 F7.3
 // re-rendered it to 0279 (tenant_lifecycle_jobs/INSERT arm gated on
 // tenant.export OR tenant.erase + attachment, ADR 0070), then to 0283 (DELETE
-// paths RETURN OLD — RETURN NEW on BEFORE DELETE silently cancelled DELETEs).
-const tripwireMigrationPath = "db/migrations/0283_tripwire_delete_return_old.sql"
+// paths RETURN OLD — RETURN NEW on BEFORE DELETE silently cancelled DELETEs),
+// then to 0284 (ADR 0083, M3 P3.S2b-3b-0: approval_instances/INSERT arm
+// splits into two subject-discriminated entries — document rows require
+// document.submit, template rows require template.submit, via a nested CASE
+// NEW.subject_kind, never unioned).
+const tripwireMigrationPath = "db/migrations/0284_tripwire_subject_discriminated_arms.sql"
 
 // gatedTableSet returns the set of table names present in TripwireArms — the
 // tables TRIPWIRE-ARM-DRIFT restricts its attention to (contract §1.5.b: "only

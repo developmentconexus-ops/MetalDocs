@@ -31,10 +31,24 @@ const (
 // the operation it applies to (or OpAny), and the ordered set of
 // capabilities the trigger accepts (any one present in metaldocs.asserted_caps
 // satisfies the branch — match-one, not match-all).
+//
+// WhenColumn/WhenValue are an OPTIONAL subject discriminator (ADR 0083,
+// M3 P3.S2b-3b-0): when set, this Arm applies only to rows where
+// NEW.<WhenColumn> = '<WhenValue>', and RenderMigration emits a nested
+// CASE NEW.<WhenColumn> inside the (table, op) branch instead of a single
+// flat ARRAY assignment. Multiple Arm entries may share the same (Table, Op)
+// ONLY if every one of them carries a discriminator — a shared kernel table
+// (e.g. approval_instances, ADR 0082) whose required capability differs per
+// subject. Discriminated arms' capability sets are NEVER unioned into one
+// ARRAY; match-one applies within each subject's own set only. An
+// undiscriminated Arm (WhenColumn == "") renders exactly as before this
+// field was added — byte-identical, no behavior change.
 type Arm struct {
-	Table string
-	Op    Op
-	Caps  []iamdomain.Capability
+	Table      string
+	Op         Op
+	Caps       []iamdomain.Capability
+	WhenColumn string
+	WhenValue  string
 }
 
 // TripwireArms is the binding source of truth for every gated (table, op)
@@ -52,13 +66,33 @@ type Arm struct {
 // Content MUST equal M2 validation-contract.md §1.2 (18 gated entries) as
 // extended by M6 validation-contract.md §3 (documents/UPDATE gains
 // document.review), M7 validation-contract.md §5 (tenants/INSERT arm, 19
-// entries) and M7 §5 (tenant_lifecycle_jobs/INSERT arm, 20 entries). Any other
-// deviation is HS-7 (see those binding clauses).
+// entries), M7 §5 (tenant_lifecycle_jobs/INSERT arm, 20 entries), and ADR 0083
+// / M3 P3.S2b-3b-0 (approval_instances/INSERT arm #1 splits into two
+// subject-discriminated entries — 21 entries total; operator-ratified
+// amendment to the GMR M2 validation-contract arm set, flagged HS-7 in the
+// prior revision of this file, resolved here). Any other deviation is HS-7
+// (see those binding clauses).
 var TripwireArms = []Arm{
-	{ // 1
-		Table: "approval_instances",
-		Op:    OpInsert,
-		Caps:  []iamdomain.Capability{iamdomain.CapDocumentSubmit},
+	{ // 1a — ADR 0083: approval_instances is a shared (subject_kind,
+		// subject_key) kernel table (ADR 0082). A flat match-one arm here would
+		// let a principal holding only template.submit authorize a document
+		// insert (or vice versa) — a security regression (ADR 0083 "why the
+		// obvious widen is a security regression"). Discriminated on
+		// NEW.subject_kind = 'document'; document rows require exactly
+		// document.submit.
+		Table:      "approval_instances",
+		Op:         OpInsert,
+		Caps:       []iamdomain.Capability{iamdomain.CapDocumentSubmit},
+		WhenColumn: "subject_kind",
+		WhenValue:  "document",
+	},
+	{ // 1b — ADR 0083 companion entry: NEW.subject_kind = 'template'; template
+		// rows require exactly template.submit. Never unioned with 1a's set.
+		Table:      "approval_instances",
+		Op:         OpInsert,
+		Caps:       []iamdomain.Capability{iamdomain.CapTemplateSubmit},
+		WhenColumn: "subject_kind",
+		WhenValue:  "template",
 	},
 	{ // 2
 		Table: "approval_signoffs",
