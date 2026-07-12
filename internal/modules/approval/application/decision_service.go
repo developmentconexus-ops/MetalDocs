@@ -261,7 +261,10 @@ func (s *DecisionService) recordSignoffInTx(ctx context.Context, tx *sql.Tx, req
 	}
 
 	// document.signoff is area-grade: pass the resolved area as-is ("" fail-closes).
-	areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, instance.DocumentID)
+	// Subject-generic resolver (M3 P3.S2b-3a): instance.Subject is hydrated from
+	// the real columns (P3.S2a), so a document instance resolves identically to
+	// the prior hardcoded LoadDocumentAreaCode(instance.DocumentID) call.
+	areaCode, err := resolveSubjectAreaCode(ctx, tx, s.cdRead, req.TenantID, instance.Subject)
 	if err != nil {
 		return SignoffResult{}, nil, fmt.Errorf("recordSignoff: load document area: %w", err)
 	}

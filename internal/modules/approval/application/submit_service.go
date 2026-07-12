@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
-	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/approval/infrastructure"
 	docsdomain "metaldocs/internal/modules/documents/domain"
@@ -92,7 +91,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, runner db.T
 
 		// document.submit is area-grade: pass the resolved area as-is ("" fail-closes,
 		// denying non-system actors). ADR 0022 Phase 11 (F7): shared LoadDocumentAreaCode.
-		areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, s.cdRead, req.TenantID, req.DocumentID)
+		areaCode, err := resolveSubjectAreaCode(ctx, tx, s.cdRead, req.TenantID, domain.NewDocumentSubject(req.DocumentID))
 		if err != nil {
 			return fmt.Errorf("submit: load document area: %w", err)
 		}
