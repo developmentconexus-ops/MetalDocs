@@ -112,74 +112,15 @@ func TestMigration0296_ApprovalInstances_CheckRejectsInvalidSubjectKind(t *testi
 	assertCheckViolation(t, err)
 }
 
-// TestMigration0296_ApprovalRoutes_TemplateSubjectKind_Insertable proves the
-// generalization actually works: an active-false route can carry
-// subject_kind='template' with a subject_key wholly distinct from any
-// document-derived key (profile_code stays populated as the required
-// backward-compat alias column, but is no longer what identifies the row).
-func TestMigration0296_ApprovalRoutes_TemplateSubjectKind_Insertable(t *testing.T) {
-	db, _ := testdb.Open(t)
-
-	tenant := testdb.NewTenant(t, db)
-	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
-	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
-
-	templateSubjectKey := "tpl:" + uuid.NewString()
-	err := insertRouteWithSubject(t, db, tenant.ID, tax.ProfileCode, owner.ID, false, 1, "template", templateSubjectKey)
-	if err != nil {
-		t.Fatalf("insert template-subject route: %v", err)
-	}
-
-	var kind, key string
-	err = db.QueryRowContext(context.Background(),
-		`SELECT subject_kind, subject_key FROM public.approval_routes
-		  WHERE tenant_id = $1::uuid AND subject_key = $2`,
-		tenant.ID, templateSubjectKey,
-	).Scan(&kind, &key)
-	if err != nil {
-		t.Fatalf("query inserted template route: %v", err)
-	}
-	if kind != "template" {
-		t.Fatalf("subject_kind = %q, want template", kind)
-	}
-	if key == tax.ProfileCode {
-		t.Fatalf("subject_key %q must be distinct from the document profile_code %q", key, tax.ProfileCode)
-	}
-}
-
-// TestMigration0296_ApprovalInstances_TemplateSubjectKind_Insertable is the
-// approval_instances sibling. document_id stays NOT NULL this phase (only
-// document rows exist yet), so the row still carries a real document_id, but
-// subject_key diverges from document_id::text — proving subject_key is not
-// hard-wired to document_id going forward.
-func TestMigration0296_ApprovalInstances_TemplateSubjectKind_Insertable(t *testing.T) {
-	db, _ := testdb.Open(t)
-
-	doc := testdb.NewDocument(t, db, testdb.WithStatus("approved"))
-	route := testdb.NewApprovalRoute(t, db, testdb.WithTenant(doc.TenantID))
-
-	templateSubjectKey := "tpl:" + uuid.NewString()
-	err := insertInstanceWithSubject(t, db, doc, route, "template", templateSubjectKey)
-	if err != nil {
-		t.Fatalf("insert template-subject instance: %v", err)
-	}
-
-	var kind, key string
-	err = db.QueryRowContext(context.Background(),
-		`SELECT subject_kind, subject_key FROM public.approval_instances
-		  WHERE tenant_id = $1::uuid AND subject_key = $2`,
-		doc.TenantID, templateSubjectKey,
-	).Scan(&kind, &key)
-	if err != nil {
-		t.Fatalf("query inserted template instance: %v", err)
-	}
-	if kind != "template" {
-		t.Fatalf("subject_kind = %q, want template", kind)
-	}
-	if key == doc.ID {
-		t.Fatalf("subject_key %q must be distinct from document_id %q", key, doc.ID)
-	}
-}
+// NOTE: template-subject INSERTABILITY (route + instance) is proven by
+// migration_0297_test.go's *_TemplateSubject_Null{ProfileCode,DocumentID}_Insertable.
+// The 0296-era versions of those tests inserted template rows with the legacy
+// profile_code/document_id columns still POPULATED — the only shape possible
+// while those columns were NOT NULL (this phase). Migration 0297 relaxes that
+// NOT NULL and adds a projection CHECK requiring template rows to leave the
+// legacy column NULL, which is the correct final invariant; the transitional
+// 0296 shape is superseded, so those two tests moved to migration_0297_test.go
+// rather than being kept here asserting a now-illegal row shape.
 
 // TestMigration0296_NewSubjectIndexesExist confirms the additive tenant-scoped
 // subject-keyed indexes exist ALONGSIDE the pre-existing document-keyed ones
@@ -230,13 +171,17 @@ func TestMigration0296_ApprovalRoutes_UniqueSubjectIndexRejectsDuplicate(t *test
 
 	tenant := testdb.NewTenant(t, db)
 	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
-	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
 
+	// Template routes carry NULL profile_code (0297 projection CHECK), so the
+	// only unique index that can fire on two active same-subject rows is
+	// ux_approval_routes_tenant_subject — profile-keyed indexes never collide on
+	// NULL. (insertRouteWithSubjectAndProfile is defined in migration_0297_test.go,
+	// same package.)
 	sharedKey := "tpl:" + uuid.NewString()
-	if err := insertRouteWithSubject(t, db, tenant.ID, tax.ProfileCode, owner.ID, true, 1, "template", sharedKey); err != nil {
+	if err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, nil, owner.ID, true, 1, "template", sharedKey); err != nil {
 		t.Fatalf("insert first template route: %v", err)
 	}
-	err := insertRouteWithSubject(t, db, tenant.ID, tax.ProfileCode, owner.ID, true, 2, "template", sharedKey)
+	err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, nil, owner.ID, true, 2, "template", sharedKey)
 	assertUniqueViolation(t, err)
 }
 
@@ -251,13 +196,13 @@ func TestMigration0296_ApprovalRoutes_InactiveDuplicateSubjectAllowed(t *testing
 
 	tenant := testdb.NewTenant(t, db)
 	owner := testdb.NewUser(t, db, testdb.WithTenant(tenant.ID))
-	tax := testdb.NewTaxonomy(t, db, testdb.WithTenant(tenant.ID))
 
+	// NULL profile_code (template rows) — see UniqueSubjectIndexRejectsDuplicate.
 	sharedKey := "tpl:" + uuid.NewString()
-	if err := insertRouteWithSubject(t, db, tenant.ID, tax.ProfileCode, owner.ID, false, 1, "template", sharedKey); err != nil {
+	if err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, nil, owner.ID, false, 1, "template", sharedKey); err != nil {
 		t.Fatalf("insert first inactive route: %v", err)
 	}
-	if err := insertRouteWithSubject(t, db, tenant.ID, tax.ProfileCode, owner.ID, false, 2, "template", sharedKey); err != nil {
+	if err := insertRouteWithSubjectAndProfile(t, db, tenant.ID, nil, owner.ID, false, 2, "template", sharedKey); err != nil {
 		t.Fatalf("insert second inactive route with same subject_key must be allowed (partial index WHERE active), got: %v", err)
 	}
 }
