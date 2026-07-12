@@ -347,6 +347,33 @@ SONNET implementer, TDD RED→GREEN on the two P3.S2a tests deferred by S2b-0.
   instead of emitting RevisionVersion=0. Template rows (NULL document/revision) unaffected. Gates: go build
   ✓, go vet -tags integration ✓, test-integration ./internal/modules/approval/... → all subpkgs ok ✓.
 
+### P3.S2b-2 — subject-generic route selection (DONE, 3-commit unit: c0ae114a + 33aa6d10 + 73904846)
+Add `LoadActiveRouteIDBySubject(tenantID, subject_kind, subject_key)`; `LoadActiveRouteIDByProfile` becomes a
+document specialization delegating with `("document", profileCode)`. SONNET implementer + independent SONNET
+review per commit (never the implementer).
+- **c0ae114a (impl):** new selector on repo + `SubmitDefaultsResolver` interface; delegation rewrite; real-DB
+  test (template selection + document delegation-equivalence). Gates all green. 0296 backfill confirmed
+  (`subject_key = profile_code` for document routes) — delegation equivalence rests on it.
+- **REGRESSION (reviewer, blocking):** delegation filters document lookup on `subject_key`, but
+  `resolveCreateRouteSubject` permitted a document route with an explicit `subject_key != profile_code`
+  (proven by the then-shipping `TestCreateRoute_SubjectFieldsPassedThrough` fixture) → such a route becomes
+  unfindable → document submit regresses to `ErrApprovalRouteMissing`. Root cause = MISSING R1 alias invariant
+  (`document ⇒ subject_key == profile_code`), not the delegation. Verified against source before acting.
+- **33aa6d10 (fix, two-layer):** (a) app friendly-first-line — `resolveCreateRouteSubject` now returns
+  `(Subject, error)`, rejects document+divergent-key with new sentinel `ErrDocumentSubjectKeyMismatch`;
+  (b) DB last-line — migration `0298_approval_route_document_subject_key_alias.sql` normalizes any divergent
+  dev rows then adds CHECK `subject_kind <> 'document' OR subject_key = profile_code` (0297 house style).
+  Corrected 3 incoherent fixtures to coherent shapes (template subject / key==profile_code) + added negative
+  tests (unit + real-DB) + delegation-equivalence real-DB test. Supersede path proven divergence-safe
+  (INSERT…SELECT carries both cols forward from the locked row). Full ladder green.
+- **RE-REVIEW (independent):** invariant closed at every write path (create/supersede/in-place/backfill/
+  trigger) + DB CHECK — data-integrity regression genuinely closed. One remaining blocking gap:
+  `ErrDocumentSubjectKeyMismatch` unmapped in `MapErrorToResponse` → surfaced as 500 not the intended 4xx.
+- **73904846 (addendum):** wired `ErrDocumentSubjectKeyMismatch` → 422 + typed code
+  `approvalCodeValidationDocumentSubjectKeyMismatch` (mirrors `ErrReasonForChangeRequired`/
+  `ErrRevisionTitleRequired` convention); HTTP handler test RED (500) → GREEN (422). Full ladder green.
+- **Disposition: ACCEPT** — 3-commit unit sound; regression closed; all reviewer findings resolved.
+
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
   cross-tenant sequence ×1, scenarios ×3, tenantdata ×1). Bar for every slice: zero NEW failures.
