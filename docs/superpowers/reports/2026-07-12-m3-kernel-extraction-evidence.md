@@ -200,6 +200,24 @@ proven (every re-compiled dependent reproduces its exact pre-existing accepted-R
   and only hard-cutover when both return 0 — nonzero → drain (old path finishes in-flight, new
   submissions route through the kernel). This preserves R4 for any DB regardless of what dev showed.
 
+### P3.S2 design resolution — template subject-key semantics (CONTRADICTION RESOLVED)
+- **Contradiction:** plan draft P3.S2 line said template `subject_key=doc_type`. Schema truth
+  contradicts: `templates_approval_config` PK=`template_id` (per-template roles) and `doc_type_code`
+  is NON-unique per tenant (`idx_templates_template_tenant_doctype`) → many templates share a doc_type.
+  A doc_type-keyed route cannot honor the per-`template_id` approver/reviewer roles the config stores.
+- **Resolution (schema truth beats plan wording; mirrors document two-level keying):**
+  - ROUTE.subject_key = `template_id::text` (governance selector, ≙ document `profile_code`).
+  - INSTANCE.subject_key = `templates_template_version.id::text` (artifact under approval, ≙ `document_id`).
+  Both are `uuid::text` — the document instance path already casts `document_id::text` (0296:93).
+- **Not a ratified-rail deviation** — R2's ratified shape only pinned "thin subject-scoped entry points
+  onto the shared kernel"; `doc_type` was an under-specified impl detail, now corrected.
+- **Kernel read-side gap for P3.S2b:** route SELECTION is still document-hard-coded
+  (`LoadActiveRouteIDByProfile(tenantID, profileCode)`, SQL `WHERE profile_code=$2`, no subject_kind
+  predicate). Template submit needs a subject-generic `LoadActiveRouteIDBySubject(tenantID, kind, key)`
+  over the `ux_approval_routes_tenant_subject (tenant_id, subject_kind, subject_key) WHERE active`
+  index; the profile_code method becomes a document specialization. (Route/Instance HYDRATION reading
+  real subject columns is closed by P3.S2a.)
+
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
   cross-tenant sequence ×1, scenarios ×3, tenantdata ×1). Bar for every slice: zero NEW failures.

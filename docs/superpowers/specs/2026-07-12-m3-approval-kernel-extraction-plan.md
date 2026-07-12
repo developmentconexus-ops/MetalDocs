@@ -102,20 +102,38 @@ document approval lifecycle unchanged. Behavior byte-equal proven BEFORE any P2 
 
 - **P3.S1** — in-flight count (R4): record live in-flight template-approval count + exact SQL in
   evidence.md; decide hard-cutover vs drain.
-- **P3.S2** — template entry points (R2): openapi
+- **P3.S2a** (repository truth — DONE-as-own-slice) — close two P2.S2-deferred document-only
+  assumptions that break with template rows: (a) `InsertInstance` zero-`Subject` fallback →
+  `NewDocumentSubject(document_id)` (`postgres_approval_repository.go` ~49-52) removed / hard-require,
+  else a forgotten template Subject is silently mis-tagged `document`. (b) Route/Instance
+  read-hydration DERIVES `Subject` from the legacy `profile_code`/`document_id` column
+  (`postgres_approval_repository.go` LoadRoute/LoadInstance/LoadActiveInstanceByDocument/
+  LoadInstanceByDocumentForView/LoadInstancesByIDs) — MUST SELECT the real `subject_kind`/`subject_key`
+  columns (only equivalent while all rows are document rows).
+- **P3.S2b** — template entry points (R2): openapi
   `/templates/{id}/versions/{n}/submit-for-approval` + `/signoff`; tier-1 caps; handlers onto the
-  kernel application service (`subject_kind=template`, `subject_key=doc_type`).
-  **MUST also close two P2.S2-deferred safety items (document-only assumptions that break with
-  template rows):** (a) `InsertInstance` zero-`Subject` fallback → `NewDocumentSubject(document_id)`
-  (`internal/modules/approval/infrastructure/postgres_approval_repository.go` ~49-52) must be removed
-  or replaced with a hard require, else a forgotten template Subject is silently mis-tagged
-  `document`. (b) Route/Instance read-hydration currently DERIVES `Subject` from the legacy
-  `profile_code`/`document_id` column (`postgres_approval_repository.go` LoadRoute/LoadInstance/
-  LoadActiveInstanceByDocument/LoadInstanceByDocumentForView/LoadInstancesByIDs) — this is only
-  equivalent while all rows are document rows with `subject_key==document_id/profile_code`; once
-  template rows exist it MUST SELECT the real `subject_kind`/`subject_key` columns.
-- **P3.S3** — data migration: `ApprovalConfig{ReviewerRole?, ApproverRole}` → kernel routes (2-stage,
-  or 1-stage when no reviewer) per doc_type; cutover rule from P3.S1.
+  kernel application service (`subject_kind=template`). Adds a subject-generic route-selection method
+  `LoadActiveRouteIDBySubject(tenantID, subject_kind, subject_key)` — the read/selection side is still
+  document-hard-coded (`LoadActiveRouteIDByProfile` takes `profile_code`, no subject_kind predicate);
+  `LoadActiveRouteIDByProfile` becomes a document specialization of it.
+
+  **SUBJECT-KEY SEMANTICS — CORRECTED (2026-07-12, schema truth beats plan wording).** The earlier
+  plan draft said `subject_key=doc_type`; that is WRONG and would lose per-template roles. Resolution,
+  mirroring the document two-level keying:
+  - **ROUTE.subject_key = `template_id::text`** (governance selector). Evidence: `templates_approval_config`
+    PK = `template_id` (baseline :3121) with FK → `templates_template(id)`; per-template
+    `reviewer_role`/`approver_role`. `doc_type_code` is NON-unique per tenant
+    (`idx_templates_template_tenant_doctype`, baseline :3578) → many templates per doc_type, so a
+    doc_type-keyed route could not honor the per-`template_id` roles the config already stores.
+  - **INSTANCE.subject_key = `templates_template_version.id::text`** (artifact under approval), the direct
+    analogue of `document_id`. Both template ids are `uuid`; `uuid::text` is the established pattern
+    (document instance already casts `document_id::text`, migration 0296:93).
+  This is NOT a ratified-rail deviation — the R2 ratified shape only pinned "thin subject-scoped entry
+  points onto the shared kernel"; `subject_key=doc_type` was an under-specified impl detail, now
+  corrected to the schema-truth grain.
+- **P3.S3** — data migration: `templates_approval_config{reviewer_role?, approver_role}` → kernel routes
+  (2-stage, or 1-stage when no reviewer) **per `template_id`** (subject_key=template_id::text; corrected
+  from "per doc_type" per P3.S2b resolution); cutover rule from P3.S1 (hard cutover, 0 in-flight).
 - **P3.S4** — retire parallel path: remove `/templates/{id}/approval-config` + `/approve`;
   `templates/domain/approval.go` (`CheckSegregation`, `HasReviewer`) + `approval_config.go` deleted;
   SoD/state-machine/audit now sourced from the kernel. Contract-diff shows the retired paths.
