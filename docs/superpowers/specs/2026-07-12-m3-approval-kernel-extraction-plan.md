@@ -116,6 +116,15 @@ document approval lifecycle unchanged. Behavior byte-equal proven BEFORE any P2 
   `LoadActiveRouteIDBySubject(tenantID, subject_kind, subject_key)` — the read/selection side is still
   document-hard-coded (`LoadActiveRouteIDByProfile` takes `profile_code`, no subject_kind predicate);
   `LoadActiveRouteIDByProfile` becomes a document specialization of it.
+  **Tier-1 caps REUSE (verified, no new cap/grant):** submit-for-approval → `CapDocumentSubmit`,
+  signoff → `CapDocumentSignoff` (the kernel's caps, forced by tripwire arms on
+  `approval_instances`/`approval_signoffs` INSERT). Registry: 2 rows in `permissions.go` `routeRules`
+  + `permissions_test.go` fixtures. Personas already hold both (author/approver/qms_admin/system_admin).
+  **HARD CONSTRAINT:** `document.submit`/`document.signoff` are `ScopeArea`; templates have no process
+  area, so the kernel MUST assert them for template subjects with the `'tenant'` sentinel (not a derived
+  area) or tier-2 (`authz.go:155`) fail-closes template approvers. ⇒ subject-aware authz-area resolution
+  in the kernel app service (document → derived area; template → `'tenant'`). Capability
+  naming/scope generalization (`approval.*`) is post-M3 debt.
 
   **SUBJECT-KEY SEMANTICS — CORRECTED (2026-07-12, schema truth beats plan wording).** The earlier
   plan draft said `subject_key=doc_type`; that is WRONG and would lose per-template roles. Resolution,

@@ -218,6 +218,38 @@ proven (every re-compiled dependent reproduces its exact pre-existing accepted-R
   index; the profile_code method becomes a document specialization. (Route/Instance HYDRATION reading
   real subject columns is closed by P3.S2a.)
 
+### P3.S2b authz pre-design — capability reuse + area-scope constraint (VERIFIED)
+- **Tier-1 caps: REUSE, no new capability.** New routes map:
+  `POST /templates/{id}/versions/{n}/submit-for-approval` → `CapDocumentSubmit` (`document.submit`);
+  `/signoff` → `CapDocumentSignoff` (`document.signoff`). These ARE the kernel's caps — DB tripwire
+  arms (`internal/platform/tripwire/arms.go:58-67`) force `approval_instances` INSERT→`document.submit`,
+  `approval_signoffs` INSERT→`document.signoff`, so kernel-routed template submit/signoff is bound to
+  them at tier-2 regardless. Minting `template.signoff`/`approval.*` would require widening arms +
+  re-render + catalog/scope/seed edits — outside M3, not warranted. Registry edit: 2 rows in
+  `apps/api/cmd/metaldocs-api/permissions.go` `routeRules` (templates block) + fixtures in
+  `permissions_test.go` (`TestPermissionResolver` cases, `TestRouteCoverage` rows). NO `model.go`
+  catalog, NO `capability_scope.go`, NO seed, NO tripwire edits.
+- **Grant matrix: personas already hold the caps (no seed rows to add).** From
+  `db/reference-data/0001_product_reference_data.sql`: author holds `document.submit` (L98) — covers
+  the submit→`approval_instances` arm (author also holds `template.submit` L103); approver
+  (`document.signoff` L82), qms_admin (`document.signoff` L113), system_admin (both) — cover the
+  signoff→`approval_signoffs` arm (these hold `template.review`/`template.approve`). Overlap exact;
+  no persona holds a template-approval cap but lacks the corresponding document cap.
+- **HARD CONSTRAINT for the S2b kernel wiring (area scope):** `document.submit`/`document.signoff` are
+  `ScopeArea` (area-grade, `capability_scope.go:41-42`); a template has NO process area. `authz.Require`
+  resolves area-grade caps with `($2='tenant' OR upa.area_code=$2)` (`internal/modules/iam/authz/authz.go:155`).
+  The kernel submit/signoff path MUST assert these caps for a template subject using the **`'tenant'`
+  sentinel** (area filter OFF), NOT a derived area — templates have no `user_process_areas` area row,
+  so a real areaCode fail-closes template approvers who DO hold the cap. Document subjects keep passing
+  their real derived area. ⇒ P3.S2b needs **subject-aware authz-area resolution** in the kernel app
+  service (document → derived area; template → `'tenant'`). The DB tripwire is area-blind (checks cap
+  string only), so the sentinel path still satisfies it.
+- **DEBT (post-M3, tracked in approval-tech-debt):** the kernel generalized SUBJECTS but its capability
+  names + scope (`document.*`, area-grade) still read document-shaped. A future generalization to
+  subject-agnostic `approval.submit`/`approval.signoff` (subject-appropriate scope) would remove the
+  `'tenant'`-sentinel accommodation. Large cross-cutting change (new caps → 10-touchpoint walk +
+  tripwire re-render + grant migration); explicitly out of M3 scope.
+
 ## Baseline (pre-work)
 - Accepted RED on main: exactly 9 tests / 4 pkgs (E-PROD-1..5: sla_surfacer ×4, controlleddocuments
   cross-tenant sequence ×1, scenarios ×3, tenantdata ×1). Bar for every slice: zero NEW failures.
