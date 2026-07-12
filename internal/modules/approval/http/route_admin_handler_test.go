@@ -303,6 +303,39 @@ func TestCreateRoute_SubjectFieldsPassedThrough(t *testing.T) {
 	}
 }
 
+// TestCreateRoute_DocumentSubjectKeyMismatch_Returns422 verifies the reviewer
+// finding from M3 P3.S2b-2: application.ErrDocumentSubjectKeyMismatch (a
+// document-kind route created with subject_key != profile_code) must map to
+// a 422 problem+json response, not fall through to a generic 500.
+func TestCreateRoute_DocumentSubjectKeyMismatch_Returns422(t *testing.T) {
+	svc := &fakeRouteAdminService{createErr: application.ErrDocumentSubjectKeyMismatch}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	body := `{"profile_code":"ops","name":"Ops Route","subject_kind":"document","subject_key":"other-profile","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"document.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-1")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusUnprocessableEntity)
+	}
+	var prob struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&prob); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if prob.Code != "validation.document_subject_key_mismatch" {
+		t.Fatalf("code = %q, want %q", prob.Code, "validation.document_subject_key_mismatch")
+	}
+}
+
 func TestListRoutes_CanonicalStageNames(t *testing.T) {
 	// The list response must serialise stages with canonical field names
 	// (`name`, `quorum`) — not the legacy `label`/`quorum_kind`.
