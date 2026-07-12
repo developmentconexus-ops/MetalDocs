@@ -1745,22 +1745,24 @@ func (r *postgresApprovalRepository) LoadControlledDocumentID(ctx context.Contex
 	return cdID.String, true, nil
 }
 
-// LoadActiveRouteIDByProfile returns the id of the single active approval route
-// for (tenantID, profileCode), newest route version first — the in-tx form of
-// the wrapper's GetFinalizePrereqs route query (repository.go:1801-1817).
-// Returns ErrNoActiveApprovalRoute when none is active. Column is `active`
-// (migration 0146). Plain non-recording SELECT (HS-PRE-1).
-func (r *postgresApprovalRepository) LoadActiveRouteIDByProfile(ctx context.Context, tx db.Tx, tenantID, profileCode string) (string, error) {
+// LoadActiveRouteIDBySubject returns the id of the single active approval
+// route for (tenantID, subjectKind, subjectKey), newest route version first
+// — the subject-generic form of the route-selection query (M3 kernel
+// extraction, ADR 0082, P3.S2b-2). Returns ErrNoActiveApprovalRoute when none
+// is active. Column is `active` (migration 0146); subject_kind/subject_key
+// columns are migration 0296. Plain non-recording SELECT (HS-PRE-1).
+func (r *postgresApprovalRepository) LoadActiveRouteIDBySubject(ctx context.Context, tx db.Tx, tenantID, subjectKind, subjectKey string) (string, error) {
 	var routeID string
 	err := tx.QueryRowContext(ctx, `
 		SELECT id
 		  FROM approval_routes
 		 WHERE tenant_id    = $1
-		   AND profile_code = $2
+		   AND subject_kind = $2
+		   AND subject_key  = $3
 		   AND active       = true
 		 ORDER BY version DESC
 		 LIMIT 1`,
-		tenantID, profileCode,
+		tenantID, subjectKind, subjectKey,
 	).Scan(&routeID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNoActiveApprovalRoute
@@ -1769,6 +1771,19 @@ func (r *postgresApprovalRepository) LoadActiveRouteIDByProfile(ctx context.Cont
 		return "", err
 	}
 	return routeID, nil
+}
+
+// LoadActiveRouteIDByProfile returns the id of the single active approval route
+// for (tenantID, profileCode), newest route version first — the in-tx form of
+// the wrapper's GetFinalizePrereqs route query (repository.go:1801-1817).
+// Returns ErrNoActiveApprovalRoute when none is active. This is the document
+// specialization of LoadActiveRouteIDBySubject (subject_kind='document',
+// subject_key=profile_code) — equivalent by construction for every document
+// route, since migration 0296 backfills subject_key = profile_code for the
+// document case and the P2.S1 compat trigger keeps new document-row INSERTs
+// in sync.
+func (r *postgresApprovalRepository) LoadActiveRouteIDByProfile(ctx context.Context, tx db.Tx, tenantID, profileCode string) (string, error) {
+	return r.LoadActiveRouteIDBySubject(ctx, tx, tenantID, string(domain.SubjectKindDocument), profileCode)
 }
 
 // LoadHeadContentHash returns the most recent autosaved revision's content_hash

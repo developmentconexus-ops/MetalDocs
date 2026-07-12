@@ -32,6 +32,7 @@ import (
 	"metaldocs/internal/modules/approval/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/db"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -246,6 +247,78 @@ func TestLoadRoute_TemplateSubject_RoundTrips_RealDB(t *testing.T) {
 	}
 	if got.Subject.Kind != domain.SubjectKindTemplate || got.Subject.Key != templateKey {
 		t.Fatalf("LoadRoute Subject = %+v, want {template %s} — hydration is still deriving from profile_code", got.Subject, templateKey)
+	}
+}
+
+// TestLoadActiveRouteIDBySubject_TemplateSubject_RealDB proves the new
+// subject-generic route-selection method (P3.S2b-2, ADR 0082) selects a
+// template-subject route by (subject_kind, subject_key) — something the
+// legacy profile_code-only LoadActiveRouteIDByProfile can never do (a
+// template route carries no profile_code) — while the document path stays
+// selectable both via the new generic method AND via the now-delegating
+// LoadActiveRouteIDByProfile (delegation-equivalence axis).
+func TestLoadActiveRouteIDBySubject_TemplateSubject_RealDB(t *testing.T) {
+	dbc, _ := testdb.Open(t)
+	baseRepo := NewPostgresApprovalRepository(dbc, iamdomain.NoopUserDisplayNameReader{})
+	ctx := context.Background()
+
+	// LoadActiveRouteIDByProfile / LoadActiveRouteIDBySubject are declared on
+	// application.SubmitDefaultsResolver, not on the broader ApprovalRepository
+	// interface NewPostgresApprovalRepository returns (same asserted-interface
+	// pattern as application.newSubmitServiceWithResolver). Assert against a
+	// minimal local interface to reach both methods on the concrete repo.
+	repo, ok := interface{}(baseRepo).(interface {
+		LoadActiveRouteIDByProfile(ctx context.Context, tx db.Tx, tenantID, profileCode string) (string, error)
+		LoadActiveRouteIDBySubject(ctx context.Context, tx db.Tx, tenantID, subjectKind, subjectKey string) (string, error)
+	})
+	if !ok {
+		t.Fatalf("postgres approval repository does not satisfy the route-selection interface; production wiring would silently break")
+	}
+
+	// Document-subject route via the ordinary factory (active by default).
+	docRoute := testdb.NewApprovalRoute(t, dbc)
+
+	// Template-subject route: seed via factory then flip subject_kind/key,
+	// same technique as TestLoadRoute_TemplateSubject_RoundTrips_RealDB.
+	tmplRoute := testdb.NewApprovalRoute(t, dbc, testdb.WithTenant(docRoute.TenantID))
+	templateKey := "tmpl-route-" + uuid.NewString()
+	if templateKey == tmplRoute.ProfileCode {
+		t.Fatal("templateKey collided with tmplRoute.ProfileCode — test setup broken")
+	}
+	if _, err := dbc.ExecContext(ctx,
+		`UPDATE public.approval_routes SET subject_kind = 'template', subject_key = $2, profile_code = NULL WHERE id = $1::uuid`,
+		tmplRoute.ID, templateKey,
+	); err != nil {
+		t.Fatalf("update route subject: %v", err)
+	}
+
+	tx, err := dbc.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin tx: %v", err)
+	}
+	defer tx.Rollback()
+
+	// Template subject: only reachable via the new generic method.
+	gotTmplID, err := repo.LoadActiveRouteIDBySubject(ctx, tx, docRoute.TenantID, string(domain.SubjectKindTemplate), templateKey)
+	if err != nil {
+		t.Fatalf("LoadActiveRouteIDBySubject(template): %v", err)
+	}
+	if gotTmplID != tmplRoute.ID {
+		t.Fatalf("LoadActiveRouteIDBySubject(template) = %q, want %q", gotTmplID, tmplRoute.ID)
+	}
+
+	// Document subject: both the generic method and the delegating legacy
+	// method must find the same route id.
+	gotDocViaSubject, err := repo.LoadActiveRouteIDBySubject(ctx, tx, docRoute.TenantID, string(domain.SubjectKindDocument), docRoute.ProfileCode)
+	if err != nil {
+		t.Fatalf("LoadActiveRouteIDBySubject(document): %v", err)
+	}
+	gotDocViaProfile, err := repo.LoadActiveRouteIDByProfile(ctx, tx, docRoute.TenantID, docRoute.ProfileCode)
+	if err != nil {
+		t.Fatalf("LoadActiveRouteIDByProfile: %v", err)
+	}
+	if gotDocViaSubject != docRoute.ID || gotDocViaProfile != docRoute.ID || gotDocViaSubject != gotDocViaProfile {
+		t.Fatalf("document route ids diverge: viaSubject=%q viaProfile=%q want=%q", gotDocViaSubject, gotDocViaProfile, docRoute.ID)
 	}
 }
 

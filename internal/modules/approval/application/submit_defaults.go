@@ -26,7 +26,15 @@ type SubmitDefaultsResolver interface {
 	// wrapper's repository.go:1801-1817 query, now in-tx). Returns
 	// infrastructure.ErrNoActiveApprovalRoute when no active route exists — the
 	// submit service maps that to documents/domain.ErrApprovalRouteMissing.
+	// Document specialization of LoadActiveRouteIDBySubject (M3 P3.S2b-2).
 	LoadActiveRouteIDByProfile(ctx context.Context, tx db.Tx, tenantID, profileCode string) (routeID string, err error)
+
+	// LoadActiveRouteIDBySubject returns the id of the single active approval
+	// route for (tenantID, subjectKind, subjectKey), newest route version
+	// first — the subject-generic form (M3 kernel extraction, ADR 0082,
+	// P3.S2b-2) that makes template routes selectable. Returns
+	// infrastructure.ErrNoActiveApprovalRoute when no active route exists.
+	LoadActiveRouteIDBySubject(ctx context.Context, tx db.Tx, tenantID, subjectKind, subjectKey string) (routeID string, err error)
 
 	// LoadHeadContentHash returns the most recent autosaved revision's
 	// content_hash for the document, or "" when no revision has a hash yet
