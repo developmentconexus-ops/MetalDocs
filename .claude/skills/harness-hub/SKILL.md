@@ -14,8 +14,11 @@ loop; never restate doctrine from memory, read it.
 
 1. **Read doctrine + queue**: `docs/superpowers/HARNESS.md` (whole file) then
    `docs/superpowers/ROADMAP.md` (the ordered unit queue; §0 first).
-2. **Repo truth**: `git log --oneline -15`, `git status`, `git branch --list 'claude/*'` — what is
-   merged, what sits on chip branches unmerged, is the tree clean.
+2. **Repo truth**: `git log --oneline -15`, `git status -sb`, `git branch --list 'claude/*'` — what
+   is merged, what sits on chip branches unmerged, is the tree clean. **The hub checkout MUST be on
+   `main`, not detached HEAD** — a detached hub once merged two units (2.4, 3.1) into a dangling
+   commit chain and main silently stalled; if `git status -sb` shows `## HEAD (no branch)`, verify
+   `git merge-base --is-ancestor main HEAD` then fast-forward main to HEAD before anything else.
 3. **Hub task board**: `TaskList`; if empty or stale, rebuild — one task per ROADMAP unit,
    `blockedBy` edges mirroring the roadmap's ordering locks, metadata carrying chip task ids and
    merge notes.
