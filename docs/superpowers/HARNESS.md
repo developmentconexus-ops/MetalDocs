@@ -24,10 +24,13 @@ Concurrency ≤15 workers. Fable never a worker.
 
 ## 2. Unit execution loop (every ROADMAP unit)
 
-**Dispatch mechanics v2 (operator-directed 2026-07-12: "automation focus" — restructure ratified).**
-Two transports, same logic, same event grammar:
+**Dispatch mechanics v2 (2026-07-12) — DEFAULT REVERTED 2026-07-13 (operator-directed:
+"vou querer retomar como estávamos antes — spawn_task e mensagem entre sessões eu preferia").
+Transport B (chip) is the DEFAULT again; the operator accepts launch/approval clicks in
+exchange for turn-by-turn observability of unit sessions. Transport A stays available but only
+on explicit operator request per unit.** Two transports, same logic, same event grammar:
 
-**Transport A — unit agent (DEFAULT, fully autonomous).** The hub dispatches the unit as a
+**Transport A — unit agent (opt-in only, fully autonomous).** The hub dispatches the unit as a
 background subagent: `Agent(subagent_type: general-purpose, model: opus, isolation: worktree,
 run_in_background: true)` with the same self-contained context pack a chip would get. Zero
 operator clicks: no launch click, no message-approval clicks (agent events are turn-returns;
@@ -55,24 +58,20 @@ Mechanics facts (probe-verified 2026-07-12):
   green slice on the worktree branch is mandatory, and hub boot (harness-hub skill) scans
   `worktree-agent-*` branches + `.claude/worktrees/agent-*` for orphaned in-flight work.
 
-**Transport B — spawn_task chip (fallback).** A real standalone session the operator launches
-and can watch turn-by-turn. Triggers: (1) operator explicitly wants an observable/intervenable
-session for the unit; (2) agent tooling fails for the unit class (e.g. browser rendering F-UI-1);
-(3) corrective redesign after 2× reject where the operator wants eyes on. All chip rules from
+**Transport B — spawn_task chip (DEFAULT since 2026-07-13).** A real standalone session the
+operator launches and can watch turn-by-turn. All chip rules from
 the 2026-07-10/11 ratifications stay binding for B: operator launches on Opus; `.env` copy note
 in the prompt; comms over `mcp__ccd_session_mgmt__send_message` to `HUB_SESSION_ID` (real
 registry id verified via a previously-sent message's `from="local_…"` attribute, never the
 scratchpad UUID; title-match fallback embedded) — accepting the confirmed client limitation that
 the operator approves each send (Ctrl+Enter), messages few and batched.
 
-**Auto-advance (the automation core):** when a unit's acceptance completes green (merge + ladder
-+ rebuild + smoke + board + cleanup), the hub IMMEDIATELY dispatches the next actionable ROADMAP
-unit on Transport A — no operator authorization per dispatch. Exceptions that hold the queue:
-(a) the ROADMAP row is marked `OPERATOR-GATE` (needs ratification/spec sign-off first);
-(b) an ordering lock or pending HS-1 blocks it; (c) the operator said "pause dispatch" (resumes
-only on explicit "resume"). The hub reports each dispatch and each acceptance to the operator as
-they happen; the operator retains: HS-1 gates, ratifications (AskUserQuestion), push decisions,
-pause/resume. Genuine human authority stays human; launch/relay friction dies.
+**Advance (revised 2026-07-13, chip default):** when a unit's acceptance completes green (merge
++ ladder + rebuild + smoke + board + cleanup), the hub PREPARES the next actionable ROADMAP
+unit as a spawn_task chip and surfaces it — the operator launches it (Opus). No agent
+auto-dispatch. Queue holds unchanged: (a) `OPERATOR-GATE` rows; (b) ordering lock or pending
+HS-1; (c) operator "pause dispatch". The operator retains: unit launches, HS-1 gates,
+ratifications (AskUserQuestion), push decisions, pause/resume.
 
 **Unit prompt template MUST carry, verbatim-strength (both transports):** (a) the §4 subagent
 obligations 1–6 as numbered instructions, not a passing mention; (b) "read

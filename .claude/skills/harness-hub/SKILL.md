@@ -40,17 +40,17 @@ loop; never restate doctrine from memory, read it.
    hub title) and capture the real id from the first chip exchange. Every chip prompt embeds
    id + fallback (§2(e)).
 
-## Operating loop (Transport A default — HARNESS §2 v2)
+## Operating loop (Transport B chip DEFAULT — operator-reverted 2026-07-13; HARNESS §2)
 
-- **Dispatch (autonomous)**: take the topmost actionable ROADMAP unit → author the context pack →
-  `Agent(subagent_type: general-purpose, model: opus, isolation: worktree, run_in_background:
-  true)`. Prompt satisfies HARNESS §2 template requirements (a)–(e) verbatim-strength: §4
-  obligations 1–6 numbered, HARNESS §4–§5 read order, dispatch-ledger + task-board obligations,
-  budget, and the Transport-A comms contract ("end your turn with exactly ONE event header").
-  Immediately after spawn: copy `.env` (+`.env.local`) from the main checkout into
-  `.claude/worktrees/agent-<agentId>` (file copy, never print). Mark the hub board task
-  `in_progress` with the agentId in metadata. Transport B (spawn_task chip) only on HARNESS §2
-  fallback triggers — then the old chip rules apply (`HUB_SESSION_ID`, ccd `send_message`).
+- **Dispatch (chip default)**: take the topmost actionable ROADMAP unit → author the context
+  pack → `spawn_task` chip for the operator to launch on Opus. Prompt satisfies HARNESS §2
+  template requirements (a)–(e) verbatim-strength: §4 obligations 1–6 numbered, HARNESS §4–§5
+  read order, dispatch-ledger + task-board obligations, budget, `.env` copy note, and the chip
+  comms contract (`HUB_SESSION_ID` + title-match fallback, ccd `send_message`, events per §2).
+  Mark the hub board task `in_progress` with the chip task_id in metadata. Transport A
+  (background unit agent) ONLY on explicit operator request for that unit — then the v2 agent
+  rules apply (spawn, `.env` copy into `.claude/worktrees/agent-<agentId>`, sync-only nested
+  dispatch, SendMessage replies).
 - **Receive events** (`CLOSED`/`BLOCKED`/`ESCALATION`/`REQUEST`/`ACK` per HARNESS §2; Transport A
   events arrive as agent turn-returns/task-notifications — no operator relay):
   - `CLOSED` → acceptance pipeline: dispatch an independent `caveman:cavecrew-reviewer` on the
@@ -68,9 +68,9 @@ loop; never restate doctrine from memory, read it.
     2× reject.
   - `BLOCKED`/`ESCALATION`/`REQUEST` → decide within hub authority (infra REQUESTs the hub just
     does — it owns :80) or surface to the operator via AskUserQuestion; never leave unanswered.
-- **Auto-advance**: acceptance green → dispatch the next actionable unit IMMEDIATELY (no operator
-  authorization per dispatch). Hold only on: `OPERATOR-GATE` roadmap marker, unmet ordering
-  lock/HS-1, or operator "pause dispatch". Report each dispatch/acceptance as it happens.
+- **Advance**: acceptance green → PREPARE the next actionable unit's chip immediately and
+  surface it; the operator launches. Hold only on: `OPERATOR-GATE` roadmap marker, unmet
+  ordering lock/HS-1, or operator "pause dispatch". Report each acceptance/chip as it happens.
 - **Close the turn**: after every merge/dispatch batch, report to the operator: what merged, gate
   results, HS-1 items waiting on them, what was auto-dispatched. Update ROADMAP row status when
   a unit closes.
