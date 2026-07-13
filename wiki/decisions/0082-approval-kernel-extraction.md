@@ -123,6 +123,26 @@ into M4: capability `CapTemplateReview` becomes functionally unreferenced once t
 deleted (registry + `arms.go` allowlist cleanup), and `domain.ApprovalConfig`/`ErrInvalidApprovalConfig`
 collapse once create + publish stop consuming them.
 
+### Retirement executed — ROADMAP unit 3.1a (2026-07-13)
+
+Phases (a), (b), and (c) of the ratified Option A retirement plan above were all executed atomically by
+ROADMAP unit 3.1a (branch `worktree-agent-a0d0c8a51f43bb656`): `CreateTemplate` and `PublishTemplateVersion`
+were migrated off the role model, the template-approval frontend was rebuilt onto the kernel routes, and the
+legacy path (4 routes + handlers + `Service.SubmitForReview`/`Review`/`Approve`/`UpsertApprovalConfig` +
+`domain.ApprovalConfig` + the `GetApprovalConfig`/non-Tx `UpsertApprovalConfig` repo methods + legacy tests +
+FE consumers) was deleted.
+
+**The transitional coexistence described above has ENDED.** The approval kernel
+(`submit-for-approval` → `signoff` → `publish`) is now the sole template-approval path — there is no
+remaining role-based fallback. Orphan bookkeeping named above was closed: capability `CapTemplateReview`
+is retired (capability registry 40→39, registry + `arms.go` allowlist cleanup), and
+`templates_approval_config` is dropped by forward migration `0302_drop_templates_approval_config.sql`
+behind a pre-drop emptiness assert. The `pending_reviewer_role`/`pending_approver_role` columns on
+`templates_template_version` are retained as named debt (write-never/read-never), ratified out of the
+migration-0302 drop list rather than dropped alongside the table.
+
+See `docs/superpowers/reports/2026-07-13-unit-3.1a-evidence.md` for full execution evidence.
+
 ## Alternatives considered
 
 - **Keep the nested exception, add templates as a third intra-documents nest** — rejected: templates is
