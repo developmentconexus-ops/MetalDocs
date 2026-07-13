@@ -1,0 +1,40 @@
+name: fe-ci
+
+# Frontend gate for the main web app (frontend/apps/web).
+# Before this workflow existed the ONLY enforced FE checks were a
+# 1-invariant ESLint rule and path-gated advisory Playwright — tsc and
+# vitest ran solely on developer memory. This makes them blocking.
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/apps/web/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/fe-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/apps/web/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/fe-ci.yml'
+
+jobs:
+  web-typecheck-test:
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20.11.0, cache: pnpm, cache-dependency-path: pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+      - name: typecheck (tsc --noEmit)
+        run: pnpm --filter @metaldocs/web run typecheck
+      - name: unit tests (vitest run)
+        run: pnpm --filter @metaldocs/web run test
