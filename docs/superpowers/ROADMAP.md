@@ -59,11 +59,13 @@ Deferred register (findings 18/19/21/22/23): `docs/superpowers/milestones/lifecy
 
 ## 5. Operator decision queue (no agent work)
 
-1. HS-1: lifecycle M2 (§1.1) — validator PASS waiting.
-2. Final sign-off: GMR program (§1.4).
+1. ~~HS-1: lifecycle M2~~ **APPROVED 2026-07-13** (91195a76).
+2. ~~Final sign-off: GMR program~~ **SEALED 2026-07-13** (91195a76).
 3. Final architecture review P1–P4 remediation list — pending operator OK (memory `final-architecture-review-2026-07-03`).
-4. **Push consolidation**: GMR HEAD, lifecycle M1–M2, frontend-screen M0–M5, approval-remediation M2b–M2d, workflow-model commits — all local-only. Decide when to push.
-5. F-18 fresh-repo re-baseline at v1 (memory `f18-history-fresh-repo-at-release`).
+4. ~~Push consolidation~~ **DONE 2026-07-13**: 621 commits pushed, origin/main == main @ 91195a76. Standing rule unchanged: every future push needs explicit operator permission.
+5. F-18 fresh-repo re-baseline at v1 (memory `f18-history-fresh-repo-at-release`) — unchanged by the push; history purge happens at re-baseline.
+6. Consolidated L3 browser QA session (operator): F2d.8 walkthrough + route builder v2 + rebuilt template approval flow — :80 stack rebuilt 2026-07-13, images current.
+7. Debt units pending operator scope-OK: (i) E-PROD 9-RED + testdb-clone isolation; (ii) schema/symbol hygiene (dead pending_*_role columns, idempotency-key drift, module-count strings).
 
 ## 6. Token discipline (how to work each unit)
 
